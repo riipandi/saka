@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_dGkNnpirJv
+createdAt: 2026-09-26T21:00:43.981386
+updatedAt: 2026-09-26T21:07:55.084139
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_ZsR2s3GrGS
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "token": "UF0SWtYQuBDljTd-J_L9YUSDYdewVY-zYGuSGRjJ2ms",
+      "new_password": "${[ password ]}"
+    }
+bodyType: application/json
+description: '[Tango] Spends a reset token from the reset email on a new password. The token is the whole credential — the caller carries none — and the new password must meet the account policy (min 8 chars, 3 of 4 classes, or a 16+ char passphrase). Success swaps the hash, revokes every live session, consumes the token, and sends the password-changed notice. Unknown, expired, and spent tokens answer permission_denied with one message.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: HJKITsQESS
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: RAhkbRYAMg
+method: POST
+name: '[Tango] Reset password'
+sortPriority: 333.3333333333333
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.PasswordRecoveryService/ResetPassword
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

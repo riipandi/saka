@@ -35,6 +35,93 @@ service AuthService {
   rpc SignIn(SignInRequest) returns (SignInResponse);
 }
 
+// PasswordRecoveryService is the forgot-password flow: the token that lets a
+// caller who lost the password back in, carried by an email through the
+// frontend.
+//
+// Pocket ID has no password recovery at all — passkey-only accounts never
+// lose a password — so this service is tango-only. The flow is the
+// email-verification shape: the raw token exists once in the email and once
+// in the request, the database stores only its hash, and an unknown, expired,
+// spent, and refused token answer the same failure. The token travels through
+// the frontend: the email links to a route that forwards it to
+// ResetPassword.
+service PasswordRecoveryService {
+  // ForgotPassword issues a reset token for the named account and enqueues
+  // the email. The answer is the same whether the account exists or not —
+  // the endpoint is not an account enumerator. Repeating the request inside
+  // the cooldown the last send opened refuses with resource_exhausted.
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+
+  // ResetPassword spends a reset token on a new password. The token is the
+  // whole credential: the caller carries none, the same way VerifyEmail
+  // does. Success revokes every live session the account holds — a password
+  // reset means the old one is no longer trusted — and the new password
+  // must meet the account password policy.
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+
+  // AdminResetUserPassword lets an administrator trigger the same email on
+  // a named account: the administrator never sees or sets the password —
+  // the token goes to the account's address, and the holder completes the
+  // reset through ResetPassword. Impersonating administrators are refused.
+  rpc AdminResetUserPassword(AdminResetUserPasswordRequest) returns (AdminResetUserPasswordResponse);
+}
+
+// ForgotPasswordRequest names the account the reset email goes to.
+message ForgotPasswordRequest {
+  // email is the account's address, matched exactly the way its unique
+  // index does. The answer does not depend on whether it names an account.
+  string email = 1 [(buf.validate.field).string = {min_len: 3, max_len: 255}];
+}
+
+// ForgotPasswordResponse is empty on purpose: it cannot confirm the account
+// exists, or the endpoint would be an account enumerator.
+message ForgotPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ResetPasswordRequest carries the token the email linked to and the new
+// credential.
+message ResetPasswordRequest {
+  // token is the raw reset token, in clear text. It travels only over TLS
+  // and is never logged.
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // new_password is the credential the account answers with from now on.
+  // The account policy is enforced here in the service, so the refusal
+  // names the rule.
+  string new_password = 2 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
+}
+
+// ResetPasswordResponse is empty: the protocol carries the success.
+message ResetPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// AdminResetUserPasswordRequest names the account the reset email goes to.
+message AdminResetUserPasswordRequest {
+  // user_id is the account's wire-form identifier (user_…).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// AdminResetUserPasswordResponse is empty: the token went to the account's
+// address, never to the caller.
+message AdminResetUserPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
 // MultifactorService is the second factor: TOTP authenticators and the
 // recovery codes that stand in when every device is out of reach.
 //

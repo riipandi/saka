@@ -82,6 +82,18 @@ var ProcedureRules = map[string]Entry{
 	authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
 	authv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
 
+	// The password recovery surfaces split at the same line. The trigger and
+	// the spend are reached before any token exists — a caller who lost the
+	// password holds no credential, and the reset token is the credential
+	// ResetPassword judges — so both are Public. The admin trigger hands the
+	// reset to a named account, which is administrative work; the guard's
+	// refusal of an impersonated caller keeps an administrator from moving
+	// the account they are wearing. The cooldown is the feature's, not the
+	// contract's: the table cannot express a window.
+	authv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {Rule: Public},
+	authv1connect.PasswordRecoveryServiceResetPasswordProcedure:          {Rule: Public},
+	authv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {Rule: Admin},
+
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and
 	// the access token a renewal is fixing may already be expired, so the

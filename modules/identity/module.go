@@ -32,6 +32,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
+	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/signup"
@@ -77,6 +78,10 @@ type Deps struct {
 	// Multifactor is the second factor: TOTP authenticators and the recovery
 	// codes. Its sign-in fork is wired to the sign-in service at build time.
 	Multifactor *multifactor.Service
+
+	// PasswordRecovery is the forgot-password flow: reset tokens, the
+	// emails that carry them, and the swap a spent token buys.
+	PasswordRecovery *password.Service
 
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
@@ -243,6 +248,25 @@ var Package = do.Package(
 		return service, nil
 	}),
 
+	// The password recovery service builds over the mailer; the queue and
+	// the session lifecycle ride the post-construction seams, because
+	// internal/jobs cannot sit below the password package (the cycle runs
+	// jobs → apikey → user → password) and the session service is built
+	// beside this one.
+	do.Lazy(func(i do.Injector) (*password.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		mail := do.MustInvoke[*mailer.Service](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		client := do.MustInvoke[*queue.Client](i)
+		sessions := do.MustInvoke[*session.Service](i)
+		return password.NewService(pool, mail, recorder, c.App.BaseURL, log).
+			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log)).
+			WithSessionEnder(sessions).
+			WithUUIDDecoder(user.UUIDFromWire), nil
+	}),
+
 	do.Lazy(func(i do.Injector) (*usergroup.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
@@ -279,7 +303,9 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		Verification:  do.MustInvoke[*verification.Service](i),
 		OneTimeAccess: do.MustInvoke[*onetimeaccess.Service](i),
 		Multifactor:   do.MustInvoke[*multifactor.Service](i),
-		UserGroups:    do.MustInvoke[*usergroup.Service](i),
+
+		PasswordRecovery: do.MustInvoke[*password.Service](i),
+		UserGroups:       do.MustInvoke[*usergroup.Service](i),
 	}), nil
 }
 
@@ -316,6 +342,9 @@ func features(deps Deps) []kernel.Module {
 	// skipped, and the wiring is the one place the feature is named.
 	if deps.Multifactor != nil {
 		modules = append(modules, multifactor.NewModule(deps.Multifactor))
+	}
+	if deps.PasswordRecovery != nil {
+		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery))
 	}
 	return modules
 }

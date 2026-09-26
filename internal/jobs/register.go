@@ -57,6 +57,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		client.Register(queue.NewQueue[UserUnbannedEmailTask](func(ctx context.Context, task UserUnbannedEmailTask) error {
 			return userUnbannedProcessor(ctx, task, mail)
 		}))
+		client.Register(queue.NewQueue[PasswordResetEmailTask](func(ctx context.Context, task PasswordResetEmailTask) error {
+			return passwordResetProcessor(ctx, task, mail, baseURL)
+		}))
+		client.Register(queue.NewQueue[PasswordChangedNoticeTask](func(ctx context.Context, task PasswordChangedNoticeTask) error {
+			return passwordChangedNoticeProcessor(ctx, task, mail)
+		}))
 	}
 }
 

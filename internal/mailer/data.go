@@ -5,17 +5,18 @@ import "time"
 // The templates this binary carries. Each name is the compiled file's base name,
 // so a name here and a file in email/templates/ are the same thing.
 const (
-	TemplateAPIKeyExpiringSoon = "api-key-expiring-soon"
-	TemplateEmailChangeNotice  = "email-change-notice"
-	TemplateEmailChangeRequest = "email-change-request"
-	TemplateEmailChangeSuccess = "email-change-success"
-	TemplateEmailVerification  = "email-verification"
-	TemplateLoginNewDevice     = "login-with-new-device"
-	TemplateOneTimeAccess      = "one-time-access"
-	TemplatePasswordReset      = "password-reset"
-	TemplateTestEmail          = "test-email"
-	TemplateUserBanned         = "user-banned"
-	TemplateUserUnbanned       = "user-unbanned"
+	TemplateAPIKeyExpiringSoon    = "api-key-expiring-soon"
+	TemplateEmailChangeNotice     = "email-change-notice"
+	TemplateEmailChangeRequest    = "email-change-request"
+	TemplateEmailChangeSuccess    = "email-change-success"
+	TemplateEmailVerification     = "email-verification"
+	TemplateLoginNewDevice        = "login-with-new-device"
+	TemplateOneTimeAccess         = "one-time-access"
+	TemplatePasswordReset         = "password-reset"
+	TemplatePasswordChangedNotice = "password-changed-notice"
+	TemplateTestEmail             = "test-email"
+	TemplateUserBanned            = "user-banned"
+	TemplateUserUnbanned          = "user-unbanned"
 )
 
 // The data each template renders. They are structs rather than maps so the field
@@ -77,6 +78,12 @@ type (
 	PasswordResetData struct {
 		Email     string
 		ResetLink string
+	}
+	// PasswordChangedNoticeData renders TemplatePasswordChangedNotice —
+	// the "your password was changed" receipt a completed reset sends.
+	PasswordChangedNoticeData struct {
+		Name  string
+		Email string
 	}
 	// TestEmailData renders TemplateTestEmail.
 	TestEmailData struct {

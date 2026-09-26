@@ -163,6 +163,17 @@ const (
 	// negative payload: applying a term and lifting it are different
 	// happenings, and the log's one filter cannot see inside a payload.
 	EventUserUnbanned = "user_unbanned"
+
+	// EventPasswordResetEmailSent is a reset message submitted — by the
+	// account's own request or by an administrator's trigger. The record
+	// lands after the enqueue, the same convention the verification mail
+	// keeps.
+	EventPasswordResetEmailSent = "password_reset_email_sent"
+
+	// EventPasswordReset is a credential replaced through a reset token.
+	// The record commits in the transaction that swaps the hash and ends
+	// the live sessions, so a reader sees the blast radius.
+	EventPasswordReset = "password_reset"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

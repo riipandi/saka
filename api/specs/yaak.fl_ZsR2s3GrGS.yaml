@@ -1,0 +1,34 @@
+type: folder
+model: folder
+id: fl_ZsR2s3GrGS
+createdAt: 2026-09-26T20:52:32.603314
+updatedAt: 2026-09-26T20:52:44.813497
+workspaceId: wk_kBiMYTkhPP
+folderId: null
+authentication: {}
+authenticationType: null
+description: ''
+headers: []
+name: Account Recovery
+sortPriority: 15111.111111111111
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingRequestMessageSize:
+  enabled: false
+  value: 67108864
+settingHttpVersion:
+  enabled: false
+  value: auto
