@@ -141,13 +141,17 @@ func TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow(t *testing.T) {
 
 	// An unknown address and an address with no password credential answer
 	// success and queue nothing — the silence is the anti-enumeration.
-	require.NoError(t, service.ForgotPassword(t.Context(), "nobody@example.com"))
+	raw, err := service.ForgotPassword(t.Context(), "nobody@example.com")
+	require.NoError(t, err)
+	assert.Empty(t, raw)
 	assert.Equal(t, 0, enqueuer.calls)
 
 	seedUser(t, pool, "unpassworded", "unpassworded@example.com")
-	_, err := pool.Exec(t.Context(), "DELETE FROM public.user_passwords WHERE user_id = (SELECT id FROM public.users WHERE email = 'unpassworded@example.com')")
+	_, err = pool.Exec(t.Context(), "DELETE FROM public.user_passwords WHERE user_id = (SELECT id FROM public.users WHERE email = 'unpassworded@example.com')")
 	require.NoError(t, err)
-	require.NoError(t, service.ForgotPassword(t.Context(), "unpassworded@example.com"))
+	raw, err = service.ForgotPassword(t.Context(), "unpassworded@example.com")
+	require.NoError(t, err)
+	assert.Empty(t, raw)
 	assert.Equal(t, 0, enqueuer.calls)
 }
 
@@ -158,19 +162,24 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 	service, enqueuer := testService(t, pool, true)
 
 	seedUser(t, pool, "sophie", "sophie@example.com")
-	require.NoError(t, service.ForgotPassword(t.Context(), "sophie@example.com"))
+	raw, err := service.ForgotPassword(t.Context(), "sophie@example.com")
+	require.NoError(t, err)
 	require.Equal(t, 1, enqueuer.calls)
 	assert.NotEmpty(t, enqueuer.last.Token)
+
+	// The token is URL-safe hex: 64 lowercase hexadecimal characters, no
+	// dashes, no symbols.
+	assert.Regexp(t, `^[0-9a-f]{64}$`, raw)
 
 	// The row carries the hash, not the value the email took away.
 	var stored string
 	require.NoError(t, pool.QueryRow(t.Context(),
 		"SELECT token_hash FROM public.auth_tokens WHERE purpose = 'password_reset'",
 	).Scan(&stored))
-	assert.Equal(t, tokenSHA256(enqueuer.last.Token), stored)
+	assert.Equal(t, tokenSHA256(raw), stored)
 
 	// A re-request inside the cooldown refuses; the row is untouched.
-	err := service.ForgotPassword(t.Context(), "sophie@example.com")
+	_, err = service.ForgotPassword(t.Context(), "sophie@example.com")
 	assert.ErrorIs(t, err, ErrResendTooSoon)
 	assert.Equal(t, 1, enqueuer.calls)
 }
@@ -182,7 +191,7 @@ func TestForgotPasswordNeedsAMailerToServe(t *testing.T) {
 	service, _ := testService(t, pool, false)
 
 	seedUser(t, pool, "vittoria", "vittoria@example.com")
-	err := service.ForgotPassword(t.Context(), "vittoria@example.com")
+	_, err := service.ForgotPassword(t.Context(), "vittoria@example.com")
 	assert.ErrorIs(t, err, ErrMailUnavailable)
 }
 
@@ -196,10 +205,11 @@ func TestResetPasswordSwapsTheCredentialAndEndsTheSessions(t *testing.T) {
 	service.now = func() time.Time { return time.Now() }
 
 	userID := seedUser(t, pool, "langdon", "langdon@example.com")
-	require.NoError(t, service.ForgotPassword(t.Context(), "langdon@example.com"))
+	_, err := service.ForgotPassword(t.Context(), "langdon@example.com")
+	require.NoError(t, err)
 	require.Equal(t, 1, enqueuer.calls)
 
-	require.NoError(t, service.ResetPassword(t.Context(), enqueuer.last.Token, "Expecto!Patronum9"))
+	require.NoError(t, service.ResetPassword(t.Context(), enqueuer.last.Token, "Expecto!Patronum9", true))
 
 	// The new hash verifies, the token row is spent, and the session
 	// coupling ran.
@@ -220,7 +230,7 @@ func TestResetPasswordSwapsTheCredentialAndEndsTheSessions(t *testing.T) {
 	assert.True(t, enqueuer.noticeSent)
 
 	// The spent token cannot reset twice.
-	err := service.ResetPassword(t.Context(), enqueuer.last.Token, "Another!Passphrase1")
+	err = service.ResetPassword(t.Context(), enqueuer.last.Token, "Another!Passphrase1", true)
 	assert.ErrorIs(t, err, ErrInvalidToken)
 }
 
@@ -233,7 +243,7 @@ func TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential(t *testing.T) 
 	userID := seedUser(t, pool, "neveu", "neveu@example.com")
 
 	// An unknown token.
-	err := service.ResetPassword(t.Context(), "no-such-token", "Expecto!Patronum9")
+	err := service.ResetPassword(t.Context(), "no-such-token", "Expecto!Patronum9", true)
 	assert.ErrorIs(t, err, ErrInvalidToken)
 
 	// An expired one: the row is written live, and the service's clock is
@@ -243,20 +253,29 @@ func TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential(t *testing.T) 
 	raw := "expiring-token-value"
 	seedResetToken(t, pool, userID, raw, time.Now().Add(tokenTTL))
 	service.now = func() time.Time { return time.Now().Add(2 * tokenTTL) }
-	err = service.ResetPassword(t.Context(), raw, "Expecto!Patronum9")
+	err = service.ResetPassword(t.Context(), raw, "Expecto!Patronum9", true)
 	assert.ErrorIs(t, err, ErrInvalidToken)
 	service.now = time.Now
 
 	// The same row, still unspent, and a credential the policy refuses: the
 	// refusal is the policy's, and the token survives.
-	err = service.ResetPassword(t.Context(), raw, "short")
+	err = service.ResetPassword(t.Context(), raw, "short", true)
 	assert.ErrorIs(t, err, ErrWeakPassword)
+
+	// A credential identical to the current one is refused too: a reset
+	// that changes nothing is not a reset.
+	err = service.ResetPassword(t.Context(), raw, "Griffindor!9", true)
+	assert.ErrorIs(t, err, ErrSamePassword)
+
+	// A different credential passes; the seeded hash was Griffindor!9.
+	err = service.ResetPassword(t.Context(), raw, "Expecto!Patronum9", true)
+	require.NoError(t, err)
 
 	var stillThere int
 	require.NoError(t, pool.QueryRow(t.Context(),
 		"SELECT count(*) FROM public.auth_tokens WHERE token_hash = $1", tokenSHA256(raw),
 	).Scan(&stillThere))
-	assert.Equal(t, 1, stillThere)
+	assert.Equal(t, 0, stillThere)
 }
 
 // decoder is the test's stand-in for the wire-form conversion: the seeded
@@ -315,6 +334,24 @@ func TestAdminResetTriggerReportsTheStatesForgotPasswordHides(t *testing.T) {
 	assert.ErrorIs(t, err, ErrResendTooSoon)
 }
 
+func TestResetPasswordCanSpareTheSessionsWhenAsked(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	enders := &recordingEnder{}
+	service, enqueuer := testService(t, pool, true)
+	service.sessions = enders
+
+	seedUser(t, pool, "chamber", "chamber@example.com")
+	_, err := service.ForgotPassword(t.Context(), "chamber@example.com")
+	require.NoError(t, err)
+
+	// terminate_sessions=false leaves the live rows alone: the caller asked
+	// for a credential swap, not a sign-out.
+	require.NoError(t, service.ResetPassword(t.Context(), enqueuer.last.Token, "Expecto!Patronum9", false))
+	assert.Equal(t, 0, enders.calls)
+}
+
 func TestMapRecoveryErrorCarriesTheConnectCodes(t *testing.T) {
 	cases := []error{
 		ErrUserNotFound,
@@ -323,6 +360,7 @@ func TestMapRecoveryErrorCarriesTheConnectCodes(t *testing.T) {
 		ErrMailUnavailable,
 		ErrInvalidToken,
 		ErrResendTooSoon,
+		ErrSamePassword,
 	}
 	for _, err := range cases {
 		mapped := mapRecoveryError(err)

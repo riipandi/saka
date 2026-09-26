@@ -173,6 +173,30 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 	return nil
 }
 
+// FindPasswordHash reads the account's current credential hash, or an
+// empty string when the account holds no password row. The same-password
+// refusal compares the new credential against it.
+func (r *Repository) FindPasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) (string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("p.password_hash")
+	sb.From("public.users AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
+	sb.Where(sb.Equal("u.id", userID))
+
+	query, args := sb.Build()
+	var hash []byte
+	if err := db.QueryRow(ctx, query, args...).Scan(&hash); err != nil {
+		if errors.Is(err, datastore.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("password: find password hash: %w", err)
+	}
+	if hash == nil {
+		return "", nil
+	}
+	return string(hash), nil
+}
+
 // SetPasswordHash writes the new credential. The row is upserted because a
 // reset may be the account's first password (a passkey-created account that
 // added one).

@@ -2,11 +2,12 @@ type: http_request
 model: http_request
 id: rq_wnQNwuqPez
 createdAt: 2026-09-26T21:00:44.046969
-updatedAt: 2026-09-26T21:05:58.204195
+updatedAt: 2026-09-26T21:25:32.706560
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_ZsR2s3GrGS
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body:
   text: |-
     {
@@ -24,7 +25,7 @@ headers:
   value: application/json
   id: DzCM2paJmW
 method: POST
-name: '[Tango] Admin reset user password'
+name: '[Tango] Reset user password (admin)'
 sortPriority: 1000.0
 url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.PasswordRecoveryService/AdminResetUserPassword
 urlParameters: []

@@ -83,6 +83,10 @@ type Deps struct {
 	// emails that carry them, and the swap a spent token buys.
 	PasswordRecovery *password.Service
 
+	// ExposeResetToken mirrors `app.expose_reset_token`: the deployment's
+	// decision whether ForgotPassword answers the raw token.
+	ExposeResetToken bool
+
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
 
@@ -284,6 +288,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 	// invocation that reached this provider, so only the validation below is
 	// returned by hand.
 	keySet := do.MustInvoke[jwtutils.KeyProvider](i)
+	c := do.MustInvoke[*config.Config](i)
 
 	// The service is resolved beside the provider it is wrapped in, so a
 	// configuration whose key pair cannot be read is reported by Err() rather
@@ -305,6 +310,8 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		Multifactor:   do.MustInvoke[*multifactor.Service](i),
 
 		PasswordRecovery: do.MustInvoke[*password.Service](i),
+
+		ExposeResetToken: c.App.ExposeResetToken,
 		UserGroups:       do.MustInvoke[*usergroup.Service](i),
 	}), nil
 }
@@ -344,7 +351,8 @@ func features(deps Deps) []kernel.Module {
 		modules = append(modules, multifactor.NewModule(deps.Multifactor))
 	}
 	if deps.PasswordRecovery != nil {
-		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery))
+		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery).
+			WithExposedResetToken(deps.ExposeResetToken))
 	}
 	return modules
 }

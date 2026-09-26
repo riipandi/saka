@@ -220,6 +220,9 @@ func Default() Config {
 			// only where a deployment asks for it.
 			BaseURL:   "",
 			AssetsURL: DefaultAssetsURL,
+			// The reset token never appears in a response by default: the
+			// email is the only channel the raw value travels through.
+			ExposeResetToken: false,
 		},
 		Auth: Auth{
 			Issuer:          "tango",

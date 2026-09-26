@@ -21,11 +21,21 @@ const RecoveryModuleName = "password-recovery"
 // answers is an RPC procedure, so its HTTP mount is empty by construction.
 type RecoveryModule struct {
 	service *Service
+	// exposeResetToken mirrors the deployment's `app.expose_reset_token`:
+	// when true, ForgotPassword answers the raw token in the body.
+	exposeResetToken bool
 }
 
 // NewRecoveryModule builds the module over the recovery service.
 func NewRecoveryModule(service *Service) *RecoveryModule {
 	return &RecoveryModule{service: service}
+}
+
+// WithExposedResetToken sets whether ForgotPassword answers the raw token.
+// The configuration decides it, not the request.
+func (m *RecoveryModule) WithExposedResetToken(expose bool) *RecoveryModule {
+	m.exposeResetToken = expose
+	return m
 }
 
 // Name reports the module in composition reports.
@@ -40,7 +50,7 @@ func (m *RecoveryModule) Mount(r chi.Router) {}
 // are the transport's — the shared snake_case codec and the panic boundary —
 // so the procedures answer exactly like the transport's own.
 func (m *RecoveryModule) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authv1connect.NewPasswordRecoveryServiceHandler(newRecoveryHandler(m.service), opts...)
+	_, handler := authv1connect.NewPasswordRecoveryServiceHandler(newRecoveryHandler(m.service, m.exposeResetToken), opts...)
 	r.Handle(authv1connect.PasswordRecoveryServiceForgotPasswordProcedure, handler)
 	r.Handle(authv1connect.PasswordRecoveryServiceResetPasswordProcedure, handler)
 	r.Handle(authv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure, handler)
@@ -50,31 +60,45 @@ func (m *RecoveryModule) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 // carries the rules; this type carries the connect codes.
 type recoveryHandler struct {
 	service *Service
+	// exposeResetToken mirrors the module's deployment decision: when true,
+	// ForgotPassword answers the raw token in the body.
+	exposeResetToken bool
 }
 
 // newRecoveryHandler builds the handler over the service.
-func newRecoveryHandler(service *Service) authv1connect.PasswordRecoveryServiceHandler {
-	return &recoveryHandler{service: service}
+func newRecoveryHandler(service *Service, exposeResetToken bool) authv1connect.PasswordRecoveryServiceHandler {
+	return &recoveryHandler{service: service, exposeResetToken: exposeResetToken}
 }
 
 // ForgotPassword issues the reset email for the named address. The procedure
 // is public — a caller who lost the password holds no credential — and the
-// answer is the same whether the account exists or not.
+// answer is the same whether the account exists or not. The raw token rides
+// the response only when the deployment exposes it.
 func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Request[authv1.ForgotPasswordRequest]) (*connect.Response[authv1.ForgotPasswordResponse], error) {
-	if err := h.service.ForgotPassword(ctx, req.Msg.Email); err != nil {
+	raw, err := h.service.ForgotPassword(ctx, req.Msg.Email)
+	if err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	return connect.NewResponse(&authv1.ForgotPasswordResponse{
+	resp := &authv1.ForgotPasswordResponse{
 		Status:  responder.StatusSuccess,
 		Message: "if the address names an account, a reset email was sent",
-	}), nil
+	}
+	if h.exposeResetToken {
+		resp.ResetToken = raw
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // ResetPassword spends the token on a new password. The procedure is public:
 // the token is the credential, and the caller carries none — the message
-// linked here from a browser that may hold no session.
+// linked here from a browser that may hold no session. The sessions the
+// account holds are revoked unless the request spares them.
 func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Request[authv1.ResetPasswordRequest]) (*connect.Response[authv1.ResetPasswordResponse], error) {
-	if err := h.service.ResetPassword(ctx, req.Msg.Token, req.Msg.NewPassword); err != nil {
+	terminate := true
+	if req.Msg.TerminateSessions != nil {
+		terminate = *req.Msg.TerminateSessions
+	}
+	if err := h.service.ResetPassword(ctx, req.Msg.Token, req.Msg.NewPassword, terminate); err != nil {
 		return nil, mapRecoveryError(err)
 	}
 	return connect.NewResponse(&authv1.ResetPasswordResponse{
@@ -117,6 +141,8 @@ func mapRecoveryError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("reset token is invalid or expired"))
 	case errors.Is(err, ErrResendTooSoon):
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("a reset email was sent less than a minute ago"))
+	case errors.Is(err, ErrSamePassword):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the new password must differ from the current one"))
 	case errors.Is(err, ErrWeakPassword):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:

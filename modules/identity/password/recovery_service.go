@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -54,6 +53,11 @@ var (
 	// ErrResendTooSoon is a request inside the cooldown the last send
 	// opened: another message now would only invite a mailbomb.
 	ErrResendTooSoon = errors.New("password: a reset email was sent recently")
+
+	// ErrSamePassword is a reset whose new credential equals the current
+	// one: a reset that changes nothing is either a typo or a probe, and
+	// both deserve the refusal rather than a success that rotated nothing.
+	ErrSamePassword = errors.New("password: the new password matches the current one")
 )
 
 // tokenTTL is how long a reset link works. The template copy states it, so
@@ -191,18 +195,20 @@ func (s *Service) WithEnqueuer(enqueuer resetEnqueuer) *Service {
 // ForgotPassword issues a reset token for the named address and enqueues the
 // email. The answer is success whether the account exists or not — the
 // endpoint is not an account enumerator — so every early return carries the
-// same answer and the work differs only in what it writes.
-func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+// same answer and the work differs only in what it writes. The raw token is
+// answered only when the deployment exposes it: the email is the ordinary
+// channel, and a response body is a disclosure the configuration owns.
+func (s *Service) ForgotPassword(ctx context.Context, email string) (string, error) {
 	account, err := s.repo.FindUserByEmail(ctx, s.pool, email)
 	if errors.Is(err, datastore.ErrNoRows) {
 		// No account, no row, no record: the silence is the anti-enumeration.
-		return nil
+		return "", nil
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !account.PasswordSet {
-		return nil
+		return "", nil
 	}
 
 	// The resend cooldown reads the send time the last token row stamps: a
@@ -210,7 +216,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	// re-issue the caller waits for, not the loop a script runs.
 	if existing, findErr := s.repo.FindTokenByUser(ctx, s.pool, account.ID); findErr == nil && existing.LastSent != nil {
 		if s.now().Before(existing.LastSent.Add(resendCooldown)) {
-			return ErrResendTooSoon
+			return "", ErrResendTooSoon
 		}
 	}
 
@@ -249,27 +255,31 @@ func (s *Service) AdminResetUserPassword(ctx context.Context, wireUserID string)
 		}
 	}
 
-	return s.issue(ctx, account)
+	if _, err := s.issue(ctx, account); err != nil {
+		return err
+	}
+	return nil
 }
 
 // issue mints the token, writes its row, and enqueues the message. The
 // cooldown check belongs to the caller: the self-service path answers
-// success where it refuses, the admin path reports the refusal.
-func (s *Service) issue(ctx context.Context, account Account) error {
+// success where it refuses, the admin path reports the refusal. The raw
+// token is the return value — the caller decides who may see it.
+func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 	if !s.mail.Configured() {
-		return ErrMailUnavailable
+		return "", ErrMailUnavailable
 	}
 	if s.enqueuer == nil {
-		return ErrMailUnavailable
+		return "", ErrMailUnavailable
 	}
 
 	raw, err := newToken()
 	if err != nil {
-		return fmt.Errorf("password: mint token: %w", err)
+		return "", fmt.Errorf("password: mint token: %w", err)
 	}
 	now := s.now()
 	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, tokenSHA256(raw), now.Add(tokenTTL), now); err != nil {
-		return err
+		return "", err
 	}
 
 	// The message is enqueued and the record is written after the queue
@@ -280,21 +290,22 @@ func (s *Service) issue(ctx context.Context, account Account) error {
 		Email:  account.Email,
 		Token:  raw,
 	}); err != nil {
-		return fmt.Errorf("password: enqueue: %w", err)
+		return "", fmt.Errorf("password: enqueue: %w", err)
 	}
 	s.audit.Record(ctx, s.pool, audit.Entry{
 		Event:  audit.EventPasswordResetEmailSent,
 		Status: audit.StatusSuccess,
 		UserID: account.ID.String(),
 	})
-	return nil
+	return raw, nil
 }
 
 // ResetPassword spends a reset token on a new password. The token is the
 // whole credential: the caller carries none. Success swaps the hash, ends
-// every live session, consumes the token, and records the reset — all in
-// one transaction, so a rollback returns the token and the old password.
-func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+// the live sessions unless the request spares them, consumes the token, and
+// records the reset — all in one transaction, so a rollback returns the
+// token and the old password.
+func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string, terminateSessions bool) error {
 	if err := Validate(newPassword); err != nil {
 		return err
 	}
@@ -326,12 +337,33 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		return ErrAccountForbidden
 	}
 
+	// A new password equal to the current one is refused before anything
+	// is written. The check needs the current hash, so the account row is
+	// read again with it — an account holding no password credential has
+	// nothing to compare against, and the reset stands.
+	current, err := s.repo.FindPasswordHash(ctx, s.pool, token.UserID)
+	if err != nil {
+		return err
+	}
+	if current != "" {
+		same, verifyErr := crypto.NewPasswordHasher().Verify(newPassword, current)
+		if verifyErr != nil {
+			// An unreadable stored hash is not the caller's fault; the
+			// reset proceeds and overwrites it.
+			s.log.Warn("password: current hash could not be verified", "error", verifyErr)
+		} else if same {
+			return ErrSamePassword
+		}
+	}
+
 	var ended int
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		var updateErr error
-		ended, updateErr = s.revokeInTx(ctx, tx, token.UserID)
-		if updateErr != nil {
-			return updateErr
+		if terminateSessions {
+			var updateErr error
+			ended, updateErr = s.revokeInTx(ctx, tx, token.UserID)
+			if updateErr != nil {
+				return updateErr
+			}
 		}
 		if setErr := s.repo.SetPasswordHash(ctx, tx, token.UserID, hash); setErr != nil {
 			return setErr
@@ -347,6 +379,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 			UserID: token.UserID.String(),
 			Payload: map[string]string{
 				"ended_sessions": fmt.Sprintf("%d", ended),
+				"kept_sessions":  fmt.Sprintf("%t", !terminateSessions),
 			},
 		})
 		return nil
@@ -381,14 +414,16 @@ func bannedNow(account Account, at time.Time) bool {
 	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
 }
 
-// newToken mints the raw value the email carries: 256 bits, base64url — the
-// verification token's shape, for the same reason.
+// newToken mints the raw value the email carries: 256 bits rendered as 64
+// lowercase hexadecimal characters. Hex keeps the token URL-safe without
+// dashes or symbols, so it survives a query string, a QR code, and a
+// copy-paste through any chat client unchanged.
 func newToken() (string, error) {
 	buf := make([]byte, tokenEntropy)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
+	return hex.EncodeToString(buf), nil
 }
 
 // tokenSHA256 hashes the raw token the caller presented, the form the

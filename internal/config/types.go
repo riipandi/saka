@@ -72,6 +72,11 @@ type App struct {
 	// /static mount today, an S3 bucket or a CDN origin whenever a deployment
 	// points the variable there.
 	AssetsURL string `koanf:"assets_url" json:"assets_url"`
+	// ExposeResetToken answers the raw password-reset token in the
+	// ForgotPassword response. It is a testing and integration aid — the
+	// response hands the account to anyone who knows the address — so it
+	// ships off and a deployment that flips it accepts that trade-off.
+	ExposeResetToken bool `koanf:"expose_reset_token" json:"expose_reset_token"`
 }
 
 // Auth holds the JWT signing material.

@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_5SgzmJyWWh
 createdAt: 2026-09-18T19:38:03.314271
-updatedAt: 2026-09-26T18:53:42.939878
+updatedAt: 2026-09-26T21:25:06.332061
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YFXTtzfvhT
 authentication: {}
@@ -15,17 +15,7 @@ body:
       "remember": ${[ remember ]}
     }
 bodyType: application/json
-description: |-
-  Verifies the primary credential — the account's username (case-insensitive) or email (exact) plus its password — and issues the token pair: a stateless Bearer access token (JWT, verified against /.well-known/jwks.json) and a refresh token stored server-side only as a SHA-256 hash.
-
-  tango-only: upstream Pocket ID signs users in with passkeys; password authentication is the tango adaptation.
-
-  Parameters:
-  - identity (body, required): the account's username or email address.
-  - password (body, required): the primary credential, in clear text; TLS only, never logged.
-  - remember (body, optional): selects the refresh lifetime — auth.refresh_short_ttl (12h default) when false, auth.refresh_long_ttl (14 days default) when true.
-
-  A wrong identity and a wrong password answer the same failure (unauthenticated).
+description: 'Verifies the primary credential and issues the token pair — or, for an account keeping a confirmed TOTP authenticator, the MFA challenge: mfa_required=true with a short-lived mfa_pending_token (5 min) and no tokens. The caller finishes via [Tango] Complete MFA sign-in with the pending token plus a TOTP or recovery code. A wrong identity and a wrong password answer the same failure, so the endpoint does not disclose which half was wrong.'
 headers:
 - enabled: true
   name: Content-Type

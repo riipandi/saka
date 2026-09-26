@@ -51,13 +51,20 @@ service PasswordRecoveryService {
   // the email. The answer is the same whether the account exists or not —
   // the endpoint is not an account enumerator. Repeating the request inside
   // the cooldown the last send opened refuses with resource_exhausted.
+  //
+  // When the deployment enables `app.expose_reset_token`, the response
+  // also carries the raw token, so a client can drive the reset without
+  // reading the email. That option is a testing and integration aid: it
+  // hands the account to anyone who knows the address, so it ships off by
+  // default and a deployment that flips it accepts that trade-off.
   rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
 
   // ResetPassword spends a reset token on a new password. The token is the
   // whole credential: the caller carries none, the same way VerifyEmail
-  // does. Success revokes every live session the account holds — a password
-  // reset means the old one is no longer trusted — and the new password
-  // must meet the account password policy.
+  // does. The new password must meet the account password policy and must
+  // not equal the current one. Success revokes every live session the
+  // account holds — a password reset means the old one is no longer
+  // trusted — unless the request asks otherwise.
   rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
 
   // AdminResetUserPassword lets an administrator trigger the same email on
@@ -71,17 +78,27 @@ service PasswordRecoveryService {
 message ForgotPasswordRequest {
   // email is the account's address, matched exactly the way its unique
   // index does. The answer does not depend on whether it names an account.
-  string email = 1 [(buf.validate.field).string = {min_len: 3, max_len: 255}];
+  string email = 1 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 255
+  }];
 }
 
-// ForgotPasswordResponse is empty on purpose: it cannot confirm the account
-// exists, or the endpoint would be an account enumerator.
+// ForgotPasswordResponse answers success whether the account exists or
+// not. The reset token is only present when the deployment enables
+// `app.expose_reset_token` — a testing and integration aid, off by
+// default.
 message ForgotPasswordResponse {
   // status is the outcome word the client checks — success.
   string status = 1;
 
   // message is the human-readable sentence describing what the call did.
   string message = 2;
+
+  // reset_token is the raw reset token, present only when the deployment
+  // enables `app.expose_reset_token`. It is 64 hexadecimal characters —
+  // URL-safe, no dashes or symbols — and is otherwise empty.
+  string reset_token = 3;
 }
 
 // ResetPasswordRequest carries the token the email linked to and the new
@@ -93,8 +110,18 @@ message ResetPasswordRequest {
 
   // new_password is the credential the account answers with from now on.
   // The account policy is enforced here in the service, so the refusal
-  // names the rule.
-  string new_password = 2 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
+  // names the rule. A new password equal to the current one is refused.
+  string new_password = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+
+  // terminate_sessions revokes every live session the account holds once
+  // the reset commits. It defaults to true: a password reset means the old
+  // credential is no longer trusted. Send false to keep the sessions —
+  // a convenience for a caller who is resetting their own password while
+  // signed in elsewhere — and accept that a stolen session survives.
+  optional bool terminate_sessions = 3;
 }
 
 // ResetPasswordResponse is empty: the protocol carries the success.
@@ -508,7 +535,7 @@ message RefreshRequest {
 // RefreshResponse is the fresh pair and the session it renews — the shape
 // SignIn answers with, because a client rotating its token treats the two the
 // same way.
-message RefreshResponse {  // access_token is the new Bearer JWT.
+message RefreshResponse { // access_token is the new Bearer JWT.
   string access_token = 1;
 
   // token_type names the authorization scheme, always `Bearer`.
@@ -666,9 +693,7 @@ message ConfirmTotpEnrollmentRequest {
   string totp_id = 1 [(buf.validate.field).string.min_len = 1];
 
   // code is the six-digit value the authenticator renders right now.
-  string code = 2 [
-    (buf.validate.field).string.pattern = "^[0-9]{6,8}$"
-  ];
+  string code = 2 [(buf.validate.field).string.pattern = "^[0-9]{6,8}$"];
 }
 
 // ConfirmTotpEnrollmentResponse answers the recovery set in the clear once —
