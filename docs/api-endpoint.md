@@ -190,7 +190,7 @@ presented string, so a database leak cannot replay it. The presentation form is
 `<prefix>.<secret>`: an eight-character prefix an operator reads (it travels in every view, so a
 leaked key can be identified without the key itself) and a thirty-two character secret a client
 sends. The name is unique per owner. The expiry reminder is off by default
-(`api_key.expiry_email_enabled`): a mailer that writes to account holders on a schedule is a
+(`auth.expiry_email_enabled`): a mailer that writes to account holders on a schedule is a
 decision, not a default.
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary          |

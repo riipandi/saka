@@ -103,7 +103,7 @@ func printSmokePlan(p printext.Palette, cfg config.Config) error {
 	if err := printFields(p, []field{
 		{"transport", fmt.Sprintf("%v", cfg.Log.Transport)},
 		{"level", cfg.Log.Level},
-		{"format", cfg.Log.Console.Format},
+		{"format", cfg.Log.Format},
 	}); err != nil {
 		return err
 	}

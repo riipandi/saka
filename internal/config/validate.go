@@ -108,8 +108,8 @@ func (c Config) Validate() error {
 	// problem in a part of the file that is switched off. A file or a
 	// collector has no key to choose, because neither has a second form.
 	if c.logTransport(LogTransportConsole) {
-		check(isOneOf(c.Log.Console.Format, LogPretty, LogStructured),
-			"log.console.format: %q is not one of %s", c.Log.Console.Format, joinValues(LogPretty, LogStructured))
+		check(isOneOf(c.Log.Format, LogPretty, LogStructured),
+			"log.format: %q is not one of %s", c.Log.Format, joinValues(LogPretty, LogStructured))
 	}
 
 	// The file sink is built only when it is named, so the rotation settings are
@@ -296,11 +296,11 @@ func (c Config) Validate() error {
 	check(c.Queue.CleanupInterval > 0, "queue.cleanup_interval: must be positive")
 	check(!c.Queue.Encrypt || c.App.SecretKey != "",
 		"queue.encrypt: requires app.secret_key, the secret it seals payloads with")
-	if _, err := time.LoadLocation(c.Scheduler.Timezone); err != nil {
-		check(false, "scheduler.timezone: %q is not a time zone: %v", c.Scheduler.Timezone, err)
+	if _, err := time.LoadLocation(c.Queue.Timezone); err != nil {
+		check(false, "queue.timezone: %q is not a time zone: %v", c.Queue.Timezone, err)
 	}
 
-	check(c.Audit.RetentionDays > 0, "audit.retention_days: must be greater than 0")
+	check(c.App.AuditRetentionDays > 0, "app.audit_retention_days: must be greater than 0")
 	check(c.Server.Host != "", "server.host: must not be empty")
 	check(c.Server.Port > 0 && c.Server.Port <= 65535, "server.port: %d must be between 1 and 65535", c.Server.Port)
 	check(c.Server.ReadTimeout > 0, "server.read_timeout: must be positive")
@@ -543,5 +543,5 @@ func (c Config) String() string {
 	redacted := c.Redacted()
 	return fmt.Sprintf("app=%s database=%s server=%s:%d log=%s/%s",
 		redacted.App.Mode, RedactDSN(redacted.Database.URL), redacted.Server.Host,
-		redacted.Server.Port, redacted.Log.Level, redacted.Log.Console.Format)
+		redacted.Server.Port, redacted.Log.Level, redacted.Log.Format)
 }

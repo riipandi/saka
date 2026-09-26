@@ -98,7 +98,7 @@ func TestConfiguredLevelIsTheLoggerThreshold(t *testing.T) {
 func TestStructuredFormatWritesOneJSONObjectPerLine(t *testing.T) {
 	// The slog frontend is the one the application calls, so a field added
 	// through slog must survive into the entry the transports write.
-	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Console.Format = config.LogStructured })
+	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Format = config.LogStructured })
 
 	log.Slog().Info("served", "user", "alice", "status", 200)
 	log.Flush()
@@ -121,7 +121,7 @@ func TestSlogChainCarriesFieldsThroughThePipeline(t *testing.T) {
 	// nests what follows under one key. Feature code is expected to use these
 	// rather than reaching for the LogLayer core, so the path is asserted here
 	// rather than assumed.
-	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Console.Format = config.LogStructured })
+	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Format = config.LogStructured })
 
 	request := log.Slog().With("request_id", "abc123")
 	request.Info("first")
@@ -162,7 +162,7 @@ func TestErrorsAreLoggedAsRenderedText(t *testing.T) {
 	// integration maps every attribute onto fields, and a raw error value
 	// there encodes as an empty object. The convention is therefore the shape
 	// LogLayer's default serializer emits: the rendered text under err.
-	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Console.Format = config.LogStructured })
+	log, buf := newLogger(t, func(cfg *config.Config) { cfg.Log.Format = config.LogStructured })
 
 	err := errors.New("connection refused")
 	log.Slog().Error("failed", "err", err.Error())
@@ -178,7 +178,7 @@ func TestErrorsAreLoggedAsRenderedText(t *testing.T) {
 // a file path tells a reader where the code lives.
 func TestSourceIsADebugOnlyField(t *testing.T) {
 	log, buf := newLogger(t, func(cfg *config.Config) {
-		cfg.Log.Console.Format = config.LogStructured
+		cfg.Log.Format = config.LogStructured
 		cfg.Log.Level = config.LogDebug
 	})
 
@@ -243,7 +243,7 @@ func TestFileSinkKeepsItsOwnJSONForm(t *testing.T) {
 	// The console format is what a person reads; a file is read by a machine, so
 	// asking for a pretty console must not put escape codes and column padding
 	// in the file.
-	log, buf, path := newFileLogger(t, func(cfg *config.Config) { cfg.Log.Console.Format = config.LogPretty })
+	log, buf, path := newFileLogger(t, func(cfg *config.Config) { cfg.Log.Format = config.LogPretty })
 
 	log.Slog().Info("both sinks")
 	require.NoError(t, log.Shutdown(context.Background()))

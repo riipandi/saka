@@ -207,13 +207,6 @@ const DefaultAssetsURL = "http://localhost:3080/static"
 // mentions keeps the value set here.
 func Default() Config {
 	return Config{
-		Audit: Audit{
-			// Ninety days is Pocket ID's own default, and the window a
-			// security review usually asks for: long enough to answer "what
-			// happened last quarter", short enough that the table stays a
-			// table rather than an archive.
-			RetentionDays: 90,
-		},
 		App: App{
 			Mode: ModeDevelopment,
 			// The public origin is empty by default: links are built absolute
@@ -227,6 +220,11 @@ func Default() Config {
 			// enrollment's one answer is the only channel it travels
 			// through, and development debugging turns this on by hand.
 			ExposeTotpSecret: false,
+			// Ninety days is Pocket ID's own default, and the window a
+			// security review usually asks for: long enough to answer "what
+			// happened last quarter", short enough that the table stays a
+			// table rather than an archive.
+			AuditRetentionDays: 90,
 		},
 		Auth: Auth{
 			Issuer:          "tango",
@@ -234,17 +232,15 @@ func Default() Config {
 			RefreshShortTTL: 12 * time.Hour,
 			RefreshLongTTL:  14 * 24 * time.Hour,
 			SessionDriver:   SessionDB,
+			// The API key's expiry reminder is off by default, the way the
+			// upstream feature ships: a mailer that reaches account holders
+			// on a schedule is a decision, not a default.
+			ExpiryEmailEnabled: false,
 			// Both email paths are opt-in: the administrative one because an
 			// operator's mailer becomes a credential sender, the public one
 			// because anyone reachable can drive it at any address.
 			OneTimeAccessEmailAsAdminEnabled:           false,
 			OneTimeAccessEmailAsUnauthenticatedEnabled: false,
-		},
-		APIKey: APIKey{
-			// Off by default: the reminder emails account holders before
-			// their keys expire, and a mailer that writes on a schedule is
-			// a deployment's decision to make.
-			ExpiryEmailEnabled: false,
 		},
 		Cache: Cache{
 			// Off by default: a feature that wants caching switches it on
@@ -291,9 +287,7 @@ func Default() Config {
 			// The console alone: a fresh checkout writes to the terminal and
 			// nothing else, so no run needs a volume or a collector to start.
 			Transport: []string{LogTransportConsole},
-			Console: LogConsole{
-				Format: LogPretty,
-			},
+			Format:    LogPretty,
 			File: LogFile{
 				MaxSize:    DefaultLogMaxSizeMB,
 				MaxBackups: DefaultLogMaxBackups,
@@ -357,9 +351,7 @@ func Default() Config {
 			ReleaseAfter:    DefaultQueueReleaseAfter,
 			CleanupInterval: DefaultQueueCleanupArchive,
 			Encrypt:         false,
-		},
-		Scheduler: Scheduler{
-			Timezone: DefaultSchedulerTimezone,
+			Timezone:        DefaultSchedulerTimezone,
 		},
 		Server: Server{
 			Host:            "0.0.0.0",

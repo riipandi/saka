@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -35,16 +34,6 @@ var secretKeys = []string{
 	"otel.headers",
 	"storage.s3.access_key_id",
 	"storage.s3.access_key_secret",
-}
-
-// nullKeys are the keys a generated file writes as null rather than as an empty
-// string, because empty has no meaning for them: an empty prefix is "no prefix",
-// which the key being absent says more directly.
-//
-// The two forms resolve alike — a null in the file leaves the key at its default
-// — so this is about what the file reads like, not about what it does.
-var nullKeys = []string{
-	"storage.s3.path_prefix",
 }
 
 // omittedKeys stay on Config and keep the built-in default, but a generated
@@ -168,8 +157,7 @@ func Sample() ([]byte, error) {
 
 // nest turns flat dotted keys back into the tree the file is written as. A
 // duration is written as a number of seconds, which is the unit the file uses
-// everywhere: "15m0s" reads as a Go expression, and 900 reads as a duration. A
-// key in nullKeys is written as null.
+// everywhere: "15m0s" reads as a Go expression, and 900 reads as a duration.
 func nest(flat map[string]any) map[string]any {
 	out := make(map[string]any)
 	for key, value := range flat {
@@ -182,10 +170,6 @@ func nest(flat map[string]any) map[string]any {
 				node[part] = child
 			}
 			node = child
-		}
-		if slices.Contains(nullKeys, key) {
-			node[parts[len(parts)-1]] = nil
-			continue
 		}
 		node[parts[len(parts)-1]] = renderable(value)
 	}

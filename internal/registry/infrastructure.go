@@ -180,7 +180,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			// The processors are wired onto the engine here — pure wiring, no
 			// connection is touched. The recurring seeds are the Seeder's
 			// service, resolved by the prewarm walk.
-			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.APIKey.ExpiryEmailEnabled)
+			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled)
 			return client, nil
 		}),
 
@@ -189,7 +189,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			client := do.MustInvoke[*queue.Client](i)
 			uploader := do.MustInvoke[*storage.Manager](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.Audit.RetentionDays, c.APIKey.ExpiryEmailEnabled, log), nil
+			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.Auth.ExpiryEmailEnabled, log), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*storage.Watcher, error) {
@@ -213,7 +213,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			pool := do.MustInvoke[*datastore.Postgres](i)
 			client := do.MustInvoke[*queue.Client](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			location, err := time.LoadLocation(c.Scheduler.Timezone)
+			location, err := time.LoadLocation(c.Queue.Timezone)
 			if err != nil {
 				return nil, err
 			}

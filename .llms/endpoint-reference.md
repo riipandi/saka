@@ -224,7 +224,7 @@ durable queue).
 | POST | `/rpc/tango.auditlog.v1.AuditLogService/ListForUser` | (tango-only) list one account's records | done — guard `Admin`; the administrative view of a single account | `modules/auditlog` (service tests) |
 | POST | `/rpc/tango.auditlog.v1.AuditLogService/FilterOptions` | List filter facets | done — guard `Admin`; facets are `events` (distinct events in the table) and `users` (accounts that appear in it). Upstream's `client-names` facet is **not** ported: tango has no OIDC client, so `payload->>'client_name'` is never written | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
 
-The writer is `internal/audit` (shared infrastructure, injected into the features); the reader is `modules/auditlog`. Events written today: `sign_in`, `account_created` (both sign-up and the administrator's CreateUser), `account_updated`, `account_deleted`, `email_verification_sent`, `email_verified`, `profile_picture_updated`, `profile_picture_reset`. Sign-out has no event: `modules/identity/session` is a scaffold, so nothing can sign out. Retention: `audit.retention_days` (default 90) applied by the `audit_cleanup` recurring job.
+The writer is `internal/audit` (shared infrastructure, injected into the features); the reader is `modules/auditlog`. Events written today: `sign_in`, `account_created` (both sign-up and the administrator's CreateUser), `account_updated`, `account_deleted`, `email_verification_sent`, `email_verified`, `profile_picture_updated`, `profile_picture_reset`. Sign-out has no event: `modules/identity/session` is a scaffold, so nothing can sign out. Retention: `app.audit_retention_days` (default 90) applied by the `audit_cleanup` recurring job.
 
 ## Custom Claims
 

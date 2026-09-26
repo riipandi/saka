@@ -418,11 +418,10 @@ func TestSampleWritesTheS3KeysAsDirectives(t *testing.T) {
 	assert.Equal(t, "env:STORAGE_S3_REGION", flat["storage.s3.region"])
 }
 
-func TestSampleWritesThePathPrefixAsNull(t *testing.T) {
-	// An empty prefix means "no prefix", which a null says more directly than an
-	// empty string. The two resolve alike, so this is about what the file reads
-	// like: the key is present, so it is discoverable, and its value says there
-	// is nothing to set.
+func TestSampleWritesThePathPrefixAsAnEmptyString(t *testing.T) {
+	// An empty prefix means "no prefix", and the empty string says so without
+	// a second JSON shape: a null in the file would be a type the schema and
+	// every editor have to special-case for one key's sake.
 	raw, err := Sample()
 	require.NoError(t, err)
 
@@ -436,19 +435,11 @@ func TestSampleWritesThePathPrefixAsNull(t *testing.T) {
 
 	value, present := s3["path_prefix"]
 	assert.True(t, present, "the key must be discoverable in the file")
-	assert.Nil(t, value, "an empty prefix is written as null, not as an empty string")
+	assert.Equal(t, "", value, "an empty prefix is written as an empty string")
 
-	// The null must not disturb the keys around it.
+	// The empty value must not disturb the keys around it.
 	assert.Equal(t, true, s3["force_path_style"])
 	assert.Equal(t, float64(3600), s3["signed_url_expires"])
-}
-
-func TestNullKeysArePartOfTheSchema(t *testing.T) {
-	// A key written as null must be a real config key, or the generated file
-	// would carry an entry the loader drops.
-	for _, key := range nullKeys {
-		assert.Contains(t, Keys(), key)
-	}
 }
 
 func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {

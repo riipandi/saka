@@ -13,9 +13,7 @@ import (
 // a json tag (how it is written back out, and how Default is flattened), a
 // default in Default(), and a rule in Validate().
 type Config struct {
-	APIKey    APIKey    `koanf:"api_key" json:"api_key"`
 	App       App       `koanf:"app" json:"app"`
-	Audit     Audit     `koanf:"audit" json:"audit"`
 	Auth      Auth      `koanf:"auth" json:"auth"`
 	Cache     Cache     `koanf:"cache" json:"cache"`
 	Database  Database  `koanf:"database" json:"database"`
@@ -26,7 +24,6 @@ type Config struct {
 	OTEL      OTEL      `koanf:"otel" json:"otel"`
 	Queue     Queue     `koanf:"queue" json:"queue"`
 	RateLimit RateLimit `koanf:"rate_limit" json:"rate_limit"`
-	Scheduler Scheduler `koanf:"scheduler" json:"scheduler"`
 	Server    Server    `koanf:"server" json:"server"`
 	Storage   Storage   `koanf:"storage" json:"storage"`
 
@@ -36,28 +33,6 @@ type Config struct {
 	// unresolved records the keys whose directive named a missing variable,
 	// mapped to the variable name. It is state about the sources, not config.
 	unresolved map[string]string
-}
-
-// Audit holds the audit trail's own settings. The trail is written by every
-// feature and read by modules/auditlog; what a deployment decides about it is
-// how long it is kept.
-type Audit struct {
-	// RetentionDays is how long a record is kept. The cleanup job deletes
-	// what is older, so the table is bounded by a policy rather than by
-	// whoever remembers to prune it. Zero would mean "keep forever", which
-	// is why Validate refuses it: an unbounded audit table is a decision a
-	// deployment should make on purpose, not a default it never noticed.
-	RetentionDays int `koanf:"retention_days" json:"retention_days"`
-}
-
-// APIKey holds the machine credentials' settings. An API key acts as the
-// account that issued it; what a deployment decides here is only whether its
-// holders are warned before a key expires.
-type APIKey struct {
-	// ExpiryEmailEnabled turns the expiry reminder on. Off by default, the
-	// way the upstream feature ships: a mailer that reaches account holders
-	// on a schedule is a decision, not a default.
-	ExpiryEmailEnabled bool `koanf:"expiry_email_enabled" json:"expiry_email_enabled"`
 }
 
 // App holds process-level settings.
@@ -82,6 +57,13 @@ type App struct {
 	// enrollment — the response hands every account's second factor to the
 	// caller — so validation refuses it outside the development mode.
 	ExposeTotpSecret bool `koanf:"expose_totp_secret" json:"expose_totp_secret"`
+	// AuditRetentionDays is how long an audit record is kept. The cleanup
+	// job deletes what is older, so the table is bounded by a policy rather
+	// than by whoever remembers to prune it. Zero would mean "keep
+	// forever", which is why Validate refuses it: an unbounded audit table
+	// is a decision a deployment should make on purpose, not a default it
+	// never noticed.
+	AuditRetentionDays int `koanf:"audit_retention_days" json:"audit_retention_days"`
 }
 
 // Auth holds the JWT signing material.
@@ -109,6 +91,12 @@ type Auth struct {
 	RefreshShortTTL time.Duration `koanf:"refresh_short_ttl" json:"refresh_short_ttl"`
 	// RefreshLongTTL is the lifetime of a remembered refresh token.
 	RefreshLongTTL time.Duration `koanf:"refresh_long_ttl" json:"refresh_long_ttl"`
+	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
+	// default, the way the upstream feature ships: a mailer that reaches
+	// account holders on a schedule is a decision, not a default. It lives
+	// beside the token lifetimes because the reminder is the tokens'
+	// housekeeping, not the machine credentials' own surface.
+	ExpiryEmailEnabled bool `koanf:"expiry_email_enabled" json:"expiry_email_enabled"`
 	// SessionDriver is the backend the sign-in session store reads: SessionDB
 	// or SessionKV. It lives beside the token lifetimes because the store
 	// serves exactly those tokens, and there is no second session concept to
@@ -235,25 +223,17 @@ type Log struct {
 	// alternatives: naming one is what turns it on, and there is no second flag
 	// that could disagree with the list.
 	Transport []string `koanf:"transport" json:"transport"`
-	// Console holds the console sink settings, read when Transport names
-	// LogTransportConsole.
-	Console LogConsole `koanf:"console" json:"console"`
+	// Format names the console sink's rendering: LogPretty or LogStructured.
+	// It lives at the top level because the console is the only sink a
+	// person reads: a file or a collector keeps its machine form regardless,
+	// so no other sink has a key to choose it.
+	Format string `koanf:"format" json:"format"`
 	// File holds the rotating file sink settings, read when Transport names
 	// LogTransportFile.
 	File LogFile `koanf:"file" json:"file"`
 	// OTLP holds the log export settings that are specific to logs, read when
 	// Transport names LogTransportOTLP.
 	OTLP LogOTLP `koanf:"otlp" json:"otlp"`
-}
-
-// LogConsole holds the console sink settings.
-//
-// The console is the only sink with a rendering choice, because it is the one
-// a person reads: a file or a collector keeps its machine form regardless, so
-// no other sink has a key to choose it.
-type LogConsole struct {
-	// Format is LogPretty or LogStructured.
-	Format string `koanf:"format" json:"format"`
 }
 
 // LogOTLP holds the log export settings that are specific to logs.
@@ -473,14 +453,10 @@ type Queue struct {
 	// (app.secret_key). A task still in flight when the flag flips is read
 	// as the plaintext it is; every task written afterwards is sealed.
 	Encrypt bool `koanf:"encrypt" json:"encrypt"`
-}
-
-// Scheduler holds the cron scheduler settings. The scheduler enqueues tasks
-// onto the queue at cron times and claims each tick in Postgres, so the
-// schedule survives a restart and one replica only fires a tick.
-type Scheduler struct {
-	// Timezone resolves a spec that names no zone of its own, so "0 3 * * *"
-	// is three in the morning somewhere in particular.
+	// Timezone resolves a cron spec that names no zone of its own, so
+	// "0 3 * * *" is three in the morning somewhere in particular. It lives
+	// here because the scheduler is a queue client: it enqueues its jobs
+	// onto this queue, and there is no second scheduling concept.
 	Timezone string `koanf:"timezone" json:"timezone"`
 }
 

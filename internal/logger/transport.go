@@ -24,7 +24,7 @@ import (
 func consoleSink(cfg config.Config, w io.Writer) *asyncTransport {
 	dst := newBatchWriter(w)
 	var inner loglayer.Transport
-	if cfg.Log.Console.Format == config.LogStructured {
+	if cfg.Log.Format == config.LogStructured {
 		inner = structured.New(structured.Config{
 			Writer: dst,
 			ID:     "console",

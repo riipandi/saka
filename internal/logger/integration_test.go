@@ -74,7 +74,7 @@ func TestEveryTransportShipsTheSameEntry(t *testing.T) {
 		config.LogTransportOTLP,
 	}
 	cfg.OTEL.Endpoint = store.OTLPEndpoint
-	cfg.Log.Console.Format = config.LogStructured
+	cfg.Log.Format = config.LogStructured
 
 	buf := &bytes.Buffer{}
 	log, err := logger.New(cfg, logger.WithWriter(buf))
