@@ -14,6 +14,7 @@
 package identity
 
 import (
+	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
@@ -29,6 +30,7 @@ import (
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/signin"
@@ -36,6 +38,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/modules/identity/usergroup"
 	"github.com/riipandi/tango/modules/identity/verification"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/jwtutils"
 )
 
@@ -70,6 +73,10 @@ type Deps struct {
 	// OneTimeAccess issues and consumes the codes that sign an account in
 	// without its password.
 	OneTimeAccess *onetimeaccess.Service
+
+	// Multifactor is the second factor: TOTP authenticators and the recovery
+	// codes. Its sign-in fork is wired to the sign-in service at build time.
+	Multifactor *multifactor.Service
 
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
@@ -207,6 +214,35 @@ var Package = do.Package(
 		return onetimeaccess.NewService(*c, pool, issuer, recorder, mail, client, log), nil
 	}),
 
+	// The multifactor service is resolved beside the sign-in issuer it
+	// gates: the gate rides the issuer after both exist, which is the same
+	// post-construction wiring the ban's side effects run. A provider cannot
+	// take the gate as a dependency without the two constructing in a cycle.
+	do.Lazy(func(i do.Injector) (*multifactor.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		issuer := do.MustInvoke[*signin.Service](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		c := do.MustInvoke[*config.Config](i)
+		// The cipher is built only when the configuration carries a key: a
+		// test or a consumer area that named no secret key has no sealing to
+		// run, and the service answers that state on the first ceremony
+		// rather than failing a run that never touches the feature. A real
+		// deployment always carries the key — validation demands it — so the
+		// production path never sees the nil.
+		var cipher *crypto.Cipher
+		if c.App.SecretKey != "" {
+			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+			if err != nil {
+				return nil, fmt.Errorf("identity: multifactor cipher: %w", err)
+			}
+			cipher = built
+		}
+		service := multifactor.NewService(pool, cipher, issuer, recorder, c.App.BaseURL, log)
+		issuer.WithMFAGate(service)
+		return service, nil
+	}),
+
 	do.Lazy(func(i do.Injector) (*usergroup.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
@@ -242,6 +278,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		Users:         do.MustInvoke[*user.Service](i),
 		Verification:  do.MustInvoke[*verification.Service](i),
 		OneTimeAccess: do.MustInvoke[*onetimeaccess.Service](i),
+		Multifactor:   do.MustInvoke[*multifactor.Service](i),
 		UserGroups:    do.MustInvoke[*usergroup.Service](i),
 	}), nil
 }
@@ -274,6 +311,11 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.UserGroups != nil {
 		modules = append(modules, usergroup.NewModule(deps.UserGroups))
+	}
+	// The second factor's feature is mounted like the rest: a nil service is
+	// skipped, and the wiring is the one place the feature is named.
+	if deps.Multifactor != nil {
+		modules = append(modules, multifactor.NewModule(deps.Multifactor))
 	}
 	return modules
 }

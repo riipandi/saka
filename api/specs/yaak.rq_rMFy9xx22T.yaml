@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_rMFy9xx22T
+createdAt: 2026-09-26T19:47:06.071535
+updatedAt: 2026-09-26T19:55:18.480433
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Names the caller's authenticators — identity, name, `confirmed_at`, `last_used_at` — the shape a settings page renders. It never carries a secret.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: bNJ4xpHNir
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: YfsBqt3TxT
+method: POST
+name: '[Tango] List TOTP enrollments'
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/ListTotpEnrollments
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

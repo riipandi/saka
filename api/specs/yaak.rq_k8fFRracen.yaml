@@ -1,0 +1,53 @@
+type: http_request
+model: http_request
+id: rq_k8fFRracen
+createdAt: 2026-09-26T19:47:06.209335
+updatedAt: 2026-09-26T19:58:40.695319
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "code": "123456"
+    }
+bodyType: application/json
+description: |-
+  Rewrites the account's recovery set — one set per account, not per device — and answers the 10 fresh codes in the clear exactly once. The previous set dies with the call, spent or not.
+
+  `code` is the second-factor proof: a code from a confirmed authenticator or a current recovery code. An account holding no confirmed factor is refused.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: AmhiGjMAvp
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: pwAS2btPeN
+method: POST
+name: '[Tango] Regenerate recovery codes'
+sortPriority: 4111.111111111111
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/RegenerateRecoveryCodes
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

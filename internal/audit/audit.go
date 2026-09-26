@@ -125,6 +125,34 @@ const (
 	// actor fields name who stepped back out.
 	EventImpersonationStopped = "impersonation_stopped"
 
+	// EventMfaEnrollmentStarted is a second-factor ceremony that wrote an
+	// unconfirmed authenticator. The secret is never in the record: the
+	// enrollment's identifier is.
+	EventMfaEnrollmentStarted = "mfa_enrollment_started"
+
+	// EventMfaEnrollmentConfirmed is a second factor now active, proven by
+	// a code the app rendered. The first confirmation also wrote the
+	// account's recovery set, which the record does not repeat.
+	EventMfaEnrollmentConfirmed = "mfa_enrollment_confirmed"
+
+	// EventMfaEnrollmentFailed is a confirm ceremony whose code did not
+	// verify. The refusal is the signal a reader of the log is watching
+	// for — someone holds the QR code and cannot generate its codes.
+	EventMfaEnrollmentFailed = "mfa_enrollment_failed"
+
+	// EventMfaSignIn is a session the second factor completed. It is a
+	// sign-in of its own kind, like the one-time access exchange: the
+	// password was verified, but the session's opening was gated on a code.
+	EventMfaSignIn = "mfa_sign_in"
+
+	// EventMfaRecoveryRegenerated is a recovery set rewritten. The record
+	// carries the count, never a value.
+	EventMfaRecoveryRegenerated = "mfa_recovery_regenerated"
+
+	// EventMfaDisabled is every second factor removed — by the account's
+	// own proof, or by the last authenticator's removal.
+	EventMfaDisabled = "mfa_disabled"
+
 	// EventUserBanned is an account's access withdrawn for a stated term.
 	// The record names the account it is about and carries the reason and
 	// the expiry in the payload; the sessions the ban ended are counted

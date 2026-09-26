@@ -84,6 +84,34 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	return &row, nil
 }
 
+// FindAccountByID returns the account the identifier names — the read the
+// MFA bridge's completion runs, when the pending row has already named the
+// account and the session issuer needs the row back.
+func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(
+		"u.id", "u.username", "u.email", "u.display_name", "u.is_admin",
+		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
+	)
+	sb.From(user.UserTable + " u")
+	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
+	sb.Where(sb.Equal("u.id", id))
+
+	query, args := sb.Build()
+	var row Account
+	err := r.db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.IsAdmin,
+		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, datastore.ErrNoRows
+	}
+	if err != nil {
+		return nil, fmt.Errorf("signin: find account by id: %w", err)
+	}
+	return &row, nil
+}
+
 // CreateSession stores the refresh token's hashed row. The caller owns the
 // transaction, so the session row and the last-login touch commit together.
 // The typed session id leaves as its UUID: the column is a UUID, the `sess_`

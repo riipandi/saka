@@ -9,3 +9,8 @@ const ProviderPassword = "password"
 // vocabulary of how a session was opened, so they are named beside each other
 // here rather than beside the features that mint them.
 const ProviderOneTimeAccess = "one_time_access"
+
+// ProviderTOTP is the `provider` value a session row carries when the
+// sign-in ran past a second factor: the password was verified, and a TOTP
+// code or a recovery code opened the session through the MFA bridge.
+const ProviderTOTP = "totp"

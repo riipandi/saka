@@ -65,6 +65,23 @@ var ProcedureRules = map[string]Entry{
 	authv1connect.OneTimeAccessServiceCreateTokenProcedure:         {Rule: Admin},
 	authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure: {Rule: Admin},
 
+	// The multifactor surfaces split at the same line the one-time access
+	// codes do. CompleteSignIn is reached with the pending token the
+	// password check minted — the caller holds no access token yet, and the
+	// pending token is the credential the procedure judges. The enrollment,
+	// listing, regeneration, and switch-off run on the caller's own token,
+	// so `Session` names them: a machine credential has no second factor to
+	// manage, and the refusal of an impersonated caller keeps an
+	// administrator from enrolling a factor onto the account they are
+	// wearing — the delegation must end before the account's guard changes.
+	authv1connect.MultifactorServiceCompleteSignInProcedure:          {Rule: Public},
+	authv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:     {Rule: Session},
+	authv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Session},
+	authv1connect.MultifactorServiceListTotpEnrollmentsProcedure:     {Rule: Session},
+	authv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
+	authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
+	authv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
+
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and
 	// the access token a renewal is fixing may already be expired, so the

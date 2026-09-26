@@ -16,6 +16,7 @@ package tango.auth.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1;authv1";
 
@@ -27,7 +28,65 @@ service AuthService {
   // email (matched exactly, the way the unique index does). A wrong
   // identity and a wrong password answer the same failure, so the endpoint
   // does not disclose which half was wrong.
+  //
+  // An account with a confirmed authenticator answers no tokens: the
+  // response carries the MFA challenge instead, and the tokens come from
+  // MultifactorService.CompleteSignIn once the second factor answers.
   rpc SignIn(SignInRequest) returns (SignInResponse);
+}
+
+// MultifactorService is the second factor: TOTP authenticators and the
+// recovery codes that stand in when every device is out of reach.
+//
+// Enrollment is a two-step ceremony on purpose. BeginTotpEnrollment writes an
+// unconfirmed authenticator the account can name, and ConfirmTotpEnrollment
+// turns it active only after a code read from the app proves the account
+// really holds the secret — a QR code shown to the wrong person is worthless
+// the moment the confirm step refuses the code it cannot generate.
+//
+// The sign-in bridge is a server-side row, not a claim: SignIn's password
+// success writes a short-lived pending token whose only trace is a hash, and
+// CompleteSignIn spends it — plus a TOTP code or a recovery code — on the
+// same token pair a plain sign-in would have issued.
+service MultifactorService {
+  // BeginTotpEnrollment writes an unconfirmed authenticator and answers the
+  // secret the app imports: the Base32 form and the otpauth:// URI the QR
+  // code renders. The secret is stored sealed (`enc:`) and never leaves the
+  // server again after this one answer.
+  rpc BeginTotpEnrollment(BeginTotpEnrollmentRequest) returns (BeginTotpEnrollmentResponse);
+
+  // ConfirmTotpEnrollment activates the named enrollment once the app's code
+  // verifies against its secret. The answer carries the account's recovery
+  // codes in the clear exactly once — their hashed rows are all that survive
+  // the call.
+  rpc ConfirmTotpEnrollment(ConfirmTotpEnrollmentRequest) returns (ConfirmTotpEnrollmentResponse);
+
+  // ListTotpEnrollments names the account's authenticators — the shape a
+  // settings page renders. It never carries a secret.
+  rpc ListTotpEnrollments(ListTotpEnrollmentsRequest) returns (ListTotpEnrollmentsResponse);
+
+  // DeleteTotpEnrollment removes one authenticator. The code field carries
+  // the proof the caller still holds a factor: a code from another confirmed
+  // authenticator, or a recovery code. A first enrollment needs no proof —
+  // deleting an unconfirmed row is how a mistyped start is thrown away.
+  rpc DeleteTotpEnrollment(DeleteTotpEnrollmentRequest) returns (DeleteTotpEnrollmentResponse);
+
+  // CompleteSignIn spends a pending token from SignIn plus the second factor
+  // — a TOTP code or a recovery code — on the full token pair. The guard
+  // leaves it Public: the pending token is the credential the password check
+  // minted, and it dies with its expiry or its failure budget.
+  rpc CompleteSignIn(CompleteSignInRequest) returns (CompleteSignInResponse);
+
+  // RegenerateRecoveryCodes rewrites the account's recovery set and answers
+  // the fresh codes in the clear exactly once. The code field proves the
+  // caller holds a factor; the old set dies with the call.
+  rpc RegenerateRecoveryCodes(RegenerateRecoveryCodesRequest) returns (RegenerateRecoveryCodesResponse);
+
+  // DisableMfa removes every authenticator and the recovery set — the way
+  // out when the account no longer wants the second factor. The code field
+  // proves the caller holds it; a stolen session alone cannot switch the
+  // protection off.
+  rpc DisableMfa(DisableMfaRequest) returns (DisableMfaResponse);
 }
 
 // SessionService is the lifecycle of the session a sign-in opened.
@@ -118,8 +177,25 @@ message SignInRequest {
   optional bool remember = 3;
 }
 
-// SignInResponse is the token pair and the account it was issued for.
+// SignInResponse is the token pair and the account it was issued for —
+// or, when the account keeps a confirmed authenticator, the pending bridge
+// the second factor spends.
 message SignInResponse {
+  // mfa_required is true when the account keeps a confirmed authenticator:
+  // no tokens were issued, and the caller finishes the sign-in through
+  // MultifactorService.CompleteSignIn with the pending token. Every token
+  // field below is empty in that case.
+  bool mfa_required = 10;
+
+  // mfa_pending_token is the short-lived bridge the password check minted.
+  // It is presented to CompleteSignIn together with the second factor and
+  // has no other use.
+  string mfa_pending_token = 11;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 12;
+
   // access_token is the Bearer JWT. It is short-lived and stateless: the
   // caller sends it in the Authorization header and the server verifies it
   // against the published key set without a round trip.
@@ -461,4 +537,184 @@ message StopImpersonatingResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 9;
+}
+
+// ---- Multifactor: enrollment ----
+
+// BeginTotpEnrollmentRequest names the authenticator the account is enrolling.
+message BeginTotpEnrollmentRequest {
+  // name is the label the account's settings page renders for the device —
+  // "iPhone 17", "Aegis on tablet". It is display data, never a credential.
+  string name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+}
+
+// BeginTotpEnrollmentResponse answers the secret the authenticator imports.
+// This is the only call that ever carries it.
+message BeginTotpEnrollmentResponse {
+  // totp_id is the TypeID (`totp_…`) of the unconfirmed enrollment row. The
+  // confirm, and the delete of a mistyped start, name it.
+  string totp_id = 1;
+
+  // name is the label as the row stores it.
+  string name = 2;
+
+  // secret is the Base32 shared secret the app stores. It leaves the server
+  // here and never again: later reads answer the enrollment's metadata only.
+  string secret = 3;
+
+  // otpauth_uri is the `otpauth://totp/…` provisioning URI the QR code
+  // renders — issuer, account label, and every parameter the app needs.
+  string otpauth_uri = 4;
+
+  // expires_at is when the unconfirmed enrollment dies if never confirmed.
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+// ConfirmTotpEnrollmentRequest proves the app really holds the secret.
+message ConfirmTotpEnrollmentRequest {
+  // totp_id is the enrollment the app's code answers.
+  string totp_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is the six-digit value the authenticator renders right now.
+  string code = 2 [
+    (buf.validate.field).string.pattern = "^[0-9]{6,8}$"
+  ];
+}
+
+// ConfirmTotpEnrollmentResponse answers the recovery set in the clear once —
+// the hashed rows are all that survive the call.
+message ConfirmTotpEnrollmentResponse {
+  // totp_id is the now-confirmed enrollment.
+  string totp_id = 1;
+
+  // recovery_codes are the account's recovery codes in the clear, exactly
+  // once. The account stores them outside the server; later procedures
+  // answer counts, never values.
+  repeated string recovery_codes = 2;
+}
+
+// ListTotpEnrollmentsRequest is empty: the caller's own enrollments answer.
+message ListTotpEnrollmentsRequest {}
+
+// ListTotpEnrollmentsResponse carries the metadata a settings page renders.
+// It never carries a secret.
+message ListTotpEnrollmentsResponse {
+  // enrollments are the account's authenticators, confirmed and pending.
+  repeated TotpEnrollment enrollments = 1;
+}
+
+// TotpEnrollment is one authenticator's view: identity and state, no secret.
+message TotpEnrollment {
+  // totp_id is the enrollment's TypeID (`totp_…`).
+  string totp_id = 1;
+
+  // name is the label the enrollment carries.
+  string name = 2;
+
+  // confirmed_at is when the ceremony completed; absent while the row is
+  // still unconfirmed.
+  optional google.protobuf.Timestamp confirmed_at = 3;
+
+  // last_used_at is when the enrollment last answered a challenge; absent
+  // until its first one.
+  optional google.protobuf.Timestamp last_used_at = 4;
+
+  // created_at is when the enrollment began.
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// DeleteTotpEnrollmentRequest names the row and carries the second-factor
+// proof the removal needs.
+message DeleteTotpEnrollmentRequest {
+  // totp_id is the enrollment to remove.
+  string totp_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is a code from another confirmed authenticator or a recovery code.
+  // Empty is accepted only while the account would keep no confirmed
+  // authenticator after this removal.
+  string code = 2 [(buf.validate.field).string.max_len = 64];
+}
+
+// DeleteTotpEnrollmentResponse confirms the removal.
+message DeleteTotpEnrollmentResponse {
+  // message is the human-readable sentence describing what the call did.
+  string message = 1;
+}
+
+// ---- Multifactor: the sign-in bridge ----
+
+// CompleteSignInRequest spends the pending bridge plus the second factor.
+message CompleteSignInRequest {
+  // pending_token is the bridge SignIn minted on the password success.
+  string pending_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is the second factor: the authenticator's six-digit value, or one
+  // of the account's recovery codes.
+  string code = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+}
+
+// CompleteSignInResponse is the token pair — the shape SignIn answers with on
+// a one-factor account, so a client entering the session treats the two alike.
+message CompleteSignInResponse {
+  // access_token is the Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the session window in seconds — the long or the
+  // short one by the remember flag the original SignIn carried.
+  int32 refresh_expires_in = 4;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token, stored server-side only as a hash.
+  string refresh_token = 5;
+
+  // session_id is the session's TypeID (`sess_…`).
+  string session_id = 6;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 7;
+
+  // status is the outcome word the client checks — success.
+  string status = 8;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 9;
+}
+
+// ---- Multifactor: recovery codes and the way out ----
+
+// RegenerateRecoveryCodesRequest carries the second-factor proof.
+message RegenerateRecoveryCodesRequest {
+  // code is a code from a confirmed authenticator or a current recovery
+  // code. An account that has never confirmed an enrollment is refused.
+  string code = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RegenerateRecoveryCodesResponse answers the fresh set in the clear once.
+message RegenerateRecoveryCodesResponse {
+  // recovery_codes are the new codes; the previous set is dead.
+  repeated string recovery_codes = 1;
+}
+
+// DisableMfaRequest carries the second-factor proof the switch-off needs.
+message DisableMfaRequest {
+  // code is a code from a confirmed authenticator or a recovery code.
+  string code = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DisableMfaResponse confirms every factor is gone.
+message DisableMfaResponse {
+  // message is the human-readable sentence describing what the call did.
+  string message = 1;
 }

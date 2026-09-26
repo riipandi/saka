@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_DVwpSQua2R
+createdAt: 2026-09-26T19:47:06.162831
+updatedAt: 2026-09-26T19:55:30.911313
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "pending_token": "REPLACE_PENDING_TOKEN",
+      "code": "123456"
+    }
+bodyType: application/json
+description: |-
+  Spends the pending bridge `SignIn` minted on the password success plus the second factor — the authenticator's six-digit code, or one recovery code — on the full token pair. The answer is the same shape a one-factor sign-in gives, so a client entering the session treats the two alike.
+
+  The bridge is server-side state with a hash: it dies at its success, at its expiry (5 minutes), or after **3 wrong codes** — whichever comes first, and a replayed code from the same time window refuses on the step guard. A wrong code or a dead bridge answers `unauthenticated` with no disclosure of which half was the lie.
+
+  Guard: Public — the pending token is the credential.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: aTNUAw0pZA
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 4PDFqVpFww
+method: POST
+name: '[Tango] Complete MFA sign-in'
+sortPriority: 4037.037037037037
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/CompleteSignIn
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

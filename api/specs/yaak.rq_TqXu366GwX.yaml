@@ -1,0 +1,53 @@
+type: http_request
+model: http_request
+id: rq_TqXu366GwX
+createdAt: 2026-09-26T19:47:05.972030
+updatedAt: 2026-09-26T19:55:18.478100
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "name": "Google Authenticator"
+    }
+bodyType: application/json
+description: |-
+  Writes an unconfirmed authenticator for the caller's account and answers the shared secret exactly once: the Base32 `secret` for manual entry and the `otpauth_uri` a QR code renders.
+
+  The secret is stored sealed (`enc:`) and never leaves the server again — later reads answer metadata only. The enrollment dies if not confirmed within 15 minutes. Accounts hold at most 10 authenticators (confirmed and pending together); multiple devices per account are the point.
+
+  Guard: Session (an impersonated caller is refused — an administrator must not enroll a factor onto the account they are wearing).
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: xtJyQeiDn4
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: vYYmZxrHJY
+method: POST
+name: '[Tango] Begin TOTP enrollment'
+sortPriority: 1000.0
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/BeginTotpEnrollment
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

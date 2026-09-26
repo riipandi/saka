@@ -13,6 +13,7 @@ import (
 	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
 	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -83,6 +84,13 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 		return nil, mapError(err)
 	}
 
+	// The MFA fork changes the response's shape, not its envelope: the
+	// challenge answer carries no token fields, and the message names the
+	// next procedure rather than pretending a session opened.
+	message := "the token pair was issued"
+	if result.MFARequired {
+		message = "the second factor is required to complete the sign-in"
+	}
 	return connect.NewResponse(&authv1.SignInResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
@@ -90,6 +98,14 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 		RefreshExpiresIn: result.RefreshExpiresIn,
 		RefreshToken:     result.RefreshToken,
 		SessionId:        result.SessionID,
+		MfaRequired:      result.MFARequired,
+		MfaPendingToken:  result.MFAPendingToken,
+		MfaPendingExpiresAt: func() *timestamppb.Timestamp {
+			if result.MFAPendingExpiresAt.IsZero() {
+				return nil
+			}
+			return timestamppb.New(result.MFAPendingExpiresAt)
+		}(),
 		User: &authv1.AuthenticatedUser{
 			Id:          result.User.ID,
 			Username:    result.User.Username,
@@ -99,7 +115,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 		},
 
 		Status:  responder.StatusSuccess,
-		Message: "the token pair was issued",
+		Message: message,
 	}), nil
 }
 

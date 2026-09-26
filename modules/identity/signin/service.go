@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/jwtutils"
+	"uuid"
 )
 
 // The failures a sign-in reports. The handler maps them to connect codes, so
@@ -47,6 +48,12 @@ const TokenType = jwtutils.BearerScheme
 type Service struct {
 	pool *datastore.Postgres
 	repo *Repository
+	// mfa is the second factor's gate, wired after both services exist: the
+	// sign-in asks it whether the verified account keeps a confirmed
+	// authenticator and mints the pending bridge through it. A nil gate is
+	// the state a unit test is in, and answers "no second factor" — the
+	// sign-in is one factor, exactly as it was before the feature existed.
+	mfa mfaGate
 	// audit writes the record of a successful sign-in. It is the shared
 	// recorder, so the record's columns and vocabulary are decided in one
 	// place rather than here.
@@ -64,6 +71,26 @@ type Service struct {
 	// against, so the two failure paths cost the same work. It is computed
 	// once, on the first miss.
 	dummyHash once[string]
+}
+
+// mfaGate is the second factor's sign-in seam: the gate question the password
+// success asks and the bridge it mints. The multifactor service satisfies it;
+// the interface keeps the sign-in package from importing it back.
+type mfaGate interface {
+	// GateSignIn answers the challenge a verified password hands over: the
+	// pending token, its expiry, and whether a challenge is owed at all.
+	GateSignIn(ctx context.Context, userID uuid.UUID, remember bool) (PendingSignIn, error)
+	// KeepsConfirmedFactor answers whether the account holds a confirmed
+	// authenticator — the question the sign-in's fork runs on.
+	KeepsConfirmedFactor(ctx context.Context, userID uuid.UUID) (bool, error)
+}
+
+// PendingSignIn is the bridge the gate mints. It is the sign-in package's
+// own view of the multifactor outcome, so the two packages share no type
+// beyond this shape.
+type PendingSignIn struct {
+	Token     string
+	ExpiresAt time.Time
 }
 
 // NewService builds the service. keys is the area's key-set service: the
@@ -120,6 +147,15 @@ type Result struct {
 	RefreshToken     string
 	SessionID        string
 	User             User
+
+	// MFARequired marks the fork: true, the account keeps a confirmed
+	// authenticator and the token fields are empty — the caller completes
+	// the sign-in through the second factor with the pending token.
+	MFARequired bool
+	// MFAPendingToken is the bridge the password check minted.
+	MFAPendingToken string
+	// MFAPendingExpiresAt is when the bridge dies.
+	MFAPendingExpiresAt time.Time
 }
 
 // SignIn verifies the credential and issues the access and refresh tokens.
@@ -149,6 +185,28 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	}
 	if !match {
 		return Result{}, ErrInvalidCredentials
+	}
+
+	// The second factor's fork runs before any session is opened: an account
+	// keeping a confirmed authenticator answers the pending bridge instead of
+	// the pair, and the tokens wait for the code. The fork is silent in the
+	// response otherwise — a one-factor account sees nothing of it.
+	if s.mfa != nil {
+		owed, owedErr := s.mfa.KeepsConfirmedFactor(ctx, account.ID)
+		if owedErr != nil {
+			return Result{}, owedErr
+		}
+		if owed {
+			pending, gateErr := s.mfa.GateSignIn(ctx, account.ID, params.Remember)
+			if gateErr != nil {
+				return Result{}, gateErr
+			}
+			return Result{
+				MFARequired:         true,
+				MFAPendingToken:     pending.Token,
+				MFAPendingExpiresAt: pending.ExpiresAt,
+			}, nil
+		}
 	}
 
 	// The account's state is the issuer's check: a disabled or banned account
@@ -273,10 +331,27 @@ func bannedAt(account *Account, at time.Time) bool {
 	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
 }
 
+// WithMFAGate arms the second factor's fork. The gate is wired after both
+// services construct — the sign-in cannot import the multifactor package
+// without a cycle, and the gate's interface keeps the seam one-shaped.
+func (s *Service) WithMFAGate(gate mfaGate) *Service {
+	s.mfa = gate
+	return s
+}
+
 // AccessTokenTTL is the lifetime the access token is signed with, so a
 // renewal answers the same expires_in the sign-in does.
 func (s *Service) AccessTokenTTL() time.Duration {
 	return s.accessTTL
+}
+
+// FindAccountByID exposes the account read the MFA bridge's completion runs:
+// the pending row has already named the account, and the session issuer needs
+// the row back to open the session. The read runs outside the bridge's
+// transaction deliberately: the row was read before the proof, and re-reading
+// inside the write transaction would only widen its lock window.
+func (s *Service) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, error) {
+	return s.repo.FindAccountByID(ctx, id)
 }
 
 // SessionLifetime picks the session lifetime the caller asked for: the short
