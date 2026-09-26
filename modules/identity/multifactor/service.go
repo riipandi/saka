@@ -119,14 +119,12 @@ const ProvisioningTTL = enrollTTL
 
 // Service is the second factor's logic over its tables.
 type Service struct {
-	pool   *datastore.Postgres
-	repo   *Repository
-	cipher cryptoCipher
-	issuer signinIssuer
-	audit  *audit.Recorder
-	log    *slog.Logger
-	// issuerName is the identity the otpauth URI names — the deployment's
-	// base URL, so the authenticator app renders "Tango: user@example.com".
+	pool       *datastore.Postgres
+	repo       *Repository
+	cipher     cryptoCipher
+	issuer     signinIssuer
+	audit      *audit.Recorder
+	log        *slog.Logger
 	issuerName string
 	now        func() time.Time
 }
@@ -191,11 +189,19 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 		return BeginTotpEnrollmentResult{}, ErrEnrollmentLimit
 	}
 
+	// The label the authenticator renders — "Tango: user@example.com" — is
+	// the account the ceremony is for. An account the issuer cannot read is
+	// a caller the guard should have refused, so the failure is internal.
+	account, err := s.issuer.FindAccountByID(ctx, userID)
+	if err != nil {
+		return BeginTotpEnrollmentResult{}, fmt.Errorf("multifactor: enrollment account: %w", err)
+	}
+
 	// pquerna's generator produces a 20-byte secret in Base32, the size the
 	// authenticator apps' QR readers all assume.
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      s.issuerName,
-		AccountName: s.issuerName,
+		AccountName: account.Email,
 		Period:      defaultPeriod,
 		Digits:      otp.DigitsSix,
 		Algorithm:   otp.AlgorithmSHA1,

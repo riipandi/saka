@@ -238,7 +238,7 @@ var Package = do.Package(
 			}
 			cipher = built
 		}
-		service := multifactor.NewService(pool, cipher, issuer, recorder, c.App.BaseURL, log)
+		service := multifactor.NewService(pool, cipher, issuer, recorder, "Tango", log)
 		issuer.WithMFAGate(service)
 		return service, nil
 	}),
