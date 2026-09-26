@@ -81,6 +81,14 @@ var ProcedureRules = map[string]Entry{
 	authv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
 	authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
 	authv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
+	// The step-up verification runs on the caller's own token — the code it
+	// spends proves the holder, the session only says whose set to look in.
+	// The administrative disable is the operator's door over a named
+	// account: the administrative session is the authority the procedure
+	// carries, because the reason it runs is that the holder has nothing
+	// left to prove.
+	authv1connect.MultifactorServiceVerifyRecoveryCodeProcedure: {Rule: Session},
+	authv1connect.MultifactorServiceAdminDisableMfaProcedure:    {Rule: Admin},
 
 	// The password recovery surfaces split at the same line. The trigger and
 	// the spend are reached before any token exists — a caller who lost the

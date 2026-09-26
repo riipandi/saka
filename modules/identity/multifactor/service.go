@@ -103,6 +103,11 @@ var (
 	// ErrNoRecoveryCodes is a regenerate or a recovery challenge answered by an
 	// account that holds no recovery set.
 	ErrNoRecoveryCodes = errors.New("multifactor: no recovery codes are enrolled")
+
+	// ErrUserNotFound is a target account the issuer does not know — the
+	// administrative disable's not-found, the same refusal an unfindable
+	// enrollment answers.
+	ErrUserNotFound = errors.New("multifactor: the account is not found")
 )
 
 // attemptBudget tracks the wrong codes one pending bridge has eaten. The
@@ -127,6 +132,7 @@ type Service struct {
 	log        *slog.Logger
 	issuerName string
 	now        func() time.Time
+	notices    noticeEnqueuer
 }
 
 // cryptoCipher is the sealing the service needs. The concrete type is the
@@ -713,6 +719,115 @@ func (s *Service) DisableMfa(ctx context.Context, userID uuid.UUID, code string)
 
 	s.audit.Record(ctx, s.pool, audit.Entry{
 		Event:  audit.EventMfaDisabled,
+		Status: audit.StatusSuccess,
+		UserID: userID.String(),
+	})
+	return nil
+}
+
+// MfaDisabledNotice is what the administrative disable hands the
+// notification channel: the account it was about, and the reason the
+// operator wrote. The channel renders and delivers; the service only
+// states.
+type MfaDisabledNotice struct {
+	UserID      string
+	Email       string
+	DisplayName string
+	Reason      string
+}
+
+// noticeEnqueuer is the notification channel the administrative disable
+// hands the message to. The concrete type lives in internal/jobs — the
+// adapter keeps the queue out of this package, the way the password
+// recovery's enqueuer does.
+type noticeEnqueuer interface {
+	EnqueueMfaDisabledNotice(ctx context.Context, notice MfaDisabledNotice)
+}
+
+// WithNoticeEnqueuer wires the notification channel after construction —
+// the same post-construction seam the sign-in gate rides, because the
+// queue client is built beside this service, not beneath it.
+func (s *Service) WithNoticeEnqueuer(enqueuer noticeEnqueuer) *Service {
+	s.notices = enqueuer
+	return s
+}
+
+// AdminDisableMfa removes every authenticator and the recovery set of the
+// named account. The caller is the administrator: no proof code exists to
+// give — the holder has lost every factor, which is the reason the
+// procedure runs — so the administrative session is the authority and the
+// record names it. An account without a confirmed factor is refused: there
+// is nothing to disable, and the refusal tells the operator so.
+func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, reason string) error {
+	// The target is resolved before the tables are read: an unknown
+	// identifier is the operator's typo, and it answers the not-found the
+	// other administrative refusals keep.
+	if _, err := s.issuer.FindAccountByID(ctx, targetUserID); err != nil {
+		return ErrUserNotFound
+	}
+
+	confirmed, err := s.repo.CountConfirmedTotp(ctx, s.pool, targetUserID)
+	if err != nil {
+		return err
+	}
+	if confirmed == 0 {
+		return ErrNotConfirmed
+	}
+
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, deleteErr := s.repo.DeleteAllTotpForUser(ctx, tx, targetUserID); deleteErr != nil {
+			return deleteErr
+		}
+		return s.repo.DeleteAllRecoveryForUser(ctx, tx, targetUserID)
+	})
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]string{}
+	if reason != "" {
+		payload["reason"] = reason
+	}
+	s.audit.Record(ctx, s.pool, audit.Entry{
+		Event:   audit.EventMfaDisabled,
+		Status:  audit.StatusSuccess,
+		UserID:  targetUserID.String(),
+		Payload: payload,
+	})
+
+	// The notice rides the account's own address; a missing channel or a
+	// failed enqueue is best-effort — the removal has committed, and the
+	// audit record already says so.
+	if s.notices != nil {
+		account, findErr := s.issuer.FindAccountByID(ctx, targetUserID)
+		if findErr != nil {
+			return fmt.Errorf("multifactor: disable notice account: %w", findErr)
+		}
+		s.notices.EnqueueMfaDisabledNotice(ctx, MfaDisabledNotice{
+			UserID:      targetUserID.String(),
+			Email:       account.Email,
+			DisplayName: account.DisplayName,
+			Reason:      reason,
+		})
+	}
+	return nil
+}
+
+// VerifyRecoveryCode spends one recovery code as a standalone proof of
+// identity — the step-up a sensitive client flow asks for without a new
+// sign-in. The code is consumed exactly once, the way every use of a
+// recovery code is, and the consumption is the record.
+func (s *Service) VerifyRecoveryCode(ctx context.Context, userID uuid.UUID, code string) error {
+	consumed, err := s.consumeRecoveryCode(ctx, userID, code, s.now())
+	if err != nil {
+		return err
+	}
+	if !consumed {
+		return ErrCodeInvalid
+	}
+
+	s.audit.Record(ctx, s.pool, audit.Entry{
+		Event:  audit.EventMfaRecoveryVerified,
 		Status: audit.StatusSuccess,
 		UserID: userID.String(),
 	})

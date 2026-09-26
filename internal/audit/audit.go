@@ -153,6 +153,11 @@ const (
 	// own proof, or by the last authenticator's removal.
 	EventMfaDisabled = "mfa_disabled"
 
+	// EventMfaRecoveryVerified is a recovery code spent as a standalone
+	// proof of identity — the step-up verification, not a sign-in. The
+	// consumption is the happening: the set's remaining count dropped.
+	EventMfaRecoveryVerified = "mfa_recovery_verified"
+
 	// EventUserBanned is an account's access withdrawn for a stated term.
 	// The record names the account it is about and carries the reason and
 	// the expiry in the payload; the sessions the ban ended are counted

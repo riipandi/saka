@@ -249,6 +249,11 @@ var Package = do.Package(
 		}
 		service := multifactor.NewService(pool, cipher, issuer, recorder, "Tango", log)
 		issuer.WithMFAGate(service)
+		// The notification channel rides the post-construction seam like the
+		// gate does: internal/jobs cannot sit below the multifactor package
+		// without the cycle the password recovery's enqueuer avoids too.
+		client := do.MustInvoke[*queue.Client](i)
+		service.WithNoticeEnqueuer(jobs.NewMfaDisabledNotifier(client, log))
 		return service, nil
 	}),
 

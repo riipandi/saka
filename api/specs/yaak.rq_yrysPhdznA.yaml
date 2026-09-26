@@ -1,0 +1,44 @@
+type: http_request
+model: http_request
+id: rq_yrysPhdznA
+createdAt: 2026-09-26T21:47:19.203415
+updatedAt: 2026-09-26T21:51:37.988077
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "code": "${[ response.body.path(request='rq_RZ4HSoJBXM', behavior='smart', ttl='0', result='first', join=', ', path='$.recovery_codes[0]') ]}"
+    }
+bodyType: application/json
+description: '[Tango] Spends one recovery code as a standalone proof of identity — the step-up a sensitive client flow asks for without a new sign-in. The code is consumed exactly once: it cannot verify twice, and it cannot open a session with afterwards. A wrong, spent, or unknown code answers unauthenticated with one message. Requires a Bearer session; a machine credential is refused by the guard.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: zxu44pSGQg
+method: POST
+name: '[Tango] Verify recovery code'
+sortPriority: 4740.740740740741
+url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/VerifyRecoveryCode
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

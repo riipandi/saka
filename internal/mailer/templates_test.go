@@ -33,6 +33,7 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 		mailer.TemplateEmailChangeSuccess,
 		mailer.TemplateEmailVerification,
 		mailer.TemplateLoginNewDevice,
+		mailer.TemplateMfaDisabledNotice,
 		mailer.TemplateOneTimeAccess,
 		mailer.TemplatePasswordChangedNotice,
 		mailer.TemplatePasswordReset,
@@ -66,6 +67,9 @@ func fixtures() map[string]mailer.View {
 		mailer.TemplateLoginNewDevice: {Data: mailer.LoginNewDeviceData{
 			City: "Jakarta", Country: "Indonesia", IPAddress: "203.0.113.7",
 			Device: "Chrome on macOS", DateTime: time.Date(2026, 1, 2, 15, 4, 0, 0, time.UTC),
+		}},
+		mailer.TemplateMfaDisabledNotice: {Data: mailer.MfaDisabledNoticeData{
+			Name: "Neveu", Reason: "Lost authenticator device, verified over support",
 		}},
 		mailer.TemplateOneTimeAccess: {Data: mailer.OneTimeAccessData{
 			Code: "123456", LoginLink: "https://app.example.com/signin?method=code",

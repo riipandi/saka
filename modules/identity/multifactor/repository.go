@@ -264,17 +264,17 @@ func (r *Repository) ConsumeRecoveryCode(ctx context.Context, db datastore.Queri
 
 // CountRecoveryCodes answers the whole set's size and how much of it is
 // spent — the two numbers a settings page renders.
-func (r *Repository) CountRecoveryCodes(ctx context.Context, db datastore.Querier, userID uuid.UUID) (total, unused int, err error) {
+func (r *Repository) CountRecoveryCodes(ctx context.Context, db datastore.Querier, userID uuid.UUID) (total, used int, err error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)", "count(used_at)")
 	sb.From(RecoveryTable)
 	sb.Where(sb.Equal("user_id", userID))
 
 	query, args := sb.Build()
-	if err := db.QueryRow(ctx, query, args...).Scan(&total, &unused); err != nil {
+	if err := db.QueryRow(ctx, query, args...).Scan(&total, &used); err != nil {
 		return 0, 0, fmt.Errorf("multifactor: count recovery: %w", err)
 	}
-	return total, total - unused, nil
+	return total, used, nil
 }
 
 // HasUnusedRecoveryCode answers whether the account holds at least one code

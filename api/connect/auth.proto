@@ -201,6 +201,21 @@ service MultifactorService {
   // proves the caller holds it; a stolen session alone cannot switch the
   // protection off.
   rpc DisableMfa(DisableMfaRequest) returns (DisableMfaResponse);
+
+  // VerifyRecoveryCode spends one recovery code as a standalone proof of
+  // identity — the step-up a sensitive client flow asks for without a new
+  // sign-in. The code is consumed exactly once, the way every use of a
+  // recovery code is; the remaining count drops by one.
+  rpc VerifyRecoveryCode(VerifyRecoveryCodeRequest) returns (VerifyRecoveryCodeResponse);
+
+  // AdminDisableMfa removes every authenticator and the recovery set of a
+  // named account — the operator's way in when the holder has lost every
+  // factor and cannot prove anything. The administrator carries no proof
+  // code: the administrative session is the authority, the audit record
+  // names it, and a notification is queued to the account's address. An
+  // account that holds no confirmed authenticator answers the
+  // failed-precondition code — there is nothing to disable.
+  rpc AdminDisableMfa(AdminDisableMfaRequest) returns (AdminDisableMfaResponse);
 }
 
 // SessionService is the lifecycle of the session a sign-in opened.
@@ -829,4 +844,47 @@ message DisableMfaRequest {
 message DisableMfaResponse {
   // message is the human-readable sentence describing what the call did.
   string message = 1;
+}
+
+// VerifyRecoveryCodeRequest carries the code the caller proves itself with.
+message VerifyRecoveryCodeRequest {
+  // code is one unused recovery code, in the form xxxx-xxxx-xxxx. It is
+  // consumed on success — a code verified here cannot sign in with.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+}
+
+// VerifyRecoveryCodeResponse is empty: the protocol carries the proof.
+message VerifyRecoveryCodeResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// AdminDisableMfaRequest names the account whose second factor is removed
+// and the note the record keeps.
+message AdminDisableMfaRequest {
+  // user_id is the target account's wire-form identifier (`user_...`).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // reason is why the second factor is being removed — the sentence the
+  // audit record and the notification keep. Optional, but a removal
+  // without a stated reason is the one an audit trail cannot explain.
+  optional string reason = 2 [(buf.validate.field).string.max_len = 500];
+}
+
+// AdminDisableMfaResponse is empty: the protocol carries the success, and
+// the removal is a matter of the record and the notification.
+message AdminDisableMfaResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }

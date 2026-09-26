@@ -11,6 +11,7 @@ const (
 	TemplateEmailChangeSuccess    = "email-change-success"
 	TemplateEmailVerification     = "email-verification"
 	TemplateLoginNewDevice        = "login-with-new-device"
+	TemplateMfaDisabledNotice     = "mfa-disabled-notice"
 	TemplateOneTimeAccess         = "one-time-access"
 	TemplatePasswordReset         = "password-reset"
 	TemplatePasswordChangedNotice = "password-changed-notice"
@@ -100,5 +101,12 @@ type (
 	// UserUnbannedData renders TemplateUserUnbanned.
 	UserUnbannedData struct {
 		Name string
+	}
+	// MfaDisabledNoticeData renders TemplateMfaDisabledNotice. Reason is
+	// empty when the operator wrote none — the template renders its own
+	// case rather than naming no reason.
+	MfaDisabledNoticeData struct {
+		Name   string
+		Reason string
 	}
 )

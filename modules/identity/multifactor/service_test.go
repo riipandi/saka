@@ -65,9 +65,12 @@ func (c *testCipher) Decrypt(encoded string) (string, error) {
 	return string(plain), nil
 }
 
-// fakeIssuer records the sessions the completed sign-ins open.
+// fakeIssuer records the sessions the completed sign-ins open, and knows
+// exactly one account — the one the test seeded, the way the real issuer's
+// lookup answers nothing for an identifier that names no row.
 type fakeIssuer struct {
 	opened []uuid.UUID
+	known  uuid.UUID
 }
 
 func (f *fakeIssuer) IssueSession(_ context.Context, _ datastore.Querier, account *signin.Account, _, _ string, _ signin.SessionParams) (signin.Result, error) {
@@ -76,7 +79,22 @@ func (f *fakeIssuer) IssueSession(_ context.Context, _ datastore.Querier, accoun
 }
 
 func (f *fakeIssuer) FindAccountByID(_ context.Context, id uuid.UUID) (*signin.Account, error) {
+	if id != f.known {
+		return nil, errors.New("fakeIssuer: unknown account")
+	}
 	return &signin.Account{ID: id, Username: "langdon", Email: "langdon@example.com"}, nil
+}
+
+// fakeNoticeEnqueuer records the removal notices the administrative disable
+// queues.
+type fakeNoticeEnqueuer struct {
+	calls int
+	last  MfaDisabledNotice
+}
+
+func (f *fakeNoticeEnqueuer) EnqueueMfaDisabledNotice(_ context.Context, notice MfaDisabledNotice) {
+	f.calls++
+	f.last = notice
 }
 
 // mfaTestService builds the service over a fresh database and a seeded
@@ -91,6 +109,7 @@ func mfaTestService(t *testing.T) (*Service, *fakeIssuer, uuid.UUID, func(code s
 
 	// The account the ceremonies run on.
 	userID := uuid.NewV7()
+	issuer.known = userID
 	insertQuery, insertArgs := insertUserBuilder(userID, "langdon")
 	if _, err := pool.Exec(t.Context(), insertQuery, insertArgs...); err != nil {
 		require.NoError(t, err)
@@ -271,6 +290,97 @@ func TestDeleteTotpEnrollmentProvesTheLastRemoval(t *testing.T) {
 	owed, err := service.KeepsConfirmedFactor(ctx, userID)
 	require.NoError(t, err)
 	assert.False(t, owed)
+}
+
+// The administrative disable: every factor goes without a proof — the
+// operator's authority is the session, the notice rides the queue, and an
+// account holding nothing answers the precondition refusal.
+func TestAdminDisableMfaStripsEveryFactorWithoutAProof(t *testing.T) {
+	service, _, userID, currentCode := mfaTestService(t)
+	ctx := t.Context()
+
+	notices := &fakeNoticeEnqueuer{}
+	service.WithNoticeEnqueuer(notices)
+
+	// An account without a confirmed factor: nothing to disable.
+	err := service.AdminDisableMfa(ctx, userID, "cleanup")
+	assert.ErrorIs(t, err, ErrNotConfirmed)
+	assert.Equal(t, 0, notices.calls)
+
+	begun, err := service.BeginTotpEnrollment(ctx, userID, "Phone")
+	require.NoError(t, err)
+	confirmed, err := service.ConfirmTotpEnrollment(ctx, userID, begun.TotpID, currentCode(begun.TotpID))
+	require.NoError(t, err)
+
+	// The disable takes no code: the holder has lost every factor, which is
+	// the reason the procedure runs.
+	require.NoError(t, service.AdminDisableMfa(ctx, userID, "lost device, verified over support"))
+	owed, err := service.KeepsConfirmedFactor(ctx, userID)
+	require.NoError(t, err)
+	assert.False(t, owed)
+
+	// The notice names the account and carries the operator's reason.
+	assert.Equal(t, 1, notices.calls)
+	assert.Equal(t, "langdon@example.com", notices.last.Email)
+	assert.Equal(t, "lost device, verified over support", notices.last.Reason)
+
+	// The recovery set went with the factors: a code from the old set
+	// proves nothing anymore.
+	consumed, err := service.consumeRecoveryCode(ctx, userID, confirmed.RecoveryCodes[0], time.Now())
+	require.NoError(t, err)
+	assert.False(t, consumed)
+
+	// Disabling twice is the precondition refusal, not a second notice.
+	err = service.AdminDisableMfa(ctx, userID, "cleanup")
+	assert.ErrorIs(t, err, ErrNotConfirmed)
+	assert.Equal(t, 1, notices.calls)
+}
+
+// An unknown target answers the not-found the other administrative
+// refusals keep.
+func TestAdminDisableMfaRefusesAnUnknownAccount(t *testing.T) {
+	service, _, _, _ := mfaTestService(t)
+
+	err := service.AdminDisableMfa(t.Context(), uuid.NewV7(), "typo")
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+// The standalone proof: one code verifies once, the consumption is real,
+// and the wrong shape refuses the same way the challenge does.
+func TestVerifyRecoveryCodeSpendsOneCodeStandalone(t *testing.T) {
+	service, _, userID, currentCode := mfaTestService(t)
+	ctx := t.Context()
+
+	// An account holding no recovery set refuses like any wrong code.
+	err := service.VerifyRecoveryCode(ctx, userID, "AAAA-BBBB-CCCC")
+	assert.ErrorIs(t, err, ErrCodeInvalid)
+
+	begun, err := service.BeginTotpEnrollment(ctx, userID, "Phone")
+	require.NoError(t, err)
+	confirmed, err := service.ConfirmTotpEnrollment(ctx, userID, begun.TotpID, currentCode(begun.TotpID))
+	require.NoError(t, err)
+
+	// A wrong code refuses without spending anything.
+	err = service.VerifyRecoveryCode(ctx, userID, "XXXX-YYYY-ZZZZ")
+	assert.ErrorIs(t, err, ErrCodeInvalid)
+	status, err := service.RecoveryCodesStatus(ctx, userID)
+	require.NoError(t, err)
+	assert.Equal(t, recoveryCodeCount, status.Unused)
+
+	// The right code verifies — and is spent: it cannot verify twice, and
+	// it cannot open a session with either.
+	require.NoError(t, service.VerifyRecoveryCode(ctx, userID, confirmed.RecoveryCodes[0]))
+	err = service.VerifyRecoveryCode(ctx, userID, confirmed.RecoveryCodes[0])
+	assert.ErrorIs(t, err, ErrCodeInvalid)
+
+	outcome, err := service.BeginSignIn(ctx, userID, false)
+	require.NoError(t, err)
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, confirmed.RecoveryCodes[0], signin.SessionParams{})
+	assert.ErrorIs(t, err, ErrCodeInvalid)
+
+	status, err = service.RecoveryCodesStatus(ctx, userID)
+	require.NoError(t, err)
+	assert.Equal(t, recoveryCodeCount-1, status.Unused)
 }
 
 // ---- helpers the test file owns ----

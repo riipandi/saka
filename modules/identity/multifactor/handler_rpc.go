@@ -60,6 +60,8 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(authv1connect.MultifactorServiceCompleteSignInProcedure, connectHandler)
 	r.Handle(authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure, connectHandler)
 	r.Handle(authv1connect.MultifactorServiceDisableMfaProcedure, connectHandler)
+	r.Handle(authv1connect.MultifactorServiceVerifyRecoveryCodeProcedure, connectHandler)
+	r.Handle(authv1connect.MultifactorServiceAdminDisableMfaProcedure, connectHandler)
 }
 
 // rpcHandler is the transport mapping of the multifactor procedures. The
@@ -233,6 +235,41 @@ func (h *rpcHandler) DisableMfa(ctx context.Context, req *connect.Request[authv1
 	}), nil
 }
 
+// VerifyRecoveryCode spends one recovery code as the caller's standalone
+// proof.
+func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Request[authv1.VerifyRecoveryCodeRequest]) (*connect.Response[authv1.VerifyRecoveryCodeResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+
+	if err := h.service.VerifyRecoveryCode(ctx, userID, req.Msg.Code); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authv1.VerifyRecoveryCodeResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the recovery code verified and is now spent",
+	}), nil
+}
+
+// AdminDisableMfa removes the named account's every factor. The target is
+// the request's wire-form identifier — the one conversion the user package
+// owns — and the reason rides the audit record and the notification.
+func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[authv1.AdminDisableMfaRequest]) (*connect.Response[authv1.AdminDisableMfaResponse], error) {
+	targetID, err := user.UUIDFromWire(req.Msg.UserId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("the account is not found"))
+	}
+
+	if err := h.service.AdminDisableMfa(ctx, targetID, req.Msg.GetReason()); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authv1.AdminDisableMfaResponse{
+		Status:  responder.StatusSuccess,
+		Message: "multifactor authentication was disabled for the account",
+	}), nil
+}
+
 // mapError translates the service's failures into the codes the Connect
 // protocol carries. The internal ones are collapsed to one answer whose text
 // names nothing a caller could aim at.
@@ -270,6 +307,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrNoRecoveryCodes):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("no recovery codes are enrolled"))
+	case errors.Is(err, ErrUserNotFound):
+		return connect.NewError(connect.CodeNotFound,
+			errors.New("the account is not found"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
