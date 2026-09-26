@@ -223,6 +223,10 @@ func Default() Config {
 			// The reset token never appears in a response by default: the
 			// email is the only channel the raw value travels through.
 			ExposeResetToken: false,
+			// The authenticator secret never appears in a listing: the
+			// enrollment's one answer is the only channel it travels
+			// through, and development debugging turns this on by hand.
+			ExposeTotpSecret: false,
 		},
 		Auth: Auth{
 			Issuer:          "tango",

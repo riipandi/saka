@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_4AA73xACsZ
 createdAt: 2026-09-26T19:47:06.257638
-updatedAt: 2026-09-26T21:52:05.063178
+updatedAt: 2026-09-26T22:11:59.143608
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_egyHKUMnQU
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "code": "${[ otp.generate(secret='${[ response.body.path(request=\'rq_TqXu366GwX\', behavior=\'smart\', ttl=\'0\', result=\'first\', join=\', \', path=\'$.secret\') ]}', inputFormat='Base32', type='totp', algorithm='SHA1', digits='6', period='30', window='1') ]}"
+      "code": "${[ otp.generate(secret='${[ response.body.path(request=\'rq_rMFy9xx22T\', behavior=\'always\', ttl=\'0\', result=\'first\', join=\', \', path=\'$.enrollments[0].secret\') ]}', inputFormat='Base32', type='totp', algorithm='SHA1', digits='6', period='30', window='1') ]}"
     }
 bodyType: application/json
 description: |-
@@ -29,7 +29,7 @@ headers:
   value: '1'
   id: 5xi8gKaZsa
 method: POST
-name: '[Tango] Disable MFA'
+name: '[Tango] Disable current user MFA'
 sortPriority: 4880.658436213992
 url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/DisableMfa
 urlParameters: []

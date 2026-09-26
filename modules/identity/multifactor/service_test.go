@@ -383,6 +383,33 @@ func TestVerifyRecoveryCodeSpendsOneCodeStandalone(t *testing.T) {
 	assert.Equal(t, recoveryCodeCount-1, status.Unused)
 }
 
+// The listing's decrypted-secret aid: off by default, and on only where the
+// wiring passes the development flag — the answer then names the same
+// secret the enrollment began with.
+func TestListTotpEnrollmentsCarriesTheSecretOnlyWhereTheAidRuns(t *testing.T) {
+	service, _, userID, currentCode := mfaTestService(t)
+	ctx := t.Context()
+
+	begun, err := service.BeginTotpEnrollment(ctx, userID, "Phone")
+	require.NoError(t, err)
+	_, err = service.ConfirmTotpEnrollment(ctx, userID, begun.TotpID, currentCode(begun.TotpID))
+	require.NoError(t, err)
+
+	// The default listing names no secret: the enrollment's one answer was
+	// the only channel the value traveled through.
+	rows, err := service.ListTotpEnrollments(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Empty(t, rows[0].Secret)
+
+	// The aid answers the secret verbatim — the same value the app holds.
+	service.WithExposedSecrets(true)
+	rows, err = service.ListTotpEnrollments(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, begun.Secret, rows[0].Secret)
+}
+
 // ---- helpers the test file owns ----
 
 // migratedPool runs the migrations over a fresh container database. The

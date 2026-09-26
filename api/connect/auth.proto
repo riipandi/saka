@@ -52,11 +52,11 @@ service PasswordRecoveryService {
   // the endpoint is not an account enumerator. Repeating the request inside
   // the cooldown the last send opened refuses with resource_exhausted.
   //
-  // When the deployment enables `app.expose_reset_token`, the response
+  // When the deployment enables `app.expose_reset_token` — a development
+  // mode only aid, which validation refuses anywhere else — the response
   // also carries the raw token, so a client can drive the reset without
-  // reading the email. That option is a testing and integration aid: it
-  // hands the account to anyone who knows the address, so it ships off by
-  // default and a deployment that flips it accepts that trade-off.
+  // reading the email. It hands the account to anyone who knows the
+  // address, which is why the aid never leaves development.
   rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
 
   // ResetPassword spends a reset token on a new password. The token is the
@@ -86,8 +86,7 @@ message ForgotPasswordRequest {
 
 // ForgotPasswordResponse answers success whether the account exists or
 // not. The reset token is only present when the deployment enables
-// `app.expose_reset_token` — a testing and integration aid, off by
-// default.
+// `app.expose_reset_token` — a development mode only aid.
 message ForgotPasswordResponse {
   // status is the outcome word the client checks — success.
   string status = 1;
@@ -96,8 +95,9 @@ message ForgotPasswordResponse {
   string message = 2;
 
   // reset_token is the raw reset token, present only when the deployment
-  // enables `app.expose_reset_token`. It is 64 hexadecimal characters —
-  // URL-safe, no dashes or symbols — and is otherwise empty.
+  // enables `app.expose_reset_token` in the development mode. It is 64
+  // hexadecimal characters — URL-safe, no dashes or symbols — and is
+  // otherwise empty.
   string reset_token = 3;
 }
 
@@ -733,7 +733,8 @@ message ListTotpEnrollmentsResponse {
   repeated TotpEnrollment enrollments = 1;
 }
 
-// TotpEnrollment is one authenticator's view: identity and state, no secret.
+// TotpEnrollment is one authenticator's view: identity and state, and — only
+// when the development mode asks for it — the secret a debugging tool needs.
 message TotpEnrollment {
   // totp_id is the enrollment's TypeID (`totp_…`).
   string totp_id = 1;
@@ -751,6 +752,13 @@ message TotpEnrollment {
 
   // created_at is when the enrollment began.
   google.protobuf.Timestamp created_at = 5;
+
+  // secret is the decrypted Base32 shared secret the authenticator holds.
+  // It is present only when the deployment enables `app.expose_totp_secret`
+  // in the development mode — a debugging aid for enrollment tooling, and
+  // otherwise absent: the one answer BeginTotpEnrollment gave is the only
+  // channel the value travels through.
+  optional string secret = 6;
 }
 
 // DeleteTotpEnrollmentRequest names the row and carries the second-factor

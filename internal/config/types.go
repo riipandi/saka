@@ -73,10 +73,15 @@ type App struct {
 	// points the variable there.
 	AssetsURL string `koanf:"assets_url" json:"assets_url"`
 	// ExposeResetToken answers the raw password-reset token in the
-	// ForgotPassword response. It is a testing and integration aid — the
-	// response hands the account to anyone who knows the address — so it
-	// ships off and a deployment that flips it accepts that trade-off.
+	// ForgotPassword response. It is a development mode only aid — the
+	// response hands the account to anyone who knows the address — and
+	// validation refuses it anywhere else.
 	ExposeResetToken bool `koanf:"expose_reset_token" json:"expose_reset_token"`
+	// ExposeTotpSecret answers the decrypted authenticator secret in the
+	// ListTotpEnrollments response. It is a development aid for debugging
+	// enrollment — the response hands every account's second factor to the
+	// caller — so validation refuses it outside the development mode.
+	ExposeTotpSecret bool `koanf:"expose_totp_secret" json:"expose_totp_secret"`
 }
 
 // Auth holds the JWT signing material.

@@ -133,6 +133,9 @@ type Service struct {
 	issuerName string
 	now        func() time.Time
 	notices    noticeEnqueuer
+	// exposeSecrets carries the development aid the listing honors; the
+	// wiring passes it from the configuration's validated flag.
+	exposeSecrets bool
 }
 
 // cryptoCipher is the sealing the service needs. The concrete type is the
@@ -339,13 +342,24 @@ func (s *Service) ConfirmTotpEnrollment(ctx context.Context, userID uuid.UUID, t
 }
 
 // EnrollmentView is one enrollment's metadata — the shape a settings page
-// renders. It never carries a secret.
+// renders. It never carries a secret unless the service was built with
+// WithExposedSecrets, the development aid.
 type EnrollmentView struct {
 	TotpID      string
 	Name        string
 	ConfirmedAt *time.Time
 	LastUsedAt  *time.Time
 	CreatedAt   time.Time
+	Secret      string
+}
+
+// WithExposedSecrets turns the listing's decrypted-secret aid on. The wiring
+// passes the configuration's expose flag only, and the configuration's
+// validation refuses the flag outside the development mode — so a
+// production run cannot carry the aid even by accident.
+func (s *Service) WithExposedSecrets(expose bool) *Service {
+	s.exposeSecrets = expose
+	return s
 }
 
 // ListTotpEnrollments answers the account's authenticators.
@@ -356,13 +370,23 @@ func (s *Service) ListTotpEnrollments(ctx context.Context, userID uuid.UUID) ([]
 	}
 	out := make([]EnrollmentView, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, EnrollmentView{
+		view := EnrollmentView{
 			TotpID:      totpIDString(row.ID),
 			Name:        row.Name,
 			ConfirmedAt: row.ConfirmedAt,
 			LastUsedAt:  row.LastUsedAt,
 			CreatedAt:   row.CreatedAt,
-		})
+		}
+		if s.exposeSecrets {
+			secret, unsealErr := s.unseal(row.Secret)
+			if unsealErr != nil {
+				s.log.Warn("multifactor: enrollment secret could not be decrypted",
+					"error", unsealErr, "totp_id", view.TotpID)
+			} else {
+				view.Secret = secret
+			}
+		}
+		out = append(out, view)
 	}
 	return out, nil
 }

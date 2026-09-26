@@ -74,6 +74,25 @@ func TestValidationRejectsMinAboveMax(t *testing.T) {
 	assert.Contains(t, err.Error(), "database.min_conns")
 }
 
+func TestValidationRestrictsTheExposureAidsToDevelopment(t *testing.T) {
+	// The raw reset token and the decrypted authenticator secret hand an
+	// account's credential to anyone who can reach the response, so the
+	// flags are development aids: any other mode is a refused run.
+	err := resolveFile(t, `"app": {"mode": "production", "expose_reset_token": true}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.expose_reset_token")
+
+	err = resolveFile(t, `"app": {"mode": "staging", "expose_totp_secret": true}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.expose_totp_secret")
+}
+
+func TestValidationAcceptsTheExposureAidsInDevelopment(t *testing.T) {
+	// The default mode is development, so the flags answer their aid.
+	err := resolveFile(t, `"app": {"expose_reset_token": true, "expose_totp_secret": true}`)
+	require.NoError(t, err)
+}
+
 func TestValidationRejectsAConnectWaitWithoutAttemptsOrInterval(t *testing.T) {
 	// The wait is what makes the startup survive a database that is still
 	// starting; zero attempts would disable it and zero interval would turn

@@ -32,6 +32,18 @@ func (c Config) Validate() error {
 		"app.secret_key: must be 64 hex characters")
 	check(c.App.BaseURL == "" || isHTTPURL(c.App.BaseURL),
 		"app.base_url: %q must be an absolute http or https URL", c.App.BaseURL)
+	// The decrypted authenticator secret is a development aid only: outside
+	// the development mode the listing would hand every account's second
+	// factor to the caller, so the combination is a refused run rather than
+	// a flag a production deployment quietly carries.
+	check(!c.App.ExposeTotpSecret || c.App.Mode == ModeDevelopment,
+		"app.expose_totp_secret: true is allowed only when app.mode is %q", ModeDevelopment)
+	// The raw reset token rides the same restriction: a response that names
+	// the account's credential to anyone who knows the address is a
+	// development aid, and the modes above development answer it with a
+	// refused run.
+	check(!c.App.ExposeResetToken || c.App.Mode == ModeDevelopment,
+		"app.expose_reset_token: true is allowed only when app.mode is %q", ModeDevelopment)
 	check(c.App.AssetsURL == "" || isHTTPURL(c.App.AssetsURL),
 		"app.assets_url: %q must be an absolute http or https URL", c.App.AssetsURL)
 

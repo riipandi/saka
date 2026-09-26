@@ -83,8 +83,9 @@ type Deps struct {
 	// emails that carry them, and the swap a spent token buys.
 	PasswordRecovery *password.Service
 
-	// ExposeResetToken mirrors `app.expose_reset_token`: the deployment's
-	// decision whether ForgotPassword answers the raw token.
+	// ExposeResetToken mirrors `app.expose_reset_token`, gated on the
+	// development mode: the deployment's decision whether ForgotPassword
+	// answers the raw token.
 	ExposeResetToken bool
 
 	// UserGroups administers the groups accounts belong to.
@@ -254,6 +255,11 @@ var Package = do.Package(
 		// without the cycle the password recovery's enqueuer avoids too.
 		client := do.MustInvoke[*queue.Client](i)
 		service.WithNoticeEnqueuer(jobs.NewMfaDisabledNotifier(client, log))
+		// The decrypted-secret aid answers the configuration's flag, and the
+		// mode gate repeats what validation refuses: the flag outside the
+		// development mode is a misconfiguration, so both layers hold even
+		// if a caller skips validation.
+		service.WithExposedSecrets(c.App.ExposeTotpSecret && c.App.Mode == config.ModeDevelopment)
 		return service, nil
 	}),
 
@@ -316,7 +322,10 @@ func Mount(i do.Injector) (kernel.Module, error) {
 
 		PasswordRecovery: do.MustInvoke[*password.Service](i),
 
-		ExposeResetToken: c.App.ExposeResetToken,
+		// The same development-mode gate the multifactor aid keeps: the
+		// configuration's validation refuses the flag outside development,
+		// and the wiring repeats it so both layers hold.
+		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
 		UserGroups:       do.MustInvoke[*usergroup.Service](i),
 	}), nil
 }

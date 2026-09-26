@@ -145,13 +145,19 @@ func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Reque
 	}
 	out := make([]*authv1.TotpEnrollment, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, &authv1.TotpEnrollment{
+		view := &authv1.TotpEnrollment{
 			TotpId:      row.TotpID,
 			Name:        row.Name,
 			ConfirmedAt: timestampPtr(row.ConfirmedAt),
 			LastUsedAt:  timestampPtr(row.LastUsedAt),
 			CreatedAt:   timestamppb.New(row.CreatedAt),
-		})
+		}
+		// The secret is present only when the deployment's development aid
+		// carries it; the wire field is optional, so empty stays absent.
+		if row.Secret != "" {
+			view.Secret = &row.Secret
+		}
+		out = append(out, view)
 	}
 	return connect.NewResponse(&authv1.ListTotpEnrollmentsResponse{Enrollments: out}), nil
 }
