@@ -15,7 +15,7 @@ can start building without repeating the initial setup.
 
 ## Quick Start
 
-You will need [`Go >= 1.27`][golang], [`Node.js >= 24.21`][nodejs], [`PNPM >= 12.5`][pnpm], and
+You will need [`Go >= 1.27`][golang], [`Node.js >= 24.21`][nodejs], [`PNPM >= 12.6`][pnpm], and
 [`Docker >= 20.10`][docker] installed on your machine.
 
 ```bash

@@ -89,6 +89,10 @@ type dispatcher struct {
 	ticker           *time.Ticker
 	tasks            chan *taskRow
 	availableWorkers chan struct{}
+	// workerIdle wakes a fetch that found every worker busy. It carries no
+	// token: the fetcher recounts availableWorkers when the signal arrives,
+	// and one buffered wakeup is the whole message.
+	workerIdle chan struct{}
 	// ready reports that fetching is worth considering: a task was added.
 	ready chan struct{}
 	// trigger carries one fetch instruction from the triggerer to the
@@ -126,6 +130,7 @@ func (d *dispatcher) start(ctx context.Context) {
 	d.ready = make(chan struct{}, 1000)
 	d.trigger = make(chan struct{}, 10)
 	d.availableWorkers = make(chan struct{}, d.numWorkers)
+	d.workerIdle = make(chan struct{}, 1)
 	d.running.Store(true)
 
 	for range d.numWorkers {
@@ -269,9 +274,27 @@ func (d *dispatcher) worker() {
 // Done, and a send that blocked here would keep the worker alive — a worker
 // that took the nil from a closed tasks channel returns a token nothing took,
 // and the stop that waits on the WaitGroup would then never return.
+//
+// A token that lands also wakes a fetch waiting on an empty pool. That wake
+// is a signal, not a second token, and it must not block this return either.
 func (d *dispatcher) releaseWorker() {
 	select {
 	case d.availableWorkers <- struct{}{}:
+		d.signalIdle()
+	default:
+	}
+}
+
+// signalIdle wakes a fetch that found no free worker. A full buffer means a
+// wakeup is already waiting, which carries the same news. An unstarted
+// dispatcher has no channel: nothing is waiting, and a send must not block
+// the worker a stop is counting.
+func (d *dispatcher) signalIdle() {
+	if d.workerIdle == nil {
+		return
+	}
+	select {
+	case d.workerIdle <- struct{}{}:
 	default:
 	}
 }
@@ -298,17 +321,19 @@ func (d *dispatcher) signalReady() bool {
 
 // fetch claims the tasks the workers are free to run and schedules the next
 // fetch. A failure schedules too — the fetcher retries on the fallback clock
-// rather than hammering a struggling database.
+// rather than hammering a struggling database. A run that is stopping claims
+// nothing: the workers may already have left without returning a token.
 func (d *dispatcher) fetch() {
 	// Indicate that a task added from this point on should trigger another
 	// fetch: the state this run reads is about to be settled.
 	d.triggered.Store(false)
 
 	// Every worker free to run is a task worth claiming, so the pool is never
-	// handed more than it can take.
-	var workers int
-	for workers = len(d.availableWorkers); workers == 0; workers = len(d.availableWorkers) {
-		time.Sleep(100 * time.Millisecond)
+	// handed more than it can take. The fetcher is the only receiver, so the
+	// count cannot shrink before the tokens are taken below.
+	workers, ok := d.awaitWorkers()
+	if !ok {
+		return
 	}
 
 	at := now()
@@ -335,6 +360,27 @@ func (d *dispatcher) fetch() {
 		d.client.log.ErrorContext(d.ctx, "queue: failed to peek next task", "err", err.Error())
 	}
 	d.schedule(exists, wait)
+}
+
+// awaitWorkers reports how many workers are free. It returns false when the
+// run is stopping, so a fetch that found every worker busy does not outlive
+// them: a worker that leaves because its context ended never returns a token.
+func (d *dispatcher) awaitWorkers() (int, bool) {
+	for {
+		if d.ctx.Err() != nil || d.shutdownCtx.Err() != nil {
+			return 0, false
+		}
+		if workers := len(d.availableWorkers); workers > 0 {
+			return workers, true
+		}
+		select {
+		case <-d.workerIdle:
+		case <-d.shutdownCtx.Done():
+			return 0, false
+		case <-d.ctx.Done():
+			return 0, false
+		}
+	}
 }
 
 // scheduleRetry arms the fallback clock after a failed fetch: the database

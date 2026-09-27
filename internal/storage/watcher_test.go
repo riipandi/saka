@@ -116,6 +116,36 @@ func TestWatcherDebounceCollapsesABurstOfWritesIntoOneSettle(t *testing.T) {
 	}
 }
 
+func TestWatcherSettlesConcurrentWriters(t *testing.T) {
+	// The timer callback only sends on the settle channel. The map that
+	// owns the timers stays on the watch loop. Concurrent writers are what
+	// would panic if a later change touched that map from the callback.
+	_, spy, staging := startWatcher(t, 20*time.Millisecond)
+
+	names := []string{"langdon.txt", "neveu.txt", "vetra.txt", "granger.txt"}
+	errs := make(chan error, len(names))
+	var wg sync.WaitGroup
+	for _, name := range names {
+		wg.Go(func() {
+			path := filepath.Join(staging, name)
+			for range 8 {
+				if err := os.WriteFile(path, []byte("horcrux"), 0o600); err != nil {
+					errs <- err
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	for _, name := range names {
+		waitFor(t, spy, name)
+	}
+}
+
 func TestWatcherSettlesTheFilesAlreadyInStaging(t *testing.T) {
 	// A file that outlived its process sits in staging when the next run
 	// starts: the scan settles it without waiting for an event.

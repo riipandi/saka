@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -20,14 +21,17 @@ import (
 func TestTheWakeupSendsNeverBlock(t *testing.T) {
 	d := &dispatcher{
 		availableWorkers: make(chan struct{}, 1),
+		workerIdle:       make(chan struct{}, 1),
 		ready:            make(chan struct{}, 1),
 	}
-	// Fill both buffers, which is the state that made the send block.
+	// Fill the buffers, which is the state that made the send block.
 	d.availableWorkers <- struct{}{}
+	d.workerIdle <- struct{}{}
 	d.ready <- struct{}{}
 
 	sends := map[string]func(){
 		"releaseWorker": d.releaseWorker,
+		"signalIdle":    d.signalIdle,
 		"signalReady":   func() { _ = d.signalReady() },
 	}
 	for name, send := range sends {
@@ -96,4 +100,82 @@ func TestAFullReadyBufferStillArmsAFetch(t *testing.T) {
 		case <-time.After(100 * time.Millisecond):
 		}
 	})
+}
+
+// idleDispatcher is a started-shaped dispatcher with an empty worker pool,
+// the state a fetch reaches when every worker is inside a task.
+func idleDispatcher(t *testing.T) (*dispatcher, context.CancelFunc, context.CancelFunc) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	d := &dispatcher{
+		ctx:              ctx,
+		shutdownCtx:      shutdownCtx,
+		availableWorkers: make(chan struct{}, 1),
+		workerIdle:       make(chan struct{}, 1),
+	}
+	return d, cancel, shutdown
+}
+
+func TestFetchWaitsUntilAWorkerIsFree(t *testing.T) {
+	d, cancel, shutdown := idleDispatcher(t)
+	defer cancel()
+	defer shutdown()
+
+	got := make(chan int, 1)
+	go func() {
+		n, ok := d.awaitWorkers()
+		if !ok {
+			got <- -1
+			return
+		}
+		got <- n
+	}()
+
+	select {
+	case n := <-got:
+		t.Fatalf("fetch returned %d before any worker was free", n)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	d.releaseWorker()
+
+	select {
+	case n := <-got:
+		require.Equal(t, 1, n)
+	case <-time.After(time.Second):
+		t.Fatal("fetch did not wake when a worker became free")
+	}
+}
+
+func TestFetchReturnsWhenTheRunStops(t *testing.T) {
+	cases := []struct {
+		name string
+		stop func(cancel, shutdown context.CancelFunc)
+	}{
+		{name: "shutdown", stop: func(_, shutdown context.CancelFunc) { shutdown() }},
+		{name: "start context", stop: func(cancel, _ context.CancelFunc) { cancel() }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d, cancel, shutdown := idleDispatcher(t)
+			defer cancel()
+			defer shutdown()
+
+			got := make(chan bool, 1)
+			go func() {
+				_, ok := d.awaitWorkers()
+				got <- ok
+			}()
+
+			tc.stop(cancel, shutdown)
+
+			select {
+			case ok := <-got:
+				require.False(t, ok)
+			case <-time.After(time.Second):
+				t.Fatal("fetch kept waiting after the run stopped")
+			}
+		})
+	}
 }
