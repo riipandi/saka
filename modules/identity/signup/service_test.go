@@ -8,6 +8,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/usergroup"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
@@ -342,7 +344,7 @@ func TestSignupTokenListAndDelete(t *testing.T) {
 	second, err := service.CreateSignupToken(t.Context(), CreateTokenParams{TTL: 48 * time.Hour, UsageLimit: 5})
 	require.NoError(t, err)
 
-	tokens, pagination, err := service.ListSignupTokens(t.Context(), 1, 0)
+	tokens, pagination, err := service.ListSignupTokens(t.Context(), "", false, 1, 0)
 	require.NoError(t, err)
 	require.Len(t, tokens, 2)
 	assert.Equal(t, second.Token.ID, tokens[0].ID, "the list is newest first")
@@ -352,14 +354,14 @@ func TestSignupTokenListAndDelete(t *testing.T) {
 	assert.Equal(t, 2, *pagination.TotalItems)
 
 	// A page beyond the set answers no items and an unknown range.
-	tokens, pagination, err = service.ListSignupTokens(t.Context(), 2, 10)
+	tokens, pagination, err = service.ListSignupTokens(t.Context(), "", false, 2, 10)
 	require.NoError(t, err)
 	assert.Empty(t, tokens)
 	assert.Nil(t, pagination.FirstItemIndex)
 
 	require.NoError(t, service.DeleteSignupToken(t.Context(), first.Token.ID))
 
-	tokens, pagination, err = service.ListSignupTokens(t.Context(), 1, 0)
+	tokens, pagination, err = service.ListSignupTokens(t.Context(), "", false, 1, 0)
 	require.NoError(t, err)
 	assert.Len(t, tokens, 1)
 	require.NotNil(t, pagination.TotalItems)
@@ -367,4 +369,83 @@ func TestSignupTokenListAndDelete(t *testing.T) {
 
 	assert.ErrorIs(t, service.DeleteSignupToken(t.Context(), first.Token.ID), ErrTokenNotFound)
 	assert.ErrorIs(t, service.DeleteSignupToken(t.Context(), "not-a-uuid"), ErrTokenNotFound)
+}
+
+// insertGroup writes one user group row and answers its wire identifier, so
+// a token can name it.
+func insertGroup(t *testing.T, pool *datastore.Postgres, name, displayName string) string {
+	t.Helper()
+
+	id := uuid.NewV7()
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(usergroup.GroupTable)
+	ib.Cols("id", "name", "display_name")
+	ib.Values(id, name, displayName)
+
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+	return usergroup.FormatID(id)
+}
+
+func TestSignupJoinsTheGroupsTheTokenCarried(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	gryffindor := insertGroup(t, pool, "gryffindor", "Gryffindor")
+	hermione := insertGroup(t, pool, "hermione", "Hermione's Circle")
+
+	created, err := service.CreateSignupToken(t.Context(), CreateTokenParams{
+		TTL:      24 * time.Hour,
+		GroupIDs: []string{gryffindor, hermione},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{gryffindor, hermione}, created.Token.GroupIDs)
+
+	// The issued token answers with the groups it carries.
+	tokens, _, err := service.ListSignupTokens(t.Context(), "", false, 1, 0)
+	require.NoError(t, err)
+	require.Len(t, tokens, 1)
+	assert.ElementsMatch(t, []string{gryffindor, hermione}, tokens[0].GroupIDs)
+
+	account, err := service.Signup(t.Context(), Params{
+		Username:  "lunalovegood",
+		Email:     "luna@example.com",
+		Password:  "expecto-patronum",
+		Token:     created.RawToken,
+		FirstName: "Luna",
+		LastName:  "Lovegood",
+	})
+	require.NoError(t, err)
+
+	userID, parseErr := user.UUIDFromWire(account.ID)
+	require.NoError(t, parseErr)
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("user_group_id")
+	sb.From(usergroup.GroupMemberTable)
+	sb.Where(sb.Equal("user_id", userID))
+	query, args := sb.Build()
+	rows, err := pool.Query(t.Context(), query, args...)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	joined := []string{}
+	for rows.Next() {
+		var raw string
+		require.NoError(t, rows.Scan(&raw))
+		joined = append(joined, usergroup.FormatID(uuid.MustParse(raw)))
+	}
+	require.NoError(t, rows.Err())
+	assert.ElementsMatch(t, []string{gryffindor, hermione}, joined)
+
+	// A token naming a group that does not exist is refused at issue time,
+	// not halfway through a sign-up.
+	_, err = service.CreateSignupToken(t.Context(), CreateTokenParams{
+		TTL:      24 * time.Hour,
+		GroupIDs: []string{usergroup.FormatID(uuid.Nil())},
+	})
+	require.ErrorIs(t, err, ErrGroupNotFound)
 }

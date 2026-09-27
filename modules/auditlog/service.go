@@ -73,7 +73,7 @@ type Scope struct {
 
 // List answers one page of records in the scope, newest first, with the
 // pagination metadata the response carries.
-func (s *Service) List(ctx context.Context, scope Scope, page, limit int) ([]View, responder.Pagination, error) {
+func (s *Service) List(ctx context.Context, scope Scope, sortBy string, ascending bool, page, limit int) ([]View, responder.Pagination, error) {
 	page, limit = normalizePage(page, limit)
 	params := responder.PaginationParams{Page: page, Limit: limit}
 
@@ -94,7 +94,7 @@ func (s *Service) List(ctx context.Context, scope Scope, page, limit int) ([]Vie
 		Event:  scope.Event,
 		UserID: filtered,
 		Search: scope.Search,
-	}, params.Offset(), limit)
+	}, sortBy, ascending, params.Offset(), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}

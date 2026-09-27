@@ -177,7 +177,7 @@ func TestMigrateUpDryRunListsPendingWithoutApplying(t *testing.T) {
 	out, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--dry-run")
 	require.NoError(t, err)
 	assert.Contains(t, out, "initialize_schema")
-	assert.Contains(t, out, "9 migrations pending")
+	assert.Contains(t, out, fmt.Sprintf("%d migrations pending", len(embeddedFiles())))
 	assert.NotContains(t, out, "applied")
 
 	// Nothing may have been written.

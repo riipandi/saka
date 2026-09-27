@@ -71,15 +71,7 @@ func (r *Repository) ListGroups(ctx context.Context, db datastore.Querier, searc
 	sb.JoinWithOption(sqlbuilder.LeftJoin, GroupMemberTable+" m", "m.user_group_id = g.id")
 	sb.GroupBy("g.id")
 	applySearch(sb, search)
-	order, ok := sortColumns[sortBy]
-	if !ok {
-		order = sortColumns["display_name"]
-	}
-	if !ascending {
-		order += " DESC"
-	} else {
-		order += " ASC"
-	}
+	order := datastore.ListOrder(sortColumns, sortBy, "display_name", ascending)
 	sb.OrderBy(order, "g.id")
 	sb.Limit(limit).Offset(offset)
 

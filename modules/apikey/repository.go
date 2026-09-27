@@ -82,14 +82,23 @@ func (r *Repository) GetKey(ctx context.Context, db datastore.Querier, id uuid.U
 // scopes the page to that account's keys — the owner's own list — and an
 // empty one names every key, the administrative view. A revoked key stays
 // listed: the revocation is a stamp the view carries, not a deletion.
-func (r *Repository) ListKeys(ctx context.Context, db datastore.Querier, owner uuid.UUID, offset, limit int) ([]KeySchema, int, error) {
+// keySortColumns is the whitelist a list's sort key resolves through. The
+// names are the wire values the list requests validate against.
+var keySortColumns = map[string]string{
+	"name":         "lower(name)",
+	"created_at":   "created_at",
+	"expires_at":   "expires_at",
+	"last_used_at": "last_used_at",
+}
+
+func (r *Repository) ListKeys(ctx context.Context, db datastore.Querier, owner uuid.UUID, sortBy string, ascending bool, offset, limit int) ([]KeySchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(keyColumns...)
 	sb.From(KeyTable)
 	if owner != uuid.Nil() {
 		sb.Where(sb.Equal("user_id", owner))
 	}
-	sb.OrderBy("created_at DESC", "id DESC")
+	sb.OrderBy(datastore.ListOrder(keySortColumns, sortBy, "created_at", ascending), "id")
 	sb.Limit(limit).Offset(offset)
 
 	keys, err := r.listRows(ctx, db, sb, "apikey: list")

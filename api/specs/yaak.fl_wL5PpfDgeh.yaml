@@ -1,0 +1,35 @@
+type: folder
+model: folder
+id: fl_wL5PpfDgeh
+createdAt: 2026-09-27T08:03:20.704133
+updatedAt: 2026-09-27T08:03:36.929619
+workspaceId: wk_kBiMYTkhPP
+folderId: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+description: ''
+headers: []
+name: Notification
+sortPriority: 15555.555555555557
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingRequestMessageSize:
+  enabled: false
+  value: 67108864
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -34,3 +34,16 @@ message ListMetadata {
   // last_item_index is zero-based and inclusive.
   optional int32 last_item_index = 6;
 }
+
+// SortOrder is the direction a sorted page answers in. Unspecified means
+// ascending — the direction every list reads naturally.
+enum SortOrder {
+  // SORT_ORDER_UNSPECIFIED answers ascending.
+  SORT_ORDER_UNSPECIFIED = 0;
+
+  // SORT_ORDER_ASC answers ascending.
+  SORT_ORDER_ASC = 1;
+
+  // SORT_ORDER_DESC answers descending.
+  SORT_ORDER_DESC = 2;
+}

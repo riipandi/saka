@@ -83,11 +83,23 @@ func (r *Repository) GetUser(ctx context.Context, db datastore.Querier, id uuid.
 	return row, nil
 }
 
-// ListUsers answers one page of the accounts, newest first, with the total
-// count the pagination metadata needs. A search term filters by a trigram
-// match against the username, the email, and the display name — the columns
-// the indexes exist for.
-func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search string, offset, limit int) ([]UserSchema, int, error) {
+// userSortColumns is the whitelist a list's sort key resolves through. The
+// names are the wire values `ListUsersRequest.sort_by` validates against.
+var userSortColumns = map[string]string{
+	"username":     "lower(username)",
+	"email":        "lower(email)",
+	"first_name":   "lower(first_name)",
+	"last_name":    "lower(last_name)",
+	"display_name": "lower(display_name)",
+	"created_at":   "created_at",
+}
+
+// ListUsers answers one page of the accounts, ordered as the caller asked
+// (absent a choice, newest first), with the total count the pagination
+// metadata needs. A search term filters by a trigram match against the
+// username, the email, and the display name — the columns the indexes exist
+// for.
+func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search, sortBy string, ascending bool, offset, limit int) ([]UserSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(UserColumns...)
 	sb.From(UserTable)
@@ -99,7 +111,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 			sb.ILike("display_name", pattern),
 		))
 	}
-	sb.OrderBy("created_at DESC", "id DESC")
+	sb.OrderBy(datastore.ListOrder(userSortColumns, sortBy, "created_at", ascending), "id")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()

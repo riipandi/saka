@@ -70,19 +70,29 @@ func applyFilter(sb *sqlbuilder.SelectBuilder, filter Filter) {
 	}
 }
 
-// List answers one page of the records the filter admits, newest first, with
-// the total the pagination metadata needs.
+// auditSortColumns is the whitelist a list's sort key resolves through. The
+// names are the wire values the list requests validate against.
+var auditSortColumns = map[string]string{
+	"event":      "a.event",
+	"username":   "lower(u.username)",
+	"ip_address": "a.ip_address",
+	"created_at": "a.created_at",
+}
+
+// List answers one page of the records the filter admits, ordered as the
+// caller asked (absent a choice, newest first), with the total the
+// pagination metadata needs.
 //
 // A filter with no field set is every record, which is what makes this the
 // one query behind all three listing procedures: `List` passes the caller's
 // own identifier, `ListForUser` the account the administrator named, and
 // `ListAll` whatever the administrator filtered by.
-func (r *Repository) List(ctx context.Context, db datastore.Querier, filter Filter, offset, limit int) ([]Row, int, error) {
+func (r *Repository) List(ctx context.Context, db datastore.Querier, filter Filter, sortBy string, ascending bool, offset, limit int) ([]Row, int, error) {
 	sb := listQuery()
 	applyFilter(sb, filter)
 	// The identifier breaks a tie on the same instant, so a page boundary
 	// falls in one place however many records share a timestamp.
-	sb.OrderBy("a.created_at DESC", "a.id DESC")
+	sb.OrderBy(datastore.ListOrder(auditSortColumns, sortBy, "created_at", ascending), "a.id")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()

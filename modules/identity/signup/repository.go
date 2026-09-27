@@ -13,6 +13,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/usergroup"
 )
 
 // Repository writes the account a sign-up creates and consumes the token it
@@ -25,8 +26,9 @@ func NewRepository() *Repository {
 	return &Repository{}
 }
 
-// FindSignupTokenByHash reads the token a raw value hashes to. The raw value
-// is never stored: only the caller's hash reaches this query.
+// FindSignupTokenByHash reads the token a raw value hashes to, with the
+// groups its sign-ups join. The raw value is never stored: only the caller's
+// hash reaches this query.
 func (r *Repository) FindSignupTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (*SignupToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "usage_limit", "usage_count", "created_at", "expires_at")
@@ -42,7 +44,81 @@ func (r *Repository) FindSignupTokenByHash(ctx context.Context, db datastore.Que
 	if err != nil {
 		return nil, fmt.Errorf("signup: find token: %w", err)
 	}
+
+	groups, err := r.TokenGroups(ctx, db, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	row.GroupIDs = groups
 	return &row, nil
+}
+
+// TokenGroups reads the groups one issued token puts its sign-ups into,
+// ordered by the group's name so the answer does not depend on insert order.
+func (r *Repository) TokenGroups(ctx context.Context, db datastore.Querier, tokenID uuid.UUID) ([]uuid.UUID, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("j.user_group_id")
+	sb.From(SignupTokenGroupTable + " j")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, usergroup.GroupTable+" g", "g.id = j.user_group_id")
+	sb.Where(sb.Equal("j.signup_token_id", tokenID))
+	sb.OrderBy("lower(g.name)", "g.id")
+
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("signup: token groups: %w", err)
+	}
+	defer rows.Close()
+
+	groups := []uuid.UUID{}
+	for rows.Next() {
+		var groupID uuid.UUID
+		if err := rows.Scan(&groupID); err != nil {
+			return nil, fmt.Errorf("signup: token groups: %w", err)
+		}
+		groups = append(groups, groupID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("signup: token groups: %w", err)
+	}
+	return groups, nil
+}
+
+// CreateTokenGroups writes the token's group links. The caller has already
+// checked the groups exist; the junction's foreign keys are the last line of
+// defense.
+func (r *Repository) CreateTokenGroups(ctx context.Context, db datastore.Querier, tokenID uuid.UUID, groupIDs []uuid.UUID) error {
+	for _, groupID := range groupIDs {
+		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+		ib.InsertInto(SignupTokenGroupTable)
+		ib.Cols("signup_token_id", "user_group_id")
+		ib.Values(tokenID, groupID)
+
+		query, args := ib.Build()
+		if _, err := db.Exec(ctx, query, args...); err != nil {
+			return fmt.Errorf("signup: token groups: %w", err)
+		}
+	}
+	return nil
+}
+
+// AddUserToGroups makes the account a member of the groups its signup token
+// carried. A group deleted between the token's issue and its use simply
+// joins fewer groups: the junction's cascade is the deletion's business, and
+// the sign-up must not fail over a vanished group.
+func (r *Repository) AddUserToGroups(ctx context.Context, db datastore.Querier, userID uuid.UUID, groupIDs []uuid.UUID) error {
+	for _, groupID := range groupIDs {
+		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+		ib.InsertInto(usergroup.GroupMemberTable)
+		ib.Cols("user_id", "user_group_id")
+		ib.Values(userID, groupID)
+
+		query, args := ib.Build()
+		if _, err := db.Exec(ctx, query, args...); err != nil {
+			return fmt.Errorf("signup: join group: %w", err)
+		}
+	}
+	return nil
 }
 
 // CreateUser inserts the account row and returns its identifier.
@@ -117,9 +193,29 @@ func errUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-// CreateSignupToken inserts the hashed row and answers its identifier. The
-// raw value is the caller's to show once; only the hash reaches this table.
-func (r *Repository) CreateSignupToken(ctx context.Context, db datastore.Querier, tokenHash string, usageLimit int32, expiresAt time.Time) (uuid.UUID, error) {
+// AssertGroupsExist refuses a group id that names no group, so a token never
+// carries a link its sign-ups cannot resolve.
+func (r *Repository) AssertGroupsExist(ctx context.Context, db datastore.Querier, groupIDs []uuid.UUID) error {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("count(*)")
+	sb.From(usergroup.GroupTable)
+	sb.Where(sb.In("id", groupIDArgs(groupIDs)...))
+
+	query, args := sb.Build()
+	var found int
+	if err := db.QueryRow(ctx, query, args...).Scan(&found); err != nil {
+		return fmt.Errorf("signup: check groups: %w", err)
+	}
+	if found != len(groupIDs) {
+		return ErrGroupNotFound
+	}
+	return nil
+}
+
+// CreateSignupToken inserts the hashed row, its group links, and answers the
+// identifier. The raw value is the caller's to show once; only the hash
+// reaches this table.
+func (r *Repository) CreateSignupToken(ctx context.Context, db datastore.Querier, tokenHash string, usageLimit int32, expiresAt time.Time, groupIDs []uuid.UUID) (uuid.UUID, error) {
 	id := uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
@@ -131,16 +227,30 @@ func (r *Repository) CreateSignupToken(ctx context.Context, db datastore.Querier
 	if _, err := db.Exec(ctx, query, args...); err != nil {
 		return uuid.Nil(), fmt.Errorf("signup: create token: %w", err)
 	}
+	if err := r.CreateTokenGroups(ctx, db, id, groupIDs); err != nil {
+		return uuid.Nil(), err
+	}
 	return id, nil
 }
 
-// ListSignupTokens answers one page of the issued tokens, newest first, with
-// the total count the pagination metadata needs.
-func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier, offset, limit int) ([]SignupToken, int, error) {
+// tokenSortColumns is the whitelist a list's sort key resolves through. The
+// names are the wire values `ListSignupTokensRequest.sort_by` validates
+// against.
+var tokenSortColumns = map[string]string{
+	"created_at":  "created_at",
+	"expires_at":  "expires_at",
+	"usage_count": "usage_count",
+	"usage_limit": "usage_limit",
+}
+
+// ListSignupTokens answers one page of the issued tokens, ordered as the
+// caller asked (absent a choice, newest first), with the total count the
+// pagination metadata needs.
+func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier, sortBy string, ascending bool, offset, limit int) ([]SignupToken, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "usage_limit", "usage_count", "created_at", "expires_at")
 	sb.From(SignupTokenTable)
-	sb.OrderBy("created_at DESC", "id DESC")
+	sb.OrderBy(datastore.ListOrder(tokenSortColumns, sortBy, "created_at", ascending), "id")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()
@@ -153,13 +263,23 @@ func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier,
 	tokens := []SignupToken{}
 	for rows.Next() {
 		var row SignupToken
-		if err := rows.Scan(&row.ID, &row.UsageLimit, &row.UsageCount, &row.CreatedAt, &row.ExpiresAt); err != nil {
-			return nil, 0, fmt.Errorf("signup: list tokens: %w", err)
+		if scanErr := rows.Scan(&row.ID, &row.UsageLimit, &row.UsageCount, &row.CreatedAt, &row.ExpiresAt); scanErr != nil {
+			return nil, 0, fmt.Errorf("signup: list tokens: %w", scanErr)
 		}
 		tokens = append(tokens, row)
 	}
-	if err := rows.Err(); err != nil {
+	// The outer `err` is the one attachGroups reuses below, so the
+	// iteration's close check assigns it rather than shadowing it.
+	err = rows.Err()
+	if err != nil {
 		return nil, 0, fmt.Errorf("signup: list tokens: %w", err)
+	}
+
+	// The junction rows ride along in one query: a page holds at most a
+	// hundred tokens, and one grouped read beats one read per token.
+	tokens, err = r.attachGroups(ctx, db, tokens)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -171,6 +291,66 @@ func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier,
 		return nil, 0, fmt.Errorf("signup: count tokens: %w", err)
 	}
 	return tokens, total, nil
+}
+
+// attachGroups fills every token's group list. The ordering by name makes
+// the answer independent of insert order, the way a single token's read is.
+func (r *Repository) attachGroups(ctx context.Context, db datastore.Querier, tokens []SignupToken) ([]SignupToken, error) {
+	if len(tokens) == 0 {
+		return tokens, nil
+	}
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("j.signup_token_id", "j.user_group_id")
+	sb.From(SignupTokenGroupTable + " j")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, usergroup.GroupTable+" g", "g.id = j.user_group_id")
+	sb.Where(sb.In("j.signup_token_id", tokenIDs(tokens)...))
+	sb.OrderBy("lower(g.name)", "g.id")
+
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("signup: token groups: %w", err)
+	}
+	defer rows.Close()
+
+	index := make(map[uuid.UUID]int, len(tokens))
+	for i, token := range tokens {
+		index[token.ID] = i
+	}
+	for rows.Next() {
+		var tokenID, groupID uuid.UUID
+		if err := rows.Scan(&tokenID, &groupID); err != nil {
+			return nil, fmt.Errorf("signup: token groups: %w", err)
+		}
+		if i, ok := index[tokenID]; ok {
+			tokens[i].GroupIDs = append(tokens[i].GroupIDs, groupID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("signup: token groups: %w", err)
+	}
+	return tokens, nil
+}
+
+// tokenIDs answers the identifiers attachGroups filters by.
+func tokenIDs(tokens []SignupToken) []any {
+	ids := make([]any, len(tokens))
+	for i, token := range tokens {
+		ids[i] = token.ID
+	}
+	return ids
+}
+
+// groupIDArgs answers the identifiers the existence check filters by. The
+// values ride as `any` because `Flatten` would unpack a uuid — an array of
+// bytes — into its bytes.
+func groupIDArgs(groupIDs []uuid.UUID) []any {
+	ids := make([]any, len(groupIDs))
+	for i, groupID := range groupIDs {
+		ids[i] = groupID
+	}
+	return ids
 }
 
 // DeleteSignupToken removes an issued token. It answers whether a row was

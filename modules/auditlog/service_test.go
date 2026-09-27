@@ -78,7 +78,7 @@ func TestListAnswersTheCallersOwnActivityOnly(t *testing.T) {
 	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonID})
 
 	logs, metadata, err := newService(pool).List(t.Context(),
-		auditlog.Scope{UserID: wireOf(hermioneID)}, 1, 20)
+		auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.Len(t, logs, 1)
@@ -100,7 +100,7 @@ func TestListOrdersNewestFirst(t *testing.T) {
 		record(t, pool, audit.Entry{Event: event, UserID: hermioneID})
 	}
 
-	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 1, 20)
+	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.Len(t, logs, 3)
@@ -119,7 +119,7 @@ func TestListPagesTheWindow(t *testing.T) {
 		record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
 	}
 
-	first, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 1, 2)
+	first, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 2)
 	require.NoError(t, err)
 	require.Len(t, first, 2)
 	require.NotNil(t, metadata.TotalItems)
@@ -127,7 +127,7 @@ func TestListPagesTheWindow(t *testing.T) {
 	require.NotNil(t, metadata.TotalPages)
 	assert.Equal(t, 3, *metadata.TotalPages)
 
-	second, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 2, 2)
+	second, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 2, 2)
 	require.NoError(t, err)
 	require.Len(t, second, 2)
 
@@ -147,23 +147,23 @@ func TestTheAdministrativeFiltersNarrowTheList(t *testing.T) {
 
 	service := newService(pool)
 
-	byEvent, _, err := service.List(t.Context(), auditlog.Scope{Event: audit.EventSignIn}, 1, 20)
+	byEvent, _, err := service.List(t.Context(), auditlog.Scope{Event: audit.EventSignIn}, "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Len(t, byEvent, 2, "the event filter must narrow to one event")
 
-	byUser, _, err := service.List(t.Context(), auditlog.Scope{UserID: wireOf(langdonID)}, 1, 20)
+	byUser, _, err := service.List(t.Context(), auditlog.Scope{UserID: wireOf(langdonID)}, "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Len(t, byUser, 1, "the account filter must narrow to one account")
 
-	bySearch, _, err := service.List(t.Context(), auditlog.Scope{Search: "herm"}, 1, 20)
+	bySearch, _, err := service.List(t.Context(), auditlog.Scope{Search: "herm"}, "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Len(t, bySearch, 2, "the search must match the account's name")
 
-	byEmail, _, err := service.List(t.Context(), auditlog.Scope{Search: "langdon@example"}, 1, 20)
+	byEmail, _, err := service.List(t.Context(), auditlog.Scope{Search: "langdon@example"}, "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Len(t, byEmail, 1, "the search must match the account's address too")
 
-	every, _, err := service.List(t.Context(), auditlog.Scope{}, 1, 20)
+	every, _, err := service.List(t.Context(), auditlog.Scope{}, "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Len(t, every, 3, "an unfiltered scope is every record")
 }
@@ -178,7 +178,7 @@ func TestTheSearchCountsWhatThePageShows(t *testing.T) {
 	// A record with no account at all, which the search's join would drop.
 	record(t, pool, audit.Entry{Event: audit.EventSignIn})
 
-	_, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{Search: "hermione"}, 1, 20)
+	_, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{Search: "hermione"}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.NotNil(t, metadata.TotalItems)
@@ -201,7 +201,7 @@ func TestTheRecordCarriesTheActorTheWriterStored(t *testing.T) {
 		},
 	})
 
-	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 1, 20)
+	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.Len(t, logs, 1)
@@ -223,7 +223,7 @@ func TestTheAddressIsStoredWithoutItsMask(t *testing.T) {
 		Client: audit.ClientInfo{IPAddress: "203.0.113.7", UserAgent: "Mozilla/5.0 Firefox/128.0"},
 	})
 
-	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 1, 20)
+	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.Len(t, logs, 1)
@@ -241,7 +241,7 @@ func TestTheUsernameIsEmptyOnceTheAccountIsGone(t *testing.T) {
 	_, err := pool.Exec(t.Context(), `DELETE FROM public.users WHERE id = $1`, vetraID)
 	require.NoError(t, err)
 
-	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{}, 1, 20)
+	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{}, "", false, 1, 20)
 	require.NoError(t, err)
 
 	require.Len(t, logs, 1, "the record must survive its account")
@@ -291,7 +291,7 @@ func TestAnUnsetPageAnswersTheDefaultWindow(t *testing.T) {
 	pool := migratedPool(t)
 	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
 
-	logs, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, 0, 0)
+	logs, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 0, 0)
 	require.NoError(t, err)
 
 	assert.Len(t, logs, 1)

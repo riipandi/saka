@@ -71,8 +71,10 @@ func (h *rpcHandler) List(ctx context.Context, req *connect.Request[auditlogv1.L
 		return nil, connect.NewError(connect.CodeUnauthenticated, errNoCaller)
 	}
 
+	// Absent a sort order the page answers newest first.
+	ascending := req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC
 	views, metadata, err := h.service.List(ctx, Scope{UserID: caller.UserID},
-		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+		req.Msg.GetSortBy(), ascending, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -93,7 +95,7 @@ func (h *rpcHandler) ListAll(ctx context.Context, req *connect.Request[auditlogv
 		UserID: req.Msg.GetUserId(),
 		Event:  req.Msg.GetEvent(),
 		Search: req.Msg.GetSearch(),
-	}, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	}, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -110,7 +112,7 @@ func (h *rpcHandler) ListAll(ctx context.Context, req *connect.Request[auditlogv
 // of the list `List` gives an account of its own.
 func (h *rpcHandler) ListForUser(ctx context.Context, req *connect.Request[auditlogv1.ListForUserRequest]) (*connect.Response[auditlogv1.ListForUserResponse], error) {
 	views, metadata, err := h.service.List(ctx, Scope{UserID: req.Msg.GetUserId()},
-		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+		"", false, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}

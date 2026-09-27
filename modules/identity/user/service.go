@@ -355,10 +355,10 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 
 // ListUsers answers one page of the accounts, newest first, optionally
 // filtered by a search term.
-func (s *Service) ListUsers(ctx context.Context, search string, page, limit int) ([]UserView, responder.Pagination, error) {
+func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]UserView, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
 
-	rows, total, err := s.repo.ListUsers(ctx, s.pool, search, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListUsers(ctx, s.pool, search, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}

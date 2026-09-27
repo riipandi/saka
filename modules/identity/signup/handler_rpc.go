@@ -95,6 +95,7 @@ func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request
 	created, err := h.service.CreateSignupToken(ctx, CreateTokenParams{
 		TTL:        time.Duration(body.TtlSeconds) * time.Second,
 		UsageLimit: body.GetUsageLimit(),
+		GroupIDs:   body.GetUserGroupIds(),
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -111,7 +112,7 @@ func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request
 
 // ListSignupTokens answers the issued tokens with their pagination block.
 func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[identityv1.ListSignupTokensRequest]) (*connect.Response[identityv1.ListSignupTokensResponse], error) {
-	tokens, pagination, err := h.service.ListSignupTokens(ctx, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -143,11 +144,12 @@ func (h *rpcHandler) DeleteSignupToken(ctx context.Context, req *connect.Request
 // tokenView maps the service's token view onto the wire message.
 func tokenView(token TokenView) *identityv1.SignupToken {
 	return &identityv1.SignupToken{
-		Id:         token.ID,
-		UsageLimit: token.UsageLimit,
-		UsageCount: token.UsageCount,
-		CreatedAt:  token.CreatedAt.Format(time.RFC3339),
-		ExpiresAt:  token.ExpiresAt.Format(time.RFC3339),
+		Id:           token.ID,
+		UsageLimit:   token.UsageLimit,
+		UsageCount:   token.UsageCount,
+		CreatedAt:    token.CreatedAt.Format(time.RFC3339),
+		ExpiresAt:    token.ExpiresAt.Format(time.RFC3339),
+		UserGroupIds: token.GroupIDs,
 	}
 }
 

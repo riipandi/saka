@@ -140,6 +140,20 @@ message ListAPIKeysRequest {
     (buf.validate.field).int32.gte = 1,
     (buf.validate.field).int32.lte = 100
   ];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "created_at",
+      "expires_at",
+      "last_used_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 4;
 }
 
 // ListAPIKeysResponse is the page of the caller's own keys.
@@ -212,6 +226,20 @@ message ListAllAPIKeysRequest {
     (buf.validate.field).int32.gte = 1,
     (buf.validate.field).int32.lte = 100
   ];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "created_at",
+      "expires_at",
+      "last_used_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 4;
 }
 
 // ListAllAPIKeysResponse is the page of every key the deployment holds.

@@ -144,6 +144,20 @@ message ListRequest {
     gte: 1
     lte: 100
   }];
+
+  // sort_by names the column the page orders by. Absent, the record time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "event",
+      "username",
+      "ip_address",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 4;
 }
 
 // ListResponse is the page of the caller's own records.
@@ -185,6 +199,20 @@ message ListAllRequest {
   // email, so an administrator can find an account's activity by naming it
   // rather than by looking its identifier up first.
   optional string search = 5 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the record time
+  // orders the page, newest first.
+  optional string sort_by = 6 [(buf.validate.field).string = {
+    in: [
+      "event",
+      "username",
+      "ip_address",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 7;
 }
 
 // ListAllResponse is the page of every record.

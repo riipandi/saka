@@ -285,7 +285,7 @@ func TestListOwnScopesToTheOwnerAndListAllSeesEverything(t *testing.T) {
 
 	// The owner's list is the owner's: another account's keys are not in
 	// it, and the count agrees.
-	own, pagination, err := service.ListOwn(t.Context(), first, 1, 10)
+	own, pagination, err := service.ListOwn(t.Context(), first, "", false, 1, 10)
 	require.NoError(t, err)
 	require.Len(t, own, 2)
 	assert.Equal(t, 2, *pagination.TotalItems)
@@ -295,7 +295,7 @@ func TestListOwnScopesToTheOwnerAndListAllSeesEverything(t *testing.T) {
 
 	// The administrative view is every key, and it is a page like any
 	// other.
-	all, pagination, err := service.ListAll(t.Context(), 1, 10)
+	all, pagination, err := service.ListAll(t.Context(), "", false, 1, 10)
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	assert.Equal(t, 3, *pagination.TotalItems)

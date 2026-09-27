@@ -12,6 +12,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/usergroup"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -29,6 +30,9 @@ var (
 
 	// ErrTokenNotFound is a delete whose id names no issued token.
 	ErrTokenNotFound = errors.New("signup: signup token not found")
+
+	// ErrGroupNotFound is a token issue naming a group that does not exist.
+	ErrGroupNotFound = errors.New("signup: user group not found")
 )
 
 // Service creates an account from a signup token.
@@ -68,9 +72,7 @@ type Params struct {
 	Token     string
 	FirstName string
 	LastName  string
-}
-
-// Signup consumes the token and creates the account. The request's shape is
+} // Signup consumes the token and creates the account. The request's shape is
 // the contract's business — `SignupRequest` carries the constraints the
 // transport's validate interceptor enforces before this runs.
 //
@@ -127,6 +129,15 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			return consumeErr
 		}
 
+		// The token's groups take the account in. A group deleted after
+		// the token was issued joins fewer accounts rather than failing
+		// the sign-up.
+		if len(token.GroupIDs) > 0 {
+			if joinErr := s.repo.AddUserToGroups(ctx, tx, userID, token.GroupIDs); joinErr != nil {
+				return joinErr
+			}
+		}
+
 		// The database fills the columns the insert omits, so the answer
 		// is the account read back — the same canonical view the account
 		// procedures answer with.
@@ -166,9 +177,12 @@ var displayName = user.DisplayName
 // live in the contract — `CreateSignupTokenRequest` carries them as
 // protovalidate constraints the transport's validate interceptor enforces
 // before this runs — so the service applies only the unset-budget default.
+// GroupIDs are the wire identifiers of the groups every account this token
+// creates joins.
 type CreateTokenParams struct {
 	TTL        time.Duration
-	UsageLimit int32 // zero means the single-invitation default
+	UsageLimit int32    // zero means the single-invitation default
+	GroupIDs   []string // empty means the sign-ups join no group
 }
 
 // TokenView is an issued token as the procedures answer it: the counters and
@@ -179,6 +193,7 @@ type TokenView struct {
 	UsageCount int32
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
+	GroupIDs   []string
 }
 
 // CreatedToken is the issued token and the raw value shown once.
@@ -189,7 +204,9 @@ type CreatedToken struct {
 
 // CreateSignupToken issues a token: the raw value is drawn here, shown once
 // in the answer, and only its hash is stored. A usage limit of zero means
-// the single invitation.
+// the single invitation. The token, its group links, and the group check
+// commit together, so a token never names a group the account creation
+// cannot resolve.
 func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParams) (CreatedToken, error) {
 	if params.UsageLimit == 0 {
 		params.UsageLimit = 1
@@ -201,7 +218,31 @@ func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParam
 	}
 	now := s.now()
 
-	id, err := s.repo.CreateSignupToken(ctx, s.pool, crypto.HashHexToken(rawToken), params.UsageLimit, now.Add(params.TTL))
+	// The wire identifiers become row identifiers before the insert, so an
+	// id that names nothing is refused here and not halfway the join.
+	groupIDs := make([]uuid.UUID, 0, len(params.GroupIDs))
+	for _, wire := range params.GroupIDs {
+		groupID, parseErr := usergroup.UUIDFromWire(wire)
+		if parseErr != nil {
+			return CreatedToken{}, fmt.Errorf("%w: %s", ErrGroupNotFound, wire)
+		}
+		groupIDs = append(groupIDs, groupID)
+	}
+
+	var id uuid.UUID
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if len(groupIDs) > 0 {
+			if existsErr := s.repo.AssertGroupsExist(ctx, tx, groupIDs); existsErr != nil {
+				return existsErr
+			}
+		}
+		created, createErr := s.repo.CreateSignupToken(ctx, tx, crypto.HashHexToken(rawToken), params.UsageLimit, now.Add(params.TTL), groupIDs)
+		if createErr != nil {
+			return createErr
+		}
+		id = created
+		return nil
+	})
 	if err != nil {
 		return CreatedToken{}, err
 	}
@@ -212,29 +253,36 @@ func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParam
 			UsageCount: 0,
 			CreatedAt:  now,
 			ExpiresAt:  now.Add(params.TTL),
+			GroupIDs:   params.GroupIDs,
 		},
 		RawToken: rawToken,
 	}, nil
 }
 
-// ListSignupTokens answers one page of the issued tokens, newest first, with
-// the pagination metadata the response carries.
-func (s *Service) ListSignupTokens(ctx context.Context, page, limit int) ([]TokenView, responder.Pagination, error) {
+// ListSignupTokens answers one page of the issued tokens, ordered as the
+// caller asked (absent a choice, newest first), with the pagination metadata
+// the response carries.
+func (s *Service) ListSignupTokens(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]TokenView, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
 
-	tokens, total, err := s.repo.ListSignupTokens(ctx, s.pool, responder.Offset(page, limit), limit)
+	tokens, total, err := s.repo.ListSignupTokens(ctx, s.pool, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}
 
 	views := make([]TokenView, 0, len(tokens))
 	for _, row := range tokens {
+		groups := make([]string, 0, len(row.GroupIDs))
+		for _, groupID := range row.GroupIDs {
+			groups = append(groups, usergroup.FormatID(groupID))
+		}
 		views = append(views, TokenView{
 			ID:         row.ID.String(),
 			UsageLimit: row.UsageLimit,
 			UsageCount: row.UsageCount,
 			CreatedAt:  row.CreatedAt,
 			ExpiresAt:  row.ExpiresAt,
+			GroupIDs:   groups,
 		})
 	}
 	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil

@@ -281,7 +281,7 @@ func TestListUsersSearchesAndPaginates(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	users, pagination, err := service.ListUsers(t.Context(), "", 1, 2)
+	users, pagination, err := service.ListUsers(t.Context(), "", "", false, 1, 2)
 	require.NoError(t, err)
 	assert.Len(t, users, 2)
 	require.NotNil(t, pagination.TotalItems)
@@ -289,7 +289,7 @@ func TestListUsersSearchesAndPaginates(t *testing.T) {
 
 	// The search matches the username and the name parts, case-insensitively,
 	// and answers only the accounts it names.
-	users, _, err = service.ListUsers(t.Context(), "GRA", 1, 10)
+	users, _, err = service.ListUsers(t.Context(), "GRA", "", false, 1, 10)
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "hermione", users[0].Username)

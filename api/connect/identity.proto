@@ -381,8 +381,7 @@ message User {
 // manages, never the raw value: a token is shown once, in the creation
 // response, and only its hash is stored.
 //
-// TODO(signup): user_groups joins an issued token to the groups its sign-ups
-// join, per the upstream shape; deferred until the usergroup feature lands.
+// SignupToken is one issued token as the list answers it.
 message SignupToken {
   // id is the token row's identifier, a UUID string.
   string id = 1;
@@ -398,9 +397,12 @@ message SignupToken {
 
   // expires_at is the instant the token stops admitting sign-ups, RFC 3339.
   string expires_at = 5;
+
+  // user_group_ids are the groups every account this token creates joins.
+  repeated string user_group_ids = 6;
 }
 
-// CreateSignupTokenRequest carries the token's window and budget.
+// CreateSignupTokenRequest carries the token's window, budget, and groups.
 message CreateSignupTokenRequest {
   // ttl_seconds is how long the token admits sign-ups, in seconds: between
   // one hour and thirty days.
@@ -415,6 +417,14 @@ message CreateSignupTokenRequest {
     gte: 1
     lte: 1000
   }];
+
+  // user_group_ids are the groups every account signed up under this token
+  // joins. Each names a group that exists; a token naming none creates
+  // groupless accounts, the way upstream's empty list does.
+  repeated string user_group_ids = 3 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
 }
 
 // CreateSignupTokenResponse is the issued token. raw_token is the only place
@@ -434,14 +444,28 @@ message CreateSignupTokenResponse {
   string message = 4;
 }
 
-// ListSignupTokensRequest carries the page the caller asks for. Both fields
-// unset answer the first default-sized page.
+// ListSignupTokensRequest carries the page and the sort the caller asks for.
+// Both page fields unset answer the first default-sized page.
 message ListSignupTokensRequest {
   // page is the one-based page number.
   optional int32 page = 1;
 
   // limit is the page size.
   optional int32 limit = 2;
+
+  // sort_by names the column the page orders by. Absent, the issue time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "expires_at",
+      "usage_count",
+      "usage_limit"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 4;
 }
 
 // ListSignupTokensResponse is the issued tokens and their pagination block.
@@ -477,7 +501,8 @@ message DeleteSignupTokenResponse {
   string message = 2;
 }
 
-// ListUsersRequest carries the page and the filter the caller asks for.
+// ListUsersRequest carries the page, the filter, and the sort the caller
+// asks for.
 message ListUsersRequest {
   // page is the one-based page number.
   optional int32 page = 1;
@@ -488,6 +513,22 @@ message ListUsersRequest {
   // search filters by a term matched against the username, the email, and
   // the display name. Absent means every account.
   optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "username",
+      "email",
+      "first_name",
+      "last_name",
+      "display_name",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional tango.common.v1.SortOrder sort_order = 5;
 }
 
 // ListUsersResponse is the page of accounts and their pagination block.
@@ -870,20 +911,7 @@ message ListUserGroupsRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional SortOrder sort_order = 5;
-}
-
-// SortOrder is the direction a sorted page answers in. Unspecified means
-// ascending — the direction every list reads naturally.
-enum SortOrder {
-  // SORT_ORDER_UNSPECIFIED answers ascending.
-  SORT_ORDER_UNSPECIFIED = 0;
-
-  // SORT_ORDER_ASC answers ascending.
-  SORT_ORDER_ASC = 1;
-
-  // SORT_ORDER_DESC answers descending.
-  SORT_ORDER_DESC = 2;
+  optional tango.common.v1.SortOrder sort_order = 5;
 }
 
 // ListUserGroupsResponse is the page of groups and their pagination block.

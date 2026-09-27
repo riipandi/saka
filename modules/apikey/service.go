@@ -146,17 +146,19 @@ func (s *Service) Create(ctx context.Context, owner uuid.UUID, params CreatePara
 	return issued, nil
 }
 
-// ListOwn answers one page of the owner's keys, newest first.
-func (s *Service) ListOwn(ctx context.Context, owner uuid.UUID, page, limit int) ([]KeySchema, responder.Pagination, error) {
+// ListOwn answers one page of the owner's keys, ordered as the caller asked
+// (absent a choice, newest first).
+func (s *Service) ListOwn(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	return s.listPage(ctx, owner, page, limit)
+	return s.listPage(ctx, owner, sortBy, ascending, page, limit)
 }
 
-// ListAll answers one page of every key the deployment holds, newest first.
-// It is the administrative view — the owner's own list is ListOwn.
-func (s *Service) ListAll(ctx context.Context, page, limit int) ([]KeySchema, responder.Pagination, error) {
+// ListAll answers one page of every key the deployment holds, ordered as the
+// caller asked. It is the administrative view — the owner's own list is
+// ListOwn.
+func (s *Service) ListAll(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	return s.listPage(ctx, uuid.Nil(), page, limit)
+	return s.listPage(ctx, uuid.Nil(), sortBy, ascending, page, limit)
 }
 
 // Renew replaces an expired key's secret and window. The key is read first:
@@ -311,8 +313,8 @@ func (s *Service) AuthenticateAPIKey(ctx context.Context, presented string) (*jw
 
 // listPage runs one list query and answers the page with its metadata. An
 // owner identifier scopes the page; the zero value names every key.
-func (s *Service) listPage(ctx context.Context, owner uuid.UUID, page, limit int) ([]KeySchema, responder.Pagination, error) {
-	keys, total, err := s.repo.ListKeys(ctx, s.pool, owner, responder.Offset(page, limit), limit)
+func (s *Service) listPage(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
+	keys, total, err := s.repo.ListKeys(ctx, s.pool, owner, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}
