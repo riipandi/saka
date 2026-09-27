@@ -84,11 +84,13 @@ func (w *Watcher) Start(ctx context.Context) error {
 			if event.Has(fsnotify.Create) {
 				// A directory that appeared inside staging joins the
 				// watch, or the files written into it after this point
-				// would be invisible.
+				// would be invisible. The directory itself is not a file
+				// to upload.
 				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
 					if err := watch.Add(event.Name); err != nil {
 						slog.WarnContext(ctx, "storage: watch subdirectory", "dir", event.Name, "err", err)
 					}
+					continue
 				}
 			}
 			key, ok := w.stageKey(event.Name)

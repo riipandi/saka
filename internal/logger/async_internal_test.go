@@ -208,6 +208,30 @@ func TestBatchingAmortizesTheSyscall(t *testing.T) {
 	}
 }
 
+// TestSendDuringCloseDoesNotShareTheWriter pins the shutdown window: producers
+// keep sending while Close runs, and the inner sink is never written from
+// two goroutines at once.
+func TestSendDuringCloseDoesNotShareTheWriter(t *testing.T) {
+	inner := &recordingTransport{id: "test", delay: time.Microsecond}
+	a := newAsyncTransport(inner, nil)
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			for range 200 {
+				a.SendToLogger(loglayer.TransportParams{Messages: []any{"line"}})
+			}
+		})
+	}
+	wg.Go(func() {
+		time.Sleep(time.Millisecond)
+		if err := a.Close(); err != nil {
+			t.Errorf("close: %v", err)
+		}
+	})
+	wg.Wait()
+}
+
 // TestCloseIsIdempotent pins the contract the shutdown paths rely on: the
 // second Close re-reports the first result instead of draining again.
 func TestCloseIsIdempotent(t *testing.T) {

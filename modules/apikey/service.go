@@ -187,12 +187,12 @@ func (s *Service) Renew(ctx context.Context, owner, keyID uuid.UUID, expiresAt t
 			return ErrKeyNotExpired
 		}
 
-		updated, renewErr := s.repo.RenewKey(ctx, tx, keyID, crypto.HashTokenBytes(raw), expiresAt)
+		updated, renewErr := s.repo.RenewKey(ctx, tx, keyID, owner, crypto.HashTokenBytes(raw), expiresAt, s.now())
 		if renewErr != nil {
 			return renewErr
 		}
 		if !updated {
-			return ErrKeyNotFound
+			return s.renewMiss(ctx, tx, owner, keyID)
 		}
 
 		fresh, readErr := s.repo.GetKey(ctx, tx, keyID)
@@ -218,6 +218,27 @@ func (s *Service) Renew(ctx context.Context, owner, keyID uuid.UUID, expiresAt t
 		return Issued{}, err
 	}
 	return issued, nil
+}
+
+// renewMiss names why the conditional update matched nothing, using the same
+// answers as the read that preceded it. A row that is gone, owned by someone
+// else, or revoked is not found. A row whose window is open again — the other
+// renew won — has not expired.
+func (s *Service) renewMiss(ctx context.Context, db datastore.Querier, owner, keyID uuid.UUID) error {
+	row, err := s.repo.GetKey(ctx, db, keyID)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return ErrKeyNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if row.UserID != owner || row.RevokedAt != nil {
+		return ErrKeyNotFound
+	}
+	if !row.ExpiresAt.Before(s.now()) {
+		return ErrKeyNotExpired
+	}
+	return ErrKeyNotFound
 }
 
 // Revoke stamps one of the owner's keys revoked. The ownership check is the

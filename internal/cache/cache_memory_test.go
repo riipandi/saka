@@ -167,7 +167,7 @@ func TestMemoryCleansItselfWhenTheBudgetIsSpent(t *testing.T) {
 	c := NewMemory(memoryChunkSize, 5*time.Minute)
 
 	for i := range 2000 {
-		c.Set(t.Context(), fmt.Sprintf("key-%d", i), []byte(fmt.Sprintf("value-%d", i)), 0)
+		c.Set(t.Context(), fmt.Sprintf("key-%d", i), fmt.Appendf(nil, "value-%d", i), 0)
 	}
 
 	// The cache still answers: whatever survived the last reset is
@@ -178,6 +178,33 @@ func TestMemoryCleansItselfWhenTheBudgetIsSpent(t *testing.T) {
 	}
 	assert.LessOrEqual(t, chunks*memoryChunkSize, memoryChunkSize,
 		"the ring must not grow past its budget")
+}
+
+func TestMemoryRefusesAnEntryLargerThanTheShard(t *testing.T) {
+	c := NewMemory(memoryChunkSize, 5*time.Minute)
+	c.Set(t.Context(), "kept", []byte("langdon"), 0)
+
+	tooBig := make([]byte, memoryChunkSize)
+	c.Set(t.Context(), "horcrux", tooBig, 0)
+
+	got, ok := c.Get(t.Context(), nil, "kept")
+	require.True(t, ok)
+	assert.Equal(t, "langdon", string(got))
+	_, ok = c.Get(t.Context(), nil, "horcrux")
+	assert.False(t, ok, "an entry larger than the shard is not stored")
+}
+
+func TestMemoryRewindsBeforeAWriteThatDoesNotFit(t *testing.T) {
+	c := NewMemory(memoryChunkSize, 5*time.Minute)
+	// Leave less than the next value in the only chunk, so the write has to
+	// rewind. The new bytes must come back whole.
+	c.Set(t.Context(), "pad", make([]byte, memoryChunkSize-32), 0)
+	value := []byte("sophie-neveu-comes-back-whole")
+	c.Set(t.Context(), "tail", value, 0)
+
+	got, ok := c.Get(t.Context(), nil, "tail")
+	require.True(t, ok)
+	assert.Equal(t, value, got)
 }
 
 func TestMemoryHandlesAnEntrySpanningChunks(t *testing.T) {

@@ -72,28 +72,27 @@ func newAsyncTransport(inner loglayer.Transport, f flusher) *asyncTransport {
 // application rather than on the log — and falls back to a synchronous send
 // once the transport has been closed, so an entry that arrives during or
 // after shutdown is written, never dropped.
+//
+// The lock covers the closed check and the enqueue together. Close takes the
+// same lock before it closes done, so a send cannot observe "still open" and
+// then write the inner sink while the worker is draining it. A send that
+// finds the transport already closed waits until that drain has finished.
 func (a *asyncTransport) SendToLogger(params loglayer.TransportParams) {
-	a.mu.RLock()
-	closed := a.closed
-	a.mu.RUnlock()
-	if closed {
+	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		<-a.exited
 		a.inner.SendToLogger(params)
 		return
 	}
-	select {
-	case a.queue <- params:
-	case <-a.done:
-		// Close was called concurrently with this send. The queue still
-		// drains below; write this one directly so it cannot be lost
-		// behind a channel that nobody reads anymore.
-		a.inner.SendToLogger(params)
-	}
+	a.queue <- params
+	a.mu.Unlock()
 }
 
 // work renders and writes entries until Close stops accepting, then drains
-// whatever is queued. No producer can be mid-send at that point: the closed
-// flag stops new sends before done is closed, so the drain loop is bounded
-// by what producers already put in.
+// whatever is queued. Close sets the closed flag under the same lock a send
+// holds across its enqueue, and only then closes done, so this drain does
+// not share the inner writer with a producer.
 func (a *asyncTransport) work() {
 	defer close(a.exited)
 	for {

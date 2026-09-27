@@ -165,8 +165,10 @@ func (r *Repository) CreateKey(ctx context.Context, db datastore.Querier, row Ke
 
 // RenewKey replaces an expired key's hash and window, and clears the expiry
 // reminder — the new window earns a fresh reminder, not the old one's stamp.
-// It answers whether the identifier named a row.
-func (r *Repository) RenewKey(ctx context.Context, db datastore.Querier, id uuid.UUID, hash []byte, expiresAt time.Time) (bool, error) {
+// The WHERE repeats the read: this owner, still unrevoked, already expired.
+// A concurrent revoke or a second renew matches nothing, so the caller is
+// not handed a secret the row no longer stores.
+func (r *Repository) RenewKey(ctx context.Context, db datastore.Querier, id, owner uuid.UUID, hash []byte, expiresAt, now time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(KeyTable)
 	ub.Set(
@@ -174,7 +176,12 @@ func (r *Repository) RenewKey(ctx context.Context, db datastore.Querier, id uuid
 		ub.Assign("expires_at", expiresAt),
 		ub.Assign("expiration_email_sent_at", nil),
 	)
-	ub.Where(ub.Equal("id", id))
+	ub.Where(
+		ub.Equal("id", id),
+		ub.Equal("user_id", owner),
+		ub.IsNull("revoked_at"),
+		ub.LessThan("expires_at", now),
+	)
 
 	query, args := ub.Build()
 	tag, err := db.Exec(ctx, query, args...)

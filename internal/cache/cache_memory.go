@@ -331,7 +331,13 @@ func (s *memoryShard) set(h uint64, key string, value []byte, expiresAt int64) {
 		valLen:    len(value),
 		expiresAt: expiresAt,
 	}
-	entry.chunk, entry.off = s.write(key, value)
+	chunk, off, ok := s.write(key, value)
+	if !ok {
+		// Larger than this shard's budget. Leaving the previous entry in
+		// place is the same answer as an eviction that never stored this one.
+		return
+	}
+	entry.chunk, entry.off = chunk, off
 
 	if prev, ok := s.m[h]; ok {
 		// A different key owns this hash: move it to the secondary slot so
@@ -344,30 +350,35 @@ func (s *memoryShard) set(h uint64, key string, value []byte, expiresAt int64) {
 	s.m[h] = entry
 }
 
-// write appends key and value to the ring and reports where they start. An
-// entry begins at the current position, or a fresh chunk when the current
-// one cannot hold it whole; the bytes may cross into following chunks.
-func (s *memoryShard) write(key string, value []byte) (chunk int, off int) {
-	if s.chunks == nil || s.off+len(key)+len(value) > memoryChunkSize {
-		s.nextChunk()
+// write appends key and value to the ring and reports where they start.
+// Bytes may cross into following chunks. A reset never lands in the middle
+// of this copy: when the remainder cannot hold the entry, the ring rewinds
+// first. An entry larger than the shard budget is refused, because storing
+// it would overwrite its own head.
+func (s *memoryShard) write(key string, value []byte) (chunk int, off int, ok bool) {
+	need := len(key) + len(value)
+	if need > s.maxMemory {
+		return 0, 0, false
+	}
+	if len(s.chunks) == 0 || s.room() < need {
+		s.rewind()
 	}
 	chunk, off = s.curr, s.off
-
 	s.appendString(key)
 	s.appendBytes(value)
-	return chunk, off
+	return chunk, off, true
 }
 
 // appendString copies a string into the ring.
 func (s *memoryShard) appendString(b string) {
 	for len(b) > 0 {
+		if s.off == memoryChunkSize {
+			s.advance()
+		}
 		cur := s.chunks[s.curr]
 		n := copy(cur[s.off:], b)
 		b = b[n:]
 		s.off += n
-		if s.off == memoryChunkSize {
-			s.nextChunk()
-		}
 	}
 }
 
@@ -376,27 +387,52 @@ func (s *memoryShard) appendString(b string) {
 // starts stays contiguous with what its continuation writes.
 func (s *memoryShard) appendBytes(b []byte) {
 	for len(b) > 0 {
+		if s.off == memoryChunkSize {
+			s.advance()
+		}
 		cur := s.chunks[s.curr]
 		n := copy(cur[s.off:], b)
 		b = b[n:]
 		s.off += n
-		if s.off == memoryChunkSize {
-			s.nextChunk()
-		}
 	}
 }
 
-// nextChunk moves to the next chunk of the ring, cleaning the whole cache
-// when the budget is spent. The chunks already allocated are kept: a cache
-// that filled once does not hand back the memory it grew.
-func (s *memoryShard) nextChunk() {
-	if (len(s.chunks)+1)*memoryChunkSize > s.maxMemory {
-		clear(s.m)
-		clear(s.collisions)
-		s.curr = 0
-	} else {
-		s.curr = len(s.chunks)
+// room is the bytes this write can still use without wrapping onto its own
+// start: the rest of the current chunk, the chunks already allocated after
+// it, and the budget not yet allocated.
+func (s *memoryShard) room() int {
+	if len(s.chunks) == 0 {
+		return s.maxMemory
+	}
+	left := (len(s.chunks)-s.curr)*memoryChunkSize - s.off
+	allocated := len(s.chunks) * memoryChunkSize
+	if allocated < s.maxMemory {
+		left += s.maxMemory - allocated
+	}
+	return left
+}
+
+// rewind drops the index and starts the next entry at the front of the ring.
+// Allocated chunks stay: a cache that filled once keeps that memory.
+func (s *memoryShard) rewind() {
+	clear(s.m)
+	clear(s.collisions)
+	s.curr = 0
+	s.off = 0
+	if len(s.chunks) == 0 {
 		s.chunks = append(s.chunks, make([]byte, memoryChunkSize))
 	}
+}
+
+// advance moves to the next chunk. write checks room first, so the budget
+// always has a chunk for this step.
+func (s *memoryShard) advance() {
+	if s.curr+1 < len(s.chunks) {
+		s.curr++
+		s.off = 0
+		return
+	}
+	s.chunks = append(s.chunks, make([]byte, memoryChunkSize))
+	s.curr = len(s.chunks) - 1
 	s.off = 0
 }

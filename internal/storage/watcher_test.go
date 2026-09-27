@@ -68,6 +68,9 @@ func TestWatcherSettlesANestedFile(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // the watch picks the new directory up
 	require.NoError(t, os.WriteFile(filepath.Join(staging, "avatar", "usr_1", "128.png"), []byte("v1"), 0o600))
 	waitFor(t, spy, filepath.Join("avatar", "usr_1", "128.png"))
+	time.Sleep(150 * time.Millisecond)
+	assert.False(t, spy.has("avatar"), "a directory is not an upload")
+	assert.False(t, spy.has(filepath.Join("avatar", "usr_1")))
 }
 
 func TestWatcherSettlesARenamedInFileOnce(t *testing.T) {

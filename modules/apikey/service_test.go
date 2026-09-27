@@ -252,6 +252,17 @@ func TestRenewReplacesAnExpiredKeyAndRefusesALiveOne(t *testing.T) {
 	assert.ErrorIs(t, err, ErrKeyNotFound)
 
 	assert.Equal(t, 1, auditCount(t, pool, audit.EventAPIKeyRenewed, expired.Key.ID.String()))
+
+	// A revoked key is not renewed, even after its window has closed. The
+	// update repeats that check, so the caller is not given a secret the
+	// row will not accept.
+	revoked := created(t, service, owner, "revoked-key")
+	_, err = pool.Exec(t.Context(),
+		"UPDATE public.api_keys SET expires_at = $1, revoked_at = $1 WHERE id = $2",
+		now.Add(-time.Hour), revoked.Key.ID)
+	require.NoError(t, err)
+	_, err = service.Renew(t.Context(), owner, revoked.Key.ID, newExpiry)
+	assert.ErrorIs(t, err, ErrKeyNotFound)
 }
 
 func TestRevokeIsSoftAndIdempotent(t *testing.T) {
