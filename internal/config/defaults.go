@@ -106,13 +106,44 @@ const DefaultStorageWatchDebounce = 2 * time.Second
 // comes from rather than being trusted by default.
 var DefaultCORSOrigins = []string{"http://localhost:3000"}
 
-// DefaultCORSMethods is the method list a REST + ConnectRPC surface needs.
+// DefaultCORSMethods is the method list the dual surface needs: the GET and
+// POST the Connect protocol answers with, plus the PUT, PATCH, and DELETE the
+// REST surface mounts. The methods connectrpc/cors-go presets are GET and
+// POST alone — its surface has no REST half.
 var DefaultCORSMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 
 // DefaultCORSHeaders is the header list a browser call may set: the fetch
-// headers the API envelope reads plus the authorization header the tokens
-// arrive in.
-var DefaultCORSHeaders = []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"}
+// headers the API envelope reads, the authorization header the tokens arrive
+// in, the machine credential's header, and the protocol headers
+// connectrpc/cors-go presets for Connect and gRPC-Web consumers.
+var DefaultCORSHeaders = []string{
+	// The fetch headers any HTTP call may carry.
+	"Accept",
+	"Content-Type",
+	// The credentials the two transports arrive in: the Bearer token and the
+	// API key on both surfaces.
+	"Authorization",
+	"X-Requested-With",
+	"X-Api-Key",
+	// The Connect protocol's own headers.
+	"Connect-Protocol-Version",
+	"Connect-Timeout-Ms",
+	"X-User-Agent",
+	// The gRPC-Web headers, so the policy survives a gRPC-Web consumer.
+	"Grpc-Timeout",
+	"X-Grpc-Web",
+}
+
+// DefaultCORSExposedHeaders is the response header list a browser script may
+// read on a cross-origin answer: the gRPC-Web status fields
+// connectrpc/cors-go exposes, so an error's code and message are visible to
+// the caller instead of opaque. Tango serves no trailers, so the list needs
+// nothing else.
+var DefaultCORSExposedHeaders = []string{
+	"Grpc-Message",
+	"Grpc-Status",
+	"Grpc-Status-Details-Bin",
+}
 
 // Mode names of the supported runtime modes.
 const (
@@ -379,6 +410,7 @@ func Default() Config {
 				AllowedOrigins: DefaultCORSOrigins,
 				AllowedMethods: DefaultCORSMethods,
 				AllowedHeaders: DefaultCORSHeaders,
+				ExposedHeaders: DefaultCORSExposedHeaders,
 				MaxAge:         DefaultCORSMaxAge,
 			},
 		},

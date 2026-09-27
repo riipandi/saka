@@ -416,6 +416,9 @@ func checkCORS(cors *CORS, check func(ok bool, format string, args ...any)) {
 	for _, header := range cors.AllowedHeaders {
 		check(isToken(header), "server.cors.allowed_headers: %q is not a header name", header)
 	}
+	for _, header := range cors.ExposedHeaders {
+		check(isToken(header), "server.cors.exposed_headers: %q is not a header name", header)
+	}
 	check(cors.MaxAge >= 0, "server.cors.max_age: %s must not be negative", cors.MaxAge)
 }
 

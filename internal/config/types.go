@@ -555,6 +555,10 @@ type CORS struct {
 	AllowedMethods []string `koanf:"allowed_methods" json:"allowed_methods"`
 	// AllowedHeaders lists the request headers a cross-origin call may set.
 	AllowedHeaders []string `koanf:"allowed_headers" json:"allowed_headers"`
+	// ExposedHeaders lists the response headers a browser script may read on
+	// a cross-origin response. Headers outside the CORS-safelist are invisible
+	// to a script unless they are named here.
+	ExposedHeaders []string `koanf:"exposed_headers" json:"exposed_headers"`
 	// AllowCredentials lets a cross-origin call carry cookies and credentials.
 	// The CORS specification forbids credentials with a wildcard origin, so
 	// Validate refuses that combination.

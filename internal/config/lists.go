@@ -18,6 +18,7 @@ var listKeys = []string{
 	"server.cors.allowed_headers",
 	"server.cors.allowed_methods",
 	"server.cors.allowed_origins",
+	"server.cors.exposed_headers",
 	"server.trusted_proxy_headers",
 }
 

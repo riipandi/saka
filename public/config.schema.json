@@ -676,6 +676,10 @@
                         "allowed_headers": {
                             "$ref": "#/$defs/stringListOrEnv"
                         },
+                        "exposed_headers": {
+                            "description": "Response headers a browser script may read on a cross-origin response.",
+                            "$ref": "#/$defs/stringListOrEnv"
+                        },
                         "allow_credentials": {
                             "description": "Forbidden with a wildcard origin; Validate refuses the combination.",
                             "$ref": "#/$defs/boolOrEnv"
