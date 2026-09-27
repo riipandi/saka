@@ -353,6 +353,11 @@ message User {
   // locale is the optional preferred locale tag.
   optional string locale = 7;
 
+  // timezone is the IANA zone the client formats UTC timestamps against;
+  // "UTC" is the default. The server never localizes: every instant it
+  // answers is UTC, and this field is the presentation hint alone.
+  string timezone = 15;
+
   // disabled says whether sign-ins are refused.
   bool disabled = 9;
 
@@ -666,6 +671,11 @@ message UpdateUserRequest {
   // locale is the preferred locale tag; empty clears it.
   string locale = 7;
 
+  // timezone is the IANA zone the account's client formats UTC timestamps
+  // against. Empty resets it to "UTC"; a non-empty value must name a zone
+  // the tz database knows — the server refuses an unknown name.
+  string timezone = 12 [(buf.validate.field).string.max_len = 64];
+
   // disabled refuses or allows sign-ins.
   bool disabled = 9;
 
@@ -818,6 +828,11 @@ message UpdateCurrentUserRequest {
 
   // locale is the preferred locale tag; empty clears it.
   string locale = 4;
+
+  // timezone is the IANA zone the account's client formats UTC timestamps
+  // against. Empty resets it to "UTC"; a non-empty value must name a zone
+  // the tz database knows — the server refuses an unknown name.
+  string timezone = 5 [(buf.validate.field).string.max_len = 64];
 }
 
 // UpdateCurrentUserResponse is the account as the update left it.

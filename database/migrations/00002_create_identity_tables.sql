@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),
     avatar_url TEXT, -- Storage key of the uploaded avatar; NULL = bundled default picture
     locale TEXT,
+    timezone TEXT NOT NULL DEFAULT 'UTC', -- IANA zone for timestamp presentation; UTC = the server default
     disabled BOOLEAN NOT NULL DEFAULT FALSE,
     metadata JSONB DEFAULT NULL, -- Metadata can contain user-specific information
     email_verified_at TIMESTAMPTZ DEFAULT NULL,
@@ -24,7 +25,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     ban_expires TIMESTAMPTZ DEFAULT NULL,
     ban_reason TEXT DEFAULT NULL,
     -- Username only allows alphanumeric characters and underscores, must be between 3 and 32 characters long
-    CONSTRAINT chk_username_format CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_]{3,32}$')
+    CONSTRAINT chk_username_format CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_]{3,32}$'),
+    CONSTRAINT chk_users_timezone CHECK (char_length(timezone) <= 64)
 ) USING heap;
 
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();

@@ -243,6 +243,93 @@ func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
 	assert.Equal(t, "vittoria.vetra@infinite.bound", row.Email)
 }
 
+func TestUpdateCurrentUserSetsTheTimezoneItIsGiven(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:    "hermione_granger",
+		Email:       "hermione.granger@hogwarts.edu",
+		DisplayName: "Hermione",
+		Password:    "Expecto-Patronum-9",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTimezone, created.Timezone,
+		"an account that never chose a zone starts on the default, not on an empty string")
+
+	updated, err := service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+		Timezone:    "Asia/Jakarta",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Asia/Jakarta", updated.Timezone)
+
+	// Clearing the field is the default, not an unparseable zone: the
+	// frontend falls back to UTC the way it would for a fresh account.
+	cleared, err := service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTimezone, cleared.Timezone)
+
+	_, err = service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+		Timezone:    "Mars/Olympus",
+	})
+	assert.ErrorIs(t, err, ErrTimezoneInvalid,
+		"a zone the tz database does not carry is refused, not stored")
+}
+
+func TestUpdateUserReplacesTheTimezoneAndRefusesAnUnknownZone(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:    "robert_langdon",
+		Email:       "robert.langdon@harvard.edu",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	require.NoError(t, err)
+
+	existing, err := service.GetUser(ctx, created.ID)
+	require.NoError(t, err)
+
+	updated, err := service.UpdateUser(ctx, created.ID, UpdateParams{
+		Username:    existing.Username,
+		Email:       existing.Email,
+		FirstName:   *existing.FirstName,
+		LastName:    *existing.LastName,
+		DisplayName: existing.DisplayName,
+		Timezone:    "Europe/Rome",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Europe/Rome", updated.Timezone)
+
+	_, err = service.UpdateUser(ctx, created.ID, UpdateParams{
+		Username:    existing.Username,
+		Email:       existing.Email,
+		FirstName:   *existing.FirstName,
+		LastName:    *existing.LastName,
+		DisplayName: existing.DisplayName,
+		Timezone:    "Not/AZone",
+	})
+	assert.ErrorIs(t, err, ErrTimezoneInvalid)
+}
+
 func TestGetUserRefusesAnUnknownIdentifier(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 

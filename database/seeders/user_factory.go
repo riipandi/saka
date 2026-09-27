@@ -179,6 +179,7 @@ func applyDefaultUser(
 		FirstName:   DefaultUser.FirstName,
 		LastName:    DefaultUser.LastName,
 		DisplayName: DefaultUser.DisplayName(),
+		Timezone:    user.DefaultTimezone,
 		CreatedAt:   time.Now().UTC(),
 	}
 
@@ -275,6 +276,7 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 		FirstName:   s.credentials.FirstName,
 		LastName:    s.credentials.LastName,
 		DisplayName: s.credentials.DisplayName(),
+		Timezone:    user.DefaultTimezone,
 		CreatedAt:   now,
 	}
 	if s.bannedAt {

@@ -34,6 +34,11 @@ var (
 	// ErrSelfDeletion is the refusal of the one deletion an administrator
 	// cannot perform: their own signed-in account.
 	ErrSelfDeletion = errors.New("user: cannot delete the signed-in account")
+
+	// ErrTimezoneInvalid is a timezone preference that names no zone the
+	// tz database carries. The proto constraint bounds its length; only
+	// this check can tell a well-formed name from a real zone.
+	ErrTimezoneInvalid = errors.New("user: unknown timezone")
 )
 
 // ResourceUser is the resource type an audit record names when the account
@@ -134,6 +139,7 @@ type UpdateParams struct {
 	LastName     string
 	DisplayName  string
 	Locale       string
+	Timezone     string
 	Disabled     bool
 	BanExpiresAt *time.Time
 	BanReason    *string
@@ -148,6 +154,37 @@ type ProfileParams struct {
 	LastName    string
 	DisplayName string
 	Locale      string
+	Timezone    string
+}
+
+// DefaultTimezone is the preference every account starts with and an empty
+// presented value resolves to. Timestamps leave the server in UTC regardless;
+// this is the hint the frontend formats them against.
+//
+// TODO(frontend): the SPA has no profile surface yet. When one lands, it
+// should render `User.timezone` over the browser's own detection — offer a
+// picker of IANA zones, defaulting to UTC — and format every instant the
+// API answers in that zone.
+const DefaultTimezone = "UTC"
+
+// normalizeTimezone validates a presented timezone preference. An empty value
+// is the default — clearing the field means UTC, not an unparseable zone —
+// and `Local` is refused because a client-side preference that means
+// "wherever this server runs" is never what its presenter intended. A
+// non-empty value must name a zone the tz database knows: the check runs at
+// the boundary, so no row can hold a name the frontend cannot load.
+func normalizeTimezone(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return DefaultTimezone, nil
+	}
+	if value == "Local" {
+		return "", ErrTimezoneInvalid
+	}
+	if _, err := time.LoadLocation(value); err != nil {
+		return "", ErrTimezoneInvalid
+	}
+	return value, nil
 }
 
 // UserView is an account as the procedures answer it: the fields a client
@@ -160,6 +197,7 @@ type UserView struct {
 	FirstName     *string
 	LastName      *string
 	Locale        *string
+	Timezone      string
 	Disabled      bool
 	EmailVerified bool
 	CreatedAt     time.Time
@@ -204,6 +242,7 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 			LastName:        params.LastName,
 			DisplayName:     displayName,
 			Locale:          params.Locale,
+			Timezone:        DefaultTimezone,
 			Disabled:        params.Disabled,
 			EmailVerifiedAt: emailVerifiedAt,
 			CreatedAt:       s.now(),
@@ -302,6 +341,11 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		return UserView{}, err
 	}
 
+	timezone, tzErr := normalizeTimezone(params.Timezone)
+	if tzErr != nil {
+		return UserView{}, tzErr
+	}
+
 	row := UserSchema{
 		ID:          userID,
 		Username:    existing.Username,
@@ -310,6 +354,7 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
 		Locale:      params.Locale,
+		Timezone:    timezone,
 		Disabled:    existing.Disabled,
 		// The immutable columns and the ban state ride through untouched:
 		// this update owns the profile, nothing else.
@@ -381,6 +426,11 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		return UserView{}, err
 	}
 
+	timezone, tzErr := normalizeTimezone(params.Timezone)
+	if tzErr != nil {
+		return UserView{}, tzErr
+	}
+
 	row := UserSchema{
 		ID:          userID,
 		Username:    params.Username,
@@ -389,6 +439,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
 		Locale:      params.Locale,
+		Timezone:    timezone,
 		Disabled:    params.Disabled,
 		// The creation instant is immutable; the update statement leaves the
 		// column alone, and the answer carries the value as it stood.
@@ -472,6 +523,7 @@ func WireView(user UserView) *identityv1.User {
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		Locale:        user.Locale,
+		Timezone:      user.Timezone,
 		Disabled:      user.Disabled,
 		EmailVerified: user.EmailVerified,
 		CreatedAt:     user.CreatedAt.Format(rfc3339),
@@ -550,6 +602,7 @@ func view(row UserSchema) UserView {
 		FirstName:     optional(row.FirstName),
 		LastName:      optional(row.LastName),
 		Locale:        optional(row.Locale),
+		Timezone:      row.Timezone,
 		Disabled:      row.Disabled,
 		EmailVerified: row.EmailVerifiedAt != nil,
 		CreatedAt:     row.CreatedAt,

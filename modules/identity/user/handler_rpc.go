@@ -138,6 +138,7 @@ func (h *rpcHandler) UpdateUser(ctx context.Context, req *connect.Request[identi
 		LastName:    body.LastName,
 		DisplayName: body.DisplayName,
 		Locale:      body.Locale,
+		Timezone:    body.Timezone,
 		Disabled:    body.Disabled,
 		BanReason:   optional(body.GetBanReason()),
 	}
@@ -268,6 +269,7 @@ func (h *rpcHandler) UpdateCurrentUser(ctx context.Context, req *connect.Request
 		LastName:    body.LastName,
 		DisplayName: body.DisplayName,
 		Locale:      body.Locale,
+		Timezone:    body.Timezone,
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -319,6 +321,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("an administrator cannot delete the account they are signed in with"))
 	case errors.Is(err, ErrBanInPast):
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("the ban expiry is in the past"))
+	case errors.Is(err, ErrTimezoneInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown timezone"))
 	case errors.Is(err, ErrPicturesUnavailable):
 		return connect.NewError(connect.CodeUnavailable, errors.New("picture storage is not available"))
 	case isPasswordPolicy(err):

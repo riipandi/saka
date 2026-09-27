@@ -26,7 +26,7 @@ func NewRepository() *Repository {
 // userColumns are the columns the account procedures read, in scan order.
 var UserColumns = []string{
 	"id", "username", "email", "first_name", "last_name", "display_name",
-	"locale", "disabled", "email_verified_at", "created_at",
+	"locale", "timezone", "disabled", "email_verified_at", "created_at",
 	"banned_at", "ban_expires", "ban_reason", "avatar_url",
 }
 
@@ -37,7 +37,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	var firstName, lastName, locale, banReason, picturePath *string
 	err := scan(
 		&row.ID, &row.Username, &row.Email, &firstName, &lastName,
-		&row.DisplayName, &locale, &row.Disabled,
+		&row.DisplayName, &locale, &row.Timezone, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
 	)
@@ -189,6 +189,7 @@ func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row U
 		ub.Assign("last_name", nullIfEmpty(row.LastName)),
 		ub.Assign("display_name", row.DisplayName),
 		ub.Assign("locale", nullIfEmpty(row.Locale)),
+		ub.Assign("timezone", row.Timezone),
 		ub.Assign("disabled", row.Disabled),
 		ub.Assign("banned_at", row.BannedAt),
 		ub.Assign("ban_expires", row.BanExpires),
