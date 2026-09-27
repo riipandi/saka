@@ -36,6 +36,14 @@ func All() []Seeder {
 	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification()}
 }
 
+// System is the seed a production deployment needs: the data the
+// application's own surfaces depend on, with no sample content beside it.
+// `initialize` applies it; the development fixtures travel with `All` and
+// `migrate:seed` alone.
+func System() []Seeder {
+	return []Seeder{Authorization()}
+}
+
 // Run applies each seeder in order over the same querier.
 //
 // The caller owns the transaction. That keeps a failed seeder from leaving a

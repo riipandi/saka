@@ -450,3 +450,38 @@ func isTerminal(cmd *cli.Command) bool {
 // terminalCheck is the seam the tests replace to exercise both branches of the
 // confirmation prompt, which otherwise needs a real terminal.
 var terminalCheck = isTerminal
+
+// requireMigrated refuses to seed a database whose schema is not current.
+//
+// A seeder writes the columns it knows about, so a missing table or a table
+// from an older migration would fail halfway through with a database error that
+// does not say what to do. Checking the migration state first turns that into
+// one instruction, and it catches the case a table check misses: a database
+// rolled back below the version a seeder needs.
+//
+// The check opens the single-connection migration handle rather than reusing
+// the pool, because goose reads its version table through database/sql. Asking
+// goose is deliberate: "pending" is the engine's own answer, so the check
+// cannot drift from what migrate:up would do.
+func requireMigrated(ctx context.Context, cfg config.Config) error {
+	db, err := datastore.OpenMigrationDB(ctx, databaseOptions(ctx, cfg))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	migrator, err := database.NewMigrator(ctx, db, database.MigratorOptions{})
+	if err != nil {
+		return err
+	}
+
+	pending, err := migrator.Pending(ctx)
+	if err != nil {
+		return err
+	}
+	if len(pending) > 0 {
+		return fmt.Errorf("database: %d %s pending; run migrate:up first",
+			len(pending), printext.Plural(len(pending), "migration"))
+	}
+	return nil
+}

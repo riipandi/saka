@@ -12,7 +12,7 @@ import (
 
 var rootCmd = &cli.Command{
 	Name:            config.AppIdentifier,
-	Description:     config.Description,
+	Usage:           config.Description,
 	Version:         config.AppVersion,
 	HideVersion:     true,
 	HideHelpCommand: true,
@@ -28,16 +28,17 @@ var rootCmd = &cli.Command{
 		migrateSeedCmd,
 		dbExportCmd,
 		dbImportCmd,
+		adminResetPasswordCmd,
 		keyGenerateCmd,
-		authPromoteCmd,
 		keyRotateCmd,
+		initializeCmd,
 		healthCheckCmd,
 		configGenerateCmd,
 		configValidateCmd,
 		configPrintCmd,
+		mailerSmokeCmd,
 		loggerSmokeCmd,
 		otelSmokeCmd,
-		mailerSmokeCmd,
 	},
 	Flags: []cli.Flag{
 		&cli.StringFlag{

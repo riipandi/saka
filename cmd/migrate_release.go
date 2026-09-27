@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/urfave/cli/v3"
-)
+import "github.com/urfave/cli/v3"
 
 var migrateUpCmd = &cli.Command{
 	Name:     "migrate:up",

@@ -104,10 +104,10 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | POST     | `/rpc/tango.identity.v1.UserService/GetCurrentUser`                          | ConnectRPC   | The account the caller is                       |
-| POST     | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser`                       | ConnectRPC   | Update the signed-in account's own profile      |
+| POST     | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser`                       | ConnectRPC   | Update the signed-in account's own profile (names, locale, timezone) |
 | POST     | `/rpc/tango.identity.v1.UserService/ListUsers`                               | ConnectRPC   | List users (admin)                              |
 | POST     | `/rpc/tango.identity.v1.UserService/GetUser`                                 | ConnectRPC   | Get user by ID (admin)                          |
-| POST     | `/rpc/tango.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin)                             |
+| POST     | `/rpc/tango.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
 | POST     | `/rpc/tango.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
 | POST     | `/rpc/tango.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
 | POST     | `/rpc/tango.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin)                              |
@@ -176,6 +176,7 @@ contract.
 | GET      | `/`                     | HTTP/REST  | SPA document; every unmatched path falls back to it |
 | GET      | `/api/`                 | HTTP/REST  | API root document (name, version, platform) |
 | GET      | `/static/*`             | HTTP/REST  | Embedded static assets, plus served uploads |
+| GET      | `/api/uploads/{key}`    | HTTP/REST  | Upload progress (authenticated): the manifest's `status` and `size` for one storage key |
 
 Debug-build-only utilities (`/debug/do`, `/debug/encode-id`, `/debug/decode-id`) answer `404` in
 a release build.
@@ -196,4 +197,4 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | Webhooks | `modules/webhook` | `WebhookService` |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
-| Initial admin setup | — | `SignupService/GetSetupAvailability`, `SetupInitialAdmin` |
+| Initial admin setup | — | `tango initialize` + `tango admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |
