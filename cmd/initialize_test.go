@@ -51,10 +51,14 @@ func TestInitializePreparesAFreshDatabase(t *testing.T) {
 
 	out, err := runInitializeCmd(t, initializeCmd, "--env-file="+db.envFile)
 	require.NoError(t, err)
-	assert.Contains(t, out, "admin@example.com")
-	assert.Contains(t, out, "the generated credential",
-		"an unattended run reads its credential from the command's own output")
-	assert.Contains(t, out, "status: initialized")
+	assert.Contains(t, out, "administrator: admin <admin@example.com>")
+	assert.Contains(t, out, "password: ",
+		"the generated credential is labeled, so an unattended run reads it from the output")
+	assert.Contains(t, out, "the generated credential — store it now; it is not recoverable")
+	assert.Contains(t, out, "authorization: 52 created, 0 skipped",
+		"the seed answers one summary line per seeder, not one line per record")
+	assert.Equal(t, 1, strings.Count(out, "status:"),
+		"the outcome is one status line — a second one is a second answer")
 
 	// The system seed ran: the administrator role exists and the catalog is
 	// populated beside it.
@@ -96,8 +100,10 @@ func TestInitializeRefusesAnInitializedDatabase(t *testing.T) {
 	out, err := runInitializeCmd(t, initializeCmd, "--env-file="+db.envFile,
 		"--admin-email=second@example.com")
 	require.Error(t, err)
-	assert.Contains(t, out+err.Error(), "already holds",
-		"the refusal names the state and points at the recovery command")
+	assert.Contains(t, out, "status: refused",
+		"the refusal is an outcome in the shape every outcome answers in")
+	assert.Contains(t, out, "already holds 1 account")
+	assert.Contains(t, out, "tango admin:reset-password")
 
 	// The refusal is the whole of the run: no second account exists.
 	row := readAccountRow(t, testPool(t, db.dsn), "second@example.com")

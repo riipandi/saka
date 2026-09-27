@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -117,8 +118,16 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	if accounts > 0 {
-		return fmt.Errorf("this database already holds %d %s; initialize refuses to touch it — use admin:reset-password to recover administrator access",
-			accounts, printext.Plural(int(accounts), "account"))
+		// The refusal is the run's outcome, not a crash: it answers in the
+		// shape every outcome answers in — one status line, the reasons
+		// indented beneath it — and exits nonzero without a second print
+		// of the message the CLI's error path would add.
+		if _, err = fmt.Fprintf(p.Writer(),
+			"status: refused\n  this database already holds %d %s — initialize never touches a running installation\n  to recover administrator access: tango admin:reset-password <email>\n",
+			accounts, printext.Plural(int(accounts), "account")); err != nil {
+			return err
+		}
+		return cli.Exit("", 1)
 	}
 
 	hash, err := crypto.NewPasswordHasher().Hash(creds)
@@ -170,20 +179,37 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	if printErr := printSeedResults(p, results, false, 0); printErr != nil {
-		return printErr
+	// One summary line per seeder: a deployment command reports what it
+	// changed at the granularity an operator acts on, and the per-record
+	// detail stays the development seed's output.
+	for _, result := range results {
+		if printErr := printSeedSummary(p, result); printErr != nil {
+			return printErr
+		}
 	}
-	_, err = fmt.Fprintf(p.Writer(), "administrator %s <%s> created\n", username, email)
-	if err != nil {
+	if _, err = fmt.Fprintf(p.Writer(), "administrator: %s <%s>\n", username, email); err != nil {
 		return err
 	}
 	if generated {
-		_, err = fmt.Fprintf(p.Writer(), "\n%s\n\n(the generated credential — store it now; it is not recoverable)\n", creds)
-		if err != nil {
+		if _, err = fmt.Fprintf(p.Writer(), "password: %s\n", creds); err != nil {
+			return err
+		}
+		if _, err = fmt.Fprintf(p.Writer(), "  the generated credential — store it now; it is not recoverable\n"); err != nil {
 			return err
 		}
 	}
 	return printStatusLine(p, "initialized")
+}
+
+// printSeedSummary writes one line per seeder — the name and the two counts
+// — so an initialize reports the system seed without the per-record noise
+// the development seed's report carries.
+func printSeedSummary(p printext.Palette, result seeders.Result) error {
+	name := strings.ToLower(strings.TrimSuffix(result.Name, "Seeder"))
+	return p.Printf("%s%s: %s, %s\n",
+		progressIndent, name,
+		p.Green(fmt.Sprintf("%d created", len(result.Created))),
+		p.Green(fmt.Sprintf("%d skipped", len(result.Skipped))))
 }
 
 // emailPattern is the address shape the users table's CHECK carries, so a
