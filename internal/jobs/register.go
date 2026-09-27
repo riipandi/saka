@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/scheduler"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/notification"
 )
 
 // Register wires the task processors onto a client. It is pure wiring — no
@@ -75,6 +76,9 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		}))
 		client.Register(queue.NewQueue[EmailChangeNoticeTask](func(ctx context.Context, task EmailChangeNoticeTask) error {
 			return emailChangeNoticeProcessor(ctx, task, mail)
+		}))
+		client.Register(queue.NewQueue[notification.NotificationEmailTask](func(ctx context.Context, task notification.NotificationEmailTask) error {
+			return notificationEmailProcessor(ctx, task, pool, mail)
 		}))
 	}
 }

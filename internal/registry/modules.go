@@ -7,6 +7,7 @@ import (
 	"github.com/riipandi/tango/modules/apikey"
 	"github.com/riipandi/tango/modules/auditlog"
 	"github.com/riipandi/tango/modules/identity"
+	"github.com/riipandi/tango/modules/notification"
 )
 
 // Area is one area the application serves, together with the services it owns.
@@ -50,6 +51,11 @@ func Areas() []Area {
 		// identity claims, so the order is descriptive rather than a
 		// dependency.
 		{Name: auditlog.ModuleName, Package: auditlog.Package, Mount: auditlog.Mount},
+		// The notification area publishes what an administrator announces
+		// and reads what an account is targeted by. It mounts last for the
+		// same reason the audit log does: its paths claim nothing the
+		// earlier areas claim.
+		{Name: notification.ModuleName, Package: notification.Package, Mount: notification.Mount},
 	}
 }
 

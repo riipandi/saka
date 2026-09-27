@@ -24,18 +24,45 @@ import (
 // interceptor answers for the whole surface instead of a path table the
 // router would have to repeat. It is registered on the handler options, so a
 // module's procedure is guarded exactly like the transport's own.
-func Guard() connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			rule := guard.RuleFor(req.Spec().Procedure)
-			caller, _ := jwtutils.CallerFrom(ctx)
+func Guard() connect.Interceptor {
+	return guardInterceptor{}
+}
 
-			if err := rule(caller, guard.Target{Message: req.Any()}); err != nil {
-				return nil, guardError(err)
-			}
-			return next(ctx, req)
+// guardInterceptor carries the rule table over both procedure shapes. The
+// unary half reads the decoded request, so a self rule can compare the
+// identifier it names; the streaming half reads no message — a stream's
+// rules are the ones that need no target, and a self rule on a stream is a
+// table defect the guard's table test catches.
+type guardInterceptor struct{}
+
+func (guardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		if err := enforce(ctx, req.Spec().Procedure, req.Any()); err != nil {
+			return nil, guardError(err)
 		}
+		return next(ctx, req)
 	}
+}
+
+func (guardInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+func (guardInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		if err := enforce(ctx, conn.Spec().Procedure, nil); err != nil {
+			return guardError(err)
+		}
+		return next(ctx, conn)
+	}
+}
+
+// enforce runs the rule one procedure gets, before the procedure runs, so a
+// refusal costs no service call and reaches no database.
+func enforce(ctx context.Context, procedure string, message any) error {
+	rule := guard.RuleFor(procedure)
+	caller, _ := jwtutils.CallerFrom(ctx)
+	return rule(caller, guard.Target{Message: message})
 }
 
 // guardError maps a rule's refusal onto the wire.

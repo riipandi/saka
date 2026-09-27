@@ -1,16 +1,16 @@
 type: folder
 model: folder
-id: fl_wL5PpfDgeh
-createdAt: 2026-09-27T08:03:20.704133
-updatedAt: 2026-09-27T08:03:36.929619
+id: fl_R9H6pBQjVK
+createdAt: 2026-09-27T10:14:18.811212
+updatedAt: 2026-09-27T10:16:50.337519
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
-description: ''
+description: '[Tango] The notification surface: what an administrator publishes and what an account reads.'
 headers: []
-name: Notification
+name: Notifications
 sortPriority: 15555.555555555557
 settingSendCookies:
   enabled: false

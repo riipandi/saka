@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_2NSLhBvbWe
+createdAt: 2026-09-27T10:14:47.752169
+updatedAt: 2026-09-27T10:15:52.728098
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: '[Tango] Write the caller''s receipt for every live notification that targets them and is still unread. Authenticated: any caller.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: I7V4Jyd5Gz
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: Shub2cw6sp
+method: POST
+name: Mark All Notifications Read
+sortPriority: 0.0
+url: ''
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

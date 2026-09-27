@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_SkK7yW2bVo
+createdAt: 2026-09-27T10:14:47.850409
+updatedAt: 2026-09-27T10:15:55.475810
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: '[Tango] Stream the notifications created while the stream stays open, those that target the caller. Connect server-streaming: the client sends one POST with content-type application/connect+json and reads enveloped messages until it closes. A ping event keeps the connection through idle proxies; the stream carries no history, so a reconnecting client catches up with List Notifications. Authenticated: any caller.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: u2EI4a0djZ
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: peXXkDgUny
+method: POST
+name: Watch Notifications
+sortPriority: 0.0
+url: ''
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

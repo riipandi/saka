@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_qECPoeLNRH
+createdAt: 2026-09-27T10:14:47.651492
+updatedAt: 2026-09-27T10:15:48.359511
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "page": 1,
+      "limit": 25,
+      "unread_only": false
+    }
+bodyType: application/json
+description: '[Tango] Answer one page of the caller''s inbox: the live notifications that target the caller, newest first, each carrying read_at once the caller read it. page is one-based; limit is 1-100; unread_only narrows the page to what the caller has not read. Authenticated: any caller.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 9qfaUSa5pV
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 2tkEbiyTxj
+method: POST
+name: List Notifications
+sortPriority: 0.0
+url: ''
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

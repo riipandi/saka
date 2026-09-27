@@ -445,3 +445,17 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 | GET | `/.well-known/jwks.json` | Get JSON Web Key Set (JWKS) | REST — done; bare RFC 7517 JWK Set over the configured key pair + `public.jwks` signing rows, cached behind `jwtutils.KeyProvider` | `modules/identity/jwks` (handler + integration tests) |
 | GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | planned — discovery documents belong to the unbuilt federation phase | — |
 | GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | planned | — |
+
+## Notifications
+
+| Method | Endpoint | Summary / Yaak Title | Status | Evidence |
+| ------ | -------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.notification.v1.NotificationService/CreateNotification` | [Tango] Create notification | done — Admin; publishes to `global`/`users`/`user_groups` audience, validates the named accounts and groups exist, refuses a system notice with a topic or a global audience; email pass gated by `mailer.notifications.announcement_email_enabled` | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/GetNotification` | [Tango] Get notification | done — Admin; full view with the audience junctions named | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/ListAllNotifications` | [Tango] List all notifications | done — Admin; page + `sort_by`/`sort_order` + `category` filter; cancelled stay listed | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/CancelNotification` | [Tango] Cancel notification | done — Admin; stamps `cancelled_at`, idempotent, the row survives | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/ListNotifications` | [Tango] List notifications | done — Authenticated; the caller's inbox resolved through the shared visibility predicate, `read_at` per row, `unread_only` filter | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/MarkNotificationRead` | [Tango] Mark notification read | done — Authenticated; receipt written once, `not_found` for what the caller is not targeted by | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead` | [Tango] Mark all notifications read | done — Authenticated; one INSERT..SELECT over the visibility predicate, answers how many it marked | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/UnreadCount` | [Tango] Unread count | done — Authenticated; the bell-badge number | `modules/notification` |
+| POST | `/rpc/tango.notification.v1.NotificationService/WatchNotifications` | [Tango] Watch notifications (stream) | done — Authenticated; server-streaming, in-process broker, ping keepalive (immediate + 25s), no history — catch-up via List; deadline exemption via `middleware.UnboundedFor` | `modules/notification` + `internal/transport/router_rpc.go` |

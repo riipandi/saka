@@ -12,6 +12,8 @@ import (
 	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
+	notificationv1 "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1"
+	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -217,6 +219,21 @@ var ProcedureRules = map[string]Entry{
 	// to end.
 	authv1connect.SessionServiceImpersonateUserProcedure:   {Rule: Admin},
 	authv1connect.SessionServiceStopImpersonatingProcedure: {Rule: StopImpersonating},
+
+	// The notifications split one service at the same line the keys do: the
+	// four administrative procedures publish and withdraw what every account
+	// reads, and the account procedures read the caller's own inbox — the
+	// account is the claims' subject, so there is no field for `Self` to
+	// compare. The watch stream is the same read held open.
+	notificationv1connect.NotificationServiceCreateNotificationProcedure:       {Rule: Admin},
+	notificationv1connect.NotificationServiceGetNotificationProcedure:          {Rule: Admin},
+	notificationv1connect.NotificationServiceListAllNotificationsProcedure:     {Rule: Admin},
+	notificationv1connect.NotificationServiceCancelNotificationProcedure:       {Rule: Admin},
+	notificationv1connect.NotificationServiceListNotificationsProcedure:        {Rule: Authenticated},
+	notificationv1connect.NotificationServiceMarkNotificationReadProcedure:     {Rule: Authenticated},
+	notificationv1connect.NotificationServiceMarkAllNotificationsReadProcedure: {Rule: Authenticated},
+	notificationv1connect.NotificationServiceUnreadCountProcedure:              {Rule: Authenticated},
+	notificationv1connect.NotificationServiceWatchNotificationsProcedure:       {Rule: Authenticated},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not
@@ -320,6 +337,7 @@ func ContractProcedures() []string {
 		authv1.File_one_time_access_proto,
 		apikeyv1.File_api_key_proto,
 		identityv1.File_identity_proto,
+		notificationv1.File_notification_proto,
 		systemv1.File_system_proto,
 	}
 

@@ -27,6 +27,7 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 	// Every template the email/ directory defines, so a template added there
 	// without a Go-side fixture is noticed here.
 	assert.Equal(t, []string{
+		mailer.TemplateAnnouncement,
 		mailer.TemplateAPIKeyExpiringSoon,
 		mailer.TemplateEmailChangeNotice,
 		mailer.TemplateEmailChangeRequest,
@@ -50,6 +51,11 @@ func fixtures() map[string]mailer.View {
 	return map[string]mailer.View{
 		mailer.TemplateAPIKeyExpiringSoon: {Data: mailer.APIKeyExpiringSoonData{
 			Name: "Andi", APIKeyName: "deploy key", ExpiresAt: "2 January 2026",
+		}},
+		mailer.TemplateAnnouncement: {Data: mailer.AnnouncementData{
+			Name: "Andi", Topic: "Maintenance",
+			Title: "Scheduled maintenance this weekend",
+			Body:  "The service will be briefly unavailable on Sunday morning.",
 		}},
 		mailer.TemplateEmailChangeNotice: {Data: mailer.EmailChangeNoticeData{
 			Name: "Andi", OldEmail: "flamel@example.com", NewEmail: "neville@example.com",

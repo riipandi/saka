@@ -1,0 +1,378 @@
+// The notification contract: what an administrator announces and what an
+// account reads.
+//
+// A notification is written once by an administrator and read by the
+// accounts it targets. The category says which kind it is: a `system`
+// notice is about an account and always names its recipients, while an
+// `announcement` is a broadcast that carries an optional topic and
+// targets everyone unless it names accounts or groups. The read state is
+// a receipt per account, written when the account marks the notification
+// read — nothing is materialised per recipient at creation, so a global
+// announcement costs one row however many accounts hold.
+//
+// The watch procedure is a live tail, not a log: it pushes the
+// notifications created after the stream opened, and the durable record
+// is the table itself. A client that reconnects catches up through the
+// list it already reads, so the stream carries no replay and no cursor.
+syntax = "proto3";
+
+package tango.notification.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1;notificationv1";
+
+// NotificationService is the one surface over notifications: the four
+// administrative procedures write them, the account procedures read the
+// caller's own view, and the watch procedure tails the live ones. The
+// guard table splits the two audiences — the administrative procedures
+// are `Admin`, the account procedures `Authenticated` — so one service
+// carries both without a second contract.
+service NotificationService {
+  // CreateNotification publishes a notification to its audience. It is
+  // live the moment the call returns; there is no draft state.
+  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
+
+  // GetNotification answers one notification's full view, the
+  // administrative read.
+  rpc GetNotification(GetNotificationRequest) returns (GetNotificationResponse);
+
+  // ListAllNotifications answers one page of every notification the
+  // deployment holds, newest first, cancelled ones included.
+  rpc ListAllNotifications(ListAllNotificationsRequest) returns (ListAllNotificationsResponse);
+
+  // CancelNotification withdraws a notification: it stops being visible
+  // to every account and no email goes out for it afterwards. The row
+  // survives, named by its cancellation instant.
+  rpc CancelNotification(CancelNotificationRequest) returns (CancelNotificationResponse);
+
+  // ListNotifications answers one page of the caller's inbox: the live
+  // notifications that target the caller, newest first, each carrying
+  // the instant the caller read it, if they did.
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+
+  // MarkNotificationRead writes the caller's receipt for one
+  // notification. Marking an already-read notification is the same
+  // success — the state it names is the one it is in.
+  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse);
+
+  // MarkAllNotificationsRead writes the caller's receipt for every live
+  // notification that targets them and is still unread.
+  rpc MarkAllNotificationsRead(MarkAllNotificationsReadRequest) returns (MarkAllNotificationsReadResponse);
+
+  // UnreadCount answers how many live notifications target the caller
+  // and carry no receipt yet — the number a bell badge shows.
+  rpc UnreadCount(UnreadCountRequest) returns (UnreadCountResponse);
+
+  // WatchNotifications streams the notifications created while the
+  // stream stays open, those that target the caller. A `ping` event
+  // keeps the connection through idle proxies; the stream carries no
+  // history, so a reconnecting client catches up with ListNotifications.
+  rpc WatchNotifications(WatchNotificationsRequest) returns (stream WatchEvent);
+}
+
+// Notification is the view of one notification. The account view and the
+// administrative view are the same message: `read_at` is absent in an
+// administrative answer because no caller's receipt was asked about.
+message Notification {
+  // id is the notification row's identifier, a UUID string.
+  string id = 1;
+
+  // category is `system` or `announcement`.
+  string category = 2;
+
+  // topic is the announcement's subject, absent on a system notice.
+  optional string topic = 3;
+
+  // title is the headline the inbox shows.
+  string title = 4;
+
+  // body is the message itself.
+  string body = 5;
+
+  // audience_kind is `global`, `users`, or `user_groups`.
+  string audience_kind = 6;
+
+  // user_ids are the accounts a `users` audience names. Empty otherwise.
+  repeated string user_ids = 7;
+
+  // user_group_ids are the groups a `user_groups` audience names. Empty
+  // otherwise.
+  repeated string user_group_ids = 8;
+
+  // created_by is the administrator who wrote it, absent when that
+  // account no longer exists.
+  optional string created_by = 9;
+
+  // created_at is when the notification went live.
+  google.protobuf.Timestamp created_at = 10;
+
+  // cancelled_at is when it was withdrawn, absent while it is live.
+  optional google.protobuf.Timestamp cancelled_at = 11;
+
+  // email_sent says whether the email pass ran for it.
+  bool email_sent = 12;
+
+  // read_at is the instant the asking account read it, absent while it
+  // is unread. Only the account view carries it.
+  optional google.protobuf.Timestamp read_at = 13;
+}
+
+// CreateNotificationRequest carries the notification and its audience.
+message CreateNotificationRequest {
+  // category is `system` or `announcement`.
+  string category = 1 [(buf.validate.field).string = {
+    in: [
+      "system",
+      "announcement"
+    ]
+  }];
+
+  // topic is the announcement's subject. A system notice must not carry
+  // one; the service refuses the pair the contract cannot express.
+  optional string topic = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+
+  // title is the headline.
+  string title = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+
+  // body is the message.
+  string body = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 2000
+  }];
+
+  // audience_kind is `global`, `users`, or `user_groups`. Absent means
+  // `global` — the default an announcement carries. A `system` notice
+  // must name its audience explicitly; the service refuses the pair the
+  // contract cannot express.
+  optional string audience_kind = 5 [(buf.validate.field).string = {
+    in: [
+      "global",
+      "users",
+      "user_groups"
+    ]
+  }];
+
+  // user_ids are the accounts a `users` audience targets, as UUID
+  // strings.
+  repeated string user_ids = 6 [(buf.validate.field).repeated.items.string.uuid = true];
+
+  // user_group_ids are the groups a `user_groups` audience targets, as
+  // UUID strings.
+  repeated string user_group_ids = 7 [(buf.validate.field).repeated.items.string.uuid = true];
+
+  // send_email asks the email pass for this notification. It rides the
+  // deployment's `mailer.notifications.announcement_email_enabled`
+  // decision: the flag a deployment switched off is a no-op here.
+  optional bool send_email = 8;
+}
+
+// CreateNotificationResponse is the notification as it went live.
+message CreateNotificationResponse {
+  // notification is the created notification's view.
+  Notification notification = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// GetNotificationRequest names the notification to read.
+message GetNotificationRequest {
+  // id is the notification row's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetNotificationResponse is the notification's full view.
+message GetNotificationResponse {
+  // notification is the notification's view.
+  Notification notification = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ListAllNotificationsRequest carries the page the administrator asks
+// for. Both fields unset answer the first default-sized page.
+message ListAllNotificationsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // sort_by names the column the page orders by. Absent, the creation
+  // time orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "category",
+      "topic",
+      "title",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means newest first.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+
+  // category narrows the page to one category when named.
+  optional string category = 5 [(buf.validate.field).string = {
+    in: [
+      "system",
+      "announcement"
+    ]
+  }];
+}
+
+// ListAllNotificationsResponse is the page of every notification.
+message ListAllNotificationsResponse {
+  // notifications are the notifications, newest first.
+  repeated Notification notifications = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// CancelNotificationRequest names the notification to withdraw.
+message CancelNotificationRequest {
+  // id is the notification row's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CancelNotificationResponse is empty: a successful withdrawal says so
+// with the protocol.
+message CancelNotificationResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListNotificationsRequest carries the page of the caller's inbox. Both
+// fields unset answer the first default-sized page.
+message ListNotificationsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // unread_only narrows the page to the notifications the caller has
+  // not read yet.
+  optional bool unread_only = 3;
+}
+
+// ListNotificationsResponse is the page of the caller's inbox.
+message ListNotificationsResponse {
+  // notifications are the caller's notifications, newest first.
+  repeated Notification notifications = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// MarkNotificationReadRequest names the notification to mark read.
+message MarkNotificationReadRequest {
+  // id is the notification row's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// MarkNotificationReadResponse is empty: a successful mark says so with
+// the protocol, and a notification the caller cannot see answers the
+// not-found code.
+message MarkNotificationReadResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// MarkAllNotificationsReadRequest is empty: the receipts are written over
+// the caller's whole inbox.
+message MarkAllNotificationsReadRequest {}
+
+// MarkAllNotificationsReadResponse is empty: the receipts are written
+// where they were missing.
+message MarkAllNotificationsReadResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// UnreadCountRequest is empty: the count is over the caller's own inbox.
+message UnreadCountRequest {}
+
+// UnreadCountResponse is the number the bell badge shows.
+message UnreadCountResponse {
+  // count is the number of live, unread notifications that target the
+  // caller.
+  int64 count = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// WatchNotificationsRequest is empty: the stream starts at now.
+message WatchNotificationsRequest {}
+
+// WatchEvent is one item the watch stream pushes. A `ping` carries no
+// notification — it only keeps the connection through an idle proxy.
+message WatchEvent {
+  // kind is `notification` or `ping`.
+  string kind = 1;
+
+  // notification is the created notification, present when kind is
+  // `notification`.
+  Notification notification = 2;
+}

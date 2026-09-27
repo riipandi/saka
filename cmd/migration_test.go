@@ -200,7 +200,7 @@ func TestMigrateUpAppliesAndIsIdempotent(t *testing.T) {
 	out, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
 	assertMigrationRow(t, out, 1, "applied")
-	assert.Contains(t, out, "9 migrations applied")
+	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", len(embeddedFiles())))
 
 	out, err = runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestMigrateDownDeclinedLeavesDatabase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "roll back 1 migration? [y/N]")
 	assert.Contains(t, out, "1 migration left applied")
-	assert.Equal(t, int64(9), currentVersion(t, dsn))
+	assert.Equal(t, int64(10), currentVersion(t, dsn))
 }
 
 // An accepted rollback applies, proving the prompt gate is not the only path.
@@ -456,7 +456,7 @@ func TestMigrateStatus(t *testing.T) {
 	out, err := runMigrateStatusCmd(t, "--env-file="+envFile)
 	require.NoError(t, err)
 	assert.Contains(t, out, "00001 pending -                   initialize_schema")
-	assert.Contains(t, out, "version 00000; 0 of 9 applied")
+	assert.Contains(t, out, "version 00000; 0 of 10 applied")
 	assert.Contains(t, out, "no migrations applied yet")
 
 	_, err = runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")

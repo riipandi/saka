@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_tXe7QHgdda
+createdAt: 2026-09-27T10:14:47.701845
+updatedAt: 2026-09-27T10:15:51.187843
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "0194b1a0-0000-7000-8000-000000000000"
+    }
+bodyType: application/json
+description: '[Tango] Write the caller''s receipt for one notification. Marking an already-read notification is the same success; a notification the caller is not targeted by answers not_found. id is the notification row''s UUID. Authenticated: any caller.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: nCG3UeeuC9
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: eGgzb2MS6a
+method: POST
+name: Mark Notification Read
+sortPriority: 0.0
+url: ''
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

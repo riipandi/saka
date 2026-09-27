@@ -6,6 +6,7 @@ import "time"
 // so a name here and a file in email/templates/ are the same thing.
 const (
 	TemplateAPIKeyExpiringSoon    = "api-key-expiring-soon"
+	TemplateAnnouncement          = "announcement"
 	TemplateEmailChangeNotice     = "email-change-notice"
 	TemplateEmailChangeRequest    = "email-change-request"
 	TemplateEmailChangeSuccess    = "email-change-success"
@@ -35,6 +36,16 @@ type (
 		Name       string
 		APIKeyName string
 		ExpiresAt  string
+	}
+	// AnnouncementData renders TemplateAnnouncement — the email pass a
+	// published notification carries. Topic is empty when the
+	// announcement named no topic; the template renders its own case
+	// rather than naming no topic.
+	AnnouncementData struct {
+		Name  string
+		Topic string
+		Title string
+		Body  string
 	}
 	// EmailChangeNoticeData renders TemplateEmailChangeNotice.
 	EmailChangeNoticeData struct {

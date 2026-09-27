@@ -185,6 +185,9 @@ CREATE TABLE IF NOT EXISTS public.signup_tokens_user_groups (
     FOREIGN KEY (user_group_id) REFERENCES public.user_groups(id) ON DELETE CASCADE
 ) USING heap;
 
+CREATE INDEX IF NOT EXISTS idx_signup_tokens_user_groups_user_group_id
+    ON public.signup_tokens_user_groups USING btree (user_group_id);
+
 -- --------------------------------------------------------
 -- Table: public.device_login_requests — QR / cross-device sign-in
 -- state (a plain table is the portable equivalent of the upstream

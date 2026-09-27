@@ -422,6 +422,10 @@
                         "email_change_notice_enabled": {
                             "$ref": "#/$defs/boolOrEnv",
                             "default": true
+                        },
+                        "announcement_email_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
                         }
                     }
                 }

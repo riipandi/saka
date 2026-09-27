@@ -379,6 +379,7 @@ func Default() Config {
 				UserUnbannedNoticeEnabled:    true,
 				APIKeyExpiringNoticeEnabled:  true,
 				EmailChangeNoticeEnabled:     true,
+				AnnouncementEmailEnabled:     true,
 			},
 		},
 		RateLimit: RateLimit{

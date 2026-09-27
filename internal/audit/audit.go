@@ -120,6 +120,15 @@ const (
 	// every email record, it names the delivery, not the message's contents.
 	EventAPIKeyExpiryEmailSent = "api_key_expiry_email_sent"
 
+	// EventNotificationCreated is a notification published to its audience.
+	// The payload names the category, the audience kind, and whether an
+	// email pass was asked for.
+	EventNotificationCreated = "notification_created"
+
+	// EventNotificationCancelled is a notification withdrawn. The stamp is
+	// the happening; the row survives it, and the record names it.
+	EventNotificationCancelled = "notification_cancelled"
+
 	// EventImpersonationStarted is a delegated session opened by an
 	// administrator. The record's user_id names the TARGET account — the one
 	// the requests will run as — and the payload's actor fields name the

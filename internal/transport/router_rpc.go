@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
@@ -34,6 +35,16 @@ const (
 	rpcCodecJSON            = "json"
 	rpcCodecJSONCharsetUTF8 = "json; charset=utf-8"
 )
+
+// rpcStreamingProcedures lists the procedures whose response stays open
+// past every request deadline: a server-streaming procedure is the one
+// surface the write timeout is wrong for, so the middleware above the
+// handlers lifts its deadline off the paths named here. A stream whose
+// procedure is missing from the list is cut at the deadline instead of
+// being answered unbounded, which is the safe side of a forgotten entry.
+var rpcStreamingProcedures = []string{
+	notificationv1connect.NotificationServiceWatchNotificationsProcedure,
+}
 
 // rpcJSONCodec adapts protojson to the contract the two transports share.
 //
@@ -168,6 +179,12 @@ func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules
 // handler is what refuses another method with `405` and `Allow: POST`.
 func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int) http.Handler {
 	r := chi.NewRouter()
+
+	// The streaming procedures are lifted out of the request deadlines the
+	// chain above them sets: a stream's whole job is to outlive the timeouts
+	// a unary call is bounded by. The paths are the contract's own, so a
+	// renamed procedure breaks the build rather than losing its exemption.
+	r.Use(middleware.UnboundedFor(rpcStreamingProcedures...))
 
 	options := rpcHandlerOptions(maxRequestBytes)
 	_, healthHandler := systemv1connect.NewHealthServiceHandler(
