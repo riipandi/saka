@@ -63,7 +63,7 @@ func TestMigrateResetRollsBackEverything(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
-	assert.Contains(t, out, "9 migrations rolled back")
+	assert.Contains(t, out, "11 migrations rolled back")
 	assert.Zero(t, currentVersion(t, dsn))
 }
 
@@ -136,8 +136,8 @@ func TestMigrateResetWithUpOnFreshDatabaseApplies(t *testing.T) {
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up")
 	require.NoError(t, err)
 	assert.NotContains(t, out, "no applied migrations")
-	assert.Contains(t, out, "9 migrations applied")
-	assert.Equal(t, int64(9), currentVersion(t, dsn))
+	assert.Contains(t, out, "11 migrations applied")
+	assert.Equal(t, int64(11), currentVersion(t, dsn))
 
 	// This path applies without rolling back first, so the rows must use the
 	// apply column width, not the rollback width the reporter was built with.
@@ -171,7 +171,7 @@ func TestMigrateResetDryRunOnFreshDatabase(t *testing.T) {
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--dry-run", "--up")
 	require.NoError(t, err)
 	assert.NotContains(t, out, "to roll back")
-	assert.Contains(t, out, "9 migrations pending")
+	assert.Contains(t, out, "11 migrations pending")
 	assert.Zero(t, currentVersion(t, dsn))
 
 	// Without --up there is nothing to report at all.
@@ -309,3 +309,4 @@ func TestMigrateResetWithUpKeepsIDsDense(t *testing.T) {
 		"the re-apply must reuse the ids, not continue past them")
 	assert.Equal(t, latestMigration().Version, currentVersion(t, dsn))
 }
+

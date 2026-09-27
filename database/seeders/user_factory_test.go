@@ -94,14 +94,17 @@ func TestUserSeederCreatesTheDefaultAccount(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 2)
+	require.Len(t, results, 4)
 	assert.Equal(t, seeders.UserSeederName, results[1].Name)
-	// The default account leads the list; the scenario accounts follow it.
+	// The default account leads the list; the scenario accounts follow it,
+	// and the scenario-role grants close it.
 	assert.Equal(t, []string{seeders.DefaultUser.Email,
 		seeders.DefaultUser.Email + " (" + seeders.AdministratorRoleName + " role)",
 		"robert.langdon@example.com", "sophie.neveu@example.com",
 		"silas.vetra@example.com", "hermione.granger@example.com",
-		"vittoria.vetra@example.com"}, results[1].Created)
+		"vittoria.vetra@example.com",
+		"robert.langdon@example.com (editor role)",
+		"hermione.granger@example.com (moderator role)"}, results[1].Created)
 	assert.Empty(t, results[1].Skipped)
 
 	var (
@@ -183,7 +186,7 @@ func TestUserSeederIsIdempotent(t *testing.T) {
 	pool := newSeededPool(t)
 
 	first := runSeeders(t, pool, false)
-	require.Len(t, first[1].Created, len(seeders.ScenarioEmails)+2)
+	require.Len(t, first[1].Created, len(seeders.ScenarioEmails)+4)
 	hash := storedHash(t, pool)
 
 	second := runSeeders(t, pool, false)
@@ -207,7 +210,7 @@ func TestUserSeederTreatsEmailCaseSensitively(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+2)
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+4)
 	assert.Empty(t, results[1].Skipped)
 	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool))
 }
@@ -224,7 +227,7 @@ func TestUserSeederKeepsAccountWithConflictingUsername(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails),
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+2,
 		"only the scenario accounts are new; the conflicting admin stays")
 	assert.Len(t, results[1].Skipped, 1)
 	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
@@ -329,3 +332,4 @@ func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 		Scan(&missing))
 	assert.Zero(t, missing)
 }
+

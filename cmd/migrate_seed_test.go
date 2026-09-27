@@ -57,8 +57,8 @@ func TestMigrateSeedCreatesTheDefaultUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" created")
-	assert.Contains(t, out, "status: 1 created, 0 skipped")
-	assert.Equal(t, 1, countUsers(t, envFile))
+	assert.Contains(t, out, "status: 70 created, 0 skipped")
+	assert.Equal(t, 6, countUsers(t, envFile))
 }
 
 // Running the command twice must not create a second account.
@@ -72,8 +72,8 @@ func TestMigrateSeedIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" skipped")
-	assert.Contains(t, out, "0 created, 1 skipped")
-	assert.Equal(t, 1, countUsers(t, envFile))
+	assert.Contains(t, out, "0 created, 67 skipped")
+	assert.Equal(t, 6, countUsers(t, envFile))
 }
 
 // --dry-run must report the work in future tense and write nothing.
@@ -84,7 +84,7 @@ func TestMigrateSeedDryRunWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" would create")
-	assert.Contains(t, out, "1 to create, 0 to skip")
+	assert.Contains(t, out, "60 to create, 4 to skip")
 	assert.Zero(t, countUsers(t, envFile))
 }
 
@@ -144,8 +144,8 @@ func TestMigrateSeedAcceptedPromptSeeds(t *testing.T) {
 	out, err := runMigrateSeedCmd(t, "y\n", "--env-file="+envFile)
 	require.NoError(t, err)
 
-	assert.Contains(t, out, "status: 1 created, 0 skipped")
-	assert.Equal(t, 1, countUsers(t, envFile))
+	assert.Contains(t, out, "status: 70 created, 0 skipped")
+	assert.Equal(t, 6, countUsers(t, envFile))
 }
 
 // A seeder that fails must roll the whole run back, so a partial seed is never

@@ -56,7 +56,7 @@ func applyAuthorization(
 	}
 
 	for _, role := range authz.SystemRoles {
-		roleID, insertErr := insertSystemRole(ctx, q, role.Name, role.Slug, role.Description, dryRun)
+		roleID, insertErr := insertSystemRole(ctx, q, role.Name, role.Slug, role.Description, "system", dryRun)
 		if insertErr != nil {
 			return nil, nil, insertErr
 		}
@@ -70,7 +70,87 @@ func applyAuthorization(
 			skipped = append(skipped, role.Slug)
 		}
 	}
+
+	for _, role := range scenarioRoles {
+		if dryRun {
+			if slugExists(ctx, q, authz.RolesTable, "slug", role.slug) {
+				skipped = append(skipped, role.slug)
+			} else {
+				created = append(created, role.slug)
+			}
+			continue
+		}
+		roleID, insertErr := insertSystemRole(ctx, q, role.name, role.slug, role.description, "custom", dryRun)
+		if insertErr != nil {
+			return nil, nil, insertErr
+		}
+		granted, grantErr := grantRolePermissions(ctx, q, roleID, role.permissions, dryRun)
+		if grantErr != nil {
+			return nil, nil, grantErr
+		}
+		if granted > 0 {
+			created = append(created, role.slug+" ("+fmt.Sprint(granted)+" permissions)")
+		} else {
+			skipped = append(skipped, role.slug)
+		}
+	}
 	return created, skipped, nil
+}
+
+// scenarioRoles are the custom roles a development database carries, each
+// with the permission set that makes its name honest. They give the claims
+// pipeline more than the administrator role to carry, so a multi-role token
+// is a thing a local test reads, not one it imagines.
+//
+// The set is seeded additively and never rewritten: a run that finds the
+// role reports it as skipped and leaves the administrator's edits alone,
+// the same courtesy the junction rows get.
+var scenarioRoles = []scenarioRole{
+	{
+		name:        "Editor",
+		slug:        "editor",
+		description: "Reads accounts, groups, and notifications",
+		permissions: []string{
+			"user:*:read",
+			"user:*:list",
+			"user_group:*:read",
+			"user_group:*:list",
+			"notification:*:read",
+			"notification:*:list",
+		},
+	},
+	{
+		name:        "Moderator",
+		slug:        "moderator",
+		description: "Bans and unbans accounts, reads the audit trail",
+		permissions: []string{
+			"user:*:ban",
+			"user:*:unban",
+			"audit_log:*:read",
+			"audit_log:*:list",
+			"audit_log:*:filter_options",
+		},
+	},
+	{
+		name:        "Service",
+		slug:        "service",
+		description: "Manages the machine credentials an integration presents",
+		permissions: []string{
+			"api_key:*:read",
+			"api_key:*:list",
+			"api_key:*:create",
+			"api_key:*:revoke",
+		},
+	},
+}
+
+// scenarioRole is one custom role the seeder writes: the display name, the
+// stable slug, and the permission slugs its set carries.
+type scenarioRole struct {
+	name        string
+	slug        string
+	description string
+	permissions []string
 }
 
 // insertPermission writes one catalog permission and answers whether this
@@ -94,9 +174,10 @@ func insertPermission(ctx context.Context, q datastore.Querier, permission authz
 	return tag.RowsAffected() > 0, nil
 }
 
-// insertSystemRole writes one system role and answers its identifier. The
-// description is nullable in the table, so an empty one reads as NULL.
-func insertSystemRole(ctx context.Context, q datastore.Querier, name, slug, description string, dryRun bool) (string, error) {
+// insertSystemRole writes one role row of either kind and answers its
+// identifier. The description is nullable in the table, so an empty one
+// reads as NULL.
+func insertSystemRole(ctx context.Context, q datastore.Querier, name, slug, description, roleType string, dryRun bool) (string, error) {
 	if dryRun {
 		return slug, nil
 	}
@@ -104,7 +185,7 @@ func insertSystemRole(ctx context.Context, q datastore.Querier, name, slug, desc
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(authz.RolesTable)
 	ib.Cols("name", "slug", "description", "type")
-	ib.Values(name, slug, nullable(description), "system")
+	ib.Values(name, slug, nullable(description), roleType)
 	ib.SQL("ON CONFLICT (slug) DO NOTHING")
 
 	query, args := ib.Build()

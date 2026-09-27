@@ -199,7 +199,7 @@ func applyDefaultUser(
 	// bootstrap identity, and with is_admin gone the role is the only thing
 	// that makes it an administrator. The grant is idempotent like the
 	// account — an active grant exists once, a second run keeps it.
-	granted, grantErr := ensureAdministratorGrant(ctx, q, DefaultUser.Email, dryRun)
+	granted, grantErr := ensureRoleGrant(ctx, q, DefaultUser.Email, authz.AdministratorRole, dryRun)
 	if grantErr != nil {
 		return nil, nil, grantErr
 	}
@@ -216,6 +216,27 @@ func applyDefaultUser(
 			created = append(created, email)
 		} else {
 			skipped = append(skipped, email)
+		}
+	}
+
+	// The scenario roles ride the accounts that exercise them: the editor
+	// reads what the editors group sees, the moderator answers for the
+	// moderation surface. A token minted for either carries both roles in
+	// its claims, which is the shape a multi-role client must render.
+	scenarioGrants := []struct {
+		email string
+		role  string
+	}{
+		{ScenarioEmails[0], "editor"},
+		{ScenarioEmails[3], "moderator"},
+	}
+	for _, grant := range scenarioGrants {
+		granted, grantErr := ensureRoleGrant(ctx, q, grant.email, grant.role, dryRun)
+		if grantErr != nil {
+			return nil, nil, grantErr
+		}
+		if granted {
+			created = append(created, grant.email+" ("+grant.role+" role)")
 		}
 	}
 	return created, skipped, nil
@@ -308,11 +329,13 @@ func userExists(ctx context.Context, q datastore.Querier, email string) (bool, e
 	return true, nil
 }
 
-// ensureAdministratorGrant grants the administrator role to the account the
-// email names, unless an active grant already carries it. It answers whether
-// this run wrote the grant. The role row must exist — the authorization
-// seeder runs first — so a missing one is an error, not a silent skip.
-func ensureAdministratorGrant(ctx context.Context, q datastore.Querier, email string, dryRun bool) (bool, error) {
+// ensureRoleGrant grants the role the slug names to the account the email
+// names, unless an active grant already carries it. It answers whether this
+// run wrote the grant. The role row must exist — the authorization seeder
+// runs first — and the account row must exist — the user seeder created it
+// a moment ago — but either miss is a skip, not a failure: a standalone run
+// of this seeder (a test, a rollback probe) carries neither row.
+func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug string, dryRun bool) (bool, error) {
 	if dryRun {
 		return false, nil
 	}
@@ -325,24 +348,17 @@ func ensureAdministratorGrant(ctx context.Context, q datastore.Querier, email st
 	query, args := sb.Build()
 	var userID string
 	if err := q.QueryRow(ctx, query, args...).Scan(&userID); err != nil {
-		// An account this run cannot find is not the grant's concern: the
-		// seeder created it a moment ago, so a miss here is a lookup on a
-		// database the account was never written to.
 		return false, nil
 	}
 
 	rb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	rb.Select("r.id")
 	rb.From(authz.RolesTable + " r")
-	rb.Where(rb.Equal("r.slug", authz.AdministratorRole))
+	rb.Where(rb.Equal("r.slug", roleSlug))
 
 	query, args = rb.Build()
 	var roleID string
 	if err := q.QueryRow(ctx, query, args...).Scan(&roleID); err != nil {
-		// The role row is the authorization seeder's write, and All()
-		// orders that one first; a User run alone — a test, a rollback
-		// probe — carries no role to grant, so the grant is skipped rather
-		// than failing the run it rides in.
 		return false, nil
 	}
 
@@ -364,7 +380,7 @@ func ensureAdministratorGrant(ctx context.Context, q datastore.Querier, email st
 
 	query, args = ib.Build()
 	if _, err := q.Exec(ctx, query, args...); err != nil {
-		return false, fmt.Errorf("grant %s role: %w", authz.AdministratorRole, err)
+		return false, fmt.Errorf("grant %s role: %w", roleSlug, err)
 	}
 	return true, nil
 }
