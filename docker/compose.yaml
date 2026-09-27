@@ -4,7 +4,9 @@ name: tango
 
 x-common: &common
   networks: ["intranet"]
-  extra_hosts: ["host.docker.internal:host-gateway"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
   shm_size: 128m # set shared memory limit
@@ -13,8 +15,8 @@ x-common: &common
 
 include:
   - ./compose-dev.yaml
-  - ./compose-mock.yaml
   - ./compose-sre.yaml
+# - ./compose-mock.yaml
 
 # services:
 #   tango:

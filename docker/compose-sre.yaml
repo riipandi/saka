@@ -2,11 +2,13 @@
 
 x-common: &common
   networks: ["intranet"]
-  extra_hosts: ["host.docker.internal:host-gateway"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
-  shm_size: 128m # set shared memory limit
-  mem_limit: 256m # set memory limit
+  shm_size: 256m # set shared memory limit
+  mem_limit: 512m # set memory limit
   cpus: 1.0 # set CPUs limit
 
 services:
@@ -26,19 +28,19 @@ services:
       retries: 3
     depends_on:
       victoria-metrics: { condition: service_healthy }
-      victoria-logs: { condition: service_started }
-      victoria-traces: { condition: service_started }
-      vector: { condition: service_started }
+      victoria-logs: { condition: service_healthy }
+      victoria-traces: { condition: service_healthy }
+      vector: { condition: service_healthy }
 
-  perses-mcp:
-    <<: *common
-    image: docker.io/persesdev/mcp-server:${PERSES_MCP_VERSION:-v0.2-distroless}
-    hostname: perses-mcp
-    ports: ['3880:3880']
-    configs: [{ source: perses_mcp_config, target: /etc/perses-mcp-config.yaml }]
-    command: '--config=/etc/perses-mcp-config.yaml'
-    depends_on:
-      perses: { condition: service_healthy }
+  # perses-mcp:
+  #   <<: *common
+  #   image: docker.io/persesdev/mcp-server:${PERSES_MCP_VERSION:-v0.2-distroless}
+  #   hostname: perses-mcp
+  #   ports: ['3880:3880']
+  #   configs: [{ source: perses_mcp_config, target: /etc/perses-mcp-config.yaml }]
+  #   command: '--config=/etc/perses-mcp-config.yaml'
+  #   depends_on:
+  #     perses: { condition: service_healthy }
 
   vector:
     <<: *common
@@ -51,16 +53,19 @@ services:
       - '9599:9599' # The edge (nginx) metrics, scraped under the nginx job
     volumes: ['./vector.yaml:/etc/vector/vector.yaml:ro', '../.storage/nginx_logs:/var/log/nginx:ro']
     command: ['--config', '/etc/vector/vector.yaml']
+    healthcheck:
+      test: ['CMD', 'vector', 'validate']
+      interval: 3s
+      timeout: 5s
+      retries: 3
     depends_on:
-      victoria-metrics: { condition: service_started }
-      victoria-logs: { condition: service_started }
-      victoria-traces: { condition: service_started }
+      victoria-metrics: { condition: service_healthy }
+      victoria-logs: { condition: service_healthy }
+      victoria-traces: { condition: service_healthy }
 
-  # VictoriaLogs v1.52+ and VictoriaTraces v0.11+ are distroless: no shell, no HTTP
-  # client, so an exec healthcheck cannot run and every `depends_on:
-  # service_healthy` behind it never starts. They carry none, their dependents wait
-  # for `service_started`, and `task metrics:health` probes them from the host.
-  # Restore the healthchecks once `-health` ships (VictoriaLogs#1741).
+  # VictoriaLogs v1.52+ and VictoriaTraces v0.11+ are distroless: no shell, 
+  # no HTTP client. Using `-version` is workaround until `-health` ships 
+  # (VictoriaLogs#1741).
 
   victoria-metrics:
     <<: *common
@@ -90,6 +95,11 @@ services:
       -storageDataPath=/victoria_logs_data
       -retentionPeriod=14d
       -opentelemetry.maxRequestSize=16777216
+    healthcheck:
+      test: ['CMD', '/victoria-logs-prod', '-version']
+      interval: 3s
+      timeout: 5s
+      retries: 3
 
   victoria-traces:
     <<: *common
@@ -100,6 +110,11 @@ services:
     command: >-
       -storageDataPath=/victoria_traces_data
       -retentionPeriod=8w
+    healthcheck:
+      test: ['CMD', '/victoria-traces-prod', '-version']
+      interval: 3s
+      timeout: 5s
+      retries: 3
 
   postgres-exporter:
     <<: *common

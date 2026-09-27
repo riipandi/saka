@@ -2,7 +2,9 @@
 
 x-common: &common
   networks: ["intranet"]
-  extra_hosts: ["host.docker.internal:host-gateway"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
   shm_size: 128m # set shared memory limit
@@ -36,6 +38,7 @@ services:
     environment:
       NGAUTH_PRESET: google
       NGAUTH_ACCESS_TOKEN_TTL: 7200
+      # https://localhost:3220/.well-known/openid-configuration
       NGAUTH_ISSUER: https://localhost:3220
       NGAUTH_DATA: /app/data
       NODE_ENV: development
@@ -44,6 +47,30 @@ services:
       interval: 3s
       timeout: 5s
       retries: 3
+
+  oidc-test-client:
+    <<: *common
+    image: ghcr.io/beryju/oidc-test-client:${OIDC_TEST_CLIENT_VERSION:-latest}
+    hostname: oidc-test-client
+    ports: ["9009:9009"]
+    environment:
+      OIDC_BIND: 0.0.0.0:9009
+      OIDC_CLIENT_ID: test-client
+      OIDC_CLIENT_SECRET: test-secret
+      OIDC_ROOT_URL: http://localhost:9009
+      OIDC_PROVIDER: https://localhost:3220
+      OIDC_SCOPES: "openid,profile,email"
+      OIDC_DO_REFRESH: false
+      OIDC_DO_INTROSPECTION: false
+      OIDC_DO_USER_INFO: false
+      OIDC_TLS_VERIFY: true
+    # healthcheck:
+    #   test: ["CMD", "nc", "-vz", "127.0.0.1", "9009"]
+    #   interval: 3s
+    #   timeout: 5s
+    #   retries: 3
+    depends_on:
+      ngauth-google: { condition: service_healthy }
 
 volumes:
   ngauth_google_data:
