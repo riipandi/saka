@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_6ZgnPwoCGu
 createdAt: 2026-09-27T10:14:47.801587
-updatedAt: 2026-09-27T10:15:54.106004
+updatedAt: 2026-09-27T10:55:37.588205
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -22,8 +22,8 @@ headers:
   id: VynsNyrV9q
 method: POST
 name: Unread Count
-sortPriority: 0.0
-url: ''
+sortPriority: 78.18930041152262
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/UnreadCount
 urlParameters: []
 settingSendCookies:
   enabled: false

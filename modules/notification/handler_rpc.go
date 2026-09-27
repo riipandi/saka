@@ -15,6 +15,7 @@ import (
 	notificationv1 "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1"
 	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/usergroup"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -95,14 +96,14 @@ func (h *rpcHandler) CreateNotification(ctx context.Context, req *connect.Reques
 		SendEmail:    req.Msg.GetSendEmail(),
 	}
 	for _, id := range req.Msg.UserIds {
-		parsed, parseErr := uuid.Parse(id)
+		parsed, parseErr := user.UUIDFromWire(id)
 		if parseErr != nil {
 			return nil, mapError(ErrUnknownTarget)
 		}
 		params.UserIDs = append(params.UserIDs, parsed)
 	}
 	for _, id := range req.Msg.UserGroupIds {
-		parsed, parseErr := uuid.Parse(id)
+		parsed, parseErr := usergroup.UUIDFromWire(id)
 		if parseErr != nil {
 			return nil, mapError(ErrUnknownTarget)
 		}
@@ -188,7 +189,7 @@ func (h *rpcHandler) ListNotifications(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, mapError(err)
 	}
-	rows, pagination, err := h.service.ListInbox(ctx, userID, req.Msg.GetUnreadOnly(), int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	rows, pagination, err := h.service.ListInbox(ctx, userID, req.Msg.GetUnreadOnly(), req.Msg.GetCategory(), req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -321,7 +322,7 @@ func (h *rpcHandler) WatchNotifications(ctx context.Context, req *connect.Reques
 // carries neither, because a stream event names its reader by arriving.
 func wireNotification(row Notification, userIDs, groupIDs []uuid.UUID, readAt *time.Time) *notificationv1.Notification {
 	n := &notificationv1.Notification{
-		Id:           row.ID.String(),
+		Id:           FormatID(row.ID),
 		Category:     row.Category,
 		Title:        row.Title,
 		Body:         row.Body,
@@ -333,7 +334,7 @@ func wireNotification(row Notification, userIDs, groupIDs []uuid.UUID, readAt *t
 		n.Topic = row.Topic
 	}
 	if row.CreatedBy != nil {
-		createdBy := row.CreatedBy.String()
+		createdBy := user.FormatID(*row.CreatedBy)
 		n.CreatedBy = &createdBy
 	}
 	if row.CancelledAt != nil {
@@ -343,10 +344,10 @@ func wireNotification(row Notification, userIDs, groupIDs []uuid.UUID, readAt *t
 		n.ReadAt = timestamppb.New(*readAt)
 	}
 	for _, id := range userIDs {
-		n.UserIds = append(n.UserIds, id.String())
+		n.UserIds = append(n.UserIds, user.FormatID(id))
 	}
 	for _, id := range groupIDs {
-		n.UserGroupIds = append(n.UserGroupIds, id.String())
+		n.UserGroupIds = append(n.UserGroupIds, usergroup.FormatID(id))
 	}
 	return n
 }
@@ -370,11 +371,11 @@ func wireInbox(rows []InboxRow) []*notificationv1.Notification {
 	return out
 }
 
-// parseID turns the request's identifier into the identifier the rows
-// carry. A malformed identifier names no notification, so it is the
-// not-found failure the same as an unknown one.
+// parseID turns the request's wire-form identifier into the identifier the
+// rows carry. A malformed one — prefix missing, payload wrong — names no
+// notification, so it is the not-found failure the same as an unknown one.
 func parseID(id string) (uuid.UUID, error) {
-	parsed, err := uuid.Parse(id)
+	parsed, err := UUIDFromWire(id)
 	if err != nil {
 		return uuid.Nil(), ErrNotFound
 	}

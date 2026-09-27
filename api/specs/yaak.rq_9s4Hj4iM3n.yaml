@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_9s4Hj4iM3n
 createdAt: 2026-09-27T10:14:47.601240
-updatedAt: 2026-09-27T10:15:46.873381
+updatedAt: 2026-09-27T10:55:48.392988
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -10,10 +10,10 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "0194b1a0-0000-7000-8000-000000000000"
+      "id": "${[ response.body.path(request='rq_kgrwkQQuFE', behavior='smart', ttl='0', result='first', join=', ', path='$.notifications[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Withdraw a notification: it stops being visible to every account and no email goes out for it afterwards. The row survives, named by its cancellation instant; a second cancellation is the same success. Administrative: requires the admin role.'
+description: '[Tango] Withdraw a notification: it stops being visible to every account and no email goes out for it afterwards. The row survives, named by its cancellation instant; a second cancellation is the same success. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Content-Type
@@ -25,8 +25,8 @@ headers:
   id: xTqb2nMV3j
 method: POST
 name: Cancel Notification
-sortPriority: 0.0
-url: ''
+sortPriority: 407.4074074074074
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/CancelNotification
 urlParameters: []
 settingSendCookies:
   enabled: false

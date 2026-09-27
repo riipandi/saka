@@ -315,10 +315,11 @@ func (s *Service) Cancel(ctx context.Context, admin uuid.UUID, id uuid.UUID) err
 	})
 }
 
-// ListInbox answers one page of the caller's inbox, newest first.
-func (s *Service) ListInbox(ctx context.Context, userID uuid.UUID, unreadOnly bool, page, limit int) ([]InboxRow, responder.Pagination, error) {
+// ListInbox answers one page of the caller's inbox, ordered by creation
+// newest first until the request sorts otherwise.
+func (s *Service) ListInbox(ctx context.Context, userID uuid.UUID, unreadOnly bool, category, sortBy string, ascending bool, page, limit int) ([]InboxRow, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListInbox(ctx, s.pool, userID, unreadOnly, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListInbox(ctx, s.pool, userID, unreadOnly, category, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}

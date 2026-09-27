@@ -121,7 +121,7 @@ func TestACreatedAnnouncementReachesEveryInbox(t *testing.T) {
 	row := created(t, service, "Expecto Patronum")
 
 	for _, who := range []uuid.UUID{hermione, ron} {
-		inbox, _, err := service.ListInbox(t.Context(), who, false, 1, 20)
+		inbox, _, err := service.ListInbox(t.Context(), who, false, "", "", false, 1, 20)
 		require.NoError(t, err)
 		require.Len(t, inbox, 1)
 		assert.Equal(t, row.ID, inbox[0].ID)
@@ -160,11 +160,11 @@ func TestAUserAudienceNamesItsReaders(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, AudienceUsers, row.AudienceKind)
 
-	inbox, _, err := service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 1)
 
-	inbox, _, err = service.ListInbox(t.Context(), ron, false, 1, 20)
+	inbox, _, err = service.ListInbox(t.Context(), ron, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Empty(t, inbox)
 }
@@ -189,12 +189,12 @@ func TestAGroupAudienceReachesTheMembers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	inbox, _, err := service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 1)
 	assert.Equal(t, "House cup", *inbox[0].Topic)
 
-	inbox, _, err = service.ListInbox(t.Context(), ron, false, 1, 20)
+	inbox, _, err = service.ListInbox(t.Context(), ron, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Empty(t, inbox)
 }
@@ -287,7 +287,7 @@ func TestAReceiptIsWrittenOnceAndOnlyForWhatIsVisible(t *testing.T) {
 
 	require.NoError(t, service.MarkRead(t.Context(), hermione, row.ID))
 
-	inbox, _, err := service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 1)
 	require.NotNil(t, inbox[0].ReadAt)
@@ -296,7 +296,7 @@ func TestAReceiptIsWrittenOnceAndOnlyForWhatIsVisible(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	require.NoError(t, service.MarkRead(t.Context(), hermione, row.ID))
 
-	inbox, _, err = service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err = service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 1)
 	assert.WithinDuration(t, firstRead, *inbox[0].ReadAt, time.Millisecond,
@@ -306,7 +306,7 @@ func TestAReceiptIsWrittenOnceAndOnlyForWhatIsVisible(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
 
-	unread, _, err := service.ListInbox(t.Context(), hermione, true, 1, 20)
+	unread, _, err := service.ListInbox(t.Context(), hermione, true, "", "", false, 1, 20)
 	require.NoError(t, err)
 	assert.Empty(t, unread)
 
@@ -347,7 +347,7 @@ func TestMarkAllReadMarksTheWholeInbox(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), again)
 
-	inbox, _, err := service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 2)
 	assert.NotNil(t, inbox[0].ReadAt)
@@ -371,7 +371,7 @@ func TestACancelledAnnouncementLeavesTheInboxes(t *testing.T) {
 	// A second cancellation is the success the state already names.
 	require.NoError(t, service.Cancel(t.Context(), mustCreate(t, service), row.ID))
 
-	inbox, _, err := service.ListInbox(t.Context(), hermione, false, 1, 20)
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, "", "", false, 1, 20)
 	require.NoError(t, err)
 	require.Len(t, inbox, 1)
 	assert.Equal(t, other.ID, inbox[0].ID)
@@ -430,4 +430,43 @@ func TestTheBrokerDeliversToTheAudienceItNames(t *testing.T) {
 		t.Fatalf("ron's stream received %s for a notice that does not target him", got.ID)
 	case <-time.After(50 * time.Millisecond):
 	}
+}
+
+// TestTheInboxSortsAndFiltersByItsOwnColumns pins the account list's
+// ordering and filtering: the category filter narrows the page, and the
+// sort key orders it against the whitelist the contract names.
+func TestTheInboxSortsAndFiltersByItsOwnColumns(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	hermione := seedAccount(t, pool, "hermione", false)
+	admin := mustCreate(t, service)
+
+	system, err := service.Create(t.Context(), admin, CreateParams{
+		Category:     CategorySystem,
+		Title:        "Marauder's Map",
+		Body:         "The map names its reader.",
+		AudienceKind: AudienceUsers,
+		UserIDs:      []uuid.UUID{hermione},
+	})
+	require.NoError(t, err)
+	created(t, service, "Expecto Patronum")
+	created(t, service, "The Invisible Book")
+
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, CategorySystem, "", false, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, inbox, 1)
+	assert.Equal(t, system.ID, inbox[0].ID)
+
+	inbox, _, err = service.ListInbox(t.Context(), hermione, false, "", "title", true, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, inbox, 3)
+	assert.Equal(t, "Expecto Patronum", inbox[0].Title)
+	assert.Equal(t, "Marauder's Map", inbox[1].Title)
+	assert.Equal(t, "The Invisible Book", inbox[2].Title)
+
+	inbox, _, err = service.ListInbox(t.Context(), hermione, false, "", "audience_kind", false, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, inbox, 3)
+	assert.Equal(t, "The Invisible Book", inbox[0].Title, "a sort key the contract does not name falls back to the creation order")
 }

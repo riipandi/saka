@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_SkK7yW2bVo
 createdAt: 2026-09-27T10:14:47.850409
-updatedAt: 2026-09-27T10:15:55.475810
+updatedAt: 2026-09-27T10:54:52.267239
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -15,15 +15,15 @@ headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: u2EI4a0djZ
+  id: QahTDIRmrw
 - enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: peXXkDgUny
+  id: 7c99qjduHB
 method: POST
 name: Watch Notifications
-sortPriority: 0.0
-url: ''
+sortPriority: 1106.6910531931112
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/WatchNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

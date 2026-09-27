@@ -281,9 +281,20 @@ func unreadCondition(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) string {
 	return "NOT " + sb.Exists(sub)
 }
 
+// inboxSortColumns is the whitelist the inbox's sort key resolves through,
+// spelled against the `n` alias the inbox query names. The names are the
+// wire values the request validates against.
+var inboxSortColumns = map[string]string{
+	"category":   "n.category",
+	"topic":      "lower(n.topic)",
+	"title":      "lower(n.title)",
+	"created_at": "n.created_at",
+}
+
 // ListInbox answers one page of the live notifications the account is
 // targeted by, newest first, each with the instant the account read it.
-func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID uuid.UUID, unreadOnly bool, offset, limit int) ([]InboxRow, int, error) {
+// The category name narrows the page; the sort key orders it.
+func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID uuid.UUID, unreadOnly bool, category, sortBy string, ascending bool, offset, limit int) ([]InboxRow, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedColumns()...)
 	sb.SelectMore(readAtExpression(sb, userID) + " AS read_at")
@@ -292,7 +303,10 @@ func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID
 	if unreadOnly {
 		sb.Where(unreadCondition(sb, userID))
 	}
-	sb.OrderBy("n.created_at DESC", "n.id")
+	if category != "" {
+		sb.Where(sb.Equal("n.category", category))
+	}
+	sb.OrderBy(datastore.ListOrder(inboxSortColumns, sortBy, "created_at", ascending), "n.id")
 	sb.Limit(limit).Offset(offset)
 
 	inbox, err := r.inboxRows(ctx, db, sb, "notification: inbox")
@@ -306,6 +320,9 @@ func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID
 	visibleWhere(cb, userID)
 	if unreadOnly {
 		cb.Where(unreadCondition(cb, userID))
+	}
+	if category != "" {
+		cb.Where(cb.Equal("n.category", category))
 	}
 	query, args := cb.Build()
 	var total int

@@ -281,7 +281,7 @@ message CancelNotificationResponse {
 }
 
 // ListNotificationsRequest carries the page of the caller's inbox. Both
-// fields unset answer the first default-sized page.
+// page fields unset answer the first default-sized page.
 message ListNotificationsRequest {
   // page is the one-based page number.
   optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
@@ -295,11 +295,39 @@ message ListNotificationsRequest {
   // unread_only narrows the page to the notifications the caller has
   // not read yet.
   optional bool unread_only = 3;
+
+  // category narrows the page to one category when named.
+  optional string category = 4 [(buf.validate.field).string = {
+    in: [
+      "system",
+      "announcement"
+    ]
+  }];
+
+  // sort_by names the column the page orders by. Absent, the creation
+  // time orders the page, newest first.
+  optional string sort_by = 5 [(buf.validate.field).string = {
+    in: [
+      "category",
+      "topic",
+      "title",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means newest first.
+  optional string sort_order = 6 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListNotificationsResponse is the page of the caller's inbox.
 message ListNotificationsResponse {
-  // notifications are the caller's notifications, newest first.
+  // notifications are the caller's notifications, ordered as the request
+  // asked.
   repeated Notification notifications = 1;
 
   // metadata is the pagination block the list responses carry.
@@ -315,8 +343,9 @@ message ListNotificationsResponse {
 
 // MarkNotificationReadRequest names the notification to mark read.
 message MarkNotificationReadRequest {
-  // id is the notification row's identifier.
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  // id is the notification's identifier in its wire form, a TypeID
+  // (`ntf_…`). One without the prefix names no notification.
+  string id = 1;
 }
 
 // MarkNotificationReadResponse is empty: a successful mark says so with

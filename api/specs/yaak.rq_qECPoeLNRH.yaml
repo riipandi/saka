@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_qECPoeLNRH
 createdAt: 2026-09-27T10:14:47.651492
-updatedAt: 2026-09-27T10:15:48.359511
+updatedAt: 2026-09-27T10:54:35.169531
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -12,10 +12,13 @@ body:
     {
       "page": 1,
       "limit": 25,
-      "unread_only": false
+      "unread_only": false,
+      "category": null,
+      "sort_by": "created_at",
+      "sort_order": "desc"
     }
 bodyType: application/json
-description: '[Tango] Answer one page of the caller''s inbox: the live notifications that target the caller, newest first, each carrying read_at once the caller read it. page is one-based; limit is 1-100; unread_only narrows the page to what the caller has not read. Authenticated: any caller.'
+description: '[Tango] Answer one page of the caller''s inbox: the live notifications that target the caller, each carrying read_at once the caller read it. page is one-based; limit is 1-100; unread_only narrows the page to what the caller has not read; category narrows it to one category; sort_by orders the page against the contract''s whitelist. Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -28,7 +31,7 @@ headers:
 method: POST
 name: List Notifications
 sortPriority: 0.0
-url: ''
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/ListNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

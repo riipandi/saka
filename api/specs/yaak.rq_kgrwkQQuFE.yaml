@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_kgrwkQQuFE
 createdAt: 2026-09-27T10:14:47.551378
-updatedAt: 2026-09-27T10:15:45.425436
+updatedAt: 2026-09-27T10:54:39.800378
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -28,8 +28,8 @@ headers:
   id: TkRcBsNWE3
 method: POST
 name: List All Notifications
-sortPriority: 0.0
-url: ''
+sortPriority: 37.03703703703703
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/ListAllNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

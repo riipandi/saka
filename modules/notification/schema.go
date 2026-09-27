@@ -15,8 +15,11 @@
 package notification
 
 import (
+	"fmt"
 	"time"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // The tables the migrations own. These constants are how Go code names
@@ -41,6 +44,56 @@ const (
 // change is about a notification. The record's user_id names the
 // administrator who made the change.
 const ResourceNotification = "notification"
+
+// NotificationIDPrefix is the TypeID prefix of a notification's identifier.
+// The id leaves the server in an API response, so the reader of a log line
+// or a support ticket can tell what it names without a lookup.
+type NotificationIDPrefix struct{}
+
+// Prefix reports the TypeID prefix.
+func (NotificationIDPrefix) Prefix() string { return "ntf" }
+
+// NotificationID is the typed identifier of one row of NotificationTable,
+// in its wire form. The column stays a UUID; the conversion lives here and
+// nowhere else.
+type NotificationID = typeid.TypeID[NotificationIDPrefix]
+
+// IDFromUUID wraps the row's UUID into the wire form.
+func IDFromUUID(raw uuid.UUID) (NotificationID, error) {
+	return typeid.FromUUID[NotificationID](raw.String())
+}
+
+// FormatID renders the wire form of a row's UUID. Rows read from the
+// database always carry a valid UUID, so the render cannot fail; an invalid
+// one answers the empty string, which no consumer should mistake for an id.
+func FormatID(raw uuid.UUID) string {
+	id, err := IDFromUUID(raw)
+	if err != nil {
+		return ""
+	}
+	return id.String()
+}
+
+// ParseID reads the wire form back. It is the boundary a request crosses:
+// an identifier that arrives without the prefix names no notification, the
+// not-found the caller refuses.
+func ParseID(wire string) (NotificationID, error) {
+	parsed, err := typeid.Parse[NotificationID](wire)
+	if err != nil {
+		return NotificationID{}, fmt.Errorf("notification: %w", err)
+	}
+	return parsed, nil
+}
+
+// UUIDFromWire is the request boundary in one step: the wire form a request
+// carries in, the key the rows carry out.
+func UUIDFromWire(wire string) (uuid.UUID, error) {
+	id, err := ParseID(wire)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	return uuid.UUID(id.UUIDBytes()), nil
+}
 
 // The category and audience values the contract validates on the wire.
 // They are spelled here so the repository's queries and the service's

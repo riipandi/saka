@@ -139,7 +139,7 @@ func TestTheNotificationGuardIsDeclared(t *testing.T) {
 		},
 		"cancel without the role": {
 			procedure: notificationv1connect.NotificationServiceCancelNotificationProcedure,
-			body:      `{"id":"` + hermioneNotified + `"}`,
+			body:      `{"id":"` + notification.FormatID(mustUUID(t, hermioneNotified)) + `"}`,
 			auth:      notificationAuthenticator(hermioneNotified, false),
 			status:    http.StatusNotFound,
 			code:      "not_found",
@@ -235,6 +235,8 @@ func TestTheInboxAnswersThroughTheSurface(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"audience_kind":"global"`)
 	assert.Contains(t, rec.Body.String(), `"title":"The Room of Requirement"`)
+	assert.Contains(t, rec.Body.String(), `"id":"ntf_`,
+		"the inbox names its rows in the wire form")
 	assert.NotContains(t, rec.Body.String(), "read_at",
 		"an inbox row nobody read carries no receipt")
 }
@@ -286,7 +288,7 @@ func TestTheWatchStreamDeliversThroughTheSurface(t *testing.T) {
 			continue
 		}
 		require.NotNil(t, event.Notification)
-		assert.Equal(t, created.ID.String(), event.Notification.Id)
+		assert.Equal(t, notification.FormatID(created.ID), event.Notification.Id)
 		break
 	}
 }

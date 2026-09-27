@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_2NSLhBvbWe
 createdAt: 2026-09-27T10:14:47.752169
-updatedAt: 2026-09-27T10:15:52.728098
+updatedAt: 2026-09-27T10:54:51.099139
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -22,8 +22,8 @@ headers:
   id: Shub2cw6sp
 method: POST
 name: Mark All Notifications Read
-sortPriority: 0.0
-url: ''
+sortPriority: 1031.0928212162785
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead
 urlParameters: []
 settingSendCookies:
   enabled: false

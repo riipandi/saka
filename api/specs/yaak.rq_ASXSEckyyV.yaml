@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_ASXSEckyyV
 createdAt: 2026-09-27T10:14:47.450748
-updatedAt: 2026-09-27T10:15:42.320062
+updatedAt: 2026-09-27T10:54:38.705055
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R9H6pBQjVK
 authentication: {}
@@ -30,8 +30,8 @@ headers:
   id: pWZYhVp5N5
 method: POST
 name: Create Notification
-sortPriority: 0.0
-url: ''
+sortPriority: 111.1111111111111
+url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/CreateNotification
 urlParameters: []
 settingSendCookies:
   enabled: false
