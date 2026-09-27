@@ -144,6 +144,13 @@ func TestTheNotificationGuardIsDeclared(t *testing.T) {
 			status:    http.StatusNotFound,
 			code:      "not_found",
 		},
+		"cancel an unknown notification": {
+			procedure: notificationv1connect.NotificationServiceCancelNotificationProcedure,
+			body:      `{"id":"` + notification.FormatID(mustUUID(t, hermioneNotified)) + `"}`,
+			auth:      notificationAuthenticator(ronNotified, true),
+			status:    http.StatusNotFound,
+			code:      "notification not found",
+		},
 		"the inbox without a credential": {
 			procedure: notificationv1connect.NotificationServiceListNotificationsProcedure,
 			body:      `{}`,

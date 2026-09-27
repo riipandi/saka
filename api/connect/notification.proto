@@ -77,7 +77,8 @@ service NotificationService {
 // administrative view are the same message: `read_at` is absent in an
 // administrative answer because no caller's receipt was asked about.
 message Notification {
-  // id is the notification row's identifier, a UUID string.
+  // id is the notification row's identifier in its wire form, a TypeID
+  // (`ntf_…`).
   string id = 1;
 
   // category is `system` or `announcement`.
@@ -161,13 +162,13 @@ message CreateNotificationRequest {
     ]
   }];
 
-  // user_ids are the accounts a `users` audience targets, as UUID
-  // strings.
-  repeated string user_ids = 6 [(buf.validate.field).repeated.items.string.uuid = true];
+  // user_ids are the accounts a `users` audience targets, in their wire
+  // form, TypeIDs (`usr_…`).
+  repeated string user_ids = 6;
 
-  // user_group_ids are the groups a `user_groups` audience targets, as
-  // UUID strings.
-  repeated string user_group_ids = 7 [(buf.validate.field).repeated.items.string.uuid = true];
+  // user_group_ids are the groups a `user_groups` audience targets, in
+  // their wire form, TypeIDs (`ugrp_…`).
+  repeated string user_group_ids = 7;
 
   // send_email asks the email pass for this notification. It rides the
   // deployment's `mailer.notifications.announcement_email_enabled`
@@ -190,8 +191,9 @@ message CreateNotificationResponse {
 
 // GetNotificationRequest names the notification to read.
 message GetNotificationRequest {
-  // id is the notification row's identifier.
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  // id is the notification's identifier in its wire form, a TypeID
+  // (`ntf_…`). One without the prefix names no notification.
+  string id = 1;
 }
 
 // GetNotificationResponse is the notification's full view.
@@ -265,8 +267,9 @@ message ListAllNotificationsResponse {
 
 // CancelNotificationRequest names the notification to withdraw.
 message CancelNotificationRequest {
-  // id is the notification row's identifier.
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  // id is the notification's identifier in its wire form, a TypeID
+  // (`ntf_…`). One without the prefix names no notification.
+  string id = 1;
 }
 
 // CancelNotificationResponse is empty: a successful withdrawal says so
