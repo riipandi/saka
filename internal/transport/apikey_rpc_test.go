@@ -41,7 +41,7 @@ const (
 // rule reads.
 func machineAuthenticator(subject string, admin bool) transport.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
-		claims := jwtutils.AccessClaims{Username: subject, IsAdmin: admin}
+		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		return &jwtutils.Caller{UserID: subject, AccessClaims: claims,
 			Credential: jwtutils.CredentialAPIKey}, nil
 	}
@@ -70,13 +70,36 @@ func apiKeyPool(t *testing.T) *datastore.Postgres {
 	t.Cleanup(func() { pool.Shutdown(t.Context()) })
 
 	_, err = pool.Exec(t.Context(), `
-		INSERT INTO public.users (id, username, email, first_name, last_name, display_name, is_admin)
+		INSERT INTO public.users (id, username, email, first_name, last_name, display_name)
 		VALUES
-			($1, 'hermione', 'hermione@example.com', 'Hermione', 'Granger', 'Hermione Granger', false),
-			($2, 'ron',      'ron@example.com',      'Ron',      'Weasley',  'Ron Weasley',      true)`,
+			($1, 'hermione', 'hermione@example.com', 'Hermione', 'Granger', 'Hermione Granger'),
+			($2, 'ron',      'ron@example.com',      'Ron',      'Weasley',  'Ron Weasley')`,
 		hermioneKeyOwner, ronKeyOwner)
 	require.NoError(t, err)
+
+	// Ron's key reaches the administrative view, which now reads the role
+	// the account holds rather than a column: seed the grant the claims
+	// will carry.
+	grantAdministratorRole(t, pool, mustUUID(t, ronKeyOwner))
 	return pool
+}
+
+// grantAdministratorRole seeds the system role row and grants it to the
+// account, the way the authorization seeder would.
+func grantAdministratorRole(t *testing.T, pool *datastore.Postgres, userID uuid.UUID) {
+	t.Helper()
+
+	_, err := pool.Exec(t.Context(), `
+		INSERT INTO public.roles (id, name, slug, type)
+		VALUES ('01900000-0000-7000-8000-0000000000aa', 'Administrator', 'administrator', 'system')
+		ON CONFLICT (slug) DO NOTHING`)
+	require.NoError(t, err)
+
+	_, err = pool.Exec(t.Context(), `
+		INSERT INTO public.user_roles (user_id, role_id)
+		SELECT $1, r.id FROM public.roles r WHERE r.slug = 'administrator'
+		ON CONFLICT DO NOTHING`, userID)
+	require.NoError(t, err)
 }
 
 // newAPIKeyRouter mounts the real key feature over the transport's guard,
@@ -238,6 +261,15 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 }
 
 // mustUUID parses one of the fixture identifiers.
+// adminRoles spells the claim an administrator's token carries, and the
+// empty set a non-administrator's does not.
+func adminRoles(admin bool) []string {
+	if admin {
+		return []string{jwtutils.AdministratorRole}
+	}
+	return nil
+}
+
 func mustUUID(t *testing.T, raw string) uuid.UUID {
 	t.Helper()
 	id, err := uuid.Parse(raw)

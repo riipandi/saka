@@ -2,7 +2,7 @@ type: folder
 model: folder
 id: fl_ZsR2s3GrGS
 createdAt: 2026-09-26T20:52:32.603314
-updatedAt: 2026-09-26T20:52:44.813497
+updatedAt: 2026-09-27T11:20:51.189633
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 description: ''
 headers: []
 name: Account Recovery
-sortPriority: 15111.111111111111
+sortPriority: 15012.345679012344
 settingSendCookies:
   enabled: false
   value: true

@@ -191,7 +191,6 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			Username:    account.Username,
 			Email:       account.Email,
 			DisplayName: account.DisplayName,
-			IsAdmin:     account.IsAdmin,
 			Disabled:    account.Disabled,
 			BannedAt:    account.BannedAt,
 			BanExpires:  account.BanExpires,

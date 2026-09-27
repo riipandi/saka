@@ -94,7 +94,7 @@ func sessionCallerAuthenticator(subject, sessionID string, admin bool) transport
 		if subject == "" {
 			return nil, authn.Errorf("authentication required")
 		}
-		claims := jwtutils.AccessClaims{Username: subject, IsAdmin: admin, SessionID: sessionID}
+		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin), SessionID: sessionID}
 		return &jwtutils.Caller{UserID: subject, AccessClaims: claims}, nil
 	}
 }

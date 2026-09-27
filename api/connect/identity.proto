@@ -353,9 +353,6 @@ message User {
   // locale is the optional preferred locale tag.
   optional string locale = 7;
 
-  // is_admin says whether the account holds the administrator role.
-  bool is_admin = 8;
-
   // disabled says whether sign-ins are refused.
   bool disabled = 9;
 
@@ -611,9 +608,6 @@ message CreateUserRequest {
   // locale is the optional preferred locale tag.
   optional string locale = 7;
 
-  // is_admin grants the administrator role at creation. Default false.
-  optional bool is_admin = 8;
-
   // disabled refuses sign-ins from the start. Default false.
   optional bool disabled = 9;
 
@@ -671,9 +665,6 @@ message UpdateUserRequest {
 
   // locale is the preferred locale tag; empty clears it.
   string locale = 7;
-
-  // is_admin grants or revokes the administrator role.
-  bool is_admin = 8;
 
   // disabled refuses or allows sign-ins.
   bool disabled = 9;

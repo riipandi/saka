@@ -1,0 +1,386 @@
+// The authorization contract: the roles an administrator shapes and the
+// grants an account holds.
+//
+// The model is flat. A permission is a string the application declares in
+// code — `resource:id:action`, the id position carrying `*` for every
+// instance of the kind — and a role is a named set of those strings. An
+// account's effective grants are its roles' permissions plus the ones
+// granted to it directly; there is no role inheritance, because a
+// hierarchy's answer is always reconstructible from the flat set and its
+// cost is not.
+//
+// The permission catalog is read-only on this surface: the slugs are code,
+// seeded into the database so roles can reference them, and an
+// administrator who needs another permission asks for it in a commit, not
+// in a form. What the surface manages is the layer above the catalog —
+// roles, the permissions each role holds, and the grants each account
+// carries.
+//
+// The grants live in the access token's claims, so a change here lands the
+// next time the account's token is minted or renewed — the durable row is
+// the source of truth, the claim its snapshot.
+syntax = "proto3";
+
+package tango.identity.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1;identityv1";
+
+// AuthorizationService is the administrative surface over roles,
+// permissions, and the grants that bind them to accounts. Every procedure
+// is administrative: shaping who may act is the one power the
+// administrator role keeps to itself, because a surface that granted its
+// own management could raise anything to itself.
+service AuthorizationService {
+  // ListPermissions answers the permission catalog: every slug the
+  // application enforces, with the description a UI renders beside it.
+  // The catalog is the same list the seed writes, so the response and the
+  // database cannot disagree.
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse);
+
+  // ListRoles answers one page of the roles, newest first unless the
+  // caller sorts otherwise.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+
+  // GetRole answers one role with the permission slugs it carries.
+  rpc GetRole(GetRoleRequest) returns (GetRoleResponse);
+
+  // CreateRole defines a custom role. The slug is unique and immutable; a
+  // role is born with no permissions and is granted them by
+  // SetRolePermissions.
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse);
+
+  // UpdateRole replaces a role's name and description. The slug and the
+  // type do not move: the slug is what the claims and the code reference,
+  // and a system role's meaning is not an administrator's to change.
+  rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse);
+
+  // DeleteRole removes a custom role. A system role is refused — the
+  // application depends on it — as is any role accounts still hold; the
+  // grants must be lifted first, so a deletion cannot silently strip the
+  // accounts that carried it.
+  rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse);
+
+  // SetRolePermissions replaces the permission set one role carries. The
+  // slugs must all be cataloged; a slug the application does not enforce
+  // would grant nothing and lie on every screen that showed it. A system
+  // role's set is the seed's, not this procedure's.
+  rpc SetRolePermissions(SetRolePermissionsRequest) returns (SetRolePermissionsResponse);
+
+  // ListUserRoles answers the roles one account actively holds.
+  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse);
+
+  // SetUserRoles replaces the set of roles one account holds. Every named
+  // role must exist; the roles the account held and no longer does are
+  // revoked, not deleted, so the assignment's history survives.
+  rpc SetUserRoles(SetUserRolesRequest) returns (SetUserRolesResponse);
+
+  // ListUserPermissions answers the permissions granted to one account
+  // directly, outside any role.
+  rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse);
+
+  // SetUserPermissions replaces the direct grants one account carries. A
+  // direct grant is the exception, not the rule: prefer a role, because a
+  // set of accounts sharing one role is one edit to change.
+  rpc SetUserPermissions(SetUserPermissionsRequest) returns (SetUserPermissionsResponse);
+}
+
+// RoleType distinguishes the roles the application seeds from the ones an
+// administrator creates.
+enum RoleType {
+  // ROLE_TYPE_UNSPECIFIED is the zero value no response carries.
+  ROLE_TYPE_UNSPECIFIED = 0;
+  // ROLE_TYPE_SYSTEM is a role the seed creates and the application
+  // depends on. It cannot be deleted or renamed, and its permission set is
+  // the seed's.
+  ROLE_TYPE_SYSTEM = 1;
+  // ROLE_TYPE_CUSTOM is a role an administrator created. It is theirs to
+  // shape, grant, and delete.
+  ROLE_TYPE_CUSTOM = 2;
+}
+
+// Permission is one entry of the catalog: the slug the server enforces and
+// the client renders, and the description a UI shows beside it. A
+// permission is not a row an administrator manages — it is the
+// application's vocabulary, and this message is how the vocabulary reads.
+message Permission {
+  // slug is the full wire form, `resource:id:action`, the id position
+  // carrying `*` for the whole kind.
+  string slug = 1;
+  // description is the human-readable summary.
+  string description = 2;
+}
+
+// Role is one role as the list answers it: the row and the size of the set
+// it carries.
+message Role {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`).
+  string id = 1;
+  // name is the display name.
+  string name = 2;
+  // slug is the stable identifier the claims and the code reference. It is
+  // unique and never changes.
+  string slug = 3;
+  // description is the human-readable summary.
+  string description = 4;
+  // type says whether the seed or an administrator owns the role.
+  RoleType type = 5;
+  // permission_count is the size of the set SetRolePermissions manages.
+  int32 permission_count = 6;
+  // created_at is the RFC 3339 instant the role was defined.
+  string created_at = 7;
+  // updated_at is the RFC 3339 instant of the last change, absent when the
+  // role has never been updated.
+  optional string updated_at = 8;
+}
+
+// RoleDetail is one role as the detail procedures answer it: the row and
+// the permission slugs it carries.
+message RoleDetail {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`).
+  string id = 1;
+  // name is the display name.
+  string name = 2;
+  // slug is the stable identifier the claims and the code reference.
+  string slug = 3;
+  // description is the human-readable summary.
+  string description = 4;
+  // type says whether the seed or an administrator owns the role.
+  RoleType type = 5;
+  // permissions are the slugs the role carries, ordered.
+  repeated string permissions = 6;
+  // created_at is the RFC 3339 instant the role was defined.
+  string created_at = 7;
+  // updated_at is the RFC 3339 instant of the last change, absent when the
+  // role has never been updated.
+  optional string updated_at = 8;
+}
+
+// ListPermissionsRequest is empty: the catalog is small and read whole.
+message ListPermissionsRequest {}
+
+// ListPermissionsResponse carries the catalog in catalog order.
+message ListPermissionsResponse {
+  repeated Permission permissions = 1;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// ListRolesRequest asks for one page of the roles.
+message ListRolesRequest {
+  // page is the one-based page number.
+  int32 page = 1 [(buf.validate.field).int32.gte = 1];
+  // limit is the page size, 1-100.
+  int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+  // search narrows the page to roles whose name or slug matches.
+  string search = 3;
+  // sort_by orders the page: name, slug, or created_at.
+  string sort_by = 4 [
+    (buf.validate.field).string = {
+      in: ["", "name", "slug", "created_at"]
+    }
+  ];
+  // sort_order is asc or desc; desc is the default.
+  string sort_order = 5 [
+    (buf.validate.field).string = {
+      in: ["", "asc", "desc"]
+    }
+  ];
+}
+
+// ListRolesResponse answers one page of the roles with the pagination
+// metadata.
+message ListRolesResponse {
+  repeated Role roles = 1;
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// GetRoleRequest names the role to read.
+message GetRoleRequest {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`). One
+  // without the prefix names no role.
+  string id = 1;
+}
+
+// GetRoleResponse answers one role with its permission slugs.
+message GetRoleResponse {
+  RoleDetail role = 1;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// CreateRoleRequest carries the fields a custom role is made of.
+message CreateRoleRequest {
+  // name is the display name, unique among the roles.
+  string name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+  // slug is the stable identifier, lowercase over the slug alphabet. It is
+  // unique and never changes after creation.
+  string slug = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64,
+    (buf.validate.field).string.pattern = "^[a-z0-9_-]+$"
+  ];
+  // description is the human-readable summary, optional.
+  string description = 3 [(buf.validate.field).string.max_len = 500];
+}
+
+// CreateRoleResponse answers the role as created.
+message CreateRoleResponse {
+  RoleDetail role = 1;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// UpdateRoleRequest carries the replacement fields of one role.
+message UpdateRoleRequest {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`).
+  string id = 1;
+  // name is the replacement display name.
+  string name = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+  // description is the replacement summary; empty clears it.
+  string description = 3 [(buf.validate.field).string.max_len = 500];
+}
+
+// UpdateRoleResponse answers the role as updated.
+message UpdateRoleResponse {
+  RoleDetail role = 1;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// DeleteRoleRequest names the role to remove.
+message DeleteRoleRequest {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`).
+  string id = 1;
+}
+
+// DeleteRoleResponse answers the removal.
+message DeleteRoleResponse {
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// SetRolePermissionsRequest carries the replacement permission set of one
+// role.
+message SetRolePermissionsRequest {
+  // id is the role's identifier in its wire form, a TypeID (`role_…`).
+  string id = 1;
+  // permission_slugs are the slugs the role should carry after the call,
+  // replacing whatever it held. Each must be cataloged.
+  repeated string permission_slugs = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.pattern = "^[a-z0-9_-]+:(\\*|[a-z0-9_-]+):[a-z0-9_-]+$"
+  ];
+}
+
+// SetRolePermissionsResponse answers the role with its new set.
+message SetRolePermissionsResponse {
+  RoleDetail role = 1;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// ListUserRolesRequest names the account whose roles to read.
+message ListUserRolesRequest {
+  // user_id is the account's identifier in its wire form, a TypeID
+  // (`usr_…`).
+  string user_id = 1;
+}
+
+// ListUserRolesResponse answers the roles the account holds.
+message ListUserRolesResponse {
+  // user_id is the account the roles belong to, in its wire form.
+  string user_id = 1;
+  // roles are the account's active roles, ordered by name.
+  repeated Role roles = 2;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// SetUserRolesRequest carries the replacement role set of one account.
+message SetUserRolesRequest {
+  // user_id is the account's identifier in its wire form, a TypeID
+  // (`usr_…`).
+  string user_id = 1;
+  // role_ids are the roles the account should hold after the call,
+  // replacing whatever it held. Each must name an existing role.
+  repeated string role_ids = 2 [(buf.validate.field).repeated.unique = true];
+}
+
+// SetUserRolesResponse answers the account's roles after the replacement.
+message SetUserRolesResponse {
+  // user_id is the account the roles belong to, in its wire form.
+  string user_id = 1;
+  // roles are the account's active roles, ordered by name.
+  repeated Role roles = 2;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// ListUserPermissionsRequest names the account whose direct grants to read.
+message ListUserPermissionsRequest {
+  // user_id is the account's identifier in its wire form, a TypeID
+  // (`usr_…`).
+  string user_id = 1;
+}
+
+// ListUserPermissionsResponse answers the account's direct grants.
+message ListUserPermissionsResponse {
+  // user_id is the account the grants belong to, in its wire form.
+  string user_id = 1;
+  // permission_slugs are the directly granted slugs, ordered.
+  repeated string permission_slugs = 2;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}
+
+// SetUserPermissionsRequest carries the replacement direct grants of one
+// account.
+message SetUserPermissionsRequest {
+  // user_id is the account's identifier in its wire form, a TypeID
+  // (`usr_…`).
+  string user_id = 1;
+  // permission_slugs are the slugs granted to the account directly after
+  // the call, replacing whatever it held. Each must be cataloged.
+  repeated string permission_slugs = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.pattern = "^[a-z0-9_-]+:(\\*|[a-z0-9_-]+):[a-z0-9_-]+$"
+  ];
+}
+
+// SetUserPermissionsResponse answers the account's direct grants after the
+// replacement.
+message SetUserPermissionsResponse {
+  // user_id is the account the grants belong to, in its wire form.
+  string user_id = 1;
+  // permission_slugs are the directly granted slugs, ordered.
+  repeated string permission_slugs = 2;
+  // status and message are the envelope every response carries.
+  string status = 98;
+  string message = 99;
+}

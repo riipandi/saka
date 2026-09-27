@@ -139,7 +139,6 @@ type User struct {
 	Username    string
 	Email       string
 	DisplayName string
-	IsAdmin     bool
 }
 
 // Result is the token pair and the account it was issued for.
@@ -352,7 +351,6 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 			Username:    account.Username,
 			Email:       account.Email,
 			DisplayName: account.DisplayName,
-			IsAdmin:     account.IsAdmin,
 		},
 	}, nil
 }
@@ -429,12 +427,22 @@ func (s *Service) SessionLifetime(remember bool) time.Duration {
 // account's identifier, and the session identifier is what the caller carries
 // in `sid`. It is the shape the renewal signs through, and it exists so the
 // two issuers — the opening and the renewal — cannot drift apart.
+//
+// The grants are read here rather than carried on the account row, so every
+// door that mints a token answers the same authorization snapshot from the
+// same query: a role assigned between the account read and this call is in
+// the token, and one revoked as late as this call is out of it.
 func (s *Service) SignAccessToken(ctx context.Context, account *Account, sessionID session.SessionID, now time.Time) (string, error) {
+	roles, permissions, err := user.LoadGrants(ctx, s.pool, account.ID)
+	if err != nil {
+		return "", err
+	}
 	return s.SignSessionToken(ctx, user.FormatID(account.ID), jwtutils.AccessClaims{
 		Email:       account.Email,
 		Username:    account.Username,
 		DisplayName: account.DisplayName,
-		IsAdmin:     account.IsAdmin,
+		Roles:       roles,
+		Permissions: permissions,
 		SessionID:   sessionID.String(),
 	}, sessionID, now)
 }

@@ -31,7 +31,7 @@ func callerAuthenticator(subject string, admin, impersonated bool) transport.Aut
 		if subject == "" {
 			return nil, authn.Errorf("authentication required")
 		}
-		claims := jwtutils.AccessClaims{Username: subject, IsAdmin: admin}
+		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		if impersonated {
 			claims.ActorID = "01a0da1c-cb41-779d-bd02-99b3eb5da32a"
 			claims.ActorUsername = "admin"

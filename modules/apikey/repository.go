@@ -215,7 +215,7 @@ func (r *Repository) RevokeKey(ctx context.Context, db datastore.Querier, id, ow
 func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, hash []byte, now time.Time) (KeySchema, user.UserSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedKeyColumns("k")...)
-	sb.SelectMore("u.id", "u.username", "u.email", "u.display_name", "u.is_admin")
+	sb.SelectMore("u.id", "u.username", "u.email", "u.display_name")
 	sb.From(KeyTable + " k")
 	sb.Join(user.UserTable+" u", "u.id = k.user_id")
 	sb.Where(sb.Equal("k.key_hash", hash), sb.IsNull("k.revoked_at"), sb.GT("k.expires_at", now), sb.Equal("u.disabled", false))
@@ -225,7 +225,7 @@ func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, ha
 	var owner ownerRow
 	err := db.QueryRow(ctx, query, args...).Scan(append(
 		keyScanDests(&key),
-		&owner.ID, &owner.Username, &owner.Email, &owner.DisplayName, &owner.IsAdmin,
+		&owner.ID, &owner.Username, &owner.Email, &owner.DisplayName,
 	)...)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return KeySchema{}, user.UserSchema{}, datastore.ErrNoRows
@@ -312,7 +312,6 @@ type ownerRow struct {
 	Username    string
 	Email       string
 	DisplayName string
-	IsAdmin     bool
 }
 
 // schema maps the joined facts onto the account schema the caller answers
@@ -323,7 +322,6 @@ func (o ownerRow) schema() user.UserSchema {
 		Username:    o.Username,
 		Email:       o.Email,
 		DisplayName: o.DisplayName,
-		IsAdmin:     o.IsAdmin,
 	}
 }
 

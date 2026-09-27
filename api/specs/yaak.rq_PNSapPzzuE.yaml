@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_PNSapPzzuE
+createdAt: 2026-09-27T11:44:29.791754
+updatedAt: 2026-09-27T11:47:50.730800
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: '[Tango] Answer the permissions granted to one account directly, outside any role. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: BrgmSKt24w
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: MCqct9ie2Y
+method: POST
+name: List User Permissions
+sortPriority: 7333.333333333333
+url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/ListUserPermissions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

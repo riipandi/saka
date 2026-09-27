@@ -119,7 +119,6 @@ type CreateParams struct {
 	LastName      string
 	DisplayName   string
 	Locale        string
-	IsAdmin       bool
 	Disabled      bool
 	EmailVerified bool
 }
@@ -135,7 +134,6 @@ type UpdateParams struct {
 	LastName     string
 	DisplayName  string
 	Locale       string
-	IsAdmin      bool
 	Disabled     bool
 	BanExpiresAt *time.Time
 	BanReason    *string
@@ -162,7 +160,6 @@ type UserView struct {
 	FirstName     *string
 	LastName      *string
 	Locale        *string
-	IsAdmin       bool
 	Disabled      bool
 	EmailVerified bool
 	CreatedAt     time.Time
@@ -207,7 +204,6 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 			LastName:        params.LastName,
 			DisplayName:     displayName,
 			Locale:          params.Locale,
-			IsAdmin:         params.IsAdmin,
 			Disabled:        params.Disabled,
 			EmailVerifiedAt: emailVerifiedAt,
 			CreatedAt:       s.now(),
@@ -314,7 +310,6 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
 		Locale:      params.Locale,
-		IsAdmin:     existing.IsAdmin,
 		Disabled:    existing.Disabled,
 		// The immutable columns and the ban state ride through untouched:
 		// this update owns the profile, nothing else.
@@ -394,7 +389,6 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
 		Locale:      params.Locale,
-		IsAdmin:     params.IsAdmin,
 		Disabled:    params.Disabled,
 		// The creation instant is immutable; the update statement leaves the
 		// column alone, and the answer carries the value as it stood.
@@ -478,7 +472,6 @@ func WireView(user UserView) *identityv1.User {
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		Locale:        user.Locale,
-		IsAdmin:       user.IsAdmin,
 		Disabled:      user.Disabled,
 		EmailVerified: user.EmailVerified,
 		CreatedAt:     user.CreatedAt.Format(rfc3339),
@@ -557,7 +550,6 @@ func view(row UserSchema) UserView {
 		FirstName:     optional(row.FirstName),
 		LastName:      optional(row.LastName),
 		Locale:        optional(row.Locale),
-		IsAdmin:       row.IsAdmin,
 		Disabled:      row.Disabled,
 		EmailVerified: row.EmailVerifiedAt != nil,
 		CreatedAt:     row.CreatedAt,

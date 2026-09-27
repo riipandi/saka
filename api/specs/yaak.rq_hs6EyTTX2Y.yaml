@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_hs6EyTTX2Y
+createdAt: 2026-09-27T11:44:29.750218
+updatedAt: 2026-09-27T11:47:53.581867
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ') ]}",
+      "role_ids": [
+        "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}"
+      ]
+    }
+bodyType: application/json
+description: '[Tango] Replace the set of roles one account holds. Every named role must exist; the ones it held and no longer does are revoked, not deleted. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: kZd20mQwrf
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: mvzf0FmNPi
+method: POST
+name: Set User Roles
+sortPriority: 8000.0
+url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/SetUserRoles
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

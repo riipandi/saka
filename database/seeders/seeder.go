@@ -29,9 +29,11 @@ type Result struct {
 }
 
 // All returns every seeder in the order they must run: a seeder may depend on a
-// record an earlier one created.
+// record an earlier one created. The authorization seeder runs first — the
+// user seeder grants its default account the administrator role the moment
+// the account exists, and the grant names a role row.
 func All() []Seeder {
-	return []Seeder{User()}
+	return []Seeder{Authorization(), User()}
 }
 
 // Run applies each seeder in order over the same querier.

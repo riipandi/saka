@@ -38,7 +38,6 @@ type Account struct {
 	Username    string
 	Email       string
 	DisplayName string
-	IsAdmin     bool
 	Disabled    bool
 	BannedAt    *time.Time
 	BanExpires  *time.Time

@@ -26,7 +26,7 @@ func NewRepository() *Repository {
 // userColumns are the columns the account procedures read, in scan order.
 var UserColumns = []string{
 	"id", "username", "email", "first_name", "last_name", "display_name",
-	"locale", "is_admin", "disabled", "email_verified_at", "created_at",
+	"locale", "disabled", "email_verified_at", "created_at",
 	"banned_at", "ban_expires", "ban_reason", "avatar_url",
 }
 
@@ -37,7 +37,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	var firstName, lastName, locale, banReason, picturePath *string
 	err := scan(
 		&row.ID, &row.Username, &row.Email, &firstName, &lastName,
-		&row.DisplayName, &locale, &row.IsAdmin, &row.Disabled,
+		&row.DisplayName, &locale, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
 	)
@@ -161,11 +161,11 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(UserTable)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
-		"locale", "is_admin", "disabled", "email_verified_at")
+		"locale", "disabled", "email_verified_at")
 	ib.Values(
 		row.ID, row.Username, row.Email,
 		nullIfEmpty(row.FirstName), nullIfEmpty(row.LastName), row.DisplayName,
-		nullIfEmpty(row.Locale), row.IsAdmin, row.Disabled, row.EmailVerifiedAt,
+		nullIfEmpty(row.Locale), row.Disabled, row.EmailVerifiedAt,
 	)
 
 	query, args := ib.Build()
@@ -189,7 +189,6 @@ func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row U
 		ub.Assign("last_name", nullIfEmpty(row.LastName)),
 		ub.Assign("display_name", row.DisplayName),
 		ub.Assign("locale", nullIfEmpty(row.Locale)),
-		ub.Assign("is_admin", row.IsAdmin),
 		ub.Assign("disabled", row.Disabled),
 		ub.Assign("banned_at", row.BannedAt),
 		ub.Assign("ban_expires", row.BanExpires),

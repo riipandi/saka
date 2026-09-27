@@ -343,7 +343,6 @@ func wireUser(view user.UserView) *authv1.AuthenticatedUser {
 		Username:    view.Username,
 		Email:       view.Email,
 		DisplayName: view.DisplayName,
-		IsAdmin:     view.IsAdmin,
 	}
 }
 

@@ -146,7 +146,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 		"the subject is the wire form: the row's UUID never leaves the server")
 	assert.Equal(t, result.SessionID, verified.Private.SessionID)
 	assert.Equal(t, "hermione@example.com", verified.Private.Email)
-	assert.False(t, verified.Private.IsAdmin)
+	assert.Empty(t, verified.Private.Roles)
 
 	// The refresh token is not stored in the clear, the caller address
 	// reached the row, the row lives under the typed id, and the provider

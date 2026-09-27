@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/riipandi/tango/internal/audit"
@@ -81,7 +82,11 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 	if err != nil {
 		return Refreshed{}, err
 	}
-	if view.IsAdmin {
+	targetRoles, targetPermissions, grantsErr := user.LoadGrants(ctx, s.pool, targetID)
+	if grantsErr != nil {
+		return Refreshed{}, grantsErr
+	}
+	if slices.Contains(targetRoles, jwtutils.AdministratorRole) {
 		return Refreshed{}, ErrTargetAdmin
 	}
 	if view.Disabled || bannedAt(view, now) {
@@ -142,7 +147,8 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 		Email:         view.Email,
 		Username:      view.Username,
 		DisplayName:   view.DisplayName,
-		IsAdmin:       view.IsAdmin,
+		Roles:         targetRoles,
+		Permissions:   targetPermissions,
 		SessionID:     sessionID.String(),
 		ActorID:       user.FormatID(callerUUID),
 		ActorUsername: callerUsername,
@@ -222,6 +228,10 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 	if view.Disabled || bannedAt(view, now) {
 		return Refreshed{}, ErrSessionEnded
 	}
+	actorRoles, actorPermissions, grantsErr := user.LoadGrants(ctx, s.pool, actorID)
+	if grantsErr != nil {
+		return Refreshed{}, grantsErr
+	}
 
 	refresh, err := crypto.NewRefreshTokenPair()
 	if err != nil {
@@ -275,7 +285,8 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 		Email:       view.Email,
 		Username:    view.Username,
 		DisplayName: view.DisplayName,
-		IsAdmin:     view.IsAdmin,
+		Roles:       actorRoles,
+		Permissions: actorPermissions,
 		SessionID:   newID.String(),
 	}, newID, now)
 	if err != nil {

@@ -25,6 +25,7 @@ var rootCmd = &cli.Command{
 		dbExportCmd,
 		dbImportCmd,
 		keyGenerateCmd,
+		authPromoteCmd,
 		keyRotateCmd,
 		healthCheckCmd,
 		configGenerateCmd,

@@ -426,8 +426,8 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 func insertUserBuilder(userID uuid.UUID, username string) (string, []any) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	sb.InsertInto("public.users")
-	sb.Cols("id", "username", "email", "display_name", "first_name", "last_name", "is_admin", "disabled", "created_at", "updated_at")
-	sb.Values(userID, username, "langdon@example.com", "Robert Langdon", "Robert", "Langdon", false, false, time.Now(), time.Now())
+	sb.Cols("id", "username", "email", "display_name", "first_name", "last_name", "disabled", "created_at", "updated_at")
+	sb.Values(userID, username, "langdon@example.com", "Robert Langdon", "Robert", "Langdon", false, time.Now(), time.Now())
 	return sb.Build()
 }
 

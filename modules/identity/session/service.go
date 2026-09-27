@@ -432,11 +432,17 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		return Refreshed{}, ErrSessionEnded
 	}
 
+	roles, permissions, grantsErr := user.LoadGrants(ctx, s.pool, row.UserID)
+	if grantsErr != nil {
+		return Refreshed{}, grantsErr
+	}
+
 	access, err := s.issuer.SignSessionToken(ctx, view.ID, jwtutils.AccessClaims{
 		Email:       view.Email,
 		Username:    view.Username,
 		DisplayName: view.DisplayName,
-		IsAdmin:     view.IsAdmin,
+		Roles:       roles,
+		Permissions: permissions,
 		SessionID:   row.ID.String(),
 		// The delegation survives its renewal: the row's impersonated_by is
 		// the durable fact the actor pair is re-signed from, so the rotated

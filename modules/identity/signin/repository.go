@@ -42,7 +42,6 @@ type Account struct {
 	Username     string
 	Email        string
 	DisplayName  string
-	IsAdmin      bool
 	Disabled     bool
 	BannedAt     *time.Time
 	BanExpires   *time.Time
@@ -58,7 +57,7 @@ type Account struct {
 func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string) (*Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name", "u.is_admin",
+		"u.id", "u.username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
 	)
 	sb.From(user.UserTable + " u")
@@ -73,7 +72,7 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	query, args := sb.Build()
 	var row Account
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.IsAdmin,
+		&row.ID, &row.Username, &row.Email, &row.DisplayName,
 		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -91,7 +90,7 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name", "u.is_admin",
+		"u.id", "u.username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
 	)
 	sb.From(user.UserTable + " u")
@@ -101,7 +100,7 @@ func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Accoun
 	query, args := sb.Build()
 	var row Account
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.IsAdmin,
+		&row.ID, &row.Username, &row.Email, &row.DisplayName,
 		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

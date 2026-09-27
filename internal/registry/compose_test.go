@@ -75,7 +75,7 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 		return func(context.Context, *http.Request) (any, error) {
 			return &jwtutils.Caller{
 				UserID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
-				AccessClaims: jwtutils.AccessClaims{Username: "admin", IsAdmin: true},
+				AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
 			}, nil
 		}, nil
 	})

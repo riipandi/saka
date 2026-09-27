@@ -102,7 +102,6 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 			Username:    result.User.Username,
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
-			IsAdmin:     result.User.IsAdmin,
 		},
 		Status:  responder.StatusSuccess,
 		Message: "the one-time access code was exchanged for a session",

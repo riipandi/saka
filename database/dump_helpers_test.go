@@ -111,9 +111,9 @@ func dumper(t *testing.T, dsn string) *datastore.Postgres {
 func seedRows(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(t.Context(), `
-		INSERT INTO public.users (id, username, email, first_name, last_name, display_name, is_admin)
+		INSERT INTO public.users (id, username, email, first_name, last_name, display_name)
 		VALUES ('01890000-0000-7000-8000-000000000001', 'alice', 'alice@example.com',
-		        'Alice', 'A', 'Alice A', true)`)
+		        'Alice', 'A', 'Alice A')`)
 	require.NoError(t, err)
 	_, err = pool.Exec(t.Context(), `
 		INSERT INTO public.user_passwords (user_id, password_hash)

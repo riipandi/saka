@@ -49,7 +49,7 @@ func notificationAuthenticator(subject string, admin bool) transport.Authenticat
 		if err != nil {
 			return nil, authn.Errorf("the subject is not an account identifier")
 		}
-		claims := jwtutils.AccessClaims{Username: subject, IsAdmin: admin}
+		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		return &jwtutils.Caller{UserID: user.FormatID(id), AccessClaims: claims}, nil
 	}
 }
@@ -77,10 +77,10 @@ func notificationPool(t *testing.T) *datastore.Postgres {
 	t.Cleanup(func() { pool.Shutdown(t.Context()) })
 
 	_, err = pool.Exec(t.Context(), `
-		INSERT INTO public.users (id, username, email, first_name, last_name, display_name, is_admin)
+		INSERT INTO public.users (id, username, email, first_name, last_name, display_name)
 		VALUES
-			($1, 'hermione', 'hermione@example.com', 'Hermione', 'Granger', 'Hermione Granger', false),
-			($2, 'ron',      'ron@example.com',      'Ron',      'Weasley',  'Ron Weasley',      true)`,
+			($1, 'hermione', 'hermione@example.com', 'Hermione', 'Granger', 'Hermione Granger'),
+			($2, 'ron',      'ron@example.com',      'Ron',      'Weasley',  'Ron Weasley')`,
 		hermioneNotified, ronNotified)
 	require.NoError(t, err)
 	return pool

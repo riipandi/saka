@@ -25,7 +25,7 @@ func NewRepository() *Repository { return &Repository{} }
 
 // accountColumns are the columns the account reads name, in scan order.
 var accountColumns = []string{
-	"id", "username", "email", "display_name", "is_admin",
+	"id", "username", "email", "display_name",
 	"disabled", "banned_at", "ban_expires",
 }
 
@@ -33,7 +33,7 @@ var accountColumns = []string{
 func scanAccount(scan func(dest ...any) error) (Account, error) {
 	var account Account
 	err := scan(&account.ID, &account.Username, &account.Email, &account.DisplayName,
-		&account.IsAdmin, &account.Disabled, &account.BannedAt, &account.BanExpires)
+		&account.Disabled, &account.BannedAt, &account.BanExpires)
 	if err != nil {
 		return Account{}, err
 	}

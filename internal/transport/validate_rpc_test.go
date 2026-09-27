@@ -41,7 +41,7 @@ func TestProtovalidateRefusesTheContractViolations(t *testing.T) {
 		Authenticator: func(context.Context, *http.Request) (any, error) {
 			return &jwtutils.Caller{
 				UserID:       stubCallerWireID(),
-				AccessClaims: jwtutils.AccessClaims{Username: "admin", IsAdmin: true},
+				AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
 			}, nil
 		},
 		Modules: []kernel.Module{

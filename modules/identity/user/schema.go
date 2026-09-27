@@ -24,7 +24,6 @@ type UserSchema struct {
 	LastName        string     `db:"last_name"`
 	DisplayName     string     `db:"display_name"`
 	Locale          string     `db:"locale"`
-	IsAdmin         bool       `db:"is_admin"`
 	Disabled        bool       `db:"disabled"`
 	EmailVerifiedAt *time.Time `db:"email_verified_at"`
 	CreatedAt       time.Time  `db:"created_at"`

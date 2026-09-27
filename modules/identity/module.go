@@ -29,6 +29,7 @@ import (
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/identity/authorization"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
@@ -90,6 +91,10 @@ type Deps struct {
 
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
+
+	// Authorization administers the roles, the permission catalog's mirror,
+	// and the grants that bind them to accounts.
+	Authorization *authorization.Service
 
 	// Storage is the file engine the profile pictures live in. A nil engine
 	// leaves the picture procedures refusing while the account procedures
@@ -297,6 +302,13 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		return usergroup.NewService(pool, recorder, log), nil
 	}),
+
+	do.Lazy(func(i do.Injector) (*authorization.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		return authorization.NewService(pool, recorder, log), nil
+	}),
 )
 
 // Mount resolves what this area's features need and builds the module the
@@ -336,6 +348,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		// and the wiring repeats it so both layers hold.
 		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
 		UserGroups:       do.MustInvoke[*usergroup.Service](i),
+		Authorization:    do.MustInvoke[*authorization.Service](i),
 	}), nil
 }
 
@@ -367,6 +380,9 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.UserGroups != nil {
 		modules = append(modules, usergroup.NewModule(deps.UserGroups))
+	}
+	if deps.Authorization != nil {
+		modules = append(modules, authorization.NewModule(deps.Authorization))
 	}
 	// The second factor's feature is mounted like the rest: a nil service is
 	// skipped, and the wiring is the one place the feature is named.

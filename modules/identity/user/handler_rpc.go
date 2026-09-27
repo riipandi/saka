@@ -115,7 +115,6 @@ func (h *rpcHandler) CreateUser(ctx context.Context, req *connect.Request[identi
 		LastName:      body.GetLastName(),
 		DisplayName:   body.GetDisplayName(),
 		Locale:        body.GetLocale(),
-		IsAdmin:       body.GetIsAdmin(),
 		Disabled:      body.GetDisabled(),
 		EmailVerified: body.GetEmailVerified(),
 	})
@@ -139,7 +138,6 @@ func (h *rpcHandler) UpdateUser(ctx context.Context, req *connect.Request[identi
 		LastName:    body.LastName,
 		DisplayName: body.DisplayName,
 		Locale:      body.Locale,
-		IsAdmin:     body.IsAdmin,
 		Disabled:    body.Disabled,
 		BanReason:   optional(body.GetBanReason()),
 	}

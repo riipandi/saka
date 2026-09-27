@@ -3,9 +3,12 @@ package jwtutils
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+
+	"github.com/riipandi/tango/internal/authz"
 )
 
 // AccessClaims are the private claims an access token carries. The subject is
@@ -16,8 +19,22 @@ type AccessClaims struct {
 	Email       string `json:"email"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
-	IsAdmin     bool   `json:"is_admin"`
 	SessionID   string `json:"sid"`
+
+	// Roles are the names of the roles the account holds at signing time,
+	// and Permissions the effective grants — the roles' permissions plus
+	// the ones granted to the account directly. Both are snapshots: an
+	// assignment that changes after this token was signed lands in the
+	// next one, which is why the access token's life is short and its
+	// renewal re-reads the account.
+	//
+	// The lists are what the guard judges and what a frontend renders, so
+	// they travel with the caller rather than costing a lookup per
+	// request. They are omitted from tokens that name neither — the
+	// machine credentials and the accounts without any grant — so an
+	// absent claim is an empty set, not a missing field.
+	Roles       []string `json:"roles,omitzero"`
+	Permissions []string `json:"permissions,omitzero"`
 
 	// ActorID and ActorUsername name the account a delegated token acts on
 	// behalf of — the administrator who asked for it, when the token was
@@ -67,9 +84,20 @@ type AccessClaims struct {
 // the renewal that answers it again must spell the same word.
 const BearerScheme = "Bearer"
 
+// AdministratorRole is the role name the guard's admin rule reads. It is
+// aliased from internal/authz so a caller's question and the policy's answer
+// spell it the same way.
+const AdministratorRole = authz.AdministratorRole
+
 // CredentialKind names the channel a caller proved itself through. The kind
 // is not a claim a token carries — it is how the caller arrived — so it lives
 // on the Caller beside the claims rather than inside them.
+//
+// A machine credential is not a lesser caller: it acts as its owner through
+// the same guard table. What the kind exists for is the refusal one surface
+// owes every credential that cannot revoke itself: the API keys' own
+// management surface is browser-session work, and a key that could manage
+// keys could outlive its owner's intent.
 //
 // A machine credential is not a lesser caller: it acts as its owner through
 // the same guard table. What the kind exists for is the refusal one surface
@@ -145,6 +173,29 @@ func (c *Caller) IsMachine() bool {
 // that reads a missing field refuses rather than passing.
 func (c *Caller) ActsFor(userID string) bool {
 	return c != nil && userID != "" && c.UserID == userID
+}
+
+// HasRole reports whether the caller's token carried the named role. The
+// answer is the signing-time snapshot: an assignment made after the token
+// was signed is invisible to it until the token is renewed.
+func (c *Caller) HasRole(role string) bool {
+	return c != nil && slices.Contains(c.Roles, role)
+}
+
+// IsAdministrator reports whether the caller holds the administrator role —
+// the standing grant the guard's admin rule reads and every administrative
+// surface answers to. It is the role claim, not a claim of its own: a token
+// that carried `is_admin` would answer a question the role set already
+// answers, and the two would drift.
+func (c *Caller) IsAdministrator() bool {
+	return c.HasRole(AdministratorRole)
+}
+
+// HasPermission reports whether the caller's effective grants satisfy the
+// requirement — a role's permission or a direct grant, matched with the
+// wildcard the slug grammar allows in the instance position.
+func (c *Caller) HasPermission(requirement string) bool {
+	return c != nil && authz.Grants(c.Permissions, requirement)
 }
 
 // SigningKeySource supplies the material the process signs and verifies its

@@ -38,8 +38,8 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string, disabl
 	t.Helper()
 
 	_, err := pool.Exec(t.Context(), `
-		INSERT INTO public.users (username, email, first_name, last_name, display_name, is_admin, disabled)
-		VALUES ($1::citext, $1::text || '@example.com', 'Hermione', 'Granger', 'Hermione Granger', false, $2)
+		INSERT INTO public.users (username, email, first_name, last_name, display_name, disabled)
+		VALUES ($1::citext, $1::text || '@example.com', 'Hermione', 'Granger', 'Hermione Granger', $2)
 		ON CONFLICT (username) DO NOTHING`,
 		username, disabled)
 	require.NoError(t, err)

@@ -129,6 +129,30 @@ const (
 	// the happening; the row survives it, and the record names it.
 	EventNotificationCancelled = "notification_cancelled"
 
+	// EventRoleCreated is a custom role defined. The payload names the slug
+	// the claims will carry.
+	EventRoleCreated = "role_created"
+
+	// EventRoleUpdated is a role's name or description replaced.
+	EventRoleUpdated = "role_updated"
+
+	// EventRoleDeleted is a custom role removed. The roles accounts still
+	// hold are refused, so the deletion strips nothing silently.
+	EventRoleDeleted = "role_deleted"
+
+	// EventRolePermissionsUpdated is a role's permission set replaced. The
+	// payload counts the slugs the set now carries.
+	EventRolePermissionsUpdated = "role_permissions_updated"
+
+	// EventUserRolesUpdated is an account's role set replaced. The record's
+	// user_id names the account; the payload counts the roles it now holds.
+	EventUserRolesUpdated = "user_roles_updated"
+
+	// EventUserPermissionsUpdated is an account's direct grants replaced.
+	// The record's user_id names the account; the payload counts the slugs
+	// it now carries.
+	EventUserPermissionsUpdated = "user_permissions_updated"
+
 	// EventImpersonationStarted is a delegated session opened by an
 	// administrator. The record's user_id names the TARGET account — the one
 	// the requests will run as — and the payload's actor fields name the

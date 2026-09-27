@@ -30,6 +30,10 @@ var (
 	// administrator role.
 	ErrAdminRequired = errors.New("administrator role required")
 
+	// ErrPermissionRequired is an authenticated caller whose effective
+	// grants do not satisfy the procedure's permission rule.
+	ErrPermissionRequired = errors.New("permission required")
+
 	// ErrNotSelf is a self-service request whose target is another account.
 	//
 	// It is deliberately the same answer an unknown account produces — the
@@ -152,17 +156,44 @@ func Session(caller *jwtutils.Caller, _ Target) error {
 	return nil
 }
 
-// Admin answers a caller whose claims name an administrator. It is the
+// Admin answers a caller whose claims name the administrator role. It is the
 // default rule, so a request that forgets to declare one is administrative
 // rather than open.
+//
+// The role is what the claims carry — `is_admin` died with the boolean it
+// reported — so an administrator is an account the administrator role was
+// assigned to, and a token signed before the assignment keeps the access
+// until it is renewed.
 func Admin(caller *jwtutils.Caller, _ Target) error {
 	if caller == nil {
 		return ErrUnauthenticated
 	}
-	if !caller.IsAdmin {
+	if !caller.IsAdministrator() {
 		return ErrAdminRequired
 	}
 	return nil
+}
+
+// Permission answers a caller whose effective grants satisfy the requirement:
+// a permission slug one of the caller's roles carries, or one granted to the
+// account directly, matched with the wildcard the slug grammar allows in the
+// instance position.
+//
+// requirement is a full slug, `resource:id:action` — the id the request is
+// about when the rule is written for one instance, the wildcard when it is
+// written for the kind. The grants are the claims' snapshot, so the rule
+// stays a pure function of the request: a check that needed the database
+// would belong in the service, and the guard runs before one.
+func Permission(requirement string) Rule {
+	return func(caller *jwtutils.Caller, _ Target) error {
+		if caller == nil {
+			return ErrUnauthenticated
+		}
+		if !caller.HasPermission(requirement) {
+			return ErrPermissionRequired
+		}
+		return nil
+	}
 }
 
 // StopImpersonating answers exactly the caller a delegation carries: a

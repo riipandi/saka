@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_ipGJVze7fK
+createdAt: 2026-09-27T11:44:29.393723
+updatedAt: 2026-09-27T11:47:26.415060
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: '[Tango] Answer the permission catalog: every slug the application enforces, with the description a UI renders beside it. The catalog is code (internal/authz), seeded and served read-only - an administrator manages roles and grants, never the slugs. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 2ENuhmQ8nH
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 4Wuegy9Fxc
+method: POST
+name: List Permissions
+sortPriority: 666.6666666666666
+url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/ListPermissions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -115,6 +115,28 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserGroupServiceUpdateUserGroupsProcedure],
 		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceListPermissionsProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceListRolesProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceGetRoleProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceCreateRoleProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceUpdateRoleProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceDeleteRoleProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetRolePermissionsProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceListUserRolesProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetUserRolesProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceListUserPermissionsProcedure],
+		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetUserPermissionsProcedure],
+		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserServiceGetCurrentUserProcedure],
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserServiceUpdateCurrentUserProcedure],

@@ -16,8 +16,17 @@ import (
 func caller(userID string, admin bool) *jwtutils.Caller {
 	return &jwtutils.Caller{
 		UserID:       userID,
-		AccessClaims: jwtutils.AccessClaims{Username: "hermione", IsAdmin: admin},
+		AccessClaims: jwtutils.AccessClaims{Username: "hermione", Roles: adminRoles(admin)},
 	}
+}
+
+// adminRoles spells the claim an administrator's token carries, and the
+// empty set a non-administrator's does not.
+func adminRoles(admin bool) []string {
+	if admin {
+		return []string{jwtutils.AdministratorRole}
+	}
+	return nil
 }
 
 // impersonator builds an administrator's delegated session: the token acts as
@@ -27,7 +36,7 @@ func impersonator(subject string) *jwtutils.Caller {
 		UserID: subject,
 		AccessClaims: jwtutils.AccessClaims{
 			Username:      "hermione",
-			IsAdmin:       true,
+			Roles:         adminRoles(true),
 			ActorID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
 			ActorUsername: "admin",
 		},

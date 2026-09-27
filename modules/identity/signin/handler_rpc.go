@@ -111,7 +111,6 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 			Username:    result.User.Username,
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
-			IsAdmin:     result.User.IsAdmin,
 		},
 
 		Status:  responder.StatusSuccess,

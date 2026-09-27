@@ -461,3 +461,21 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 | POST | `/rpc/tango.notification.v1.NotificationService/WatchNotifications` | [Tango] Watch notifications (stream) | done — Authenticated; server-streaming, in-process broker, ping keepalive (immediate + 25s), no history — catch-up via List; deadline exemption via `middleware.UnboundedFor` | `modules/notification` + `internal/transport/router_rpc.go` |
 
 Identifiers are TypeIDs on the wire, the columns stay UUIDs: a notification is `ntf_…` (`modules/notification.IDFromUUID`/`UUIDFromWire`), the audience accounts and groups arrive and leave as `usr_…`/`ugrp_…`, and `created_by` renders in the account's wire form.
+
+## Authorization
+
+| Method | Endpoint | Summary / Yaak Title | Status | Evidence |
+| ------ | -------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/ListPermissions` | [Tango] List permissions | done — Admin; the code-declared catalog read-only (slug + description) | `modules/identity/authorization` + `internal/authz` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/ListRoles` | [Tango] List roles | done — Admin; page + `search` + `sort_by`/`sort_order` (name, slug, created_at), `permission_count` per row | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/GetRole` | [Tango] Get role | done — Admin; the row plus the permission slugs it carries | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/CreateRole` | [Tango] Create role | done — Admin; unique name and slug, born with no permissions | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/UpdateRole` | [Tango] Update role | done — Admin; name + description only; slug and type immutable; a system role refuses | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/DeleteRole` | [Tango] Delete role | done — Admin; custom roles only, refused while accounts hold it | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/SetRolePermissions` | [Tango] Set role permissions | done — Admin; replaces the set; every slug must be cataloged; a system role refuses | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/ListUserRoles` | [Tango] List user roles | done — Admin; the account's active roles | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/SetUserRoles` | [Tango] Set user roles | done — Admin; replaces the set; leaving grants are revoked (stamped, not deleted) | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/ListUserPermissions` | [Tango] List user permissions | done — Admin; the account's direct grants, outside any role | `modules/identity/authorization` |
+| POST | `/rpc/tango.identity.v1.AuthorizationService/SetUserPermissions` | [Tango] Set user permissions | done — Admin; replaces the direct grants; every slug must be cataloged | `modules/identity/authorization` |
+
+Permissions are identified by slug everywhere (the catalog is code: `internal/authz`, `resource:id:action`, `*` in the instance position only); roles are `role_…` TypeIDs, accounts `usr_…`. The grants an access token carries are a snapshot taken at mint time — a change here lands at the next sign-in or refresh. `users.is_admin` is gone: an administrator is an account the `administrator` system role holds, and `auth:promote --email=…` bootstraps one on a database the seed has not promoted.

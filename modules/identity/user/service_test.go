@@ -105,7 +105,6 @@ func TestCreateUserStoresTheAccountAndTheCredential(t *testing.T) {
 		Password:      "expecto-patronum",
 		FirstName:     "Hermione",
 		LastName:      "Granger",
-		IsAdmin:       true,
 		EmailVerified: true,
 	})
 	require.NoError(t, err)
@@ -114,7 +113,6 @@ func TestCreateUserStoresTheAccountAndTheCredential(t *testing.T) {
 	assert.Equal(t, "hermione", created.Username)
 	assert.Equal(t, "hermione@example.com", created.Email)
 	assert.Equal(t, "Hermione Granger", created.DisplayName)
-	assert.True(t, created.IsAdmin)
 	assert.True(t, created.EmailVerified)
 	assert.False(t, created.CreatedAt.IsZero())
 	assert.Equal(t, 1, passwordCount(t, pool, created.ID))
@@ -223,7 +221,6 @@ func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
 		Email:     "vittoria.vetra@infinite.bound",
 		FirstName: "Vittoria",
 		LastName:  "Vetra",
-		IsAdmin:   true,
 		Locale:    "id-ID",
 	})
 	require.NoError(t, err)
@@ -244,7 +241,6 @@ func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "vittoria_vetra", row.Username)
 	assert.Equal(t, "vittoria.vetra@infinite.bound", row.Email)
-	assert.True(t, row.IsAdmin)
 }
 
 func TestGetUserRefusesAnUnknownIdentifier(t *testing.T) {

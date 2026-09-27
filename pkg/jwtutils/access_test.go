@@ -58,7 +58,7 @@ func TestAccessVerifierRoundTripsTheClaims(t *testing.T) {
 	token, err := signer.Sign(AccessClaims{
 		Email:     "hermione@example.com",
 		Username:  "hermione",
-		IsAdmin:   true,
+		Roles:     []string{"administrator"},
 		SessionID: "sess_01abc",
 	}, Standard{Subject: "0197abc", IssuedAt: time.Now()})
 	require.NoError(t, err)
@@ -66,10 +66,14 @@ func TestAccessVerifierRoundTripsTheClaims(t *testing.T) {
 	verified, err := NewAccessVerifier(source, "https://tango.example").Verify(t.Context(), token)
 	require.NoError(t, err)
 
+	caller, err := NewCaller(verified)
+	require.NoError(t, err)
+
 	assert.Equal(t, "0197abc", verified.Subject)
 	assert.Equal(t, "hermione@example.com", verified.Private.Email)
 	assert.Equal(t, "hermione", verified.Private.Username)
-	assert.True(t, verified.Private.IsAdmin)
+	assert.True(t, caller.HasRole("administrator"))
+	assert.True(t, caller.IsAdministrator())
 	assert.Equal(t, "sess_01abc", verified.Private.SessionID)
 }
 
@@ -142,13 +146,16 @@ func TestNewCallerRefusesATokenWithoutASubject(t *testing.T) {
 func TestNewCallerKeepsTheSubjectAndTheClaims(t *testing.T) {
 	caller, err := NewCaller(Verified[AccessClaims]{
 		Standard: Standard{Subject: "0197abc"},
-		Private:  AccessClaims{Username: "hermione", IsAdmin: true},
+		Private:  AccessClaims{Username: "hermione", Roles: []string{"administrator"}, Permissions: []string{"user:*:read", "user:*:ban"}},
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, "0197abc", caller.UserID)
 	assert.Equal(t, "hermione", caller.Username)
-	assert.True(t, caller.IsAdmin)
+	assert.True(t, caller.IsAdministrator())
+	assert.True(t, caller.HasPermission("user:usr_9:ban"))
+	assert.True(t, caller.HasPermission("user:usr_9:read"))
+	assert.False(t, caller.HasPermission("user:usr_9:delete"))
 	assert.False(t, caller.IsImpersonating())
 }
 

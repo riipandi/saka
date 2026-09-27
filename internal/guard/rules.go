@@ -185,6 +185,23 @@ var ProcedureRules = map[string]Entry{
 	identityv1connect.UserGroupServiceGetUserGroupsProcedure:       {Rule: Admin},
 	identityv1connect.UserGroupServiceUpdateUserGroupsProcedure:    {Rule: Admin},
 
+	// The authorization surface is administrative end to end: shaping who
+	// may act is the one power the administrator role keeps to itself,
+	// because a surface that granted its own management could raise
+	// anything to itself. Declared explicitly rather than left to the
+	// default so the table reads as the complete policy of the surface.
+	identityv1connect.AuthorizationServiceListPermissionsProcedure:      {Rule: Admin},
+	identityv1connect.AuthorizationServiceListRolesProcedure:            {Rule: Admin},
+	identityv1connect.AuthorizationServiceGetRoleProcedure:              {Rule: Admin},
+	identityv1connect.AuthorizationServiceCreateRoleProcedure:           {Rule: Admin},
+	identityv1connect.AuthorizationServiceUpdateRoleProcedure:           {Rule: Admin},
+	identityv1connect.AuthorizationServiceDeleteRoleProcedure:           {Rule: Admin},
+	identityv1connect.AuthorizationServiceSetRolePermissionsProcedure:   {Rule: Admin},
+	identityv1connect.AuthorizationServiceListUserRolesProcedure:        {Rule: Admin},
+	identityv1connect.AuthorizationServiceSetUserRolesProcedure:         {Rule: Admin},
+	identityv1connect.AuthorizationServiceListUserPermissionsProcedure:  {Rule: Admin},
+	identityv1connect.AuthorizationServiceSetUserPermissionsProcedure:   {Rule: Admin},
+
 	// The API keys' own surface is session-only: a key cannot manage keys,
 	// the refusal the upstream spells with a middleware switch and this
 	// surface spells with a rule against the caller's credential kind. The
@@ -336,6 +353,7 @@ func ContractProcedures() []string {
 		authv1.File_auth_proto,
 		authv1.File_one_time_access_proto,
 		apikeyv1.File_api_key_proto,
+		identityv1.File_authorization_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
 		systemv1.File_system_proto,

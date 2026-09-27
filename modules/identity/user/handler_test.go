@@ -36,7 +36,7 @@ func testVerifier(t *testing.T, subject string) (*jwtutils.AccessVerifier, strin
 	require.NoError(t, err)
 	signer, err := jwtutils.NewSigner[jwtutils.AccessClaims](key, algorithm)
 	require.NoError(t, err)
-	token, err := signer.Sign(jwtutils.AccessClaims{Username: "hermione", IsAdmin: true},
+	token, err := signer.Sign(jwtutils.AccessClaims{Username: "hermione", Roles: []string{"administrator"}},
 		jwtutils.Standard{Issuer: cfg.Auth.Issuer, Subject: subject, IssuedAt: time.Now()})
 	require.NoError(t, err)
 	return jwtutils.NewAccessVerifier(keys, cfg.Auth.Issuer), token

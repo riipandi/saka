@@ -204,7 +204,6 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 			Username:    result.User.Username,
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
-			IsAdmin:     result.User.IsAdmin,
 		},
 		Status:  responder.StatusSuccess,
 		Message: "the second factor verified and the session opened",

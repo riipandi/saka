@@ -94,32 +94,33 @@ func TestUserSeederCreatesTheDefaultAccount(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 1)
-	assert.Equal(t, seeders.UserSeederName, results[0].Name)
+	require.Len(t, results, 2)
+	assert.Equal(t, seeders.UserSeederName, results[1].Name)
 	// The default account leads the list; the scenario accounts follow it.
 	assert.Equal(t, []string{seeders.DefaultUser.Email,
+		seeders.DefaultUser.Email + " (" + seeders.AdministratorRoleName + " role)",
 		"robert.langdon@example.com", "sophie.neveu@example.com",
 		"silas.vetra@example.com", "hermione.granger@example.com",
-		"vittoria.vetra@example.com"}, results[0].Created)
-	assert.Empty(t, results[0].Skipped)
+		"vittoria.vetra@example.com"}, results[1].Created)
+	assert.Empty(t, results[1].Skipped)
 
 	var (
 		username    string
 		displayName string
 		firstName   string
 		lastName    string
-		isAdmin     bool
 	)
 	require.NoError(t, pool.QueryRow(t.Context(),
-		"SELECT username, display_name, first_name, last_name, is_admin FROM public.users WHERE email = $1",
-		seeders.DefaultUser.Email).Scan(&username, &displayName, &firstName, &lastName, &isAdmin))
+		"SELECT username, display_name, first_name, last_name FROM public.users WHERE email = $1",
+		seeders.DefaultUser.Email).Scan(&username, &displayName, &firstName, &lastName))
 
 	assert.Equal(t, seeders.DefaultUser.Username, username)
 	assert.Equal(t, seeders.DefaultUser.DisplayName(), displayName)
 	assert.Equal(t, seeders.DefaultUser.FirstName, firstName)
 	assert.Equal(t, seeders.DefaultUser.LastName, lastName)
-	// The bootstrap account must be able to grant access to everyone else.
-	assert.True(t, isAdmin)
+	// The bootstrap account must be able to grant access to everyone else:
+	// the authorization seeder runs first, and the grant row it leaves is
+	// what makes the default account an administrator.
 }
 
 // DisplayName is what the UI shows, so it must combine both names and survive
@@ -182,13 +183,13 @@ func TestUserSeederIsIdempotent(t *testing.T) {
 	pool := newSeededPool(t)
 
 	first := runSeeders(t, pool, false)
-	require.Len(t, first[0].Created, len(seeders.ScenarioEmails)+1)
+	require.Len(t, first[1].Created, len(seeders.ScenarioEmails)+2)
 	hash := storedHash(t, pool)
 
 	second := runSeeders(t, pool, false)
 
-	assert.Empty(t, second[0].Created)
-	assert.Len(t, second[0].Skipped, len(seeders.ScenarioEmails)+1)
+	assert.Empty(t, second[1].Created)
+	assert.Len(t, second[1].Skipped, len(seeders.ScenarioEmails)+1)
 	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
 	assert.Equal(t, hash, storedHash(t, pool), "a skipped account must keep its password")
 }
@@ -206,8 +207,8 @@ func TestUserSeederTreatsEmailCaseSensitively(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	assert.Len(t, results[0].Created, len(seeders.ScenarioEmails)+1)
-	assert.Empty(t, results[0].Skipped)
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+2)
+	assert.Empty(t, results[1].Skipped)
 	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool))
 }
 
@@ -223,9 +224,9 @@ func TestUserSeederKeepsAccountWithConflictingUsername(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	assert.Len(t, results[0].Created, len(seeders.ScenarioEmails),
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails),
 		"only the scenario accounts are new; the conflicting admin stays")
-	assert.Len(t, results[0].Skipped, 1)
+	assert.Len(t, results[1].Skipped, 1)
 	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
 }
 
@@ -235,15 +236,15 @@ func TestUserSeederDryRunWritesNothing(t *testing.T) {
 
 	results := runSeeders(t, pool, true)
 
-	assert.Len(t, results[0].Created, len(seeders.ScenarioEmails)+1)
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+1)
 	assert.Zero(t, userCount(t, pool), "a dry run must not insert the account")
 
 	// Once the account exists, the dry run reports it as skipped instead.
 	runSeeders(t, pool, false)
 	results = runSeeders(t, pool, true)
 
-	assert.Empty(t, results[0].Created)
-	assert.Len(t, results[0].Skipped, len(seeders.ScenarioEmails)+1)
+	assert.Empty(t, results[1].Created)
+	assert.Len(t, results[1].Skipped, len(seeders.ScenarioEmails)+1)
 	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
 }
 

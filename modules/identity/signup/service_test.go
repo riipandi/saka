@@ -104,24 +104,21 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 	require.NotNil(t, user.LastName)
 	assert.Equal(t, "Granger", *user.LastName)
 	assert.False(t, user.EmailVerified)
-	assert.False(t, user.IsAdmin)
 	assert.False(t, user.Disabled)
 	assert.False(t, user.CreatedAt.IsZero())
 
 	// The account row carries the composed display name and stays
 	// unverified: email verification is a later procedure.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("email", "display_name", "email_verified_at", "is_admin")
+	sb.Select("email", "display_name", "email_verified_at")
 	sb.From("public.users")
 	sb.Where(sb.Equal("username", "hermione"))
 	query, args := sb.Build()
 	var email, displayName string
 	var verifiedAt *time.Time
-	var isAdmin bool
-	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&email, &displayName, &verifiedAt, &isAdmin))
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&email, &displayName, &verifiedAt))
 	assert.Equal(t, "hermione@example.com", email)
 	assert.Nil(t, verifiedAt)
-	assert.False(t, isAdmin)
 
 	// The credential is stored as the hash the verifier accepts, never in
 	// the clear.

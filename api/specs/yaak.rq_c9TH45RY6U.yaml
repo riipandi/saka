@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_c9TH45RY6U
+createdAt: 2026-09-27T11:44:29.531735
+updatedAt: 2026-09-27T11:47:29.399423
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "name": "Content Editor",
+      "slug": "content-editor",
+      "description": "Edits the content"
+    }
+bodyType: application/json
+description: '[Tango] Define a custom role. The slug is unique and immutable; the role is born with no permissions and is granted them by SetRolePermissions. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: eY8ZAKMssg
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: KPkjYVXPed
+method: POST
+name: Create Role
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/CreateRole
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

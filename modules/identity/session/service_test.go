@@ -132,10 +132,11 @@ func seedAdmin(t *testing.T, pool *datastore.Postgres, username string) uuid.UUI
 	t.Helper()
 
 	_, err := pool.Exec(t.Context(), `
-		INSERT INTO public.users (username, email, display_name, is_admin)
-		VALUES ($1::citext, $1::text || '@example.com', 'Vittoria Vetra', true)`,
+		INSERT INTO public.users (username, email, display_name)
+		VALUES ($1::citext, $1::text || '@example.com', 'Vittoria Vetra')`,
 		username)
 	require.NoError(t, err)
+	seedAdministratorRole(t, pool, username)
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
@@ -146,6 +147,28 @@ func seedAdmin(t *testing.T, pool *datastore.Postgres, username string) uuid.UUI
 	var id uuid.UUID
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&id))
 	return id
+}
+
+// seedAdministratorRole grants the administrator role to the account the
+// username names, creating the system role row first. The column is_admin is
+// gone: the role is the elevation, so a test that seeds an administrator
+// seeds the grant.
+func seedAdministratorRole(t *testing.T, pool *datastore.Postgres, username string) {
+	t.Helper()
+
+	_, err := pool.Exec(t.Context(), `
+		INSERT INTO public.roles (id, name, slug, type)
+		VALUES ('01900000-0000-7000-8000-0000000000aa', 'Administrator', 'administrator', 'system')
+		ON CONFLICT (slug) DO NOTHING`)
+	require.NoError(t, err)
+
+	_, err = pool.Exec(t.Context(), `
+		INSERT INTO public.user_roles (user_id, role_id)
+		SELECT u.id, r.id
+		FROM public.users u JOIN public.roles r ON r.slug = 'administrator'
+		WHERE u.username = $1
+		ON CONFLICT DO NOTHING`, username)
+	require.NoError(t, err)
 }
 
 // auditCount reads how many records the log holds of one event about one

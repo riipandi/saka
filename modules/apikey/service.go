@@ -301,11 +301,16 @@ func (s *Service) AuthenticateAPIKey(ctx context.Context, presented string) (*jw
 	if err != nil {
 		return nil, err
 	}
+	roles, permissions, err := user.LoadGrants(ctx, s.pool, owner.ID)
+	if err != nil {
+		return nil, err
+	}
 	return &jwtutils.Caller{
 		Email:       owner.Email,
 		Username:    owner.Username,
 		DisplayName: owner.DisplayName,
-		IsAdmin:     owner.IsAdmin,
+		Roles:       roles,
+		Permissions: permissions,
 		UserID:      user.FormatID(owner.ID),
 		Credential:  jwtutils.CredentialAPIKey,
 	}, nil

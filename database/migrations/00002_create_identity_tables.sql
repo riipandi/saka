@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS public.users (
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),
     avatar_url TEXT, -- Storage key of the uploaded avatar; NULL = bundled default picture
     locale TEXT,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     disabled BOOLEAN NOT NULL DEFAULT FALSE,
     metadata JSONB DEFAULT NULL, -- Metadata can contain user-specific information
     email_verified_at TIMESTAMPTZ DEFAULT NULL,

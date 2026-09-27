@@ -58,9 +58,9 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 	t.Helper()
 
 	_, err := pool.Exec(t.Context(), `
-		INSERT INTO public.users (username, email, first_name, last_name, display_name, is_admin)
-		VALUES ($1::citext, $1::text || '@example.com', 'Hermione', 'Granger', 'Hermione Granger', $2)`,
-		username, username == "admin")
+		INSERT INTO public.users (username, email, first_name, last_name, display_name)
+		VALUES ($1::citext, $1::text || '@example.com', 'Hermione', 'Granger', 'Hermione Granger')`,
+		username)
 	require.NoError(t, err)
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()

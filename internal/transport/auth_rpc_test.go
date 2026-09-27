@@ -32,7 +32,7 @@ func stubAuthenticator() transport.Authenticator {
 		}
 		return &jwtutils.Caller{
 			UserID:       stubCallerWireID(),
-			AccessClaims: jwtutils.AccessClaims{Username: "admin", IsAdmin: true},
+			AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
 		}, nil
 	}
 }
