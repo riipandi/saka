@@ -73,7 +73,7 @@ func newRPCHandler(service *Service) identityv1connect.UserServiceHandler {
 func (h *rpcHandler) ListUsers(ctx context.Context, req *connect.Request[identityv1.ListUsersRequest]) (*connect.Response[identityv1.ListUsersResponse], error) {
 	// Absent a sort order the page answers newest first, the way the list
 	// read before the sort key existed.
-	ascending := req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC
+	ascending := req.Msg.GetSortOrder() == "asc"
 	users, pagination, err := h.service.ListUsers(ctx, req.Msg.GetSearch(), req.Msg.GetSortBy(), ascending, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)

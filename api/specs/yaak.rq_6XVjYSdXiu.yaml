@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_6XVjYSdXiu
 createdAt: 2026-09-25T10:33:40.668220
-updatedAt: 2026-09-26T18:47:27.385474
+updatedAt: 2026-09-27T08:33:03.554146
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication: {}
@@ -13,11 +13,13 @@ body:
     {
       "page": 1,
       "limit": 25,
-      "search": ""
+      "search": "",
+      "sort_by": "created_at",
+      "sort_order": "SORT_ORDER_DESC"
     }
 bodyType: application/json
 description: |-
-  List users with pagination and an optional search term matched against the username, the email, and the display name.
+  List users with pagination, an optional search term, and sorting.
 
   Ported from Pocket ID `GET /api/users` as the `tango.identity.v1.UserService/ListUsers` procedure.
 
@@ -25,6 +27,8 @@ description: |-
   - page (body, optional): One-based page number
   - limit (body, optional): Page size
   - search (body, optional): Search term
+  - sort_by (body, optional): One of username, email, first_name, last_name, display_name, created_at; absent orders newest first
+  - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
 headers:
 - enabled: true
   name: Content-Type

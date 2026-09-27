@@ -71,7 +71,7 @@ func newRPCHandler(service *Service) identityv1connect.UserGroupServiceHandler {
 // ListUserGroups answers one page of the groups.
 func (h *rpcHandler) ListUserGroups(ctx context.Context, req *connect.Request[identityv1.ListUserGroupsRequest]) (*connect.Response[identityv1.ListUserGroupsResponse], error) {
 	sortBy := req.Msg.GetSortBy()
-	ascending := req.Msg.GetSortOrder() != commonv1.SortOrder_SORT_ORDER_DESC
+	ascending := req.Msg.GetSortOrder() != "desc"
 
 	groups, pagination, err := h.service.ListGroups(
 		ctx,

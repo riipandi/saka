@@ -112,7 +112,7 @@ func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request
 
 // ListSignupTokens answers the issued tokens with their pagination block.
 func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[identityv1.ListSignupTokensRequest]) (*connect.Response[identityv1.ListSignupTokensResponse], error) {
-	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}

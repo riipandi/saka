@@ -72,7 +72,7 @@ func (h *rpcHandler) List(ctx context.Context, req *connect.Request[auditlogv1.L
 	}
 
 	// Absent a sort order the page answers newest first.
-	ascending := req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC
+	ascending := req.Msg.GetSortOrder() == "asc"
 	views, metadata, err := h.service.List(ctx, Scope{UserID: caller.UserID},
 		req.Msg.GetSortBy(), ascending, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
@@ -95,7 +95,7 @@ func (h *rpcHandler) ListAll(ctx context.Context, req *connect.Request[auditlogv
 		UserID: req.Msg.GetUserId(),
 		Event:  req.Msg.GetEvent(),
 		Search: req.Msg.GetSearch(),
-	}, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	}, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}

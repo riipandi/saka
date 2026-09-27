@@ -153,7 +153,12 @@ message ListAPIKeysRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 4;
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListAPIKeysResponse is the page of the caller's own keys.
@@ -239,7 +244,12 @@ message ListAllAPIKeysRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 4;
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListAllAPIKeysResponse is the page of every key the deployment holds.

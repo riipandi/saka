@@ -157,7 +157,12 @@ message ListRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 4;
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListResponse is the page of the caller's own records.
@@ -212,7 +217,12 @@ message ListAllRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 7;
+  optional string sort_order = 7 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListAllResponse is the page of every record.

@@ -112,7 +112,7 @@ func (h *rpcHandler) ListAPIKeys(ctx context.Context, req *connect.Request[apike
 	if ownerErr != nil {
 		return nil, mapError(ErrKeyNotFound)
 	}
-	keys, pagination, err := h.service.ListOwn(ctx, ownerID, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	keys, pagination, err := h.service.ListOwn(ctx, ownerID, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -181,7 +181,7 @@ func (h *rpcHandler) RevokeAPIKey(ctx context.Context, req *connect.Request[apik
 
 // ListAllApiKeys answers one page of every key the deployment holds.
 func (h *rpcHandler) ListAllAPIKeys(ctx context.Context, req *connect.Request[apikeyv1.ListAllAPIKeysRequest]) (*connect.Response[apikeyv1.ListAllAPIKeysResponse], error) {
-	keys, pagination, err := h.service.ListAll(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == commonv1.SortOrder_SORT_ORDER_ASC, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	keys, pagination, err := h.service.ListAll(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}

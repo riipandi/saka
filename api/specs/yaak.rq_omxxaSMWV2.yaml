@@ -2,23 +2,29 @@ type: http_request
 model: http_request
 id: rq_omxxaSMWV2
 createdAt: 2026-09-18T18:41:27.267187
-updatedAt: 2026-09-26T14:33:29.237841
+updatedAt: 2026-09-27T08:34:43.563635
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5ohk34DQsY
 authentication: {}
 authenticationType: null
 body:
   bodyType: application/json
-  text: '{}'
+  text: |-
+    {
+      "page": 1,
+      "limit": 25,
+      "sort_by": "created_at",
+      "sort_order": "SORT_ORDER_DESC"
+    }
 bodyType: application/json
 description: |-
-  One page of the caller's own API keys, newest first, revoked ones included.
-
-  Ported from Pocket ID `GET /api/api-keys` as the `tango.apikey.v1.ApiKeyService/ListAPIKeys` procedure.
+  List the caller's own API keys with pagination and sorting.
 
   Parameters:
-  - page (body, optional): one-based page number
-  - limit (body, optional): page size
+  - page (body, optional): One-based page number
+  - limit (body, optional): Page size
+  - sort_by (body, optional): One of name, created_at, expires_at, last_used_at; absent orders newest first
+  - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
 headers:
 - enabled: true
   name: Content-Type

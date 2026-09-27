@@ -465,7 +465,12 @@ message ListSignupTokensRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 4;
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListSignupTokensResponse is the issued tokens and their pagination block.
@@ -528,7 +533,12 @@ message ListUsersRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 5;
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListUsersResponse is the page of accounts and their pagination block.
@@ -911,7 +921,12 @@ message ListUserGroupsRequest {
   }];
 
   // sort_order flips the direction; absent means ascending.
-  optional tango.common.v1.SortOrder sort_order = 5;
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
 // ListUserGroupsResponse is the page of groups and their pagination block.
