@@ -239,6 +239,26 @@ func applyDefaultUser(
 			created = append(created, grant.email+" ("+grant.role+" role)")
 		}
 	}
+
+	// One direct permission grant closes the last path the claims carry:
+	// the union of a role's set and the account's own grants. Sophie's
+	// notice-writing power comes from no role — it is hers alone, the
+	// exception the direct grant table exists for.
+	directGrants := []struct {
+		email string
+		slug  string
+	}{
+		{ScenarioEmails[1], "notification:*:create"},
+	}
+	for _, grant := range directGrants {
+		granted, grantErr := ensurePermissionGrant(ctx, q, grant.email, grant.slug, dryRun)
+		if grantErr != nil {
+			return nil, nil, grantErr
+		}
+		if granted {
+			created = append(created, grant.email+" ("+grant.slug+" grant)")
+		}
+	}
 	return created, skipped, nil
 }
 
@@ -381,6 +401,61 @@ func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug s
 	query, args = ib.Build()
 	if _, err := q.Exec(ctx, query, args...); err != nil {
 		return false, fmt.Errorf("grant %s role: %w", roleSlug, err)
+	}
+	return true, nil
+}
+
+// ensurePermissionGrant grants the permission the slug names directly to the
+// account the email names, unless an active grant already carries it. It
+// answers whether this run wrote the grant. A missing account or permission
+// row is a skip, not a failure — a standalone run of this seeder carries
+// neither row, and the authorization seeder owns the catalog.
+func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug string, dryRun bool) (bool, error) {
+	if dryRun {
+		return false, nil
+	}
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("u.id")
+	sb.From(user.UserTable + " u")
+	sb.Where(sb.Equal("u.email", email))
+
+	query, args := sb.Build()
+	var userID string
+	if err := q.QueryRow(ctx, query, args...).Scan(&userID); err != nil {
+		return false, nil
+	}
+
+	pb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	pb.Select("p.id")
+	pb.From(authz.PermissionsTable + " p")
+	pb.Where(pb.Equal("p.slug", slug))
+
+	query, args = pb.Build()
+	var permissionID string
+	if err := q.QueryRow(ctx, query, args...).Scan(&permissionID); err != nil {
+		return false, nil
+	}
+
+	active := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	active.Select("1")
+	active.From(authz.UserPermissionsTable)
+	active.Where(active.Equal("user_id", userID), active.Equal("permission_id", permissionID), active.IsNull("revoked_at"))
+
+	query, args = active.Build()
+	var one int
+	if q.QueryRow(ctx, query, args...).Scan(&one) == nil {
+		return false, nil
+	}
+
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(authz.UserPermissionsTable)
+	ib.Cols("user_id", "permission_id")
+	ib.Values(userID, permissionID)
+
+	query, args = ib.Build()
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return false, fmt.Errorf("grant %s permission: %w", slug, err)
 	}
 	return true, nil
 }

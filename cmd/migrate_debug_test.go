@@ -309,4 +309,3 @@ func TestMigrateResetWithUpKeepsIDsDense(t *testing.T) {
 		"the re-apply must reuse the ids, not continue past them")
 	assert.Equal(t, latestMigration().Version, currentVersion(t, dsn))
 }
-

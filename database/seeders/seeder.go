@@ -33,7 +33,7 @@ type Result struct {
 // user seeder grants its default account the administrator role the moment
 // the account exists, and the grant names a role row.
 func All() []Seeder {
-	return []Seeder{Authorization(), User(), UserGroup(), APIKey()}
+	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification()}
 }
 
 // Run applies each seeder in order over the same querier.

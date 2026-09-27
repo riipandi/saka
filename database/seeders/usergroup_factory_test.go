@@ -69,7 +69,7 @@ func TestUserGroupSeederCreatesTheGroupsAndMemberships(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 4)
+	require.Len(t, results, 5)
 	require.Equal(t, seeders.UserGroupSeederName, results[2].Name)
 
 	require.Len(t, results[2].Created, 6)
@@ -105,7 +105,7 @@ func TestAPIKeySeederCreatesTheScenarioKeys(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 4)
+	require.Len(t, results, 5)
 	require.Equal(t, seeders.APIKeySeederName, results[3].Name)
 	require.Len(t, results[3].Created, 3)
 	assert.Empty(t, results[3].Skipped)
@@ -157,4 +157,3 @@ func countRows(t *testing.T, pool *datastore.Postgres, query string) int {
 	require.NoError(t, pool.QueryRow(t.Context(), query).Scan(&count))
 	return count
 }
-
