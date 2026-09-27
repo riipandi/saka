@@ -18,8 +18,9 @@ import (
 const smokeMarker = "tango-logger-smoke"
 
 var loggerSmokeCmd = &cli.Command{
-	Name:  "logger:smoke",
-	Usage: "Emit one log line through every configured transport",
+	Name:     "logger:smoke",
+	Category: "Development commands",
+	Usage:    "Emit one log line through every configured transport",
 	Description: `Writes one line at each configured log level through the transports named by
 log.transport, so the logging path can be proved end to end against a real
 backend before anything depends on it.

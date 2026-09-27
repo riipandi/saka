@@ -19,8 +19,9 @@ import (
 const mailerSmokeTemplate = "test-email"
 
 var mailerSmokeCmd = &cli.Command{
-	Name:  "mailer:smoke",
-	Usage: "Send one templated email through the configured SMTP server",
+	Name:     "mailer:smoke",
+	Category: "Development commands",
+	Usage:    "Send one templated email through the configured SMTP server",
 	Description: `Renders one embedded email template and submits it, so the mail path can be
 proved end to end against a real server before anything depends on it.
 

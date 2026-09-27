@@ -21,8 +21,9 @@ import (
 const otelSmokeMarker = "tango-otel-smoke"
 
 var otelSmokeCmd = &cli.Command{
-	Name:  "otel:smoke",
-	Usage: "Emit one span and one measurement through the configured signals",
+	Name:     "otel:smoke",
+	Category: "Development commands",
+	Usage:    "Emit one span and one measurement through the configured signals",
 	Description: `Records a span and a measurement through the providers the configuration
 enables, so tracing and metrics can be proved end to end against a real backend
 before anything depends on them.
