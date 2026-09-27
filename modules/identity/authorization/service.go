@@ -75,20 +75,20 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Lo
 	}
 }
 
-// ListPermissions answers the permission catalog, in catalog order. The
-// catalog is the code's own list — the same list the seed writes — so the
-// response and the database cannot disagree, and a slug the application
-// stopped enforcing leaves the answer the commit that removed it did.
-func (s *Service) ListPermissions(ctx context.Context) ([]CatalogEntry, error) {
-	return authz.Catalog(), nil
+// ListPermissions answers the permission catalog as the database holds it —
+// the rows the seed writes from the code's own list, so the response and
+// the grants that reference these rows by id cannot disagree — narrowed by
+// the request's search and resource, ordered as the caller asked.
+func (s *Service) ListPermissions(ctx context.Context, search, resource, sortBy string, ascending bool) ([]PermissionSchema, error) {
+	return s.repo.ListPermissions(ctx, s.pool, search, resource, sortBy, ascending)
 }
 
 // ListRoles answers one page of the roles, ordered as the caller asked,
-// optionally filtered by a search term.
-func (s *Service) ListRoles(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
+// optionally filtered by a search term and a role kind.
+func (s *Service) ListRoles(ctx context.Context, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
 
-	rows, total, err := s.repo.ListRoles(ctx, s.pool, search, sortBy, ascending, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListRoles(ctx, s.pool, search, roleType, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
 		return nil, responder.Pagination{}, err
 	}

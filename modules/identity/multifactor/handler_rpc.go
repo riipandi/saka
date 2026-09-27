@@ -13,8 +13,8 @@ import (
 
 	"uuid"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -53,16 +53,16 @@ func (m *Module) Mount(r chi.Router) {}
 // so the procedure answers exactly like the transport's own.
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	handler := newRPCHandler(m.service)
-	_, connectHandler := authv1connect.NewMultifactorServiceHandler(handler, opts...)
-	r.Handle(authv1connect.MultifactorServiceBeginTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceListTotpEnrollmentsProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceCompleteSignInProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceDisableMfaProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceVerifyRecoveryCodeProcedure, connectHandler)
-	r.Handle(authv1connect.MultifactorServiceAdminDisableMfaProcedure, connectHandler)
+	_, connectHandler := authnv1connect.NewMultifactorServiceHandler(handler, opts...)
+	r.Handle(authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceListTotpEnrollmentsProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceCompleteSignInProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceDisableMfaProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceVerifyRecoveryCodeProcedure, connectHandler)
+	r.Handle(authnv1connect.MultifactorServiceAdminDisableMfaProcedure, connectHandler)
 }
 
 // rpcHandler is the transport mapping of the multifactor procedures. The
@@ -73,7 +73,7 @@ type rpcHandler struct {
 }
 
 // newRPCHandler builds the handler over the service.
-func newRPCHandler(service *Service) authv1connect.MultifactorServiceHandler {
+func newRPCHandler(service *Service) authnv1connect.MultifactorServiceHandler {
 	return &rpcHandler{service: service}
 }
 
@@ -96,7 +96,7 @@ func callerID(ctx context.Context) (uuid.UUID, error) {
 
 // BeginTotpEnrollment writes an unconfirmed authenticator and answers its
 // secret once.
-func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Request[authv1.BeginTotpEnrollmentRequest]) (*connect.Response[authv1.BeginTotpEnrollmentResponse], error) {
+func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.BeginTotpEnrollmentRequest]) (*connect.Response[authnv1.BeginTotpEnrollmentResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -106,7 +106,7 @@ func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.BeginTotpEnrollmentResponse{
+	return connect.NewResponse(&authnv1.BeginTotpEnrollmentResponse{
 		TotpId:     result.TotpID,
 		Name:       result.Name,
 		Secret:     result.Secret,
@@ -117,7 +117,7 @@ func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Reque
 
 // ConfirmTotpEnrollment activates the enrollment and answers the recovery
 // set once.
-func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *connect.Request[authv1.ConfirmTotpEnrollmentRequest]) (*connect.Response[authv1.ConfirmTotpEnrollmentResponse], error) {
+func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.ConfirmTotpEnrollmentRequest]) (*connect.Response[authnv1.ConfirmTotpEnrollmentResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -127,14 +127,14 @@ func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.ConfirmTotpEnrollmentResponse{
+	return connect.NewResponse(&authnv1.ConfirmTotpEnrollmentResponse{
 		TotpId:        result.TotpID,
 		RecoveryCodes: result.RecoveryCodes,
 	}), nil
 }
 
 // ListTotpEnrollments answers the account's authenticators.
-func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Request[authv1.ListTotpEnrollmentsRequest]) (*connect.Response[authv1.ListTotpEnrollmentsResponse], error) {
+func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Request[authnv1.ListTotpEnrollmentsRequest]) (*connect.Response[authnv1.ListTotpEnrollmentsResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -144,9 +144,9 @@ func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, mapError(err)
 	}
-	out := make([]*authv1.TotpEnrollment, 0, len(rows))
+	out := make([]*authnv1.TotpEnrollment, 0, len(rows))
 	for _, row := range rows {
-		view := &authv1.TotpEnrollment{
+		view := &authnv1.TotpEnrollment{
 			TotpId:      row.TotpID,
 			Name:        row.Name,
 			ConfirmedAt: timestampPtr(row.ConfirmedAt),
@@ -160,12 +160,12 @@ func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Reque
 		}
 		out = append(out, view)
 	}
-	return connect.NewResponse(&authv1.ListTotpEnrollmentsResponse{Enrollments: out}), nil
+	return connect.NewResponse(&authnv1.ListTotpEnrollmentsResponse{Enrollments: out}), nil
 }
 
 // DeleteTotpEnrollment removes one authenticator, with the proof the removal
 // needs when it would disarm the account.
-func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Request[authv1.DeleteTotpEnrollmentRequest]) (*connect.Response[authv1.DeleteTotpEnrollmentResponse], error) {
+func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.DeleteTotpEnrollmentRequest]) (*connect.Response[authnv1.DeleteTotpEnrollmentResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -174,14 +174,14 @@ func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Requ
 	if err := h.service.DeleteTotpEnrollment(ctx, userID, req.Msg.TotpId, req.Msg.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.DeleteTotpEnrollmentResponse{
+	return connect.NewResponse(&authnv1.DeleteTotpEnrollmentResponse{
 		Message: "the authenticator was removed",
 	}), nil
 }
 
 // CompleteSignIn spends the pending bridge plus the second factor on the
 // session.
-func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[authv1.CompleteSignInRequest]) (*connect.Response[authv1.CompleteSignInResponse], error) {
+func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[authnv1.CompleteSignInRequest]) (*connect.Response[authnv1.CompleteSignInResponse], error) {
 	client := audit.ClientFromContext(ctx)
 
 	result, err := h.service.CompleteSignIn(ctx, req.Msg.PendingToken, req.Msg.Code, signin.SessionParams{
@@ -192,14 +192,14 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.CompleteSignInResponse{
+	return connect.NewResponse(&authnv1.CompleteSignInResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
 		AccessExpiresIn:  result.AccessExpiresIn,
 		RefreshExpiresIn: result.RefreshExpiresIn,
 		RefreshToken:     result.RefreshToken,
 		SessionId:        result.SessionID,
-		User: &authv1.AuthenticatedUser{
+		User: &authnv1.AuthenticatedUser{
 			Id:          result.User.ID,
 			Username:    result.User.Username,
 			Email:       result.User.Email,
@@ -211,7 +211,7 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 }
 
 // RegenerateRecoveryCodes rewrites the set and answers it once.
-func (h *rpcHandler) RegenerateRecoveryCodes(ctx context.Context, req *connect.Request[authv1.RegenerateRecoveryCodesRequest]) (*connect.Response[authv1.RegenerateRecoveryCodesResponse], error) {
+func (h *rpcHandler) RegenerateRecoveryCodes(ctx context.Context, req *connect.Request[authnv1.RegenerateRecoveryCodesRequest]) (*connect.Response[authnv1.RegenerateRecoveryCodesResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -221,13 +221,13 @@ func (h *rpcHandler) RegenerateRecoveryCodes(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.RegenerateRecoveryCodesResponse{
+	return connect.NewResponse(&authnv1.RegenerateRecoveryCodesResponse{
 		RecoveryCodes: codes,
 	}), nil
 }
 
 // DisableMfa removes every factor after the proof.
-func (h *rpcHandler) DisableMfa(ctx context.Context, req *connect.Request[authv1.DisableMfaRequest]) (*connect.Response[authv1.DisableMfaResponse], error) {
+func (h *rpcHandler) DisableMfa(ctx context.Context, req *connect.Request[authnv1.DisableMfaRequest]) (*connect.Response[authnv1.DisableMfaResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -236,14 +236,14 @@ func (h *rpcHandler) DisableMfa(ctx context.Context, req *connect.Request[authv1
 	if err := h.service.DisableMfa(ctx, userID, req.Msg.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.DisableMfaResponse{
+	return connect.NewResponse(&authnv1.DisableMfaResponse{
 		Message: "multifactor authentication was disabled for the account",
 	}), nil
 }
 
 // VerifyRecoveryCode spends one recovery code as the caller's standalone
 // proof.
-func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Request[authv1.VerifyRecoveryCodeRequest]) (*connect.Response[authv1.VerifyRecoveryCodeResponse], error) {
+func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Request[authnv1.VerifyRecoveryCodeRequest]) (*connect.Response[authnv1.VerifyRecoveryCodeResponse], error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
@@ -252,7 +252,7 @@ func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Reques
 	if err := h.service.VerifyRecoveryCode(ctx, userID, req.Msg.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.VerifyRecoveryCodeResponse{
+	return connect.NewResponse(&authnv1.VerifyRecoveryCodeResponse{
 		Status:  responder.StatusSuccess,
 		Message: "the recovery code verified and is now spent",
 	}), nil
@@ -261,7 +261,7 @@ func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Reques
 // AdminDisableMfa removes the named account's every factor. The target is
 // the request's wire-form identifier — the one conversion the user package
 // owns — and the reason rides the audit record and the notification.
-func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[authv1.AdminDisableMfaRequest]) (*connect.Response[authv1.AdminDisableMfaResponse], error) {
+func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[authnv1.AdminDisableMfaRequest]) (*connect.Response[authnv1.AdminDisableMfaResponse], error) {
 	targetID, err := user.UUIDFromWire(req.Msg.UserId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("the account is not found"))
@@ -270,7 +270,7 @@ func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[a
 	if err := h.service.AdminDisableMfa(ctx, targetID, req.Msg.GetReason()); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.AdminDisableMfaResponse{
+	return connect.NewResponse(&authnv1.AdminDisableMfaResponse{
 		Status:  responder.StatusSuccess,
 		Message: "multifactor authentication was disabled for the account",
 	}), nil

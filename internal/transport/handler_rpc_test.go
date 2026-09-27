@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	"github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
 	"github.com/riipandi/tango/internal/config"
@@ -289,10 +289,10 @@ func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
 		Modules: []kernel.Module{feature},
 	})
 
-	_, handler := authv1connect.NewAuthServiceHandler(
+	_, handler := authnv1connect.NewAuthServiceHandler(
 		stubAuthService{}, feature.options...)
 	req := httptest.NewRequest(http.MethodPost,
-		authv1connect.AuthServiceSignInProcedure, strings.NewReader("{}"))
+		authnv1connect.AuthServiceSignInProcedure, strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connect-Protocol-Version", "1")
 
@@ -307,8 +307,8 @@ func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
 // stubAuthService answers the smallest SignIn response that carries the field.
 type stubAuthService struct{}
 
-func (stubAuthService) SignIn(context.Context, *connect.Request[authv1.SignInRequest]) (*connect.Response[authv1.SignInResponse], error) {
-	return connect.NewResponse(&authv1.SignInResponse{
+func (stubAuthService) SignIn(context.Context, *connect.Request[authnv1.SignInRequest]) (*connect.Response[authnv1.SignInResponse], error) {
+	return connect.NewResponse(&authnv1.SignInResponse{
 		AccessToken:     "token",
 		TokenType:       "Bearer",
 		AccessExpiresIn: 900,

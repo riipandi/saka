@@ -21,13 +21,13 @@
 // the source of truth, the claim its snapshot.
 syntax = "proto3";
 
-package tango.identity.v1;
+package tango.authz.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1;identityv1";
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1;authzv1";
 
 // AuthorizationService is the administrative surface over roles,
 // permissions, and the grants that bind them to accounts. Every procedure
@@ -102,16 +102,21 @@ enum RoleType {
   ROLE_TYPE_CUSTOM = 2;
 }
 
-// Permission is one entry of the catalog: the slug the server enforces and
-// the client renders, and the description a UI shows beside it. A
-// permission is not a row an administrator manages — it is the
-// application's vocabulary, and this message is how the vocabulary reads.
+// Permission is one entry of the catalog: the identifier the wire carries,
+// the slug the server enforces, and the description a UI shows beside it. A
+// permission is not a row an administrator manages — it is the application's
+// vocabulary, and this message is how the vocabulary reads. The grants still
+// travel by slug: the slug is what the claims and the code reference, while
+// the identifier only names the catalog entry.
 message Permission {
+  // id is the permission's identifier in its wire form, a TypeID (`perm_…`)
+  // encoded from the row's UUID.
+  string id = 1;
   // slug is the full wire form, `resource:id:action`, the id position
   // carrying `*` for the whole kind.
-  string slug = 1;
+  string slug = 2;
   // description is the human-readable summary.
-  string description = 2;
+  string description = 3;
 }
 
 // Role is one role as the list answers it: the row and the size of the set
@@ -159,10 +164,35 @@ message RoleDetail {
   optional string updated_at = 8;
 }
 
-// ListPermissionsRequest is empty: the catalog is small and read whole.
-message ListPermissionsRequest {}
+// ListPermissionsRequest narrows and orders the catalog read.
+message ListPermissionsRequest {
+  // search narrows the catalog to entries whose slug or description
+  // matches, case-insensitively.
+  string search = 1;
+  // resource narrows the catalog to one resource's entries — the first
+  // segment of the slug. Empty answers every resource.
+  string resource = 2 [
+    (buf.validate.field).string = {
+      in: ["", "user", "user_group", "role", "permission", "session", "api_key", "signup_token", "audit_log", "notification", "file"]
+    }
+  ];
+  // sort_by orders the catalog: slug or description. Empty keeps the
+  // catalog order — grouped by resource, slugs alphabetical inside it.
+  string sort_by = 3 [
+    (buf.validate.field).string = {
+      in: ["", "slug", "description"]
+    }
+  ];
+  // sort_order is asc or desc; asc is the default.
+  string sort_order = 4 [
+    (buf.validate.field).string = {
+      in: ["", "asc", "desc"]
+    }
+  ];
+}
 
-// ListPermissionsResponse carries the catalog in catalog order.
+// ListPermissionsResponse carries the catalog in the order the request
+// asked for.
 message ListPermissionsResponse {
   repeated Permission permissions = 1;
   // status and message are the envelope every response carries.
@@ -192,6 +222,11 @@ message ListRolesRequest {
     (buf.validate.field).string = {
       in: ["", "asc", "desc"]
     }
+  ];
+  // type narrows the page to one kind of role. Unspecified answers every
+  // role — the system ones the seed created and the custom ones.
+  optional RoleType type = 6 [
+    (buf.validate.field).enum.defined_only = true
   ];
 }
 

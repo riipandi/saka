@@ -27,6 +27,17 @@ func (RoleIDPrefix) Prefix() string { return "role" }
 // The column stays a UUID; the conversion lives here and nowhere else.
 type RoleID = typeid.TypeID[RoleIDPrefix]
 
+// PermissionIDPrefix is the TypeID prefix of a permission catalog row. The
+// slug is what grants and claims carry; the identifier only names the
+// catalog entry on the wire.
+type PermissionIDPrefix struct{}
+
+// Prefix reports the TypeID prefix.
+func (PermissionIDPrefix) Prefix() string { return "perm" }
+
+// PermID is the typed identifier of one row of PermissionsTable.
+type PermID = typeid.TypeID[PermissionIDPrefix]
+
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (RoleID, error) {
 	return typeid.FromUUID[RoleID](raw.String())
@@ -100,6 +111,14 @@ type RoleDetail struct {
 	Permissions []string
 }
 
-// CatalogEntry is one permission as the catalog answers it: the slug and
-// the description the code declares.
+// CatalogEntry is one permission as the code declares it: the slug and the
+// description.
 type CatalogEntry = authz.Permission
+
+// PermissionSchema is one row of the permission catalog as the list answer
+// carries it: the row's identifier, the slug, and the description.
+type PermissionSchema struct {
+	ID          PermID
+	Slug        string
+	Description string
+}

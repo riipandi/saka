@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
+	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -65,7 +66,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 	for _, route := range router.Routes() {
 		claimed[route.Pattern] = true
 	}
-	assert.True(t, claimed[authv1connect.AuthServiceSignInProcedure],
+	assert.True(t, claimed[authnv1connect.AuthServiceSignInProcedure],
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.SignupServiceSignupProcedure],
 		"the area must forward its features' procedures to the RPC router")
@@ -91,13 +92,13 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.EmailVerificationServiceVerifyEmailProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.OneTimeAccessServiceCreateTokenProcedure],
+	assert.True(t, claimed[authnv1connect.OneTimeAccessServiceCreateTokenProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.OneTimeAccessServiceExchangeTokenProcedure],
+	assert.True(t, claimed[authnv1connect.OneTimeAccessServiceExchangeTokenProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure],
+	assert.True(t, claimed[authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.OneTimeAccessServiceRequestEmailProcedure],
+	assert.True(t, claimed[authnv1connect.OneTimeAccessServiceRequestEmailProcedure],
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserGroupServiceListUserGroupsProcedure],
 		"the area must forward its features' procedures to the RPC router")
@@ -115,27 +116,27 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserGroupServiceUpdateUserGroupsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceListPermissionsProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceListPermissionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceListRolesProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceListRolesProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceGetRoleProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceGetRoleProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceCreateRoleProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceCreateRoleProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceUpdateRoleProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceUpdateRoleProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceDeleteRoleProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceDeleteRoleProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetRolePermissionsProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceSetRolePermissionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceListUserRolesProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceListUserRolesProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetUserRolesProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceSetUserRolesProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceListUserPermissionsProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceListUserPermissionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[identityv1connect.AuthorizationServiceSetUserPermissionsProcedure],
+	assert.True(t, claimed[authzv1connect.AuthorizationServiceSetUserPermissionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserServiceGetCurrentUserProcedure],
 		"the area must forward its features' procedures to the RPC router")
@@ -145,23 +146,23 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserServiceUnbanUserProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceSignOutProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceSignOutProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceGetSessionProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceGetSessionProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceListSessionsProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceListSessionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceRevokeSessionProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceRevokeSessionProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceRefreshProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceRefreshProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceSignOutOtherSessionsProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceSignOutOtherSessionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceSignOutAllSessionsProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceSignOutAllSessionsProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceImpersonateUserProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceImpersonateUserProcedure],
 		"the area must forward its features' procedures to the RPC router")
-	assert.True(t, claimed[authv1connect.SessionServiceStopImpersonatingProcedure],
+	assert.True(t, claimed[authnv1connect.SessionServiceStopImpersonatingProcedure],
 		"the area must forward its features' procedures to the RPC router")
 }
 

@@ -10,8 +10,8 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/pkg/responder"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -42,8 +42,8 @@ func (m *Module) Mount(r chi.Router) {}
 // are the transport's — the shared snake_case codec and the panic boundary —
 // so the procedure answers exactly like the transport's own.
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authv1connect.NewAuthServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(authv1connect.AuthServiceSignInProcedure, handler)
+	_, handler := authnv1connect.NewAuthServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(authnv1connect.AuthServiceSignInProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the sign-in procedures. The service
@@ -54,12 +54,12 @@ type rpcHandler struct {
 }
 
 // newRPCHandler builds the handler over the service.
-func newRPCHandler(service *Service) authv1connect.AuthServiceHandler {
+func newRPCHandler(service *Service) authnv1connect.AuthServiceHandler {
 	return &rpcHandler{service: service}
 }
 
 // SignIn verifies the credential and answers the token pair.
-func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.SignInRequest]) (*connect.Response[authv1.SignInResponse], error) {
+func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.SignInRequest]) (*connect.Response[authnv1.SignInResponse], error) {
 	body := req.Msg
 	if body.Identity == "" || body.Password == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
@@ -91,7 +91,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 	if result.MFARequired {
 		message = "the second factor is required to complete the sign-in"
 	}
-	return connect.NewResponse(&authv1.SignInResponse{
+	return connect.NewResponse(&authnv1.SignInResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
 		AccessExpiresIn:  result.AccessExpiresIn,
@@ -106,7 +106,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authv1.Sig
 			}
 			return timestamppb.New(result.MFAPendingExpiresAt)
 		}(),
-		User: &authv1.AuthenticatedUser{
+		User: &authnv1.AuthenticatedUser{
 			Id:          result.User.ID,
 			Username:    result.User.Username,
 			Email:       result.User.Email,

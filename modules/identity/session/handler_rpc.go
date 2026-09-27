@@ -10,8 +10,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -50,16 +50,16 @@ func (m *Module) Mount(r chi.Router) {}
 // its prefix it does not know with a plain-text 404, which a Connect client
 // cannot read.
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authv1connect.NewSessionServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(authv1connect.SessionServiceSignOutProcedure, handler)
-	r.Handle(authv1connect.SessionServiceGetSessionProcedure, handler)
-	r.Handle(authv1connect.SessionServiceListSessionsProcedure, handler)
-	r.Handle(authv1connect.SessionServiceRevokeSessionProcedure, handler)
-	r.Handle(authv1connect.SessionServiceRefreshProcedure, handler)
-	r.Handle(authv1connect.SessionServiceSignOutOtherSessionsProcedure, handler)
-	r.Handle(authv1connect.SessionServiceSignOutAllSessionsProcedure, handler)
-	r.Handle(authv1connect.SessionServiceImpersonateUserProcedure, handler)
-	r.Handle(authv1connect.SessionServiceStopImpersonatingProcedure, handler)
+	_, handler := authnv1connect.NewSessionServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(authnv1connect.SessionServiceSignOutProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceGetSessionProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceListSessionsProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceRevokeSessionProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceRefreshProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceSignOutOtherSessionsProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceSignOutAllSessionsProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceImpersonateUserProcedure, handler)
+	r.Handle(authnv1connect.SessionServiceStopImpersonatingProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -71,7 +71,7 @@ type rpcHandler struct {
 }
 
 // newRPCHandler builds the handler over the service.
-func newRPCHandler(service *Service) authv1connect.SessionServiceHandler {
+func newRPCHandler(service *Service) authnv1connect.SessionServiceHandler {
 	return &rpcHandler{service: service}
 }
 
@@ -92,7 +92,7 @@ func sessionCaller(ctx context.Context) *jwtutils.Caller {
 // holder's, in the second person: a fresh sign-out says they are signed out,
 // an already-ended one says the intent was satisfied without a write, and an
 // expired one says the sign-out closed a book the window had already closed.
-func (h *rpcHandler) SignOut(ctx context.Context, req *connect.Request[authv1.SignOutRequest]) (*connect.Response[authv1.SignOutResponse], error) {
+func (h *rpcHandler) SignOut(ctx context.Context, req *connect.Request[authnv1.SignOutRequest]) (*connect.Response[authnv1.SignOutResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -110,7 +110,7 @@ func (h *rpcHandler) SignOut(ctx context.Context, req *connect.Request[authv1.Si
 	case outcome.Expired:
 		message = "you have been signed out; the session had already expired"
 	}
-	return connect.NewResponse(&authv1.SignOutResponse{
+	return connect.NewResponse(&authnv1.SignOutResponse{
 		Status:  responder.StatusSuccess,
 		Message: message,
 	}), nil
@@ -120,7 +120,7 @@ func (h *rpcHandler) SignOut(ctx context.Context, req *connect.Request[authv1.Si
 // the access token names. The message is the holder's: the count is what the
 // sweep actually ended, and an account holding nothing else answers the
 // success its intent already is.
-func (h *rpcHandler) SignOutOtherSessions(ctx context.Context, req *connect.Request[authv1.SignOutOtherSessionsRequest]) (*connect.Response[authv1.SignOutOtherSessionsResponse], error) {
+func (h *rpcHandler) SignOutOtherSessions(ctx context.Context, req *connect.Request[authnv1.SignOutOtherSessionsRequest]) (*connect.Response[authnv1.SignOutOtherSessionsResponse], error) {
 	count, err := h.revokeBulk(ctx, h.service.SignOutOtherSessions)
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (h *rpcHandler) SignOutOtherSessions(ctx context.Context, req *connect.Requ
 	if count == 0 {
 		message = "you had no other sessions to sign out"
 	}
-	return connect.NewResponse(&authv1.SignOutOtherSessionsResponse{
+	return connect.NewResponse(&authnv1.SignOutOtherSessionsResponse{
 		RevokedCount: narrowCount(count),
 		Status:       responder.StatusSuccess,
 		Message:      message,
@@ -141,7 +141,7 @@ func (h *rpcHandler) SignOutOtherSessions(ctx context.Context, req *connect.Requ
 // access token names included. The token pair the caller holds is not
 // invalidated by the call — the access token expires on its own — so the
 // message says what was stamped, not what the caller still carries.
-func (h *rpcHandler) SignOutAllSessions(ctx context.Context, req *connect.Request[authv1.SignOutAllSessionsRequest]) (*connect.Response[authv1.SignOutAllSessionsResponse], error) {
+func (h *rpcHandler) SignOutAllSessions(ctx context.Context, req *connect.Request[authnv1.SignOutAllSessionsRequest]) (*connect.Response[authnv1.SignOutAllSessionsResponse], error) {
 	count, err := h.revokeBulk(ctx, h.service.SignOutAllSessions)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (h *rpcHandler) SignOutAllSessions(ctx context.Context, req *connect.Reques
 	if count == 0 {
 		message = "you had no live sessions to sign out"
 	}
-	return connect.NewResponse(&authv1.SignOutAllSessionsResponse{
+	return connect.NewResponse(&authnv1.SignOutAllSessionsResponse{
 		RevokedCount: narrowCount(count),
 		Status:       responder.StatusSuccess,
 		Message:      message,
@@ -174,7 +174,7 @@ func (h *rpcHandler) revokeBulk(ctx context.Context, sweep func(ctx context.Cont
 }
 
 // GetSession answers the session the access token names.
-func (h *rpcHandler) GetSession(ctx context.Context, req *connect.Request[authv1.GetSessionRequest]) (*connect.Response[authv1.GetSessionResponse], error) {
+func (h *rpcHandler) GetSession(ctx context.Context, req *connect.Request[authnv1.GetSessionRequest]) (*connect.Response[authnv1.GetSessionResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -184,7 +184,7 @@ func (h *rpcHandler) GetSession(ctx context.Context, req *connect.Request[authv1
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.GetSessionResponse{
+	return connect.NewResponse(&authnv1.GetSessionResponse{
 		Session: wireSession(row, caller.SessionID),
 		User:    wireUser(view),
 		Status:  responder.StatusSuccess,
@@ -193,7 +193,7 @@ func (h *rpcHandler) GetSession(ctx context.Context, req *connect.Request[authv1
 }
 
 // ListSessions answers one page of the account's sessions.
-func (h *rpcHandler) ListSessions(ctx context.Context, req *connect.Request[authv1.ListSessionsRequest]) (*connect.Response[authv1.ListSessionsResponse], error) {
+func (h *rpcHandler) ListSessions(ctx context.Context, req *connect.Request[authnv1.ListSessionsRequest]) (*connect.Response[authnv1.ListSessionsResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -204,11 +204,11 @@ func (h *rpcHandler) ListSessions(ctx context.Context, req *connect.Request[auth
 		return nil, mapError(err)
 	}
 
-	views := make([]*authv1.Session, 0, len(rows))
+	views := make([]*authnv1.Session, 0, len(rows))
 	for _, row := range rows {
 		views = append(views, wireSession(row, caller.SessionID))
 	}
-	return connect.NewResponse(&authv1.ListSessionsResponse{
+	return connect.NewResponse(&authnv1.ListSessionsResponse{
 		Sessions: views,
 		Metadata: metadataOf(pagination),
 		Status:   responder.StatusSuccess,
@@ -217,7 +217,7 @@ func (h *rpcHandler) ListSessions(ctx context.Context, req *connect.Request[auth
 }
 
 // RevokeSession ends one of the account's sessions.
-func (h *rpcHandler) RevokeSession(ctx context.Context, req *connect.Request[authv1.RevokeSessionRequest]) (*connect.Response[authv1.RevokeSessionResponse], error) {
+func (h *rpcHandler) RevokeSession(ctx context.Context, req *connect.Request[authnv1.RevokeSessionRequest]) (*connect.Response[authnv1.RevokeSessionResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -226,7 +226,7 @@ func (h *rpcHandler) RevokeSession(ctx context.Context, req *connect.Request[aut
 	if err := h.service.RevokeSession(ctx, caller.SessionID, caller.UserID, req.Msg.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.RevokeSessionResponse{
+	return connect.NewResponse(&authnv1.RevokeSessionResponse{
 		Status:  responder.StatusSuccess,
 		Message: "the session was revoked",
 	}), nil
@@ -237,12 +237,12 @@ func (h *rpcHandler) RevokeSession(ctx context.Context, req *connect.Request[aut
 // body's refresh token, not the caller's session — a client rotating its
 // token on a schedule may hold an access token whose session is the very row
 // the body names.
-func (h *rpcHandler) Refresh(ctx context.Context, req *connect.Request[authv1.RefreshRequest]) (*connect.Response[authv1.RefreshResponse], error) {
+func (h *rpcHandler) Refresh(ctx context.Context, req *connect.Request[authnv1.RefreshRequest]) (*connect.Response[authnv1.RefreshResponse], error) {
 	refreshed, err := h.service.Refresh(ctx, req.Msg.RefreshToken)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.RefreshResponse{
+	return connect.NewResponse(&authnv1.RefreshResponse{
 		AccessToken:      refreshed.AccessToken,
 		TokenType:        refreshed.TokenType,
 		AccessExpiresIn:  refreshed.AccessExpiresIn,
@@ -259,7 +259,7 @@ func (h *rpcHandler) Refresh(ctx context.Context, req *connect.Request[authv1.Re
 // caller's identity is the actor pair's only source — the request cannot
 // name an actor, because a request that could would be a delegation of an
 // unknown kind.
-func (h *rpcHandler) ImpersonateUser(ctx context.Context, req *connect.Request[authv1.ImpersonateUserRequest]) (*connect.Response[authv1.ImpersonateUserResponse], error) {
+func (h *rpcHandler) ImpersonateUser(ctx context.Context, req *connect.Request[authnv1.ImpersonateUserRequest]) (*connect.Response[authnv1.ImpersonateUserResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -269,7 +269,7 @@ func (h *rpcHandler) ImpersonateUser(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.ImpersonateUserResponse{
+	return connect.NewResponse(&authnv1.ImpersonateUserResponse{
 		AccessToken:      refreshed.AccessToken,
 		TokenType:        refreshed.TokenType,
 		AccessExpiresIn:  refreshed.AccessExpiresIn,
@@ -285,7 +285,7 @@ func (h *rpcHandler) ImpersonateUser(ctx context.Context, req *connect.Request[a
 // StopImpersonating ends the delegated session and answers the actor's own
 // fresh pair. The rule that admits a delegated caller here — the one place
 // the guard lets one through — is what makes the way out reachable.
-func (h *rpcHandler) StopImpersonating(ctx context.Context, req *connect.Request[authv1.StopImpersonatingRequest]) (*connect.Response[authv1.StopImpersonatingResponse], error) {
+func (h *rpcHandler) StopImpersonating(ctx context.Context, req *connect.Request[authnv1.StopImpersonatingRequest]) (*connect.Response[authnv1.StopImpersonatingResponse], error) {
 	caller := sessionCaller(ctx)
 	if caller == nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
@@ -295,7 +295,7 @@ func (h *rpcHandler) StopImpersonating(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.StopImpersonatingResponse{
+	return connect.NewResponse(&authnv1.StopImpersonatingResponse{
 		AccessToken:      refreshed.AccessToken,
 		TokenType:        refreshed.TokenType,
 		AccessExpiresIn:  refreshed.AccessExpiresIn,
@@ -311,8 +311,8 @@ func (h *rpcHandler) StopImpersonating(ctx context.Context, req *connect.Request
 // wireSession maps the stored row onto the wire message. The request facts
 // are what the row stored when it was opened, and `current` is the one field
 // the row cannot answer — it is the caller's question, not the row's.
-func wireSession(row SessionSchema, current string) *authv1.Session {
-	session := &authv1.Session{
+func wireSession(row SessionSchema, current string) *authnv1.Session {
+	session := &authnv1.Session{
 		Id:        row.ID.String(),
 		Provider:  row.Provider,
 		Remember:  row.Remember,
@@ -337,8 +337,8 @@ func wireSession(row SessionSchema, current string) *authv1.Session {
 
 // wireUser maps the account view onto the tokens' account view, the shape the
 // sign-in answered with.
-func wireUser(view user.UserView) *authv1.AuthenticatedUser {
-	return &authv1.AuthenticatedUser{
+func wireUser(view user.UserView) *authnv1.AuthenticatedUser {
+	return &authnv1.AuthenticatedUser{
 		Id:          view.ID,
 		Username:    view.Username,
 		Email:       view.Email,

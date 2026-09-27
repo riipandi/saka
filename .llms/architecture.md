@@ -244,7 +244,7 @@ Who may act, beyond "an administrator". `internal/authz` is the vocabulary and `
 
 **The managing surface is administrative end to end.** Every `AuthorizationService` procedure is `Admin`, deliberately: a surface that granted its own management could raise anything to itself. System roles (`type = 'system'`, seeded) refuse rename and delete and keep the seed's permission set; a custom role cannot be deleted while accounts actively hold it — the grants must be lifted first, so a deletion strips nothing silently. Role grants and direct grants carry their own life (`assigned_at`/`revoked_at`/`granted_by`/`revoked_by`): a revoke is a stamp, not a delete, so an assignment's history survives, and a re-grant opens a fresh row — the composite primary key plus the partial unique index on the active rows is what makes both true at once.
 
-**For the frontend, the claims are the API.** A signed-in caller's abilities are the token's `roles` and `permissions` — the strings map one-to-one onto a casl `can(action, subject)` — and `ListPermissions` answers the whole catalog (slug + description) so an admin UI renders the checkboxes the server will actually enforce. An admin managing another account's grants reads them from `ListUserRoles`/`ListUserPermissions` and writes them with the `SetUser*` pair; both write procedures replace the whole set, because a grant set is a fact about the account, not a delta to apply.
+**For the frontend, the claims are the API.** A signed-in caller's abilities are the token's `roles` and `permissions` — the strings map one-to-one onto a casl `can(action, subject)` — and `ListPermissions` answers the catalog rows (the `perm_…` id, the slug, the description; search, resource filter, and sort) so an admin UI renders the checkboxes the server will actually enforce. `ListRoles` narrows by search and `RoleType`. An admin managing another account's grants reads them from `ListUserRoles`/`ListUserPermissions` and writes them with the `SetUser*` pair; both write procedures replace the whole set, because a grant set is a fact about the account, not a delta to apply.
 
 ## Implemented modules
 
@@ -280,7 +280,7 @@ Closed for the tokens the process signs itself, open for a foreign key set: the 
 
 ### modules/identity/signin
 
-The sign-in feature, the first password credential on the RPC surface: `tango.auth.v1.AuthService/SignIn` (the contract lives in `api/connect/auth.proto`, not `tango.identity.v1` — authentication is its own package, the area is the implementation). The identity is one field, matched as CITEXT username or exact email; the failure for an unknown identity and a wrong password is one error, and a miss runs the verifier against a lazily computed dummy hash, so the two failures cost the same work and the endpoint is not an account enumerator.
+The sign-in feature, the first password credential on the RPC surface: `tango.authn.v1.AuthService/SignIn` (the contract lives in `api/connect/authn.proto`, not `tango.identity.v1` — authentication is its own package, the area is the implementation). The identity is one field, matched as CITEXT username or exact email; the failure for an unknown identity and a wrong password is one error, and a miss runs the verifier against a lazily computed dummy hash, so the two failures cost the same work and the endpoint is not an account enumerator.
 
 The answer is the token pair the protocol section settles: a stateless access token (signed through the area's `jwks.Service`, so the dual stack is the deployment's decision — the service resolves algorithm and key per call, symmetric to `HMACKey`, asymmetric to `SignKey`) and a refresh token whose only server-side trace is a hashed row in `public.sessions` (SHA-256, 256 bits of base64url randomness). The `remember` flag selects only a lifetime, not a kind of token: `auth.refresh_short_ttl` (twelve hours, the shared-machine window) versus `auth.refresh_long_ttl` (fourteen days, the remembered device), both plain configuration keys with no flag of their own. The session row is the feature's one write-side coupling: the table constants live in the `session` package (`session.SessionTable`, `session.SessionID`), the row is written where the credential is verified, and the id leaves the server as a TypeID (`sess_…`) — the UUID column stores the typed id's UUID, the prefixed form is for clients and log lines. `sid` in the access claims is the same id, so a later rotation or revocation names exactly the row.
 
@@ -291,7 +291,7 @@ Opening the session is `IssueSession`, the issuer the one-time access exchange a
 ### modules/identity/session
 
 The session lifecycle: what happens to the row a sign-in wrote once the caller walks away from it.
-The surface is `tango.auth.v1.SessionService` beside the issuing `AuthService`, because the two
+The surface is `tango.authn.v1.SessionService` beside the issuing `AuthService`, because the two
 halves are one story — the opening and the ending — carried by one contract.
 
 The access token stays stateless by decision, and the lifecycle is what makes that honest. A
@@ -334,7 +334,7 @@ names the session it ended so an operator can pair it with the sign-in line.
 
 ### modules/identity/signup
 
-The sign-up feature: `tango.identity.v1.SignupService/Signup`, the contract in `api/connect/identity.proto` (the identity package, unlike sign-in's `tango.auth.v1` — authentication is its own package, account creation is identity's). RPC only: there is no REST route and none is planned for it. The account carries its primary credential from the first call — the password is required and hashed with the shared `crypto.PasswordHasher` — so the account can sign in immediately; it is created unverified, and email verification is a later procedure (`public.auth_tokens` with purpose `email_verification` already exists for it).
+The sign-up feature: `tango.identity.v1.SignupService/Signup`, the contract in `api/connect/identity.proto` (the identity package, unlike sign-in's `tango.authn.v1` — authentication is its own package, account creation is identity's). RPC only: there is no REST route and none is planned for it. The account carries its primary credential from the first call — the password is required and hashed with the shared `crypto.PasswordHasher` — so the account can sign in immediately; it is created unverified, and email verification is a later procedure (`public.auth_tokens` with purpose `email_verification` already exists for it).
 
 Signup is not open: the request must carry a raw signup token, stored server-side only as its SHA-256 hash in `public.signup_tokens`. An unknown, expired, and spent token answer one failure (`permission_denied`), so the endpoint does not disclose which half was wrong; the spend is a conditional `usage_count` bump inside the transaction that also writes the user and the password, so a single-use token cannot create two accounts under a race and a refused duplicate spends nothing. The username grammar and the email check the users table enforces live in the contract — `SignupRequest` carries them as protovalidate constraints the transport's validate interceptor enforces before any handler runs, answering `invalid_argument` with typed violation details — and the names are mandatory on the same terms, so a duplicate answers `already_exists` and a malformed field never reaches the database. The answer is the canonical account view the account procedures share — `user.UserView` read back from the row the transaction wrote, mapped to the wire once in `user.WireView` — so sign-up describes the account exactly the way the administration CRUD does: the names, the creation instant the database stamped, and the unverified state. The service carries no shape checks of its own; `pkg/validate`'s ozzo vocabulary stays the REST body seam.
 
@@ -390,7 +390,7 @@ shape of its own for an account.
 
 The one-time access codes: a credential an administrator or an emailed message puts in one
 account holder's hands, exchanged for a session without the password. The surface is
-`tango.auth.v1.OneTimeAccessService` — the contract names it under authentication, because the
+`tango.authn.v1.OneTimeAccessService` — the contract names it under authentication, because the
 exchange is the sign-in a caller makes with a code instead of a password.
 
 The codes live in `public.auth_tokens` under the `one_time_access` purpose, beside the
@@ -440,7 +440,7 @@ The email-verification flow: `tango.identity.v1.EmailVerificationService/SendEma
 
 ### modules/identity/multifactor
 
-The TOTP second factor: `tango.auth.v1.MultifactorService` beside the issuing `AuthService`, because enrollment and the sign-in bridge are one story with it. Pocket ID has no MFA at all (passkey-only — no passwords, no TOTP), so this surface is tango-only and the design reference is Better Auth's twoFactor plugin; the schema in migration `00003` was pre-authored for it.
+The TOTP second factor: `tango.authn.v1.MultifactorService` beside the issuing `AuthService`, because enrollment and the sign-in bridge are one story with it. Pocket ID has no MFA at all (passkey-only — no passwords, no TOTP), so this surface is tango-only and the design reference is Better Auth's twoFactor plugin; the schema in migration `00003` was pre-authored for it.
 
 Enrollment is a two-step ceremony on purpose: `BeginTotpEnrollment` writes an **unconfirmed** authenticator (sealed secret, 15-minute window, answered once — the secret never leaves the server again) and `ConfirmTotpEnrollment` activates it only after a code the app rendered verifies. The account's **first** confirmation writes its recovery set, because an account that holds no confirmed factor holds no codes and the ceremony's one clear answer is where they belong. Enrollments are **per device** — up to ten rows per account, each a `totp_` TypeID with its own name, `confirmed_at`, and `last_used_at` — so a user registers a phone and a tablet and either answers the challenge.
 

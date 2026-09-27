@@ -9,9 +9,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	authzv1 "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1"
+	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
 	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -48,18 +48,18 @@ func (m *Module) Mount(r chi.Router) {}
 // its prefix it does not know with a plain-text 404, which a Connect client
 // cannot read.
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := identityv1connect.NewAuthorizationServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(identityv1connect.AuthorizationServiceListPermissionsProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceListRolesProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceGetRoleProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceCreateRoleProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceUpdateRoleProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceDeleteRoleProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceSetRolePermissionsProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceListUserRolesProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceSetUserRolesProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceListUserPermissionsProcedure, handler)
-	r.Handle(identityv1connect.AuthorizationServiceSetUserPermissionsProcedure, handler)
+	_, handler := authzv1connect.NewAuthorizationServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(authzv1connect.AuthorizationServiceListPermissionsProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceListRolesProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceGetRoleProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceCreateRoleProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceUpdateRoleProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceDeleteRoleProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceSetRolePermissionsProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceListUserRolesProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceSetUserRolesProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceListUserPermissionsProcedure, handler)
+	r.Handle(authzv1connect.AuthorizationServiceSetUserPermissionsProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -69,24 +69,27 @@ type rpcHandler struct {
 }
 
 // newRPCHandler builds the handler over the service.
-func newRPCHandler(service *Service) identityv1connect.AuthorizationServiceHandler {
+func newRPCHandler(service *Service) authzv1connect.AuthorizationServiceHandler {
 	return &rpcHandler{service: service}
 }
 
 // ListPermissions answers the permission catalog.
-func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[identityv1.ListPermissionsRequest]) (*connect.Response[identityv1.ListPermissionsResponse], error) {
-	catalog, err := h.service.ListPermissions(ctx)
+func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[authzv1.ListPermissionsRequest]) (*connect.Response[authzv1.ListPermissionsResponse], error) {
+	ascending := req.Msg.GetSortOrder() != "desc"
+
+	entries, err := h.service.ListPermissions(ctx, req.Msg.GetSearch(), req.Msg.GetResource(), req.Msg.GetSortBy(), ascending)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	permissions := make([]*identityv1.Permission, 0, len(catalog))
-	for _, entry := range catalog {
-		permissions = append(permissions, &identityv1.Permission{
+	permissions := make([]*authzv1.Permission, 0, len(entries))
+	for _, entry := range entries {
+		permissions = append(permissions, &authzv1.Permission{
+			Id:          entry.ID.String(),
 			Slug:        entry.Slug,
 			Description: entry.Description,
 		})
 	}
-	return connect.NewResponse(&identityv1.ListPermissionsResponse{
+	return connect.NewResponse(&authzv1.ListPermissionsResponse{
 		Permissions: permissions,
 		Status:      responder.StatusSuccess,
 		Message:     "the permission catalog was listed",
@@ -94,24 +97,24 @@ func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[i
 }
 
 // ListRoles answers one page of the roles.
-func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[identityv1.ListRolesRequest]) (*connect.Response[identityv1.ListRolesResponse], error) {
+func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1.ListRolesRequest]) (*connect.Response[authzv1.ListRolesResponse], error) {
 	sortBy := req.Msg.GetSortBy()
 	ascending := req.Msg.GetSortOrder() != "desc"
 
 	roles, pagination, err := h.service.ListRoles(
 		ctx,
-		req.Msg.GetSearch(), sortBy, ascending,
+		req.Msg.GetSearch(), parseRoleType(req.Msg.Type), sortBy, ascending,
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()),
 	)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	views := make([]*identityv1.Role, 0, len(roles))
+	views := make([]*authzv1.Role, 0, len(roles))
 	for _, role := range roles {
 		views = append(views, wireRole(role))
 	}
-	return connect.NewResponse(&identityv1.ListRolesResponse{
+	return connect.NewResponse(&authzv1.ListRolesResponse{
 		Roles:    views,
 		Metadata: listMetadata(pagination),
 		Status:   responder.StatusSuccess,
@@ -120,12 +123,12 @@ func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[identit
 }
 
 // GetRole answers one role with its permission slugs.
-func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[identityv1.GetRoleRequest]) (*connect.Response[identityv1.GetRoleResponse], error) {
+func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[authzv1.GetRoleRequest]) (*connect.Response[authzv1.GetRoleResponse], error) {
 	role, err := h.service.GetRole(ctx, req.Msg.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.GetRoleResponse{
+	return connect.NewResponse(&authzv1.GetRoleResponse{
 		Role:    wireDetail(role),
 		Status:  responder.StatusSuccess,
 		Message: "the role was fetched",
@@ -133,7 +136,7 @@ func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[identityv
 }
 
 // CreateRole defines a custom role.
-func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[identityv1.CreateRoleRequest]) (*connect.Response[identityv1.CreateRoleResponse], error) {
+func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[authzv1.CreateRoleRequest]) (*connect.Response[authzv1.CreateRoleResponse], error) {
 	role, err := h.service.CreateRole(ctx, CreateParams{
 		Name:        req.Msg.Name,
 		Slug:        req.Msg.Slug,
@@ -142,7 +145,7 @@ func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[identi
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.CreateRoleResponse{
+	return connect.NewResponse(&authzv1.CreateRoleResponse{
 		Role:    wireDetail(role),
 		Status:  responder.StatusSuccess,
 		Message: "the role was created",
@@ -150,7 +153,7 @@ func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[identi
 }
 
 // UpdateRole replaces a role's fields.
-func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[identityv1.UpdateRoleRequest]) (*connect.Response[identityv1.UpdateRoleResponse], error) {
+func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[authzv1.UpdateRoleRequest]) (*connect.Response[authzv1.UpdateRoleResponse], error) {
 	role, err := h.service.UpdateRole(ctx, req.Msg.Id, CreateParams{
 		Name:        req.Msg.Name,
 		Description: req.Msg.Description,
@@ -158,7 +161,7 @@ func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[identi
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.UpdateRoleResponse{
+	return connect.NewResponse(&authzv1.UpdateRoleResponse{
 		Role:    wireDetail(role),
 		Status:  responder.StatusSuccess,
 		Message: "the role was updated",
@@ -166,23 +169,23 @@ func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[identi
 }
 
 // DeleteRole removes a custom role.
-func (h *rpcHandler) DeleteRole(ctx context.Context, req *connect.Request[identityv1.DeleteRoleRequest]) (*connect.Response[identityv1.DeleteRoleResponse], error) {
+func (h *rpcHandler) DeleteRole(ctx context.Context, req *connect.Request[authzv1.DeleteRoleRequest]) (*connect.Response[authzv1.DeleteRoleResponse], error) {
 	if err := h.service.DeleteRole(ctx, req.Msg.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.DeleteRoleResponse{
+	return connect.NewResponse(&authzv1.DeleteRoleResponse{
 		Status:  responder.StatusSuccess,
 		Message: "the role was deleted",
 	}), nil
 }
 
 // SetRolePermissions replaces a role's permission set.
-func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *connect.Request[identityv1.SetRolePermissionsRequest]) (*connect.Response[identityv1.SetRolePermissionsResponse], error) {
+func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *connect.Request[authzv1.SetRolePermissionsRequest]) (*connect.Response[authzv1.SetRolePermissionsResponse], error) {
 	role, err := h.service.SetRolePermissions(ctx, req.Msg.Id, req.Msg.PermissionSlugs)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.SetRolePermissionsResponse{
+	return connect.NewResponse(&authzv1.SetRolePermissionsResponse{
 		Role:    wireDetail(role),
 		Status:  responder.StatusSuccess,
 		Message: "the role permissions were updated",
@@ -190,12 +193,12 @@ func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *connect.Reques
 }
 
 // ListUserRoles answers the roles one account holds.
-func (h *rpcHandler) ListUserRoles(ctx context.Context, req *connect.Request[identityv1.ListUserRolesRequest]) (*connect.Response[identityv1.ListUserRolesResponse], error) {
+func (h *rpcHandler) ListUserRoles(ctx context.Context, req *connect.Request[authzv1.ListUserRolesRequest]) (*connect.Response[authzv1.ListUserRolesResponse], error) {
 	roles, err := h.service.ListUserRoles(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.ListUserRolesResponse{
+	return connect.NewResponse(&authzv1.ListUserRolesResponse{
 		UserId:  req.Msg.UserId,
 		Roles:   wireRoles(roles),
 		Status:  responder.StatusSuccess,
@@ -206,12 +209,12 @@ func (h *rpcHandler) ListUserRoles(ctx context.Context, req *connect.Request[ide
 // SetUserRoles replaces the set of roles one account holds. The granter is
 // the caller: the audit record names them from the context, and the grant
 // row does too.
-func (h *rpcHandler) SetUserRoles(ctx context.Context, req *connect.Request[identityv1.SetUserRolesRequest]) (*connect.Response[identityv1.SetUserRolesResponse], error) {
+func (h *rpcHandler) SetUserRoles(ctx context.Context, req *connect.Request[authzv1.SetUserRolesRequest]) (*connect.Response[authzv1.SetUserRolesResponse], error) {
 	roles, err := h.service.SetUserRoles(ctx, req.Msg.UserId, req.Msg.RoleIds, callerID(ctx))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.SetUserRolesResponse{
+	return connect.NewResponse(&authzv1.SetUserRolesResponse{
 		UserId:  req.Msg.UserId,
 		Roles:   wireRoles(roles),
 		Status:  responder.StatusSuccess,
@@ -221,12 +224,12 @@ func (h *rpcHandler) SetUserRoles(ctx context.Context, req *connect.Request[iden
 
 // ListUserPermissions answers the permissions granted to one account
 // directly.
-func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *connect.Request[identityv1.ListUserPermissionsRequest]) (*connect.Response[identityv1.ListUserPermissionsResponse], error) {
+func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *connect.Request[authzv1.ListUserPermissionsRequest]) (*connect.Response[authzv1.ListUserPermissionsResponse], error) {
 	slugs, err := h.service.ListUserPermissions(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.ListUserPermissionsResponse{
+	return connect.NewResponse(&authzv1.ListUserPermissionsResponse{
 		UserId:          req.Msg.UserId,
 		PermissionSlugs: slugs,
 		Status:          responder.StatusSuccess,
@@ -235,12 +238,12 @@ func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *connect.Reque
 }
 
 // SetUserPermissions replaces the direct grants one account carries.
-func (h *rpcHandler) SetUserPermissions(ctx context.Context, req *connect.Request[identityv1.SetUserPermissionsRequest]) (*connect.Response[identityv1.SetUserPermissionsResponse], error) {
+func (h *rpcHandler) SetUserPermissions(ctx context.Context, req *connect.Request[authzv1.SetUserPermissionsRequest]) (*connect.Response[authzv1.SetUserPermissionsResponse], error) {
 	slugs, err := h.service.SetUserPermissions(ctx, req.Msg.UserId, req.Msg.PermissionSlugs, callerID(ctx))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.SetUserPermissionsResponse{
+	return connect.NewResponse(&authzv1.SetUserPermissionsResponse{
 		UserId:          req.Msg.UserId,
 		PermissionSlugs: slugs,
 		Status:          responder.StatusSuccess,
@@ -260,8 +263,8 @@ func callerID(ctx context.Context) string {
 }
 
 // wireRole maps the list row onto the wire message the list answers with.
-func wireRole(view RoleRow) *identityv1.Role {
-	role := &identityv1.Role{
+func wireRole(view RoleRow) *authzv1.Role {
+	role := &authzv1.Role{
 		Id:              view.ID.String(),
 		Name:            view.Name,
 		Slug:            view.Slug,
@@ -280,10 +283,10 @@ func wireRole(view RoleRow) *identityv1.Role {
 // messages. The rows hold no permission count — the count belongs to the
 // role list, not to the account's — so the wire field is left at zero
 // rather than being computed with a query per row.
-func wireRoles(rows []RoleSchema) []*identityv1.Role {
-	roles := make([]*identityv1.Role, 0, len(rows))
+func wireRoles(rows []RoleSchema) []*authzv1.Role {
+	roles := make([]*authzv1.Role, 0, len(rows))
 	for _, row := range rows {
-		role := &identityv1.Role{
+		role := &authzv1.Role{
 			Id:          row.ID.String(),
 			Name:        row.Name,
 			Slug:        row.Slug,
@@ -301,8 +304,8 @@ func wireRoles(rows []RoleSchema) []*identityv1.Role {
 
 // wireDetail maps the detail view onto the wire message the single-role
 // procedures answer with.
-func wireDetail(view RoleDetail) *identityv1.RoleDetail {
-	detail := &identityv1.RoleDetail{
+func wireDetail(view RoleDetail) *authzv1.RoleDetail {
+	detail := &authzv1.RoleDetail{
 		Id:          view.ID.String(),
 		Name:        view.Name,
 		Slug:        view.Slug,
@@ -318,11 +321,27 @@ func wireDetail(view RoleDetail) *identityv1.RoleDetail {
 }
 
 // wireRoleType maps the row's type string onto the wire enum.
-func wireRoleType(kind string) identityv1.RoleType {
+func wireRoleType(kind string) authzv1.RoleType {
 	if kind == RoleTypeSystem {
-		return identityv1.RoleType_ROLE_TYPE_SYSTEM
+		return authzv1.RoleType_ROLE_TYPE_SYSTEM
 	}
-	return identityv1.RoleType_ROLE_TYPE_CUSTOM
+	return authzv1.RoleType_ROLE_TYPE_CUSTOM
+}
+
+// parseRoleType reads the request's role-kind filter back into the row's
+// vocabulary; an unset enum keeps every kind.
+func parseRoleType(value *authzv1.RoleType) string {
+	if value == nil {
+		return ""
+	}
+	switch *value {
+	case authzv1.RoleType_ROLE_TYPE_SYSTEM:
+		return RoleTypeSystem
+	case authzv1.RoleType_ROLE_TYPE_CUSTOM:
+		return RoleTypeCustom
+	default:
+		return ""
+	}
 }
 
 // derefString answers the pointer's value, or the empty string the optional

@@ -2,6 +2,8 @@ package authorization
 
 import (
 	"log/slog"
+	"slices"
+	"strings"
 	"testing"
 
 	"uuid"
@@ -115,17 +117,74 @@ func seedRole(t *testing.T, pool *datastore.Postgres, name, slug string) string 
 
 func TestListPermissionsAnswersTheCatalog(t *testing.T) {
 	pool := migratedPool(t)
+	seedCatalog(t, pool)
 	service := testService(t, pool)
 
-	catalog, err := service.ListPermissions(t.Context())
+	catalog, err := service.ListPermissions(t.Context(), "", "", "", true)
 	require.NoError(t, err)
 
 	expected := authz.Catalog()
 	require.Len(t, catalog, len(expected))
-	for i := range catalog {
-		assert.Equal(t, expected[i].Slug, catalog[i].Slug)
-		assert.Equal(t, expected[i].Description, catalog[i].Description)
+	seen := make(map[string]string, len(catalog))
+	for _, entry := range catalog {
+		assert.NotEmpty(t, entry.ID.String(), "permission id")
+		assert.True(t, strings.HasPrefix(entry.ID.String(), "perm_"), entry.ID.String())
+		seen[entry.Slug] = entry.Description
 	}
+	for _, permission := range expected {
+		assert.Equal(t, permission.Description, seen[permission.Slug])
+	}
+}
+
+func TestListPermissionsNarrowsAndOrders(t *testing.T) {
+	pool := migratedPool(t)
+	seedCatalog(t, pool)
+	service := testService(t, pool)
+
+	roles, err := service.ListPermissions(t.Context(), "", "role", "", true)
+	require.NoError(t, err)
+	require.NotEmpty(t, roles)
+	for _, entry := range roles {
+		assert.True(t, strings.HasPrefix(entry.Slug, "role:"), entry.Slug)
+	}
+
+	found, err := service.ListPermissions(t.Context(), "delete", "", "", true)
+	require.NoError(t, err)
+	require.NotEmpty(t, found)
+	for _, entry := range found {
+		assert.Contains(t, entry.Slug+entry.Description, "delete")
+	}
+
+	bySlug, err := service.ListPermissions(t.Context(), "", "", "slug", true)
+	require.NoError(t, err)
+	for i := 1; i < len(bySlug); i++ {
+		assert.LessOrEqual(t, bySlug[i-1].Slug, bySlug[i].Slug)
+	}
+
+	descending, err := service.ListPermissions(t.Context(), "", "", "slug", false)
+	require.NoError(t, err)
+	slices.Reverse(bySlug)
+	require.Equal(t, bySlug, descending)
+}
+
+func TestListRolesNarrowsByKind(t *testing.T) {
+	pool := migratedPool(t)
+	seedCatalog(t, pool)
+	service := testService(t, pool)
+	seedRole(t, pool, "Content Editor", "content-editor")
+
+	custom, pagination, err := service.ListRoles(t.Context(), "", RoleTypeCustom, "", true, 1, 100)
+	require.NoError(t, err)
+	require.NotNil(t, pagination.TotalItems)
+	require.Equal(t, 1, *pagination.TotalItems)
+	require.Len(t, custom, 1)
+	assert.Equal(t, "content-editor", custom[0].Slug)
+
+	every, pagination, err := service.ListRoles(t.Context(), "", "", "", true, 1, 100)
+	require.NoError(t, err)
+	require.NotNil(t, pagination.TotalItems)
+	require.Equal(t, 2, *pagination.TotalItems)
+	require.Len(t, every, 2)
 }
 
 func TestCreateRoleNamesASlugOnce(t *testing.T) {

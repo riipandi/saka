@@ -12,13 +12,13 @@
 // `permission_denied`, both with the detail message naming the reason.
 syntax = "proto3";
 
-package tango.auth.v1;
+package tango.authn.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1;authv1";
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
 
 // AuthService issues the credentials a caller presents on every later call.
 service AuthService {

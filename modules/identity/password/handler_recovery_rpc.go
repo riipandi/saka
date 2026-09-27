@@ -7,8 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -50,10 +50,10 @@ func (m *RecoveryModule) Mount(r chi.Router) {}
 // are the transport's — the shared snake_case codec and the panic boundary —
 // so the procedures answer exactly like the transport's own.
 func (m *RecoveryModule) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authv1connect.NewPasswordRecoveryServiceHandler(newRecoveryHandler(m.service, m.exposeResetToken), opts...)
-	r.Handle(authv1connect.PasswordRecoveryServiceForgotPasswordProcedure, handler)
-	r.Handle(authv1connect.PasswordRecoveryServiceResetPasswordProcedure, handler)
-	r.Handle(authv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure, handler)
+	_, handler := authnv1connect.NewPasswordRecoveryServiceHandler(newRecoveryHandler(m.service, m.exposeResetToken), opts...)
+	r.Handle(authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure, handler)
+	r.Handle(authnv1connect.PasswordRecoveryServiceResetPasswordProcedure, handler)
+	r.Handle(authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure, handler)
 }
 
 // recoveryHandler is the transport mapping of the procedures. The service
@@ -66,7 +66,7 @@ type recoveryHandler struct {
 }
 
 // newRecoveryHandler builds the handler over the service.
-func newRecoveryHandler(service *Service, exposeResetToken bool) authv1connect.PasswordRecoveryServiceHandler {
+func newRecoveryHandler(service *Service, exposeResetToken bool) authnv1connect.PasswordRecoveryServiceHandler {
 	return &recoveryHandler{service: service, exposeResetToken: exposeResetToken}
 }
 
@@ -74,12 +74,12 @@ func newRecoveryHandler(service *Service, exposeResetToken bool) authv1connect.P
 // is public — a caller who lost the password holds no credential — and the
 // answer is the same whether the account exists or not. The raw token rides
 // the response only when the deployment exposes it.
-func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Request[authv1.ForgotPasswordRequest]) (*connect.Response[authv1.ForgotPasswordResponse], error) {
+func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Request[authnv1.ForgotPasswordRequest]) (*connect.Response[authnv1.ForgotPasswordResponse], error) {
 	raw, err := h.service.ForgotPassword(ctx, req.Msg.Email)
 	if err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	resp := &authv1.ForgotPasswordResponse{
+	resp := &authnv1.ForgotPasswordResponse{
 		Status:  responder.StatusSuccess,
 		Message: "if the address names an account, a reset email was sent",
 	}
@@ -93,7 +93,7 @@ func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Reque
 // the token is the credential, and the caller carries none — the message
 // linked here from a browser that may hold no session. The sessions the
 // account holds are revoked unless the request spares them.
-func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Request[authv1.ResetPasswordRequest]) (*connect.Response[authv1.ResetPasswordResponse], error) {
+func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Request[authnv1.ResetPasswordRequest]) (*connect.Response[authnv1.ResetPasswordResponse], error) {
 	terminate := true
 	if req.Msg.TerminateSessions != nil {
 		terminate = *req.Msg.TerminateSessions
@@ -101,7 +101,7 @@ func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Reques
 	if err := h.service.ResetPassword(ctx, req.Msg.Token, req.Msg.NewPassword, terminate); err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	return connect.NewResponse(&authv1.ResetPasswordResponse{
+	return connect.NewResponse(&authnv1.ResetPasswordResponse{
 		Status:  responder.StatusSuccess,
 		Message: "the password was reset",
 	}), nil
@@ -110,7 +110,7 @@ func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Reques
 // AdminResetUserPassword triggers the reset email on a named account. The
 // caller is administrative by the guard's default; the service answers the
 // account-level failures the impersonating caller is never allowed to see.
-func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *connect.Request[authv1.AdminResetUserPasswordRequest]) (*connect.Response[authv1.AdminResetUserPasswordResponse], error) {
+func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *connect.Request[authnv1.AdminResetUserPasswordRequest]) (*connect.Response[authnv1.AdminResetUserPasswordResponse], error) {
 	if _, ok := jwtutils.CallerFrom(ctx); !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
@@ -118,7 +118,7 @@ func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *conne
 	if err := h.service.AdminResetUserPassword(ctx, req.Msg.UserId); err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	return connect.NewResponse(&authv1.AdminResetUserPasswordResponse{
+	return connect.NewResponse(&authnv1.AdminResetUserPasswordResponse{
 		Status:  responder.StatusSuccess,
 		Message: "a reset email was sent to the account's address",
 	}), nil

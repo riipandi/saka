@@ -11,8 +11,8 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/pkg/responder"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -41,11 +41,11 @@ func (m *Module) Mount(r chi.Router) {}
 // are the transport's — the shared snake_case codec and the panic boundary —
 // so the procedure answers exactly like the transport's own.
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authv1connect.NewOneTimeAccessServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(authv1connect.OneTimeAccessServiceCreateTokenProcedure, handler)
-	r.Handle(authv1connect.OneTimeAccessServiceExchangeTokenProcedure, handler)
-	r.Handle(authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure, handler)
-	r.Handle(authv1connect.OneTimeAccessServiceRequestEmailProcedure, handler)
+	_, handler := authnv1connect.NewOneTimeAccessServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(authnv1connect.OneTimeAccessServiceCreateTokenProcedure, handler)
+	r.Handle(authnv1connect.OneTimeAccessServiceExchangeTokenProcedure, handler)
+	r.Handle(authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure, handler)
+	r.Handle(authnv1connect.OneTimeAccessServiceRequestEmailProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the one-time access procedures. The
@@ -56,19 +56,19 @@ type rpcHandler struct {
 }
 
 // newRPCHandler builds the handler over the service.
-func newRPCHandler(service *Service) authv1connect.OneTimeAccessServiceHandler {
+func newRPCHandler(service *Service) authnv1connect.OneTimeAccessServiceHandler {
 	return &rpcHandler{service: service}
 }
 
 // CreateToken issues a code for one account, for an administrator to hand
 // over.
-func (h *rpcHandler) CreateToken(ctx context.Context, req *connect.Request[authv1.CreateOneTimeAccessTokenRequest]) (*connect.Response[authv1.CreateOneTimeAccessTokenResponse], error) {
+func (h *rpcHandler) CreateToken(ctx context.Context, req *connect.Request[authnv1.CreateOneTimeAccessTokenRequest]) (*connect.Response[authnv1.CreateOneTimeAccessTokenResponse], error) {
 	body := req.Msg
 	token, expiresAt, err := h.service.CreateToken(ctx, body.Id, body.GetTtlSeconds())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.CreateOneTimeAccessTokenResponse{
+	return connect.NewResponse(&authnv1.CreateOneTimeAccessTokenResponse{
 		Token:     token,
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 		Status:    responder.StatusSuccess,
@@ -77,7 +77,7 @@ func (h *rpcHandler) CreateToken(ctx context.Context, req *connect.Request[authv
 }
 
 // ExchangeToken consumes a code and signs its holder in.
-func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[authv1.ExchangeOneTimeAccessTokenRequest]) (*connect.Response[authv1.ExchangeOneTimeAccessTokenResponse], error) {
+func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[authnv1.ExchangeOneTimeAccessTokenRequest]) (*connect.Response[authnv1.ExchangeOneTimeAccessTokenResponse], error) {
 	body := req.Msg
 
 	// The client facts are the transport's: one middleware captured them
@@ -90,14 +90,14 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.ExchangeOneTimeAccessTokenResponse{
+	return connect.NewResponse(&authnv1.ExchangeOneTimeAccessTokenResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
 		AccessExpiresIn:  result.AccessExpiresIn,
 		RefreshExpiresIn: result.RefreshExpiresIn,
 		RefreshToken:     result.RefreshToken,
 		SessionId:        result.SessionID,
-		User: &authv1.AuthenticatedUser{
+		User: &authnv1.AuthenticatedUser{
 			Id:          result.User.ID,
 			Username:    result.User.Username,
 			Email:       result.User.Email,
@@ -109,25 +109,25 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 }
 
 // RequestEmailAsAdmin sends a code to one account's address.
-func (h *rpcHandler) RequestEmailAsAdmin(ctx context.Context, req *connect.Request[authv1.RequestOneTimeAccessEmailAsAdminRequest]) (*connect.Response[authv1.RequestOneTimeAccessEmailAsAdminResponse], error) {
+func (h *rpcHandler) RequestEmailAsAdmin(ctx context.Context, req *connect.Request[authnv1.RequestOneTimeAccessEmailAsAdminRequest]) (*connect.Response[authnv1.RequestOneTimeAccessEmailAsAdminResponse], error) {
 	body := req.Msg
 	if err := h.service.RequestEmailAsAdmin(ctx, body.Id, body.GetTtlSeconds()); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.RequestOneTimeAccessEmailAsAdminResponse{
+	return connect.NewResponse(&authnv1.RequestOneTimeAccessEmailAsAdminResponse{
 		Status:  responder.StatusSuccess,
 		Message: "the one-time access code was sent to the account's email address",
 	}), nil
 }
 
 // RequestEmail sends a code to the address the caller names.
-func (h *rpcHandler) RequestEmail(ctx context.Context, req *connect.Request[authv1.RequestOneTimeAccessEmailRequest]) (*connect.Response[authv1.RequestOneTimeAccessEmailResponse], error) {
+func (h *rpcHandler) RequestEmail(ctx context.Context, req *connect.Request[authnv1.RequestOneTimeAccessEmailRequest]) (*connect.Response[authnv1.RequestOneTimeAccessEmailResponse], error) {
 	body := req.Msg
 	deviceToken, err := h.service.RequestEmail(ctx, body.Email, body.GetRedirectPath())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authv1.RequestOneTimeAccessEmailResponse{
+	return connect.NewResponse(&authnv1.RequestOneTimeAccessEmailResponse{
 		DeviceToken: deviceToken,
 		Status:      responder.StatusSuccess,
 		Message:     "if the address names an account, a code is on its way",

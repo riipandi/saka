@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -120,7 +120,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	// The session answers: the row the opening wrote, with the caller's own
 	// marked.
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceGetSessionProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceGetSessionProcedure, `{}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	var got struct {
 		Session struct {
@@ -136,7 +136,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	// refresh token does not, and the spent token answers the refusal an
 	// unknown one does.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceRefreshProcedure,
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
 		`{"refresh_token":"`+result.RefreshToken+`"}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	var refreshed struct {
@@ -149,36 +149,36 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	assert.NotEqual(t, result.RefreshToken, refreshed.RefreshToken)
 
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceRefreshProcedure,
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
 		`{"refresh_token":"`+result.RefreshToken+`"}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 
 	// The list answers the one session the account holds.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceListSessionsProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceListSessionsProcedure, `{}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	// The sign-out stamps the row. The access token keeps passing the guard
 	// — the statelessness the protocol settles — but the session it names
 	// answers the ended failure, and the refresh token dies with the stamp.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceSignOutProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceSignOutProcedure, `{}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceGetSessionProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceGetSessionProcedure, `{}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "the session has ended")
 
 	// The account-scoped procedures honour the same gate: the list a
 	// sign-out ends is not served to the credential that signed out.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceListSessionsProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceListSessionsProcedure, `{}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "the session has ended")
 
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceRefreshProcedure,
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
 		`{"refresh_token":"`+refreshed.RefreshToken+`"}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 }
@@ -217,7 +217,7 @@ func TestTheBulkSignOutsSweepTheAccountSessions(t *testing.T) {
 	// The other-sessions sweep stamps the two extras and keeps the caller's
 	// own row: the count is what the call ended.
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceSignOutOtherSessionsProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceSignOutOtherSessionsProcedure, `{}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	var others struct {
 		RevokedCount int    `json:"revoked_count"`
@@ -230,7 +230,7 @@ func TestTheBulkSignOutsSweepTheAccountSessions(t *testing.T) {
 	// finds nothing live: the account is fully swept, and the answer says
 	// so without writing anything.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceSignOutAllSessionsProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceSignOutAllSessionsProcedure, `{}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	var all struct {
 		RevokedCount int `json:"revoked_count"`
@@ -242,7 +242,7 @@ func TestTheBulkSignOutsSweepTheAccountSessions(t *testing.T) {
 	// that: the sweep answers the ended failure instead of running, because
 	// a credential the surface no longer honours cannot manage sessions.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceSignOutAllSessionsProcedure, `{}`))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceSignOutAllSessionsProcedure, `{}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "the session has ended")
 }
@@ -279,7 +279,7 @@ func TestARevocationNamingNoSessionAnswersNotFound(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, rpcRequest(t, authv1connect.SessionServiceRevokeSessionProcedure, body))
+			router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRevokeSessionProcedure, body))
 			assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 			assert.NotContains(t, rec.Body.String(), "internal", rec.Body.String())
 		})
@@ -309,42 +309,42 @@ func TestTheSessionGuardIsDeclared(t *testing.T) {
 		code      string
 	}{
 		"sign out without a credential": {
-			procedure: authv1connect.SessionServiceSignOutProcedure,
+			procedure: authnv1connect.SessionServiceSignOutProcedure,
 			body:      `{}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,
 			code:      "unauthenticated",
 		},
 		"sign out with a machine credential": {
-			procedure: authv1connect.SessionServiceSignOutProcedure,
+			procedure: authnv1connect.SessionServiceSignOutProcedure,
 			body:      `{}`,
 			auth:      machineAuthenticator(hermioneSessionOwner, false),
 			status:    http.StatusNotFound,
 			code:      "not_found",
 		},
 		"list without a credential": {
-			procedure: authv1connect.SessionServiceListSessionsProcedure,
+			procedure: authnv1connect.SessionServiceListSessionsProcedure,
 			body:      `{}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,
 			code:      "unauthenticated",
 		},
 		"list with a machine credential": {
-			procedure: authv1connect.SessionServiceListSessionsProcedure,
+			procedure: authnv1connect.SessionServiceListSessionsProcedure,
 			body:      `{}`,
 			auth:      machineAuthenticator(hermioneSessionOwner, false),
 			status:    http.StatusNotFound,
 			code:      "not_found",
 		},
 		"revoke with a machine credential": {
-			procedure: authv1connect.SessionServiceRevokeSessionProcedure,
+			procedure: authnv1connect.SessionServiceRevokeSessionProcedure,
 			body:      `{"id":"sess_01a0da3e11117000800000000001"}`,
 			auth:      machineAuthenticator(hermioneSessionOwner, false),
 			status:    http.StatusNotFound,
 			code:      "not_found",
 		},
 		"get session without the session claim": {
-			procedure: authv1connect.SessionServiceGetSessionProcedure,
+			procedure: authnv1connect.SessionServiceGetSessionProcedure,
 			body:      `{}`,
 			auth:      noSessionCaller(hermioneSessionOwner),
 			status:    http.StatusUnauthorized,
@@ -354,7 +354,7 @@ func TestTheSessionGuardIsDeclared(t *testing.T) {
 			// Refresh rides the public surfaces: the credential it spends is
 			// the body's refresh token, so the guard lets a request through
 			// that carries none — the service judges the token itself.
-			procedure: authv1connect.SessionServiceRefreshProcedure,
+			procedure: authnv1connect.SessionServiceRefreshProcedure,
 			body:      `{"refresh_token":"x"}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,

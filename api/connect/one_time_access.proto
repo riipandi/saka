@@ -14,12 +14,12 @@
 // read out of a mailbox alone signs nobody in.
 syntax = "proto3";
 
-package tango.auth.v1;
+package tango.authn.v1;
 
-import "auth.proto";
+import "authn.proto";
 import "buf/validate/validate.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1;authv1";
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
 
 // OneTimeAccessService issues and consumes the codes that sign an account in
 // without its password.

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -119,28 +119,28 @@ func TestTheOneTimeAccessGuardIsDeclared(t *testing.T) {
 		code      string
 	}{
 		"create token without a credential": {
-			procedure: authv1connect.OneTimeAccessServiceCreateTokenProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceCreateTokenProcedure,
 			body:      `{"id":"` + wireID(t, hermioneCodeAccount) + `"}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,
 			code:      "unauthenticated",
 		},
 		"create token without the role": {
-			procedure: authv1connect.OneTimeAccessServiceCreateTokenProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceCreateTokenProcedure,
 			body:      `{"id":"` + wireID(t, hermioneCodeAccount) + `"}`,
 			auth:      callerAuthenticator(wireID(t, hermioneCodeAccount), false, false),
 			status:    http.StatusNotFound,
 			code:      "not_found",
 		},
 		"admin email without a credential": {
-			procedure: authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure,
 			body:      `{"id":"` + wireID(t, hermioneCodeAccount) + `"}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,
 			code:      "unauthenticated",
 		},
 		"admin email without the role": {
-			procedure: authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure,
 			body:      `{"id":"` + wireID(t, hermioneCodeAccount) + `"}`,
 			auth:      callerAuthenticator(wireID(t, hermioneCodeAccount), false, false),
 			status:    http.StatusNotFound,
@@ -153,14 +153,14 @@ func TestTheOneTimeAccessGuardIsDeclared(t *testing.T) {
 		// configuration's answer — either proves the request got past the
 		// guard to reach one.
 		"exchange admits an anonymous caller": {
-			procedure: authv1connect.OneTimeAccessServiceExchangeTokenProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceExchangeTokenProcedure,
 			body:      `{"token":"abcdef"}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusUnauthorized,
 			code:      "unauthenticated",
 		},
 		"email ask admits an anonymous caller": {
-			procedure: authv1connect.OneTimeAccessServiceRequestEmailProcedure,
+			procedure: authnv1connect.OneTimeAccessServiceRequestEmailProcedure,
 			body:      `{"email":"hermione@example.com"}`,
 			auth:      callerAuthenticator("", false, false),
 			status:    http.StatusForbidden,
@@ -187,7 +187,7 @@ func TestTheOneTimeAccessLoopEndsInASession(t *testing.T) {
 	router := newOneTimeAccessRouter(t, callerAuthenticator(wireID(t, hermioneCodeAccount), true, false), pool)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authv1connect.OneTimeAccessServiceCreateTokenProcedure,
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.OneTimeAccessServiceCreateTokenProcedure,
 		`{"id":"`+wireID(t, hermioneCodeAccount)+`"}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
@@ -201,7 +201,7 @@ func TestTheOneTimeAccessLoopEndsInASession(t *testing.T) {
 	// code.
 	holder := newOneTimeAccessRouter(t, callerAuthenticator("", false, false), pool)
 	rec = httptest.NewRecorder()
-	holder.ServeHTTP(rec, rpcRequest(t, authv1connect.OneTimeAccessServiceExchangeTokenProcedure,
+	holder.ServeHTTP(rec, rpcRequest(t, authnv1connect.OneTimeAccessServiceExchangeTokenProcedure,
 		`{"token":"`+created.Token+`"}`))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
@@ -222,7 +222,7 @@ func TestTheOneTimeAccessLoopEndsInASession(t *testing.T) {
 	// The code is spent: a second exchange with the same value answers the
 	// refusal an unknown code does.
 	rec = httptest.NewRecorder()
-	holder.ServeHTTP(rec, rpcRequest(t, authv1connect.OneTimeAccessServiceExchangeTokenProcedure,
+	holder.ServeHTTP(rec, rpcRequest(t, authnv1connect.OneTimeAccessServiceExchangeTokenProcedure,
 		`{"token":"`+created.Token+`"}`))
 	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 }

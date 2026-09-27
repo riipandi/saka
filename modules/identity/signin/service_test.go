@@ -17,7 +17,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -361,7 +361,7 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 
 func TestRPCSignInRefusesAnIncompleteCredential(t *testing.T) {
 	handler := &rpcHandler{service: nil} // the guard runs before the service
-	request := connect.NewRequest(&authv1.SignInRequest{})
+	request := connect.NewRequest(&authnv1.SignInRequest{})
 	_, err := handler.SignIn(t.Context(), request)
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }

@@ -8,8 +8,10 @@ import (
 	apikeyv1connect "github.com/riipandi/tango/codegen/proto/go/tango/apikey/v1/apikeyv1connect"
 	auditlogv1 "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1"
 	auditlogv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1/auditlogv1connect"
-	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
+	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
+	authzv1 "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1"
+	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	notificationv1 "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1"
@@ -52,7 +54,7 @@ var ProcedureRules = map[string]Entry{
 	// The surfaces a caller reaches before they hold a token, or that a
 	// monitor probes without one.
 	systemv1connect.HealthServiceCheckProcedure:                    {Rule: Public},
-	authv1connect.AuthServiceSignInProcedure:                       {Rule: Public},
+	authnv1connect.AuthServiceSignInProcedure:                      {Rule: Public},
 	identityv1connect.SignupServiceSignupProcedure:                 {Rule: Public},
 	identityv1connect.EmailVerificationServiceVerifyEmailProcedure: {Rule: Public},
 
@@ -69,10 +71,10 @@ var ProcedureRules = map[string]Entry{
 	// same reason. The two administrative procedures hand a credential to an
 	// account's owner or drive the mailer at one address, which is
 	// administrative work on an account.
-	authv1connect.OneTimeAccessServiceExchangeTokenProcedure:       {Rule: Public},
-	authv1connect.OneTimeAccessServiceRequestEmailProcedure:        {Rule: Public},
-	authv1connect.OneTimeAccessServiceCreateTokenProcedure:         {Rule: Admin},
-	authv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure: {Rule: Admin},
+	authnv1connect.OneTimeAccessServiceExchangeTokenProcedure:       {Rule: Public},
+	authnv1connect.OneTimeAccessServiceRequestEmailProcedure:        {Rule: Public},
+	authnv1connect.OneTimeAccessServiceCreateTokenProcedure:         {Rule: Admin},
+	authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure: {Rule: Admin},
 
 	// The multifactor surfaces split at the same line the one-time access
 	// codes do. CompleteSignIn is reached with the pending token the
@@ -83,21 +85,21 @@ var ProcedureRules = map[string]Entry{
 	// manage, and the refusal of an impersonated caller keeps an
 	// administrator from enrolling a factor onto the account they are
 	// wearing — the delegation must end before the account's guard changes.
-	authv1connect.MultifactorServiceCompleteSignInProcedure:          {Rule: Public},
-	authv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:     {Rule: Session},
-	authv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Session},
-	authv1connect.MultifactorServiceListTotpEnrollmentsProcedure:     {Rule: Session},
-	authv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
-	authv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
-	authv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
+	authnv1connect.MultifactorServiceCompleteSignInProcedure:          {Rule: Public},
+	authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:     {Rule: Session},
+	authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Session},
+	authnv1connect.MultifactorServiceListTotpEnrollmentsProcedure:     {Rule: Session},
+	authnv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
+	authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
+	authnv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
 	// The step-up verification runs on the caller's own token — the code it
 	// spends proves the holder, the session only says whose set to look in.
 	// The administrative disable is the operator's door over a named
 	// account: the administrative session is the authority the procedure
 	// carries, because the reason it runs is that the holder has nothing
 	// left to prove.
-	authv1connect.MultifactorServiceVerifyRecoveryCodeProcedure: {Rule: Session},
-	authv1connect.MultifactorServiceAdminDisableMfaProcedure:    {Rule: Admin},
+	authnv1connect.MultifactorServiceVerifyRecoveryCodeProcedure: {Rule: Session},
+	authnv1connect.MultifactorServiceAdminDisableMfaProcedure:    {Rule: Admin},
 
 	// The password recovery surfaces split at the same line. The trigger and
 	// the spend are reached before any token exists — a caller who lost the
@@ -107,9 +109,9 @@ var ProcedureRules = map[string]Entry{
 	// refusal of an impersonated caller keeps an administrator from moving
 	// the account they are wearing. The cooldown is the feature's, not the
 	// contract's: the table cannot express a window.
-	authv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {Rule: Public},
-	authv1connect.PasswordRecoveryServiceResetPasswordProcedure:          {Rule: Public},
-	authv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {Rule: Admin},
+	authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {Rule: Public},
+	authnv1connect.PasswordRecoveryServiceResetPasswordProcedure:          {Rule: Public},
+	authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {Rule: Admin},
 
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and
@@ -118,7 +120,7 @@ var ProcedureRules = map[string]Entry{
 	// itself — an unknown, spent, or rotated one answers the ended-session
 	// refusal — and a presented bearer is read only to give the procedure
 	// the client facts a record rides with.
-	authv1connect.SessionServiceRefreshProcedure: {Rule: Public},
+	authnv1connect.SessionServiceRefreshProcedure: {Rule: Public},
 
 	// The audit trail. `List` is the caller's own history, so being
 	// authenticated is the whole requirement — except that a delegated
@@ -190,17 +192,17 @@ var ProcedureRules = map[string]Entry{
 	// because a surface that granted its own management could raise
 	// anything to itself. Declared explicitly rather than left to the
 	// default so the table reads as the complete policy of the surface.
-	identityv1connect.AuthorizationServiceListPermissionsProcedure:      {Rule: Admin},
-	identityv1connect.AuthorizationServiceListRolesProcedure:            {Rule: Admin},
-	identityv1connect.AuthorizationServiceGetRoleProcedure:              {Rule: Admin},
-	identityv1connect.AuthorizationServiceCreateRoleProcedure:           {Rule: Admin},
-	identityv1connect.AuthorizationServiceUpdateRoleProcedure:           {Rule: Admin},
-	identityv1connect.AuthorizationServiceDeleteRoleProcedure:           {Rule: Admin},
-	identityv1connect.AuthorizationServiceSetRolePermissionsProcedure:   {Rule: Admin},
-	identityv1connect.AuthorizationServiceListUserRolesProcedure:        {Rule: Admin},
-	identityv1connect.AuthorizationServiceSetUserRolesProcedure:         {Rule: Admin},
-	identityv1connect.AuthorizationServiceListUserPermissionsProcedure:  {Rule: Admin},
-	identityv1connect.AuthorizationServiceSetUserPermissionsProcedure:   {Rule: Admin},
+	authzv1connect.AuthorizationServiceListPermissionsProcedure:     {Rule: Admin},
+	authzv1connect.AuthorizationServiceListRolesProcedure:           {Rule: Admin},
+	authzv1connect.AuthorizationServiceGetRoleProcedure:             {Rule: Admin},
+	authzv1connect.AuthorizationServiceCreateRoleProcedure:          {Rule: Admin},
+	authzv1connect.AuthorizationServiceUpdateRoleProcedure:          {Rule: Admin},
+	authzv1connect.AuthorizationServiceDeleteRoleProcedure:          {Rule: Admin},
+	authzv1connect.AuthorizationServiceSetRolePermissionsProcedure:  {Rule: Admin},
+	authzv1connect.AuthorizationServiceListUserRolesProcedure:       {Rule: Admin},
+	authzv1connect.AuthorizationServiceSetUserRolesProcedure:        {Rule: Admin},
+	authzv1connect.AuthorizationServiceListUserPermissionsProcedure: {Rule: Admin},
+	authzv1connect.AuthorizationServiceSetUserPermissionsProcedure:  {Rule: Admin},
 
 	// The API keys' own surface is session-only: a key cannot manage keys,
 	// the refusal the upstream spells with a middleware switch and this
@@ -218,12 +220,12 @@ var ProcedureRules = map[string]Entry{
 	// behind it and is refused with the keys' surface, and a caller without
 	// the sid claim is not a session at all. Refresh is the exception, read
 	// with the public surfaces above: its credential is the body's token.
-	authv1connect.SessionServiceSignOutProcedure:              {Rule: Session},
-	authv1connect.SessionServiceGetSessionProcedure:           {Rule: Session},
-	authv1connect.SessionServiceListSessionsProcedure:         {Rule: Session},
-	authv1connect.SessionServiceRevokeSessionProcedure:        {Rule: Session},
-	authv1connect.SessionServiceSignOutOtherSessionsProcedure: {Rule: Session},
-	authv1connect.SessionServiceSignOutAllSessionsProcedure:   {Rule: Session},
+	authnv1connect.SessionServiceSignOutProcedure:              {Rule: Session},
+	authnv1connect.SessionServiceGetSessionProcedure:           {Rule: Session},
+	authnv1connect.SessionServiceListSessionsProcedure:         {Rule: Session},
+	authnv1connect.SessionServiceRevokeSessionProcedure:        {Rule: Session},
+	authnv1connect.SessionServiceSignOutOtherSessionsProcedure: {Rule: Session},
+	authnv1connect.SessionServiceSignOutAllSessionsProcedure:   {Rule: Session},
 
 	// The delegation pair. ImpersonateUser is administrative work over a
 	// session, so the admin rule is the whole requirement — and the service
@@ -234,8 +236,8 @@ var ProcedureRules = map[string]Entry{
 	// borrowed identity must not be closed by the refusals the other rules
 	// keep — and it still refuses a machine credential, which has no session
 	// to end.
-	authv1connect.SessionServiceImpersonateUserProcedure:   {Rule: Admin},
-	authv1connect.SessionServiceStopImpersonatingProcedure: {Rule: StopImpersonating},
+	authnv1connect.SessionServiceImpersonateUserProcedure:   {Rule: Admin},
+	authnv1connect.SessionServiceStopImpersonatingProcedure: {Rule: StopImpersonating},
 
 	// The notifications split one service at the same line the keys do: the
 	// four administrative procedures publish and withdraw what every account
@@ -350,10 +352,10 @@ func RestRuleFor(method, path string) (Rule, Target) {
 func ContractProcedures() []string {
 	files := []protoreflect.FileDescriptor{
 		auditlogv1.File_auditlog_proto,
-		authv1.File_auth_proto,
-		authv1.File_one_time_access_proto,
+		authnv1.File_authn_proto,
+		authnv1.File_one_time_access_proto,
 		apikeyv1.File_api_key_proto,
-		identityv1.File_authorization_proto,
+		authzv1.File_authz_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
 		systemv1.File_system_proto,

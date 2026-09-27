@@ -69,7 +69,7 @@ func loadRoleSlugs(ctx context.Context, db datastore.Querier, userID uuid.UUID) 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("r.slug")
 	sb.From(authz.UserRolesTable + " ur")
-	sb.Join(authz.RolesTable+" r ON r.id = ur.role_id")
+	sb.Join(authz.RolesTable + " r ON r.id = ur.role_id")
 	sb.Where(sb.Equal("ur.user_id", userID.String()), sb.IsNull("ur.revoked_at"))
 	sb.OrderBy("r.slug")
 
@@ -87,8 +87,8 @@ func loadRolePermissions(ctx context.Context, db datastore.Querier, userID uuid.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
 	sb.From(authz.UserRolesTable + " ur")
-	sb.Join(authz.RolePermissionsTable+" rp ON rp.role_id = ur.role_id")
-	sb.Join(authz.PermissionsTable+" p ON p.id = rp.permission_id")
+	sb.Join(authz.RolePermissionsTable + " rp ON rp.role_id = ur.role_id")
+	sb.Join(authz.PermissionsTable + " p ON p.id = rp.permission_id")
 	sb.Where(sb.Equal("ur.user_id", userID.String()), sb.IsNull("ur.revoked_at"))
 
 	query, args := sb.Build()
@@ -105,7 +105,7 @@ func loadDirectPermissions(ctx context.Context, db datastore.Querier, userID uui
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
 	sb.From(authz.UserPermissionsTable + " up")
-	sb.Join(authz.PermissionsTable+" p ON p.id = up.permission_id")
+	sb.Join(authz.PermissionsTable + " p ON p.id = up.permission_id")
 	sb.Where(sb.Equal("up.user_id", userID.String()), sb.IsNull("up.revoked_at"))
 
 	query, args := sb.Build()
