@@ -18,10 +18,10 @@ internal tools call the generated clients from `api/connect/*.proto`. The `Endpo
 the original REST path for traceability; it is no longer mounted. Protocol and infrastructure
 surfaces stay HTTP below `/api` (or their root path) and are marked `REST`.
 
-Protected RPCs authenticate with `Authorization: Bearer <internal-access-token>`; the admin
-application API also accepts `X-API-KEY` for machine clients. Self-service and credential-lifecycle
-procedures — the account surface, `UserService` self procedures, email verification, one-time
-access administration, signup-token administration, MFA, and device approval — never accept a
+Protected RPCs authenticate with `Authorization: Bearer <access token>`; the administrative
+surfaces also accept `X-API-KEY` for machine clients. Self-service and credential-lifecycle
+procedures — `UserService` self procedures, email verification, one-time access
+administration, signup-token administration, MFA, and the session lifecycle — never accept a
 machine credential, so a leaked key cannot rotate its owner's password or edit its owner's profile.
 Cookie presence never authorizes an RPC.
 
@@ -34,10 +34,10 @@ block) and `tango.system.v1` (`system.proto`: `HealthService`). The transport ru
 field naming on both surfaces, and an unknown `/rpc` path answering the Connect error document —
 are pinned by `internal/transport/handler_rpc_test.go`.
 
-> **Most rows below are stale.** The matrix was written for a tree that was later reset, so it
-> names routes, modules, and tests that do not exist today. Do not read a **done** row as a working
-> route. `docs/api-endpoint.md` is the target surface, the code is the only record of what is
-> served, and the Health rows further down are the part re-verified against the current tree.
+> This matrix was reconciled against the tree on 2026-09-27: every row marked **done** is backed
+> by code and the named tests exist; rows for features that were never built say **planned**.
+> The code is still the only record of what is served — re-verify against it before trusting a
+> row, and keep a row's Evidence honest in the same change that ships the endpoint.
 
 ## Authentication (tango-only)
 
@@ -66,10 +66,24 @@ account without the prefix is refused the same way a malformed one is; the sign-
 the tight auth rate budget; the sign-in failure never
 reveals whether the identity exists; refresh tokens are SHA-256 hashed with 256 bits of base64url
 randomness (`pkg/crypto.NewRefreshTokenPair`, the one draw both the opening and the renewal use);
-the account-state checks are the issuer's, so every way of opening or continuing a session refuses
+The account-state checks are the issuer's, so every way of opening or continuing a session refuses
 the same. Audit events cover sign-in, sign-out, and named revocations; a renewal records nothing.
-The RPC `ForgotPassword`/`ResetPassword` twins stay unimplemented — recovery is served by the
-retained REST routes below.
+
+## Password Recovery (tango-only)
+
+Upstream Pocket ID has no passwords, so the whole flow is tango's. The contract lives in
+`api/connect/auth.proto` under `PasswordRecoveryService`; the implementation is
+`modules/identity/password` (`recovery_*`).
+
+| Method | Procedure | Summary / Yaak Title | Status | Evidence |
+| ------ | --------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.auth.v1.PasswordRecoveryService/ForgotPassword` | Forgot password | done — guard `Public`; anti-enumeration: an unknown address answers the same success; a mailer-less run refuses; the token is 256 bits of lowercase hex, shown once in the email and stored only as a hash | `modules/identity/password.TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow`, `modules/identity/password.TestForgotPasswordIssuesOneTokenPerAccount` |
+| POST | `/rpc/tango.auth.v1.PasswordRecoveryService/ResetPassword` | Reset password | done — guard `Public`; the token is the credential; the swap, the session termination, and the audit record commit in one transaction, so a rollback returns the token; `terminate_sessions` selects whether the live sessions die with the credential | `modules/identity/password.TestResetPasswordSwapsTheCredentialAndEndsTheSessions`, `modules/identity/password.TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential` |
+| POST | `/rpc/tango.auth.v1.PasswordRecoveryService/AdminResetUserPassword` | Reset a user's password (admin) | done — guard `Admin`; answers the states `ForgotPassword` hides (unknown account, banned, no address); the flow then travels by email like a self-service reset | `modules/identity/password.TestAdminResetTriggerReportsTheStatesForgotPasswordHides` |
+
+Shared rules: the password-changed notice to the account's address rides the durable queue and is
+gated by `mailer.notifications.password_changed_notice_enabled`; a reset that ends sessions ends
+them in the same transaction. Impersonating administrators are refused.
 
 ## One-Time Access
 
@@ -103,39 +117,42 @@ Upstream Pocket ID has no TOTP; this surface is tango-only and follows the datab
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.identity.v1.MfaService/EnrollTotp` | Start TOTP enrollment | done — self; returns the raw secret + otpauth URI exactly once; re-enroll replaces an unconfirmed row | `modules/identity/totp.TestMfaRPCLifecycle` |
-| POST | `/rpc/tango.identity.v1.MfaService/ConfirmTotp` | Confirm and enable TOTP | done — verifies one code; sets `confirmed_at`; returns recovery codes exactly once | `modules/identity/totp.TestMfaRPCLifecycle` |
-| POST | `/rpc/tango.identity.v1.MfaService/GetTotpStatus` | TOTP status | done — confirmed flag + remaining recovery-code count | `modules/identity/totp.TestMfaRPCLifecycle` |
-| POST | `/rpc/tango.identity.v1.MfaService/VerifyPending` | Complete a pending sign-in | done — pending-auth cookie; accepts a TOTP code or a recovery code; issues the full session | `modules/identity/totp.TestMfaRPCVerifyPending` |
-| POST | `/rpc/tango.identity.v1.MfaService/RotateRecoveryCodes` | Rotate recovery codes | done — requires a valid TOTP code; returns the new codes exactly once | `modules/identity/totp.TestMfaRPCLifecycle` |
-| POST| `/rpc/tango.identity.v1.MfaService/DisableTotp` | Disable TOTP | done — requires the current password; drops all MFA state | `modules/identity/totp.TestMfaRPCLifecycle` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/BeginTotpEnrollment` | Start TOTP enrollment | done — self; answers the Base32 secret + otpauth URI exactly once; the secret is stored sealed (`enc:`); a second begin replaces the unconfirmed row | `modules/identity/multifactor` (service tests) |
+| POST | `/rpc/tango.auth.v1.MultifactorService/ConfirmTotpEnrollment` | Confirm and enable TOTP | done — verifies one code against the enrollment; sets `confirmed_at`; answers the recovery codes exactly once | `modules/identity/multifactor.TestConfirmTotpEnrollmentActivatesOnTheRightCode` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/ListTotpEnrollments` | List TOTP enrollments | done — self; the settings-page shape, never a secret; the decrypted-secret aid answers only behind the development exposure gate | `modules/identity/multifactor.TestListTotpEnrollmentsCarriesTheSecretOnlyWhereTheAidRuns` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/DeleteTotpEnrollment` | Delete one TOTP enrollment | done — self; the code field proves a held factor (another authenticator or a recovery code); deleting an unconfirmed row needs no proof | `modules/identity/multifactor.TestDeleteTotpEnrollmentProvesTheLastRemoval` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/CompleteSignIn` | Complete a pending sign-in | done — guard `Public`; spends the pending bridge a password sign-in minted (5-minute TTL, 3-wrong-codes budget) with a TOTP code or a recovery code; issues the full token pair | `modules/identity/multifactor.TestCompleteSignInOpensTheSessionOncePerCode`, `modules/identity/multifactor.TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/RegenerateRecoveryCodes` | Regenerate recovery codes | done — self; requires a held factor as the code field; the fresh set answers exactly once, the old set dies | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/DisableMfa` | Disable MFA | done — self; requires the second-factor proof; drops every authenticator and the recovery set | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/VerifyRecoveryCode` | Verify a recovery code | done — self; spends one code as a standalone identity proof, consumed exactly once | `modules/identity/multifactor.TestVerifyRecoveryCodeSpendsOneCodeStandalone` |
+| POST | `/rpc/tango.auth.v1.MultifactorService/AdminDisableMfa` | Disable a user's MFA (admin) | done — guard `Admin`; the administrative session is the authority, no proof code; refuses an account with nothing confirmed (`failed_precondition`); a notice is queued to the account | `modules/identity/multifactor.TestAdminDisableMfaStripsEveryFactorWithoutAProof`, `modules/identity/multifactor.TestAdminDisableMfaRefusesAnUnknownAccount` |
 
 Fixed parameters: issuer = the configured app name, 6 digits, 30-second period, SHA-1,
 ±1 step bounded skew. Sign-in composition: a confirmed TOTP enrollment turns a successful
-password sign-in into a pending authentication (5-minute TTL, one row per user, cookie-bound)
-instead of a full session; the full session is issued only by `VerifyPending`. Pending state is
+password sign-in into a pending bridge (5-minute TTL, several live per account) instead of a
+full session; the full session is issued only by `CompleteSignIn`. Pending state is
 never a session flag, expires server-side, is replaced on the next sign-in, and is cleared on
 sign-out. TOTP verification is constant-time with step replay protection (`last_used_step`);
 recovery codes are hashed, single-use, shown exactly once, and rotated atomically. Disablement
-requires the current password and clears every MFA row.
+requires the second-factor proof and clears every MFA row; the administrator's way in needs no
+proof — the audit record names it.
 
 ## Webhooks (tango-only)
 
-Upstream Pocket ID has no webhooks; this surface is tango-only and follows the database contract
-in `.llms/porting-plan/database.md` (`webhook_endpoints`, `webhook_deliveries`,
-`webhook_delivery_attempts`).
+**Not implemented.** `modules/webhook` is a scaffold; no proto, no routes, no queue wiring. The
+contract below is the design the implementation will follow — do not call these procedures.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.webhook.v1.WebhookService/List` | List webhook endpoints | done — admin guard; `enabled` and `event` filters; secrets never present | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Create` | Create a webhook endpoint | done — returns the signing secret exactly once | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Get` | Get a webhook endpoint | done — no secret field | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Update` | Update a webhook endpoint | done — partial update; absent fields keep values | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | done — deliveries survive with `webhook_id` nulled | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | done — returns the new plaintext exactly once; new deliveries sign with it | `modules/webhook.TestRPCRotateSecret` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Test` | Send a test delivery | done — queues a `webhook.test` delivery | `modules/webhook.TestRPCTestDelivery` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | done — newest first, paginated; latest attempt rides along | `modules/webhook.TestRPCWebhookLifecycle` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | done — `event` filter; redacted response metadata only | `modules/webhook.TestRPCWebhookLifecycle` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/List` | List webhook endpoints | planned — admin guard; `enabled` and `event` filters; secrets never present | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Create` | Create a webhook endpoint | planned — returns the signing secret exactly once | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Get` | Get a webhook endpoint | planned — no secret field | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Update` | Update a webhook endpoint | planned — partial update; absent fields keep values | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | planned — deliveries survive with `webhook_id` nulled | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | planned — returns the new plaintext exactly once; new deliveries sign with it | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Test` | Send a test delivery | planned — queues a `webhook.test` delivery | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | planned — newest first, paginated; latest attempt rides along | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | planned — `event` filter; redacted response metadata only | — |
 
 Delivery contract: HMAC-SHA256 over `t=<unix>,v1=<hex>` where the digest covers the signed
 timestamp concatenated with the exact canonical body bytes. Headers on every delivery:
@@ -183,36 +200,42 @@ durable queue).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.admin.v1.ApiService/ListApis` | List APIs | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/CreateAPI` | Create API | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/GetAPI` | Get API by ID | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/UpdateAPI` | Update API | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/DeleteAPI` | Delete API | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/SetPermissions` | Update API permissions | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/SetCimdAccess` | Update metadata document client access | done | `modules/admin/apiaccess.TestRPCAPILifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableClients` | List clients that can still be granted access | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/ListClients` | List clients with access to an API | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/GrantClient` | Grant a client access to an API | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/RevokeClient` | Revoke a client's access to an API | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/ListApisForClient` | List APIs a client may access | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableApisForClient` | List APIs a client can still be granted | done | `modules/admin/apiaccess.TestRPCGrantLifecycle` |
+| POST | `/rpc/tango.admin.v1.ApiService/ListApis` | List APIs | planned — no proto yet; upstream's API-access surface | — |
+| POST | `/rpc/tango.admin.v1.ApiService/CreateAPI` | Create API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/GetAPI` | Get API by ID | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/UpdateAPI` | Update API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/DeleteAPI` | Delete API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/SetPermissions` | Update API permissions | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/SetCimdAccess` | Update metadata document client access | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableClients` | List clients that can still be granted access | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/ListClients` | List clients with access to an API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/GrantClient` | Grant a client access to an API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/RevokeClient` | Revoke a client's access to an API | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/ListApisForClient` | List APIs a client may access | planned | — |
+| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableApisForClient` | List APIs a client can still be granted | planned | — |
+
+Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above — this upstream
+`ApiService` surface (API resources + client grants) is a separate, unbuilt feature.
 
 ## Application Configuration
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Get` | Public bootstrap configuration | done — anonymous view the SPA reads before sign-in | `modules/admin/appconfig.TestRPCConfigBootstrapIsAnonymous` |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/GetAll` | List all application configurations | done — admin | `modules/admin/appconfig.TestRPCConfigLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Update` | Update application configurations | done — partial update | `modules/admin/appconfig.TestRPCConfigLifecycle` |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/TestEmail` | Send test email | done — admin; defaults to the signed-in administrator | `modules/admin/appconfig.TestRPCConfigLifecycle` |
-| GET | `/api/application-configuration` | List public application configurations | REST — unauthenticated bootstrap read | `modules/admin/appconfig.TestConfigCRUD` |
+| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Get` | Public bootstrap configuration | planned — `modules/appconfig` is a scaffold; the SPA bootstrap read has no procedure yet | — |
+| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/GetAll` | List all application configurations | planned — admin | — |
+| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Update` | Update application configurations | planned — partial update | — |
+| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/TestEmail` | Send test email | planned — admin; defaults to the signed-in administrator | — |
+| GET | `/api/application-configuration` | List public application configurations | planned — unauthenticated bootstrap read | — |
 | POST | `/api/application-configuration/sync-ldap` | Synchronize LDAP | excluded | — |
+
+The test-email and SMTP settings surface is served today by the mailer smoke probe
+(`task mailer:smoke`), not by an application-configuration procedure.
 
 ## Application Images
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| DELETE, GET, PUT | `/api/application-images/*` | Bundled application images | excluded — served from `public/images` through `/static/*` | `internal/transport.TestStaticAssetsHandler` |
+| DELETE, GET, PUT | `/api/application-images/*` | Bundled application images | excluded — served from `public/images` through `/static/*` | — |
 | GET | `/api/storage/sqlite-warning` | SQLite storage warning | excluded — Postgres is the only supported database | — |
 
 ## Audit Logs
@@ -224,33 +247,38 @@ durable queue).
 | POST | `/rpc/tango.auditlog.v1.AuditLogService/ListForUser` | (tango-only) list one account's records | done — guard `Admin`; the administrative view of a single account | `modules/auditlog` (service tests) |
 | POST | `/rpc/tango.auditlog.v1.AuditLogService/FilterOptions` | List filter facets | done — guard `Admin`; facets are `events` (distinct events in the table) and `users` (accounts that appear in it). Upstream's `client-names` facet is **not** ported: tango has no OIDC client, so `payload->>'client_name'` is never written | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
 
-The writer is `internal/audit` (shared infrastructure, injected into the features); the reader is `modules/auditlog`. Events written today: `sign_in`, `account_created` (both sign-up and the administrator's CreateUser), `account_updated`, `account_deleted`, `email_verification_sent`, `email_verified`, `profile_picture_updated`, `profile_picture_reset`. Sign-out has no event: `modules/identity/session` is a scaffold, so nothing can sign out. Retention: `app.audit_retention_days` (default 90) applied by the `audit_cleanup` recurring job.
+The writer is `internal/audit` (shared infrastructure, injected into the features); the reader is `modules/auditlog`. The event vocabulary lives in `internal/audit/audit.go` — that file is the single source of what can be written (sign-in/out and revocations, account and group lifecycle, email verification and change, one-time access, API keys, impersonation, MFA ceremonies, profile pictures); read it before adding a row that names an event. Retention: `app.audit_retention_days` (default 90) applied by the `audit_cleanup` recurring job.
 
 ## Custom Claims
 
+**Not implemented.** The scaffold lives at `modules/federation/customclaim` (moved out of
+`modules/identity` — claims are an OIDC token-issuance concern, so they belong beside the
+federation surface that would mint them). No proto, no procedures.
+
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/Suggest` | Get custom claim suggestions | done — keys ordered by usage count | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | done | `modules/admin/customclaim.TestRPCClaimLifecycle` |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/Suggest` | Get custom claim suggestions | planned — keys ordered by usage count | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | planned | — |
+| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | planned | — |
 
 ## Device Login
 
-The device side is an integration flow and stays HTTP; the approval UI is first-party and moved to
+**Not implemented.** `modules/devicelogin` is a scaffold; no proto, no routes. The planned shape:
+the device side stays HTTP (pairing cookie, long-poll exchange), the approval UI moves to
 ConnectRPC.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/api/device-login/requests` | Create device login request | REST — pairing cookie rides the response | `modules/identity/devicelogin.TestCreateApproveExchange` |
-| POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | REST — long-poll; the device holds the request id | `modules/identity/devicelogin.TestCreateApproveExchange` |
-| POST | `/rpc/tango.identity.v1.DeviceApprovalService/GetPendingRequest` | Inspect device login request | done — carries the user code | `modules/identity/devicelogin.TestRPCApprovalFlow`, `modules/identity/devicelogin.TestRPCApprovalValidation` |
-| POST | `/rpc/tango.identity.v1.DeviceApprovalService/DecideRequest` | Decide device login request | done — carries the user code + approve flag | `modules/identity/devicelogin.TestRPCApprovalFlow` |
+| POST | `/api/device-login/requests` | Create device login request | planned — pairing cookie rides the response | — |
+| POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | planned — long-poll; the device holds the request id | — |
+| POST | `/rpc/tango.identity.v1.DeviceApprovalService/GetPendingRequest` | Inspect device login request | planned — carries the user code | — |
+| POST | `/rpc/tango.identity.v1.DeviceApprovalService/DecideRequest` | Decide device login request | planned — carries the user code + approve flag | — |
 
 ## Health
 
@@ -262,69 +290,63 @@ ConnectRPC.
 
 ## OIDC
 
-Client administration and consents are first-party and moved to ConnectRPC. The public logo read,
-the interaction pages, and every protocol endpoint stay HTTP.
+**Not implemented.** `modules/federation/{oidc,discovery,scimsync}` are scaffolds — the package
+bodies are empty, and no OIDC procedure or protocol route exists anywhere in the transport. The
+tables below record the planned surface only; every row is unbuilt and uncallable.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListClients` | List OIDC clients | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateClient` | Create OIDC client | done — show-once secret | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClient` | Get OIDC client | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | done | `modules/federation/oidc.TestRPCClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | done — claim maps, no real JWTs; no focused RPC test yet | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | done — CIMD-lite | `modules/federation/oidc.TestRPCIMDClientLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UploadLogo` | Update client logo | done — `bytes` payload, content type sniffed; no focused RPC test yet | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | done; no focused RPC test yet | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — multi-secret; values never returned | `modules/federation/oidc.TestClientSecretLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — show-once | `modules/federation/oidc.TestClientSecretLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done | `modules/federation/oidc.TestClientSecretLifecycle` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | done; no focused RPC test yet | `modules/federation/scimsync.TestProviderGetByClient` (store-level) |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | done — revocation cascades to active tokens | `modules/federation/oidc.TestRPCConsentScopes` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | done | `modules/federation/oidc.TestRPCConsentScopes` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | done | `modules/federation/oidc.TestRPCConsentScopes` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | done — admin | `modules/federation/oidc.TestRPCConsentScopes` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | done — admin-wide | `modules/federation/oidc.TestRPCConsentScopes` |
-| GET | `/api/oidc/clients/{id}/logo` | Get client logo | REST — bare image for the sign-in page | `internal/registry.TestRetainedRESTInventory` |
-| GET | `/api/oidc/interaction/{id}` | Read the authorization interaction | REST — browser protocol flow | `modules/federation/oidc.TestAuthorizeRedirectsAnonymousToInteraction` |
-| POST | `/api/oidc/interaction/{id}/approve` | Approve the authorization interaction | REST — browser session and redirect behavior | `modules/federation/oidc.TestEndToEndAuthorizeTokenUserinfo` |
-| GET, POST | `/authorize` | Authorization endpoint | REST — redirect and OAuth error contract | `modules/federation/oidc.TestEndToEndAuthorizeTokenUserinfo` |
-| POST | `/api/oidc/token` | Token endpoint | REST — form encoding, client authentication, RFC errors | `modules/federation/oidc.TestRefreshRotationAndReuseRevocation` |
-| POST | `/api/oidc/introspect` | Introspect OIDC tokens | REST — client-scoped RFC 7662 | `modules/federation/oidc.TestIntrospection` |
-| POST | `/api/oidc/par` | Push authorization request | REST — RFC 9126; one-time request_uri | `modules/federation/oidc.TestPARPushAndOneTimeAuthorizeResume` |
-| POST | `/api/oidc/device/authorize` | Device authorization grant | REST — RFC 8628; hashed codes | `modules/federation/oidc.TestDeviceFlowIssuesTokensAfterApproval` |
-| GET | `/api/oidc/device/info` | Device code info for the consent page | REST | `modules/federation/oidc.TestDeviceFlowIssuesTokensAfterApproval` |
-| POST | `/api/oidc/device/verify` | Approve or deny a device code | REST — browser session; single approval | `modules/federation/oidc.TestDeviceFlowDenialDeniesThePoll` |
-| GET | `/api/oidc/userinfo` | Get user information | REST — bearer token, RFC-style errors | `modules/federation/oidc.TestEndToEndAuthorizeTokenUserinfo` |
-| GET, POST | `/api/oidc/end-session` | RP-initiated logout | REST — redirect behavior | `modules/federation/oidc.TestEndSessionRevokesFamilyAndRedirects` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/ListClients` | List OIDC clients | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/CreateClient` | Create OIDC client | planned — show-once secret | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetClient` | Get OIDC client | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | planned — claim maps, no real JWTs | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | planned — CIMD-lite | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UploadLogo` | Update client logo | planned — `bytes` payload, content type sniffed | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | planned — multi-secret; values never returned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | planned — show-once | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | planned — revocation cascades to active tokens | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | planned | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | planned — admin | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | planned — admin-wide | — |
+| GET | `/api/oidc/clients/{id}/logo` | Get client logo | planned — REST, bare image for the sign-in page | — |
+| GET | `/api/oidc/interaction/{id}` | Read the authorization interaction | planned — REST, browser protocol flow | — |
+| POST | `/api/oidc/interaction/{id}/approve` | Approve the authorization interaction | planned — REST, browser session and redirect behavior | — |
+| GET, POST | `/authorize` | Authorization endpoint | planned — REST, redirect and OAuth error contract | — |
+| POST | `/api/oidc/token` | Token endpoint | planned — REST, form encoding, client authentication, RFC errors | — |
+| POST | `/api/oidc/introspect` | Introspect OIDC tokens | planned — REST, client-scoped RFC 7662 | — |
+| POST | `/api/oidc/par` | Push authorization request | planned — REST, RFC 9126; one-time request_uri | — |
+| POST | `/api/oidc/device/authorize` | Device authorization grant | planned — REST, RFC 8628; hashed codes | — |
+| GET | `/api/oidc/device/info` | Device code info for the consent page | planned — REST | — |
+| POST | `/api/oidc/device/verify` | Approve or deny a device code | planned — REST, browser session; single approval | — |
+| GET | `/api/oidc/userinfo` | Get user information | planned — REST, bearer token, RFC-style errors | — |
+| GET, POST | `/api/oidc/end-session` | RP-initiated logout | planned — REST, redirect behavior | — |
 
-The protocol endpoints are verified by the same suite: `/authorize` →
-`modules/federation/oidc.TestEndToEndAuthorizeTokenUserinfo` and friends. It
-accepts an RFC 9126 `request_uri` in place of inline parameters (one-time; a replayed push is
-rejected); `/api/oidc/end-session` → `modules/federation/oidc.TestEndSessionRevokesFamilyAndRedirects`:
-the `id_token_hint` must verify (issuer, audience, subject, jti), the `client_id` must match the
-hint's audience, and the user must have granted the client — every failure redirects to the
-instance logout page without explaining why. Ending the session deactivates the grant's whole
-token family (the ID token carries the access token's `jti`), replays are idempotent, and an
-unregistered `post_logout_redirect_uri` is never followed;
-`/.well-known/*` and JWKS → `modules/federation/discovery` and `modules/federation/jwks`. The
-discovery document advertises the device, PAR, and introspection endpoints plus upstream's
-metadata fields (`response_modes_supported`, `prompt_values_supported`, `grant_types_supported`
-with the device grant, `authorization_response_iss_parameter_supported`,
-`client_id_metadata_document_supported: false`, `require_pushed_authorization_requests: false`).
-Device-flow codes are stored hashed; the poll answers `authorization_pending`, `slow_down`,
-`expired_token`, and `access_denied` per RFC 8628 §3.5.
+The prose below is the **design contract** the implementation will be held to, written before any
+code exists. The device-flow and PAR details, the end-session `id_token_hint` verification chain,
+and the discovery metadata fields are the acceptance criteria for the federation phase; the
+discovery documents themselves (`.well-known/openid-configuration`,
+`/.well-known/oauth-authorization-server`) do not exist yet. The JWKS endpoint that does exist is
+tango's own (`/.well-known/jwks.json`, `modules/identity/jwks` — see Well Known below), not the
+federation module's.
 
 ## SCIM
 
+**Not implemented** — `modules/federation/scimsync` is a scaffold; no proto, no procedures.
+
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Upsert` | Create SCIM service provider | done | `modules/federation/scimsync.TestRPCProviderLifecycle` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Update` | Update SCIM service provider | done | `modules/federation/scimsync.TestRPCProviderLifecycle` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | done | `modules/federation/scimsync.TestRPCProviderLifecycle` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | done — queues outbound sync | `modules/federation/scimsync.TestRPCProviderLifecycle` |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Upsert` | Create SCIM service provider | planned | — |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Update` | Update SCIM service provider | planned | — |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | planned | — |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | planned — queues outbound sync | — |
 
 ## User Groups
 
@@ -364,13 +386,13 @@ feature owns them when it lands).
 | POST | `/rpc/tango.identity.v1.UserService/CreateUser` | Create user | done — admin Bearer; mandatory names; optional password (absent = no credential) | `modules/identity/user` (service tests) |
 | POST | `/rpc/tango.identity.v1.UserService/UpdateUser` | Update user | done — admin Bearer; full replace; mandatory names; ban fields as a unit | `modules/identity/user` (service tests) |
 | POST | `/rpc/tango.identity.v1.UserService/DeleteUser` | Delete user | done — admin Bearer; refuses the signed-in account | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/UpdateMe` | Update current user | planned — self-service profile; not yet implemented | — |
+| POST | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser` | Update current user | done — guard `Authenticated`; full replace of the signed-in account's own profile fields | `modules/identity/user` (service tests) |
 | PUT | `/api/users/{id}/profile-picture` | Update user profile picture | done — REST raw-body upload; self-service Bearer (guard `Self("id")` on the path param); magic-byte sniff (PNG/JPEG/WebP), max 2 MiB; stored at `avatars/<id>.<ext>` with the extension the sniffed bytes earn, so a kind change moves the key and deletes the replaced picture first; staged then synced in-request | `modules/identity/user` (service + handler tests), `internal/guard` (rule) |
 | POST | `/rpc/tango.identity.v1.UserService/ResetProfilePicture` | Reset user profile picture | done — self-service Bearer (guard `Self("id")`); deletes the stored file and clears the row | `modules/identity/user` (service tests), `internal/guard` (rule), `internal/transport` (guard) |
 | POST | `/rpc/tango.identity.v1.UserService/ListWebAuthnCredentials` | List user passkeys | planned — needs the webauthn feature; not yet implemented | — |
 | POST | `/rpc/tango.identity.v1.UserService/UpdateWebAuthnCredential` | Rename user passkey | planned — needs the webauthn feature; not yet implemented | — |
-| POST | `ImpersonateUser` (procedure name TBD) | Impersonate a user (admin) | TODO(impersonation) — **not implemented**: no procedure, nothing sets `AccessClaims.ActorID`, `public.sessions.impersonated_by` unused. The guard rule that *refuses* an impersonated caller on self-service requests is in place and tested (`internal/guard`), which is the half that had to land first | `pkg/jwtutils` (claim round-trip), `internal/guard` (refusal), `internal/transport` (guard) |
-| POST | `StopImpersonating` (procedure name TBD) | Stop impersonating | TODO(impersonation) — **not implemented**; must be `Authenticated` in `guard.ProcedureRules`, not `Self`, because it has to be callable while the delegation is active | — |
+| POST | `/rpc/tango.auth.v1.SessionService/ImpersonateUser` | Impersonate a user (admin) | done — guard `Admin`; opens a **new** session on the target account with the delegation recorded (`sessions.impersonated_by`, the access token's `ActorID`); refuses another administrator, the caller themselves, and an unknown account; audit `impersonation_started`; a delegated caller is refused on self-service procedures by the guard | `modules/identity/session.TestImpersonateUserOpensADelegatedSession`, `modules/identity/session.TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown`, `internal/transport.TestTheGuardRefusesAnImpersonatedCallerOnASelfProcedure` |
+| POST | `/rpc/tango.auth.v1.SessionService/StopImpersonating` | Stop impersonating | done — guard `Authenticated` (callable while the delegation is active); ends the delegated session and reissues the actor's own token pair; audit `impersonation_stopped` | `modules/identity/session.TestStopImpersonatingEndsTheDelegationAndReissuesTheActor`, `modules/identity/session.TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign` |
 | POST | `/rpc/tango.identity.v1.UserService/DeleteWebAuthnCredential` | Delete user passkey | planned — needs the webauthn feature; not yet implemented | — |
 | POST | `/rpc/tango.auth.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — public; anti-enumeration: an unknown address answers the same success and a real device token; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress` |
 | POST | `/rpc/tango.auth.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — admin; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off; the code travels by email alone | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode` |
@@ -384,21 +406,26 @@ feature owns them when it lands).
 
 ## WebAuthn
 
+**Not implemented.** Upstream Pocket ID is passkey-only; tango signs in with passwords and treats
+passkeys as a planned feature. The scaffold stays at `modules/identity/webauthn` (empty — kept
+deliberately as the landing place), and the `UserService` passkey procedures in the Users section
+above are planned rows for the same feature. No proto, no routes.
+
 Passkey ceremonies are a browser contract and stay HTTP.
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| POST | `/api/webauthn/register/begin` | Begin passkey registration | done — bare `publicKey` options plus an explicit ceremony id | `modules/identity/webauthn.TestRegisterBeginReturnsOptions` |
-| POST | `/api/webauthn/register/finish` | Finish passkey registration | done | `modules/identity/webauthn.TestRegisterBeginReturnsOptions` |
-| POST | `/api/webauthn/login/begin` | Begin discoverable passkey login | done — bare `publicKey` options plus an explicit ceremony id | `modules/identity/webauthn.TestLoginBeginAnonymousAndFinishValidation` |
-| POST | `/api/webauthn/login/finish` | Finish discoverable passkey login | done — fail closed on unknown ceremony sessions | `modules/identity/webauthn.TestLoginBeginAnonymousAndFinishValidation` |
+| POST | `/api/webauthn/register/begin` | Begin passkey registration | planned — bare `publicKey` options plus an explicit ceremony id | — |
+| POST | `/api/webauthn/register/finish` | Finish passkey registration | planned | — |
+| POST | `/api/webauthn/login/begin` | Begin discoverable passkey login | planned — bare `publicKey` options plus an explicit ceremony id | — |
+| POST | `/api/webauthn/login/finish` | Finish discoverable passkey login | planned — fail closed on unknown ceremony sessions | — |
 
 ## Version
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.VersionService/Current` | Get current deployed version | done — bearer required | `internal/transport.TestRPCVersionAuthBranches`, `internal/transport.TestRPCVersionCurrentWithoutInterceptor` |
-| POST | `/rpc/tango.system.v1.VersionService/Latest` | Get latest available version | done — anonymous; falls back to the deployed build when the feed never answered | `internal/transport.TestRPCVersionAuthBranches`, `internal/transport.TestRPCVersionCurrentWithoutInterceptor` |
+| POST | `/rpc/tango.system.v1.VersionService/Current` | Get current deployed version | planned — no proto yet; `system.proto` holds only `HealthService` | — |
+| POST | `/rpc/tango.system.v1.VersionService/Latest` | Get latest available version | planned — anonymous; falls back to the deployed build when the feed never answered | — |
 
 ## Utilities
 
@@ -415,6 +442,6 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| GET | `/.well-known/jwks.json` | Get JSON Web Key Set (JWKS) | REST | `modules/federation/discovery.TestOpenIDConfigurationHandler` |
-| GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | REST | `modules/federation/discovery.TestOpenIDConfigurationHandler` |
-| GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | REST | `modules/federation/discovery.TestOpenIDConfigurationHandler` |
+| GET | `/.well-known/jwks.json` | Get JSON Web Key Set (JWKS) | REST — done; bare RFC 7517 JWK Set over the configured key pair + `public.jwks` signing rows, cached behind `jwtutils.KeyProvider` | `modules/identity/jwks` (handler + integration tests) |
+| GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | planned — discovery documents belong to the unbuilt federation phase | — |
+| GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | planned | — |
