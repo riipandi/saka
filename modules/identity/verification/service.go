@@ -2,9 +2,6 @@ package verification
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +12,7 @@ import (
 	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/tango/pkg/crypto"
 )
 
 // The failures the flow reports. The handler maps them to connect codes, so
@@ -59,11 +57,6 @@ const tokenTTL = time.Hour
 // is what stops a caller from turning the procedure into a mailbomb; the
 // token row's send time is the clock it reads.
 const resendCooldown = time.Minute
-
-// tokenEntropy is the randomness of a raw verification token. It is sent to
-// one address once and only its hash is stored, so 256 bits is the whole
-// defense against a database leak.
-const tokenEntropy = 32
 
 // Service issues the verification tokens and consumes them.
 type Service struct {
@@ -131,13 +124,13 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 		}
 	}
 
-	rawToken, err := newToken()
+	rawToken, err := crypto.NewHexToken()
 	if err != nil {
 		return fmt.Errorf("verification: token: %w", err)
 	}
 	now := s.now()
 
-	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, tokenSHA256(rawToken), now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(rawToken), now.Add(tokenTTL), now); err != nil {
 		return err
 	}
 	if _, err := s.queue.Add(jobs.EmailVerificationTask{
@@ -171,7 +164,7 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 // twice under a race: the delete is what a second caller loses.
 func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		token, findErr := s.repo.FindTokenByHash(ctx, tx, tokenSHA256(rawToken))
+		token, findErr := s.repo.FindTokenByHash(ctx, tx, crypto.HashHexToken(rawToken))
 		if errors.Is(findErr, datastore.ErrNoRows) {
 			return ErrInvalidToken
 		}
@@ -198,26 +191,6 @@ func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 		return nil
 	})
 	return err
-}
-
-// tokenSHA256 hashes the raw token the caller presented, the form the
-// auth_tokens table stores.
-func tokenSHA256(raw string) string {
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
-}
-
-// newToken mints one raw token: 256 bits of randomness as 64 lowercase
-// hexadecimal characters. Hex keeps the token URL-safe without dashes or
-// symbols — the same form the password-reset token takes — so it survives a
-// query string, a QR code, and a copy-paste through any chat client
-// unchanged.
-func newToken() (string, error) {
-	buf := make([]byte, tokenEntropy)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
 }
 
 // EmailChangeNotice is what a pending request and a completed confirmation
@@ -281,13 +254,13 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 		}
 	}
 
-	rawToken, err := newToken()
+	rawToken, err := crypto.NewHexToken()
 	if err != nil {
 		return fmt.Errorf("verification: change token: %w", err)
 	}
 	now := s.now()
 
-	if err := s.repo.UpsertEmailChangeToken(ctx, s.pool, account.ID, tokenSHA256(rawToken), newEmail, now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertEmailChangeToken(ctx, s.pool, account.ID, crypto.HashHexToken(rawToken), newEmail, now.Add(tokenTTL), now); err != nil {
 		return err
 	}
 	if _, err := s.queue.Add(jobs.EmailChangeRequestEmailTask{
@@ -341,7 +314,7 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error {
 	var confirmed EmailChangeNotice
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		token, findErr := s.repo.FindEmailChangeTokenByHash(ctx, tx, tokenSHA256(rawToken))
+		token, findErr := s.repo.FindEmailChangeTokenByHash(ctx, tx, crypto.HashHexToken(rawToken))
 		if errors.Is(findErr, datastore.ErrNoRows) {
 			return ErrInvalidToken
 		}

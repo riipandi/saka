@@ -1,7 +1,6 @@
 package auditlog_test
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	auditlogv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1/auditlogv1connect"
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
@@ -34,22 +32,7 @@ const (
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "auditlog_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
+	pool := testutils.MigratedPostgres(t, "auditlog_test")
 
 	for id, name := range map[string]string{
 		hermioneID: "hermione",

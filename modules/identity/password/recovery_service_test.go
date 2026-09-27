@@ -13,33 +13,17 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/mailer"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "password_recovery_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
+	return testutils.MigratedPostgres(t, "password_recovery_test")
 }
 
 // seedUser writes an account row with a password credential, so the tests
@@ -76,7 +60,7 @@ func seedResetToken(t *testing.T, pool *datastore.Postgres, userID, raw string, 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(AuthTokenTable)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at")
-	ib.Values(userID, tokenSHA256(raw), PurposePasswordReset, expiresAt)
+	ib.Values(userID, crypto.HashHexToken(raw), PurposePasswordReset, expiresAt)
 
 	query, args := ib.Build()
 	_, err := pool.Exec(t.Context(), query, args...)
@@ -176,7 +160,7 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 	require.NoError(t, pool.QueryRow(t.Context(),
 		"SELECT token_hash FROM public.auth_tokens WHERE purpose = 'password_reset'",
 	).Scan(&stored))
-	assert.Equal(t, tokenSHA256(raw), stored)
+	assert.Equal(t, crypto.HashHexToken(raw), stored)
 
 	// A re-request inside the cooldown refuses; the row is untouched.
 	_, err = service.ForgotPassword(t.Context(), "sophie@example.com")
@@ -273,7 +257,7 @@ func TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential(t *testing.T) 
 
 	var stillThere int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		"SELECT count(*) FROM public.auth_tokens WHERE token_hash = $1", tokenSHA256(raw),
+		"SELECT count(*) FROM public.auth_tokens WHERE token_hash = $1", crypto.HashHexToken(raw),
 	).Scan(&stillThere))
 	assert.Equal(t, 0, stillThere)
 }

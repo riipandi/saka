@@ -2,9 +2,6 @@ package signup
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -88,7 +85,7 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 	if err != nil {
 		return user.UserView{}, fmt.Errorf("signup: hash password: %w", err)
 	}
-	tokenHash := tokenSHA256(params.Token)
+	tokenHash := crypto.HashHexToken(params.Token)
 
 	name := displayName(params.FirstName, params.LastName)
 
@@ -165,31 +162,6 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 // account-creating features share the rule; the user package owns it.
 var displayName = user.DisplayName
 
-// tokenSHA256 hashes the raw token the caller presented, the form the
-// signup_tokens table stores.
-func tokenSHA256(raw string) string {
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
-}
-
-// tokenEntropy is the randomness of a raw signup token. It is shown to the
-// operator once and only its hash is stored, so 256 bits is the whole defense
-// against a database leak.
-const tokenEntropy = 32
-
-// newToken mints one raw token: 256 bits of randomness as 64 lowercase
-// hexadecimal characters. Hex keeps the token URL-safe without dashes or
-// symbols — the form every token that travels a URL takes — so it survives a
-// query string, a QR code, and a copy-paste through any chat client
-// unchanged.
-func newToken() (string, error) {
-	buf := make([]byte, tokenEntropy)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
 // CreateTokenParams carries one token issue. The window and budget bounds
 // live in the contract — `CreateSignupTokenRequest` carries them as
 // protovalidate constraints the transport's validate interceptor enforces
@@ -223,13 +195,13 @@ func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParam
 		params.UsageLimit = 1
 	}
 
-	rawToken, err := newToken()
+	rawToken, err := crypto.NewHexToken()
 	if err != nil {
 		return CreatedToken{}, fmt.Errorf("signup: token: %w", err)
 	}
 	now := s.now()
 
-	id, err := s.repo.CreateSignupToken(ctx, s.pool, tokenSHA256(rawToken), params.UsageLimit, now.Add(params.TTL))
+	id, err := s.repo.CreateSignupToken(ctx, s.pool, crypto.HashHexToken(rawToken), params.UsageLimit, now.Add(params.TTL))
 	if err != nil {
 		return CreatedToken{}, err
 	}

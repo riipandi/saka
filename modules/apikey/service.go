@@ -2,12 +2,9 @@ package apikey
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"uuid"
@@ -15,6 +12,7 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -112,7 +110,7 @@ func (s *Service) Create(ctx context.Context, owner uuid.UUID, params CreatePara
 			UserID:    owner,
 			Name:      params.Name,
 			Prefix:    prefixOf(raw),
-			KeyHash:   hashOf(raw),
+			KeyHash:   crypto.HashTokenBytes(raw),
 			Descr:     descriptionOf(params.Description),
 			ExpiresAt: params.ExpiresAt,
 		})
@@ -187,7 +185,7 @@ func (s *Service) Renew(ctx context.Context, owner, keyID uuid.UUID, expiresAt t
 			return ErrKeyNotExpired
 		}
 
-		updated, renewErr := s.repo.RenewKey(ctx, tx, keyID, hashOf(raw), expiresAt)
+		updated, renewErr := s.repo.RenewKey(ctx, tx, keyID, crypto.HashTokenBytes(raw), expiresAt)
 		if renewErr != nil {
 			return renewErr
 		}
@@ -272,7 +270,7 @@ func (s *Service) Validate(ctx context.Context, presented string) (user.UserSche
 	}
 
 	now := s.now()
-	key, owner, err := s.repo.FindActiveKey(ctx, s.pool, hashOf(presented), now)
+	key, owner, err := s.repo.FindActiveKey(ctx, s.pool, crypto.HashTokenBytes(presented), now)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return user.UserSchema{}, ErrKeyNotFound
 	}
@@ -326,11 +324,11 @@ func (s *Service) listPage(ctx context.Context, owner uuid.UUID, page, limit int
 // sends. The draw is over the full alphanumeric alphabet with the crypto
 // source, so neither half is a modulo bias away from uniform.
 func generateKey() (string, error) {
-	prefix, err := randomString(prefixLength)
+	prefix, err := crypto.RandomString(prefixLength, crypto.AlphabetAlphanumeric)
 	if err != nil {
 		return "", err
 	}
-	secret, err := randomString(secretLength)
+	secret, err := crypto.RandomString(secretLength, crypto.AlphabetAlphanumeric)
 	if err != nil {
 		return "", err
 	}
@@ -347,35 +345,10 @@ func prefixOf(presented string) string {
 	return presented
 }
 
-// hashOf is the key's whole stored presence: the SHA-256 of the presented
-// string, as the bytes the BYTEA column holds.
-func hashOf(presented string) []byte {
-	sum := sha256.Sum256([]byte(presented))
-	return sum[:]
-}
-
 // descriptionOf turns an absent note into the NULL its column stores.
 func descriptionOf(descr string) *string {
 	if descr == "" {
 		return nil
 	}
 	return &descr
-}
-
-// alphanumericAlphabet is the alphabet keys draw from.
-const alphanumericAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-// randomString draws length characters from the alphabet with the crypto
-// source.
-func randomString(length int) (string, error) {
-	out := make([]byte, length)
-	max := big.NewInt(int64(len(alphanumericAlphabet)))
-	for i := range out {
-		n, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return "", err
-		}
-		out[i] = alphanumericAlphabet[n.Int64()]
-	}
-	return string(out), nil
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -21,23 +20,7 @@ import (
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "usergroup_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(t.Context()) })
-	return pool
+	return testutils.MigratedPostgres(t, "usergroup_test")
 }
 
 // testService builds the service with a recorder that writes for real — a

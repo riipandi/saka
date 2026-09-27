@@ -16,7 +16,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/riipandi/tango/database"
 	"log/slog"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -35,23 +34,7 @@ import (
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "user_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(t.Context()) })
-	return pool
+	return testutils.MigratedPostgres(t, "user_test")
 }
 
 // readPicture opens the account's picture through the service's read, so a

@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/riipandi/tango/internal/datastore"
-	"uuid"
 )
 
 // ErrNoRows re-exports the datastore's sentinel so callers answer one

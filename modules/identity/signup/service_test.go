@@ -1,7 +1,6 @@
 package signup
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -25,23 +23,7 @@ import (
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "signup_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
+	return testutils.MigratedPostgres(t, "signup_test")
 }
 
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
@@ -59,7 +41,7 @@ func insertToken(t *testing.T, pool *datastore.Postgres, raw string, usageLimit,
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(SignupTokenTable)
 	ib.Cols("token_hash", "usage_limit", "usage_count", "expires_at")
-	ib.Values(tokenSHA256(raw), usageLimit, usageCount, time.Now().Add(time.Hour))
+	ib.Values(crypto.HashHexToken(raw), usageLimit, usageCount, time.Now().Add(time.Hour))
 
 	query, args := ib.Build()
 	_, err := pool.Exec(t.Context(), query, args...)
@@ -72,7 +54,7 @@ func tokenUsageCount(t *testing.T, pool *datastore.Postgres, raw string) int32 {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("usage_count")
 	sb.From(SignupTokenTable)
-	sb.Where(sb.Equal("token_hash", tokenSHA256(raw)))
+	sb.Where(sb.Equal("token_hash", crypto.HashHexToken(raw)))
 
 	query, args := sb.Build()
 	var count int32
@@ -331,7 +313,7 @@ func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {
 	var usageLimit, usageCount int32
 	var expiresAt time.Time
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&tokenHash, &usageLimit, &usageCount, &expiresAt))
-	assert.Equal(t, tokenSHA256(created.RawToken), tokenHash)
+	assert.Equal(t, crypto.HashHexToken(created.RawToken), tokenHash)
 	assert.NotEqual(t, created.RawToken, tokenHash)
 	assert.Equal(t, int32(1), usageLimit)
 	assert.Equal(t, int32(0), usageCount)

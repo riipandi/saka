@@ -3,8 +3,9 @@ package multifactor
 import (
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // TotpTable is the table holding one row per enrolled TOTP authenticator. The

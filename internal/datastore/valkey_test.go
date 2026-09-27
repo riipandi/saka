@@ -1,4 +1,4 @@
-package datastore
+package datastore_test
 
 import (
 	"context"
@@ -8,13 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
 
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
 func TestValkeyAnswersAPing(t *testing.T) {
 	backend := testutils.StartValkeyWithTimeout(t)
 
-	v, err := NewValkey(t.Context(), ValkeyOptions{
+	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{
 		URL:             backend.URL,
 		ApplicationName: "tango-test",
 	})
@@ -29,7 +30,7 @@ func TestValkeySelectsTheConfiguredDatabase(t *testing.T) {
 
 	// A DB index in the options outranks the one the URL names, which is
 	// how a URL written for a shared server is retargeted per feature.
-	five, err := NewValkey(t.Context(), ValkeyOptions{
+	five, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{
 		URL: backend.URL + "/0",
 		DB:  5,
 	})
@@ -42,7 +43,7 @@ func TestValkeySelectsTheConfiguredDatabase(t *testing.T) {
 
 	// A second client on database 0 must not see the entry: the index the
 	// options named is the one the connection selected.
-	zero, err := NewValkey(t.Context(), ValkeyOptions{URL: backend.URL})
+	zero, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{URL: backend.URL})
 	require.NoError(t, err)
 	defer zero.Shutdown(context.Background())
 
@@ -55,7 +56,7 @@ func TestValkeySelectsTheConfiguredDatabase(t *testing.T) {
 func TestValkeyFailsFastOnAnUnreachableServer(t *testing.T) {
 	// A port nothing listens on: the ping in the constructor must fail the
 	// build, not hand out a client that errors on first use.
-	v, err := NewValkey(t.Context(), ValkeyOptions{
+	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{
 		URL: "redis://127.0.0.1:1/0",
 	})
 	require.Error(t, err)
@@ -63,13 +64,13 @@ func TestValkeyFailsFastOnAnUnreachableServer(t *testing.T) {
 }
 
 func TestValkeyRejectsAMalformedURL(t *testing.T) {
-	v, err := NewValkey(t.Context(), ValkeyOptions{URL: "postgres://localhost:5432/tango"})
+	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{URL: "postgres://localhost:5432/tango"})
 	require.Error(t, err)
 	assert.Nil(t, v)
 }
 
 func TestValkeyRequiresAURL(t *testing.T) {
-	v, err := NewValkey(t.Context(), ValkeyOptions{})
-	require.ErrorIs(t, err, ErrNoValkeyURL)
+	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{})
+	require.ErrorIs(t, err, datastore.ErrNoValkeyURL)
 	assert.Nil(t, v)
 }

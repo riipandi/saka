@@ -2,13 +2,9 @@ package onetimeaccess
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"github.com/riipandi/tango/internal/audit"
@@ -19,6 +15,7 @@ import (
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/pkg/crypto"
 )
 
 // The failures the flow reports. The handler maps them to connect codes, so
@@ -73,16 +70,6 @@ const (
 	// alone.
 	deviceTokenLength = 16
 )
-
-// unambiguousAlphabet is the alphabet the codes draw from: no digit or letter
-// a reader mistakes for another. A code is typed from a phone reading an
-// email, and an ambiguous character would send the holder through the refusal
-// loop for nothing.
-const unambiguousAlphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
-
-// alphanumericAlphabet is the alphabet the device tokens draw from. Ambiguity
-// costs nothing in a value the frontend holds whole.
-const alphanumericAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // Service issues and consumes the codes that sign an account in without its
 // password.
@@ -146,7 +133,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 		return "", time.Time{}, fmt.Errorf("onetimeaccess: code: %w", err)
 	}
 	expiresAt := s.now().Add(ttl)
-	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, codeSHA256(code), nil, expiresAt, s.now()); err != nil {
+	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(code), nil, expiresAt, s.now()); err != nil {
 		return "", time.Time{}, err
 	}
 	return code, expiresAt, nil
@@ -164,7 +151,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client audit.ClientInfo) (signin.Result, error) {
 	var result signin.Result
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		row, err := s.repo.FindTokenByHash(ctx, tx, codeSHA256(rawCode))
+		row, err := s.repo.FindTokenByHash(ctx, tx, crypto.HashHexToken(rawCode))
 		if errors.Is(err, datastore.ErrNoRows) {
 			return ErrTokenInvalid
 		}
@@ -286,7 +273,7 @@ func (s *Service) issueEmailCode(ctx context.Context, account Account, redirectP
 		return fmt.Errorf("onetimeaccess: code: %w", err)
 	}
 	now := s.now()
-	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, codeSHA256(code), deviceToken, now.Add(ttl), now); err != nil {
+	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(code), deviceToken, now.Add(ttl), now); err != nil {
 		return err
 	}
 	if _, err := s.queue.Add(jobs.OneTimeAccessEmailTask{
@@ -343,14 +330,6 @@ func ttlOr(ttlSeconds int32) time.Duration {
 	return time.Duration(ttlSeconds) * time.Second
 }
 
-// codeSHA256 hashes the raw code the caller presented, the form the token
-// table stores. The code is a credential shown once, so its hash is the whole
-// defense against a database leak.
-func codeSHA256(raw string) string {
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
-}
-
 // generateCode draws a code from the unambiguous alphabet, six characters for
 // a code that lives fifteen minutes or less and twelve for anything longer.
 func generateCode(ttl time.Duration) (string, error) {
@@ -358,26 +337,11 @@ func generateCode(ttl time.Duration) (string, error) {
 	if ttl <= shortCodeWindow {
 		length = shortCodeLength
 	}
-	return randomString(length, unambiguousAlphabet)
+	return crypto.RandomString(length, crypto.AlphabetUnambiguous)
 }
 
 // generateDeviceToken draws the device token the public email request answers
 // with.
 func generateDeviceToken() (string, error) {
-	return randomString(deviceTokenLength, alphanumericAlphabet)
-}
-
-// randomString draws length characters from the alphabet with the crypto
-// source, so a short code is still a real draw and not a modulo bias.
-func randomString(length int, alphabet string) (string, error) {
-	out := make([]byte, length)
-	max := big.NewInt(int64(len(alphabet)))
-	for i := range out {
-		n, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return "", fmt.Errorf("onetimeaccess: random: %w", err)
-		}
-		out[i] = alphabet[n.Int64()]
-	}
-	return string(out), nil
+	return crypto.RandomString(deviceTokenLength, crypto.AlphabetAlphanumeric)
 }

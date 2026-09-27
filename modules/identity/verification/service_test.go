@@ -18,35 +18,19 @@ import (
 	"connectrpc.com/connect"
 
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "verification_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
+	return testutils.MigratedPostgres(t, "verification_test")
 }
 
 // seedUser writes an account row directly, so the tests drive the flow's own
@@ -78,7 +62,7 @@ func seedToken(t *testing.T, pool *datastore.Postgres, userID, raw string, expir
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(AuthTokenTable)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at")
-	ib.Values(userID, tokenSHA256(raw), PurposeEmailVerification, expiresAt)
+	ib.Values(userID, crypto.HashHexToken(raw), PurposeEmailVerification, expiresAt)
 
 	query, args := ib.Build()
 	_, err := pool.Exec(t.Context(), query, args...)

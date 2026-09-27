@@ -11,6 +11,7 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/jobs"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
@@ -95,7 +96,7 @@ func TestConfirmEmailChangeMovesTheAccountOnce(t *testing.T) {
 	raw := "vetra-change-token-value"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
-	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, tokenSHA256(raw), "vetra@new.example.com",
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, crypto.HashHexToken(raw), "vetra@new.example.com",
 		time.Now().Add(time.Hour), time.Now()))
 
 	require.NoError(t, service.ConfirmEmailChange(t.Context(), raw))
@@ -126,7 +127,7 @@ func TestConfirmEmailChangeRefusesAnAddressClaimedInTheMeantime(t *testing.T) {
 	raw := "kohl-change-token-value"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
-	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, tokenSHA256(raw), "granger@example.com",
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, crypto.HashHexToken(raw), "granger@example.com",
 		time.Now().Add(time.Hour), time.Now()))
 
 	// Another account claims the address between the request and the click.
@@ -159,7 +160,7 @@ func TestConfirmEmailChangeRefusesAnExpiredToken(t *testing.T) {
 	require.NoError(t, parseErr)
 	// The table refuses a backdated row, so the test moves the service's
 	// clock past the window a fresh token closes with.
-	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, tokenSHA256(raw), "silas@new.example.com",
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, crypto.HashHexToken(raw), "silas@new.example.com",
 		time.Now().Add(2*time.Second), time.Now()))
 	service.now = func() time.Time { return time.Now().Add(time.Hour) }
 

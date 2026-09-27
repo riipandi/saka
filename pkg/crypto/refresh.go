@@ -2,9 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 )
 
 // RefreshTokenBytes is the entropy of a refresh token: 256 bits, the draw a
@@ -32,13 +30,12 @@ func NewRefreshTokenPair() (RefreshTokenPair, error) {
 		return RefreshTokenPair{}, err
 	}
 	plain := base64.RawURLEncoding.EncodeToString(raw)
-	return RefreshTokenPair{Plain: plain, Hash: HashRefreshToken(plain)}, nil
+	return RefreshTokenPair{Plain: plain, Hash: HashHexToken(plain)}, nil
 }
 
 // HashRefreshToken is the storage form of a refresh token: the SHA-256 of the
 // presented value, hex-encoded. Every issuer hashes the same way, so a row a
 // sign-in wrote is a row a renewal can rotate.
 func HashRefreshToken(presented string) string {
-	sum := sha256.Sum256([]byte(presented))
-	return hex.EncodeToString(sum[:])
+	return HashHexToken(presented)
 }

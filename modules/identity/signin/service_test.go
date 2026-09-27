@@ -1,7 +1,6 @@
 package signin
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -19,7 +18,6 @@ import (
 	"connectrpc.com/connect"
 
 	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -38,23 +36,7 @@ const testSecretHex = "0123456789abcdeffedcba98765432100123456789abcdeffedcba987
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "signin_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
+	return testutils.MigratedPostgres(t, "signin_test")
 }
 
 // testConfig is the one-stack configuration: the HMAC secret alone signs.

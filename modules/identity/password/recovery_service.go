@@ -2,19 +2,15 @@ package password
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/mailer"
-	"uuid"
-
 	"github.com/riipandi/tango/pkg/crypto"
 )
 
@@ -68,11 +64,6 @@ const tokenTTL = time.Hour
 // is what stops a caller from turning the trigger into a mailbomb; the token
 // row's send time is the clock it reads.
 const resendCooldown = time.Minute
-
-// tokenEntropy is the randomness of a raw reset token. It is sent to one
-// address once and only its hash is stored, so 256 bits is the whole defense
-// against a database leak.
-const tokenEntropy = 32
 
 // ResetEmail is the message a trigger queues. The queue's task wraps it, so
 // this package names the fields and never the queue — importing internal/jobs
@@ -273,12 +264,12 @@ func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 		return "", ErrMailUnavailable
 	}
 
-	raw, err := newToken()
+	raw, err := crypto.NewHexToken()
 	if err != nil {
 		return "", fmt.Errorf("password: mint token: %w", err)
 	}
 	now := s.now()
-	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, tokenSHA256(raw), now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(raw), now.Add(tokenTTL), now); err != nil {
 		return "", err
 	}
 
@@ -315,7 +306,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		return fmt.Errorf("password: hash: %w", err)
 	}
 
-	token, err := s.repo.FindTokenByHash(ctx, s.pool, tokenSHA256(rawToken))
+	token, err := s.repo.FindTokenByHash(ctx, s.pool, crypto.HashHexToken(rawToken))
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrInvalidToken
 	}
@@ -412,23 +403,4 @@ func (s *Service) revokeInTx(ctx context.Context, tx datastore.Querier, userID u
 // refusals agree on when a ban is in force.
 func bannedNow(account Account, at time.Time) bool {
 	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
-}
-
-// newToken mints the raw value the email carries: 256 bits rendered as 64
-// lowercase hexadecimal characters. Hex keeps the token URL-safe without
-// dashes or symbols, so it survives a query string, a QR code, and a
-// copy-paste through any chat client unchanged.
-func newToken() (string, error) {
-	buf := make([]byte, tokenEntropy)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
-// tokenSHA256 hashes the raw token the caller presented, the form the
-// auth_tokens table stores.
-func tokenSHA256(raw string) string {
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
 }

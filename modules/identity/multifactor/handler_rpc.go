@@ -11,13 +11,14 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/pkg/responder"
 
+	"uuid"
+
 	authv1 "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1"
 	authv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auth/v1/authv1connect"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"uuid"
 )
 
 // jwtutilsCallerFrom is the caller read the handler runs. It is the package

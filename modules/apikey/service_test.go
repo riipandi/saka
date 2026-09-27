@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 
 	"uuid"
@@ -23,23 +23,7 @@ import (
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "apikey_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(t.Context()) })
-	return pool
+	return testutils.MigratedPostgres(t, "apikey_test")
 }
 
 // testService builds the service with a recorder that writes for real — a
@@ -128,7 +112,7 @@ func TestCreateShowsTheKeyOnceAndRefusesADuplicateName(t *testing.T) {
 	// hash is the row's whole presence, so the raw value survives nowhere.
 	require.Len(t, issued.Raw, prefixLength+1+secretLength)
 	assert.True(t, strings.HasPrefix(issued.Raw, issued.Key.Prefix+keySeparator))
-	assert.Equal(t, hashOf(issued.Raw), issued.Key.KeyHash)
+	assert.Equal(t, crypto.HashTokenBytes(issued.Raw), issued.Key.KeyHash)
 	assert.NotEqual(t, issued.Raw, string(issued.Key.KeyHash))
 	assert.Equal(t, "hogwarts-library", issued.Key.Name)
 	require.NotNil(t, issued.Key.Descr)
@@ -233,7 +217,7 @@ func TestRenewReplacesAnExpiredKeyAndRefusesALiveOne(t *testing.T) {
 	renewed, err := service.Renew(t.Context(), owner, expired.Key.ID, newExpiry)
 	require.NoError(t, err)
 	assert.NotEqual(t, expired.Raw, renewed.Raw, "the old secret is dead the moment the row is written")
-	assert.Equal(t, hashOf(renewed.Raw), renewed.Key.KeyHash)
+	assert.Equal(t, crypto.HashTokenBytes(renewed.Raw), renewed.Key.KeyHash)
 	assert.WithinDuration(t, newExpiry, renewed.Key.ExpiresAt, time.Second)
 	assert.Nil(t, renewed.Key.EmailSent, "the new window earns a fresh reminder, not the old one's stamp")
 	assert.NotNil(t, renewed.Key.UpdatedAt)

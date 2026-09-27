@@ -1,7 +1,6 @@
 package onetimeaccess
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"log/slog"
 
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
@@ -21,6 +19,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
@@ -31,23 +30,7 @@ const testSecretHex = "0123456789abcdeffedcba98765432100123456789abcdeffedcba987
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "onetimeaccess_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
+	return testutils.MigratedPostgres(t, "onetimeaccess_test")
 }
 
 func testConfig() config.Config {
@@ -345,7 +328,7 @@ func TestRequestEmailAsAdminSendsWithoutExposingTheCode(t *testing.T) {
 	// The response carried no code, so the queued message is the only place
 	// the value exists — and the row beside it holds a hash, not the value.
 	code := pendingOneTimeAccessTask(t, pool, service.queue).Token
-	row, err := service.repo.FindTokenByHash(t.Context(), pool, codeSHA256(code))
+	row, err := service.repo.FindTokenByHash(t.Context(), pool, crypto.HashHexToken(code))
 	require.NoError(t, err)
 	assert.Nil(t, row.DeviceToken, "the administrative send pairs no device token")
 }

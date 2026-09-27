@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pquerna/otp/totp"
-	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 )
 
 // testCipher is the sealing a test runs: a real AES-256-GCM over a key the
@@ -417,23 +417,7 @@ func TestListTotpEnrollmentsCarriesTheSecretOnlyWhereTheAidRuns(t *testing.T) {
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
-	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "multifactor_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(t.Context()) })
-	return pool
+	return testutils.MigratedPostgres(t, "multifactor_test")
 }
 
 // insertUserBuilder answers the query and args one account row needs. The
