@@ -167,9 +167,3 @@ func CatalogBySlug() map[string]Permission {
 	}
 	return out
 }
-
-// IsCataloged reports whether the slug is one the catalog declares.
-func IsCataloged(slug string) bool {
-	_, ok := CatalogBySlug()[slug]
-	return ok
-}

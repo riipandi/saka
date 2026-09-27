@@ -162,9 +162,11 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 	).Scan(&stored))
 	assert.Equal(t, crypto.HashHexToken(raw), stored)
 
-	// A re-request inside the cooldown refuses; the row is untouched.
+	// A re-request inside the cooldown holds the send and answers the same
+	// generic success — a distinct refusal would disclose the address. The
+	// row is untouched and no second mail is queued.
 	_, err = service.ForgotPassword(t.Context(), "sophie@example.com")
-	assert.ErrorIs(t, err, ErrResendTooSoon)
+	require.NoError(t, err)
 	assert.Equal(t, 1, enqueuer.calls)
 }
 

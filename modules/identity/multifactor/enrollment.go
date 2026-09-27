@@ -79,18 +79,25 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := s.repo.CreateTotp(ctx, s.pool, row); err != nil {
+	// The enrollment and its record commit together, so a row that reads
+	// back has the record that explains it.
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if createErr := s.repo.CreateTotp(ctx, tx, row); createErr != nil {
+			return createErr
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventMfaEnrollmentStarted,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+			Payload: map[string]string{
+				"totp_id": totpIDString(row.ID),
+			},
+		})
+		return nil
+	})
+	if err != nil {
 		return BeginTotpEnrollmentResult{}, err
 	}
-
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:  audit.EventMfaEnrollmentStarted,
-		Status: audit.StatusSuccess,
-		UserID: userID.String(),
-		Payload: map[string]string{
-			"totp_id": totpIDString(row.ID),
-		},
-	})
 
 	return BeginTotpEnrollmentResult{
 		TotpID:     totpIDString(row.ID),
@@ -160,21 +167,21 @@ func (s *Service) ConfirmTotpEnrollment(ctx context.Context, userID uuid.UUID, t
 			}
 			clearCodes = codes
 		}
+		// The activation and its record commit together.
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventMfaEnrollmentConfirmed,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+			Payload: map[string]string{
+				"totp_id":     totpIDString(row.ID),
+				"device_name": row.Name,
+			},
+		})
 		return nil
 	})
 	if err != nil {
 		return ConfirmTotpEnrollmentResult{}, err
 	}
-
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:  audit.EventMfaEnrollmentConfirmed,
-		Status: audit.StatusSuccess,
-		UserID: userID.String(),
-		Payload: map[string]string{
-			"totp_id":     totpIDString(row.ID),
-			"device_name": row.Name,
-		},
-	})
 
 	return ConfirmTotpEnrollmentResult{
 		TotpID:        totpIDString(row.ID),
@@ -258,30 +265,34 @@ func (s *Service) DeleteTotpEnrollment(ctx context.Context, userID uuid.UUID, to
 	}
 
 	// The last factor's removal is the disable path's risk: prove the caller
-	// holds it or refuse.
+	// holds it or refuse. The proof, the deletes, and the record commit
+	// together — a failure between them must not leave recovery codes that
+	// answer a factor the account no longer holds.
 	if code == "" {
 		return ErrProofRequired
 	}
-	if err := s.verifyProof(ctx, userID, code); err != nil {
-		return err
-	}
-	if err := s.repo.DeleteTotp(ctx, s.pool, row.ID, userID); err != nil {
-		return err
-	}
-	// The set's device is gone: the recovery codes answer a factor that no
-	// longer exists, so they go with it.
-	if err := s.repo.DeleteAllRecoveryForUser(ctx, s.pool, userID); err != nil {
-		return err
-	}
-
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:  audit.EventMfaDisabled,
-		Status: audit.StatusSuccess,
-		UserID: userID.String(),
-		Payload: map[string]string{
-			"totp_id": totpIDString(row.ID),
-			"reason":  "last_device_removed",
-		},
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if verifyErr := s.verifyProof(ctx, tx, userID, code); verifyErr != nil {
+			return verifyErr
+		}
+		if delErr := s.repo.DeleteTotp(ctx, tx, row.ID, userID); delErr != nil {
+			return delErr
+		}
+		// The set's device is gone: the recovery codes answer a factor that
+		// no longer exists, so they go with it.
+		if recErr := s.repo.DeleteAllRecoveryForUser(ctx, tx, userID); recErr != nil {
+			return recErr
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventMfaDisabled,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+			Payload: map[string]string{
+				"totp_id": totpIDString(row.ID),
+				"reason":  "last_device_removed",
+			},
+		})
+		return nil
 	})
-	return nil
+	return err
 }

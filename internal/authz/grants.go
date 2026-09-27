@@ -77,23 +77,6 @@ func Grants(held []string, requirement string) bool {
 	return false
 }
 
-// Effective merges the grants a set of roles carries with the ones granted
-// directly, in a stable order: roles first, direct grants after, duplicates
-// collapsed. It is the shape an access token carries, and the shape the
-// service that loads an account's grants returns.
-func Effective(roleGrants, directGrants []string) []string {
-	seen := make(map[string]struct{}, len(roleGrants)+len(directGrants))
-	out := make([]string, 0, len(roleGrants)+len(directGrants))
-	for _, grant := range append(append([]string{}, roleGrants...), directGrants...) {
-		if _, dup := seen[grant]; dup {
-			continue
-		}
-		seen[grant] = struct{}{}
-		out = append(out, grant)
-	}
-	return out
-}
-
 // ValidSlug reports whether the string is a well-formed permission slug:
 // three colon-separated segments over the slug alphabet, with a wildcard
 // only in the middle position. It is the gate a role edit passes before a

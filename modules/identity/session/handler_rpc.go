@@ -397,6 +397,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeNotFound, errors.New("user not found"))
 	case errors.Is(err, ErrTargetAdmin):
 		return connect.NewError(connect.CodePermissionDenied, errors.New("an administrator may not be impersonated"))
+	case errors.Is(err, ErrTargetSelf):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("an account may not impersonate itself"))
 	case errors.Is(err, ErrNotImpersonating):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the caller is not impersonating"))
 	default:

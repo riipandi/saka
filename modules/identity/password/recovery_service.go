@@ -203,11 +203,13 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) (string, err
 	}
 
 	// The resend cooldown reads the send time the last token row stamps: a
-	// request inside the window refuses, so the resend is the deliberate
-	// re-issue the caller waits for, not the loop a script runs.
+	// request inside the window holds the send rather than re-issuing, and
+	// answers the same generic success — a distinct refusal would tell the
+	// caller the address is real and freshly targeted, which is the one bit
+	// every other path here refuses to give.
 	if existing, findErr := s.repo.FindTokenByUser(ctx, s.pool, account.ID); findErr == nil && existing.LastSent != nil {
 		if s.now().Before(existing.LastSent.Add(resendCooldown)) {
-			return "", ErrResendTooSoon
+			return "", nil
 		}
 	}
 
@@ -301,11 +303,8 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		return err
 	}
 
-	hash, err := s.hasher(newPassword)
-	if err != nil {
-		return fmt.Errorf("password: hash: %w", err)
-	}
-
+	// The token is looked up before the password is hashed: a public
+	// endpoint answers a junk token with a cheap refusal, not a KDF run.
 	token, err := s.repo.FindTokenByHash(ctx, s.pool, crypto.HashHexToken(rawToken))
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrInvalidToken
@@ -315,6 +314,11 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 	}
 	if !token.ExpiresAt.After(s.now()) {
 		return ErrInvalidToken
+	}
+
+	hash, err := s.hasher(newPassword)
+	if err != nil {
+		return fmt.Errorf("password: hash: %w", err)
 	}
 
 	account, err := s.repo.FindUserByID(ctx, s.pool, token.UserID)
@@ -359,8 +363,15 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		if setErr := s.repo.SetPasswordHash(ctx, tx, token.UserID, hash); setErr != nil {
 			return setErr
 		}
-		if delErr := s.repo.DeleteToken(ctx, tx, token.ID); delErr != nil {
+		consumed, delErr := s.repo.DeleteToken(ctx, tx, token.ID, crypto.HashHexToken(rawToken))
+		if delErr != nil {
 			return delErr
+		}
+		if !consumed {
+			// Another reset spent this token between the read and the
+			// write: the write rolls back, so only one caller's password
+			// lands.
+			return ErrInvalidToken
 		}
 		// The swap, the revocations, and the record commit together: a
 		// credential that reads as replaced has a record saying so.

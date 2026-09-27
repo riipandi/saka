@@ -62,4 +62,8 @@ type SessionSchema struct {
 	// a stop request checks the actor claims against, so a delegation is
 	// provable from the row and not from the token alone.
 	ImpersonatedBy *uuid.UUID `db:"impersonated_by"`
+	// RotatedTokenHash is the refresh hash the last rotation replaced. A
+	// lookup that lands on it is a replayed token, and the session it names
+	// is revoked as compromised rather than merely refused.
+	RotatedTokenHash string `db:"rotated_token_hash"`
 }

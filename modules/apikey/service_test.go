@@ -182,6 +182,20 @@ func TestValidateRefusesAnUnknownExpiredRevokedOrDisabledKey(t *testing.T) {
 	_, err = pool.Exec(t.Context(), "UPDATE public.users SET disabled = false WHERE id = $1", owner)
 	require.NoError(t, err)
 
+	// A banned owner's keys open nothing either — permanent and windowed
+	// alike. The ban is the account-level refusal every credential answers,
+	// and a machine credential is the one that would otherwise outlive the
+	// judgement entirely.
+	banned := createdExpiring(t, service, owner, "banned-key", 90*24*time.Hour)
+	_, err = pool.Exec(t.Context(), "UPDATE public.users SET banned_at = now() - interval '1 hour' WHERE id = $1", owner)
+	require.NoError(t, err)
+	_, err = service.Validate(t.Context(), banned.Raw)
+	assert.ErrorIs(t, err, ErrKeyNotFound)
+	_, err = pool.Exec(t.Context(), "UPDATE public.users SET banned_at = now() - interval '25 hours', ban_expires = now() - interval '1 hour' WHERE id = $1", owner)
+	require.NoError(t, err)
+	_, err = service.Validate(t.Context(), banned.Raw)
+	require.NoError(t, err, "an expired ban lifts the refusal")
+
 	// The live key still works, and the validation it just passed left its
 	// mark: the last-used instant is the touch the row carries.
 	validated, err := service.Validate(t.Context(), live.Raw)

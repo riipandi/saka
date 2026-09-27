@@ -326,7 +326,7 @@ func TestAdminDisableMfaStripsEveryFactorWithoutAProof(t *testing.T) {
 
 	// The recovery set went with the factors: a code from the old set
 	// proves nothing anymore.
-	consumed, err := service.consumeRecoveryCode(ctx, userID, confirmed.RecoveryCodes[0], time.Now())
+	consumed, err := service.consumeRecoveryCode(ctx, service.pool, userID, confirmed.RecoveryCodes[0], time.Now())
 	require.NoError(t, err)
 	assert.False(t, consumed)
 

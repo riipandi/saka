@@ -135,7 +135,7 @@ func (s *Service) SignOut(ctx context.Context, callerSession string, callerID st
 		}
 
 		now := s.now()
-		ended, revokeErr := s.repo.Revoke(ctx, tx, sid, userID, now)
+		ended, revokeErr := s.repo.Revoke(ctx, tx, sid, &userID, now)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -273,7 +273,7 @@ func (s *Service) RevokeSession(ctx context.Context, callerSession, callerID, ta
 			return ErrSessionNotFound
 		}
 
-		ended, revokeErr := s.repo.Revoke(ctx, tx, targetID, userID, s.now())
+		ended, revokeErr := s.repo.Revoke(ctx, tx, targetID, &userID, s.now())
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -392,8 +392,23 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 	}
 
 	now := s.now()
-	row, err := s.repo.FindActiveByTokenHash(ctx, s.pool, crypto.HashRefreshToken(presented), now)
+	hash := crypto.HashRefreshToken(presented)
+	row, err := s.repo.FindActiveByTokenHash(ctx, s.pool, hash, now)
 	if errors.Is(err, datastore.ErrNoRows) {
+		// A hash the active lookup misses may still name a live session —
+		// the one a rotation replaced. Presenting a spent token is the one
+		// competent explanation of a duplicated credential, so the session
+		// it belongs to is revoked outright rather than merely refused.
+		spent, spentErr := s.repo.FindByRotatedTokenHash(ctx, s.pool, hash)
+		if errors.Is(spentErr, datastore.ErrNoRows) {
+			return Refreshed{}, ErrSessionEnded
+		}
+		if spentErr != nil {
+			return Refreshed{}, spentErr
+		}
+		if revokeErr := s.revokeCompromised(ctx, spent); revokeErr != nil {
+			return Refreshed{}, revokeErr
+		}
 		return Refreshed{}, ErrSessionEnded
 	}
 	if err != nil {
@@ -416,11 +431,26 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		return Refreshed{}, fmt.Errorf("session: refresh token: %w", err)
 	}
 
+	// The renewal's window: the caller's lifetime, capped for a delegation —
+	// the impersonation window is a hard bound, and a renewal that handed a
+	// delegated session a fresh full lifetime would let it outlive the
+	// administration that opened it. A delegation whose window has passed
+	// renews no further.
+	lifetime := s.issuer.SessionLifetime(row.Remember)
+	expiresAt := now.Add(lifetime)
+	if row.Provider == ImpersonationProvider {
+		hardEnd := row.CreatedAt.Add(ImpersonationTTL)
+		if !now.Before(hardEnd) {
+			return Refreshed{}, ErrSessionEnded
+		}
+		expiresAt = hardEnd
+		lifetime = expiresAt.Sub(now)
+	}
+
 	var rotated bool
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		var rotateErr error
-		rotated, rotateErr = s.repo.Rotate(ctx, tx, row.ID, replacement.Hash, now,
-			now.Add(s.issuer.SessionLifetime(row.Remember)))
+		rotated, rotateErr = s.repo.Rotate(ctx, tx, row.ID, replacement.Hash, hash, now, expiresAt)
 		return rotateErr
 	})
 	if err != nil {
@@ -437,18 +467,27 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		return Refreshed{}, grantsErr
 	}
 
-	access, err := s.issuer.SignSessionToken(ctx, view.ID, jwtutils.AccessClaims{
+	claims := jwtutils.AccessClaims{
 		Email:       view.Email,
 		Username:    view.Username,
 		DisplayName: view.DisplayName,
 		Roles:       roles,
 		Permissions: permissions,
 		SessionID:   row.ID.String(),
-		// The delegation survives its renewal: the row's impersonated_by is
-		// the durable fact the actor pair is re-signed from, so the rotated
-		// token keeps naming the administrator behind it.
-		ActorID: actorIDString(row.ImpersonatedBy),
-	}, row.ID, now)
+	}
+	// The delegation survives its renewal: the row's impersonated_by is the
+	// durable fact the actor pair is re-signed from, so the rotated token
+	// keeps naming the administrator behind it. The username takes one extra
+	// read — the row carries the identifier alone — and a delegation that
+	// cannot name its actor in full is worse than the query costs.
+	if row.ImpersonatedBy != nil {
+		if actor, actorErr := user.ReadAccount(ctx, s.pool, *row.ImpersonatedBy); actorErr == nil {
+			claims.ActorID = user.FormatID(*row.ImpersonatedBy)
+			claims.ActorUsername = actor.Username
+		}
+	}
+
+	access, err := s.issuer.SignSessionToken(ctx, view.ID, claims, row.ID, now)
 	if err != nil {
 		return Refreshed{}, err
 	}
@@ -457,11 +496,36 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		AccessToken:      access,
 		TokenType:        jwtutils.BearerScheme,
 		AccessExpiresIn:  int32(s.issuer.AccessTokenTTL().Seconds()),
-		RefreshExpiresIn: int32(s.issuer.SessionLifetime(row.Remember).Seconds()),
+		RefreshExpiresIn: int32(lifetime.Seconds()),
 		RefreshToken:     replacement.Plain,
 		SessionID:        row.ID.String(),
 		User:             view,
 	}, nil
+}
+
+// revokeCompromised ends the session a replayed token named and writes the
+// audit record in the same transaction: a reuse is a security happening an
+// operator must see even if the process dies mid-write.
+func (s *Service) revokeCompromised(ctx context.Context, spent SessionSchema) error {
+	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, revokeErr := s.repo.Revoke(ctx, tx, spent.ID, nil, s.now()); revokeErr != nil {
+			return revokeErr
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:        audit.EventSessionRevoked,
+			Trigger:      audit.TriggerSystem,
+			Status:       audit.StatusFailed,
+			UserID:       spent.UserID.String(),
+			ResourceType: "session",
+			ResourceID:   spent.ID.UUID(),
+			Payload:      map[string]string{"reason": "refresh_token_reuse"},
+		})
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("session: refresh reuse revocation: %w", err)
+	}
+	return nil
 }
 
 // RevokeAllForUser stamps the end of every live session the account holds —
@@ -492,16 +556,6 @@ func addrPtr(raw string) *netip.Addr {
 		return nil
 	}
 	return &addr
-}
-
-// actorIDString is the delegated row's actor as the claims carry it — the
-// wire TypeID form, and empty on a session that is nobody's delegation, so
-// the omitted claim stays omitted on every token that is not one.
-func actorIDString(by *uuid.UUID) string {
-	if by == nil {
-		return ""
-	}
-	return user.FormatID(*by)
 }
 
 // callerUUID turns the claims' subject into the key the rows carry. The

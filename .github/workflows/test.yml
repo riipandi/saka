@@ -135,7 +135,6 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Mirrors `task test:go:debug` (Taskfile.yml).
       - name: Run unit tests (backend, debug tags)
         run: gotestsum --format testname -- -tags debug ./cmd/... ./database/...
         env:

@@ -39,7 +39,6 @@ CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC
 CREATE INDEX IF NOT EXISTS idx_users_updated_at ON public.users (updated_at) WHERE updated_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_metadata_gin ON public.users USING GIN (metadata);
 CREATE INDEX IF NOT EXISTS idx_users_last_login_at ON public.users (last_login_at) WHERE last_login_at IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_normalized_username ON public.users (LOWER(username));
 
 -- --------------------------------------------------------
 -- Table: public.user_passwords (junction table)
@@ -95,10 +94,9 @@ CREATE INDEX IF NOT EXISTS idx_user_groups_users_user_group_id ON public.user_gr
 CREATE TABLE IF NOT EXISTS public.sessions (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL,
+    provider TEXT NOT NULL CONSTRAINT chk_sessions_provider CHECK (provider IN ('password', 'one_time_access', 'totp', 'impersonation')),
     token_hash TEXT NOT NULL UNIQUE,
     user_agent TEXT,
-    device_name TEXT,
     device_fingerprint TEXT,
     ip_address INET,
     remember BOOLEAN NOT NULL DEFAULT false,
@@ -107,11 +105,13 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     refreshed_at TIMESTAMPTZ DEFAULT NULL,
     revoked_at TIMESTAMPTZ DEFAULT NULL,
     revoked_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    impersonated_by UUID REFERENCES public.users(id) ON DELETE SET NULL
+    impersonated_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    rotated_token_hash TEXT DEFAULT NULL
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.sessions (user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions (expires_at) WHERE expires_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_rotated_token_hash ON public.sessions (rotated_token_hash) WHERE rotated_token_hash IS NOT NULL;
 
 -- The table remembering every browser fingerprint an account has signed in
 -- from. A session row is a poor record of a device — it expires and gets
@@ -130,7 +130,6 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON public.sessions US
 CREATE INDEX IF NOT EXISTS idx_sessions_ip_address ON public.sessions (ip_address) WHERE ip_address IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_device_fingerprint ON public.sessions (device_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_sessions_impersonated_by ON public.sessions (impersonated_by) WHERE impersonated_by IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_token_hash ON public.sessions (token_hash);
 
 -- --------------------------------------------------------
 -- Table: public.auth_tokens — one-time access, email verification,
@@ -144,11 +143,21 @@ CREATE TABLE IF NOT EXISTS public.auth_tokens (
     device_token VARCHAR(16), -- Used only for one_time_access
     payload TEXT,             -- Used only for email_change: the pending address the token is bound to
     purpose TEXT NOT NULL DEFAULT 'one_time_access',
+    -- The wrong-guess budget a one-time-access token spends. The count rides
+    -- the row so every replica judges the same token the same way.
+    wrong_attempts INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP),
     last_sent_at TIMESTAMPTZ DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'password_reset', 'email_change'))
+    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'password_reset', 'email_change')),
+    -- A device pair travels only beside a one-time-access code, and a
+    -- pending address only beside an email-change token. One-time-access
+    -- may carry no device at all: the email path binds the code to nothing.
+    CONSTRAINT chk_auth_tokens_purpose_columns CHECK (
+        (device_token IS NULL OR purpose = 'one_time_access')
+        AND (payload IS NULL OR purpose = 'email_change')
+    )
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens (user_id);
@@ -268,7 +277,6 @@ DROP INDEX IF EXISTS idx_auth_tokens_token_hash;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;
-DROP INDEX IF EXISTS idx_sessions_token_hash;
 DROP INDEX IF EXISTS idx_sessions_impersonated_by;
 DROP INDEX IF EXISTS idx_sessions_device_fingerprint;
 DROP INDEX IF EXISTS idx_sessions_ip_address;
@@ -277,7 +285,6 @@ DROP INDEX IF EXISTS idx_sessions_expires_at;
 DROP INDEX IF EXISTS idx_sessions_user_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_group_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_id;
-DROP INDEX IF EXISTS idx_users_normalized_username;
 DROP INDEX IF EXISTS idx_users_last_login_at;
 DROP INDEX IF EXISTS idx_users_metadata_gin;
 DROP INDEX IF EXISTS idx_users_updated_at;

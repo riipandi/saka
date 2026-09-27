@@ -325,6 +325,21 @@ func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 	assert.Equal(t, 2, bannedLive, "one permanent and one inside its window")
 	assert.Equal(t, 1, bannedPast, "one whose window has passed")
 
+	// The aggregate buckets above cannot tell the two expiry scenarios
+	// apart — a swap between them satisfies the counts while leaving both
+	// scenarios reading the wrong state. Pin each account to its own
+	// bucket: hermione's window is open, vittoria's has passed.
+	var states int
+	require.NoError(t, pool.QueryRow(t.Context(), `
+		SELECT count(*) FROM (
+			SELECT 1 FROM public.users
+			WHERE username = 'hermione_granger' AND ban_expires > now()
+			UNION ALL
+			SELECT 1 FROM public.users
+			WHERE username = 'vittoria_vetra' AND ban_expires IS NOT NULL AND ban_expires <= now()
+		) matched`).Scan(&states))
+	assert.Equal(t, 2, states, "hermione's window is open and vittoria's has passed")
+
 	// Every banned row carries a reason: the column and the notification
 	// read from it, and a ban without one is the kind an audit cannot
 	// explain.

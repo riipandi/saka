@@ -97,21 +97,18 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 	}
 }
 
-// refuseREST writes a rule's refusal in the envelope the REST surface
-// answers.
+// refuseREST writes a rule's refusal in the envelope the REST surface answers.
 //
-// The mapping is the same one the RPC surface applies, expressed in status
-// codes: a missing caller is 401 because the answer is to present a
-// credential, a caller without the role is 403, and a request naming another
-// account is 404 — the answer that discloses least, because the caller learns
-// nothing about whether the account exists.
+// The mapping is the one the RPC surface applies, expressed in status codes:
+// a missing caller is 401 because the answer is to present a credential, and
+// every other refusal is 404 — the answer that discloses least, because a
+// caller without the role cannot tell an administrative route from an absent
+// one, and a caller naming another account learns nothing about whether the
+// account exists.
 func refuseREST(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, guard.ErrUnauthenticated):
+	if errors.Is(err, guard.ErrUnauthenticated) {
 		responder.Fail(w, r, http.StatusUnauthorized, "authentication required")
-	case errors.Is(err, guard.ErrAdminRequired), errors.Is(err, guard.ErrImpersonated):
-		responder.Fail(w, r, http.StatusForbidden, "the caller may not perform this operation")
-	default:
-		responder.Fail(w, r, http.StatusNotFound, "not found")
+		return
 	}
+	responder.Fail(w, r, http.StatusNotFound, "not found")
 }

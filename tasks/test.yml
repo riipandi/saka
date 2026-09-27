@@ -12,11 +12,7 @@ tasks:
 
   test:go:
     desc: Run Go unit tests (pass packages or flags after `--`)
-    cmd: gotestsum --format testname {{.CLI_ARGS | default "./..."}}
-
-  test:go:debug:
-    desc: Run Go unit tests for the debug build
-    cmd: gotestsum --format testname -- -tags debug {{.CLI_ARGS | default "./cmd/... ./database/..."}}
+    cmd: gotestsum --format testname -- {{.CLI_ARGS | default "$(go list ./... | egrep -v '(/test|/codegen)$$')"}}
 
   test:ui:
     desc: Run frontend unit tests

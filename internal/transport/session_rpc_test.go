@@ -148,11 +148,6 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	assert.Equal(t, result.SessionID, refreshed.SessionID)
 	assert.NotEqual(t, result.RefreshToken, refreshed.RefreshToken)
 
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
-		`{"refresh_token":"`+result.RefreshToken+`"}`))
-	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
-
 	// The list answers the one session the account holds.
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceListSessionsProcedure, `{}`))
@@ -181,6 +176,30 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
 		`{"refresh_token":"`+refreshed.RefreshToken+`"}`))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+
+	// The reuse walk needs a session the fake caller's identifier names, so
+	// a second opening runs it: the renewal rotates, the replayed original
+	// is refused, and the refusal comes with a revocation — the one
+	// competent explanation of a replayed refresh token is a duplicated
+	// credential, and the session it named ends with it.
+	stamp, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderPassword,
+		audit.EventSignIn, signin.SessionParams{})
+	require.NoError(t, err)
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
+		`{"refresh_token":"`+stamp.RefreshToken+`"}`))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRefreshProcedure,
+		`{"refresh_token":"`+stamp.RefreshToken+`"}`))
+	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceListSessionsProcedure, `{}`))
+	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "the session has ended")
 }
 
 // TestTheBulkSignOutsSweepTheAccountSessions runs the two sweeps a holder

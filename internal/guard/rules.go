@@ -314,35 +314,6 @@ var RestRules = []RestEntry{
 	},
 }
 
-// RestRuleFor answers the rule a REST request gets, with the target it names.
-//
-// The route is matched segment by segment, so a `{param}` stands for exactly
-// one segment and a path parameter is read from the position the pattern puts
-// it in. Matching here rather than reading chi's route context is deliberate:
-// the middleware runs before the route is matched, and a guard that waited
-// for the match would run after the handler was chosen.
-//
-// A route the table does not name is administrative, the same default the
-// procedure table applies.
-func RestRuleFor(method, path string) (Rule, Target) {
-	segments := splitPath(path)
-	for _, entry := range RestRules {
-		if entry.Method != method {
-			continue
-		}
-		params, ok := matchPattern(splitPath(entry.Pattern), segments)
-		if !ok {
-			continue
-		}
-		rule := entry.Rule
-		if rule == nil {
-			rule = Admin
-		}
-		return rule, Target{PathParams: params}
-	}
-	return Admin, Target{}
-}
-
 // ContractProcedures lists every procedure path the contracts declare.
 //
 // It is derived from the generated descriptors rather than written out, so

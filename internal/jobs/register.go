@@ -26,7 +26,9 @@ import (
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
 func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool) {
-	client.Register(queue.NewQueue[CleanupTask](cleanupProcessor))
+	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
+		return cleanupProcessor(ctx, task, pool)
+	}))
 	// The audit retention runs on the pool rather than through a service: it
 	// deletes rows nothing reads back, so it needs no feature to own it.
 	client.Register(queue.NewQueue[AuditCleanupTask](func(ctx context.Context, task AuditCleanupTask) error {

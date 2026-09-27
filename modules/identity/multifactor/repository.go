@@ -278,22 +278,6 @@ func (r *Repository) CountRecoveryCodes(ctx context.Context, db datastore.Querie
 	return total, used, nil
 }
 
-// HasUnusedRecoveryCode answers whether the account holds at least one code
-// it has not spent — the proof gate the destructive procedures share.
-func (r *Repository) HasUnusedRecoveryCode(ctx context.Context, db datastore.Querier, userID uuid.UUID) (bool, error) {
-	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("count(*)")
-	sb.From(RecoveryTable)
-	sb.Where(sb.Equal("user_id", userID), sb.IsNull("used_at"))
-
-	query, args := sb.Build()
-	var count int
-	if err := db.QueryRow(ctx, query, args...).Scan(&count); err != nil {
-		return false, fmt.Errorf("multifactor: has recovery: %w", err)
-	}
-	return count > 0, nil
-}
-
 // DeleteAllRecoveryForUser clears the account's set — disable's write.
 func (r *Repository) DeleteAllRecoveryForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
@@ -325,7 +309,7 @@ func (r *Repository) CreatePending(ctx context.Context, db datastore.Querier, ro
 }
 
 // pendingColumns is the select list one bridge row answers.
-var pendingColumns = []string{"id", "user_id", "token_hash", "remember", "expires_at", "created_at"}
+var pendingColumns = []string{"id", "user_id", "token_hash", "remember", "expires_at", "created_at", "wrong_attempts"}
 
 // FindLivePending reads the bridge a presented pending token resolves to.
 // The WHERE clause is the gate: hash match and unexpired — a spent, expired,
@@ -340,7 +324,7 @@ func (r *Repository) FindLivePending(ctx context.Context, db datastore.Querier, 
 	var row PendingSchema
 	var rawID string
 	scan := func(dest ...any) error { return db.QueryRow(ctx, query, args...).Scan(dest...) }
-	if err := scan(&rawID, &row.UserID, &row.TokenHash, &row.Remember, &row.ExpiresAt, &row.CreatedAt); err != nil {
+	if err := scan(&rawID, &row.UserID, &row.TokenHash, &row.Remember, &row.ExpiresAt, &row.CreatedAt, &row.WrongAttempts); err != nil {
 		if errors.Is(err, datastore.ErrNoRows) {
 			return PendingSchema{}, datastore.ErrNoRows
 		}
@@ -356,16 +340,46 @@ func (r *Repository) FindLivePending(ctx context.Context, db datastore.Querier, 
 
 // DeletePending removes one bridge row — CompleteSignIn's consume, whatever
 // way the exchange ended.
-func (r *Repository) DeletePending(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
+// DeletePending consumes the bridge a presented pending token names. The
+// delete is the consumption: its WHERE carries the token hash, so two
+// completions racing on one bridge cannot both spend it — the second answers
+// false, and the session it was about to open never opens.
+func (r *Repository) DeletePending(ctx context.Context, db datastore.Querier, id uuid.UUID, hash string) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
 	dbb.DeleteFrom(PendingTable)
-	dbb.Where(dbb.Equal("id", id))
+	dbb.Where(dbb.Equal("id", id), dbb.Equal("token_hash", hash))
 
 	query, args := dbb.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("multifactor: delete pending: %w", err)
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("multifactor: delete pending: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
+}
+
+// RegisterWrongAttempt spends one wrong-code slot on the bridge. The UPDATE's
+// WHERE carries the budget, so two racing wrong answers cannot both fit in
+// the last slot; it answers whether that strike was the budget's last — the
+// caller ends the bridge when it was.
+func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Querier, id uuid.UUID, max int) (bool, error) {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(PendingTable)
+	ub.Set(ub.Add("wrong_attempts", 1))
+	ub.Where(ub.Equal("id", id), ub.LT("wrong_attempts", max))
+	ub.Returning("wrong_attempts")
+
+	query, args := ub.Build()
+	var attempts int
+	err := db.QueryRow(ctx, query, args...).Scan(&attempts)
+	if errors.Is(err, datastore.ErrNoRows) {
+		// Another racer took the slot: the bridge is on its way out either
+		// way, so the strike reads as the last one.
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("multifactor: register wrong attempt: %w", err)
+	}
+	return attempts >= max, nil
 }
 
 // DeleteExpiredPending purges bridges past their life — the sweeper's delete.

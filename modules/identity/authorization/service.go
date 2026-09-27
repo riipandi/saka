@@ -564,9 +564,12 @@ func (s *Service) readDetail(ctx context.Context, db datastore.Querier, roleID R
 // not-found boundary the per-user procedures share, the way the group
 // procedures answer theirs.
 func (s *Service) accountExists(ctx context.Context, userID uuid.UUID) error {
-	row := s.pool.QueryRow(ctx, "SELECT 1 FROM "+user.UserTable+" WHERE id = $1", userID)
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("1").From(user.UserTable).Where(sb.Equal("id", userID))
+
+	query, args := sb.Build()
 	var one int
-	if err := row.Scan(&one); errors.Is(err, datastore.ErrNoRows) {
+	if err := s.pool.QueryRow(ctx, query, args...).Scan(&one); errors.Is(err, datastore.ErrNoRows) {
 		return ErrUserNotFound
 	} else if err != nil {
 		return fmt.Errorf("authorization: read account: %w", err)

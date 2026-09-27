@@ -54,7 +54,6 @@ CREATE TABLE IF NOT EXISTS public.webauthn_sessions (
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_user_id ON public.webauthn_sessions (user_id);
-CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_challenge ON public.webauthn_sessions (challenge);
 CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires_at ON public.webauthn_sessions USING btree (expires_at);
 CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_type ON public.webauthn_sessions (challenge_type);
 CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_user_type ON public.webauthn_sessions (user_id, challenge_type);
@@ -115,7 +114,11 @@ CREATE TABLE IF NOT EXISTS public.user_mfa_pending (
     token_hash TEXT NOT NULL UNIQUE,
     remember BOOLEAN NOT NULL DEFAULT false,
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- The wrong-code budget the bridge has spent. The count rides the row so
+    -- every replica judges the same bridge the same way, and so the budget
+    -- survives a process restart inside the bridge's life.
+    wrong_attempts INT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_mfa_pending_expires_at ON public.user_mfa_pending (expires_at);
@@ -136,7 +139,6 @@ DROP TRIGGER IF EXISTS trg_webauthn_credentials_updated_at ON public.webauthn_cr
 DROP INDEX IF EXISTS idx_webauthn_sessions_user_type;
 DROP INDEX IF EXISTS idx_webauthn_sessions_type;
 DROP INDEX IF EXISTS idx_webauthn_sessions_expires_at;
-DROP INDEX IF EXISTS idx_webauthn_sessions_challenge;
 DROP INDEX IF EXISTS idx_webauthn_sessions_user_id;
 DROP INDEX IF EXISTS idx_webauthn_credentials_user_device_type;
 DROP INDEX IF EXISTS idx_webauthn_credentials_created_at;

@@ -2,6 +2,7 @@ package onetimeaccess
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +18,11 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
 )
+
+// maxAttempts is how many wrong device pairs one token survives before the
+// token dies. The budget rides the row, so every replica judges the same
+// token the same way.
+const maxAttempts = 5
 
 // The failures the flow reports. The handler maps them to connect codes, so
 // the wire form of a refusal lives with the transport, not here.
@@ -141,6 +147,15 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 
 // Exchange consumes a code and signs its holder in.
 //
+// The exchange deliberately runs one factor, not two: the email code is the
+// recovery path an account walks when its password is the thing it cannot
+// produce, and a second factor demanded beside it would turn a forgotten
+// password into a locked-out account. The compensating controls are the
+// code's own shape — six characters of a 58-symbol alphabet, bound to the
+// device pair it was issued beside, spendable once, alive for the TTL, and
+// ended by a wrong-device budget — plus the anti-enumeration every
+// unauthenticated procedure here keeps.
+//
 // The whole exchange is one transaction: the code's spend, the session it
 // opens, the last-login stamp, and the audit record commit together, so a
 // rollback returns the code — a holder whose sign-in failed halfway can try
@@ -161,7 +176,19 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 		if !row.ExpiresAt.After(s.now()) {
 			return ErrTokenInvalid
 		}
-		if row.DeviceToken != nil && *row.DeviceToken != deviceToken {
+		if row.DeviceToken != nil && subtle.ConstantTimeCompare([]byte(*row.DeviceToken), []byte(deviceToken)) != 1 {
+			// The device pair failed: the wrong guess rides the row, and the
+			// guess that fills the budget ends the token — a device-bound
+			// code that keeps failing is one a third party is holding.
+			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, tx, row.ID, maxAttempts)
+			if budgetErr != nil {
+				return budgetErr
+			}
+			if !live {
+				if _, delErr := s.repo.DeleteToken(ctx, tx, row.ID); delErr != nil {
+					return delErr
+				}
+			}
 			return ErrDeviceMismatch
 		}
 

@@ -57,11 +57,13 @@ func TestTheCatalogCarriesEverySlugTheGrammarAllows(t *testing.T) {
 			t.Errorf("catalog slug %q is not a slug the grammar accepts", slug)
 		}
 	}
-	if !IsCataloged("user:*:assign_role") {
+	if _, ok := catalog["user:*:assign_role"]; !ok {
 		t.Error("the user resource must carry assign_role")
 	}
-	if IsCataloged("user:usr_1:read") {
-		t.Error("a per-instance slug is minted at the feature, never cataloged")
+	for slug := range catalog {
+		if slug == "user:usr_1:read" {
+			t.Error("a per-instance slug is minted at the feature, never cataloged")
+		}
 	}
 }
 
@@ -75,17 +77,6 @@ func TestTheAdministratorRoleHoldsTheWholeCatalog(t *testing.T) {
 				t.Errorf("the administrator role must hold %q", slug)
 			}
 		}
-	}
-}
-
-func TestEffectiveCollapsesDuplicatesInStableOrder(t *testing.T) {
-	got := Effective(
-		[]string{"user:*:read", "user:*:ban", "user:*:read"},
-		[]string{"user:*:ban", "notification:*:read"},
-	)
-	want := []string{"user:*:read", "user:*:ban", "notification:*:read"}
-	if !slices.Equal(got, want) {
-		t.Errorf("Effective() = %v, want %v", got, want)
 	}
 }
 

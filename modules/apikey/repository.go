@@ -218,7 +218,11 @@ func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, ha
 	sb.SelectMore("u.id", "u.username", "u.email", "u.display_name")
 	sb.From(KeyTable + " k")
 	sb.Join(user.UserTable+" u", "u.id = k.user_id")
-	sb.Where(sb.Equal("k.key_hash", hash), sb.IsNull("k.revoked_at"), sb.GT("k.expires_at", now), sb.Equal("u.disabled", false))
+	sb.Where(sb.Equal("k.key_hash", hash), sb.IsNull("k.revoked_at"), sb.GT("k.expires_at", now), sb.Equal("u.disabled", false),
+		// A banned owner's keys open nothing: the ban is the account-level
+		// refusal every credential answers, and a machine credential is the
+		// one that would otherwise outlive the judgement entirely.
+		sb.Or(sb.IsNull("u.banned_at"), sb.And(sb.IsNotNull("u.ban_expires"), sb.LE("u.ban_expires", now))))
 
 	query, args := sb.Build()
 	var key KeySchema

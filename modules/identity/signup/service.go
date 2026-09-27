@@ -83,16 +83,14 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 	if policyErr := password.Validate(params.Password); policyErr != nil {
 		return user.UserView{}, policyErr
 	}
-	passwordHash, err := s.hasher.Hash(params.Password)
-	if err != nil {
-		return user.UserView{}, fmt.Errorf("signup: hash password: %w", err)
-	}
+	// The token is looked up before the password is hashed: a public
+	// endpoint answers a junk token with a cheap refusal, not a KDF run.
 	tokenHash := crypto.HashHexToken(params.Token)
 
 	name := displayName(params.FirstName, params.LastName)
 
 	var created user.UserView
-	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		token, findErr := s.repo.FindSignupTokenByHash(ctx, tx, tokenHash)
 		if errors.Is(findErr, datastore.ErrNoRows) {
 			return ErrInvalidToken
@@ -118,6 +116,13 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			return fmt.Errorf("signup: create user: %w", createErr)
 		}
 
+		// The hash runs inside the transaction the account opens in: a
+		// token that failed above never paid for a KDF, and an account that
+		// failed here never hashed for nothing.
+		passwordHash, hashErr := s.hasher.Hash(params.Password)
+		if hashErr != nil {
+			return fmt.Errorf("signup: hash password: %w", hashErr)
+		}
 		if passErr := s.repo.CreatePassword(ctx, tx, password.UserPasswordSchema{
 			UserID:       userID,
 			PasswordHash: passwordHash,

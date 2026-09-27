@@ -83,4 +83,8 @@ type PendingSchema struct {
 	Remember  bool      `db:"remember"`
 	ExpiresAt time.Time `db:"expires_at"`
 	CreatedAt time.Time `db:"created_at"`
+	// WrongAttempts is the wrong-code budget the bridge has spent. The count
+	// rides the row so every replica judges the same bridge the same way,
+	// and so the budget survives a process restart inside the bridge's life.
+	WrongAttempts int `db:"wrong_attempts"`
 }

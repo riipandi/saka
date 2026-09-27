@@ -18,7 +18,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/tango/modules/identity/multifactor"
 )
 
 // CleanupName is the queue the maintenance job runs on.
@@ -49,8 +51,12 @@ func (t CleanupTask) Config() queue.QueueConfig {
 	}
 }
 
-// cleanupProcessor deletes the expired records and queues the next run.
-func cleanupProcessor(ctx context.Context, task CleanupTask) error {
+// cleanupProcessor deletes the expired records and queues the next run. The
+// sweep also reaches the auth tables whose rows no query cleans up by
+// itself: the unconfirmed TOTP enrollments whose ceremony never completed,
+// and the sign-in bridges past their life — rows the runtime refuses on
+// read, but which hold sealed secrets until someone deletes them.
+func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Postgres) error {
 	client := queue.FromContext(ctx)
 	if client == nil {
 		return errors.New("cleanup: queue client missing from context")
@@ -70,6 +76,18 @@ func cleanupProcessor(ctx context.Context, task CleanupTask) error {
 			"deleted", deleted)
 	}
 
+	// The window matches the tables' own lifetimes: an unconfirmed
+	// enrollment's ceremony is minutes long, a bridge's life shorter still,
+	// so anything older than an hour is dead weight no caller can reach.
+	purged, err := purgeExpiredAuthRows(ctx, pool, time.Now().Add(-time.Hour))
+	if err != nil {
+		return err
+	}
+	if purged[0] > 0 || purged[1] > 0 {
+		slog.InfoContext(ctx, "queue: purged expired auth rows",
+			"unconfirmed_enrollments", purged[0], "pending_bridges", purged[1])
+	}
+
 	// The next run is queued before this one succeeds, so the schedule never
 	// depends on the process that ran the last one.
 	_, err = client.Add(CleanupTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
@@ -80,6 +98,23 @@ func cleanupProcessor(ctx context.Context, task CleanupTask) error {
 	slog.DebugContext(ctx, "queue: cleanup rescheduled",
 		"interval", interval.String())
 	return nil
+}
+
+// purgeExpiredAuthRows deletes the multifactor rows their own lifetimes have
+// ended: enrollments never confirmed and bridges never completed. The deletes
+// live in the multifactor repository because the tables are its vocabulary;
+// the job is the schedule that calls them.
+func purgeExpiredAuthRows(ctx context.Context, pool *datastore.Postgres, cutoff time.Time) ([2]int, error) {
+	repo := multifactor.NewRepository()
+	unconfirmed, err := repo.DeleteUnconfirmedTotpBefore(ctx, pool, cutoff)
+	if err != nil {
+		return [2]int{}, err
+	}
+	bridges, err := repo.DeleteExpiredPending(ctx, pool, cutoff)
+	if err != nil {
+		return [2]int{}, err
+	}
+	return [2]int{unconfirmed, bridges}, nil
 }
 
 // cleanupSeed is the payload the first run of the maintenance job is seeded

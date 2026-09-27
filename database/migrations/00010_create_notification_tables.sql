@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
     body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
     audience_kind TEXT NOT NULL CHECK (audience_kind IN ('global', 'users', 'user_groups')),
-    -- A system notice targets accounts, so its audience is never global.
+    -- A system notice targets accounts, so its audience is never global;
+    -- an announcement may name no subject — the contract leaves topic
+    -- optional for it.
     CONSTRAINT uq_notifications_system_audience
         CHECK (category <> 'system' OR audience_kind <> 'global'),
     created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,

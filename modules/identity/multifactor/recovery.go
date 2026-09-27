@@ -42,28 +42,33 @@ func (s *Service) RegenerateRecoveryCodes(ctx context.Context, userID uuid.UUID,
 	if confirmed == 0 {
 		return nil, ErrNotConfirmed
 	}
-	if err := s.verifyProof(ctx, userID, code); err != nil {
-		return nil, err
-	}
 
 	codes, genErr := generateRecoveryCodes(recoveryCodeCount)
 	if genErr != nil {
 		return nil, genErr
 	}
+	// The proof, the rewrite, and the record commit together: a rolled-back
+	// regeneration must not have burned the proof or left a half state.
 	txErr := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		return s.writeRecoverySet(ctx, tx, userID, codes, now)
+		if verifyErr := s.verifyProof(ctx, tx, userID, code); verifyErr != nil {
+			return verifyErr
+		}
+		if writeErr := s.writeRecoverySet(ctx, tx, userID, codes, now); writeErr != nil {
+			return writeErr
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventMfaRecoveryRegenerated,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+			Payload: map[string]string{
+				"count": fmt.Sprint(len(codes)),
+			},
+		})
+		return nil
 	})
 	if txErr != nil {
 		return nil, txErr
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:  audit.EventMfaRecoveryRegenerated,
-		Status: audit.StatusSuccess,
-		UserID: userID.String(),
-		Payload: map[string]string{
-			"count": fmt.Sprint(len(codes)),
-		},
-	})
 	return codes, nil
 }
 
@@ -81,8 +86,8 @@ func (s *Service) writeRecoverySet(ctx context.Context, tx datastore.Querier, us
 // consumeRecoveryCode marks one code used. The hash lookup is the timing
 // answer: the presented code is hashed and matched, never compared in clear
 // against a stored row.
-func (s *Service) consumeRecoveryCode(ctx context.Context, userID uuid.UUID, code string, now time.Time) (bool, error) {
-	return s.repo.ConsumeRecoveryCode(ctx, s.pool, userID, crypto.HashHexToken(code), now)
+func (s *Service) consumeRecoveryCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, code string, now time.Time) (bool, error) {
+	return s.repo.ConsumeRecoveryCode(ctx, db, userID, crypto.HashHexToken(code), now)
 }
 
 // ---- The way out ----
@@ -98,7 +103,7 @@ func (s *Service) DisableMfa(ctx context.Context, userID uuid.UUID, code string)
 	if confirmed == 0 {
 		return ErrNotConfirmed
 	}
-	if err := s.verifyProof(ctx, userID, code); err != nil {
+	if err := s.verifyProof(ctx, s.pool, userID, code); err != nil {
 		return err
 	}
 
@@ -106,17 +111,21 @@ func (s *Service) DisableMfa(ctx context.Context, userID uuid.UUID, code string)
 		if _, deleteErr := s.repo.DeleteAllTotpForUser(ctx, tx, userID); deleteErr != nil {
 			return deleteErr
 		}
-		return s.repo.DeleteAllRecoveryForUser(ctx, tx, userID)
+		if recErr := s.repo.DeleteAllRecoveryForUser(ctx, tx, userID); recErr != nil {
+			return recErr
+		}
+		// The removal and its record commit together: a disabled state that
+		// reads back has the record that explains it.
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventMfaDisabled,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+		})
+		return nil
 	})
 	if err != nil {
 		return err
 	}
-
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:  audit.EventMfaDisabled,
-		Status: audit.StatusSuccess,
-		UserID: userID.String(),
-	})
 	return nil
 }
 
@@ -169,26 +178,31 @@ func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, r
 		return ErrNotConfirmed
 	}
 
-	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if _, deleteErr := s.repo.DeleteAllTotpForUser(ctx, tx, targetUserID); deleteErr != nil {
-			return deleteErr
-		}
-		return s.repo.DeleteAllRecoveryForUser(ctx, tx, targetUserID)
-	})
-	if err != nil {
-		return err
-	}
-
 	payload := map[string]string{}
 	if reason != "" {
 		payload["reason"] = reason
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:   audit.EventMfaDisabled,
-		Status:  audit.StatusSuccess,
-		UserID:  targetUserID.String(),
-		Payload: payload,
+
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, deleteErr := s.repo.DeleteAllTotpForUser(ctx, tx, targetUserID); deleteErr != nil {
+			return deleteErr
+		}
+		if recErr := s.repo.DeleteAllRecoveryForUser(ctx, tx, targetUserID); recErr != nil {
+			return recErr
+		}
+		// The removal and its record commit together, the way the
+		// self-service disable writes its own.
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:   audit.EventMfaDisabled,
+			Status:  audit.StatusSuccess,
+			UserID:  targetUserID.String(),
+			Payload: payload,
+		})
+		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// The notice rides the account's own address; a missing channel or a
 	// failed enqueue is best-effort — the removal has committed, and the
@@ -213,7 +227,7 @@ func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, r
 // sign-in. The code is consumed exactly once, the way every use of a
 // recovery code is, and the consumption is the record.
 func (s *Service) VerifyRecoveryCode(ctx context.Context, userID uuid.UUID, code string) error {
-	consumed, err := s.consumeRecoveryCode(ctx, userID, code, s.now())
+	consumed, err := s.consumeRecoveryCode(ctx, s.pool, userID, code, s.now())
 	if err != nil {
 		return err
 	}

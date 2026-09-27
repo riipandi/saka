@@ -34,10 +34,13 @@ const ImpersonationProvider = "impersonation"
 var ErrTargetNotFound = errors.New("session: impersonation target not found")
 
 // ErrTargetAdmin is an impersonation target that holds administrative
-// privileges. The refusal is deliberate and separate from the unknown
-// target's: an administrator's identity is never worn by another, and the
-// log must be able to tell an attempted admin impersonation from a typo.
+// privileges itself. An administrator wearing another administrator's
+// identity would defeat the audit trail's ability to name who acted.
 var ErrTargetAdmin = errors.New("session: an administrator may not be impersonated")
+
+// ErrTargetSelf is an impersonation request whose target is the caller: the
+// delegation would record a fiction, so it refuses with the mistake named.
+var ErrTargetSelf = errors.New("session: an account may not impersonate itself")
 
 // ErrNotImpersonating is a stop request from a caller whose token carries no
 // delegation. The pair the caller holds is their own; there is nothing to
@@ -71,7 +74,9 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 		return Refreshed{}, ErrSessionEnded
 	}
 	if targetID == callerUUID {
-		return Refreshed{}, ErrTargetAdmin
+		// The caller's own account is not a delegation, it is a rename: the
+		// honest refusal names the mistake instead of accusing the target.
+		return Refreshed{}, ErrTargetSelf
 	}
 
 	now := s.now()
@@ -216,7 +221,7 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 	if errors.Is(err, datastore.ErrNoRows) {
 		// The administrator's account was deleted while their delegation
 		// lived: the delegation ends, and there is nothing to re-issue to.
-		_, revokeErr := s.repo.Revoke(ctx, s.pool, sid, actorID, now)
+		_, revokeErr := s.repo.Revoke(ctx, s.pool, sid, &actorID, now)
 		if revokeErr != nil {
 			return Refreshed{}, revokeErr
 		}
@@ -243,7 +248,7 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 	}
 
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if _, revokeErr := s.repo.Revoke(ctx, tx, sid, actorID, now); revokeErr != nil {
+		if _, revokeErr := s.repo.Revoke(ctx, tx, sid, &actorID, now); revokeErr != nil {
 			return revokeErr
 		}
 		if createErr := s.repo.Create(ctx, tx, SessionSchema{

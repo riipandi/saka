@@ -32,6 +32,9 @@ var sessionColumns = []string{
 	// scanner has no plan for.
 	"COALESCE(revoked_by::text, '')",
 	"COALESCE(impersonated_by::text, '')",
+	// The hash the last rotation replaced, read through its text form the
+	// same way: a lookup that lands on it is a replayed token.
+	"COALESCE(rotated_token_hash::text, '')",
 }
 
 // scanSession reads one row into the schema. The identifier arrives as the
@@ -43,7 +46,7 @@ func scanSession(scan func(dest ...any) error) (SessionSchema, error) {
 	err := scan(
 		&rawID, &row.UserID, &row.Provider, &row.UserAgent, &row.IPAddress,
 		&row.Remember, &row.CreatedAt, &row.ExpiresAt, &row.RefreshedAt, &row.RevokedAt,
-		&rawEnder, &rawActor,
+		&rawEnder, &rawActor, &row.RotatedTokenHash,
 	)
 	if err != nil {
 		return SessionSchema{}, err
@@ -135,11 +138,36 @@ func (r *Repository) FindActiveByTokenHash(ctx context.Context, db datastore.Que
 // service treats that as the success it is. The refresh token dies with the
 // stamp; the access token does not, by the statelessness the protocol
 // settles.
-func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id SessionID, by uuid.UUID, at time.Time) (bool, error) {
+// FindByRotatedTokenHash answers the live session whose last rotation
+// replaced the presented hash. A hit is a replayed token: the one competent
+// explanation is a duplicated credential, and the caller revokes the row as
+// compromised rather than merely refusing it.
+func (r *Repository) FindByRotatedTokenHash(ctx context.Context, db datastore.Querier, hash string) (SessionSchema, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(sessionColumns...)
+	sb.From(SessionTable)
+	sb.Where(sb.Equal("rotated_token_hash", hash), sb.IsNull("revoked_at"))
+
+	query, args := sb.Build()
+	row, err := scanSession(func(dest ...any) error {
+		return db.QueryRow(ctx, query, args...).Scan(dest...)
+	})
+	if errors.Is(err, datastore.ErrNoRows) {
+		return SessionSchema{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return SessionSchema{}, fmt.Errorf("session: find by rotated token: %w", err)
+	}
+	return row, nil
+}
+
+func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id SessionID, by *uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(SessionTable)
 	ub.Set(
 		ub.Assign("revoked_at", at),
+		// A system revocation names no ender: the NULL is the row's way of
+		// saying the account did not end its own session.
 		ub.Assign("revoked_by", by),
 	)
 	ub.Where(ub.Equal("id", id.UUID()), ub.IsNull("revoked_at"))
@@ -156,11 +184,15 @@ func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id Sessio
 // clause is the race: a session that was revoked or expired between the read
 // and this write answers false, and the renewal dies before it spent anything
 // — the new secret is thrown away and the caller tries again.
-func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id SessionID, hash string, refreshedAt, expiresAt time.Time) (bool, error) {
+func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id SessionID, hash, previousHash string, refreshedAt, expiresAt time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(SessionTable)
 	ub.Set(
 		ub.Assign("token_hash", hash),
+		// The hash being replaced is kept beside the row: a caller who
+		// presents it again is replaying a spent token, and the lookup that
+		// lands on this column is the reuse signal.
+		ub.Assign("rotated_token_hash", previousHash),
 		ub.Assign("refreshed_at", refreshedAt),
 		ub.Assign("expires_at", expiresAt),
 	)

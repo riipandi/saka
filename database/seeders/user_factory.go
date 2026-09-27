@@ -279,15 +279,15 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 	}
 	if s.bannedAt {
 		// The start instant sits a day back, so the two expiry scenarios
-		// read honestly: one window is open (12h from a day ago), one has
-		// passed (48h from a day ago).
+		// read honestly: one window is open (25h from a day ago, an hour
+		// ahead), one has passed (23h from a day ago, an hour back).
 		at := now.Add(-24 * time.Hour)
 		row.BannedAt = &at
 		row.BanReason = &s.banReason
 		if s.banExpires {
-			expires := at.Add(12 * time.Hour)
+			expires := at.Add(25 * time.Hour)
 			if s.banExpired {
-				expires = at.Add(48 * time.Hour)
+				expires = at.Add(23 * time.Hour)
 			}
 			row.BanExpires = &expires
 		}

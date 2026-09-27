@@ -63,6 +63,11 @@ type CompleteSignInResult = signin.Result
 // CompleteSignIn spends the bridge plus the second factor on the session.
 // The bridge dies whatever way the call ends: success consumes it, a wrong
 // code eats the failure budget, an expired bridge is swept on read.
+//
+// The proof runs inside the transaction the session opens in, so a failure
+// consumes nothing — a TOTP step a rollback returned, a recovery code a
+// rollback un-spent — and the bridge's delete carries the token hash, so two
+// completions racing on one bridge cannot both open a session.
 func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string, session signin.SessionParams) (CompleteSignInResult, error) {
 	now := s.now()
 
@@ -75,20 +80,11 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 		return CompleteSignInResult{}, err
 	}
 
-	// The failure budget is checked before any proof runs, so a bridge one
-	// guess from death cannot spend a guess it no longer owns.
-	if attemptBudget[pending.ID] >= maxAttempts {
-		_ = s.repo.DeletePending(ctx, s.pool, pending.ID)
+	// A bridge that has spent its budget is dead on arrival: swept here so
+	// the account learns the refusal is final, not one guess from final.
+	if pending.WrongAttempts >= maxAttempts {
+		_, _ = s.repo.DeletePending(ctx, s.pool, pending.ID, hash)
 		return CompleteSignInResult{}, ErrPendingExhausted
-	}
-
-	if _, verifiedErr := s.verifyChallenge(ctx, pending.UserID, code, now); verifiedErr != nil {
-		attemptBudget[pending.ID]++
-		if attemptBudget[pending.ID] >= maxAttempts {
-			_ = s.repo.DeletePending(ctx, s.pool, pending.ID)
-			return CompleteSignInResult{}, ErrPendingExhausted
-		}
-		return CompleteSignInResult{}, verifiedErr
 	}
 
 	account, err := s.issuer.FindAccountByID(ctx, pending.UserID)
@@ -97,12 +93,21 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 	}
 
 	var result CompleteSignInResult
+	var challengeErr error
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, verifyErr := s.verifyChallenge(ctx, tx, pending.UserID, code, now); verifyErr != nil {
+			challengeErr = verifyErr
+			return verifyErr
+		}
 		// The bridge dies in the transaction the session opens in: a
-		// rollback returns the bridge, and the same code cannot open two
-		// sessions because the TOTP step check refuses its replay.
-		if deleteErr := s.repo.DeletePending(ctx, tx, pending.ID); deleteErr != nil {
+		// rollback returns the bridge, and the hash in the WHERE refuses the
+		// second racer before anything is spent twice.
+		deleted, deleteErr := s.repo.DeletePending(ctx, tx, pending.ID, hash)
+		if deleteErr != nil {
 			return deleteErr
+		}
+		if !deleted {
+			return ErrPendingInvalid
 		}
 		var issueErr error
 		result, issueErr = s.issuer.IssueSession(ctx, tx, account, signin.ProviderTOTP, audit.EventMfaSignIn, signin.SessionParams{
@@ -114,22 +119,37 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 		return issueErr
 	})
 	if err != nil {
+		if errors.Is(challengeErr, ErrCodeInvalid) {
+			// The wrong answer is the bridge's problem, not the session's:
+			// the budget rides the row, committed apart from the rolled-back
+			// proof, and the strike that fills it ends the bridge.
+			last, budgetErr := s.repo.RegisterWrongAttempt(ctx, s.pool, pending.ID, maxAttempts)
+			if budgetErr != nil {
+				return CompleteSignInResult{}, budgetErr
+			}
+			if last {
+				_, _ = s.repo.DeletePending(ctx, s.pool, pending.ID, hash)
+				return CompleteSignInResult{}, ErrPendingExhausted
+			}
+		}
+		if errors.Is(err, ErrPendingInvalid) {
+			return CompleteSignInResult{}, ErrPendingInvalid
+		}
 		return CompleteSignInResult{}, err
 	}
-
-	delete(attemptBudget, pending.ID)
 	return result, nil
 }
 
 // verifyChallenge answers whether the code is the account's second factor: a
 // TOTP code from any confirmed authenticator, or one unused recovery code.
-// It marks what it consumes.
-func (s *Service) verifyChallenge(ctx context.Context, userID uuid.UUID, code string, now time.Time) (bool, error) {
+// It marks what it consumes — on the query surface it is handed, so a
+// caller's transaction can return every consumption it caused.
+func (s *Service) verifyChallenge(ctx context.Context, db datastore.Querier, userID uuid.UUID, code string, now time.Time) (bool, error) {
 	// The recovery shape is longer than any TOTP code and carries hyphens;
 	// one look at the shape picks the table, and the lookup is cheap enough
 	// that trying both would also be fine.
 	if isRecoveryShape(code) {
-		consumed, err := s.consumeRecoveryCode(ctx, userID, code, now)
+		consumed, err := s.consumeRecoveryCode(ctx, db, userID, code, now)
 		if err != nil {
 			return false, err
 		}
@@ -139,7 +159,7 @@ func (s *Service) verifyChallenge(ctx context.Context, userID uuid.UUID, code st
 		return true, nil
 	}
 
-	confirmed, err := s.repo.ListTotp(ctx, s.pool, userID)
+	confirmed, err := s.repo.ListTotp(ctx, db, userID)
 	if err != nil {
 		return false, err
 	}
@@ -154,7 +174,7 @@ func (s *Service) verifyChallenge(ctx context.Context, userID uuid.UUID, code st
 			return false, err
 		}
 		if step, ok := verifyCodeStep(secret, code, int(row.Period), now, 1); ok {
-			won, err := s.repo.TouchTotpUsage(ctx, s.pool, row.ID, step, now)
+			won, err := s.repo.TouchTotpUsage(ctx, db, row.ID, step, now)
 			if err != nil {
 				return false, err
 			}
@@ -174,11 +194,13 @@ func (s *Service) verifyChallenge(ctx context.Context, userID uuid.UUID, code st
 // verifyProof answers whether the code proves the caller holds a factor. It
 // consumes what it accepts — a recovery code is single-use everywhere — but
 // never a TOTP step: a proof that rotates under a double-clicked button is
-// a support ticket, so proofs replay within their window.
-func (s *Service) verifyProof(ctx context.Context, userID uuid.UUID, code string) error {
+// a support ticket, so proofs replay within their window. The consumption
+// runs on the query surface it is handed, so a caller's transaction can
+// return it.
+func (s *Service) verifyProof(ctx context.Context, db datastore.Querier, userID uuid.UUID, code string) error {
 	now := s.now()
 	if isRecoveryShape(code) {
-		consumed, err := s.consumeRecoveryCode(ctx, userID, code, now)
+		consumed, err := s.consumeRecoveryCode(ctx, db, userID, code, now)
 		if err != nil {
 			return err
 		}
@@ -188,7 +210,7 @@ func (s *Service) verifyProof(ctx context.Context, userID uuid.UUID, code string
 		return nil
 	}
 
-	rows, err := s.repo.ListTotp(ctx, s.pool, userID)
+	rows, err := s.repo.ListTotp(ctx, db, userID)
 	if err != nil {
 		return err
 	}

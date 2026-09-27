@@ -27,13 +27,6 @@ import (
 // The three reads are reads: no transaction holds them together, so a grant
 // that changes between them answers in the next token. An account with no
 // grants answers two empty slices, which is a state, not an error.
-// LoadRoles answers just the role slugs an account actively holds — the
-// read a policy question ("is this account an administrator?") runs when the
-// permissions themselves are not needed.
-func LoadRoles(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]string, error) {
-	return loadRoleSlugs(ctx, db, userID)
-}
-
 // LoadGrants reads one account's effective grants: the slugs of the roles
 // the account actively holds, and the permissions those roles carry plus the
 // ones granted to the account directly.

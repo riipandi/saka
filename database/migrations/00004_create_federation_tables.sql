@@ -86,7 +86,10 @@ CREATE TABLE IF NOT EXISTS public.custom_claims (
     value TEXT NOT NULL,
     user_id UUID,
     user_group_id UUID,
-    UNIQUE (key, user_id, user_group_id),
+    -- Unique per subject: NULLS NOT DISTINCT is what makes one NULL group
+    -- id behave like a value — without it, the same claim key could attach
+    -- to one account once per NULL row.
+    UNIQUE NULLS NOT DISTINCT (key, user_id, user_group_id),
     CHECK (user_id IS NOT NULL OR user_group_id IS NOT NULL),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
@@ -289,7 +292,6 @@ DROP INDEX IF EXISTS idx_oauth2_sessions_kind_request;
 DROP INDEX IF EXISTS idx_oauth2_sessions_kind_key;
 DROP INDEX IF EXISTS idx_oidc_device_codes_status;
 DROP INDEX IF EXISTS idx_oidc_device_codes_expires_at;
-DROP INDEX IF EXISTS idx_oidc_refresh_tokens_expires_at;
 DROP INDEX IF EXISTS idx_oidc_authorization_codes_expires_at;
 DROP INDEX IF EXISTS idx_user_authorized_oidc_clients_last_used_at;
 DROP INDEX IF EXISTS idx_user_groups_allowed_oidc_clients_client_id;
@@ -306,7 +308,6 @@ DROP TABLE IF EXISTS public.interaction_sessions;
 DROP TABLE IF EXISTS public.oauth2_jtis;
 DROP TABLE IF EXISTS public.oauth2_sessions;
 DROP TABLE IF EXISTS public.oidc_device_codes;
-DROP TABLE IF EXISTS public.oidc_refresh_tokens;
 DROP TABLE IF EXISTS public.user_groups_allowed_oidc_clients;
 DROP TABLE IF EXISTS public.oidc_clients_allowed_user_groups;
 DROP TABLE IF EXISTS public.user_authorized_oidc_clients;

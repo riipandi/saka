@@ -159,18 +159,20 @@ func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, 
 	return row, nil
 }
 
-// DeleteToken removes the reset row. The delete is the consumption: a
-// second caller presenting the same token loses the race and reads nothing.
-func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
+// DeleteToken consumes the reset row. The delete's WHERE carries the token
+// hash, so two resets racing on one token cannot both spend it: the second
+// answers false, and the password write it was about to make never happens.
+func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, hash string) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
 	dbl.DeleteFrom(AuthTokenTable)
-	dbl.Where(dbl.Equal("id", id), dbl.Equal("purpose", PurposePasswordReset))
+	dbl.Where(dbl.Equal("id", id), dbl.Equal("token_hash", hash), dbl.Equal("purpose", PurposePasswordReset))
 
 	query, args := dbl.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("password: delete reset token: %w", err)
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("password: delete reset token: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // FindPasswordHash reads the account's current credential hash, or an

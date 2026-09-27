@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -134,8 +135,32 @@ func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, 
 // reports is what a second caller loses the race with. The caller checks the
 // expiry and the device token before it deletes, so the delete's guard is the
 // last word on whether the code was still there to spend.
-func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID) (int64, error) {
-	// pgconn's CommandTag counts the rows the statement touched; a second
+// RegisterWrongAttempt spends one wrong-device slot on the token. The
+// UPDATE's WHERE carries the budget, so two racing mismatches cannot both
+// fit in the last slot; it answers whether the token still has attempts
+// left.
+func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Querier, id uuid.UUID, max int) (bool, error) {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(tokenTable)
+	ub.Set(ub.Add("wrong_attempts", 1))
+	ub.Where(ub.Equal("id", id), ub.LT("wrong_attempts", max))
+	ub.Returning("wrong_attempts")
+
+	query, args := ub.Build()
+	var attempts int
+	err := db.QueryRow(ctx, query, args...).Scan(&attempts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The budget was already spent: the token is dead, and the caller
+		// ends it.
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("onetimeaccess: register wrong attempt: %w", err)
+	}
+	return attempts < max, nil
+}
+
+func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID) (int64, error) { // pgconn's CommandTag counts the rows the statement touched; a second
 	// caller that lost the race sees zero, which is the code already spent.
 	db2 := sqlbuilder.PostgreSQL.NewDeleteBuilder()
 	db2.DeleteFrom(tokenTable)

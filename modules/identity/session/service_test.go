@@ -478,6 +478,79 @@ func TestRefreshRotatesTheTokenAndKeepsTheSession(t *testing.T) {
 	assert.ErrorIs(t, err, ErrSessionEnded)
 }
 
+// The delegation's window is a hard bound: a renewal rotates the secret but
+// hands the row no lifetime beyond the hour the impersonation opened, and
+// once the window has passed the delegation renews no further.
+func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testService(t, pool)
+	admin := seedAccount(t, pool, "robert_langdon")
+	target := seedAccount(t, pool, "sophie_neveu")
+
+	out, err := service.ImpersonateUser(t.Context(), wireOf(t, admin), "robert_langdon",
+		wireOf(t, target), "reproducing the vault's missing entry")
+	require.NoError(t, err)
+
+	refreshed, err := service.Refresh(t.Context(), out.RefreshToken)
+	require.NoError(t, err)
+
+	// The renewal still answers, but the window it reports is the remainder
+	// of the delegation's hour, not a fresh short lifetime.
+	assert.Less(t, refreshed.RefreshExpiresIn, int32((12 * time.Hour).Seconds()),
+		"the reported window is the delegation's remainder, not a fresh short lifetime")
+	assert.Greater(t, refreshed.RefreshExpiresIn, int32((55 * time.Minute).Seconds()))
+
+	row, err := service.repo.GetSession(t.Context(), pool, mustSessionID(t, out.SessionID))
+	require.NoError(t, err)
+	assert.True(t, row.ExpiresAt.Before(time.Now().Add(ImpersonationTTL).Add(time.Minute)),
+		"the rotated row's expiry stays inside the impersonation window")
+
+	// The delegation survives its renewal — the actor pair is re-signed.
+	assert.NotEmpty(t, refreshed.AccessToken)
+}
+
+// Presenting a refresh token a rotation already replaced is the one
+// competent explanation of a duplicated credential: the renewal refuses the
+// caller and revokes the session the spent token names, with the audit
+// record written in the same transaction.
+func TestRefreshRefusesAReplayedTokenAndRevokesTheSession(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testService(t, pool)
+	userID := seedAccount(t, pool, "hermione")
+	sid, token := seedSession(t, pool, userID, "one", "password", false)
+
+	first, err := service.Refresh(t.Context(), token)
+	require.NoError(t, err)
+
+	mid, err := service.repo.GetSession(t.Context(), pool, sid)
+	require.NoError(t, err)
+	require.Equal(t, crypto.HashRefreshToken(token), mid.RotatedTokenHash,
+		"the rotation keeps the hash it replaced beside the row")
+
+	_, err = service.Refresh(t.Context(), token)
+	assert.ErrorIs(t, err, ErrSessionEnded)
+
+	// The session the replay named is dead, not merely unrotated.
+	row, err := service.repo.GetSession(t.Context(), pool, sid)
+	require.NoError(t, err)
+	require.NotNil(t, row.RevokedAt)
+
+	// And the replacement the first renewal minted is dead with it: the
+	// whole credential is retired, not just the half that leaked.
+	_, err = service.Refresh(t.Context(), first.RefreshToken)
+	assert.ErrorIs(t, err, ErrSessionEnded)
+	_, err = service.repo.FindActiveByTokenHash(t.Context(), pool,
+		crypto.HashRefreshToken(first.RefreshToken), time.Now())
+	assert.ErrorIs(t, err, datastore.ErrNoRows)
+
+	assert.Greater(t, auditCount(t, pool, audit.EventSessionRevoked, sid.UUID()), 0,
+		"the reuse is an audit record, not a silent refusal")
+}
+
 func TestImpersonateUserOpensADelegatedSession(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
@@ -520,8 +593,8 @@ func TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown(t *testing.T) {
 
 	_, err = service.ImpersonateUser(t.Context(), wireOf(t, admin), "robert_langdon",
 		wireOf(t, admin), "checking the ledger")
-	assert.ErrorIs(t, err, ErrTargetAdmin,
-		"impersonating oneself is the same refusal: the delegation would record a fiction")
+	assert.ErrorIs(t, err, ErrTargetSelf,
+		"impersonating oneself is not an admin refusal: it names the mistake")
 
 	unknown := uuid.New()
 	_, err = service.ImpersonateUser(t.Context(), wireOf(t, admin), "robert_langdon",

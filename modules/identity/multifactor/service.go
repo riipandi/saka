@@ -108,19 +108,6 @@ var (
 	ErrUserNotFound = errors.New("multifactor: the account is not found")
 )
 
-// attemptBudget tracks the wrong codes one pending bridge has eaten. The
-// budget rides the bridge's life in the service because the table carries no
-// column for it — a bridge is a five-minute object, and the budget dying
-// with the process is acceptable for the window it guards. The map's key is
-// the pending row's identifier.
-var attemptBudget = map[uuid.UUID]int{}
-
-// ProvisioningTTL answers the ceremony window the enrollment response
-// reports, so a client may render a countdown without reaching into the
-// service's constants.
-const ProvisioningTTL = enrollTTL
-
-// Service is the second factor's logic over its tables.
 // Service is the second factor's logic over its tables.
 type Service struct {
 	pool       *datastore.Postgres
