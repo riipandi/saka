@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_yaRdgWJj6r
 createdAt: 2026-09-26T23:10:25.696277
-updatedAt: 2026-09-27T06:34:18.147637
+updatedAt: 2026-09-27T06:38:06.519065
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "new_email": "new-address@example.com"
+      "new_email": "${[ prompt.text(label='New Email', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='admin@example.com', placeholder='somebody@example.com') ]}"
     }
 bodyType: application/json
 description: |-

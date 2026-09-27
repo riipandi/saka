@@ -317,7 +317,7 @@ func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {
 	created, err := service.CreateSignupToken(t.Context(), CreateTokenParams{TTL: 24 * time.Hour})
 	require.NoError(t, err)
 
-	assert.Regexp(t, `^[A-Za-z0-9_-]{43}$`, created.RawToken, "the raw token is 256 bits of base64url")
+	assert.Regexp(t, `^[0-9a-f]{64}$`, created.RawToken, "the raw token is 256 bits of lowercase hex, URL-safe without symbols")
 	assert.Equal(t, int32(1), created.Token.UsageLimit, "an unset budget is the single invitation")
 
 	// The row stores the hash alone: the raw value must not be recoverable

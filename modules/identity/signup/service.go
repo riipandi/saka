@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
@@ -17,8 +17,6 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/responder"
-
-	"uuid"
 )
 
 // The failures a sign-up reports. The handler maps them to connect codes, so
@@ -179,6 +177,19 @@ func tokenSHA256(raw string) string {
 // against a database leak.
 const tokenEntropy = 32
 
+// newToken mints one raw token: 256 bits of randomness as 64 lowercase
+// hexadecimal characters. Hex keeps the token URL-safe without dashes or
+// symbols — the form every token that travels a URL takes — so it survives a
+// query string, a QR code, and a copy-paste through any chat client
+// unchanged.
+func newToken() (string, error) {
+	buf := make([]byte, tokenEntropy)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
 // CreateTokenParams carries one token issue. The window and budget bounds
 // live in the contract — `CreateSignupTokenRequest` carries them as
 // protovalidate constraints the transport's validate interceptor enforces
@@ -212,11 +223,10 @@ func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParam
 		params.UsageLimit = 1
 	}
 
-	raw := make([]byte, tokenEntropy)
-	if _, err := rand.Read(raw); err != nil {
+	rawToken, err := newToken()
+	if err != nil {
 		return CreatedToken{}, fmt.Errorf("signup: token: %w", err)
 	}
-	rawToken := base64.RawURLEncoding.EncodeToString(raw)
 	now := s.now()
 
 	id, err := s.repo.CreateSignupToken(ctx, s.pool, tokenSHA256(rawToken), params.UsageLimit, now.Add(params.TTL))

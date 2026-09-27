@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -132,11 +131,10 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 		}
 	}
 
-	raw := make([]byte, tokenEntropy)
-	if _, err := rand.Read(raw); err != nil {
+	rawToken, err := newToken()
+	if err != nil {
 		return fmt.Errorf("verification: token: %w", err)
 	}
-	rawToken := base64.RawURLEncoding.EncodeToString(raw)
 	now := s.now()
 
 	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, tokenSHA256(rawToken), now.Add(tokenTTL), now); err != nil {
@@ -209,6 +207,19 @@ func tokenSHA256(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// newToken mints one raw token: 256 bits of randomness as 64 lowercase
+// hexadecimal characters. Hex keeps the token URL-safe without dashes or
+// symbols — the same form the password-reset token takes — so it survives a
+// query string, a QR code, and a copy-paste through any chat client
+// unchanged.
+func newToken() (string, error) {
+	buf := make([]byte, tokenEntropy)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
 // EmailChangeNotice is what a pending request and a completed confirmation
 // send to the address they concern; the struct lives in the jobs package
 // beside the task it becomes. To is the address the notice goes to — the old
@@ -270,11 +281,10 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 		}
 	}
 
-	raw := make([]byte, tokenEntropy)
-	if _, err := rand.Read(raw); err != nil {
+	rawToken, err := newToken()
+	if err != nil {
 		return fmt.Errorf("verification: change token: %w", err)
 	}
-	rawToken := base64.RawURLEncoding.EncodeToString(raw)
 	now := s.now()
 
 	if err := s.repo.UpsertEmailChangeToken(ctx, s.pool, account.ID, tokenSHA256(rawToken), newEmail, now.Add(tokenTTL), now); err != nil {
