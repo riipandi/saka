@@ -139,7 +139,12 @@ func (s *Service) UpdateProfilePicture(ctx context.Context, id string, data []by
 			return fmt.Errorf("user: delete the replaced picture: %w", err)
 		}
 	}
-	metadata := map[string]any{"content_type": mime, "user_id": userID.String()}
+	// owner is the fact the upload-finished notice addresses: the staging
+	// caller names the account its file belongs to, and the notice ride the
+	// manifest's metadata. user_id stays beside it — the older record —
+	// because removing a key from free-form metadata is a change no reader
+	// asked for.
+	metadata := map[string]any{"content_type": mime, "owner": userID.String(), "user_id": userID.String()}
 	if err := s.pictures.Stage(ctx, key, bytes.NewReader(data), metadata); err != nil {
 		return fmt.Errorf("user: stage picture: %w", err)
 	}

@@ -300,7 +300,14 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return usergroup.NewService(pool, recorder, log), nil
+		service := usergroup.NewService(pool, recorder, log)
+		// The account views' group seam rides the post-construction wiring
+		// like the ban's side effects do: the directory is the group
+		// feature's own repository, and the user service must not construct
+		// against it to stay free of the import the other way would cycle.
+		users := do.MustInvoke[*user.Service](i)
+		users.WithGroups(usergroup.NewRepository())
+		return service, nil
 	}),
 
 	do.Lazy(func(i do.Injector) (*authorization.Service, error) {

@@ -170,6 +170,52 @@ func (s *Service) Create(ctx context.Context, creator uuid.UUID, params CreatePa
 	return stored, nil
 }
 
+// CreateSystemNotice publishes the one notification the deployment itself
+// writes: a message about an account's own object, addressed to that
+// account alone. No creator is named — the system, not an operator, is the
+// author — and no email pass is asked, because the notice is the inbox's
+// business and the stream's convenience, not a message anyone composed.
+func (s *Service) CreateSystemNotice(ctx context.Context, userID uuid.UUID, title, body string) error {
+	row := Notification{
+		ID:           uuid.NewV7(),
+		Category:     CategorySystem,
+		Title:        title,
+		Body:         body,
+		AudienceKind: AudienceUsers,
+	}
+
+	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if createErr := s.repo.Create(ctx, tx, row, []uuid.UUID{userID}, nil); createErr != nil {
+			return createErr
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:        audit.EventNotificationCreated,
+			Status:       audit.StatusSuccess,
+			ResourceType: ResourceNotification,
+			Payload: map[string]string{
+				"category":      CategorySystem,
+				"audience_kind": AudienceUsers,
+				"source":        "system",
+			},
+		})
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	stored, _, _, err := s.repo.Get(ctx, s.pool, row.ID)
+	if err != nil {
+		return err
+	}
+	s.publish(ctx, stored, CreateParams{
+		Category:     CategorySystem,
+		AudienceKind: AudienceUsers,
+		UserIDs:      []uuid.UUID{userID},
+	})
+	return nil
+}
+
 // resolveAudience names the audience a create carries and refuses the
 // pairs the contract cannot express: a system notice is about accounts,
 // so it carries a topic never and a global audience never; an

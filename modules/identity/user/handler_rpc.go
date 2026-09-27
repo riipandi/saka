@@ -117,6 +117,7 @@ func (h *rpcHandler) CreateUser(ctx context.Context, req *connect.Request[identi
 		Locale:        body.GetLocale(),
 		Disabled:      body.GetDisabled(),
 		EmailVerified: body.GetEmailVerified(),
+		GroupIDs:      body.GetUserGroupIds(),
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -323,6 +324,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("the ban expiry is in the past"))
 	case errors.Is(err, ErrTimezoneInvalid):
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown timezone"))
+	case errors.Is(err, ErrGroupUnknown):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown user group"))
 	case errors.Is(err, ErrPicturesUnavailable):
 		return connect.NewError(connect.CodeUnavailable, errors.New("picture storage is not available"))
 	case isPasswordPolicy(err):

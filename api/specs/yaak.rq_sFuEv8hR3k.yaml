@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_sFuEv8hR3k
+createdAt: 2026-09-27T16:06:11.717821
+updatedAt: 2026-09-27T16:39:23.055452
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_9GjzmC2N4g
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: |-
+  Read one stored file's upload progress: the manifest's own state — a status word (pending while the bytes travel, ready once the backend holds them, failed when a round gave up), the byte size, and nothing pretending to be a percentage; the engine stages whole files, so there is no per-chunk distance to report. The key is the storage key the upload used, slashes included. A key nothing stored answers not_found. Signed-in read: any authenticated caller may poll a key it holds.
+
+  Tango-only: the ConnectRPC surface never carried it, so there is no upstream endpoint to port.
+
+  Parameters:
+  - key (path): Storage key of the file, slashes included
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: byRYuBfdev
+method: GET
+name: '[Tango] Get upload progress'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/api/uploads/:storageKey
+urlParameters:
+- enabled: true
+  name: :storageKey
+  value: ${[ prompt.text(label='Storage Key', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='', placeholder='some/path/to/file.ext') ]}
+  id: path-placeholder:0
+- enabled: true
+  name: ''
+  value: ''
+  id: hgzRzpDHJI
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

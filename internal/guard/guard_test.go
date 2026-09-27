@@ -186,6 +186,24 @@ func TestMatchRestReadsThePathParameter(t *testing.T) {
 	assert.ErrorIs(t, rule(caller("01a0da1c-0000-7000-8000-000000000000", false), target), guard.ErrNotSelf)
 }
 
+// TestMatchRestAbsorbsTheTrailingKey keeps the catch-all honest: the upload
+// progress route names a key that carries slashes, so the pattern's last
+// segment absorbs the rest of the path — and a pattern whose catch-all has
+// nothing to absorb names no route at all.
+func TestMatchRestAbsorbsTheTrailingKey(t *testing.T) {
+	_, target := guard.MatchRest(guard.RestRules, "GET", "/api/uploads/avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png")
+	assert.Equal(t, "avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png", target.PathParams["key"])
+
+	// A bare prefix names no key: the catch-all answers at least one
+	// segment, so the empty remainder is a different route.
+	rule, _ := guard.MatchRest(guard.RestRules, "GET", "/api/uploads")
+	assert.ErrorIs(t, rule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
+
+	// The rule names the read, not every method under the prefix.
+	rule, _ = guard.MatchRest(guard.RestRules, "DELETE", "/api/uploads/avatars/01a0da1c.png")
+	assert.ErrorIs(t, rule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
+}
+
 // TestPublicProceduresComeFromTheTable pins the derivation: the set the
 // authenticator excuses is read from the rules, so a procedure cannot be
 // public for one seam and guarded for the other.

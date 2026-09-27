@@ -71,6 +71,12 @@ type Service struct {
 	// notify queues the ban notifications. It is nil where the queue is
 	// absent — a ban still writes, only without a message.
 	notify banNotifier
+
+	// groups reads and opens the memberships the account views carry. It
+	// is nil where the group feature is not wired — the views then answer
+	// without the field filled, which is the smaller feature rather than a
+	// broken one.
+	groups GroupDirectory
 }
 
 // banNotifier queues the messages a ban and its lift produce. It is an
@@ -104,6 +110,65 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Lo
 	}
 }
 
+// WithGroups arms the group seam the account views read through. It is
+// wired after construction because the group tables belong to the group
+// feature — a provider that took the directory would order the area's
+// construction around it, and a nil directory degrades the views to
+// answering without memberships rather than failing the run.
+func (s *Service) WithGroups(directory GroupDirectory) *Service {
+	s.groups = directory
+	return s
+}
+
+// withGroup fills one view's memberships through the group seam. db is the
+// query surface the caller already holds — inside a transaction the
+// memberships the write just opened are read back through it, so the answer
+// never names a join the commit has not made. A nil directory is the state
+// a consumer without the group feature is in: the view answers without the
+// field filled.
+func (s *Service) withGroup(ctx context.Context, db datastore.Querier, filled UserView) (UserView, error) {
+	if s.groups == nil {
+		return filled, nil
+	}
+	id, err := parseWire(filled.ID)
+	if err != nil {
+		return UserView{}, ErrUserNotFound
+	}
+	groups, err := s.groups.GroupsOfUser(ctx, db, id)
+	if err != nil {
+		return UserView{}, err
+	}
+	filled.Groups = groups
+	return filled, nil
+}
+
+// withGroups fills a page of views in one seam read, the batch the list
+// procedure's one answer needs — a per-row query would pay the group read
+// once per account on the page.
+func (s *Service) withGroups(ctx context.Context, views []UserView) ([]UserView, error) {
+	if s.groups == nil || len(views) == 0 {
+		return views, nil
+	}
+	ids := make([]uuid.UUID, 0, len(views))
+	for _, filled := range views {
+		id, err := parseWire(filled.ID)
+		if err != nil {
+			return nil, ErrUserNotFound
+		}
+		ids = append(ids, id)
+	}
+	byUser, err := s.groups.GroupsOfUsers(ctx, s.pool, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range views {
+		if id, err := parseWire(views[i].ID); err == nil {
+			views[i].Groups = byUser[id]
+		}
+	}
+	return views, nil
+}
+
 // WithBanSideEffects answers the same service carrying the ban's two side
 // effects: the session rows a ban ends and the notifications it queues. Both
 // are optional — an absent one degrades the ban to a write — and they are
@@ -126,6 +191,9 @@ type CreateParams struct {
 	Locale        string
 	Disabled      bool
 	EmailVerified bool
+	// GroupIDs are the memberships the account opens with, in the wire
+	// form the request carried. Empty creates a memberless account.
+	GroupIDs []string
 }
 
 // UpdateParams carries the replacement fields of one account. The ban fields
@@ -190,14 +258,18 @@ func normalizeTimezone(value string) (string, error) {
 // UserView is an account as the procedures answer it: the fields a client
 // renders or an operator manages, never the credential hash.
 type UserView struct {
-	ID            string
-	Username      string
-	Email         string
-	DisplayName   string
-	FirstName     *string
-	LastName      *string
-	Locale        *string
-	Timezone      string
+	ID          string
+	Username    string
+	Email       string
+	DisplayName string
+	FirstName   *string
+	LastName    *string
+	Locale      *string
+	Timezone    string
+	// Groups are the memberships the account answers with, ordered by the
+	// group's display name. Empty when the group seam is not wired or the
+	// account belongs to none.
+	Groups        []GroupSummary
 	Disabled      bool
 	EmailVerified bool
 	CreatedAt     time.Time
@@ -268,6 +340,15 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 			return readErr
 		}
 
+		// The memberships open in the account's transaction: a group id
+		// the directory cannot name rolls the whole creation back, so an
+		// account is never created with a membership half-applied.
+		if len(params.GroupIDs) > 0 {
+			if attachErr := s.groups.AttachGroups(ctx, tx, id, params.GroupIDs); attachErr != nil {
+				return attachErr
+			}
+		}
+
 		created = view(row)
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventAccountCreated,
@@ -284,7 +365,7 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 	if err != nil {
 		return UserView{}, err
 	}
-	return created, nil
+	return s.withGroup(ctx, s.pool, created)
 }
 
 // GetUser answers one account by its identifier.
@@ -300,7 +381,11 @@ func (s *Service) GetUser(ctx context.Context, id string) (UserView, error) {
 	if err != nil {
 		return UserView{}, err
 	}
-	return view(row), nil
+	filled, err := s.withGroup(ctx, s.pool, view(row))
+	if err != nil {
+		return UserView{}, err
+	}
+	return filled, nil
 }
 
 // GetCurrentUser answers the account the caller is. The caller's identifier
@@ -319,7 +404,11 @@ func (s *Service) GetCurrentUser(ctx context.Context, subject string) (UserView,
 	if err != nil {
 		return UserView{}, err
 	}
-	return view(row), nil
+	filled, err := s.withGroup(ctx, s.pool, view(row))
+	if err != nil {
+		return UserView{}, err
+	}
+	return filled, nil
 }
 
 // UpdateCurrentUser replaces the signed-in account's own profile fields.
@@ -390,7 +479,11 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	if err != nil {
 		return UserView{}, err
 	}
-	return view(row), nil
+	filled, err := s.withGroup(ctx, s.pool, view(row))
+	if err != nil {
+		return UserView{}, err
+	}
+	return filled, nil
 }
 
 // ListUsers answers one page of the accounts, newest first, optionally
@@ -407,7 +500,11 @@ func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascendin
 	for _, row := range rows {
 		views = append(views, view(row))
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	filled, err := s.withGroups(ctx, views)
+	if err != nil {
+		return nil, responder.Pagination{}, err
+	}
+	return filled, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // UpdateUser replaces an account's writable fields. The account is read
@@ -488,7 +585,11 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 	if err != nil {
 		return UserView{}, err
 	}
-	return view(row), nil
+	filled, err := s.withGroup(ctx, s.pool, view(row))
+	if err != nil {
+		return UserView{}, err
+	}
+	return filled, nil
 }
 
 // ReadAccount reads one account row and answers the canonical view. It is
@@ -534,6 +635,19 @@ func WireView(user UserView) *identityv1.User {
 	}
 	if user.BanExpires != nil {
 		view.BanExpires = new(user.BanExpires.Format(rfc3339))
+	}
+	for _, group := range user.Groups {
+		wire := &identityv1.UserGroup{
+			Id:          group.ID,
+			Name:        group.Name,
+			DisplayName: group.DisplayName,
+			UserCount:   group.UserCount,
+			CreatedAt:   group.CreatedAt.Format(rfc3339),
+		}
+		if group.UpdatedAt != nil {
+			wire.UpdatedAt = new(group.UpdatedAt.Format(rfc3339))
+		}
+		view.UserGroups = append(view.UserGroups, wire)
 	}
 	return view
 }

@@ -24,7 +24,9 @@ import (
 	"github.com/riipandi/tango/modules/apikey"
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/modules/notification"
 	"github.com/riipandi/tango/pkg/crypto"
+	"uuid"
 )
 
 // infrastructure registers what the process runs on: the pool, the cache, the
@@ -35,6 +37,26 @@ import (
 // The context is captured rather than registered. It is the run's own context,
 // which the command cancels on a signal, so it is a property of this run
 // instead of a service anything could resolve and replace.
+// lazyPublisher resolves the notification area's service when a task runs,
+// not when the queue is built: that service's own provider resolves this
+// queue for its email pass, so building one against the other would order
+// the two around each other. A container without the notification area —
+// a consumer served without it — answers the failure the skip falls back
+// to, the notice being advisory.
+type lazyPublisher struct {
+	injector do.Injector
+}
+
+// CreateSystemNotice delivers one automated notice through the notification
+// area's own create.
+func (p lazyPublisher) CreateSystemNotice(ctx context.Context, userID uuid.UUID, title, body string) error {
+	service, err := do.Invoke[*notification.Service](p.injector)
+	if err != nil || service == nil {
+		return err
+	}
+	return service.CreateSystemNotice(ctx, userID, title, body)
+}
+
 func infrastructure(ctx context.Context) func(do.Injector) {
 	return do.Package(
 		do.Lazy(func(i do.Injector) (*fetcher.Client, error) {
@@ -179,8 +201,18 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 
 			// The processors are wired onto the engine here — pure wiring, no
 			// connection is touched. The recurring seeds are the Seeder's
-			// service, resolved by the prewarm walk.
-			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled)
+			// service, resolved by the prewarm walk. The upload-finished
+			// notices resolve the notification area's service at task-run
+			// time, not build time, because that service's own provider
+			// resolves this queue for its email pass — a build-time
+			// resolution would order the two around each other.
+			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i})
+
+			// The upload's after-sync hook rides here rather than on the
+			// manager's provider: the hook enqueues through the client this
+			// provider builds, and the manager must not construct against
+			// the queue to stay buildable without one.
+			uploader.WithAfterSync(jobs.NewUploadFinishedEnqueuer(client, log).Uploaded)
 			return client, nil
 		}),
 

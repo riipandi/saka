@@ -327,9 +327,6 @@ message SignupResponse {
 // password hash, no metadata blob, no profile-picture path. The nullable
 // columns are optional on the wire, so an account without a name part or a
 // ban reads as absent rather than as an empty string.
-//
-// TODO(signup): user_groups joins an account to the groups it belongs to,
-// per the upstream shape; deferred until the usergroup feature lands.
 message User {
   // id is the account's identifier in its wire form, a TypeID (`user_…`)
   // encoded from the row's UUID — the UUID never leaves the server.
@@ -377,6 +374,13 @@ message User {
 
   // ban_reason is the note the banning administrator wrote.
   optional string ban_reason = 14;
+
+  // user_groups are the groups the account belongs to, ordered by the
+  // group's display name — the same view ListUserGroups answers with, so
+  // a client rendering an account never needs a second roundtrip to name
+  // its memberships. The group names are what a deployment's clients
+  // match a group-based claim against.
+  repeated UserGroup user_groups = 16;
 }
 
 // SignupToken is the issued token's view. It carries the counters an operator
@@ -619,6 +623,12 @@ message CreateUserRequest {
   // email_verified records the address as verified at creation. Default
   // false; verification itself is a later procedure.
   optional bool email_verified = 10;
+
+  // user_group_ids are the groups the created account joins, the way the
+  // upstream create carries them. Every name must be a group the
+  // deployment holds — the creation refuses an audience it cannot name,
+  // the way the group procedures refuse an unknown identifier.
+  repeated string user_group_ids = 11;
 }
 
 // CreateUserResponse is the created account.

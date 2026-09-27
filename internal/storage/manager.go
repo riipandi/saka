@@ -120,13 +120,11 @@ func (m *Manager) UpdateMetadata(ctx context.Context, key string, metadata map[s
 	return m.manifests.UpdateMetadata(ctx, m.db, key, metadata)
 }
 
-// Progress reports how far one key's upload has travelled, the shape a
-// status endpoint would serve.
-//
-// TODO(notification): nothing serves this yet — the ConnectRPC and REST
-// wiring does not exist. When it does, a handler maps this onto either a
-// polling response or a server-streamed updates channel; the data is
-// already current.
+// Progress reports how far one key's upload has travelled. The REST
+// progress read (`GET /api/uploads/{key}`, mounted beside the transport)
+// maps the manifest onto its answer, and the after-sync hook pushes the
+// finished transition to the metadata's owner — the sources of truth stay
+// the manifest's row and this read of it.
 func (m *Manager) Progress(ctx context.Context, key string) (Progress, error) {
 	manifest, err := m.Manifest(ctx, key)
 	if err != nil {

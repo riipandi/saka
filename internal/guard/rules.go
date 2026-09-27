@@ -312,6 +312,13 @@ var RestRules = []RestEntry{
 		Rule:    Self("id"),
 		Param:   "id",
 	},
+
+	// The upload progress is a signed-in read, not an owner-scoped one: the
+	// key a progress poll names is the storage key a client already holds,
+	// and the answer — a status word and a byte size — is the same fact the
+	// file's own read carries. The catch-all is the rule's shape because a
+	// storage key carries slashes inside it.
+	{Method: http.MethodGet, Pattern: "/api/uploads/{key...}", Rule: Authenticated},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.
@@ -406,10 +413,32 @@ func CallerOf(info any) *jwtutils.Caller {
 // cannot match, so `{id}` never stands for the rest of a path.
 func matchPattern(pattern, path []string) (map[string]string, bool) {
 	if len(pattern) != len(path) {
+		// A trailing catch-all is the one shape a shorter path cannot
+		// preclude: the check below decides it by prefix.
+		if len(pattern) == 0 || !isWildcard(pattern[len(pattern)-1]) || len(path) < len(pattern) {
+			return nil, false
+		}
+	} else if isWildcard(pattern[len(pattern)-1]) && len(path) == len(pattern) {
+		// A catch-all with nothing left to absorb names nothing.
 		return nil, false
 	}
+
 	var params map[string]string
 	for i, segment := range pattern {
+		if isWildcard(segment) {
+			// The storage keys carry slashes, so a route that names one
+			// absorbs the rest of the path; the wildcard is the pattern's
+			// last segment and answers at least one segment of it.
+			if i != len(pattern)-1 {
+				return nil, false
+			}
+			if params == nil {
+				params = make(map[string]string, 1)
+			}
+			name, _ := wildcardName(segment)
+			params[name] = strings.Join(path[i:], "/")
+			return params, true
+		}
 		if name, ok := paramName(segment); ok {
 			if params == nil {
 				params = make(map[string]string, 1)
@@ -422,6 +451,26 @@ func matchPattern(pattern, path []string) (map[string]string, bool) {
 		}
 	}
 	return params, true
+}
+
+// isWildcard reports whether a pattern segment is the trailing catch-all
+// `{name...}`: the one segment that absorbs the rest of the path, for the
+// keys a route names that carry slashes inside them.
+func isWildcard(segment string) bool {
+	_, ok := wildcardName(segment)
+	return ok
+}
+
+// wildcardName reads the `{name...}` segment's name.
+func wildcardName(segment string) (string, bool) {
+	if len(segment) < 6 || !strings.HasPrefix(segment, "{") || !strings.HasSuffix(segment, "...}") {
+		return "", false
+	}
+	name := segment[1 : len(segment)-4]
+	if name == "" || strings.ContainsAny(name, "{}. ") {
+		return "", false
+	}
+	return name, true
 }
 
 // paramName reads a `{name}` segment.

@@ -25,7 +25,7 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool)
 	}))
@@ -81,6 +81,11 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		}))
 		client.Register(queue.NewQueue[notification.NotificationEmailTask](func(ctx context.Context, task notification.NotificationEmailTask) error {
 			return notificationEmailProcessor(ctx, task, pool, mail)
+		}))
+	}
+	if notices != nil {
+		client.Register(queue.NewQueue[UploadFinishedTask](func(ctx context.Context, task UploadFinishedTask) error {
+			return uploadFinishedProcessor(ctx, task, notices)
 		}))
 	}
 }

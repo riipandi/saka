@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/internal/transport/middleware"
 	"github.com/riipandi/tango/internal/transport/static"
 	"github.com/riipandi/tango/pkg/responder"
@@ -124,6 +125,16 @@ func NewRouter(opts Options) chi.Router {
 		// outside it: they are the surface a monitor reaches.
 		throttled.Group(func(mod chi.Router) {
 			mod.Use(middleware.RESTBearer(opts.Authenticator, restGuardRules))
+			// The upload progress read mounts beside the modules: the same
+			// bearer middleware guards it, and the storage engine it reads
+			// is infrastructure's to resolve. A container without the
+			// engine — a test's bare router — mounts no route, the smaller
+			// feature rather than a broken one.
+			if opts.Injector != nil {
+				if manager, err := do.Invoke[*storage.Manager](opts.Injector); err == nil && manager != nil {
+					mod.Get("/api/uploads/*", uploadProgressHandler(manager))
+				}
+			}
 			kernel.Mount(mod, opts.Modules...)
 		})
 	})

@@ -19,10 +19,6 @@ package audit
 // An event names what happened, not which procedure answered. `user_created`
 // is written by both the administrator's CreateUser and the sign-up flow,
 // because a reader asking "when was this account created" wants one answer.
-//
-// TODO(audit): sign-out has no event here because it has no procedure — the
-// session feature is a scaffold, and an event for a path nothing can take
-// would be a name no writer reaches.
 const (
 	// EventSignIn is a credential verified and a session opened.
 	EventSignIn = "sign_in"

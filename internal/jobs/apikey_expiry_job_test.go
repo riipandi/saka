@@ -33,7 +33,7 @@ func expiryPool(t *testing.T, enabled bool, mail *mailer.Service) (*datastorePos
 
 	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
 	pool, client := migratedClient(t, dsn)
-	Register(client, time.Hour, nil, mail, pool, "", enabled, true)
+	Register(client, time.Hour, nil, mail, pool, "", enabled, true, nil)
 	return pool, client
 }
 

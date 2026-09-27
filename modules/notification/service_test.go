@@ -470,3 +470,30 @@ func TestTheInboxSortsAndFiltersByItsOwnColumns(t *testing.T) {
 	require.Len(t, inbox, 3)
 	assert.Equal(t, "The Invisible Book", inbox[0].Title, "a sort key the contract does not name falls back to the creation order")
 }
+
+// TestCreateSystemNoticeAddressesOneAccountWithoutACreator pins the
+// automated notice: the row lands in exactly the addressee's inbox, no
+// creator is named, and the live tail carries it — the shape the upload
+// finished notice rides.
+func TestCreateSystemNoticeAddressesOneAccountWithoutACreator(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	hermione := seedAccount(t, pool, "hermione", false)
+	ron := seedAccount(t, pool, "ron", false)
+
+	require.NoError(t, service.CreateSystemNotice(t.Context(), hermione,
+		"Upload complete", "Your file avatars/hermione.png is ready."))
+
+	inbox, _, err := service.ListInbox(t.Context(), hermione, false, CategorySystem, "", false, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, inbox, 1)
+	assert.Equal(t, "Upload complete", inbox[0].Title)
+	assert.Empty(t, inbox[0].CreatedBy,
+		"the system is the author; no operator's identifier travels on it")
+
+	inbox, _, err = service.ListInbox(t.Context(), ron, false, CategorySystem, "", false, 1, 20)
+	require.NoError(t, err)
+	assert.Empty(t, inbox,
+		"the notice is addressed, not broadcast: another account reads none")
+}
