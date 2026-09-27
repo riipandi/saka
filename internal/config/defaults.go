@@ -340,6 +340,15 @@ func Default() Config {
 			FromName:  "Tango Mailer",
 			SMTPPort:  587,
 			Timeout:   DefaultMailerTimeout,
+			Notifications: MailerNotifications{
+				NewDeviceNoticeEnabled:       true,
+				PasswordChangedNoticeEnabled: true,
+				MfaDisabledNoticeEnabled:     true,
+				UserBannedNoticeEnabled:      true,
+				UserUnbannedNoticeEnabled:    true,
+				APIKeyExpiringNoticeEnabled:  true,
+				EmailChangeNoticeEnabled:     true,
+			},
 		},
 		RateLimit: RateLimit{
 			Driver: RateLimitDB,

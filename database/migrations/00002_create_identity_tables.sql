@@ -113,6 +113,20 @@ CREATE TABLE IF NOT EXISTS public.sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions (expires_at) WHERE expires_at IS NOT NULL;
+
+-- The table remembering every browser fingerprint an account has signed in
+-- from. A session row is a poor record of a device — it expires and gets
+-- cleaned up — so the first-seen judgement behind the new-device notice needs
+-- a row that outlives the sessions.
+CREATE TABLE IF NOT EXISTS public.known_devices (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    device_fingerprint TEXT NOT NULL,
+    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, device_fingerprint)
+) USING heap;
+
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON public.sessions USING btree (user_id, expires_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_ip_address ON public.sessions (ip_address) WHERE ip_address IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_device_fingerprint ON public.sessions (device_fingerprint);
@@ -121,7 +135,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_token_hash ON public.sessions (to
 
 -- --------------------------------------------------------
 -- Table: public.auth_tokens — one-time access, email verification,
--- reauthentication, and password-reset tokens (hash-only).
+-- reauthentication, password-reset, and email-change tokens (hash-only).
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.auth_tokens (
@@ -129,12 +143,13 @@ CREATE TABLE IF NOT EXISTS public.auth_tokens (
     user_id UUID NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     device_token VARCHAR(16), -- Used only for one_time_access
+    payload TEXT,             -- Used only for email_change: the pending address the token is bound to
     purpose TEXT NOT NULL DEFAULT 'one_time_access',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP),
     last_sent_at TIMESTAMPTZ DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'password_reset'))
+    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'password_reset', 'email_change'))
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens (user_id);
@@ -276,6 +291,7 @@ DROP INDEX IF EXISTS idx_user_passwords_user_id;
 
 DROP TABLE IF EXISTS public.audit_logs;
 DROP TABLE IF EXISTS public.device_login_requests;
+DROP TABLE IF EXISTS public.known_devices;
 DROP TABLE IF EXISTS public.signup_tokens_user_groups;
 DROP TABLE IF EXISTS public.signup_tokens;
 DROP TABLE IF EXISTS public.auth_tokens;

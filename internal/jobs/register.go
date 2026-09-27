@@ -20,10 +20,11 @@ import (
 // run through. A nil uploader registers none of its jobs: a queue that
 // cannot answer its tasks is not a schedule, it is a failure. mail is the
 // service the verification email submits through, and the same rule applies.
-// expiryEmailEnabled says whether the API-key expiry reminder runs: the scan
-// is seeded only when the deployment asked for it, and a scan a deployment
+// expiryEmailEnabled says whether the API-key expiry reminder runs — its
+// feature switch, AND-ed with the notice flag the deployment's cost decision
+// carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool) {
 	client.Register(queue.NewQueue[CleanupTask](cleanupProcessor))
 	// The audit retention runs on the pool rather than through a service: it
 	// deletes rows nothing reads back, so it needs no feature to own it.
@@ -39,7 +40,7 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		}))
 	}
 	client.Register(queue.NewQueue[APIKeyExpiryScanTask](func(ctx context.Context, task APIKeyExpiryScanTask) error {
-		return apiKeyExpiryScanProcessor(ctx, task, pool, client, expiryEmailEnabled && mail != nil, mail)
+		return apiKeyExpiryScanProcessor(ctx, task, pool, client, expiryEmailEnabled && apiKeyExpiringNoticeEnabled && mail != nil, mail)
 	}))
 	if mail != nil {
 		client.Register(queue.NewQueue[EmailVerificationTask](func(ctx context.Context, task EmailVerificationTask) error {
@@ -65,6 +66,15 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		}))
 		client.Register(queue.NewQueue[MfaDisabledNoticeTask](func(ctx context.Context, task MfaDisabledNoticeTask) error {
 			return mfaDisabledNoticeProcessor(ctx, task, mail)
+		}))
+		client.Register(queue.NewQueue[NewDeviceEmailTask](func(ctx context.Context, task NewDeviceEmailTask) error {
+			return newDeviceEmailProcessor(ctx, task, mail)
+		}))
+		client.Register(queue.NewQueue[EmailChangeRequestEmailTask](func(ctx context.Context, task EmailChangeRequestEmailTask) error {
+			return emailChangeRequestProcessor(ctx, task, mail, baseURL)
+		}))
+		client.Register(queue.NewQueue[EmailChangeNoticeTask](func(ctx context.Context, task EmailChangeNoticeTask) error {
+			return emailChangeNoticeProcessor(ctx, task, mail)
 		}))
 	}
 }

@@ -152,3 +152,137 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 	}
 	return nil
 }
+
+// FindUserByID reads the account the identifier names — the read the
+// confirmation runs inside its transaction, when the pending token has
+// already named the account whose address moves.
+func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "username", "email", "display_name", "email_verified_at")
+	sb.From("public.users")
+	sb.Where(sb.Equal("id", id))
+
+	query, args := sb.Build()
+	var row Account
+	err := db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.EmailVerifiedAt,
+	)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return Account{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("verification: find user by id: %w", err)
+	}
+	return row, nil
+}
+
+// UpsertEmailChangeToken writes the pending-change token. The account
+// carries at most one pending change, so a re-request replaces the hash,
+// rebinds the payload to the newest address asked for, moves the window,
+// and stamps the send time over the row it conflicts with.
+func (r *Repository) UpsertEmailChangeToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash, payload string, expiresAt, sentAt time.Time) error {
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(AuthTokenTable)
+	ib.Cols("user_id", "token_hash", "purpose", "payload", "expires_at", "last_sent_at")
+	ib.Values(userID, tokenHash, PurposeEmailChange, payload, expiresAt, sentAt)
+	ib.SQL("ON CONFLICT (user_id, purpose) DO UPDATE SET " +
+		"token_hash = EXCLUDED.token_hash, " +
+		"payload = EXCLUDED.payload, " +
+		"expires_at = EXCLUDED.expires_at, " +
+		"last_sent_at = EXCLUDED.last_sent_at")
+
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("verification: upsert email change token: %w", err)
+	}
+	return nil
+}
+
+// FindEmailChangeTokenByHash reads the pending-change row a raw value hashes
+// to. The raw value is never stored: only the caller's hash reaches this
+// query.
+func (r *Repository) FindEmailChangeTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (EmailChangeToken, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "user_id", "payload", "expires_at", "last_sent_at")
+	sb.From(AuthTokenTable)
+	sb.Where(
+		sb.Equal("token_hash", tokenHash),
+		sb.Equal("purpose", PurposeEmailChange),
+	)
+
+	query, args := sb.Build()
+	var row EmailChangeToken
+	err := db.QueryRow(ctx, query, args...).Scan(&row.ID, &row.UserID, &row.Payload, &row.ExpiresAt, &row.LastSentAt)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return EmailChangeToken{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return EmailChangeToken{}, fmt.Errorf("verification: find email change token: %w", err)
+	}
+	return row, nil
+}
+
+// FindEmailChangeTokenByUser reads the pending-change row an account
+// carries. The request cooldown reads the send time it stamps.
+func (r *Repository) FindEmailChangeTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (EmailChangeToken, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "user_id", "payload", "expires_at", "last_sent_at")
+	sb.From(AuthTokenTable)
+	sb.Where(
+		sb.Equal("user_id", userID),
+		sb.Equal("purpose", PurposeEmailChange),
+	)
+
+	query, args := sb.Build()
+	var row EmailChangeToken
+	err := db.QueryRow(ctx, query, args...).Scan(&row.ID, &row.UserID, &row.Payload, &row.ExpiresAt, &row.LastSentAt)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return EmailChangeToken{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return EmailChangeToken{}, fmt.Errorf("verification: find email change token by user: %w", err)
+	}
+	return row, nil
+}
+
+// FindUserByEmail reads the account an address is on record for, whatever
+// its username. The uniqueness judgement the request and the confirmation
+// both run reads it.
+func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "username", "email", "display_name", "email_verified_at")
+	sb.From("public.users")
+	sb.Where(sb.Equal("email", email))
+
+	query, args := sb.Build()
+	var row Account
+	err := db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.EmailVerifiedAt,
+	)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return Account{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("verification: find user by email: %w", err)
+	}
+	return row, nil
+}
+
+// SetEmail moves the account's address and stamps it verified in one write:
+// the confirmation's token proved control of the new address, so the proof
+// the old address carried moves with the account and the fresh one applies.
+func (r *Repository) SetEmail(ctx context.Context, db datastore.Querier, userID uuid.UUID, email string, at time.Time) error {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update("public.users")
+	ub.Set(
+		ub.Assign("email", email),
+		ub.Assign("email_verified_at", at),
+	)
+	ub.Where(ub.Equal("id", userID))
+
+	query, args := ub.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("verification: set email: %w", err)
+	}
+	return nil
+}

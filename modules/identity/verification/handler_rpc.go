@@ -46,6 +46,8 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	_, handler := identityv1connect.NewEmailVerificationServiceHandler(newRPCHandler(m.service), opts...)
 	r.Handle(identityv1connect.EmailVerificationServiceSendEmailProcedure, handler)
 	r.Handle(identityv1connect.EmailVerificationServiceVerifyEmailProcedure, handler)
+	r.Handle(identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure, handler)
+	r.Handle(identityv1connect.EmailVerificationServiceConfirmEmailChangeProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -91,6 +93,39 @@ func (h *rpcHandler) VerifyEmail(ctx context.Context, req *connect.Request[ident
 	}), nil
 }
 
+// RequestEmailChange writes the signed-in account's pending change and mails
+// its token to the address the change moves to. The procedure is the
+// signed-in user's own door: the claims — not the request — name the
+// account, so a caller can only ever start a change for their own address.
+func (h *rpcHandler) RequestEmailChange(ctx context.Context, req *connect.Request[identityv1.RequestEmailChangeRequest]) (*connect.Response[identityv1.RequestEmailChangeResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+
+	if err := h.service.RequestEmailChange(ctx, caller.Username, req.Msg.NewEmail); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.RequestEmailChangeResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the change was requested; the confirm link was sent to the new address",
+	}), nil
+}
+
+// ConfirmEmailChange consumes the pending token and moves the account to the
+// address it binds. The procedure is public: the token is the credential,
+// and the caller carries none — the message linked here from a browser that
+// may hold no session.
+func (h *rpcHandler) ConfirmEmailChange(ctx context.Context, req *connect.Request[identityv1.ConfirmEmailChangeRequest]) (*connect.Response[identityv1.ConfirmEmailChangeResponse], error) {
+	if err := h.service.ConfirmEmailChange(ctx, req.Msg.Token); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.ConfirmEmailChangeResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the email address was changed",
+	}), nil
+}
+
 // mapError translates the service's failures into the codes the Connect
 // protocol carries. The internal ones are collapsed to one answer whose text
 // names nothing a caller could aim at. A malformed field never reaches the
@@ -108,6 +143,10 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("verification token is invalid or expired"))
 	case errors.Is(err, ErrResendTooSoon):
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("a verification email was sent less than a minute ago"))
+	case errors.Is(err, ErrSameEmail):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the new address is the current one"))
+	case errors.Is(err, ErrEmailTaken):
+		return connect.NewError(connect.CodeAlreadyExists, errors.New("the address is already in use"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("email verification failed"))
 	}

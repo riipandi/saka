@@ -303,6 +303,8 @@ User management, sign-up, one-time access, email verification, and profile pictu
 | POST     | `/api/one-time-access-token/{token}`                                         | HTTP/REST    | Exchange one-time access token                  |
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                         |
 | POST     | `/api/users/me/verify-email`                                                 | HTTP/REST    | Verify email                                    |
+| POST     | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change                            |
+| POST     | `/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change                            |
 | GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture                        |
 
 ## User Groups

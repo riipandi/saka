@@ -476,6 +476,34 @@ failed enqueue needs to retry. A key whose owner has no address is skipped unmar
 that appears later still earns its reminder. The switch is `auth.expiry_email_enabled`, off by
 default: a mailer that writes to account holders on a schedule is a deployment's decision.
 
+## Notice emails and their switches (settled 2026-09-27)
+
+The application sends two kinds of email, and only one of them is configurable. **Transactional**
+emails carry the flow itself — a password-reset link, a verification token, a one-time access code,
+an email-change confirm link — so no switch exists for them: turning one off would break the flow,
+not save the cost. **Notices** are receipts a committed fact sends — a new-device sign-in, a changed
+password, an administrative MFA removal, a ban and its lift, an expiring API key, the email-change
+pending notice and its success confirmation — and every one of them is gated per flow under
+`mailer.notifications.*` (default on). The gate sits at the **enqueue** site, in the jobs adapter,
+not in the queue processor: a switched-off flow is a no-op before the task exists, so the queue
+never carries mail nobody asked for.
+
+The new-device notice is the one notice with state of its own: `public.known_devices` remembers
+every browser fingerprint an account has signed in from, and the first-seen judgement rides the
+session's transaction (`INSERT ... ON CONFLICT ... RETURNING (xmax = 0)`), so a rolled-back sign-in
+leaves no device row and a concurrent sign-in cannot double-notice. A fingerprint-less client is
+never a device — it cannot be told apart from any other fingerprint-less client, so noticing it
+would mail every sign-in. The judgement runs in `IssueSession`, so every way of opening a session —
+password, one-time access, MFA bridge — feeds it.
+
+The email-change flow lives beside email verification (`modules/identity/verification`), sharing the
+`auth_tokens` table under the `email_change` purpose with the pending address bound in the row's
+`payload` column. The confirm token is the flow's whole credential: generated, shown once in the
+message, stored only as a hash; the confirmation moves the account to the row's payload, never to an
+address the confirm request could name, and re-judges uniqueness inside its transaction — a lost
+race leaves the token unconsumed. A confirmed change stamps the account verified: the token proved
+control of the new address.
+
 ## Protocol and authentication (settled 2026-09-24)
 
 The two transports serve different audiences, and the split decides where each fact lives. **ConnectRPC is the primary protocol** — internal communication and the backoffice client, whose generated clients read response headers natively and think in `connect.Code`. **REST serves external integrations**, and the OAuth2/OIDC identity-provider features are planned on the REST surface, where third-party tooling expects conventional shapes.

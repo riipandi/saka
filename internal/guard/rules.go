@@ -54,6 +54,13 @@ var ProcedureRules = map[string]Entry{
 	identityv1connect.SignupServiceSignupProcedure:                 {Rule: Public},
 	identityv1connect.EmailVerificationServiceVerifyEmailProcedure: {Rule: Public},
 
+	// The email-change flow splits at the same line its sibling
+	// verification does: the request runs on the caller's own token, and
+	// the confirmation is answered without one — the pending token is the
+	// credential it judges.
+	identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure: {Rule: Authenticated},
+	identityv1connect.EmailVerificationServiceConfirmEmailChangeProcedure: {Rule: Public},
+
 	// The one-time access codes. The exchange is the sign-in a caller makes
 	// with a code instead of a password, so it is reached before any token
 	// exists; the public email ask is reached from the sign-in page for the

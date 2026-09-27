@@ -389,6 +389,41 @@
                     "description": "Bounds one mail submission, seconds.",
                     "$ref": "#/$defs/numberOrEnv",
                     "default": 15
+                },
+                "notifications": {
+                    "description": "Which notice emails a deployment pays for. The transactional emails (password reset, email verification, one-time access, the email-change token) are not gated: they carry the flow itself.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "new_device_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "password_changed_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "mfa_disabled_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "user_banned_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "user_unbanned_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "api_key_expiring_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        },
+                        "email_change_notice_enabled": {
+                            "$ref": "#/$defs/boolOrEnv",
+                            "default": true
+                        }
+                    }
                 }
             }
         },

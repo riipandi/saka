@@ -67,6 +67,10 @@ type Service struct {
 	longTTL   time.Duration
 	now       func() time.Time
 
+	// notices is the new-device notification channel. Nil until wired; a
+	// service without one skips the mail, never the sign-in.
+	notices deviceNoticeEnqueuer
+
 	// dummyHash holds the hash a sign-in of an unknown account is checked
 	// against, so the two failure paths cost the same work. It is computed
 	// once, on the first miss.
@@ -303,9 +307,37 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		},
 	})
 
+	// The first-seen judgement rides the session's transaction, so a
+	// rolled-back sign-in leaves no device row behind. A fingerprint-less
+	// client is never a device: it cannot be told apart from any other
+	// fingerprint-less client, so noticing it would mail every sign-in.
+	newDevice := false
+	if params.Fingerprint != "" {
+		seen, seenErr := repo.MarkDeviceSeen(ctx, db, account.ID, params.Fingerprint, now)
+		if seenErr != nil {
+			return Result{}, seenErr
+		}
+		newDevice = seen
+	}
+
 	access, err := s.SignAccessToken(ctx, account, sessionID, now)
 	if err != nil {
 		return Result{}, err
+	}
+
+	// The notice is best-effort and rides outside the transaction: the queue
+	// client writes on its own connection, the sign-in has committed by the
+	// only paths this method returns through, and a failed enqueue never
+	// fails a sign-in that already succeeded.
+	if newDevice && s.notices != nil {
+		s.notices.EnqueueNewDeviceNotice(ctx, NewDeviceNotice{
+			UserID:      account.ID.String(),
+			Email:       account.Email,
+			IPAddress:   params.IPAddress,
+			UserAgent:   params.UserAgent,
+			Fingerprint: params.Fingerprint,
+			SignedInAt:  now,
+		})
 	}
 
 	return Result{
@@ -336,6 +368,32 @@ func bannedAt(account *Account, at time.Time) bool {
 // without a cycle, and the gate's interface keeps the seam one-shaped.
 func (s *Service) WithMFAGate(gate mfaGate) *Service {
 	s.mfa = gate
+	return s
+}
+
+// NewDeviceNotice is what a first sighting of a browser fingerprint sends.
+// Location (city, country) is not resolved here: no GeoIP source runs in the
+// process, so the template's own fallback names it.
+type NewDeviceNotice struct {
+	UserID      string
+	Email       string
+	IPAddress   string
+	UserAgent   string
+	Fingerprint string
+	SignedInAt  time.Time
+}
+
+// deviceNoticeEnqueuer is the notification channel the first-seen judgement
+// feeds. The interface lives here so the sign-in names no queue; the jobs
+// package adapts it, the way the ban and MFA notices travel.
+type deviceNoticeEnqueuer interface {
+	EnqueueNewDeviceNotice(ctx context.Context, notice NewDeviceNotice)
+}
+
+// WithDeviceNotifier arms the new-device notice. Nil-safe: a service without
+// a notifier signs in as before and only skips the mail.
+func (s *Service) WithDeviceNotifier(notices deviceNoticeEnqueuer) *Service {
+	s.notices = notices
 	return s
 }
 

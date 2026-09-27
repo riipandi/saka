@@ -18,15 +18,22 @@ import (
 type PasswordResetNotifier struct {
 	client *queue.Client
 	log    *slog.Logger
+
+	// changedNoticeEnabled is the deployment's cost decision for the change
+	// receipt (mailer.notifications). The reset link itself is transactional
+	// and never gated. A switched-off notice is a no-op here rather than a
+	// dropped task, so the queue never carries mail nobody asked for.
+	changedNoticeEnabled bool
 }
 
-// NewPasswordResetNotifier builds the adapter over the queue client. A nil
-// logger is answered with the discard handler.
-func NewPasswordResetNotifier(client *queue.Client, log *slog.Logger) *PasswordResetNotifier {
+// NewPasswordResetNotifier builds the adapter over the queue client.
+// changedNoticeEnabled gates the change receipt; a nil logger is answered
+// with the discard handler.
+func NewPasswordResetNotifier(client *queue.Client, log *slog.Logger, changedNoticeEnabled bool) *PasswordResetNotifier {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &PasswordResetNotifier{client: client, log: log}
+	return &PasswordResetNotifier{client: client, log: log, changedNoticeEnabled: changedNoticeEnabled}
 }
 
 // EnqueuePasswordResetEmail queues the message the trigger produced.
@@ -47,6 +54,9 @@ func (n *PasswordResetNotifier) EnqueuePasswordResetEmail(ctx context.Context, e
 // committed, and the audit record already says so — a lost notice must not
 // fail the procedure that succeeded.
 func (n *PasswordResetNotifier) EnqueuePasswordChangedNotice(ctx context.Context, notice password.ChangedNotice) error {
+	if !n.changedNoticeEnabled {
+		return nil
+	}
 	if _, err := n.client.Add(PasswordChangedNoticeTask{
 		UserID:      notice.UserID,
 		Email:       notice.Email,

@@ -426,6 +426,37 @@ type Mailer struct {
 	// message body. A submission that hangs must fail rather than hold the
 	// caller for as long as the kernel's own connect timeout allows.
 	Timeout time.Duration `koanf:"timeout" json:"timeout"`
+	// Notifications gates the notice emails per flow. Only the notices are
+	// toggleable: the transactional emails (a password reset link, a
+	// verification token, a one-time access code) carry the flow itself, so
+	// switching them off would break the feature rather than save the cost.
+	Notifications MailerNotifications `koanf:"notifications" json:"notifications"`
+}
+
+// MailerNotifications says which notice emails a deployment pays for. Every
+// flow defaults to on: a notice left off is a deliberate cost decision, and
+// the account side of the fact — the audit record — is written either way.
+type MailerNotifications struct {
+	// NewDeviceNoticeEnabled gates the sign-in notice an unseen browser
+	// fingerprint sends.
+	NewDeviceNoticeEnabled bool `koanf:"new_device_notice_enabled" json:"new_device_notice_enabled"`
+	// PasswordChangedNoticeEnabled gates the "your password was changed"
+	// receipt a completed reset sends.
+	PasswordChangedNoticeEnabled bool `koanf:"password_changed_notice_enabled" json:"password_changed_notice_enabled"`
+	// MfaDisabledNoticeEnabled gates the notice an administrative MFA removal
+	// sends.
+	MfaDisabledNoticeEnabled bool `koanf:"mfa_disabled_notice_enabled" json:"mfa_disabled_notice_enabled"`
+	// UserBannedNoticeEnabled gates the notice a ban sends.
+	UserBannedNoticeEnabled bool `koanf:"user_banned_notice_enabled" json:"user_banned_notice_enabled"`
+	// UserUnbannedNoticeEnabled gates the notice a lifted ban sends.
+	UserUnbannedNoticeEnabled bool `koanf:"user_unbanned_notice_enabled" json:"user_unbanned_notice_enabled"`
+	// APIKeyExpiringNoticeEnabled gates the expiry warning an aging API key
+	// sends.
+	APIKeyExpiringNoticeEnabled bool `koanf:"api_key_expiring_notice_enabled" json:"api_key_expiring_notice_enabled"`
+	// EmailChangeNoticeEnabled gates the notice the old address receives while
+	// a change is pending and the confirmation the new address receives after
+	// it completes. The request token itself is transactional and always sent.
+	EmailChangeNoticeEnabled bool `koanf:"email_change_notice_enabled" json:"email_change_notice_enabled"`
 }
 
 // Queue holds the background task queue settings. The queue runs on the same

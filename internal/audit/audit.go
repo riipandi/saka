@@ -44,6 +44,14 @@ const (
 	// rather than the message.
 	EventEmailVerified = "email_verified"
 
+	// EventEmailChangeRequested is a pending change written and its token
+	// submitted to the address the change moves to.
+	EventEmailChangeRequested = "email_change_requested"
+
+	// EventEmailChanged is a pending change confirmed: the account's address
+	// moved and the token was consumed.
+	EventEmailChanged = "email_changed"
+
 	// EventProfilePictureUpdated is an account's picture replaced.
 	EventProfilePictureUpdated = "profile_picture_updated"
 

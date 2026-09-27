@@ -157,13 +157,16 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		keys := do.MustInvoke[*jwks.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return signin.NewService(*c, pool, signin.NewRepository(pool), keys, recorder, log), nil
+		client := do.MustInvoke[*queue.Client](i)
+		return signin.NewService(*c, pool, signin.NewRepository(pool), keys, recorder, log).
+			WithDeviceNotifier(jobs.NewDeviceNotifier(client, log, c.Mailer.Notifications.NewDeviceNoticeEnabled)), nil
 	}),
 
 	// The session lifecycle builds over the sign-in issuer through the
 	// interface the session package defines — the renewal and the opening
 	// must not drift apart, and the issuer satisfies it without an adapter.
 	do.Lazy(func(i do.Injector) (*session.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
@@ -178,6 +181,8 @@ var Package = do.Package(
 		users.WithBanSideEffects(service, jobs.NewBanNotifier(
 			do.MustInvoke[*queue.Client](i),
 			do.MustInvoke[*slog.Logger](i),
+			c.Mailer.Notifications.UserBannedNoticeEnabled,
+			c.Mailer.Notifications.UserUnbannedNoticeEnabled,
 		))
 		return service, nil
 	}),
@@ -207,7 +212,11 @@ var Package = do.Package(
 		mail := do.MustInvoke[*mailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return verification.NewService(pool, mail, client, recorder, c.App.BaseURL, log), nil
+		// The change notices ride the deployment's cost decision; the
+		// confirm-link message the request itself sends is transactional
+		// and enqueues directly.
+		return verification.NewService(pool, mail, client, recorder, c.App.BaseURL, log).
+			WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(client, log, c.Mailer.Notifications.EmailChangeNoticeEnabled)), nil
 	}),
 
 	// The one-time access service builds over the sign-in issuer — the
@@ -254,7 +263,7 @@ var Package = do.Package(
 		// gate does: internal/jobs cannot sit below the multifactor package
 		// without the cycle the password recovery's enqueuer avoids too.
 		client := do.MustInvoke[*queue.Client](i)
-		service.WithNoticeEnqueuer(jobs.NewMfaDisabledNotifier(client, log))
+		service.WithNoticeEnqueuer(jobs.NewMfaDisabledNotifier(client, log, c.Mailer.Notifications.MfaDisabledNoticeEnabled))
 		// The decrypted-secret aid answers the configuration's flag, and the
 		// mode gate repeats what validation refuses: the flag outside the
 		// development mode is a misconfiguration, so both layers hold even
@@ -277,7 +286,7 @@ var Package = do.Package(
 		client := do.MustInvoke[*queue.Client](i)
 		sessions := do.MustInvoke[*session.Service](i)
 		return password.NewService(pool, mail, recorder, c.App.BaseURL, log).
-			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log)).
+			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log, c.Mailer.Notifications.PasswordChangedNoticeEnabled)).
 			WithSessionEnder(sessions).
 			WithUUIDDecoder(user.UUIDFromWire), nil
 	}),

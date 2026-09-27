@@ -18,16 +18,24 @@ import (
 type BanNotifier struct {
 	client *queue.Client
 	log    *slog.Logger
+
+	// bannedEnabled and unbannedEnabled are the deployment's cost decisions
+	// (mailer.notifications), one per flow. A switched-off flow is a no-op
+	// here rather than a dropped task, so the queue never carries mail
+	// nobody asked for.
+	bannedEnabled   bool
+	unbannedEnabled bool
 }
 
-// NewBanNotifier builds the ban notifier over the queue client. A nil
-// logger is answered with the discard handler, so a caller without logging
-// stays silent rather than panicking on the first missed enqueue.
-func NewBanNotifier(client *queue.Client, log *slog.Logger) *BanNotifier {
+// NewBanNotifier builds the ban notifier over the queue client. The two
+// flags gate each notice flow separately; a nil logger is answered with the
+// discard handler, so a caller without logging stays silent rather than
+// panicking on the first missed enqueue.
+func NewBanNotifier(client *queue.Client, log *slog.Logger, bannedEnabled, unbannedEnabled bool) *BanNotifier {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &BanNotifier{client: client, log: log}
+	return &BanNotifier{client: client, log: log, bannedEnabled: bannedEnabled, unbannedEnabled: unbannedEnabled}
 }
 
 // UserBanned queues the suspension notice. The expiry is rendered here —
@@ -35,6 +43,9 @@ func NewBanNotifier(client *queue.Client, log *slog.Logger) *BanNotifier {
 // travels the queue as JSON. The subject's ban reason is the same sentence
 // the audit record keeps.
 func (n *BanNotifier) UserBanned(ctx context.Context, email string, subject user.UserView, expiresAt *time.Time) {
+	if !n.bannedEnabled {
+		return
+	}
 	task := UserBannedEmailTask{
 		Email:       email,
 		DisplayName: subject.DisplayName,
@@ -53,6 +64,9 @@ func (n *BanNotifier) UserBanned(ctx context.Context, email string, subject user
 
 // UserUnbanned queues the reinstatement notice.
 func (n *BanNotifier) UserUnbanned(ctx context.Context, email string, subject user.UserView) {
+	if !n.unbannedEnabled {
+		return
+	}
 	if _, err := n.client.Add(UserUnbannedEmailTask{
 		Email:       email,
 		DisplayName: subject.DisplayName,

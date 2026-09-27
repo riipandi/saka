@@ -8,6 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
+	"go.jetify.com/typeid"
 	"uuid"
 
 	"github.com/riipandi/tango/internal/datastore"
@@ -141,4 +142,33 @@ func (r *Repository) TouchLastLogin(ctx context.Context, userID uuid.UUID, at ti
 		return fmt.Errorf("signin: touch last login: %w", err)
 	}
 	return nil
+}
+
+// MarkDeviceSeen records a fingerprint as seen for an account and answers
+// whether this was the first sighting. One statement does both: the insert
+// wins the race (the unique pair makes the concurrent loser a no-op), and an
+// empty result means the device was already known — no notice for it. The
+// conflict branch keeps last_seen_at fresh, so a returning device's row says
+// when it was last presented.
+//
+// db is the query surface the caller is already inside — the judgement rides
+// the session's transaction, so a rolled-back sign-in leaves no device row.
+func (r *Repository) MarkDeviceSeen(ctx context.Context, db datastore.Querier, userID uuid.UUID, fingerprint string, at time.Time) (bool, error) {
+	id, err := typeid.New[KnownDeviceID]()
+	if err != nil {
+		return false, fmt.Errorf("signin: known device id: %w", err)
+	}
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(KnownDeviceTable)
+	ib.Cols("id", "user_id", "device_fingerprint", "first_seen_at", "last_seen_at")
+	ib.Values(id.UUID(), userID, fingerprint, at, at)
+	ib.SQL("ON CONFLICT (user_id, device_fingerprint) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at RETURNING (xmax = 0) AS inserted")
+
+	query, args := ib.Build()
+	var inserted bool
+	err = db.QueryRow(ctx, query, args...).Scan(&inserted)
+	if err != nil {
+		return false, fmt.Errorf("signin: mark device seen: %w", err)
+	}
+	return inserted, nil
 }

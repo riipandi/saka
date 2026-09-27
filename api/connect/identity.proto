@@ -189,6 +189,23 @@ service EmailVerificationService {
   // not disclose which half was wrong. Verification consumes the token: the
   // row is deleted, so the link works once.
   rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse);
+
+  // RequestEmailChange writes the pending change for the signed-in account
+  // and mails its token to the address the change moves to. The address the
+  // request names must be free: another account's address is refused here,
+  // where the caller can pick a different one, rather than at the
+  // confirmation, where the link would already be in flight. The message to
+  // the old address is the account holder's defense against a change
+  // someone else asked for; the token message is the flow itself.
+  rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse);
+
+  // ConfirmEmailChange consumes the pending token and moves the account to
+  // the address the token binds. An unknown, expired, and spent token
+  // answer the same failure, and the row is deleted, so the link works
+  // once. The confirmation is answered without a caller: the token
+  // identifies the account, and the frontend the message links to forwards
+  // the value, so the flow works in a browser that holds no session.
+  rpc ConfirmEmailChange(ConfirmEmailChangeRequest) returns (ConfirmEmailChangeResponse);
 }
 
 // SendVerificationEmailRequest is empty: the caller is the account the
@@ -215,6 +232,43 @@ message VerifyEmailRequest {
 
 // VerifyEmailResponse is empty: the protocol carries the success.
 message VerifyEmailResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// RequestEmailChangeRequest names the address the account moves to.
+message RequestEmailChangeRequest {
+  // new_email is the pending address. It is refused here when another
+  // account is already on record with it, and the token the procedure
+  // mails binds it: the confirmation moves the account to this address,
+  // never to one a replayed link could pick.
+  string new_email = 1 [(buf.validate.field).string.email = true];
+}
+
+// RequestEmailChangeResponse is empty: acceptance says the token was issued
+// and the tasks enqueued, not that a message was delivered.
+message RequestEmailChangeResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ConfirmEmailChangeRequest carries the token the message linked to.
+message ConfirmEmailChangeRequest {
+  // token is the raw change token, in clear text. It travels only over TLS
+  // and is never logged.
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// ConfirmEmailChangeResponse is empty: the protocol carries the success.
+message ConfirmEmailChangeResponse {
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
   string status = 1;
