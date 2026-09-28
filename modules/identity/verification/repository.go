@@ -139,18 +139,21 @@ func (r *Repository) MarkVerified(ctx context.Context, db datastore.Querier, use
 	return nil
 }
 
-// DeleteToken removes the verification row. It answers whether a row was
-// removed, so the caller refuses an id that names nothing.
-func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
+// DeleteToken consumes the token row. The WHERE carries the hash the caller
+// looked up, so a row a re-request replaced cannot be deleted by the stale
+// read that named it: a superseded token answers false, and the caller aborts
+// the transaction rather than applying the payload it read from the old row.
+func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, tokenHash string, purpose string) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
 	dbl.DeleteFrom(AuthTokenTable)
-	dbl.Where(dbl.Equal("id", id))
+	dbl.Where(dbl.Equal("id", id), dbl.Equal("token_hash", tokenHash), dbl.Equal("purpose", purpose))
 
 	query, args := dbl.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("verification: delete token: %w", err)
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("verification: delete token: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // FindUserByID reads the account the identifier names — the read the

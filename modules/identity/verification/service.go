@@ -161,10 +161,14 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 
 // VerifyEmail consumes the token and verifies the account. The read, the
 // stamp, and the delete run in one transaction, so a token cannot verify
-// twice under a race: the delete is what a second caller loses.
+// twice under a race: the delete is what a second caller loses. The delete
+// carries the hash the read resolved, so a re-request that replaced the row
+// between the two makes the consume fail rather than stamping a token that is
+// no longer the one presented.
 func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
+	hash := crypto.HashHexToken(rawToken)
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		token, findErr := s.repo.FindTokenByHash(ctx, tx, crypto.HashHexToken(rawToken))
+		token, findErr := s.repo.FindTokenByHash(ctx, tx, hash)
 		if errors.Is(findErr, datastore.ErrNoRows) {
 			return ErrInvalidToken
 		}
@@ -178,8 +182,15 @@ func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 		if markErr := s.repo.MarkVerified(ctx, tx, token.UserID, s.now()); markErr != nil {
 			return markErr
 		}
-		if deleteErr := s.repo.DeleteToken(ctx, tx, token.ID); deleteErr != nil {
+		consumed, deleteErr := s.repo.DeleteToken(ctx, tx, token.ID, hash, PurposeEmailVerification)
+		if deleteErr != nil {
 			return deleteErr
+		}
+		if !consumed {
+			// A re-request replaced the row between the read and the delete:
+			// the token this caller presented is no longer the live one, so
+			// the stamp rolls back with the delete and the flow refuses.
+			return ErrInvalidToken
 		}
 		// The stamp and the record commit together: an address that reads as
 		// verified must have a record saying when it became so.
@@ -312,9 +323,10 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 // a caller: the frontend the message links to forwards the value, and the
 // flow works in a browser that holds no session.
 func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error {
+	hash := crypto.HashHexToken(rawToken)
 	var confirmed EmailChangeNotice
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		token, findErr := s.repo.FindEmailChangeTokenByHash(ctx, tx, crypto.HashHexToken(rawToken))
+		token, findErr := s.repo.FindEmailChangeTokenByHash(ctx, tx, hash)
 		if errors.Is(findErr, datastore.ErrNoRows) {
 			return ErrInvalidToken
 		}
@@ -339,8 +351,16 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error
 		if setErr := s.repo.SetEmail(ctx, tx, token.UserID, token.Payload, s.now()); setErr != nil {
 			return setErr
 		}
-		if deleteErr := s.repo.DeleteToken(ctx, tx, token.ID); deleteErr != nil {
+		consumed, deleteErr := s.repo.DeleteToken(ctx, tx, token.ID, hash, PurposeEmailChange)
+		if deleteErr != nil {
 			return deleteErr
+		}
+		if !consumed {
+			// A re-request replaced the row between the read and the delete:
+			// the payload this caller read belongs to a token that is no
+			// longer live, so the move rolls back with the delete and the
+			// stale confirmation applies nothing.
+			return ErrInvalidToken
 		}
 
 		// The move and the record commit together: an account whose address

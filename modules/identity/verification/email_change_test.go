@@ -148,6 +148,72 @@ func TestConfirmEmailChangeRefusesAnAddressClaimedInTheMeantime(t *testing.T) {
 	assert.Equal(t, "kohl@example.com", email)
 }
 
+// A re-request replaces the pending row under the same id. The confirm that
+// read the row before the replacement must not apply the stale payload: the
+// delete carries the hash it resolved, so a superseded token removes nothing
+// and the transaction aborts before the address moves.
+func TestConfirmEmailChangeRefusesASupersededToken(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := emailChangeService(t, pool, true)
+	userID := seedUser(t, pool, "hermione", "hermione@example.com", false)
+
+	stale := "hermione-stale-change-token"
+	parsed, parseErr := uuid.Parse(userID)
+	require.NoError(t, parseErr)
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
+		crypto.HashHexToken(stale), "hermione@first.example.com", time.Now().Add(time.Hour), time.Now()))
+
+	// A second request replaces the row in place: the id survives, the hash
+	// and the payload move to the newest address.
+	fresh := "hermione-fresh-change-token"
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
+		crypto.HashHexToken(fresh), "hermione@second.example.com", time.Now().Add(time.Hour), time.Now()))
+
+	err := service.ConfirmEmailChange(t.Context(), stale)
+	assert.ErrorIs(t, err, ErrInvalidToken, "the superseded token confirms nothing")
+
+	var email string
+	require.NoError(t, pool.QueryRow(t.Context(), "SELECT email FROM public.users WHERE id = $1", userID).Scan(&email))
+	assert.Equal(t, "hermione@example.com", email, "the stale payload never reached the account")
+
+	// The live token still works: the replacement is the one that confirms.
+	require.NoError(t, service.ConfirmEmailChange(t.Context(), fresh))
+	require.NoError(t, pool.QueryRow(t.Context(), "SELECT email FROM public.users WHERE id = $1", userID).Scan(&email))
+	assert.Equal(t, "hermione@second.example.com", email)
+}
+
+// The delete's guard is the hash the caller resolved, so a row a re-request
+// replaced is removed by nothing: the stale delete reports no rows and leaves
+// the live token standing.
+func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := emailChangeService(t, pool, true)
+	userID := seedUser(t, pool, "gsilas", "silas@example.com", false)
+
+	stale := "silas-stale-token"
+	parsed, parseErr := uuid.Parse(userID)
+	require.NoError(t, parseErr)
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
+		crypto.HashHexToken(stale), "silas@first.example.com", time.Now().Add(time.Hour), time.Now()))
+
+	token := pendingChangeToken(t, pool, userID)
+	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
+		crypto.HashHexToken("silas-live-token"), "silas@second.example.com", time.Now().Add(time.Hour), time.Now()))
+
+	consumed, err := service.repo.DeleteToken(t.Context(), pool, token.ID, crypto.HashHexToken(stale), PurposeEmailChange)
+	require.NoError(t, err)
+	assert.False(t, consumed, "a stale hash removes nothing")
+
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT count(*) FROM public.auth_tokens WHERE purpose = $1", PurposeEmailChange).Scan(&count))
+	assert.Equal(t, 1, count, "the live token survives the stale delete")
+}
+
 func TestConfirmEmailChangeRefusesAnExpiredToken(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
