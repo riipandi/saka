@@ -72,7 +72,8 @@ An area module lists features, builds one router each, and takes a `Deps` struct
 
 ## Library docs
 
-Look up the current library docs first (MCP Context7, DeepWiki, or the official pages). The pinned source of truth is the module cache (`go env GOMODCACHE`). When docs and code disagree, code wins — say so. Settled comparisons go in `.llms/architecture.md` under "Library decision records".
+Always use the MCP Context7 and DeepWiki tools to look up library documentation/references (instead of relying on memory or source-reading alone) when working with external libraries.
+The pinned source of truth is the module cache (`go env GOMODCACHE`). When docs and code disagree, code wins — say so. Settled comparisons go in `.llms/architecture.md` under "Library decision records".
 
 ## Traps
 
