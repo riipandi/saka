@@ -2,11 +2,11 @@ type: http_request
 model: http_request
 id: rq_kpuGhBAvud
 createdAt: 2026-09-28T20:45:10.286013
-updatedAt: 2026-09-28T20:45:10.286013
+updatedAt: 2026-09-28T20:47:48.205352
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
-authenticationType: null
+authenticationType: none
 body:
   bodyType: application/x-www-form-urlencoded
   form:
