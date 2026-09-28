@@ -424,13 +424,15 @@ the member count every answer carries is what the query computes, never a column
 | POST | `/rpc/tango.identity.v1.UserGroupService/UpdateUserGroup` | Update user group | done — full replace of the two fields; a name another group holds is refused and the other group stays intact; an unknown identifier is `not_found` | `modules/identity/usergroup.TestUpdateGroupReplacesTheFieldsAndRefusesADuplicate` |
 | POST | `/rpc/tango.identity.v1.UserGroupService/DeleteUserGroup` | Delete user group | done — the membership rows die with the group by the foreign keys' cascade, the accounts are untouched; the record of the deletion names the member count it took away, the one fact a later reader cannot reconstruct | `modules/identity/usergroup.TestDeleteGroupRemovesTheMemberships` |
 | POST | `/rpc/tango.identity.v1.UserGroupService/SetUserGroupMembers` | Update users in a group | done — the replace, not a delta: an empty list empties the group; every identifier must name an account, and a member that does not exist refuses the replacement whole, so the group keeps the set it held | `modules/identity/usergroup.TestSetMembersReplacesTheWholeSet` |
+| POST | `/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients` | Update allowed OIDC clients (group side) | done — admin; the group-side roll of the client restriction, the mirror of the client surface's `UpdateAllowedUserGroups`; the replace is whole, an unknown client refuses the replacement | `modules/identity/usergroup.TestSetAllowedOidcClientsReplacesTheRollAndRefusesAnUnknownClient` |
 
-Audit events: `group_created`, `group_updated`, `group_deleted`, and `group_members_updated` —
-the membership change is its own event, because the log's one filter cannot see inside a payload.
-Upstream records nothing for groups; tango records every administrative write, the way it does
-for accounts. Not ported: the allowed-OIDC-clients update (the federation surface decides it),
-the LDAP guards (tango has no LDAP), and the custom claims a group carries (the customclaim
-feature owns them when it lands).
+Audit events: `group_created`, `group_updated`, `group_deleted`,
+`group_members_updated`, and `group_allowed_clients_updated` — the
+membership change is its own event, because the log's one filter cannot see
+inside a payload. Upstream records nothing for groups; tango records every
+administrative write, the way it does for accounts. Not ported: the LDAP
+guards (tango has no LDAP) and the custom claims a group carries (the
+customclaim feature owns them).
 
 ## Users
 

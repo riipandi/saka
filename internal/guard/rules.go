@@ -190,6 +190,10 @@ var ProcedureRules = map[string]Entry{
 	identityv1connect.UserGroupServiceSetUserGroupMembersProcedure: {Rule: Admin},
 	identityv1connect.UserGroupServiceGetUserGroupsProcedure:       {Rule: Admin},
 	identityv1connect.UserGroupServiceUpdateUserGroupsProcedure:    {Rule: Admin},
+	// The group-side client allowlist is the group's own write — the
+	// mirror of the member set the surface owns — so it is administrative
+	// like the group's other procedures are.
+	identityv1connect.UserGroupServiceSetAllowedOidcClientsProcedure: {Rule: Admin},
 
 	// The authorization surface is administrative end to end: shaping who
 	// may act is the one power the administrator role keeps to itself,

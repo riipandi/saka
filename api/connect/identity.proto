@@ -163,6 +163,13 @@ service UserGroupService {
   // list removes the account from all of them. Every named group must
   // exist — a membership is not created into nothing.
   rpc UpdateUserGroups(UpdateUserGroupsRequest) returns (UpdateUserGroupsResponse);
+
+  // SetAllowedOidcClients replaces the set of OIDC clients the group's
+  // allowlist names — the group-side view of the client restriction, the
+  // mirror of the client surface's UpdateAllowedUserGroups. The replace is
+  // whole, an empty list empties the roll, and one identifier that names
+  // no client refuses the replacement.
+  rpc SetAllowedOidcClients(SetGroupAllowedOidcClientsRequest) returns (SetGroupAllowedOidcClientsResponse);
 }
 
 // EmailVerificationService verifies an account's address. The verification
@@ -1084,6 +1091,56 @@ message SetUserGroupMembersResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 3;
+}
+
+// SetGroupAllowedOidcClientsRequest replaces the group's OIDC client
+// allowlist — the group-side roll of which clients the group's members may
+// be signed into.
+message SetGroupAllowedOidcClientsRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // oidc_client_ids are the clients the group's members may access after
+  // the call. An empty list empties the roll — with the clients' own
+  // restrictions on, an empty roll means the group admits nobody through
+  // it.
+  repeated string oidc_client_ids = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.items.string = {
+      min_len: 1,
+      max_len: 64
+    }
+  ];
+}
+
+// AllowedOidcClientRef is one client the group's allowlist names, in the
+// minimal shape a group view renders it: the protocol identifier and the
+// display name.
+message AllowedOidcClientRef {
+  // id is the client's protocol identifier — the client_id the relying
+  // party presents, not a row UUID.
+  string id = 1;
+
+  // name is the client's display name.
+  string name = 2;
+}
+
+// SetGroupAllowedOidcClientsResponse is the group and the allowlist after
+// the replacement.
+message SetGroupAllowedOidcClientsResponse {
+  // group is the group's view.
+  UserGroup group = 1;
+
+  // allowed_clients are the clients the roll now names, ordered by name.
+  repeated AllowedOidcClientRef allowed_clients = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
 // GetUserGroupsRequest names the account whose groups are read.

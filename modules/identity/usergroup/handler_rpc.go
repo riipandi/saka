@@ -189,6 +189,27 @@ func (h *rpcHandler) UpdateUserGroups(ctx context.Context, req *connect.Request[
 	}), nil
 }
 
+// SetAllowedOidcClients replaces the group's client allowlist.
+func (h *rpcHandler) SetAllowedOidcClients(ctx context.Context, req *connect.Request[identityv1.SetGroupAllowedOidcClientsRequest]) (*connect.Response[identityv1.SetGroupAllowedOidcClientsResponse], error) {
+	group, allowed, err := h.service.SetAllowedOidcClients(ctx, req.Msg.Id, req.Msg.OidcClientIds)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	refs := make([]*identityv1.AllowedOidcClientRef, 0, len(allowed))
+	for _, client := range allowed {
+		refs = append(refs, &identityv1.AllowedOidcClientRef{
+			Id:   client.ID,
+			Name: client.Name,
+		})
+	}
+	return connect.NewResponse(&identityv1.SetGroupAllowedOidcClientsResponse{
+		Group:          wireGroup(group),
+		AllowedClients: refs,
+		Status:         responder.StatusSuccess,
+		Message:        "the group's allowed OIDC clients were updated",
+	}), nil
+}
+
 // wireGroup maps the group view onto the wire message the list answers with.
 func wireGroup(view GroupView) *identityv1.UserGroup {
 	group := &identityv1.UserGroup{
