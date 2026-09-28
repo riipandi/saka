@@ -627,6 +627,35 @@ plain authorize endpoint. `/oidc/token` and `/oidc/par` ride the
 credential bucket; introspection is exempt — the client already paid with
 its secret.
 
+**The device grant (RFC 8628) and the prefix.** The provider registers
+its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no
+setter for the device endpoints, and the prefix is the one mechanism
+that renames them: every `With*Endpoint` value is the bare name, the
+full path is always `protocolPrefix +` the endpoint, and discovery
+builds its advertised URLs from issuer + prefix + bare name. The device
+code and the user code ride the same pointer pattern as the
+authorization code — session rows kind `device`, hashed pointer rows
+kinds `devicecode` and `usercode`, a re-entered user code moving the
+pointer to the newest session holding it. Every registered client may
+use the grant; the approval walks the SPA interaction the authorize
+flow walks, and `oidc_device_authorized` is the approval's own audit
+record.
+
+**Device login is a second feature, not the device grant.**
+`modules/devicelogin` is the passkey-less pairing sign-in: a browser
+that cannot sign itself in creates a request, another browser approves
+it, and the creating browser's long poll answers the decision. The
+device side is REST (`/api/device-login/requests`, the exchange riding
+an http-only pairing cookie); the approval is
+`tango.authn.v1.DeviceApprovalService` guarded `Session` with the
+impersonated caller refused — the approval names the account whose
+browser will sign in, and a token acting for another must not mint
+sessions for a third device. Codes are drawn from
+`23456789ABCDEFGHJKMNPQRSTUVWXYZ` and rendered `XXXX-XXXX`; the code
+and the pairing secret live only as SHA-256 hashes; decisions are
+single-use in the UPDATE's WHERE, and the exchange's consumption is
+first-writer-wins.
+
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**
 emails carry the flow itself — a password-reset link, a verification token, a one-time access code,

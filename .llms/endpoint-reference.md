@@ -326,16 +326,32 @@ naming the subject kind and the key, never the value.
 
 ## Device Login
 
-**Not implemented.** `modules/devicelogin` is a scaffold; no proto, no routes. The planned shape:
-the device side stays HTTP (pairing cookie, long-poll exchange), the approval UI moves to
-ConnectRPC.
+Implemented in `modules/devicelogin` — the passkey-less pairing sign-in.
+A browser that cannot sign itself in (a shared kiosk, a TV) creates a
+pairing request; the account holder, signed in elsewhere, reads what the
+request names and answers it. The device side is REST: the two routes a
+browser reaches without a credential, the pairing secret riding an
+http-only cookie the exchange demands back. The approval side is
+ConnectRPC under `tango.authn.v1.DeviceApprovalService`, guarded
+`Session` — a machine credential has no browser to pair — and the
+handlers refuse an impersonated caller, so a token acting for another
+cannot mint sessions for a third device.
+
+The user code is eight characters of `23456789ABCDEFGHJKMNPQRSTUVWXYZ`
+(no `0O1IL`), rendered `XXXX-XXXX`; the code and the pairing secret are
+stored only as SHA-256 hashes. A request lives five minutes; the
+exchange long-polls twenty-five seconds at a three-second rhythm.
+Decisions are single-use in the UPDATE's WHERE: a request decided once
+is decided forever, and of two concurrent exchanges exactly one consumes
+the approval. Audit events: `device_login_approved`,
+`device_login_denied`.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/api/device-login/requests` | Create device login request | planned — pairing cookie rides the response | — |
-| POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | planned — long-poll; the device holds the request id | — |
-| POST | `/rpc/tango.identity.v1.DeviceApprovalService/GetPendingRequest` | Inspect device login request | planned — carries the user code | — |
-| POST | `/rpc/tango.identity.v1.DeviceApprovalService/DecideRequest` | Decide device login request | planned — carries the user code + approve flag | — |
+| POST | `/api/device-login/requests` | Create device login request | done — REST, public; the pairing cookie rides the response, the device token never travels the body | `modules/devicelogin` (service tests), `internal/guard` (RestRules) |
+| POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | done — REST, public; long-poll, the pairing cookie proves the creating browser; the approval answers the account view | `modules/devicelogin` (service tests) |
+| POST | `/rpc/tango.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
+| POST | `/rpc/tango.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
 
 ## Health
 
@@ -378,17 +394,16 @@ The tables below record the whole planned surface; an unbuilt row is uncallable.
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — admin | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped | — |
 | GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
-| GET | `/oidc/interactions/{id}` | Read the authorization interaction | planned — sub-phase b/c, browser protocol flow | — |
-| POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | planned — sub-phase b/c, browser session and redirect behavior | — |
-| GET, POST | `/oidc/authorize` | Authorization endpoint | planned — sub-phase b, REST, redirect and OAuth error contract | — |
-| POST | `/oidc/token` | Token endpoint | planned — sub-phase b, REST, form encoding, client authentication, RFC errors | — |
+| GET | `/oidc/interactions/{id}` | Read the authorization interaction | done — REST, public; the SPA interaction page renders from it | `modules/federation/oidc` (protocol mount) |
+| POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | done — REST, public; the SPA posts the consent decision | `modules/federation/oidc` (protocol mount) |
+| GET, POST | `/oidc/authorize` | Authorization endpoint | done — REST, public, redirect and OAuth error contract | `modules/federation/oidc` (protocol mount) |
+| POST | `/oidc/token` | Token endpoint | done — REST, public, form encoding, client authentication, RFC errors | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/introspect` | Introspect OIDC tokens | shipped — REST, client-scoped RFC 7662 (own tokens only) | — |
 | POST | `/oidc/par` | Push authorization request | shipped — REST, RFC 9126; one-time request_uri, 5-minute lifetime | — |
-| POST | `/oidc/device/authorize` | Device authorization grant | planned — sub-phase d, REST, RFC 8628; hashed codes | — |
-| GET | `/oidc/device/info` | Device code info for the consent page | planned — sub-phase d, REST | — |
-| POST | `/oidc/device/verify` | Approve or deny a device code | planned — sub-phase d, REST, browser session; single approval | — |
-| GET, POST | `/oidc/end-session` | RP-initiated logout | planned — sub-phase b, REST, redirect behavior | — |
-| GET, POST | `/oidc/userinfo` | Get user information | planned — sub-phase b, REST, bearer token, RFC-style errors | — |
+| POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
+| GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public, redirect behavior | `modules/federation/oidc` (protocol mount) |
+| GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
 The design contract for the protocol phases (device-flow and PAR details, the
 end-session `id_token_hint` verification chain, the discovery metadata fields)
@@ -410,14 +425,17 @@ Authorization = `GET,POST /oidc/authorize`; token = `POST /oidc/token`;
 userinfo = `GET,POST /oidc/userinfo`; end-session = `GET,POST /oidc/end-session`;
 interactions = `GET /oidc/interactions/{id}`, `POST /oidc/interactions/{id}/complete`;
 introspect = `POST /oidc/introspect` (slice 6); PAR = `POST /oidc/par` (slice 6);
-device = `POST /oidc/device/authorize`, `GET /oidc/device/info`,
-`POST /oidc/device/verify` (slice 7); device login pairs with it. Discovery
-advertises exactly the user-specified URLs: issuer = `app.base_url`,
-authorization = `/oidc/authorize`, token = `/oidc/token`, userinfo =
-`/oidc/userinfo`, end-session = `/oidc/end-session`, jwks_uri =
-`/.well-known/jwks.json`, plus the standard metadata fields upstream carries
+device = `POST /oidc/device_authorization` and the verification surface
+`GET,POST /oidc/device[/{callback}]` (slice 7 — the library's default
+names, its v0.25.0 API exposing no endpoint setter; the provider
+registers its routes under `WithPathPrefix("/oidc")`); device login
+pairs with it. Discovery advertises exactly the user-specified URLs:
+issuer = `app.base_url`, authorization = `/oidc/authorize`, token =
+`/oidc/token`, userinfo = `/oidc/userinfo`, end-session =
+`/oidc/end-session`, jwks_uri = `/.well-known/jwks.json`, plus the
+standard metadata fields upstream carries
 (grant/scopes/claims/response types, `pushed_authorization_request_endpoint`,
-`client_id_metadata_document_supported: true`).
+`device_authorization_endpoint`, `client_id_metadata_document_supported: true`).
 
 **Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
 `(kind,key)`, JSONB `request_data`): grants (`kind='grant'`, keyed by grant id,
