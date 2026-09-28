@@ -390,6 +390,9 @@ func Default() Config {
 			AuthLimit: DefaultRateLimitAuthLimit,
 			Window:    time.Minute,
 		},
+		OIDC: OIDC{
+			Enabled: true,
+		},
 		Queue: Queue{
 			NumWorkers:      DefaultQueueNumWorkers,
 			ReleaseAfter:    DefaultQueueReleaseAfter,

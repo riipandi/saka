@@ -21,6 +21,7 @@ type Config struct {
 	KVStore   KVStore   `koanf:"kvstore" json:"kvstore"`
 	Log       Log       `koanf:"log" json:"log"`
 	Mailer    Mailer    `koanf:"mailer" json:"mailer"`
+	OIDC      OIDC      `koanf:"oidc" json:"oidc"`
 	OTEL      OTEL      `koanf:"otel" json:"otel"`
 	Queue     Queue     `koanf:"queue" json:"queue"`
 	RateLimit RateLimit `koanf:"rate_limit" json:"rate_limit"`
@@ -270,6 +271,21 @@ type LogFile struct {
 	MaxAge     int `koanf:"max_age" json:"max_age"`
 	// Compress gzips a rotated file.
 	Compress bool `koanf:"compress" json:"compress"`
+}
+
+// OIDC holds the identity-provider surface's settings: the switch the
+// protocol endpoints answer behind, and the policy the client-id metadata
+// document feature fetches under.
+type OIDC struct {
+	// Enabled serves the OIDC protocol endpoints (/oidc/*, the discovery
+	// documents). Off, the endpoints answer not found and the management
+	// surface still runs, so a deployment that does not federate can keep
+	// the surface dark without losing its client records.
+	Enabled bool `koanf:"enabled" json:"enabled"`
+	// CIMDURLAllowlist is the URL patterns a client-id metadata document
+	// (a CIMD client) may materialize from. An empty list refuses CIMD
+	// entirely: no document is ever fetched.
+	CIMDURLAllowlist []string `koanf:"cimd_url_allowlist" json:"cimd_url_allowlist"`
 }
 
 // OTEL holds the OpenTelemetry settings the three signals share, plus the

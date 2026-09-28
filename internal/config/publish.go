@@ -37,6 +37,7 @@ type Published struct {
 	KVStore   PublishedKVStore   `json:"kvstore,omitzero"`
 	Log       PublishedLog       `json:"log,omitzero"`
 	Mailer    PublishedMailer    `json:"mailer,omitzero"`
+	OIDC      PublishedOIDC      `json:"oidc,omitzero"`
 	OTEL      PublishedOTEL      `json:"otel,omitzero"`
 	Queue     PublishedQueue     `json:"queue,omitzero"`
 	RateLimit PublishedRateLimit `json:"rate_limit,omitzero"`
@@ -229,6 +230,15 @@ type PublishedQueue struct {
 	Timezone        string   `json:"timezone,omitzero"`
 }
 
+// PublishedOIDC is the oidc section. The enable switch is public — it is
+// the sign-in option's answer to whether the deployment federates — and
+// the CIMD allowlist is administrative, naming the origins the deployment
+// is willing to trust a metadata document from.
+type PublishedOIDC struct {
+	Enabled          bool     `json:"enabled,omitzero"`
+	CIMDURLAllowlist []string `json:"cimd_url_allowlist,omitzero"`
+}
+
 // PublishedRateLimit is the rate_limit section.
 type PublishedRateLimit struct {
 	Driver string   `json:"driver,omitzero"`
@@ -312,6 +322,9 @@ func (c Config) Published(full bool) Published {
 		Auth: PublishedAuth{
 			OneTimeAccessEmailAsAdminEnabled:           c.Auth.OneTimeAccessEmailAsAdminEnabled,
 			OneTimeAccessEmailAsUnauthenticatedEnabled: c.Auth.OneTimeAccessEmailAsUnauthenticatedEnabled,
+		},
+		OIDC: PublishedOIDC{
+			Enabled: c.OIDC.Enabled,
 		},
 		Mailer: PublishedMailer{
 			Notifications: PublishedMailerNotifications{
@@ -412,6 +425,10 @@ func (c Config) Published(full bool) Published {
 		APIKeyExpiringNoticeEnabled:  c.Mailer.Notifications.APIKeyExpiringNoticeEnabled,
 		EmailChangeNoticeEnabled:     c.Mailer.Notifications.EmailChangeNoticeEnabled,
 		AnnouncementEmailEnabled:     c.Mailer.Notifications.AnnouncementEmailEnabled,
+	}
+	public.OIDC = PublishedOIDC{
+		Enabled:          c.OIDC.Enabled,
+		CIMDURLAllowlist: c.OIDC.CIMDURLAllowlist,
 	}
 	public.OTEL = PublishedOTEL{
 		Endpoint:    c.OTEL.Endpoint,

@@ -139,6 +139,17 @@ func (c Config) Validate() error {
 		"otel.compression: %q is not one of %s", c.OTEL.Compression, joinValues(OTELCompressions()...))
 	check(c.OTEL.Queue.MaxSize > 0, "otel.queue.max_size: must be positive")
 
+	// The metadata-document allowlist is read only when a CIMD client asks
+	// for a fetch, but a typo in the file would then read as "not allowed" —
+	// the refusal is silent by design — so the entries are held here, where
+	// the mistake is reported against the file that made it.
+	for _, pattern := range c.OIDC.CIMDURLAllowlist {
+		check(strings.TrimSpace(pattern) != "",
+			"oidc.cimd_url_allowlist: an entry must not be empty")
+	}
+	check(noDuplicates(c.OIDC.CIMDURLAllowlist),
+		"oidc.cimd_url_allowlist: %s must not repeat a pattern", strings.Join(c.OIDC.CIMDURLAllowlist, ", "))
+
 	// A header name becomes part of the request, so an empty one or a value
 	// that cannot be a header value is refused here rather than at the first
 	// export, where the exporter reports it far from the key that caused it.

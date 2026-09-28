@@ -15,6 +15,7 @@ import "strings"
 // so adding one fails until it is listed here.
 var listKeys = []string{
 	"log.transport",
+	"oidc.cimd_url_allowlist",
 	"server.cors.allowed_headers",
 	"server.cors.allowed_methods",
 	"server.cors.allowed_origins",

@@ -630,6 +630,29 @@
                 }
             }
         },
+        "oidc": {
+            "description": "OIDC identity-provider surface settings.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "description": "Serves the OIDC protocol endpoints (/oidc/*, the discovery documents). Off, the endpoints answer not found and the management surface still runs.",
+                    "anyOf": [{ "type": "boolean" }, { "$ref": "#/$defs/envDirective" }],
+                    "default": true
+                },
+                "cimd_url_allowlist": {
+                    "description": "URL patterns a client-id metadata document (CIMD) client may materialize from; an empty list refuses CIMD entirely. One entry per line or comma-separated in an environment directive.",
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": { "type": "string" }
+                        },
+                        { "$ref": "#/$defs/stringOrEnv" }
+                    ],
+                    "default": []
+                }
+            }
+        },
         "server": {
             "description": "HTTP server settings.",
             "type": "object",
