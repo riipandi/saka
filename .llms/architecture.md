@@ -590,6 +590,43 @@ re-fetch. The protocol-time materialization — an authorize request carrying
 a CIMD id that has not been seen yet — lands with the protocol core, where
 the client lookup consults the same materializer.
 
+**The consent ledger and the token cascade.** `OidcConsentService` reads and
+undoes what the authorization flow records in `user_authorized_oidc_clients`:
+the self-service procedures (`ListMyAuthorizedClients`,
+`RevokeMyAuthorizedClient`, `ListMyClients`) ride `Authenticated` — the
+account is the token's subject — and the two administrative reads
+(`ListUserAuthorizedClients`, `ListAllAuthorizedClients`) ride `Admin`.
+`ListMyClients` answers the catalogue the consent page offers: the clients
+whose allowed-groups roll is empty, plus the restricted ones the account's
+groups admit it to (the restriction **is** the roll; the
+`is_group_restricted` column is upstream's explicit flag and carries no
+write in tango yet). A revocation is one transaction: the ledger row dies,
+the account's grants for the client die with it (the grant document's
+`sub` names the account), and every code and refresh pointer riding those
+grants dies too — a revoked consent is a consent the client cannot use.
+
+**Client authentication admits both spellings.** The stored secret hashes
+are plain SHA-256 hex digests, so the protocol's secret verifier matches by
+the algorithm each entry names (a 64-char hex entry is a digest, anything
+else a PHC string the password hasher reads). The library binds one
+authentication method per client — `client_secret_post` is the one tango's
+confidential clients declare — so a flattening middleware on the token,
+introspect, and PAR routes copies the `Authorization: Basic` pair onto the
+form when the form carries none, body bounded to 1 MiB before the parse:
+RFC 6749 §2.3.1's two spellings of the same credential.
+
+**Introspection is client-scoped** (RFC 7662): a client reads only the
+tokens minted to it — the `TokenIntrospectionIsClientAllowed` callback
+answers `info.ClientID == client.ID`, and a stranger's introspection
+answers `access_denied`. **PAR** (RFC 9126) rides the same
+`oauth2_sessions` rows: a pushed request creates an authorization session
+whose pointer row resolves by the PAR id, the request URI is
+`urn:ietf:params:oauth:request_uri:…`, the lifetime 5 minutes, and a client
+whose `requires_pushed_authorization_requests` is set is refused at the
+plain authorize endpoint. `/oidc/token` and `/oidc/par` ride the
+credential bucket; introspection is exempt — the client already paid with
+its secret.
+
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**
 emails carry the flow itself — a password-reset link, a verification token, a one-time access code,

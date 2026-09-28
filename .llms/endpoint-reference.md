@@ -372,18 +372,18 @@ The tables below record the whole planned surface; an unbuilt row is uncallable.
 | POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | planned — the scimsync feature owns it | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | planned — sub-phase c | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | planned — sub-phase c; revocation cascades to active tokens | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | planned — sub-phase c | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | planned — sub-phase c; admin | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | planned — sub-phase c; admin-wide | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — revocation cascades to grants and tokens | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — admin | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped | — |
 | GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
 | GET | `/oidc/interactions/{id}` | Read the authorization interaction | planned — sub-phase b/c, browser protocol flow | — |
 | POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | planned — sub-phase b/c, browser session and redirect behavior | — |
 | GET, POST | `/oidc/authorize` | Authorization endpoint | planned — sub-phase b, REST, redirect and OAuth error contract | — |
 | POST | `/oidc/token` | Token endpoint | planned — sub-phase b, REST, form encoding, client authentication, RFC errors | — |
-| POST | `/oidc/introspect` | Introspect OIDC tokens | planned — sub-phase c, REST, client-scoped RFC 7662 | — |
-| POST | `/oidc/par` | Push authorization request | planned — sub-phase c, REST, RFC 9126; one-time request_uri | — |
+| POST | `/oidc/introspect` | Introspect OIDC tokens | shipped — REST, client-scoped RFC 7662 (own tokens only) | — |
+| POST | `/oidc/par` | Push authorization request | shipped — REST, RFC 9126; one-time request_uri, 5-minute lifetime | — |
 | POST | `/oidc/device/authorize` | Device authorization grant | planned — sub-phase d, REST, RFC 8628; hashed codes | — |
 | GET | `/oidc/device/info` | Device code info for the consent page | planned — sub-phase d, REST | — |
 | POST | `/oidc/device/verify` | Approve or deny a device code | planned — sub-phase d, REST, browser session; single approval | — |
