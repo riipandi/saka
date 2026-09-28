@@ -15,7 +15,6 @@ import (
 	"github.com/valkey-io/valkey-go"
 
 	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/pkg/responder"
 	"github.com/riipandi/tango/pkg/testutils"
@@ -30,16 +29,33 @@ func valkeyClient(url string) (valkey.Client, error) {
 	return valkey.NewClient(opt)
 }
 
-// stubLimiter is a Limiter a test answers with, recording the keys it was
-// asked about.
-type stubLimiter struct {
-	keys   []string
-	result Result
-	err    error
+// testPolicy is the budget the limiter tests run under, the shape a
+// classifier hands the middleware.
+var testPolicy = Policy{Limit: 60, Window: time.Minute}
+
+// classifyCounted answers the one bucket every path falls into, the
+// classifier a deployment whose whole surface is counted would build.
+func classifyCounted(path string) (RateClass, bool) {
+	return RateClass{Name: "default", Policy: testPolicy}, true
 }
 
-func (s *stubLimiter) Allow(_ context.Context, key string) (Result, error) {
+// classifyNothing is the classifier of a surface nothing is counted on.
+func classifyNothing(path string) (RateClass, bool) {
+	return RateClass{}, false
+}
+
+// stubLimiter is a Limiter a test answers with, recording the keys it was
+// asked about and the policies those keys rode with.
+type stubLimiter struct {
+	keys     []string
+	policies []Policy
+	result   Result
+	err      error
+}
+
+func (s *stubLimiter) Allow(_ context.Context, key string, policy Policy) (Result, error) {
 	s.keys = append(s.keys, key)
+	s.policies = append(s.policies, policy)
 	return s.result, s.err
 }
 
@@ -52,7 +68,7 @@ func envelopeRefuse(w http.ResponseWriter, r *http.Request) {
 func TestRateLimitWritesTheHeadersAClientPacesBy(t *testing.T) {
 	reset := time.Now().Add(time.Minute).Truncate(time.Second)
 	limiter := &stubLimiter{result: Result{Limit: 60, Remaining: 59, ResetAt: reset}}
-	handler := RateLimit("rest", limiter, envelopeRefuse)(http.HandlerFunc(
+	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusAccepted)
 		}))
@@ -67,9 +83,28 @@ func TestRateLimitWritesTheHeadersAClientPacesBy(t *testing.T) {
 	assert.Equal(t, "59", rec.Header().Get(RateLimitRemainingHeader))
 	assert.Equal(t, strconv.FormatInt(reset.Unix(), 10), rec.Header().Get(RateLimitResetHeader))
 
-	// The key is the address without its port, reduced to the alphabet the
-	// rate_limits check allows.
-	assert.Equal(t, []string{"ip_192_0_2_1"}, limiter.keys)
+	// The key is the bucket and the address without its port, reduced to the
+	// alphabet the rate_limits check allows.
+	assert.Equal(t, []string{"default:ip_192_0_2_1"}, limiter.keys)
+	assert.Equal(t, []Policy{testPolicy}, limiter.policies,
+		"the budget the check counts against is the classifier's")
+}
+
+func TestRateLimitSparesAClassifiedAsExempt(t *testing.T) {
+	limiter := &stubLimiter{}
+	handler := RateLimit("rest", limiter, envelopeRefuse, classifyNothing)(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/users", nil))
+
+	// An uncounted path is answered before any check runs, and its response
+	// carries no headers, because no budget was spent answering it.
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Empty(t, limiter.keys)
+	assert.Empty(t, rec.Header().Get(RateLimitLimitHeader))
 }
 
 func TestRateLimitRefusesAStudentWhoSpentTheWindow(t *testing.T) {
@@ -77,7 +112,7 @@ func TestRateLimitRefusesAStudentWhoSpentTheWindow(t *testing.T) {
 		Limited: true, Limit: 60, Remaining: 0,
 		RetryAfter: 30 * time.Second,
 	}}
-	handler := RateLimit("rest", limiter, envelopeRefuse)(http.HandlerFunc(
+	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			require.Fail(t, "a limited request must not reach the route")
 		}))
@@ -98,7 +133,7 @@ func TestRateLimitRefusesAStudentWhoSpentTheWindow(t *testing.T) {
 
 func TestRateLimitLetsTheRequestThroughWhenTheBackendCannotAnswer(t *testing.T) {
 	limiter := &stubLimiter{err: context.DeadlineExceeded}
-	handler := RateLimit("rest", limiter, envelopeRefuse)(http.HandlerFunc(
+	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -113,7 +148,7 @@ func TestRateLimitLetsTheRequestThroughWhenTheBackendCannotAnswer(t *testing.T) 
 }
 
 func TestRateLimitWithoutALimiterIsAPassThrough(t *testing.T) {
-	handler := RateLimit("rest", nil, envelopeRefuse)(http.HandlerFunc(
+	handler := RateLimit("rest", nil, envelopeRefuse, classifyCounted)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -126,7 +161,7 @@ func TestRateLimitWithoutALimiterIsAPassThrough(t *testing.T) {
 
 func TestRateLimitSparesTheExcludedPrefixes(t *testing.T) {
 	limiter := &stubLimiter{}
-	handler := RateLimit("rest", limiter, envelopeRefuse, "/api/healthz")(http.HandlerFunc(
+	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted, "/api/healthz")(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -138,7 +173,7 @@ func TestRateLimitSparesTheExcludedPrefixes(t *testing.T) {
 	assert.Empty(t, limiter.keys, "an excluded path reaches no check at all, not merely one it would pass")
 
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/healthcheck", nil))
-	assert.Equal(t, []string{"ip_192_0_2_1"}, limiter.keys,
+	assert.Equal(t, []string{"default:ip_192_0_2_1"}, limiter.keys,
 		"a path that merely shares a prefix character is still counted")
 }
 
@@ -179,36 +214,56 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 func TestDatabaseLimiterCountsTheWindow(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
-	cfg := config.RateLimit{Driver: config.RateLimitDB, Limit: 2, Window: time.Minute}
-	limiter := NewDatabaseLimiter(migratedPool(t), cfg)
+	limiter := NewDatabaseLimiter(migratedPool(t))
+	policy := Policy{Limit: 2, Window: time.Minute}
 
-	first, err := limiter.Allow(t.Context(), "ip_192_0_2_7")
+	first, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
 	require.NoError(t, err)
 	assert.False(t, first.Limited)
 	assert.Equal(t, 2, first.Limit)
 	assert.Equal(t, 1, first.Remaining)
 
-	second, err := limiter.Allow(t.Context(), "ip_192_0_2_7")
+	second, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
 	require.NoError(t, err)
 	assert.Equal(t, 0, second.Remaining)
 
-	third, err := limiter.Allow(t.Context(), "ip_192_0_2_7")
+	third, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
 	require.NoError(t, err)
 	assert.True(t, third.Limited)
 	assert.Equal(t, 0, third.Remaining)
 	assert.Greater(t, third.RetryAfter, time.Duration(0), "the function's own retry hint")
 }
 
+func TestDatabaseLimiterBucketsAreIndependent(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	limiter := NewDatabaseLimiter(migratedPool(t))
+
+	// The same address in two buckets spends two budgets: the credential
+	// attempts a client makes must not starve the rest of its traffic.
+	_, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
+	require.NoError(t, err)
+	_, err = limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
+	require.NoError(t, err)
+	spent, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
+	require.NoError(t, err)
+	assert.True(t, spent.Limited, "the credential bucket is spent")
+
+	other, err := limiter.Allow(t.Context(), "default:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
+	require.NoError(t, err)
+	assert.False(t, other.Limited, "the default bucket is the client's own budget")
+}
+
 func TestDatabaseLimiterKeysAreIndependent(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
-	cfg := config.RateLimit{Driver: config.RateLimitDB, Limit: 1, Window: time.Minute}
-	limiter := NewDatabaseLimiter(migratedPool(t), cfg)
+	limiter := NewDatabaseLimiter(migratedPool(t))
+	policy := Policy{Limit: 1, Window: time.Minute}
 
-	_, err := limiter.Allow(t.Context(), "ip_192_0_2_7")
+	_, err := limiter.Allow(t.Context(), "ip_192_0_2_7", policy)
 	require.NoError(t, err)
 
-	other, err := limiter.Allow(t.Context(), "ip_192_0_2_8")
+	other, err := limiter.Allow(t.Context(), "ip_192_0_2_8", policy)
 	require.NoError(t, err)
 	assert.False(t, other.Limited, "a second client starts its own window")
 }
@@ -221,21 +276,21 @@ func TestKVStoreLimiterCountsTheWindow(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	cfg := config.RateLimit{Driver: config.RateLimitKV, Limit: 2, Window: time.Minute}
-	limiter := NewKVStoreLimiter(client, cfg)
+	limiter := NewKVStoreLimiter(client)
+	policy := Policy{Limit: 2, Window: time.Minute}
 	key := "ip_" + sanitizeKey(strings.ToLower(t.Name()))
 
-	first, err := limiter.Allow(t.Context(), key)
+	first, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	assert.False(t, first.Limited)
 	assert.Equal(t, 1, first.Remaining)
 	assert.False(t, first.ResetAt.IsZero())
 
-	second, err := limiter.Allow(t.Context(), key)
+	second, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	assert.Equal(t, 0, second.Remaining)
 
-	third, err := limiter.Allow(t.Context(), key)
+	third, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	assert.True(t, third.Limited)
 	assert.Greater(t, third.RetryAfter, time.Duration(0), "the window has time left")
@@ -249,21 +304,21 @@ func TestKVStoreLimiterExpiresTheWindow(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	cfg := config.RateLimit{Driver: config.RateLimitKV, Limit: 1, Window: 2 * time.Second}
-	limiter := NewKVStoreLimiter(client, cfg)
+	limiter := NewKVStoreLimiter(client)
+	policy := Policy{Limit: 1, Window: 2 * time.Second}
 	key := "ip_" + sanitizeKey(strings.ToLower(t.Name()))
 
-	exhausted, err := limiter.Allow(t.Context(), key)
+	exhausted, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	require.False(t, exhausted.Limited)
 
-	limited, err := limiter.Allow(t.Context(), key)
+	limited, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	require.True(t, limited.Limited)
 
 	time.Sleep(3 * time.Second)
 
-	renewed, err := limiter.Allow(t.Context(), key)
+	renewed, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	assert.False(t, renewed.Limited, "a spent window starts again once it expires")
 }

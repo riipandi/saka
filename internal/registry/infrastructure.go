@@ -270,13 +270,13 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			switch c.RateLimit.Driver {
 			case config.RateLimitDB:
 				pool := do.MustInvoke[*datastore.Postgres](i)
-				return middleware.NewDatabaseLimiter(pool, c.RateLimit), nil
+				return middleware.NewDatabaseLimiter(pool), nil
 			case config.RateLimitKV:
 				// Validation refuses a kvstore driver while the backend is
 				// disabled, so resolving the client here is always a run that
 				// asked for it.
 				kv := do.MustInvoke[*datastore.Valkey](i)
-				return middleware.NewKVStoreLimiter(kv.Client(), c.RateLimit), nil
+				return middleware.NewKVStoreLimiter(kv.Client()), nil
 			default:
 				return nil, fmt.Errorf("registry: rate_limit.driver: unknown driver %q", c.RateLimit.Driver)
 			}

@@ -20,10 +20,10 @@ import (
 )
 
 // countingLimiter records every check the limiter is asked for, so a test can
-// tell a throttled route from one the limiter never saw.
+// tell a counted route from one the limiter never saw.
 type countingLimiter struct{ calls int }
 
-func (c *countingLimiter) Allow(context.Context, string) (middleware.Result, error) {
+func (c *countingLimiter) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
 	c.calls++
 	return middleware.Result{Limit: 60, Remaining: 59}, nil
 }
@@ -32,13 +32,31 @@ func (c *countingLimiter) Allow(context.Context, string) (middleware.Result, err
 // limited, with the Retry-After a client waits by.
 type spendingLimiter struct{ calls int }
 
-func (s *spendingLimiter) Allow(context.Context, string) (middleware.Result, error) {
+func (s *spendingLimiter) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
 	s.calls++
 	return middleware.Result{
 		Limited: true, Limit: 60, Remaining: 0,
 		RetryAfter: 30 * time.Second,
 		ResetAt:    time.Now().Add(time.Minute),
 	}, nil
+}
+
+// countPaths classifies exactly the paths the test names, the way the
+// composition root's classifier answers the guard's tables.
+func countPaths(paths ...string) middleware.Classifier {
+	counted := map[string]struct{}{}
+	for _, path := range paths {
+		counted[path] = struct{}{}
+	}
+	return func(path string) (middleware.RateClass, bool) {
+		if _, ok := counted[path]; !ok {
+			return middleware.RateClass{}, false
+		}
+		return middleware.RateClass{
+			Name:   "default",
+			Policy: middleware.Policy{Limit: 60, Window: time.Minute},
+		}, true
+	}
 }
 
 // apiFeature mounts its own route under /api, the way an application-API
@@ -52,11 +70,11 @@ func (apiFeature) Mount(r chi.Router) {
 	r.Get("/.well-known/thing", func(w http.ResponseWriter, _ *http.Request) {})
 }
 
-// TestAModuleRouteIsThrottled is the regression this pins: the limiter used to
-// be attached to the /api subrouter, which a module's own routes never pass
-// through, so every feature route was exempt from the policy the API's own
-// routes were held to.
-func TestAModuleRouteIsThrottled(t *testing.T) {
+// TestAClassifiedModuleRouteIsThrottled pins the regression the limiter's own
+// history wrote: the middleware sits on the group every surface mounts
+// inside, so a feature's route is counted exactly when the classifier names
+// it — on the API, under a module, on a protocol path of the root.
+func TestAClassifiedModuleRouteIsThrottled(t *testing.T) {
 	cases := []struct {
 		name string
 		path string
@@ -70,9 +88,10 @@ func TestAModuleRouteIsThrottled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			limiter := &countingLimiter{}
 			router := transport.NewRouter(transport.Options{
-				Config:      config.Default(),
-				RateLimiter: limiter,
-				Modules:     []kernel.Module{apiFeature{}},
+				Config:       config.Default(),
+				RateLimiter:  limiter,
+				RateClassify: countPaths(tc.path),
+				Modules:      []kernel.Module{apiFeature{}},
 			})
 
 			router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, tc.path, nil))
@@ -80,6 +99,25 @@ func TestAModuleRouteIsThrottled(t *testing.T) {
 			assert.Equal(t, 1, limiter.calls, "%s must be throttled", tc.path)
 		})
 	}
+}
+
+// TestAnUnclassifiedRouteSpendsNoCheck keeps the other half of the decision
+// visible: a path the classifier does not name passes before any check runs,
+// whatever surface it mounted on.
+func TestAnUnclassifiedRouteSpendsNoCheck(t *testing.T) {
+	limiter := &countingLimiter{}
+	router := transport.NewRouter(transport.Options{
+		Config:       config.Default(),
+		RateLimiter:  limiter,
+		RateClassify: countPaths("/api/other/thing"),
+		Modules:      []kernel.Module{apiFeature{}},
+	})
+
+	for _, path := range []string{"/api/feature/thing", "/.well-known/thing"} {
+		router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+
+	assert.Zero(t, limiter.calls, "a path the tables do not name is outside the limiter's books")
 }
 
 // TestTheSPAAndMetricsAreNotThrottled covers the other side of the boundary:
@@ -92,9 +130,10 @@ func TestTheSPAAndMetricsAreNotThrottled(t *testing.T) {
 	cfg.OTEL.Metrics.PrometheusPath = "/metrics"
 
 	router := transport.NewRouter(transport.Options{
-		Config:      cfg,
-		RateLimiter: limiter,
-		Metrics:     metrics,
+		Config:       cfg,
+		RateLimiter:  limiter,
+		RateClassify: countAllEverywhere(),
+		Metrics:      metrics,
 	})
 
 	for _, path := range []string{"/metrics", "/"} {
@@ -104,13 +143,24 @@ func TestTheSPAAndMetricsAreNotThrottled(t *testing.T) {
 	assert.Zero(t, limiter.calls, "a metrics scrape and an SPA load spend no rate-limit check")
 }
 
+// countAllEverywhere classifies every path into the default bucket.
+func countAllEverywhere() middleware.Classifier {
+	return func(path string) (middleware.RateClass, bool) {
+		return middleware.RateClass{
+			Name:   "default",
+			Policy: middleware.Policy{Limit: 60, Window: time.Minute},
+		}, true
+	}
+}
+
 // TestAnExcludedModulePathIsSpared keeps the exclusion list meaningful now
 // that it covers module routes too.
 func TestAnExcludedModulePathIsSpared(t *testing.T) {
 	limiter := &countingLimiter{}
 	router := transport.NewRouter(transport.Options{
-		Config:      config.Default(),
-		RateLimiter: limiter,
+		Config:       config.Default(),
+		RateLimiter:  limiter,
+		RateClassify: countAllEverywhere(),
 	})
 
 	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/healthz", nil))
@@ -124,9 +174,10 @@ func TestAnExcludedModulePathIsSpared(t *testing.T) {
 func TestTheRPCHealthProcedureIsExcludedToo(t *testing.T) {
 	limiter := &countingLimiter{}
 	router := transport.NewRouter(transport.Options{
-		Config:      config.Default(),
-		Checker:     health.NewChecker(),
-		RateLimiter: limiter,
+		Config:       config.Default(),
+		Checker:      health.NewChecker(),
+		RateLimiter:  limiter,
+		RateClassify: countAllEverywhere(),
 	})
 
 	router.ServeHTTP(httptest.NewRecorder(), rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
@@ -143,10 +194,11 @@ func TestTheRPCHealthProcedureIsExcludedToo(t *testing.T) {
 func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 	feature := &rpcFeature{}
 	router := transport.NewRouter(transport.Options{
-		Config:      config.Default(),
-		Checker:     health.NewChecker(),
-		RateLimiter: &spendingLimiter{},
-		Modules:     []kernel.Module{feature},
+		Config:       config.Default(),
+		Checker:      health.NewChecker(),
+		RateLimiter:  &spendingLimiter{},
+		RateClassify: countAllEverywhere(),
+		Modules:      []kernel.Module{feature},
 	})
 
 	rec := httptest.NewRecorder()
@@ -170,8 +222,9 @@ func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 // rule: the REST surface's refusal is the envelope its clients read.
 func TestALimitedRestRouteIsRefusedInTheEnvelope(t *testing.T) {
 	router := transport.NewRouter(transport.Options{
-		Config:      config.Default(),
-		RateLimiter: &spendingLimiter{},
+		Config:       config.Default(),
+		RateLimiter:  &spendingLimiter{},
+		RateClassify: countAllEverywhere(),
 	})
 
 	rec := httptest.NewRecorder()

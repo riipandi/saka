@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/valkey-io/valkey-go"
-
-	"github.com/riipandi/tango/internal/config"
 )
 
 // RateLimitKeyPrefix namespaces the limiter's keys on a shared backend, the
@@ -31,24 +29,24 @@ return {count, redis.call('PTTL', KEYS[1])}
 //
 // It is the driver a run with a Valkey server names in place of the database
 // one, moving the counter's write off the SQL pool; the semantics are the
-// check function's: one window per key, counted from the first request.
+// check function's: one window per key, counted from the first request. The
+// budget a key counts against rides with each Allow call — the bucket's
+// policy, not this limiter's own.
 type KVStoreLimiter struct {
 	client valkey.Client
-	limit  int
-	window time.Duration
 }
 
 // NewKVStoreLimiter builds the limiter over the shared backend client. The
 // client is the one the process opened; the limiter owns no connection.
-func NewKVStoreLimiter(client valkey.Client, cfg config.RateLimit) *KVStoreLimiter {
-	return &KVStoreLimiter{client: client, limit: cfg.Limit, window: cfg.Window}
+func NewKVStoreLimiter(client valkey.Client) *KVStoreLimiter {
+	return &KVStoreLimiter{client: client}
 }
 
 // Allow runs the window script. The count is allowed to pass the limit — the
 // window keeps counting, as the database check does — so a burst that arrives
 // together reads one coherent answer instead of racing an expiry.
-func (l *KVStoreLimiter) Allow(ctx context.Context, key string) (Result, error) {
-	windowSeconds := max(int(l.window/time.Second), 1)
+func (l *KVStoreLimiter) Allow(ctx context.Context, key string, policy Policy) (Result, error) {
+	windowSeconds := max(int(policy.Window/time.Second), 1)
 
 	cmd := l.client.B().Eval().
 		Script(rateLimitScript).
@@ -78,9 +76,9 @@ func (l *KVStoreLimiter) Allow(ctx context.Context, key string) (Result, error) 
 	// window that starts now, not an error.
 	ttl := max(time.Duration(ttlMillis)*time.Millisecond, 0)
 	return Result{
-		Limited:    count > int64(l.limit),
-		Limit:      l.limit,
-		Remaining:  l.limit - int(count),
+		Limited:    count > int64(policy.Limit),
+		Limit:      policy.Limit,
+		Remaining:  policy.Limit - int(count),
 		ResetAt:    time.Now().Add(ttl),
 		RetryAfter: ttl,
 	}, nil

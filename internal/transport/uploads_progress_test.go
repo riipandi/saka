@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-		authn "connectrpc.com/authn"
+	authn "connectrpc.com/authn"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -618,6 +618,11 @@
                     "$ref": "#/$defs/integerOrEnv",
                     "default": 60
                 },
+                "auth_limit": {
+                    "description": "Requests allowed per window for the credential bucket (sign-in, code verifications, email senders).",
+                    "$ref": "#/$defs/integerOrEnv",
+                    "default": 10
+                },
                 "window": {
                     "description": "Period the limit applies to, seconds.",
                     "$ref": "#/$defs/numberOrEnv",

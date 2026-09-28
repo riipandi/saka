@@ -29,6 +29,14 @@ Every procedure is called with `POST`; `GET` is reserved for procedures that dec
 `idempotency_level = NO_SIDE_EFFECTS`, and no procedure in `api/connect/` does, so a `GET` on any
 procedure answers `405` with `Allow: POST` (`internal/transport.TestRPCRejectsGet`).
 
+The rate limiter counts a named surface only: the public mutation procedures and the email
+senders ride the credential bucket (`rate_limit.auth_limit`, 10 per window per IP), the refresh
+rides the default bucket (`rate_limit.limit`), and everything else — reads, administrative
+writes, and every call a bearer-guarded caller makes — is outside the limiter's books. The
+classification is the guard's tables (`internal/guard/ratelimit.go`), the budgets the
+configuration's; a public procedure missing from the tables fails a test rather than slipping
+past uncounted.
+
 The contracts frozen so far are `tango.common.v1` (`common.proto`: the shared response metadata
 block) and `tango.system.v1` (`system.proto`: `HealthService`). The transport rules — snake_case
 field naming on both surfaces, and an unknown `/rpc` path answering the Connect error document —

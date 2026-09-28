@@ -496,12 +496,21 @@ type Queue struct {
 }
 
 // RateLimit holds the request throttling settings.
+//
+// Limit is the default bucket: the budget every counted procedure shares
+// that is not named into a tighter one. AuthLimit is the credential bucket —
+// the sign-in, the sign-up, the code and token verifications, and the email
+// senders — whose tighter budget is what an attacker's script meets. Both
+// buckets share the window: one window to reason about, two budgets.
 type RateLimit struct {
 	// Driver is RateLimitDB or RateLimitKV.
 	Driver string `koanf:"driver" json:"driver"`
-	// Limit is the number of requests allowed per Window.
+	// Limit is the default bucket's number of requests per Window.
 	Limit int `koanf:"limit" json:"limit"`
-	// Window is the period the Limit applies to.
+	// AuthLimit is the credential bucket's number of requests per Window.
+	// The procedures it throttles are named in internal/guard.
+	AuthLimit int `koanf:"auth_limit" json:"auth_limit"`
+	// Window is the period the budgets apply to.
 	Window time.Duration `koanf:"window" json:"window"`
 }
 

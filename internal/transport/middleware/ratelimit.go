@@ -22,10 +22,32 @@ const (
 )
 
 // Limiter answers one rate limit check for one key. A key is opaque here; the
-// drivers give it its backend and its window.
+// drivers give it its backend and its window. The policy rides with the call,
+// because the budget a key counts against is the bucket's, and the bucket is
+// decided by the classifier at the mount site.
 type Limiter interface {
-	Allow(ctx context.Context, key string) (Result, error)
+	Allow(ctx context.Context, key string, policy Policy) (Result, error)
 }
+
+// Policy is one bucket's budget: how many requests a key may spend per window.
+type Policy struct {
+	Limit  int
+	Window time.Duration
+}
+
+// RateClass is a named policy. The name is what the limiter keys the bucket
+// with and what the rejection metrics carry, so a dashboard can tell the
+// credential bucket from the default one.
+type RateClass struct {
+	Name   string
+	Policy Policy
+}
+
+// Classifier answers the bucket a request path is counted under, or false
+// when the limiter never counts it. The transport receives one from the
+// composition root, built over the guard's policy tables; the tables are what
+// make the classification a decision, not a default.
+type Classifier func(path string) (RateClass, bool)
 
 // Result is the outcome of one check. A limited result carries a RetryAfter
 // the middleware turns into the header the client asked for.
@@ -43,22 +65,28 @@ type Result struct {
 // Retry-After are already on the response when Refuse runs.
 type Refuse func(w http.ResponseWriter, r *http.Request)
 
-// RateLimit throttles the requests a client may make, keyed by its address.
+// RateLimit throttles the requests a client may make, keyed by its address
+// within the bucket the classifier names the path with.
 //
 // surface names the route family the middleware throttles — "rest" or "rpc" —
 // and is the label the rejection counter carries, so a dashboard can tell
 // which protocol is being limited without inferring it from the path.
 //
-// A limited request is refused by Refuse — in the protocol of the surface it
-// reached — with a Retry-After header before any route runs; every response
-// carries the X-RateLimit-* headers, so a well-behaved client can pace itself
-// and the envelope metadata the responder publishes stays filled.
+// A path the classifier does not name is not counted: it passes before the
+// check runs, and its answer carries no rate-limit headers, because no budget
+// was spent answering it. The limiter's counted surface is a decision the
+// guard's tables declare, not a default every request falls into.
 //
-// The excluded prefixes are the paths the limiter never counts — the health
-// endpoints, a webhook a partner posts to. They are named by the caller at
-// the mount site, in the one list the router composes its pipeline from. A
-// prefix matches the paths under it, so an exclusion of "/api/healthz" also
-// spares "/api/healthz/deep".
+// A limited request is refused by Refuse — in the protocol of the surface it
+// reached — with a Retry-After header before any route runs; every counted
+// response carries the X-RateLimit-* headers, so a well-behaved client can
+// pace itself and the envelope metadata the responder publishes stays filled.
+//
+// The excluded prefixes are the paths the limiter never sees at all — the
+// health endpoints, a webhook a partner posts to. They are named by the
+// caller at the mount site, in the one list the router composes its pipeline
+// from. A prefix matches the paths under it, so an exclusion of
+// "/api/healthz" also spares "/api/healthz/deep".
 //
 // A limiter that cannot answer — a database that is down — lets the request
 // through. The limiter is a protection of the service, and taking the API
@@ -67,20 +95,31 @@ type Refuse func(w http.ResponseWriter, r *http.Request)
 // the pass-through is counted, so a silent degradation still shows up as a
 // rising "error" outcome on the rejection counter.
 //
-// The key is the connection's host without its port. Behind a proxy every
-// address is the proxy's, which makes the limit global rather than per
-// client; a deployment that terminates TLS on the application itself gets
-// honest keys.
-func RateLimit(surface string, limiter Limiter, refuse Refuse, excluded ...string) func(http.Handler) http.Handler {
+// The key is the bucket and the connection's host without its port. Behind a
+// proxy every address is the proxy's, which makes a bucket's limit global
+// rather than per client; a deployment that terminates TLS on the
+// application itself gets honest keys.
+func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifier, excluded ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if limiter == nil {
 			return next
 		}
 		metrics := rateLimitInstrumentation()
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// An excluded path is answered before the check runs, so a probe
-			// costs the backend no round trip at all, not merely one it
-			// would have passed.
+			class, counted := classify(r.URL.Path)
+
+			// A path the policy tables do not name, and an excluded one, are
+			// answered before any check runs: an exempt route costs the
+			// backend no round trip at all, not merely one it would have
+			// passed.
+			if !counted {
+				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
+					attribute.String("surface", surface),
+					attribute.String("outcome", outcomeExcluded),
+				))
+				next.ServeHTTP(w, r)
+				return
+			}
 			for _, prefix := range excluded {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
@@ -92,7 +131,7 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, excluded ...strin
 				}
 			}
 
-			result, err := limiter.Allow(r.Context(), rateLimitKey(r))
+			result, err := limiter.Allow(r.Context(), rateLimitKey(class.Name, r), class.Policy)
 			if err != nil {
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
 					attribute.String("surface", surface),
@@ -114,6 +153,7 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, excluded ...strin
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
 					attribute.String("surface", surface),
 					attribute.String("outcome", outcomeLimited),
+					attribute.String("bucket", class.Name),
 				))
 				refuse(w, r)
 				return
@@ -122,17 +162,20 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, excluded ...strin
 			metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
 				attribute.String("surface", surface),
 				attribute.String("outcome", outcomeAllowed),
+				attribute.String("bucket", class.Name),
 			))
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-// rateLimitKey names the bucket one client falls into. The form has to satisfy
-// the rate_limits key check — lowercase alphanumerics, underscores, colons —
-// which is why an address loses its dots before it becomes a key.
-func rateLimitKey(r *http.Request) string {
-	return "ip_" + sanitizeKey(clientIP(r))
+// rateLimitKey names the bucket-and-address pair one check counts. The form
+// has to satisfy the rate_limits key check — lowercase alphanumerics,
+// underscores, colons — which is why an address loses its dots before it
+// becomes a key. The bucket stands first, so one client's budgets read
+// together in the table.
+func rateLimitKey(bucket string, r *http.Request) string {
+	return sanitizeKey(bucket) + ":ip_" + sanitizeKey(clientIP(r))
 }
 
 // sanitizeKey reduces any string to the alphabet the rate_limits check allows.

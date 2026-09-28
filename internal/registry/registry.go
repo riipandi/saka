@@ -34,6 +34,7 @@ import (
 
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/mailer"
@@ -95,12 +96,37 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		return nil, err
 	}
 
+	// The rate-limit classifier is the join of the guard's policy tables and
+	// the configuration's budgets: the guard names which procedure counts in
+	// which bucket, the configuration gives each bucket its numbers. A path
+	// the tables do not name is not counted, so the classified surface is a
+	// decision on record rather than a default every request falls into.
+	classes := map[string]middleware.RateClass{
+		guard.RateAuth: {
+			Name:   guard.RateAuth,
+			Policy: middleware.Policy{Limit: c.RateLimit.AuthLimit, Window: c.RateLimit.Window},
+		},
+		guard.RateDefault: {
+			Name:   guard.RateDefault,
+			Policy: middleware.Policy{Limit: c.RateLimit.Limit, Window: c.RateLimit.Window},
+		},
+	}
+	classify := func(path string) (middleware.RateClass, bool) {
+		bucket, ok := guard.RateBucketFor(path)
+		if !ok {
+			return middleware.RateClass{}, false
+		}
+		class, ok := classes[bucket]
+		return class, ok
+	}
+
 	return transport.NewRouter(transport.Options{
 		Config:        *c,
 		Checker:       checker,
 		Metrics:       metrics,
 		Logger:        log,
 		RateLimiter:   limiter,
+		RateClassify:  classify,
 		Modules:       mounted,
 		Authenticator: do.MustInvoke[middleware.Authenticator](i),
 		Injector:      i,

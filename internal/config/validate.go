@@ -289,6 +289,7 @@ func (c Config) Validate() error {
 	check(isOneOf(c.RateLimit.Driver, RateLimitDB, RateLimitKV),
 		"rate_limit.driver: %q is not one of %s", c.RateLimit.Driver, joinValues(RateLimitDB, RateLimitKV))
 	check(c.RateLimit.Limit > 0, "rate_limit.limit: must be positive")
+	check(c.RateLimit.AuthLimit > 0, "rate_limit.auth_limit: must be positive")
 	check(c.RateLimit.Window > 0, "rate_limit.window: must be positive")
 
 	check(c.Queue.NumWorkers >= 1, "queue.num_workers: %d must be at least 1", c.Queue.NumWorkers)

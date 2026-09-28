@@ -144,16 +144,23 @@ type countingLimiter struct {
 	calls int
 }
 
-func (c *countingLimiter) Allow(_ context.Context, _ string) (middleware.Result, error) {
+func (c *countingLimiter) Allow(_ context.Context, _ string, _ middleware.Policy) (middleware.Result, error) {
 	c.calls++
 	return middleware.Result{Limit: 100, Remaining: 99, ResetAt: time.Now().Add(time.Minute)}, nil
+}
+
+// countAll classifies every path into the default bucket, the classifier a
+// test uses to exercise the limiter's own behaviour.
+func countAll(path string) (middleware.RateClass, bool) {
+	return middleware.RateClass{Name: "default", Policy: middleware.Policy{Limit: 100, Window: time.Minute}}, true
 }
 
 func TestRateLimitRunsOnTheAPISurfaceOnly(t *testing.T) {
 	limiter := &countingLimiter{}
 	router := NewRouter(Options{
-		Config:      config.Default(),
-		RateLimiter: limiter,
+		Config:       config.Default(),
+		RateLimiter:  limiter,
+		RateClassify: countAll,
 	})
 
 	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api", nil))

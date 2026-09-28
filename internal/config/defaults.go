@@ -190,6 +190,12 @@ const (
 // the only zone that needs no data file and reads the same on every host.
 const DefaultSchedulerTimezone = "UTC"
 
+// DefaultRateLimitAuthLimit is the credential bucket's budget per window: the
+// sign-in, the code verifications, and the email senders share it. Ten a
+// minute is several attempts more than one person needs and far fewer than
+// a script wants; the deployment can loosen it through the configuration.
+const DefaultRateLimitAuthLimit = 10
+
 // DefaultMaxRequestBytes is the body size one RPC request may carry. A
 // contract's largest legitimate message — a profile picture upload rides the
 // REST surface with its own bound — stays far below it, and a caller with
@@ -379,9 +385,10 @@ func Default() Config {
 			},
 		},
 		RateLimit: RateLimit{
-			Driver: RateLimitDB,
-			Limit:  60,
-			Window: time.Minute,
+			Driver:    RateLimitDB,
+			Limit:     60,
+			AuthLimit: DefaultRateLimitAuthLimit,
+			Window:    time.Minute,
 		},
 		Queue: Queue{
 			NumWorkers:      DefaultQueueNumWorkers,

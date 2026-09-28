@@ -95,7 +95,7 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 // routing above it without a backend.
 type allowAll struct{}
 
-func (allowAll) Allow(context.Context, string) (middleware.Result, error) {
+func (allowAll) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
 	return middleware.Result{Limit: 60, Remaining: 60}, nil
 }
 

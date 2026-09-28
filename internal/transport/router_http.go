@@ -38,6 +38,11 @@ type Options struct {
 	// limiter mounts no throttling, which is the state a run without a
 	// rate_limit driver is in.
 	RateLimiter middleware.Limiter
+	// RateClassify answers the bucket a request path is counted under, or
+	// false when the limiter never counts it. A nil classifier counts
+	// nothing, which is the state a bare test router is in — the limiter's
+	// counted surface is the guard's decision, wired here.
+	RateClassify middleware.Classifier
 	// Modules are the feature modules whose routes and procedures the server
 	// mounts.
 	Modules []kernel.Module
@@ -98,17 +103,17 @@ func NewRouter(opts Options) chi.Router {
 	// to the page that embeds it. The throttled surface is two chi groups —
 	// one per transport — because a limited request is refused in the
 	// protocol the caller used: the responder envelope on REST, the connect
-	// error on RPC. Both groups share one limiter, one policy, and one
-	// exclusion list; the groups are what make the limiter cover every
-	// mounted route without also covering the SPA. Paths that must never be
-	// throttled are listed in rateLimitExclusions.
+	// error on RPC. Both groups share one limiter, one classifier, and one
+	// exclusion list; the classifier is what decides which paths cost a
+	// check and which bucket each counted one spends from. Paths that must
+	// never be throttled are listed in rateLimitExclusions.
 	//
 	// The SPA is mounted last: its handler answers whatever the routes above
 	// it did not claim, and its own not-found rule keeps API and protocol
 	// paths from being answered with index.html.
 	r.Group(func(throttled chi.Router) {
 		if opts.RateLimiter != nil {
-			throttled.Use(middleware.RateLimit("rest", opts.RateLimiter, restRefuse, httpRateLimitExclusions...))
+			throttled.Use(middleware.RateLimit("rest", opts.RateLimiter, restRefuse, opts.RateClassify, httpRateLimitExclusions...))
 		}
 
 		throttled.Route("/api", func(api chi.Router) {
@@ -148,7 +153,7 @@ func NewRouter(opts Options) chi.Router {
 	r.Group(func(throttled chi.Router) {
 		if opts.RateLimiter != nil {
 			throttled.Use(middleware.RateLimit("rpc", opts.RateLimiter,
-				rpcRefuseWith(opts.Config.Server.MaxRequestBytes), rpcRateLimitExclusions...))
+				rpcRefuseWith(opts.Config.Server.MaxRequestBytes), opts.RateClassify, rpcRateLimitExclusions...))
 		}
 
 		mountRPC(throttled, opts.Checker, opts.Authenticator, opts.Modules, opts.Config.Server.MaxRequestBytes)
