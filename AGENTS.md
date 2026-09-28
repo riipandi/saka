@@ -26,7 +26,7 @@ One binary: HTTP/ConnectRPC API, embedded SPA, CLI. Rules live here. Per-package
 - E2E probes hit `build/release/tango serve --env-file=.env.local`. A green unit suite does not exercise the composition root.
 - Reset a dev database you created with `task db:reset -- --force --up`, then `task db:seed -- --force`. Do not hand-drop tables. Do not reset a database that holds state you did not create.
 - `task rpc:generate` rewrites Go and TypeScript from `api/connect/*.proto`. `task rpc:stale` fails when the contract moved and the generated code did not.
-- `task cert:generate` / `cert:trust` write `storage/certs/localhost_{key,crt}.pem` (mkcert, else openssl). nginx in `docker/compose-dev.yaml` reads them.
+- `task cert:generate` / `cert:trust` write `storage/config/localhost_{key,crt}.pem` (mkcert, else openssl). nginx in `docker/compose-dev.yaml` reads them.
 - Integration tests call `testutils.SkipWithoutDocker(t)` first, then `StartPostgres` / `StartMailpit` / `StartMinIO` / `StartValkey` / `StartVictoriaLogs`. A missing daemon skips. Do not widen a timeout to hide a hung container.
 - Local Postgres: `docker compose -f docker/compose.yaml up -d pgsql`. `task metrics:up` starts the observability half. Full stack and observability share that compose file.
 

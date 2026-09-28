@@ -34,7 +34,7 @@ services:
     ports: ["3220:3000"]
     volumes:
       - "../.storage/ngauth_google_data:/app/data:rw"
-      - "../storage/certs/localhost_key.pem:/app/data/private-key.pem:ro"
+      - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
     environment:
       NGAUTH_PRESET: google
       NGAUTH_ACCESS_TOKEN_TTL: 7200

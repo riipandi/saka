@@ -109,7 +109,7 @@ services:
     image: docker.io/nginx:${NGINX_VERSION:-mainline-alpine-slim}
     hostname: nginx
     ports: ["9180:9180", "3443:3443", "8443:8443"]
-    volumes: ["../storage/certs:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
+    volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
     configs: [{ source: nginx_config, target: /etc/nginx/templates/default.conf.template }]
     healthcheck:
       test: ["CMD", "nc", "-vz", "127.0.0.1", "9180"]

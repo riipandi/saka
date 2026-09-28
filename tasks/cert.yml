@@ -4,9 +4,9 @@ version: "3"
 
 tasks:
   cert:generate:
-    desc: Generate local HTTPS certificates into storage/certs
+    desc: Generate local HTTPS certificates into storage/config
     vars:
-      CERT_DIR: storage/certs
+      CERT_DIR: storage/config
     cmds:
       - mkdir -p {{.CERT_DIR}}
       - |
@@ -28,7 +28,7 @@ tasks:
     cmds:
       - |
         if ! command -v mkcert >/dev/null 2>&1; then
-          echo "mkcert is not installed — add storage/certs/localhost_crt.pem to your trust store manually"
+          echo "mkcert is not installed — add storage/config/localhost_crt.pem to your trust store manually"
           exit 0
         fi
         mkcert -install

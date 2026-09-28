@@ -53,7 +53,7 @@ Run `task` to list every target. Most targets live in `tasks/`, one file per gro
 | `task check`        | Run `go vet` and the formatting check                  |
 | `task format`       | Format all files (Go and JS)                           |
 | `task key:generate` | Generate the application secret keys                   |
-| `task cert:generate`| Generate local HTTPS certificates into `storage/certs` |
+| `task cert:generate`| Generate local HTTPS certificates into `storage/config` |
 | `task cert:trust`   | Trust the local CA in the system trust store           |
 | `task rpc:generate` | Generate Go and TypeScript from the proto contracts    |
 | `task rpc:stale`    | Fail when generated code is out of date                |
@@ -98,12 +98,12 @@ Run `task` to list every target. Most targets live in `tasks/`, one file per gro
 
 ## Local HTTPS
 
-The nginx service in `docker/compose-dev.yaml` reads certificates from `storage/certs`. Generate them with
+The nginx service in `docker/compose-dev.yaml` reads certificates from `storage/config`. Generate them with
 [`mkcert`](https://github.com/FiloSottile/mkcert), falling back to a self-signed `openssl` certificate when
 `mkcert` is unavailable:
 
 ```sh
-# Writes storage/certs/localhost_key.pem and storage/certs/localhost_crt.pem.
+# Writes storage/config/localhost_key.pem and storage/config/localhost_crt.pem.
 task cert:generate
 
 # Install the mkcert local CA in the system trust store.
