@@ -424,3 +424,78 @@ func pendingOneTimeAccessTask(t *testing.T, pool *datastore.Postgres, client *qu
 	require.NoError(t, json.Unmarshal(payload, &task))
 	return task
 }
+
+// TestRequestEmailHoldsTheSendInsideTheCooldown pins the public path's
+// answer to a retry: the same generic success, a fresh decoy device token,
+// and no second message — while the code the first request sent goes on
+// standing, pair intact.
+func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool, false, true)
+	seedUser(t, pool, "hermione", "hermione@example.com")
+
+	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	require.NoError(t, err)
+	code := pendingOneTimeAccessTask(t, pool, service.queue).Token
+
+	// The retry inside the window is the network's answer arriving twice.
+	held, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	require.NoError(t, err, "a held send answers the same success a first one does")
+	assert.Len(t, held, deviceTokenLength)
+	assert.Equal(t, int64(1), pendingEmails(t, service.queue), "the held request enqueues nothing")
+	assert.Equal(t, 1, countTokens(t, pool, readUserID(t, pool, "hermione@example.com")), "the held request replaces no code")
+
+	// The first email's pair is untouched: the account holder signs in with
+	// what already arrived.
+	result, err := service.Exchange(t.Context(), code, deviceToken, audit.ClientInfo{})
+	require.NoError(t, err)
+	assert.Equal(t, "hermione", result.User.Username)
+
+	// Past the window the send re-issues: the cooldown is a hold, not a
+	// lifetime mute.
+	service.now = func() time.Time { return time.Now().Add(2 * resendCooldown) }
+	_, err = service.RequestEmail(t.Context(), "hermione@example.com", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), pendingEmails(t, service.queue))
+}
+
+// TestRequestEmailAsAdminRefusesInsideTheCooldown pins the administrative
+// path: the caller knows the account is real, so the refusal is the answer,
+// the way the admin reset trigger reports its own window.
+func TestRequestEmailAsAdminRefusesInsideTheCooldown(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool, true, false)
+	seedUser(t, pool, "vittoria", "vittoria@example.com")
+	wire := wireOf(t, readUserID(t, pool, "vittoria@example.com"))
+
+	require.NoError(t, service.RequestEmailAsAdmin(t.Context(), wire, 0))
+	assert.Equal(t, int64(1), pendingEmails(t, service.queue))
+
+	err := service.RequestEmailAsAdmin(t.Context(), wire, 0)
+	assert.ErrorIs(t, err, ErrResendTooSoon)
+	assert.Equal(t, int64(1), pendingEmails(t, service.queue), "the refused request enqueues nothing")
+
+	service.now = func() time.Time { return time.Now().Add(2 * resendCooldown) }
+	require.NoError(t, service.RequestEmailAsAdmin(t.Context(), wire, 0))
+	assert.Equal(t, int64(2), pendingEmails(t, service.queue))
+}
+
+// readUserID answers an account's row identifier by its address, the shape
+// the seed helper returns and the administrative procedures take.
+func readUserID(t *testing.T, pool *datastore.Postgres, email string) string {
+	t.Helper()
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id")
+	sb.From("public.users")
+	sb.Where(sb.Equal("email", email))
+	query, args := sb.Build()
+
+	var id string
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&id))
+	return id
+}

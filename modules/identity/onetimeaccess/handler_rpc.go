@@ -160,6 +160,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrTokenInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
 			errors.New("the one-time access code is invalid or expired"))
+	case errors.Is(err, ErrResendTooSoon):
+		return connect.NewError(connect.CodeResourceExhausted,
+			errors.New("an access code email was sent less than a minute ago"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}

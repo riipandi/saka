@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -23,6 +24,14 @@ import (
 // token dies. The budget rides the row, so every replica judges the same
 // token the same way.
 const maxAttempts = 5
+
+// resendCooldown is how long the last issued code keeps a fresh email send
+// out. An impatient caller — or a retry the network answered twice — holds
+// the send instead of landing a second message on the same address, the
+// same window the password recovery's resend keeps. The row stamps the send
+// time on every issue, direct hand-off included, so the window reads the
+// one fact both paths write.
+const resendCooldown = time.Minute
 
 // The failures the flow reports. The handler maps them to connect codes, so
 // the wire form of a refusal lives with the transport, not here.
@@ -52,6 +61,12 @@ var (
 	// one the email request answered. The code stays spendable: the mistake
 	// is the caller's, not the code's.
 	ErrDeviceMismatch = errors.New("onetimeaccess: the device token does not match")
+
+	// ErrResendTooSoon is an administrative email request inside the cooldown
+	// the last issued code stamped. The public path never reports it — a
+	// distinct refusal there would tell the caller the address is real —
+	// it answers the same generic success and simply holds the send.
+	ErrResendTooSoon = errors.New("onetimeaccess: an access code email was sent recently")
 )
 
 const (
@@ -250,6 +265,15 @@ func (s *Service) RequestEmailAsAdmin(ctx context.Context, userID string, ttlSec
 	if err != nil {
 		return err
 	}
+	// The cooldown is a visible refusal on the administrative path: the
+	// administrator knows the account is real, and holding the send silently
+	// would read as success while the older code went on standing. An
+	// impatient operator must not turn into a mailbomb either.
+	if inside, waitErr := s.resendOnCooldown(ctx, account.ID); waitErr != nil {
+		return waitErr
+	} else if inside {
+		return ErrResendTooSoon
+	}
 	return s.issueEmailCode(ctx, account, "", ttlOr(ttlSeconds), nil)
 }
 
@@ -279,10 +303,37 @@ func (s *Service) RequestEmail(ctx context.Context, email, redirectPath string) 
 	if err != nil {
 		return "", err
 	}
+	// A request inside the cooldown holds the send and answers the same
+	// generic success, decoy device token and all: a distinct refusal would
+	// tell the caller the address is real and freshly targeted, which is the
+	// one bit every other path here refuses to give. The code the earlier
+	// request sent is still standing, so the account loses nothing.
+	if inside, waitErr := s.resendOnCooldown(ctx, account.ID); waitErr != nil {
+		return "", waitErr
+	} else if inside {
+		return deviceToken, nil
+	}
 	if err := s.issueEmailCode(ctx, account, redirectPath, defaultTTL, &deviceToken); err != nil {
 		return "", err
 	}
 	return deviceToken, nil
+}
+
+// resendOnCooldown reports whether an account's last issued code is still
+// inside the resend window. An account that carries no row has never been
+// issued one, and a row without a stamp predates the window's own record.
+func (s *Service) resendOnCooldown(ctx context.Context, userID uuid.UUID) (bool, error) {
+	row, err := s.repo.FindTokenByUser(ctx, s.pool, userID)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if row.LastSentAt == nil {
+		return false, nil
+	}
+	return s.now().Before(row.LastSentAt.Add(resendCooldown)), nil
 }
 
 // issueEmailCode issues the code, records it beside the device token the

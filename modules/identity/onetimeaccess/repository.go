@@ -131,6 +131,31 @@ func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, 
 	return row, nil
 }
 
+// FindTokenByUser reads the code row an account carries, whatever value it
+// hashes — the upsert keeps an account to one row per purpose, so the
+// holder alone names it. The resend cooldown reads the send time it stamps.
+func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (OneTimeToken, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "user_id", "expires_at", "device_token", "last_sent_at")
+	sb.From(tokenTable)
+	sb.Where(
+		sb.Equal("user_id", userID),
+		sb.Equal("purpose", PurposeOneTimeAccess),
+	)
+
+	query, args := sb.Build()
+	var row OneTimeToken
+	err := db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.UserID, &row.ExpiresAt, &row.DeviceToken, &row.LastSentAt)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return OneTimeToken{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return OneTimeToken{}, fmt.Errorf("onetimeaccess: find token by user: %w", err)
+	}
+	return row, nil
+}
+
 // DeleteToken consumes a code row: the delete is the spend, and the count it
 // reports is what a second caller loses the race with. The caller checks the
 // expiry and the device token before it deletes, so the delete's guard is the

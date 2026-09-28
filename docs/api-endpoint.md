@@ -198,3 +198,18 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
 | Initial admin setup | — | `tango initialize` + `tango admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |
+
+## Future Improvements (deferred, decided 2026-09-28)
+
+**Idempotency keys for non-idempotent procedures** (`X-Idempotency-Key`). A surface audit found
+almost every mutating procedure already safe by design — single-use tokens spent through CAS
+`UPDATE`s, `UNIQUE` refusals on creations, set-semantics `Set*` procedures, one-minute resend
+cooldowns on the email senders. The one procedure a retried `POST` really corrupts is
+`NotificationService/CreateNotification` (a plain insert whose retry duplicates the notice and
+re-runs the announcement email fan-out). If a non-SPA client with aggressive retries ever calls
+this API, add a Connect interceptor on an opt-in whitelist (the email senders and the
+administrative creations): the key is scoped per caller and procedure, a key reused with a
+different payload is refused, the original response is replayed with an
+`X-Idempotency-Replayed: true` header, and `SignIn`/`Refresh` are never replayed (a cached
+response would be a stored credential). Interim mitigation: client-side dedup in the SPA and the
+per-IP rate limit both surfaces already sit behind.
