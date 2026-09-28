@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_z7AXTcG7wN
 createdAt: 2026-09-13T16:08:36.116262
-updatedAt: 2026-09-26T14:50:46.941419
+updatedAt: 2026-09-28T22:37:28.100243
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R5pypBKj8u
 authentication: {}
@@ -12,34 +12,31 @@ body:
   text: '{}'
 bodyType: null
 description: |-
-  Wait for a device login decision and create a browser session after it has been approved
+  Long-polls the pairing decision (25s window, 202 while pending) and answers the account view the session mints. The pairing cookie proves the creating browser.
 
-  Mirror of Pocket ID `POST /api/device-login/requests/{id}/exchange`.
-
-  Parameters:
-  - id (path, required): Device login request ID
+  Endpoint: `POST /api/device-login/requests/{id}/exchange`
 headers:
 - enabled: true
   name: X-Device-Token
   value: REPLACE_DEVICE_TOKEN
-  id: null
+  id: ReppGXuMpe
 - enabled: true
   name: Content-Type
   value: application/json
-  id: null
-- enabled: true
-  name: Connect-Protocol-Version
-  value: '1'
-  id: null
+  id: C05UhbX8cI
 method: POST
-name: '[Pocket ID] Exchange device login request (unimplemented)'
+name: '[Tango] Exchange device login request'
 sortPriority: 333.3333333333333
 url: ${[ apiBaseURL ]}/api/device-login/requests/:id/exchange
 urlParameters:
 - enabled: true
-  name: id
-  value: REPLACE_ID
-  id: null
+  name: :id
+  value: ${[ response.body.path(request='rq_ykxJHjw3fT', behavior='smart', ttl='0', result='first', join=', ', path='$.id') ]}
+  id: path-placeholder:0
+- enabled: true
+  name: ''
+  value: ''
+  id: NczKu2iYv6
 settingSendCookies:
   enabled: false
   value: true

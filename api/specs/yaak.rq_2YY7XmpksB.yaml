@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_2YY7XmpksB
 createdAt: 2026-09-19T01:09:32.336397
-updatedAt: 2026-09-26T14:50:44.946912
+updatedAt: 2026-09-28T22:39:33.821329
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R5pypBKj8u
 authentication: {}
@@ -11,17 +11,14 @@ body:
   bodyType: application/json
   text: |-
     {
-      "user_code": "P7JMQ95R",
-      "approve": true
+      "code": "${[ response.body.path(request='rq_ykxJHjw3fT', behavior='smart', ttl='0', result='first', join=', ', path='$.user_code') ]}",
+      "decision": "${[ prompt.text(label='Decision', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='approve', placeholder='approve or deny') ]}"
     }
 bodyType: application/json
 description: |-
-  Approve or deny a device login request; approval requires fresh passkey reauthentication
+  Stamps the answer — approve or deny. A request decided once is decided forever; a repeat answers not_found. The impersonated caller is refused. Guard: session.
 
-  Mirror of Pocket ID `POST /api/device-login/verification/decision`.
-
-  Parameters:
-  - decision (body, required): Device login decision
+  Procedure: `tango.authn.v1.DeviceApprovalService/Decide`
 headers:
 - enabled: true
   name: Content-Type
@@ -32,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Decide device login request (unimplemented)'
+name: '[Tango] Decide device login request'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.DeviceApprovalService/DecideRequest
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.DeviceApprovalService/Decide
 urlParameters: []
 settingSendCookies:
   enabled: false
