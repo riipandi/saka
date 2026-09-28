@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_vbNNicT9VF
 createdAt: 2026-09-19T12:32:10.505776
-updatedAt: 2026-09-26T14:38:41.490836
+updatedAt: 2026-09-28T14:57:57.736177
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -10,16 +10,15 @@ authenticationType: null
 body: {}
 bodyType: null
 description: |-
-  Get the logo image for an OIDC client
+  Answers a client's logo as the raw image bytes — the asset the OIDC sign-in page fetches through an <img> tag, so the read is public and carries no envelope. A client without a logo, or an unknown one, answers 404, never a substitute. The cache holds briefly, because an update changes the bytes.
 
-  Mirror of Pocket ID `GET /api/oidc/clients/{id}/logo`.
+  Tango-only REST route beside the tango.federation.v1.OidcClientService surface. Guard: public.
 
   Parameters:
-  - id (path, required): Client ID
-  - light (query, optional): Light mode logo (true) or dark mode logo (false)
+  - clientId (path): the client's identifier
 headers: []
 method: GET
-name: '[Pocket ID] Get client logo (unimplemented)'
+name: '[Pocket ID] Get client logo'
 sortPriority: 7000.0
 url: ${[ apiBaseURL ]}/api/oidc/clients/:clientId/logo
 urlParameters:

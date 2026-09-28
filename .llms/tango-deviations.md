@@ -84,6 +84,34 @@ seeding. Do not implement or document it as a working surface while it is on hol
 
 ### Also excluded (per design, see `.llms/architecture.md`)
 
-LDAP and SCIM (no directory to sync), OIDC provider/federation surfaces (single-tenant product),
-`audit-logs/filters/client-names` (tango never writes `client_name`), `GET /api/storage/sqlite-warning`
-(tango is Postgres-only), and the SQLite storage engine behind it.
+LDAP and SCIM sync (no directory to sync), `audit-logs/filters/client-names`
+(tango never writes `client_name`), `GET /api/storage/sqlite-warning` (tango is
+Postgres-only), and the SQLite storage engine behind it.
+
+### OIDC provider — no longer excluded (**superseded 2026-09-28**)
+
+The earlier scope decision — "OIDC provider/federation surfaces excluded,
+single-tenant product" — is **superseded**: the user has decided tango becomes
+a full OIDC provider, built in four sub-phases (client management, protocol
+core, consent + introspect + PAR, device flow + device login). The transport
+split the plan settled holds: management is ConnectRPC
+(`tango.federation.v1`), the protocol endpoints are REST. Sub-phase a (client
+management) is implemented; the protocol phases follow. The engine decision
+for the protocol core is recorded in `.llms/architecture.md` under "Library
+decision records".
+
+Deviations the client-management surface carries, beside the structural ones:
+
+- **Client id is operator-chosen** — the upstream create accepts a client id
+  and tango does too, against the "identifiers are always server-generated"
+  structural rule: the `client_id` is the credential a foreign client
+  presents, not a row key on tango's own wire. Absent, one is generated.
+- **Secrets are hashed, not encrypted** — the stored `credentials` document
+  keeps a SHA-256 hash and a 4-character prefix per secret; the raw value
+  exists in exactly one response. Upstream stores the same pair.
+- **Logo kinds are PNG/JPEG/WebP, not SVG** — the upstream accepts SVG;
+  tango refuses it because a publicly served SVG is a script host. The kind
+  is sniffed from the magic bytes, so a renamed archive lands nowhere.
+- **One logo, not two** — the upstream carries a light and a dark logo;
+  tango's schema reserves one `logo_path`, so `hasDarkLogo` /
+  `darkLogoUrl` have no counterpart yet.

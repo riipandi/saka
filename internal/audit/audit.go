@@ -233,6 +233,44 @@ const (
 	// default — the override removed. The record commits in the transaction
 	// that drops the row.
 	EventSettingReset = "setting_reset"
+
+	// EventOidcClientCreated is an OIDC client that did not exist now does.
+	// The payload names the client id and the defining account; the first
+	// secret is never in the record — it exists in the response and the
+	// hash.
+	EventOidcClientCreated = "oidc_client_created"
+
+	// EventOidcClientUpdated is a client's fields rewritten. The secrets,
+	// the logo, and the group restriction are not this event's happenings:
+	// each has its own.
+	EventOidcClientUpdated = "oidc_client_updated"
+
+	// EventOidcClientDeleted is a client removed. The client id rides the
+	// payload — it is the operator's word, not a row UUID, so the uuid
+	// resource_id column cannot carry it — and it is the one fact a later
+	// reader cannot reconstruct.
+	EventOidcClientDeleted = "oidc_client_deleted"
+
+	// EventOidcClientGroupsUpdated is a client's group restriction
+	// replaced. It is its own event, because the log's one filter cannot
+	// see inside a payload.
+	EventOidcClientGroupsUpdated = "oidc_client_groups_updated"
+
+	// EventOidcClientSecretCreated is one more secret minted for a client.
+	// The raw value is never in the record; the payload names the secret's
+	// identifier.
+	EventOidcClientSecretCreated = "oidc_client_secret_created"
+
+	// EventOidcClientSecretDeleted is one secret withdrawn. The payload
+	// names which one, so a reader can pair it with the creation.
+	EventOidcClientSecretDeleted = "oidc_client_secret_deleted"
+
+	// EventOidcClientLogoUpdated is a client's logo replaced. The payload
+	// names the kind the bytes proved, not the bytes.
+	EventOidcClientLogoUpdated = "oidc_client_logo_updated"
+
+	// EventOidcClientLogoDeleted is a client's logo removed.
+	EventOidcClientLogoDeleted = "oidc_client_logo_deleted"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

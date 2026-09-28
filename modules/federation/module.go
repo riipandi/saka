@@ -1,1 +1,105 @@
+// Package federation is the federation area: the surfaces a deployment
+// serves to applications that federate identities to it. The OIDC clients
+// an operator administers and the protocol the relying parties speak live
+// here; the custom claims and the SCIM sync join as they land.
+//
+// The split the protocol settled holds: the management surface is
+// ConnectRPC — administering clients is backoffice work the SPA drives —
+// and the protocol surface is REST, the shapes the specifications define.
+// The area owns its own wiring, like every other: the registry names it and
+// knows nothing about its services.
 package federation
+
+import (
+	"connectrpc.com/connect"
+	"github.com/go-chi/chi/v5"
+	"github.com/samber/do/v2"
+	"log/slog"
+
+	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/federation/oidc"
+	"github.com/riipandi/tango/modules/identity/user"
+)
+
+// ModuleName is the name the area reports under.
+const ModuleName = "federation"
+
+// Deps are the resolved services the area's features are built from. The
+// registry resolves them; the area decides which feature takes which.
+type Deps struct {
+	// Clients administers the OIDC clients.
+	Clients *oidc.Service
+}
+
+// Module mounts every federation feature.
+type Module struct {
+	features []kernel.Module
+}
+
+// NewModule builds the area over its dependencies.
+func NewModule(deps Deps) *Module {
+	return &Module{features: features(deps)}
+}
+
+// Name reports the area in composition reports and logs.
+func (m *Module) Name() string { return ModuleName }
+
+// Mount registers every feature's endpoints on the router. It runs once, at
+// startup, before the listener opens.
+func (m *Module) Mount(r chi.Router) {
+	kernel.Mount(r, m.features...)
+}
+
+// MountRPC registers the procedures of every feature that serves any. The
+// area forwards because the composition root names the area alone.
+func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
+	kernel.MountRPC(r, opts, m.features...)
+}
+
+// Package registers the services this area owns.
+//
+// The composition root applies it while the container is built, so it only
+// registers: each service is constructed when something resolves it.
+var Package = do.Package(
+	do.Lazy(func(i do.Injector) (*oidc.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		users := do.MustInvoke[*user.Service](i)
+		pictures := do.MustInvoke[*storage.Manager](i)
+		// The account facts ride the user service directly — its GetUser
+		// is the method set the preview's seam names — and the logos ride
+		// the shared storage engine, the way the profile pictures do. A
+		// container without the identity area hands a typed nil here, which
+		// an interface would happily hold; the preview refuses a directory
+		// it cannot call, so the typed nil is dropped at the seam.
+		service := oidc.NewService(pool, recorder, log).WithPictures(pictures)
+		if users != nil {
+			service = service.WithUserDirectory(users)
+		}
+		return service.WithBaseURL(c.App.BaseURL), nil
+	}),
+)
+
+// Mount resolves what this area's features need and builds the module the
+// router mounts. It is the other half of the seam the composition root uses.
+func Mount(i do.Injector) (kernel.Module, error) {
+	return NewModule(Deps{
+		Clients: do.MustInvoke[*oidc.Service](i),
+	}), nil
+}
+
+// features is the area's feature list, the one place a federation feature is
+// named. A nil service is skipped, the way every area's list does it.
+func features(deps Deps) []kernel.Module {
+	modules := []kernel.Module{}
+	if deps.Clients != nil {
+		modules = append(modules, oidc.NewModule(deps.Clients))
+	}
+	return modules
+}

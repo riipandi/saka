@@ -7,6 +7,7 @@ import (
 	"github.com/riipandi/tango/modules/apikey"
 	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/auditlog"
+	"github.com/riipandi/tango/modules/federation"
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/notification"
 )
@@ -61,6 +62,11 @@ func Areas() []Area {
 		// same reason the audit log does: its paths claim nothing the
 		// earlier areas claim.
 		{Name: notification.ModuleName, Package: notification.Package, Mount: notification.Mount},
+		// The federation area serves the OIDC clients an operator
+		// administers and the protocol surfaces the relying parties speak.
+		// The protocol endpoints claim their own root paths, so the order
+		// beside the other areas is descriptive rather than a dependency.
+		{Name: federation.ModuleName, Package: federation.Package, Mount: federation.Mount},
 	}
 }
 

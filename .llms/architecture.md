@@ -529,8 +529,64 @@ failed enqueue needs to retry. A key whose owner has no address is skipped unmar
 that appears later still earns its reminder. The switch is `auth.expiry_email_enabled`, off by
 default: a mailer that writes to account holders on a schedule is a deployment's decision.
 
-## Notice emails and their switches (settled 2026-09-27)
+### modules/federation
 
+The federation **area**: the surfaces a deployment serves to applications that
+federate identities to it. Sub-phase a of the OIDC provider — client
+management — is implemented here; the protocol phases (authorize, token,
+userinfo, end-session, introspect, PAR, device flow, discovery) and the
+customclaim and scimsync scaffolds join as they land. The transport split the
+protocol section settles is the area's shape: **management is ConnectRPC**
+(`tango.federation.v1.OidcClientService`, the backoffice's generated client),
+**the protocol endpoints are REST** — the shapes the specifications define,
+the third naming exception beside SCIM and WebAuthn.
+
+The `client_id` is the one wire identifier that is not a TypeID: it is the
+credential a foreign client presents, the operator's word (letters, digits,
+`_`, `-`) or a generated one. The identifiers it names on tango's own wire —
+`created_by_id` as `usr_…`, the restriction's groups as `ugrp_…` — travel in
+their TypeID forms.
+
+**Secrets are hashes in a JSONB document.** The `credentials` column carries
+`{secrets: [...]}`, one entry per secret: a SHA-256 hex hash, a four-character
+prefix, and the window. The raw value exists in exactly one response (the
+creation), the way the API keys and the reset tokens run — a database leak
+cannot replay it. **Several live secrets per client are legitimate**: a
+rotation is an addition followed by a deletion, never a swap, so the document
+rewrite runs under the row lock (`SELECT … FOR UPDATE`) and filters by secret
+id rather than overwriting.
+
+**PKCE follows the kind.** A public client cannot keep a secret, so the write
+forces `pkce_enabled` on when `is_public` is set — the operator does not
+choose it. `pkce_supported` is not a capability the write derives: it is the
+**observed** capability, set by the authorization endpoint when a client
+presents a code challenge the requirement did not demand, and reset when the
+requirement is switched off. This is upstream Pocket ID's own semantics.
+
+**The logo rides the storage engine** the profile pictures ride: the bytes
+sniffed for their kind (PNG/JPEG/WebP — an SVG is refused, because a publicly
+served SVG is a script host), the key `oidc-logos/<client_id>.<ext>` carrying
+the extension the bytes earn, staged then synced in-request, the replaced file
+deleted before its replacement is stored. The staging metadata names no owner,
+so no upload-finished notice mails an operator about their own administrative
+write. The read is the one REST route the feature claims:
+`GET /api/oidc/clients/{id}/logo`, public on the guard's books, 404 for an
+unknown client or an absent logo — never a substitute image.
+
+**The preview is a pure function of the account's own views.** PreviewClient
+answers the id-token, access-token, and userinfo claim maps the client would
+receive, built through the `UserDirectory` seam the user feature's `GetUser`
+satisfies — no token is minted, and the custom claims join when the
+customclaim feature does. The seam pattern is the account view's: the
+consuming package names the interface, the area wires it post-construction,
+and a typed-nil dependency is dropped at the seam rather than held in an
+interface the first call would panic through.
+
+CIMD (`client_type = 'cimd'`, the metadata-document clients) is **deferred**:
+the schema's columns wait, every client today is `standard`, and the
+`RefreshClient` procedure is not served.
+
+## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**
 emails carry the flow itself — a password-reset link, a verification token, a one-time access code,
 an email-change confirm link — so no switch exists for them: turning one off would break the flow,
@@ -736,6 +792,7 @@ Outcomes of library comparisons, kept so the comparison does not get re-run. Rec
 - **Authorization as a declared table, not a per-handler check** (settled 2026-09-26): the alternative was a helper each handler calls at its top (`authz.RequireAdmin(ctx)`). The table wins because the policy of the whole surface is readable in one file, a new procedure is protected by default, and the public list is *derived* from it rather than kept beside it — the two-list drift is what the old `rpcPublicProcedures`/`restPublicRoutes` pair invited. The cost is that a rule is named per procedure, and a renamed contract breaks the build (which is the point). Upstream Pocket ID declares the same policy per route (`authMiddleware.Add()` vs `WithAdminNotRequired().Add()`), so the table is a port of that idea into Connect's shape.
 - **Connect authentication middleware** (`connectrpc.com/authn` v0.2.0): adopted as the RPC surface's bearer-auth seam. It is an HTTP middleware, not a connect interceptor — the earlier note imagined an interceptor beside `rpcHandlerOptions`, and the library's actual shape is better: it authenticates before the request is decoded (an unauthenticated call costs no unmarshal) and takes the same handler options so refusals are marshaled in the caller's protocol across Connect, gRPC, and gRPC-Web. Its `InferProcedure`/`BearerToken` helpers cover the public-procedure exclusion model. A hand-rolled interceptor (~80 lines) was the alternative and loses on all three counts; the cost is the **Unstable** status (v0.x, so breaking changes are possible) on a small, core-shaped API (`AuthFunc`, `Middleware`, `Wrap`) — revisit the pin when it reaches 1.x. The REST twin and machine credentials (`X-API-Key`) stay with the `middleware/apikey.go` scaffold.
 - **Request validation** (`connectrpc.com/validate` v0.7.0 + `buf.build/go/protovalidate`): adopted as the RPC surface's declarative validation. The constraints live in the contracts as `buf.validate.field` options (mirroring what the database enforces), the interceptor sits in `rpcHandlerOptions` beside the codec and the panic boundary, and a refusal is `invalid_argument` with a typed `buf.validate.ErrorInfo` detail. Evaluated against keeping the hand-written ozzo rules (`pkg/validate`): ozzo stays for the REST JSON bodies only — two systems enforcing the same rule on one surface is the drift this removes, not a pairing to grow. The well-known constraint options come from the `buf.build/bufbuild/protovalidate` buf module dependency. Costs, stated plainly: the interceptor is **Unstable** (v0.x — two breaking changes in its history: `WithValidator` at v0.2, `NewInterceptor` at v0.5) while protovalidate-go underneath is stable; and CEL brings a dependency chain (`cel-go`) that is not small. The proto rules are not a test substitute — the transport test pins each violated contract case against the real router.
+- **OIDC protocol engine** (compared 2026-09-28, decision pending the user's pick — binds sub-phases b–d only; sub-phase a is engine-independent): `ory/fosite` (v0.46.1, last release Dec 2024 — OAuth2 core incl. PKCE, refresh, introspect, revocation, PAR, device flow, OIDC id_token flows; discovery, userinfo, and end-session are hand-built; schema `00004` is fosite-shaped because upstream Pocket ID uses it), `zitadel/oidc` (v3/v4, active, full OP incl. end-session and device auth; the RP half is OpenID Certified, the OP half is not), and `luikyv/go-oidc` (v0.25.0, MIT, 2024, single maintainer — full OP incl. PAR, JAR, DCR, CIBA, and the **only candidate already OpenID Certified**: Basic, Implicit, Hybrid, Config, Dynamic OP, FAPI 1.0/2.0 on openid.net's certified list, with the conformance suite in its CI). The user's target is OpenID certification for tango in the future, which weighs toward `luikyv/go-oidc`; the fallback is `zitadel/oidc`. Whichever lands, the protocol handlers mount as REST routes on chi and the storage adapter maps onto the `00004` tables.
 - **LogLayer transport pins**: `go.loglayer.dev/transports/otellog/v3` v3.0.0 was built against `go.opentelemetry.io/otel/log` v0.19.0, where `Record.Body()` returns `otellog.Value` and attributes are `otellog.KeyValue`. OTel moved `KeyValue` and `Value` into `go.opentelemetry.io/otel/attribute` in `otel/log` v0.20.0, so the transport does not compile above v0.19.0 (`undefined: otellog.StringValue`). `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp` and `go.opentelemetry.io/otel/sdk/log` are held at v0.19.0 for the same reason: their `otel/log` floor has to agree with the transport's. The core module (`go.opentelemetry.io/otel`, and `otel/sdk` with it) is on its own version line and stays free, and so are the trace and metric exporters (`otlptracehttp`, `otlpmetrichttp`, `exporters/prometheus`), which depend on the core module rather than on `otel/log`. Before bumping any of the three pinned modules, check that the transport still compiles; the failure is at the type level and shows up only when `otellog` is built. **`go get` on an unrelated OTel package will silently raise `otel/log` past the pin** — it happened while adding the metric exporter — so after any `go get`, re-check the three versions and `go mod edit -require` them back.
 
 ## Also implemented today (one line each)

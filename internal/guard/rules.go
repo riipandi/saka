@@ -12,6 +12,8 @@ import (
 	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	authzv1 "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1"
 	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
+	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
+	federationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1/federationv1connect"
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	notificationv1 "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1"
@@ -273,6 +275,27 @@ var ProcedureRules = map[string]Entry{
 	settingsv1connect.SettingsServiceUpdateProcedure:     {Rule: Admin},
 	settingsv1connect.SettingsServiceResetProcedure:      {Rule: Admin},
 	settingsv1connect.SettingsServiceListPublicProcedure: {Rule: Public},
+
+	// The OIDC client surface is administrative end to end: deciding which
+	// applications a deployment signs accounts into is the operator's
+	// power, the way the authorization surface is. Declared explicitly
+	// rather than left to the default so the table reads as the complete
+	// policy of the surface. The protocol endpoints the clients themselves
+	// speak are REST routes, declared beside the routes below when they
+	// land.
+	federationv1connect.OidcClientServiceListClientsProcedure:             {Rule: Admin},
+	federationv1connect.OidcClientServiceCreateClientProcedure:            {Rule: Admin},
+	federationv1connect.OidcClientServiceGetClientProcedure:               {Rule: Admin},
+	federationv1connect.OidcClientServiceUpdateClientProcedure:            {Rule: Admin},
+	federationv1connect.OidcClientServiceDeleteClientProcedure:            {Rule: Admin},
+	federationv1connect.OidcClientServiceUpdateAllowedUserGroupsProcedure: {Rule: Admin},
+	federationv1connect.OidcClientServiceGetClientMetaProcedure:           {Rule: Admin},
+	federationv1connect.OidcClientServicePreviewClientProcedure:           {Rule: Admin},
+	federationv1connect.OidcClientServiceUploadLogoProcedure:              {Rule: Admin},
+	federationv1connect.OidcClientServiceDeleteLogoProcedure:              {Rule: Admin},
+	federationv1connect.OidcClientServiceListSecretsProcedure:             {Rule: Admin},
+	federationv1connect.OidcClientServiceCreateSecretProcedure:            {Rule: Admin},
+	federationv1connect.OidcClientServiceDeleteSecretProcedure:            {Rule: Admin},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not
@@ -347,6 +370,12 @@ var RestRules = []RestEntry{
 	// presented, an anonymous caller is never refused — and the handler
 	// reads the caller the context carries.
 	{Method: http.MethodGet, Pattern: "/api/configuration", Rule: Public},
+
+	// The client logo is the OIDC sign-in page's asset: an <img> tag
+	// fetches it before any credential exists, the way the account
+	// pictures are read. A client without a logo answers not found, never
+	// a substitute.
+	{Method: http.MethodGet, Pattern: "/api/oidc/clients/{id}/logo", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.
@@ -362,6 +391,7 @@ func ContractProcedures() []string {
 		authnv1.File_one_time_access_proto,
 		apikeyv1.File_api_key_proto,
 		authzv1.File_authz_proto,
+		federationv1.File_federation_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
 		settingsv1.File_settings_proto,

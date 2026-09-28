@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_P7f5Mp4zXS
 createdAt: 2026-09-19T12:31:58.358897
-updatedAt: 2026-09-26T14:38:41.489256
+updatedAt: 2026-09-28T14:56:44.121099
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -10,18 +10,30 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID",
-      "name": "REPLACE_CLIENT_NAME"
+      "id": "hogwarts-portal",
+      "name": "Hogwarts Portal",
+      "description": "The house points dashboard",
+      "callback_urls": ["https://portal.hogwarts.example/callback"],
+      "logout_callback_urls": ["https://portal.hogwarts.example/signed-out"],
+      "launch_url": "https://portal.hogwarts.example",
+      "is_public": false,
+      "pkce_enabled": true,
+      "requires_reauthentication": false,
+      "requires_pushed_authorization_requests": false,
+      "skip_consent": false,
+      "access_token_duration_minutes": 60,
+      "refresh_token_duration_minutes": 43200
     }
 bodyType: application/json
 description: |-
-  Update an existing OIDC client
+  Replaces a client's fields — the full replace, so a field the request leaves out falls back to empty. The secrets, the logo, and the group restriction are not fields of this call: each has its own procedure, because a rotation and an access change are happenings of their own.
 
-  Mirror of Pocket ID `PUT /api/oidc/clients/{id}`.
+  Tango procedure tango.federation.v1.OidcClientService/UpdateClient. Guard: admin.
 
   Parameters:
-  - id (path, required): Client ID
-  - client (body, required): Client information
+  - id (body, required): the client to rewrite
+  - name (body, required): the display name
+  - callback_urls (body, required): the redirect URIs, at least one
 headers:
 - enabled: true
   name: Content-Type
@@ -32,7 +44,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Update OIDC client (unimplemented)'
+name: '[Pocket ID] Update OIDC client'
 sortPriority: 4000.0
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UpdateClient
 urlParameters:

@@ -330,52 +330,56 @@ ConnectRPC.
 
 ## OIDC
 
-**Not implemented.** `modules/federation/{oidc,discovery,scimsync}` are scaffolds — the package
-bodies are empty, and no OIDC procedure or protocol route exists anywhere in the transport. The
-tables below record the planned surface only; every row is unbuilt and uncallable.
+The provider surface is under construction in four sub-phases. **Sub-phase a —
+client management — is implemented**: `tango.federation.v1.OidcClientService`
+(ConnectRPC, `modules/federation/oidc`, schema `00004`'s `oidc_clients` and
+junctions) and the public logo route. The protocol endpoints (authorize, token,
+userinfo, end-session, introspect, PAR, device flow, discovery), the consent
+service, and the CIMD client type are still planned; every such row says so.
+The tables below record the whole planned surface; an unbuilt row is uncallable.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListClients` | List OIDC clients | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateClient` | Create OIDC client | planned — show-once secret | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClient` | Get OIDC client | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | planned — claim maps, no real JWTs | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | planned — CIMD-lite | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UploadLogo` | Update client logo | planned — `bytes` payload, content type sniffed | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | planned — multi-secret; values never returned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | planned — show-once | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | planned — revocation cascades to active tokens | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | planned | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | planned — admin | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | planned — admin-wide | — |
-| GET | `/api/oidc/clients/{id}/logo` | Get client logo | planned — REST, bare image for the sign-in page | — |
-| GET | `/api/oidc/interaction/{id}` | Read the authorization interaction | planned — REST, browser protocol flow | — |
-| POST | `/api/oidc/interaction/{id}/approve` | Approve the authorization interaction | planned — REST, browser session and redirect behavior | — |
-| GET, POST | `/authorize` | Authorization endpoint | planned — REST, redirect and OAuth error contract | — |
-| POST | `/api/oidc/token` | Token endpoint | planned — REST, form encoding, client authentication, RFC errors | — |
-| POST | `/api/oidc/introspect` | Introspect OIDC tokens | planned — REST, client-scoped RFC 7662 | — |
-| POST | `/api/oidc/par` | Push authorization request | planned — REST, RFC 9126; one-time request_uri | — |
-| POST | `/api/oidc/device/authorize` | Device authorization grant | planned — REST, RFC 8628; hashed codes | — |
-| GET | `/api/oidc/device/info` | Device code info for the consent page | planned — REST | — |
-| POST | `/api/oidc/device/verify` | Approve or deny a device code | planned — REST, browser session; single approval | — |
-| GET | `/api/oidc/userinfo` | Get user information | planned — REST, bearer token, RFC-style errors | — |
-| GET, POST | `/api/oidc/end-session` | RP-initiated logout | planned — REST, redirect behavior | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/ListClients` | List OIDC clients | done — admin; page/limit/search over the name; sorted by `id`, `name`, or `created_at` (absent: newest first); every client carries its secrets' views and its allowed groups | `modules/federation/oidc` (service tests), `internal/guard` (rules) |
+| POST | `/rpc/tango.federation.v1.OidcClientService/CreateClient` | Create OIDC client | done — admin; the identifier is operator-chosen (letters, digits, `_`, `-`) or generated; the first secret is shown exactly once, only its SHA-256 hash stored in the `credentials` JSONB; a public client forces `pkce_enabled` on | `modules/federation/oidc.TestCreateMintsASecretTheRowCannotReplay` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetClient` | Get OIDC client | done — admin; the full view with secrets' views and groups | `modules/federation/oidc` (service tests) |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done — admin; full replace under the row lock; secrets, logo, and restriction untouched | `modules/federation/oidc.TestUpdateReplacesTheFieldsAndKeepsTheSecrets` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | done — admin; the codes, sessions, grants, and restrictions die with the row by the cascades | `modules/federation/oidc.TestDeleteRemovesTheClientAndTheRecordNamesIt` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | done — admin; the replace, not a delta; an unknown group refuses the replacement whole | `modules/federation/oidc.TestAllowedGroupsReplaceWholeAndRefuseAnUnknownGroup` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | done — admin; the display facts a sign-in page renders | `modules/federation/oidc` (service tests) |
+| POST | `/rpc/tango.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | done — admin; the id-token, access-token, and userinfo claim maps built from the account's own views, no token minted; custom claims join when the customclaim feature does | `modules/federation/oidc.TestPreviewBuildsTheClaimMapsForTheAccount` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | planned — CIMD deferred to a later phase; the schema columns wait | — |
+| POST | `/rpc/tango.federation.v1.OidcClientService/UploadLogo` | Update client logo | done — admin; bytes payload, kind sniffed off the magic bytes (PNG/JPEG/WebP, 2 MiB; SVG refused — deviation), staged then synced in-request | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | done — admin; idempotent — a client without a logo is the same success | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — admin; prefixes and windows, values never returned | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | planned — the scimsync feature owns it | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | planned — sub-phase c | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | planned — sub-phase c; revocation cascades to active tokens | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | planned — sub-phase c | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | planned — sub-phase c; admin | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | planned — sub-phase c; admin-wide | — |
+| GET | `/api/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
+| GET | `/api/oidc/interaction/{id}` | Read the authorization interaction | planned — sub-phase b/c, browser protocol flow | — |
+| POST | `/api/oidc/interaction/{id}/approve` | Approve the authorization interaction | planned — sub-phase b/c, browser session and redirect behavior | — |
+| GET, POST | `/authorize` | Authorization endpoint | planned — sub-phase b, REST, redirect and OAuth error contract | — |
+| POST | `/api/oidc/token` | Token endpoint | planned — sub-phase b, REST, form encoding, client authentication, RFC errors | — |
+| POST | `/api/oidc/introspect` | Introspect OIDC tokens | planned — sub-phase c, REST, client-scoped RFC 7662 | — |
+| POST | `/api/oidc/par` | Push authorization request | planned — sub-phase c, REST, RFC 9126; one-time request_uri | — |
+| POST | `/api/oidc/device/authorize` | Device authorization grant | planned — sub-phase d, REST, RFC 8628; hashed codes | — |
+| GET | `/api/oidc/device/info` | Device code info for the consent page | planned — sub-phase d, REST | — |
+| POST | `/api/oidc/device/verify` | Approve or deny a device code | planned — sub-phase d, REST, browser session; single approval | — |
+| GET, POST | `/api/oidc/end-session` | RP-initiated logout | planned — sub-phase b, REST, redirect behavior | — |
+| GET, POST | `/api/oidc/userinfo` | Get user information | planned — sub-phase b, REST, bearer token, RFC-style errors | — |
 
-The prose below is the **design contract** the implementation will be held to, written before any
-code exists. The device-flow and PAR details, the end-session `id_token_hint` verification chain,
-and the discovery metadata fields are the acceptance criteria for the federation phase; the
-discovery documents themselves (`.well-known/openid-configuration`,
-`/.well-known/oauth-authorization-server`) do not exist yet. The JWKS endpoint that does exist is
-tango's own (`/.well-known/jwks.json`, `modules/identity/jwks` — see Well Known below), not the
-federation module's.
+The design contract for the protocol phases (device-flow and PAR details, the
+end-session `id_token_hint` verification chain, the discovery metadata fields)
+is written with sub-phase b, before any protocol code exists. The engine
+decision for the protocol core is recorded in `.llms/architecture.md` under
+"Library decision records" once the comparison lands. The JWKS endpoint that
+exists is tango's own (`/.well-known/jwks.json`, `modules/identity/jwks`), not
+the federation module's.
 
 ## SCIM
 

@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_CRyqj8iv5c
 createdAt: 2026-09-19T12:32:22.296754
-updatedAt: 2026-09-26T14:38:41.493802
+updatedAt: 2026-09-28T14:57:13.596690
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -10,17 +10,19 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal",
+      "expires_at": "2027-01-01T00:00:00Z"
     }
 bodyType: application/json
 description: |-
-  Add a new secret to an OIDC client, leaving the existing ones usable. The value is only returned by this endpoint and cannot be retrieved later.
+  Mints one more secret for a client. Several live secrets are legitimate — a rotation is an addition followed by a deletion, never a swap. Absent a value, a 32-character alphanumeric secret is drawn; a supplied one must carry at least 16 characters of the same alphabet. The raw value is shown exactly once.
 
-  Mirror of Pocket ID `POST /api/oidc/clients/{id}/secrets`.
+  Tango procedure tango.federation.v1.OidcClientService/CreateSecret. Guard: admin.
 
   Parameters:
-  - id (path, required): Client ID
-  - payload (body, optional): Client secret
+  - id (body, required): the client
+  - secret (body, optional): the value to store, 16-128 alphanumeric characters
+  - expires_at (body, optional): when the secret stops authenticating
 headers:
 - enabled: true
   name: Content-Type
@@ -31,7 +33,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Create client secret (unimplemented)'
+name: '[Pocket ID] Create client secret'
 sortPriority: 14000.0
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/CreateSecret
 urlParameters:

@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_749ksx8zrN
 createdAt: 2026-09-19T12:32:22.291930
-updatedAt: 2026-09-26T14:38:41.496961
+updatedAt: 2026-09-28T14:57:10.362765
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -10,16 +10,16 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
 description: |-
-  List the secrets of an OIDC client, without disclosing their values
+  Answers a client's secrets as their views — prefixes, windows, and whether each still authenticates. The values never travel: they exist only in the response that created them, and only their SHA-256 hashes are stored.
 
-  Mirror of Pocket ID `GET /api/oidc/clients/{id}/secrets`.
+  Tango procedure tango.federation.v1.OidcClientService/ListSecrets. Guard: admin.
 
   Parameters:
-  - id (path, required): Client ID
+  - id (body, required): the client
 headers:
 - enabled: true
   name: Content-Type
@@ -30,7 +30,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] List client secrets (unimplemented)'
+name: '[Pocket ID] List client secrets'
 sortPriority: 13000.0
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/ListSecrets
 urlParameters:

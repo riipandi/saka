@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_JJM6p4NuM3
 createdAt: 2026-09-19T12:31:58.362266
-updatedAt: 2026-09-26T14:38:41.487897
+updatedAt: 2026-09-28T14:56:47.249721
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -10,16 +10,16 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
 description: |-
-  Delete an OIDC client by ID
+  Removes a client. The authorization codes, sessions, grants, and group restrictions that name it die with it, by the schema's cascades. An unknown client is the not-found refusal.
 
-  Mirror of Pocket ID `DELETE /api/oidc/clients/{id}`.
+  Tango procedure tango.federation.v1.OidcClientService/DeleteClient. Guard: admin.
 
   Parameters:
-  - id (path, required): Client ID
+  - id (body, required): the client to remove
 headers:
 - enabled: true
   name: Content-Type
@@ -30,7 +30,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Delete OIDC client (unimplemented)'
+name: '[Pocket ID] Delete OIDC client'
 sortPriority: 2000.0
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/DeleteClient
 urlParameters:

@@ -31,6 +31,7 @@ const viteProxy: Record<string, string | ProxyOptions> = {
   '/rpc': { target: targetHost, changeOrigin: true },
   '/metrics': { target: targetHost, changeOrigin: true },
   '/static': { target: targetHost, changeOrigin: true },
+  '/oidc': { target: targetHost, changeOrigin: true },
   '/debug': { target: targetHost, changeOrigin: true }
 }
 

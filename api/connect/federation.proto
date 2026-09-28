@@ -1,0 +1,718 @@
+// The federation contract: the OIDC clients an operator administers.
+//
+// An OIDC client is the relying party a deployment federates identities to:
+// the application whose sign-in button points at this server's authorize
+// endpoint. The protocol surface those clients speak — authorize, token,
+// userinfo — is REST, the shapes the specifications define; the management
+// surface here is ConnectRPC, because administering clients is backoffice
+// work the SPA drives.
+//
+// A client's secrets are shown once, in the response that creates them, and
+// stored only as SHA-256 hashes beside the prefix the operator reads a leak
+// from — the same rule the API keys run on. The identifiers travel in their
+// protocol form: the client id is the string the relying party presents, not
+// a TypeID, because it is the wire credential of a foreign client.
+syntax = "proto3";
+
+package tango.federation.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "identity.proto";
+
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1;federationv1";
+
+// OidcClientService administers the OIDC clients the deployment federates to.
+//
+// Every procedure is administrative: deciding which applications a deployment
+// signs accounts into is the operator's power, the way the authorization
+// surface is. The surface refuses nothing a caller's role allows, and a
+// caller without the administrator role learns nothing about it.
+service OidcClientService {
+  // ListClients answers one page of the clients, newest first.
+  rpc ListClients(ListOidcClientsRequest) returns (ListOidcClientsResponse);
+
+  // CreateClient defines a client and mints its first secret. The raw
+  // secret is in this response alone.
+  rpc CreateClient(CreateOidcClientRequest) returns (CreateOidcClientResponse);
+
+  // GetClient reads one client with its secrets (hashes only) and the
+  // groups its restriction names.
+  rpc GetClient(GetOidcClientRequest) returns (GetOidcClientResponse);
+
+  // UpdateClient replaces a client's fields. The secrets and the group
+  // restriction are not fields of this call: they have their own procedures,
+  // because a rotation and an access change are happenings of their own.
+  rpc UpdateClient(UpdateOidcClientRequest) returns (UpdateOidcClientResponse);
+
+  // DeleteClient removes a client. The codes, sessions, and grants that
+  // name it die with it, by the schema's cascades.
+  rpc DeleteClient(DeleteOidcClientRequest) returns (DeleteOidcClientResponse);
+
+  // UpdateAllowedUserGroups replaces the set of groups the client's
+  // restriction names. An empty list with the restriction on admits nobody.
+  rpc UpdateAllowedUserGroups(UpdateOidcClientAllowedUserGroupsRequest) returns (UpdateOidcClientAllowedUserGroupsResponse);
+
+  // GetClientMeta answers the display facts a sign-in page renders: the
+  // name, the launch URL, whether a logo waits behind its endpoint.
+  rpc GetClientMeta(GetOidcClientMetaRequest) returns (GetOidcClientMetaResponse);
+
+  // PreviewClient answers the claim maps a client would receive for one
+  // account — id token, access token, userinfo — built from the account as
+  // it stands, without minting a real token.
+  rpc PreviewClient(PreviewOidcClientRequest) returns (PreviewOidcClientResponse);
+
+  // UploadLogo replaces a client's logo. The bytes decide the kind, and the
+  // raw image answers the logo endpoint.
+  rpc UploadLogo(UploadOidcClientLogoRequest) returns (UploadOidcClientLogoResponse);
+
+  // DeleteLogo removes a client's logo; the endpoint then answers not found.
+  rpc DeleteLogo(DeleteOidcClientLogoRequest) returns (DeleteOidcClientLogoResponse);
+
+  // ListSecrets answers a client's secrets as their prefixes and windows —
+  // never the values, which exist only in the response that created them.
+  rpc ListSecrets(ListOidcClientSecretsRequest) returns (ListOidcClientSecretsResponse);
+
+  // CreateSecret mints one more secret for a client. The raw value is in
+  // this response alone; several live secrets are legitimate, so a rotation
+  // is an addition followed by a deletion, never a swap.
+  rpc CreateSecret(CreateOidcClientSecretRequest) returns (CreateOidcClientSecretResponse);
+
+  // DeleteSecret withdraws one secret. A client left with none can still
+  // authenticate nothing new, but its public-client grants are untouched.
+  rpc DeleteSecret(DeleteOidcClientSecretRequest) returns (DeleteOidcClientSecretResponse);
+}
+
+// OidcClient is the client's view. The secret hashes never travel: the
+// credentials block carries the prefixes an operator tells rows apart by,
+// and the raw values are the create-secret responses' `secret` field alone.
+message OidcClient {
+  // id is the identifier the relying party presents as its client_id. It
+  // names no row on this server's own wire — it is the protocol credential
+  // of a foreign client — so it is the operator's word, generated when the
+  // creation request carries none.
+  string id = 1;
+
+  // name is the display name a sign-in page shows.
+  string name = 2;
+
+  // description is the optional note the operator wrote.
+  optional string description = 3;
+
+  // callback_urls are the redirect URIs the authorization endpoint may send
+  // the user back to. An exact match against one of them is the redirect's
+  // whole guard.
+  repeated string callback_urls = 4;
+
+  // logout_callback_urls are the post-logout redirect URIs the end-session
+  // endpoint may send the user back to.
+  repeated string logout_callback_urls = 5;
+
+  // launch_url is the address the console launches the client at.
+  optional string launch_url = 6;
+
+  // is_public marks a client that cannot keep a secret — an SPA, a native
+  // app. A public client authenticates with PKCE instead of a secret.
+  bool is_public = 7;
+
+  // pkce_enabled demands the code exchange carry the proof-key pair.
+  bool pkce_enabled = 8;
+
+  // pkce_supported records the capability the client has shown: the
+  // authorization endpoint sets it when a client presents a code challenge
+  // the requirement did not demand. It resets when the requirement is
+  // switched off.
+  bool pkce_supported = 9;
+
+  // requires_reauthentication demands a fresh sign-in at the authorize
+  // endpoint even over a live session.
+  bool requires_reauthentication = 10;
+
+  // requires_pushed_authorization_requests demands the authorization
+  // request arrive by the PAR endpoint first.
+  bool requires_pushed_authorization_requests = 11;
+
+  // skip_consent answers whether the consent step is waived for this
+  // client after the account has authorized it once.
+  bool skip_consent = 12;
+
+  // is_group_restricted gates the client on the allowed groups: an account
+  // outside them is refused at the authorization endpoint.
+  bool is_group_restricted = 13;
+
+  // client_type names the client's origin: `standard` for one defined
+  // here, `cimd` for one materialized from a metadata document. The CIMD
+  // type is not served yet; every client today is standard.
+  string client_type = 14;
+
+  // has_logo says whether the logo endpoint answers bytes.
+  bool has_logo = 15;
+
+  // logo_url is the address the logo answers at, absent while has_logo is
+  // false.
+  optional string logo_url = 16;
+
+  // credentials is the client's secret block: the hashes' views.
+  OidcClientCredentials credentials = 17;
+
+  // access_token_duration_minutes is the window an issued access token
+  // lives for.
+  int64 access_token_duration_minutes = 18;
+
+  // refresh_token_duration_minutes is the window an issued refresh token
+  // lives for.
+  int64 refresh_token_duration_minutes = 19;
+
+  // allowed_user_groups are the groups the restriction names, resolved to
+  // the group views the group surface answers with.
+  repeated tango.identity.v1.UserGroup allowed_user_groups = 20;
+
+  // created_by_id is the account that defined the client, in its wire form.
+  optional string created_by_id = 21;
+
+  // created_at is the creation instant.
+  google.protobuf.Timestamp created_at = 22;
+}
+
+// OidcClientCredentials is the credentials block a client view carries.
+// The federated identities join when the JWT-profile client authentication
+// does; today the block is the secrets alone.
+message OidcClientCredentials {
+  // secrets are the client's secrets as their views — prefixes and windows,
+  // never the values.
+  repeated OidcClientSecret secrets = 1;
+}
+
+// OidcClientSecret is one secret's view. The hash is the stored presence;
+// the prefix is what an operator reads a leaked credential from.
+message OidcClientSecret {
+  // id names the secret within the client.
+  string id = 1;
+
+  // prefix is the secret's first four characters.
+  string prefix = 2;
+
+  // is_active answers whether the secret still authenticates: it is false
+  // once its window has passed.
+  bool is_active = 3;
+
+  // created_at is the creation instant.
+  google.protobuf.Timestamp created_at = 4;
+
+  // expires_at is when the secret stops authenticating, absent for a
+  // secret that never expires.
+  optional google.protobuf.Timestamp expires_at = 5;
+}
+
+// ListOidcClientsRequest carries the page the caller asks for.
+message ListOidcClientsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // search narrows the page by name.
+  optional string search = 3 [(buf.validate.field).string.max_len = 255];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "id",
+      "name",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListOidcClientsResponse is the page of the clients.
+message ListOidcClientsResponse {
+  // clients are the clients, with their secrets' views and their groups.
+  repeated OidcClient clients = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// CreateOidcClientRequest defines the client. The identifier and the
+// description are optional; everything the protocol needs is not.
+message CreateOidcClientRequest {
+  // id is the client_id the relying party will present. Absent, one is
+  // generated. Letters, digits, underscores, and hyphens only: the value
+  // travels in URLs and becomes a storage key's segment.
+  optional string id = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_-]{1,64}$"];
+
+  // name is the display name a sign-in page shows.
+  string name = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // description is the optional note the client carries.
+  optional string description = 3 [(buf.validate.field).string.max_len = 255];
+
+  // callback_urls are the redirect URIs. A client with none cannot receive
+  // an authorization response, so at least one is required.
+  repeated string callback_urls = 4 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 50,
+    (buf.validate.field).repeated.items.string.uri = true
+  ];
+
+  // logout_callback_urls are the post-logout redirect URIs.
+  repeated string logout_callback_urls = 5 [
+    (buf.validate.field).repeated.max_items = 50,
+    (buf.validate.field).repeated.items.string.uri = true
+  ];
+
+  // launch_url is the address the console launches the client at.
+  optional string launch_url = 6 [(buf.validate.field).string.uri = true];
+
+  // is_public marks a client that cannot keep a secret.
+  bool is_public = 7;
+
+  // pkce_enabled demands the code exchange carry the proof-key pair.
+  bool pkce_enabled = 8;
+
+  // requires_reauthentication demands a fresh sign-in at the authorize
+  // endpoint even over a live session.
+  bool requires_reauthentication = 9;
+
+  // requires_pushed_authorization_requests demands the request arrive by
+  // the PAR endpoint first.
+  bool requires_pushed_authorization_requests = 10;
+
+  // skip_consent waives the consent step after the first authorization.
+  bool skip_consent = 11;
+
+  // access_token_duration_minutes is the window an issued access token
+  // lives for; absent, the default applies.
+  optional int64 access_token_duration_minutes = 12 [(buf.validate.field).int64.gte = 1];
+
+  // refresh_token_duration_minutes is the window an issued refresh token
+  // lives for; absent, the default applies.
+  optional int64 refresh_token_duration_minutes = 13 [(buf.validate.field).int64.gte = 1];
+
+  // allowed_user_groups names the groups the restriction admits, as the
+  // groups' wire identifiers. Presenting it turns the restriction on.
+  repeated string allowed_user_groups = 14 [
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.items.string.max_len = 64
+  ];
+}
+
+// CreateOidcClientResponse is the created client and its first secret.
+message CreateOidcClientResponse {
+  // client is the client's view.
+  OidcClient client = 1;
+
+  // secret is the raw first secret, shown exactly once. Only its hash is
+  // stored, so losing it means issuing another.
+  string secret = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// GetOidcClientRequest names the client.
+message GetOidcClientRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+}
+
+// GetOidcClientResponse is the client's full view.
+message GetOidcClientResponse {
+  // client is the client, secrets' views and groups included.
+  OidcClient client = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateOidcClientRequest replaces a client's fields. A field the request
+// leaves out falls back to empty, the way a full replace does; the secrets
+// and the group restriction are untouched here.
+message UpdateOidcClientRequest {
+  // id names the client to rewrite.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // name is the display name a sign-in page shows.
+  string name = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // description is the note the client carries; an empty string clears it.
+  optional string description = 3 [(buf.validate.field).string.max_len = 255];
+
+  // callback_urls are the redirect URIs.
+  repeated string callback_urls = 4 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 50,
+    (buf.validate.field).repeated.items.string.uri = true
+  ];
+
+  // logout_callback_urls are the post-logout redirect URIs.
+  repeated string logout_callback_urls = 5 [
+    (buf.validate.field).repeated.max_items = 50,
+    (buf.validate.field).repeated.items.string.uri = true
+  ];
+
+  // launch_url is the address the console launches the client at.
+  optional string launch_url = 6 [(buf.validate.field).string.uri = true];
+
+  // is_public marks a client that cannot keep a secret.
+  bool is_public = 7;
+
+  // pkce_enabled demands the code exchange carry the proof-key pair.
+  bool pkce_enabled = 8;
+
+  // requires_reauthentication demands a fresh sign-in at the authorize
+  // endpoint even over a live session.
+  bool requires_reauthentication = 9;
+
+  // requires_pushed_authorization_requests demands the request arrive by
+  // the PAR endpoint first.
+  bool requires_pushed_authorization_requests = 10;
+
+  // skip_consent waives the consent step after the first authorization.
+  bool skip_consent = 11;
+
+  // access_token_duration_minutes is the window an issued access token
+  // lives for; absent, the default applies.
+  optional int64 access_token_duration_minutes = 12 [(buf.validate.field).int64.gte = 1];
+
+  // refresh_token_duration_minutes is the window an issued refresh token
+  // lives for; absent, the default applies.
+  optional int64 refresh_token_duration_minutes = 13 [(buf.validate.field).int64.gte = 1];
+}
+
+// UpdateOidcClientResponse is the client after the rewrite.
+message UpdateOidcClientResponse {
+  // client is the client's view.
+  OidcClient client = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteOidcClientRequest names the client to remove.
+message DeleteOidcClientRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+}
+
+// DeleteOidcClientResponse is empty: a successful deletion says so with the
+// protocol, and an unknown client answers the not-found code.
+message DeleteOidcClientResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// UpdateOidcClientAllowedUserGroupsRequest replaces the set of groups the
+// client's restriction names.
+message UpdateOidcClientAllowedUserGroupsRequest {
+  // id names the client.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // user_group_ids are the groups' wire identifiers, replacing the set. An
+  // empty list empties the restriction's roll: with the restriction on, the
+  // client admits nobody.
+  repeated string user_group_ids = 2 [
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.items.string.max_len = 64
+  ];
+}
+
+// UpdateOidcClientAllowedUserGroupsResponse is the client after the change.
+message UpdateOidcClientAllowedUserGroupsResponse {
+  // client is the client's view, the resolved groups among it.
+  OidcClient client = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// GetOidcClientMetaRequest names the client whose display facts are asked.
+message GetOidcClientMetaRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+}
+
+// OidcClientMeta is the display facts a sign-in page renders.
+message OidcClientMeta {
+  // id is the client's identifier.
+  string id = 1;
+
+  // name is the display name.
+  string name = 2;
+
+  // description is the note the operator wrote.
+  string description = 3;
+
+  // launch_url is the address the console launches the client at.
+  optional string launch_url = 4;
+
+  // client_type names the client's origin.
+  string client_type = 5;
+
+  // has_logo says whether the logo endpoint answers bytes.
+  bool has_logo = 6;
+
+  // requires_reauthentication demands a fresh sign-in.
+  bool requires_reauthentication = 7;
+}
+
+// GetOidcClientMetaResponse is the client's display facts.
+message GetOidcClientMetaResponse {
+  // meta is the display facts.
+  OidcClientMeta meta = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// PreviewOidcClientRequest names the client and the account to preview.
+message PreviewOidcClientRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // user_id is the account to preview, in its wire form.
+  string user_id = 2 [(buf.validate.field).string.max_len = 64];
+}
+
+// OidcClientPreview is the claim maps a client would receive for one
+// account. Every map is what the token would carry, built from the account
+// as it stands — no token is minted, and none of these claims are secrets.
+message OidcClientPreview {
+  // id_token is the claims an issued ID token would carry.
+  google.protobuf.Struct id_token = 1;
+
+  // access_token is the claims an issued access token would carry.
+  google.protobuf.Struct access_token = 2;
+
+  // user_info is the claims the userinfo endpoint would answer with.
+  google.protobuf.Struct user_info = 3;
+}
+
+// PreviewOidcClientResponse is the preview.
+message PreviewOidcClientResponse {
+  // preview is the claim maps.
+  OidcClientPreview preview = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UploadOidcClientLogoRequest carries the logo's bytes. The kind is read
+// off them, never off a declared content type.
+message UploadOidcClientLogoRequest {
+  // id names the client.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // logo is the image, at most 2 MiB. A PNG, JPEG, or WebP the magic bytes
+  // confirm — an SVG is refused, because the format is a script host.
+  bytes logo = 2 [
+    (buf.validate.field).bytes.min_len = 1,
+    (buf.validate.field).bytes.max_len = 2097152
+  ];
+}
+
+// UploadOidcClientLogoResponse is empty: a successful upload says so with
+// the protocol, and an unknown client answers the not-found code.
+message UploadOidcClientLogoResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// DeleteOidcClientLogoRequest names the client whose logo is removed.
+message DeleteOidcClientLogoRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+}
+
+// DeleteOidcClientLogoResponse is empty: a successful removal says so with
+// the protocol, and a client without a logo is the same success.
+message DeleteOidcClientLogoResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListOidcClientSecretsRequest names the client whose secrets are listed.
+message ListOidcClientSecretsRequest {
+  // id is the client's identifier.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+}
+
+// ListOidcClientSecretsResponse is the client's secrets as their views.
+message ListOidcClientSecretsResponse {
+  // credentials carries the secrets' views.
+  OidcClientCredentials credentials = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateOidcClientSecretRequest mints one more secret. The value may be
+// supplied — re-issuing a credential an operator already holds — or left to
+// the server's draw.
+message CreateOidcClientSecretRequest {
+  // id names the client.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // secret is the value to store. Absent, a 32-character alphanumeric
+  // value is drawn. Supplied, it must carry at least 16 characters of the
+  // same alphabet, because a short shared secret is the exchange's weak
+  // half.
+  optional string secret = 2 [(buf.validate.field).string = {
+    min_len: 16
+    max_len: 128
+    pattern: "^[a-zA-Z0-9]+$"
+  }];
+
+  // expires_at is when the secret stops authenticating, absent for a
+  // secret that never expires.
+  optional google.protobuf.Timestamp expires_at = 3;
+}
+
+// CreateOidcClientSecretResponse is the new secret and its raw value.
+message CreateOidcClientSecretResponse {
+  // secret is the secret's view.
+  OidcClientSecret secret = 1;
+
+  // value is the raw secret, shown exactly once. Only the hash is stored,
+  // so losing it means issuing another.
+  string value = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// DeleteOidcClientSecretRequest names the secret to withdraw.
+message DeleteOidcClientSecretRequest {
+  // id names the client.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_-]+$"
+  }];
+
+  // secret_id names the secret within the client.
+  string secret_id = 2 [(buf.validate.field).string.max_len = 64];
+}
+
+// DeleteOidcClientSecretResponse is empty: a successful withdrawal says so
+// with the protocol, and an unknown secret answers the not-found code.
+message DeleteOidcClientSecretResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}

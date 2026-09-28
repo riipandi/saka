@@ -25,7 +25,9 @@ func SetupStatic(r chi.Router) {
 			strings.HasPrefix(r.URL.Path, "/api") ||
 			strings.HasPrefix(r.URL.Path, "/rpc") ||
 			strings.HasPrefix(r.URL.Path, "/metrics") ||
-			strings.HasPrefix(r.URL.Path, "/static") {
+			strings.HasPrefix(r.URL.Path, "/static") ||
+			strings.HasPrefix(r.URL.Path, "/oidc") ||
+			strings.HasPrefix(r.URL.Path, "/debug") {
 			responder.NotFoundJSON(w, r)
 			return
 		}
