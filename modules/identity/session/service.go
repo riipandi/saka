@@ -385,6 +385,12 @@ func (s *Service) revokeBulk(ctx context.Context, callerSession, callerID, reaso
 // renewal that arrives after the session was revoked or its window closed
 // costs the new secret and nothing else, and the caller signs in again.
 //
+// A delegated session's actor is re-read inside the same transaction, before
+// the rotation: the token is signed from the row's bookkeeping, so a renewal
+// that cannot name the administrator behind the delegation refuses rather
+// than sign a token that would read as the target's own. The read sits before
+// the write, so the refusal does not spend the refresh token.
+//
 // No audit record is written for an ordinary renewal: a renewal is the
 // session continuing, not a happening an operator audits for, and one line
 // per heartbeat would drown the log in the very renewals it exists to see
@@ -402,11 +408,13 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 	}
 
 	var (
-		row       SessionSchema
-		view      user.UserView
-		lifetime  time.Duration
-		expiresAt time.Time
-		reused    bool
+		row           SessionSchema
+		view          user.UserView
+		lifetime      time.Duration
+		expiresAt     time.Time
+		actorID       string
+		actorUsername string
+		reused        bool
 	)
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		// The row lock is taken before anything is read from it: a concurrent
@@ -445,6 +453,29 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		}
 		if account.Disabled || bannedAt(account, now) {
 			return ErrSessionEnded
+		}
+
+		// A delegated row must name the administrator behind it, and the
+		// renewal must be able to read that account. The provider is what
+		// makes the row a delegation — the `impersonated_by` column is
+		// ON DELETE SET NULL, so an administrator deleted while their
+		// delegation lived leaves a row that would otherwise read as the
+		// target's own session. Either shape fails the renewal: a token
+		// that cannot name its actor would authorize the target's identity
+		// to whoever holds the refresh token and lose the audit trail.
+		if locked.Provider == ImpersonationProvider {
+			if locked.ImpersonatedBy == nil {
+				return ErrSessionEnded
+			}
+			actor, actorErr := user.ReadAccount(ctx, tx, *locked.ImpersonatedBy)
+			if errors.Is(actorErr, datastore.ErrNoRows) {
+				return ErrSessionEnded
+			}
+			if actorErr != nil {
+				return actorErr
+			}
+			actorID = user.FormatID(*locked.ImpersonatedBy)
+			actorUsername = actor.Username
 		}
 
 		// The renewal's window: the caller's lifetime, capped for a
@@ -498,15 +529,12 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		SessionID:   row.ID.String(),
 	}
 	// The delegation survives its renewal: the row's impersonated_by is the
-	// durable fact the actor pair is re-signed from, so the rotated token
-	// keeps naming the administrator behind it. The username takes one extra
-	// read — the row carries the identifier alone — and a delegation that
-	// cannot name its actor in full is worse than the query costs.
-	if row.ImpersonatedBy != nil {
-		if actor, actorErr := user.ReadAccount(ctx, s.pool, *row.ImpersonatedBy); actorErr == nil {
-			claims.ActorID = user.FormatID(*row.ImpersonatedBy)
-			claims.ActorUsername = actor.Username
-		}
+	// durable fact the actor pair was re-signed from inside the transaction
+	// above, where a delegation that could not name its actor failed the
+	// renewal outright.
+	if actorID != "" {
+		claims.ActorID = actorID
+		claims.ActorUsername = actorUsername
 	}
 
 	access, err := s.issuer.SignSessionToken(ctx, view.ID, claims, row.ID, now)

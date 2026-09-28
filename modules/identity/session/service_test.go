@@ -512,6 +512,48 @@ func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
 	assert.NotEmpty(t, refreshed.AccessToken)
 }
 
+// A delegated row whose administrator cannot be named is not a renewal: the
+// claims are re-signed from the row's bookkeeping, so a row that lost its
+// actor would mint a token for the target with nobody behind it — the
+// delegation would read as the target's own session. The refusal comes before
+// the rotation, so the refresh token survives the attempt.
+func TestRefreshRefusesADelegationThatCannotNameItsActor(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testService(t, pool)
+	admin := seedAccount(t, pool, "robert_langdon")
+	target := seedAccount(t, pool, "sophie_neveu")
+
+	out, err := service.ImpersonateUser(t.Context(), wireOf(t, admin), "robert_langdon",
+		wireOf(t, target), "reproducing the vault's missing entry")
+	require.NoError(t, err)
+
+	// The administrator is deleted while the delegation lives. The column's
+	// ON DELETE SET NULL leaves the row a delegation by provider and by
+	// nothing else.
+	_, err = pool.Exec(t.Context(), `DELETE FROM public.users WHERE id = $1`, admin)
+	require.NoError(t, err)
+
+	row, err := service.repo.GetSession(t.Context(), pool, mustSessionID(t, out.SessionID))
+	require.NoError(t, err)
+	require.Equal(t, ImpersonationProvider, row.Provider)
+	require.Nil(t, row.ImpersonatedBy, "the deleted administrator leaves the column NULL")
+
+	_, err = service.Refresh(t.Context(), out.RefreshToken)
+	assert.ErrorIs(t, err, ErrSessionEnded,
+		"a delegation that cannot name its actor must not sign a token for the target")
+
+	// The refusal landed before the rotation: the token was not spent, so the
+	// same credential is refused again rather than silently replaced.
+	_, err = service.Refresh(t.Context(), out.RefreshToken)
+	assert.ErrorIs(t, err, ErrSessionEnded)
+
+	_, err = service.repo.FindActiveByTokenHash(t.Context(), pool,
+		crypto.HashRefreshToken(out.RefreshToken), time.Now())
+	assert.NoError(t, err, "the refused renewal did not burn the refresh token")
+}
+
 // Presenting a refresh token a rotation already replaced is the one
 // competent explanation of a duplicated credential: the renewal refuses the
 // caller and revokes the session the spent token names, with the audit
