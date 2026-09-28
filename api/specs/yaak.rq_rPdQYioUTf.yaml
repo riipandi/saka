@@ -1,0 +1,60 @@
+type: http_request
+model: http_request
+id: rq_rPdQYioUTf
+createdAt: 2026-09-28T20:45:10.280467
+updatedAt: 2026-09-28T20:45:10.280468
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: grant_type
+    value: authorization_code
+  - enabled: true
+    name: code
+    value: REPLACE_CODE
+  - enabled: true
+    name: redirect_uri
+    value: https://rp.example/callback
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+  - enabled: true
+    name: code_verifier
+    value: REPLACE_VERIFIER
+bodyType: application/x-www-form-urlencoded
+description: |-
+  The OAuth token endpoint: exchange a code (or refresh token) for the token pair. Client authentication rides the Basic header or the form — the flattening middleware admits both spellings.
+
+  Endpoint: `POST /oidc/token`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: null
+method: POST
+name: '[Pocket ID] Token'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/token
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,32 +1,32 @@
 type: http_request
 model: http_request
-id: rq_PV9dEDbAaz
-createdAt: 2026-09-19T12:32:34.128996
-updatedAt: 2026-09-28T20:44:57.280821
+id: rq_bgLz5oNdGm
+createdAt: 2026-09-28T20:45:57.272939
+updatedAt: 2026-09-28T20:45:57.272940
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
-  text: '{}'
+  bodyType: application/json
+  text: |-
+    {
+      "scopes": ["openid", "profile"]
+    }
 bodyType: application/json
 description: |-
-  The OpenID Connect userinfo endpoint: the claims the granted scopes map to, carried by the access token's bearer header. Answers GET and POST.
+  Completes the authorization interaction: approves the requested scopes (the browser session cookie or bearer token proves the account), parks the consent in the ledger, and answers the redirect with the code.
 
-  Endpoint: `/oidc/userinfo`
+  Endpoint: `POST /oidc/interactions/{id}/complete`
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
   id: null
-- enabled: true
-  name: Connect-Protocol-Version
-  value: '1'
-  id: null
-method: GET
-name: '[Pocket ID] Get user information'
-sortPriority: 16111.111111111111
-url: ${[ apiBaseURL ]}/oidc/userinfo
+method: POST
+name: '[Tango] Approve authorization interaction'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID/complete
 urlParameters: []
 settingSendCookies:
   enabled: false

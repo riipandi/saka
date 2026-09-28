@@ -1,20 +1,23 @@
 type: http_request
 model: http_request
-id: rq_rndUypTZHE
-createdAt: 2026-09-13T08:49:31.188481
-updatedAt: 2026-09-14T09:47:19.505809
+id: rq_n4PiHj4cqQ
+createdAt: 2026-09-28T20:45:48.483671
+updatedAt: 2026-09-28T20:45:48.483671
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_YNuU3gaJNQ
+folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body: {}
 bodyType: null
-description: Returns the RFC 8414 OAuth 2.0 authorization server metadata document with endpoints and capabilities
+description: |-
+  Reads the authorization interaction the provider parked for the browser: the client's display facts, the requested scopes, and the account's previous consent. The SPA interaction page renders from this before completing.
+
+  Endpoint: `GET /oidc/interactions/{id}`
 headers: []
 method: GET
-name: Get OAuth 2.0 authorization server metadata
+name: '[Tango] Read authorization interaction'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/.well-known/oauth-authorization-server
+url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID
 urlParameters: []
 settingSendCookies:
   enabled: false
