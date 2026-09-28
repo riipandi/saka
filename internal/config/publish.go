@@ -20,10 +20,11 @@ func seconds(d time.Duration) Duration {
 // Published is the configuration document the endpoint serves. It is one
 // struct for both scopes: the public fields are what an unauthenticated
 // caller reads, the rest only fills in when the caller is an administrator.
-// Everything secret — the key material, the SMTP password, the S3 key
-// secret, the collector headers, and the datastore URLs — is absent from
-// the struct by construction, not blanked, so a secret cannot reach the
-// wire by being populated.
+// The secret keys are part of the document, but a secret value never
+// crosses: the full document reads them through the redaction path
+// redact.go prints (`[redacted]`, the datastore URLs reduced to
+// host:port/database), and an unset secret stays empty, so an omitted key
+// is told apart from a redacted one.
 //
 // The JSON names follow the configuration keys, and unset values are
 // omitted, so the public body carries only the public facts.
@@ -44,7 +45,8 @@ type Published struct {
 }
 
 // PublishedApp is the app section. The mode is public: the SPA reads it to
-// know which deployment it fronts.
+// know which deployment it fronts. The secret key is published only as its
+// redaction.
 type PublishedApp struct {
 	Mode    string `json:"mode,omitzero"`
 	BaseURL string `json:"base_url,omitzero"`
@@ -53,16 +55,17 @@ type PublishedApp struct {
 	// rest of the section is administrative.
 	AssetsURL string `json:"assets_url,omitzero"`
 
-	ExposeResetToken   bool `json:"expose_reset_token,omitzero"`
-	ExposeTotpSecret   bool `json:"expose_totp_secret,omitzero"`
-	AuditRetentionDays int  `json:"audit_retention_days,omitzero"`
+	ExposeResetToken   bool   `json:"expose_reset_token,omitzero"`
+	ExposeTotpSecret   bool   `json:"expose_totp_secret,omitzero"`
+	AuditRetentionDays int    `json:"audit_retention_days,omitzero"`
+	SecretKey          string `json:"secret_key,omitzero"`
 }
 
-// PublishedAuth is the auth section without the signing keys. The key
-// material is published at /.well-known/jwks.json and read from the file or
-// the environment that owns it, never from this surface. The one-time
-// access toggles are public: they decide which sign-in options the login
-// screen offers.
+// PublishedAuth is the auth section. The signing keys are published only as
+// their redactions — the public key's real value is served at
+// /.well-known/jwks.json anyway, and the private one is nobody's to read
+// back. The one-time access toggles are public: they decide which sign-in
+// options the login screen offers.
 type PublishedAuth struct {
 	JWTAlgorithm       string   `json:"jwt_algorithm,omitzero"`
 	Issuer             string   `json:"issuer,omitzero"`
@@ -74,6 +77,10 @@ type PublishedAuth struct {
 
 	OneTimeAccessEmailAsAdminEnabled           bool `json:"one_time_access_email_as_admin_enabled,omitzero"`
 	OneTimeAccessEmailAsUnauthenticatedEnabled bool `json:"one_time_access_email_as_unauthenticated_enabled,omitzero"`
+
+	PrivateKey string `json:"private_key,omitzero"`
+	PublicKey  string `json:"public_key,omitzero"`
+	SecretKey  string `json:"secret_key,omitzero"`
 }
 
 // PublishedCache is the cache section.
@@ -84,8 +91,10 @@ type PublishedCache struct {
 	MaxMemory int64    `json:"max_memory,omitzero"`
 }
 
-// PublishedDatabase is the database section without the DSN.
+// PublishedDatabase is the database section. The DSN is published only in
+// the reduced form RedactDSN prints — host:port/database.
 type PublishedDatabase struct {
+	URL                  string   `json:"url,omitzero"`
 	MaxConns             int32    `json:"max_conns,omitzero"`
 	MinConns             int32    `json:"min_conns,omitzero"`
 	MaxConnLifetime      Duration `json:"max_conn_lifetime,omitzero"`
@@ -110,10 +119,12 @@ type PublishedFetcher struct {
 	MaxBodyBytes            int64    `json:"max_body_bytes,omitzero"`
 }
 
-// PublishedKVStore is the kvstore section without the URL.
+// PublishedKVStore is the kvstore section. The URL is published only in the
+// reduced form RedactKVURL prints — host:port/database.
 type PublishedKVStore struct {
-	Enable bool `json:"enable,omitzero"`
-	DB     int  `json:"db,omitzero"`
+	Enable bool   `json:"enable,omitzero"`
+	URL    string `json:"url,omitzero"`
+	DB     int    `json:"db,omitzero"`
 }
 
 // PublishedLog is the log section.
@@ -139,13 +150,15 @@ type PublishedLogOTLP struct {
 	Timeout Duration `json:"timeout,omitzero"`
 }
 
-// PublishedMailer is the mailer section without the SMTP password.
+// PublishedMailer is the mailer section. The SMTP password is published
+// only as its redaction.
 type PublishedMailer struct {
 	FromEmail              string                       `json:"from_email,omitzero"`
 	FromName               string                       `json:"from_name,omitzero"`
 	SMTPHost               string                       `json:"smtp_host,omitzero"`
 	SMTPPort               int                          `json:"smtp_port,omitzero"`
 	SMTPUsername           string                       `json:"smtp_username,omitzero"`
+	SMTPPassword           string                       `json:"smtp_password,omitzero"`
 	SMTPSecure             bool                         `json:"smtp_secure,omitzero"`
 	SMTPAllowPlaintextAuth bool                         `json:"smtp_allow_plaintext_auth,omitzero"`
 	Timeout                Duration                     `json:"timeout,omitzero"`
@@ -166,13 +179,16 @@ type PublishedMailerNotifications struct {
 	AnnouncementEmailEnabled     bool `json:"announcement_email_enabled,omitzero"`
 }
 
-// PublishedOTEL is the otel section without the collector headers.
+// PublishedOTEL is the otel section. The collector headers are published
+// with their names kept and every value redacted — a header is a secret as
+// a whole, because an authorization token is why the key exists.
 type PublishedOTEL struct {
 	Endpoint    string               `json:"endpoint,omitzero"`
 	ServiceName string               `json:"service_name,omitzero"`
 	Environment string               `json:"environment,omitzero"`
 	Protocol    string               `json:"protocol,omitzero"`
 	Compression string               `json:"compression,omitzero"`
+	Headers     map[string]string    `json:"headers,omitzero"`
 	Queue       PublishedOTELQueue   `json:"queue,omitzero"`
 	Tracing     PublishedOTELTracing `json:"tracing,omitzero"`
 	Metrics     PublishedOTELMetrics `json:"metrics,omitzero"`
@@ -257,9 +273,11 @@ type PublishedWatch struct {
 	Debounce Duration `json:"debounce,omitzero"`
 }
 
-// PublishedS3 is the object-storage settings without the key secret.
+// PublishedS3 is the object-storage settings. Both credentials are
+// published only as their redactions.
 type PublishedS3 struct {
 	AccessKeyID      string   `json:"access_key_id,omitzero"`
+	AccessKeySecret  string   `json:"access_key_secret,omitzero"`
 	BucketName       string   `json:"bucket_name,omitzero"`
 	EndpointURL      string   `json:"endpoint_url,omitzero"`
 	ForcePathStyle   bool     `json:"force_path_style,omitzero"`
@@ -273,6 +291,17 @@ type PublishedS3 struct {
 // may read — the mode, the addresses, and the toggles that decide which
 // sign-in options exist; the full scope adds everything else the process
 // runs on, which is what an administrator gets.
+// publishedSecretRender renders a secret for the published document. An
+// empty secret stays empty — an unset key is omitted, not redacted — and
+// everything else is the placeholder Redacted prints, so the document is
+// what a fail-safe print would show and nothing more.
+func publishedSecretRender(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	return redacted
+}
+
 func (c Config) Published(full bool) Published {
 	public := Published{
 		App: PublishedApp{
@@ -294,10 +323,17 @@ func (c Config) Published(full bool) Published {
 		return public
 	}
 
+	// Every secret value the full document carries is read from the
+	// redacted copy, never from the configuration itself: the placeholder
+	// is decided by the same path `config:print`'s fail-safe uses, so a
+	// secret cannot reach the wire by being populated.
+	sealed := c.withSecrets(publishedSecretRender)
+
 	public.App.AssetsURL = c.App.AssetsURL
 	public.App.ExposeResetToken = c.App.ExposeResetToken
 	public.App.ExposeTotpSecret = c.App.ExposeTotpSecret
 	public.App.AuditRetentionDays = c.App.AuditRetentionDays
+	public.App.SecretKey = sealed.App.SecretKey
 	public.Auth.JWTAlgorithm = c.Auth.JWTAlgorithm
 	public.Auth.Issuer = c.Auth.Issuer
 	public.Auth.AccessTTL = seconds(c.Auth.AccessTTL)
@@ -305,6 +341,9 @@ func (c Config) Published(full bool) Published {
 	public.Auth.RefreshLongTTL = seconds(c.Auth.RefreshLongTTL)
 	public.Auth.ExpiryEmailEnabled = c.Auth.ExpiryEmailEnabled
 	public.Auth.SessionDriver = c.Auth.SessionDriver
+	public.Auth.PrivateKey = sealed.Auth.PrivateKey
+	public.Auth.PublicKey = sealed.Auth.PublicKey
+	public.Auth.SecretKey = sealed.Auth.SecretKey
 	public.Cache = PublishedCache{
 		Enable:    c.Cache.Enable,
 		Driver:    c.Cache.Driver,
@@ -312,6 +351,7 @@ func (c Config) Published(full bool) Published {
 		MaxMemory: c.Cache.MaxMemory,
 	}
 	public.Database = PublishedDatabase{
+		URL:                  sealed.Database.URL,
 		MaxConns:             c.Database.MaxConns,
 		MinConns:             c.Database.MinConns,
 		MaxConnLifetime:      seconds(c.Database.MaxConnLifetime),
@@ -335,6 +375,7 @@ func (c Config) Published(full bool) Published {
 	}
 	public.KVStore = PublishedKVStore{
 		Enable: c.KVStore.Enable,
+		URL:    sealed.KVStore.URL,
 		DB:     c.KVStore.DB,
 	}
 	public.Log = PublishedLog{
@@ -357,6 +398,7 @@ func (c Config) Published(full bool) Published {
 	public.Mailer.SMTPHost = c.Mailer.SMTPHost
 	public.Mailer.SMTPPort = c.Mailer.SMTPPort
 	public.Mailer.SMTPUsername = c.Mailer.SMTPUsername
+	public.Mailer.SMTPPassword = sealed.Mailer.SMTPPassword
 	public.Mailer.SMTPSecure = c.Mailer.SMTPSecure
 	public.Mailer.SMTPAllowPlaintextAuth = c.Mailer.SMTPAllowPlaintextAuth
 	public.Mailer.Timeout = seconds(c.Mailer.Timeout)
@@ -376,6 +418,7 @@ func (c Config) Published(full bool) Published {
 		Environment: c.OTEL.Environment,
 		Protocol:    c.OTEL.Protocol,
 		Compression: c.OTEL.Compression,
+		Headers:     sealed.OTEL.Headers,
 		Queue:       PublishedOTELQueue{MaxSize: c.OTEL.Queue.MaxSize},
 		Tracing: PublishedOTELTracing{
 			Enable:        c.OTEL.Tracing.Enable,
@@ -433,7 +476,8 @@ func (c Config) Published(full bool) Published {
 			Debounce: seconds(c.Storage.Watch.Debounce),
 		},
 		S3: PublishedS3{
-			AccessKeyID:      c.Storage.S3.AccessKeyID,
+			AccessKeyID:      sealed.Storage.S3.AccessKeyID,
+			AccessKeySecret:  sealed.Storage.S3.AccessKeySecret,
 			BucketName:       c.Storage.S3.BucketName,
 			EndpointURL:      c.Storage.S3.EndpointURL,
 			ForcePathStyle:   c.Storage.S3.ForcePathStyle,

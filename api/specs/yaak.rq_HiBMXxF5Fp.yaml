@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_HiBMXxF5Fp
 createdAt: 2026-09-28T09:24:57.873922
-updatedAt: 2026-09-28T09:24:57.873922
+updatedAt: 2026-09-28T10:13:30.771754
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -17,17 +17,15 @@ body:
     }
 bodyType: application/json
 description: |-
-  Creates or replaces one setting; the write is an upsert keyed by key.
+  Replaces one setting value. The write is an upsert over the catalog key; the flags (sealed, public) are the catalog, not the request.
 
-  Tango procedure tango.settings.v1.SettingsService/Set. Guard: admin.
+  Tango procedure tango.settings.v1.SettingsService/Update. Guard: admin.
 
-  sensitive seals the value before it reaches the table (AES-256-GCM, enc: prefix). A sealed setting cannot also be public - the pair is refused, and the table check constraint backs the refusal.
+  A sealed item (per the catalog) encrypts the value at rest (AES-256-GCM, enc: prefix).
 
   Parameters:
-  - key (body, required): the setting namespaced name
+  - key (body, required): the setting catalog key
   - value (body, required): the value in the clear
-  - sensitive (body): seal the value
-  - public (body): publish to the unauthenticated read
 headers:
 - enabled: true
   name: Content-Type
@@ -38,9 +36,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Set setting'
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Set
+name: '[Tango] Update setting'
+sortPriority: 333.3333333333333
+url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

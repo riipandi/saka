@@ -2,11 +2,13 @@ type: http_request
 model: http_request
 id: rq_24pawEzUmb
 createdAt: 2026-09-14T09:48:01.887234
-updatedAt: 2026-09-28T10:12:29.635740
+updatedAt: 2026-09-28T10:16:43.785662
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
-authentication: {}
-authenticationType: null
+authentication:
+  disabled: false
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body: {}
 bodyType: null
 description: |-
@@ -22,7 +24,7 @@ headers:
   id: XgYJZSktgb
 method: GET
 name: '[Tango] Get app configuration'
-sortPriority: 37.03703703703703
+sortPriority: 4000.0
 url: ${[ apiBaseURL ]}/api/configuration
 urlParameters: []
 settingSendCookies:

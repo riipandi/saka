@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_YhrAKKyq4J
 createdAt: 2026-09-19T12:33:32.171637
-updatedAt: 2026-09-28T10:08:07.453623
+updatedAt: 2026-09-28T10:13:20.746963
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -28,7 +28,7 @@ headers:
   id: null
 method: POST
 name: '[Pocket ID] Send test email'
-sortPriority: 111.1111111111111
+sortPriority: 5000.0
 url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/TestEmail
 urlParameters: []
 settingSendCookies:

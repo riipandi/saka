@@ -221,7 +221,7 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; secrets are absent by construction | `modules/appconfig/handler_rest.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
+| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler_rest.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
 | POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
@@ -231,8 +231,12 @@ proto contract — the body is `config.Config.Published(full)` from
 `internal/config/publish.go`, so the document cannot disagree with the types
 it projects. The route is public on the guard's books and the REST bearer
 middleware authenticates opportunistically; the handler reads the caller the
-context carries and answers the wider document only to `IsAdministrator`.
-The test-email procedure is on `tango.system.v1.AppConfigService` in
+context carries and answers the wider document only to `IsAdministrator`. A
+secret in the full document is the value through the redaction path
+redact.go prints — `[redacted]`, the datastore URLs reduced to
+`host:port/database`, an unset secret omitted — the same rendering
+`config:print`'s fail-safe uses, never the value itself. The test-email
+procedure is on `tango.system.v1.AppConfigService` in
 `api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
 probe (`task mailer:smoke`).
 

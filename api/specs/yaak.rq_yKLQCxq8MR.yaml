@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_yKLQCxq8MR
 createdAt: 2026-09-28T09:24:57.917897
-updatedAt: 2026-09-28T09:24:57.917897
+updatedAt: 2026-09-28T10:13:20.746280
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -14,12 +14,12 @@ body:
     }
 bodyType: application/json
 description: |-
-  Removes one setting. An unknown key is not_found, not a silence.
+  Removes one setting override, so the item answers its catalog default again. An item already at its default answers unchanged.
 
-  Tango procedure tango.settings.v1.SettingsService/Delete. Guard: admin.
+  Tango procedure tango.settings.v1.SettingsService/Reset. Guard: admin.
 
   Parameters:
-  - key (body, required): the setting namespaced name
+  - key (body, required): the setting catalog key
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Delete setting'
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Delete
+name: '[Tango] Reset setting to default'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Reset
 urlParameters: []
 settingSendCookies:
   enabled: false
