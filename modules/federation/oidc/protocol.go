@@ -138,10 +138,11 @@ func jwksFunc(keys *jwks.Service) goidc.JWKSFunc {
 }
 
 // protocolScopes are the scopes a relying party may ask for. Each is its
-// own word: a scope matches when it is named exactly.
+// own word: a scope matches when it is named exactly, openid included —
+// the library calls the matcher for every requested word.
 func protocolScopes() []goidc.Scope {
-	scopes := []goidc.Scope{{ID: "openid"}}
-	for _, id := range []string{"profile", "email", "groups"} {
+	scopes := []goidc.Scope{}
+	for _, id := range []string{"openid", "profile", "email", "groups"} {
 		scoped := id
 		scopes = append(scopes, goidc.Scope{ID: scoped, Matches: func(requested string) bool {
 			return requested == scoped

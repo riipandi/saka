@@ -77,10 +77,22 @@ var RateExemptProcedures = map[string]struct{}{
 // the lookup.
 const rpcPathPrefix = "/rpc"
 
+// RateAuthRestPaths names the REST paths the limiter counts under the
+// credential bucket — the protocol endpoints a token is bought at, where
+// the attempt is the abuse. The authorize and userinfo surfaces are
+// exempt: the redirect is free, and the bearer already paid.
+var RateAuthRestPaths = map[string]struct{}{
+	"/oidc/token": {},
+}
+
 // RateBucketFor answers the bucket a procedure is counted under, or false
 // when the limiter never counts it. The path is the URL path the RPC surface
-// serves, with or without its /rpc prefix.
+// serves, with or without its /rpc prefix; the REST protocol paths the
+// tables name are full URL paths.
 func RateBucketFor(path string) (string, bool) {
+	if _, ok := RateAuthRestPaths[strings.TrimSuffix(path, "/")]; ok {
+		return RateAuth, true
+	}
 	path = strings.TrimPrefix(path, rpcPathPrefix)
 	if _, ok := RateAuthProcedures[path]; ok {
 		return RateAuth, true

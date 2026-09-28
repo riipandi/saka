@@ -350,6 +350,7 @@ var RestRules = []RestEntry{
 	// picture read is public because an <img> tag fetches it, and an account
 	// without one answers the bundled default by redirect.
 	{Method: http.MethodGet, Pattern: "/.well-known/jwks.json", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/.well-known/openid-configuration", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/api/users/{id}/profile-picture.png", Rule: Public},
 
 	// The `/me` writes come before the `/{id}` write: the table is matched

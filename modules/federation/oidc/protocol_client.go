@@ -79,6 +79,10 @@ func protocolClient(row ClientSchema, baseURL string) goidc.Client {
 	client.RedirectURIs = row.CallbackURLs
 	client.PostLogoutRedirectURIs = row.LogoutCallbackURLs
 	client.ResponseTypes = []goidc.ResponseType{goidc.ResponseTypeCode}
+	// The scopes a client may ask for are all the provider's — the
+	// consent question and the group restriction are what govern them,
+	// not a per-client list the management surface does not keep.
+	client.ScopeIDs = "openid profile email groups"
 	if len(row.MetadataGrantTypes) > 0 {
 		client.GrantTypes = make([]goidc.GrantType, 0, len(row.MetadataGrantTypes))
 		for _, grant := range row.MetadataGrantTypes {
