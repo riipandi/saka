@@ -193,6 +193,55 @@ func TestStagingMtimeRoundTrips(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), manifest.StagingMtime, time.Minute)
 }
 
+func TestStagingMtimeIsTruncatedToTheColumnPrecision(t *testing.T) {
+	// `timestamptz` keeps microseconds, and the file system may report
+	// nanoseconds: the fingerprint is truncated on the way in, so the value
+	// a retry compares against is the value the database can hold back.
+	manager, _, _ := newManager(t)
+	ctx := t.Context()
+
+	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader([]byte("x")), nil))
+	manifest, err := manager.Manifest(ctx, "k")
+	require.NoError(t, err)
+	assert.Equal(t, manifest.StagingMtime.Truncate(time.Microsecond), manifest.StagingMtime,
+		"the stored fingerprint carries no sub-microsecond residue")
+}
+
+func TestRestageClearsTheStoredContentHash(t *testing.T) {
+	// The re-stage's fingerprint is the new file's, so the row's hash — the
+	// previous version's — must not survive it: a sync that found a matching
+	// fingerprint would otherwise skip hashing and store the new bytes under
+	// the old digest.
+	manager, _, _ := newManager(t)
+	ctx := t.Context()
+
+	first := bytes.Repeat([]byte("first"), 40)
+	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(first), nil))
+	require.NoError(t, manager.Sync(ctx, "k"))
+
+	second := bytes.Repeat([]byte("second"), 40)
+	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(second), nil))
+
+	staged, err := manager.Manifest(ctx, "k")
+	require.NoError(t, err)
+	assert.Equal(t, StatusPending, staged.Status)
+	assert.Empty(t, staged.ContentHash,
+		"a re-stage must not leave the previous version's hash beside the new file")
+
+	require.NoError(t, manager.Sync(ctx, "k"))
+	final, err := manager.Manifest(ctx, "k")
+	require.NoError(t, err)
+	assert.Equal(t, hashOf(second), final.ContentHash)
+	assert.NotEqual(t, hashOf(first), final.ContentHash)
+
+	reader, err := manager.Open(ctx, "k")
+	require.NoError(t, err)
+	got, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.NoError(t, reader.Close())
+	assert.Equal(t, second, got)
+}
+
 // mtimeOf reads the staging fingerprint a checkpoint stores.
 func mtimeOf(m *Manager, key string) time.Time {
 	info, err := os.Stat(m.stagingPath(key))

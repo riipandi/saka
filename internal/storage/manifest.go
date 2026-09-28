@@ -126,6 +126,13 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 // byte travels, carrying the feature's metadata and the staging fingerprint.
 // An upload that never arrives leaves a pending row the next Stage or Sync
 // of the same key overwrites, not a half-stored file.
+//
+// A re-stage clears the stored content hash. The fingerprint written here is
+// the new file's, so the row's hash — the previous version's — must not
+// survive it: a Sync that reads a matching fingerprint would otherwise skip
+// hashing and upload the new bytes under the old digest. Clearing it means a
+// re-stage always pays for one hash, and a retry of an unchanged file still
+// takes the reuse path off the checkpoint the sync itself committed.
 func (Manifests) Stage(ctx context.Context, q datastore.Querier, key string, size int64, mtime time.Time, metadata map[string]any) error {
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
@@ -137,6 +144,7 @@ func (Manifests) Stage(ctx context.Context, q datastore.Querier, key string, siz
 	ib.Cols("key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
 	ib.Values(key, size, "", StatusPending, encoded, size, nullableTime(mtime))
 	ib.SQL("ON CONFLICT (key) DO UPDATE SET " +
+		"content_hash = EXCLUDED.content_hash, " +
 		"metadata = EXCLUDED.metadata, " +
 		"staging_size = EXCLUDED.staging_size, " +
 		"staging_mtime = EXCLUDED.staging_mtime, " +

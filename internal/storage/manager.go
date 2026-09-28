@@ -187,7 +187,7 @@ func (m *Manager) Stage(ctx context.Context, key string, r io.Reader, metadata m
 	if err != nil {
 		return fmt.Errorf("storage: staging %q: %w", key, err)
 	}
-	if err := m.manifests.Stage(ctx, m.db, key, info.Size(), info.ModTime(), metadata); err != nil {
+	if err := m.manifests.Stage(ctx, m.db, key, info.Size(), micros(info.ModTime()), metadata); err != nil {
 		return err
 	}
 	m.metrics.recordStaged(ctx)
@@ -248,7 +248,7 @@ func (m *Manager) sync(ctx context.Context, key string) (string, int64, error) {
 	if err != nil {
 		return uploadError, 0, fmt.Errorf("storage: stat staging %q: %w", key, err)
 	}
-	fingerprint := stagingFingerprint{size: info.Size(), mtime: info.ModTime()}
+	fingerprint := stagingFingerprint{size: info.Size(), mtime: micros(info.ModTime())}
 
 	prior, err := m.manifests.Load(ctx, m.db, key)
 	if err != nil && !errors.Is(err, ErrNoManifest) {
@@ -443,7 +443,7 @@ func (m *Manager) clearStaging(ctx context.Context, path string, fingerprint sta
 	if err != nil {
 		return fmt.Errorf("storage: clear staging: %w", err)
 	}
-	if info.Size() != fingerprint.size || !info.ModTime().Equal(fingerprint.mtime) {
+	if info.Size() != fingerprint.size || !micros(info.ModTime()).Equal(fingerprint.mtime) {
 		return fmt.Errorf("storage: staging %s changed during sync, left for a fresh round", filepath.Base(path))
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -464,4 +464,15 @@ func (m *Manager) stagingPath(key string) string {
 type stagingFingerprint struct {
 	size  int64
 	mtime time.Time
+}
+
+// micros truncates an instant to microseconds, the precision a `timestamptz`
+// column keeps. A fingerprint is written to Postgres and compared against the
+// file system's own reading, so both sides go through this one function: the
+// comparison then sees the same value on both sides of the round trip,
+// whatever precision the volume reports. Without it a nanosecond file system
+// would make an honest retry re-hash the whole file, and a coarse one could
+// let the reuse path trust a fingerprint the database had rounded.
+func micros(t time.Time) time.Time {
+	return t.Truncate(time.Microsecond)
 }
