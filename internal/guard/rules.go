@@ -253,6 +253,12 @@ var ProcedureRules = map[string]Entry{
 	notificationv1connect.NotificationServiceMarkAllNotificationsReadProcedure: {Rule: Authenticated},
 	notificationv1connect.NotificationServiceUnreadCountProcedure:              {Rule: Authenticated},
 	notificationv1connect.NotificationServiceWatchNotificationsProcedure:       {Rule: Authenticated},
+
+	// The application-configuration surface is the deployment's own settings,
+	// so every procedure it serves today is administrative. The test-email
+	// send proves the mailer from the settings screen; it is not an account
+	// read, so there is no self rule to name a field for.
+	systemv1connect.AppConfigServiceTestEmailProcedure: {Rule: Admin},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not

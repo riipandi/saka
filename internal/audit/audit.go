@@ -216,6 +216,12 @@ const (
 	// The record commits in the transaction that swaps the hash and ends
 	// the live sessions, so a reader sees the blast radius.
 	EventPasswordReset = "password_reset"
+
+	// EventTestEmailSent is the deployment's own smoke message submitted —
+	// the administrator's proof that the mailer is configured and
+	// reachable. The payload names the address it went to, which the
+	// request may have redirected away from the caller's own.
+	EventTestEmailSent = "test_email_sent"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

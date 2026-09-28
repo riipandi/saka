@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_LoEENExLKC
 createdAt: 2026-09-19T12:33:32.164794
-updatedAt: 2026-09-26T14:33:50.891082
+updatedAt: 2026-09-28T08:18:24.193010
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -31,8 +31,8 @@ headers:
   id: null
 method: POST
 name: '[Pocket ID] Update application configurations (unimplemented)'
-sortPriority: 333.3333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApplicationConfigurationService/Update
+sortPriority: 407.4074074074074
+url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

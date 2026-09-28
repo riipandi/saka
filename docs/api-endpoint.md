@@ -193,7 +193,7 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | SCIM sync | `modules/federation/scimsync` | `ScimProviderService` |
 | Custom claims | `modules/federation/customclaim` | `CustomClaimService` |
 | Device login | `modules/devicelogin` | `/api/device-login/*` + `DeviceApprovalService` |
-| Application configuration | `modules/appconfig` | `ApplicationConfigurationService` + `/api/application-configuration` |
+| Application configuration | `modules/appconfig` | `AppConfigService` + `/api/application-configuration` |
 | Webhooks | `modules/webhook` | `WebhookService` |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |

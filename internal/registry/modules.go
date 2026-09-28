@@ -5,6 +5,7 @@ import (
 
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/modules/apikey"
+	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/auditlog"
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/notification"
@@ -46,6 +47,10 @@ func Areas() []Area {
 		// the key set is: the authenticator resolves it through the
 		// container like any other consumer.
 		{Name: apikey.ModuleName, Package: apikey.Package, Mount: apikey.Mount},
+		// The application-configuration area serves the deployment's own
+		// settings. It mounts with the other administrative areas and
+		// claims nothing the earlier areas claim.
+		{Name: appconfig.ModuleName, Package: appconfig.Package, Mount: appconfig.Mount},
 		// The audit-log area reads what every other area writes. It mounts
 		// after identity because it serves its own paths and claims nothing
 		// identity claims, so the order is descriptive rather than a

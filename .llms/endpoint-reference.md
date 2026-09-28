@@ -221,15 +221,16 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Get` | Public bootstrap configuration | planned — `modules/appconfig` is a scaffold; the SPA bootstrap read has no procedure yet | — |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/GetAll` | List all application configurations | planned — admin | — |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/Update` | Update application configurations | planned — partial update | — |
-| POST | `/rpc/tango.admin.v1.ApplicationConfigurationService/TestEmail` | Send test email | planned — admin; defaults to the signed-in administrator | — |
+| POST | `/rpc/tango.system.v1.AppConfigService/Get` | Public bootstrap configuration | planned — the SPA bootstrap read has no procedure yet | — |
+| POST | `/rpc/tango.system.v1.AppConfigService/GetAll` | List all application configurations | planned — admin | — |
+| POST | `/rpc/tango.system.v1.AppConfigService/Update` | Update application configurations | planned — partial update | — |
+| POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | GET | `/api/application-configuration` | List public application configurations | planned — unauthenticated bootstrap read | — |
-| POST | `/api/application-configuration/sync-ldap` | Synchronize LDAP | excluded | — |
+| POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
 
-The test-email and SMTP settings surface is served today by the mailer smoke probe
-(`task mailer:smoke`), not by an application-configuration procedure.
+The test-email procedure is served by `tango.system.v1.AppConfigService` in
+`api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
+probe (`task mailer:smoke`).
 
 ## Application Images
 

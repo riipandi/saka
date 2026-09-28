@@ -7,6 +7,8 @@ syntax = "proto3";
 
 package tango.system.v1;
 
+import "buf/validate/validate.proto";
+
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/system/v1;systemv1";
 
 // HealthService reports the availability of the dependencies the process runs
@@ -35,6 +37,42 @@ message CheckResponse {
 
   // took_ms is how long the whole check call took.
   double took_ms = 3;
+}
+
+// AppConfigService is the administrative surface over the deployment's
+// application configuration. Pocket ID keeps the surface behind
+// `/api/application-configuration`; Tango carries it as an RPC service here,
+// and the public bootstrap read the SPA needs is still planned.
+service AppConfigService {
+  // TestEmail sends one templated test message through the configured
+  // mailer. The send is synchronous: the response says the message left
+  // this process, and an SMTP failure is the call's failure, so the
+  // administrator learns whether the configuration works while the
+  // settings screen is still open. An unconfigured mailer refuses the
+  // procedure rather than pretending to have sent anything.
+  //
+  // The message goes to the caller's address on record unless the request
+  // names one, so an administrator can prove the path to a mailbox they
+  // hold without touching another account.
+  rpc TestEmail(TestEmailRequest) returns (TestEmailResponse);
+}
+
+// TestEmailRequest is empty unless the caller redirects the message.
+message TestEmailRequest {
+  // to is the address the message goes to when present. Empty means the
+  // caller's own address on record.
+  optional string to = 1 [(buf.validate.field).string.email = true];
+}
+
+// TestEmailResponse is empty: acceptance says the message was rendered and
+// submitted, not that a mailbox accepted it.
+message TestEmailResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
 // CheckDetail is the outcome of one dependency check.
