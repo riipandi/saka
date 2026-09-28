@@ -129,6 +129,39 @@ func TestTheExpiryScanHonoursTheSwitch(t *testing.T) {
 	assert.Equal(t, 0, expiryAuditCount(t, pool))
 }
 
+// TestTheExpiryScanQueuesNoSuccessorWhenTheScanFails pins the schedule's
+// integrity: a scan that fails leaves no successor, so the queue's retry of
+// the same attempt is the only run — a successor committed before the scan
+// would let three attempts leave three daily chains, and two chains could
+// both remind a key before either marked it.
+func TestTheExpiryScanQueuesNoSuccessorWhenTheScanFails(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
+	pool, client := migratedClient(t, dsn)
+	Register(client, time.Hour, nil, nil, pool, "", true, true, nil)
+
+	// A second pool on the same database, closed before the call: the scan's
+	// list is refused, while the client's own pool stays live for the
+	// assertion.
+	dead, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
+		DSN:             dsn,
+		ApplicationName: "expiry_dead",
+	})
+	require.NoError(t, err)
+	dead.Shutdown(context.Background())
+
+	scanErr := apiKeyExpiryScanProcessor(t.Context(), APIKeyExpiryScanTask{}, dead, client, true,
+		&mailer.Service{})
+	require.Error(t, scanErr, "a failed scan must report the failure")
+
+	// No successor: the pending row is what a committed successor would be,
+	// and there is none.
+	pending, countErr := client.Pending(t.Context(), APIKeyExpiryScanName)
+	require.NoError(t, countErr)
+	assert.Zero(t, pending, "a failed scan must not commit a successor")
+}
+
 // The helpers the expiry tests share with the fixture they run against.
 
 // datastorePostgres aliases the pool type the migrated client answers, so the

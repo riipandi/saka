@@ -90,17 +90,37 @@ func (t APIKeyExpiryEmailTask) Config() queue.QueueConfig {
 // keys that expire within it and have not been reminded, one reminder each,
 // and the mark that keeps the next pass from repeating them.
 //
-// A disabled switch is not an error: the pass runs, finds nothing asked of
-// it, and re-enqueues its successor, so turning the reminder off and on
-// again leaves the schedule alive.
+// The successor is queued only once the pass has succeeded. Queuing it first
+// meant a failed scan still committed its successor, and the queue's retry of
+// the same attempt inserted another: three attempts could leave three daily
+// chains, and two chains could both remind a key before either marked it. A
+// failed scan now leaves no successor — the retry is the queue's — and a
+// crash between the scan and the enqueue costs one day rather than leaving a
+// second permanent schedule. Unmarked keys are still picked up by the next
+// pass. This is the order the cleanup, retention, and garbage-collection jobs
+// already keep.
+//
+// A disabled switch is not an error: the pass finds nothing asked of it and
+// re-enqueues its successor, so turning the reminder off and on again leaves
+// the schedule alive.
 func apiKeyExpiryScanProcessor(ctx context.Context, task APIKeyExpiryScanTask, pool *datastore.Postgres, client *queue.Client, enabled bool, mail *mailer.Service) error {
-	if _, err := client.Add(task).Wait(DefaultAPIKeyExpiryInterval).Ctx(ctx).Save(); err != nil {
-		return err
-	}
-	if !enabled || mail == nil {
-		return nil
+	if enabled && mail != nil {
+		if err := apiKeyExpiryScan(ctx, pool, client); err != nil {
+			return err
+		}
 	}
 
+	_, err := client.Add(task).Wait(DefaultAPIKeyExpiryInterval).Ctx(ctx).Save()
+	return err
+}
+
+// apiKeyExpiryScan is the pass itself: list the window, enqueue one reminder
+// per key, and mark each one. A failure to list is the pass's failure, which
+// leaves the caller no successor to queue. A failure on a single key is
+// logged and skipped: the unmarked row is the fact the next pass re-reads, so
+// an address that appears later, or an enqueue that failed once, still earns
+// its reminder.
+func apiKeyExpiryScan(ctx context.Context, pool *datastore.Postgres, client *queue.Client) error {
 	now := time.Now()
 	repo := apikey.NewRepository()
 	keys, err := repo.ListExpiring(ctx, pool, now, now.Add(APIKeyExpiryWindow))
