@@ -8,14 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -65,7 +62,7 @@ func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(cfg, pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
+	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
 }
 
 // unconfiguredService builds the service the way a deployment without an
@@ -80,7 +77,7 @@ func unconfiguredService(t *testing.T, pool *datastore.Postgres) *Service {
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(cfg, pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
+	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
 }
 
 func host(addr string) string {
@@ -222,70 +219,4 @@ func TestTestEmailWritesTheAuditRecordTheSendDeserves(t *testing.T) {
 	assert.Equal(t, callerID.String(), userID)
 	assert.Contains(t, payload, "gryffindor@example.com")
 	assert.Contains(t, payload, `"redirected"`)
-}
-
-// TestGetPublicPublishesOnlyTheBootstrapFacts pins the public subset: the
-// facts a login screen shows and nothing else, so a key added to the
-// configuration later stays private until the mapping names it.
-func TestGetPublicPublishesOnlyTheBootstrapFacts(t *testing.T) {
-	cfg := config.Default()
-	cfg.App.Mode = config.ModeProduction
-	cfg.App.BaseURL = "https://id.example.com"
-	cfg.App.AssetsURL = "https://cdn.example.com"
-	cfg.Auth.OneTimeAccessEmailAsAdminEnabled = true
-	cfg.Mailer.Notifications.AnnouncementEmailEnabled = true
-
-	public := NewService(cfg, nil, nil, nil, nil).GetPublic()
-
-	assert.Equal(t, "production", public.GetApp().GetMode())
-	assert.Equal(t, "https://id.example.com", public.GetApp().GetBaseUrl())
-	assert.Equal(t, "https://cdn.example.com", public.GetApp().GetAssetsUrl())
-	assert.True(t, public.GetAuth().GetOneTimeAccessEmailAsAdminEnabled())
-	assert.False(t, public.GetAuth().GetOneTimeAccessEmailAsUnauthenticatedEnabled())
-	assert.True(t, public.GetMailer().GetAnnouncementEmailEnabled())
-}
-
-// TestGetAllPublishesNoSecret plants every secret value in the configuration
-// and reads the administrator's answer back as JSON: if a secret reached a
-// published field, the planted value would show up here.
-func TestGetAllPublishesNoSecret(t *testing.T) {
-	cfg := config.Default()
-	secrets := map[string]*string{
-		"app.secret_key":               &cfg.App.SecretKey,
-		"auth.private_key":             &cfg.Auth.PrivateKey,
-		"auth.public_key":              &cfg.Auth.PublicKey,
-		"auth.secret_key":              &cfg.Auth.SecretKey,
-		"database.url":                 &cfg.Database.URL,
-		"kvstore.url":                  &cfg.KVStore.URL,
-		"mailer.smtp_password":         &cfg.Mailer.SMTPPassword,
-		"storage.s3.access_key_secret": &cfg.Storage.S3.AccessKeySecret,
-	}
-	for _, v := range secrets {
-		*v = "planted-hogwarts-secret"
-	}
-	cfg.OTEL.Headers = map[string]string{"authorization": "planted-hogwarts-secret"}
-
-	document, err := protojson.Marshal(NewService(cfg, nil, nil, nil, nil).GetAll())
-	require.NoError(t, err)
-	assert.NotContains(t, string(document), "planted-hogwarts-secret",
-		"a published field carries a secret; the mapping must not name it")
-}
-
-// TestGetAllCarriesTheRunningConfiguration pins representative fields across
-// the sections, so a mapping dropped in a refactor fails here.
-func TestGetAllCarriesTheRunningConfiguration(t *testing.T) {
-	cfg := config.Default()
-	cfg.App.Mode = config.ModeStaging
-	cfg.Auth.AccessTTL = 15 * time.Minute
-	cfg.Server.Port = 4080
-	cfg.Server.CORS.AllowedOrigins = []string{"https://app.example.com"}
-	cfg.Storage.S3.Region = "ap-southeast-1"
-
-	full := NewService(cfg, nil, nil, nil, nil).GetAll()
-
-	assert.Equal(t, "staging", full.GetApp().GetMode())
-	assert.Equal(t, durationpb.New(15*time.Minute), full.GetAuth().GetAccessTtl())
-	assert.Equal(t, int64(4080), full.GetServer().GetPort())
-	assert.Equal(t, []string{"https://app.example.com"}, full.GetServer().GetCors().GetAllowedOrigins())
-	assert.Equal(t, "ap-southeast-1", full.GetStorage().GetS3().GetRegion())
 }

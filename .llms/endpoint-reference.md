@@ -221,41 +221,42 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.AppConfigService/Get` | Public bootstrap configuration | implemented — public; the public subset only (mode, base URL, assets URL, sign-in and announcement toggles), resolved at startup | `modules/appconfig`, `internal/guard/rules.go` |
-| POST | `/rpc/tango.system.v1.AppConfigService/GetAll` | List all application configurations | implemented — admin; every non-secret setting, sectioned like the JSON file; secrets are absent by construction | `modules/appconfig`, `internal/guard/rules.go` |
-| POST | `/rpc/tango.system.v1.AppConfigService/Update` | Update application configurations | planned — partial update | — |
+| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; secrets are absent by construction | `modules/appconfig/handler_rest.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
 | POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
-| GET | `/api/application-configuration` | List public application configurations | planned — unauthenticated bootstrap read; the facts it would serve are already published by `AppConfigService/Get` on the RPC surface | — |
+| PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
 
-The read procedures are served by `tango.system.v1.AppConfigService` in
-`api/connect/system.proto`: `Get` answers the public subset to any caller,
-`GetAll` answers every non-secret setting to an administrator. Both read the
-configuration resolved at startup — the JSON file is the only source for the
-system sector. The test-email procedure is on the same service. The other
-SMTP checks stay with the mailer smoke probe (`task mailer:smoke`).
+The configuration read is REST: one endpoint, `GET /api/configuration`, no
+proto contract — the body is `config.Config.Published(full)` from
+`internal/config/publish.go`, so the document cannot disagree with the types
+it projects. The route is public on the guard's books and the REST bearer
+middleware authenticates opportunistically; the handler reads the caller the
+context carries and answers the wider document only to `IsAdministrator`.
+The test-email procedure is on `tango.system.v1.AppConfigService` in
+`api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
+probe (`task mailer:smoke`).
 
 ## Settings
 
-Tango-only surface — Pocket ID has no generic settings CRUD; its `app_config`
-table is the closest thing, and tango's `public.settings` table replaces the
-one `00005` used to carry.
+Tango-only surface — Pocket ID has no generic settings CRUD. The catalog in
+code declares every item (key, default, sealed, public, description);
+`public.settings` in `00005_create_platform_tables.sql` stores the overrides
+alone. No delete surface exists by design: an item is removed by resetting
+it, and a key not in the catalog is refused everywhere.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.settings.v1.SettingsService/List` | List settings | implemented — admin; every row, values in the clear (sealed rows are opened) | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/Get` | Get setting | implemented — admin; unknown key is `not_found` | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/Set` | Set setting | implemented — admin upsert; `sensitive` seals the value (AES-256-GCM, `enc:` prefix); a sealed setting cannot be public | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/Delete` | Delete setting | implemented — admin; unknown key is `not_found` | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only rows flagged `public`, names and values, never a sealed value | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/List` | List settings | implemented — admin; every catalog item with its effective value (override resting, else default) and the default it falls back to | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/Update` | Update setting | implemented — admin; catalog keys only; a sealed item seals the value (AES-256-GCM, `enc:` prefix) | `modules/appconfig/settings.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/Reset` | Reset setting to default | implemented — admin; drops the override; an item already at its default answers unchanged | `modules/appconfig/settings.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
 
-The settings table lives in `00005_create_platform_tables.sql`. Whether a
-value rests sealed is told by its `enc:` prefix alone — there is no flag
-column — and a public row never rests sealed: the write refuses the pair and
-a check constraint backs it. Other features read through the `Settings`
-service (`Get`, `GetString`, `GetBool`, `GetInt64`, `Set`, `Delete`), which
-the appconfig area's `Package` provides; the RPC writes (`SetFor`,
-`DeleteFor`) record `setting_updated` / `setting_deleted` in the causing
+Whether a value rests sealed is told by its `enc:` prefix alone — there is
+no flag column — and a public item never rests sealed: the catalog refuses
+the pair at construction. Other features read through the `Settings`
+service (`Get`, `GetString`, `GetBool`, `GetInt64`, `Update`, `Reset`),
+which the appconfig area's `Package` provides; the RPC writes (`UpdateFor`,
+`ResetFor`) record `setting_updated` / `setting_reset` in the causing
 transaction, with the key in the payload and never the value.
 
 ## Application Images

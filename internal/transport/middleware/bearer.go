@@ -76,8 +76,24 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rule, target := guard.MatchRest(rules, r.Method, r.URL.Path)
+
+			// A public route never refuses a caller. A caller who presents a
+			// token anyway is still verified, so the handler sees who asked:
+			// the configuration read widens its answer for an administrator
+			// this way. A token that does not verify is the anonymous case —
+			// the route is public, so there is nothing the credential could
+			// have added, and no refusal either.
 			if guard.IsPublic(rule) {
-				next.ServeHTTP(w, r)
+				if r.Header.Get("Authorization") == "" {
+					next.ServeHTTP(w, r)
+					return
+				}
+				info, err := auth(r.Context(), r)
+				if err != nil {
+					next.ServeHTTP(w, r)
+					return
+				}
+				next.ServeHTTP(w, r.WithContext(authn.SetInfo(r.Context(), info)))
 				return
 			}
 

@@ -26,7 +26,9 @@ func settingsService(t *testing.T) (*Settings, *datastore.Postgres) {
 	cipher, err := crypto.NewCipherFromHex(testCipherKey)
 	require.NoError(t, err)
 	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
-	return NewSettings(pool, cipher, recorder), pool
+	settings, err := NewSettings(pool, cipher, recorder)
+	require.NoError(t, err)
+	return settings, pool
 }
 
 // blindSettings builds the feature the way a run without a secret key is
@@ -37,38 +39,85 @@ func blindSettings(t *testing.T) (*Settings, *datastore.Postgres) {
 
 	pool := migratedPool(t)
 	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
-	return NewSettings(pool, nil, recorder), pool
+	settings, err := NewSettings(pool, nil, recorder)
+	require.NoError(t, err)
+	return settings, pool
 }
 
-// TestSetRoundTripsAPlainValue covers the base case: what Set writes, Get
-// reads back, unchanged and in the clear.
-func TestSetRoundTripsAPlainValue(t *testing.T) {
+// TestASettingAnswersItsDefaultUntilOverridden covers the catalog model:
+// every item answers before anything is written, and the override replaces
+// the default, not the item.
+func TestASettingAnswersItsDefaultUntilOverridden(t *testing.T) {
 	settings, _ := settingsService(t)
 
-	require.NoError(t, settings.Set(t.Context(), "product.name", "Hogwarts", false, false))
-
-	value, err := settings.Get(t.Context(), "product.name")
+	setting, err := settings.GetSetting(t.Context(), "product.name")
 	require.NoError(t, err)
-	assert.Equal(t, "Hogwarts", value)
+	assert.Equal(t, "Tango", setting.Value, "an item at rest answers its catalog default")
+	assert.Equal(t, "Tango", setting.Default, "the default is carried with the item")
+	assert.False(t, setting.Sealed)
+	assert.True(t, setting.Public)
+
+	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
+
+	setting, err = settings.GetSetting(t.Context(), "product.name")
+	require.NoError(t, err)
+	assert.Equal(t, "Gringotts", setting.Value)
+	assert.Equal(t, "Tango", setting.Default, "the override never replaces the default")
+	require.NotNil(t, setting.UpdatedAt)
+}
+
+// TestAnUnknownKeyIsRefusedEverywhere: the catalog owns the keys, so a key
+// it does not declare is a refusal on every path — read, write, reset.
+func TestAnUnknownKeyIsRefusedEverywhere(t *testing.T) {
+	settings, _ := settingsService(t)
+
+	_, err := settings.GetSetting(t.Context(), "made.up.key")
+	assert.ErrorIs(t, err, ErrUnknownSetting)
+
+	err = settings.Update(t.Context(), "made.up.key", "x")
+	assert.ErrorIs(t, err, ErrUnknownSetting)
+
+	_, err = settings.UpdateFor(t.Context(), "", "made.up.key", "x")
+	assert.ErrorIs(t, err, ErrUnknownSetting)
+
+	_, err = settings.ResetFor(t.Context(), "", "made.up.key")
+	assert.ErrorIs(t, err, ErrUnknownSetting)
 }
 
 // TestASealedValueRestsEncryptedAndReadsOpened is the feature's reason to
-// exist: the table never holds the plaintext of a sensitive row, and every
+// exist: the table never holds the plaintext of a sealed item, and every
 // reader — helper or RPC — still answers the value the writer meant.
 func TestASealedValueRestsEncryptedAndReadsOpened(t *testing.T) {
 	settings, pool := settingsService(t)
 
-	require.NoError(t, settings.Set(t.Context(), "smtp.relay", "s3cret", true, false))
+	// The catalog carries no sealed item today; the seal path is driven by
+	// declaring one here, the way a feature would by adding its entry.
+	if _, err := pool.Exec(t.Context(), `DELETE FROM public.settings`); err != nil {
+		require.NoError(t, err)
+	}
+	sealed := SettingDef{Key: "smtp.relay", Default: "", Sealed: true}
+	settings.byKey["smtp.relay"] = sealed
+
+	require.NoError(t, settings.Update(t.Context(), "smtp.relay", "s3cret"))
 
 	var resting string
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT value FROM public.settings WHERE key = $1`, "smtp.relay").Scan(&resting))
 	assert.True(t, isSealed(resting),
-		"a sensitive value must rest sealed, not in the clear")
+		"a sealed item must rest encrypted, not in the clear")
 
 	value, err := settings.Get(t.Context(), "smtp.relay")
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", value, "the reader must open what the writer sealed")
+
+	listed, err := settings.List(t.Context())
+	require.NoError(t, err)
+	for _, item := range listed {
+		if item.Key == "smtp.relay" {
+			assert.Equal(t, "s3cret", item.Value, "the administrator's list opens sealed rows")
+			assert.True(t, item.Sealed)
+		}
+	}
 }
 
 // TestGetOnASealedRowWithoutACipherFails pins the fail-closed path: a run
@@ -85,100 +134,91 @@ func TestGetOnASealedRowWithoutACipherFails(t *testing.T) {
 		`INSERT INTO public.settings (key, value) VALUES ($1, $2)`, "orphan.key", sealed)
 	require.NoError(t, err)
 
+	settings.byKey["orphan.key"] = SettingDef{Key: "orphan.key", Default: "", Sealed: true}
 	_, err = settings.Get(t.Context(), "orphan.key")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrMissingCipher)
 }
 
-// TestSetWithoutACipherRefusesTheSensitiveWrite: a run with no secret key
-// serves plain settings and refuses the one write it cannot protect.
-func TestSetWithoutACipherRefusesTheSensitiveWrite(t *testing.T) {
-	settings, _ := blindSettings(t)
+// TestASealedWriteWithoutACipherRefuses: a run with no secret key serves
+// plain settings and refuses the one write it cannot protect.
+func TestASealedWriteWithoutACipherRefuses(t *testing.T) {
+	settings, pool := blindSettings(t)
+	settings.byKey["smtp.relay"] = SettingDef{Key: "smtp.relay", Default: "", Sealed: true}
 
-	err := settings.Set(t.Context(), "smtp.relay", "s3cret", true, false)
+	err := settings.Update(t.Context(), "smtp.relay", "s3cret")
 	require.ErrorIs(t, err, ErrSealUnavailable)
-
-	_, getErr := settings.Get(t.Context(), "smtp.relay")
-	assert.ErrorIs(t, getErr, ErrUnknownSetting, "a refused write must not leave a row")
-}
-
-// TestASealedSettingCannotBePublic: the unauthenticated read publishes
-// every public row verbatim, so the pair is refused at the write and
-// checked at the table.
-func TestASealedSettingCannotBePublic(t *testing.T) {
-	settings, _ := settingsService(t)
-
-	err := settings.Set(t.Context(), "brand.secret", "s3cret", true, true)
-	require.ErrorIs(t, err, ErrSealedNotPublic)
-}
-
-// TestAPlainWriteMayNotForgeTheSealedPrefix keeps the read unambiguous: the
-// enc: prefix is how a value declares itself sealed, so a plain write that
-// begins with it is refused rather than stored as an unreadable value.
-func TestAPlainWriteMayNotForgeTheSealedPrefix(t *testing.T) {
-	settings, _ := settingsService(t)
-
-	err := settings.Set(t.Context(), "brand.note", "enc:not-really-sealed", false, false)
-	require.ErrorIs(t, err, ErrReservedPrefix)
-}
-
-// TestSetUpsertsTheRow covers the replace: the same key written twice rests
-// once, with the second call's value and flags.
-func TestSetUpsertsTheRow(t *testing.T) {
-	settings, pool := settingsService(t)
-
-	require.NoError(t, settings.Set(t.Context(), "product.name", "Hogwarts", false, false))
-	require.NoError(t, settings.Set(t.Context(), "product.name", "Gringotts", false, true))
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.settings WHERE key = $1`, "product.name").Scan(&count))
-	assert.Equal(t, 1, count)
+		`SELECT count(*) FROM public.settings`).Scan(&count))
+	assert.Zero(t, count, "a refused write must not leave a row")
+}
+
+// TestAPlainWriteMayNotForgeTheSealedPrefix keeps the read unambiguous: the
+// enc: prefix is how a value declares itself sealed, so a plain item whose
+// write begins with it is refused rather than stored as an unreadable value.
+func TestAPlainWriteMayNotForgeTheSealedPrefix(t *testing.T) {
+	settings, _ := settingsService(t)
+
+	err := settings.Update(t.Context(), "product.name", "enc:not-really-sealed")
+	require.ErrorIs(t, err, ErrReservedPrefix)
+}
+
+// TestResetRestoresTheCatalogDefault covers the reset and its idempotence:
+// the override is dropped, the default answers again, and resetting an item
+// already at its default changes nothing.
+func TestResetRestoresTheCatalogDefault(t *testing.T) {
+	settings, pool := settingsService(t)
+
+	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
+	_, err := settings.ResetFor(t.Context(), "01a0da1c-cb41-779d-bd02-99b3eb5da999", "product.name")
+	require.NoError(t, err)
 
 	setting, err := settings.GetSetting(t.Context(), "product.name")
 	require.NoError(t, err)
-	assert.Equal(t, "Gringotts", setting.Value)
-	assert.True(t, setting.Public)
-	require.NotNil(t, setting.UpdatedAt, "an update must stamp the row")
+	assert.Equal(t, "Tango", setting.Value)
+	assert.Nil(t, setting.UpdatedAt, "a reset item carries no override instant")
+
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.settings`).Scan(&count))
+	assert.Zero(t, count, "a reset removes the override, it does not write the default")
+
+	// The second reset is the item already at its default: unchanged, and
+	// no override left behind.
+	_, err = settings.ResetFor(t.Context(), "", "product.name")
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.settings`).Scan(&count))
+	assert.Zero(t, count)
 }
 
-// TestDeleteRemovesTheRowAndReportsAnUnknownKey covers both outcomes of a
-// delete: the row is gone, and a key that names nothing is a refusal.
-func TestDeleteRemovesTheRowAndReportsAnUnknownKey(t *testing.T) {
+// TestListMergesTheCatalogWithTheOverrides covers the two reads: List
+// answers every catalog item, ListPublic only the ones flagged public,
+// both ordered by key and both carrying effective values.
+func TestListMergesTheCatalogWithTheOverrides(t *testing.T) {
 	settings, _ := settingsService(t)
 
-	require.NoError(t, settings.Set(t.Context(), "product.name", "Hogwarts", false, false))
-	require.NoError(t, settings.Delete(t.Context(), "product.name"))
-
-	_, err := settings.Get(t.Context(), "product.name")
-	assert.ErrorIs(t, err, ErrUnknownSetting)
-
-	err = settings.Delete(t.Context(), "product.name")
-	assert.ErrorIs(t, err, ErrUnknownSetting, "deleting an absent key must be a refusal, not a silence")
-}
-
-// TestListPublishesOnlyPublicRowsToTheUnauthenticatedRead covers the split
-// the surface is named for: List answers everything, ListPublic only the
-// rows flagged public.
-func TestListPublishesOnlyPublicRowsToTheUnauthenticatedRead(t *testing.T) {
-	settings, _ := settingsService(t)
-
-	require.NoError(t, settings.Set(t.Context(), "brand.name", "Hogwarts", false, true))
-	require.NoError(t, settings.Set(t.Context(), "product.quota", "42", false, false))
-	require.NoError(t, settings.Set(t.Context(), "smtp.relay", "s3cret", true, false))
+	require.NoError(t, settings.Update(t.Context(), "product.announcement", "Expecto Patronum"))
+	require.NoError(t, settings.Update(t.Context(), "product.support_email", "support@example.com"))
 
 	all, err := settings.List(t.Context())
 	require.NoError(t, err)
-	require.Len(t, all, 3)
-	assert.Equal(t, []string{"brand.name", "product.quota", "smtp.relay"},
-		[]string{all[0].Key, all[1].Key, all[2].Key}, "the list is ordered by key")
-	assert.Equal(t, "s3cret", all[2].Value, "the administrator's list opens sealed rows")
+	require.Len(t, all, len(Catalog()))
+	for i := 1; i < len(all); i++ {
+		assert.LessOrEqual(t, all[i-1].Key, all[i].Key, "the list is ordered by key")
+	}
 
 	public, err := settings.ListPublic(t.Context())
 	require.NoError(t, err)
-	require.Len(t, public, 1)
-	assert.Equal(t, "brand.name", public[0].Key)
-	assert.Equal(t, "Hogwarts", public[0].Value)
+	require.Len(t, public, 3, "every starter item is public")
+	values := map[string]string{}
+	for _, item := range public {
+		values[item.Key] = item.Value
+	}
+	assert.Equal(t, "Expecto Patronum", values["product.announcement"])
+	assert.Equal(t, "Tango", values["product.name"], "an item with no override answers its default")
 }
 
 // TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue covers the audit
@@ -188,23 +228,41 @@ func TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue(t *testing.T) {
 	settings, pool := settingsService(t)
 
 	caller := seedUser(t, pool, "granger", "granger@example.com")
-	_, err := settings.SetFor(t.Context(), caller.String(), "smtp.relay", "s3cret", true, false)
+	_, err := settings.UpdateFor(t.Context(), caller.String(), "product.announcement", "s3cret")
 	require.NoError(t, err)
-	require.NoError(t, settings.DeleteFor(t.Context(), caller.String(), "smtp.relay"))
+	_, err = settings.ResetFor(t.Context(), caller.String(), "product.announcement")
+	require.NoError(t, err)
 
 	var records int
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT count(*) FROM public.audit_logs WHERE event IN ($1, $2)`,
-		audit.EventSettingDeleted, audit.EventSettingUpdated).Scan(&records))
+		audit.EventSettingReset, audit.EventSettingUpdated).Scan(&records))
 	assert.Equal(t, 2, records, "both halves of the ceremony leave their record")
 
 	var payload string
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT payload::text FROM public.audit_logs WHERE event = $1`,
 		audit.EventSettingUpdated).Scan(&payload))
-	assert.Contains(t, payload, "smtp.relay")
-	assert.Contains(t, payload, `"sealed"`)
+	assert.Contains(t, payload, "product.announcement")
 	assert.NotContains(t, payload, "s3cret", "the audit record must never carry the value")
+}
+
+// TestTheCatalogRefusesAPublicSealedItem pins the constructor's check: the
+// unauthenticated read publishes every public item's value verbatim, so a
+// catalog entry claiming both is a broken deployment, not a runtime answer.
+func TestTheCatalogRefusesAPublicSealedItem(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+	pool := migratedPool(t)
+
+	_, err := newSettings(pool, nil, nil,
+		[]SettingDef{{Key: "bad.item", Default: "x", Sealed: true, Public: true}})
+	require.ErrorIs(t, err, ErrInvalidCatalog)
+
+	_, err = newSettings(pool, nil, nil, []SettingDef{
+		{Key: "dup.item", Default: "x"},
+		{Key: "dup.item", Default: "y"},
+	})
+	require.ErrorIs(t, err, ErrInvalidCatalog, "a catalog that names a key twice is broken too")
 }
 
 // TestTheTypedGettersParseTheStoredValue covers the helper surface another
@@ -213,37 +271,38 @@ func TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue(t *testing.T) {
 func TestTheTypedGettersParseTheStoredValue(t *testing.T) {
 	settings, _ := settingsService(t)
 
-	require.NoError(t, settings.Set(t.Context(), "product.seats", "42", false, false))
-	require.NoError(t, settings.Set(t.Context(), "product.trial", "true", false, false))
+	require.NoError(t, settings.Update(t.Context(), "product.name", "42"))
 
-	seats, err := settings.GetInt64(t.Context(), "product.seats")
+	seats, err := settings.GetInt64(t.Context(), "product.name")
 	require.NoError(t, err)
 	assert.Equal(t, int64(42), seats)
 
-	trial, err := settings.GetBool(t.Context(), "product.trial")
-	require.NoError(t, err)
-	assert.True(t, trial)
-
-	name, err := settings.GetString(t.Context(), "product.name")
-	assert.ErrorIs(t, err, ErrUnknownSetting, "an absent key is refused, not zeroed")
-	assert.Empty(t, name)
-
-	require.NoError(t, settings.Set(t.Context(), "product.seats", "forty-two", false, false))
-	_, err = settings.GetInt64(t.Context(), "product.seats")
+	_, err = settings.GetBool(t.Context(), "product.name")
 	assert.Error(t, err, "a value that does not parse must fail loudly")
 }
 
-// TestTheTableRefusesAPublicRowThatRestsSealed is the database's own half of
-// the invariant: even a writer that skips the service cannot make the
-// unauthenticated read carry a ciphertext.
-func TestTheTableRefusesAPublicRowThatRestsSealed(t *testing.T) {
+// TestTheTableKeepsTheOverrideShapeOnly pins the schema the code scans: the
+// table holds key, value, and the instants — the flags live in the catalog.
+func TestTheTableKeepsTheOverrideShapeOnly(t *testing.T) {
 	settings, pool := settingsService(t)
 
-	_, err := pool.Exec(t.Context(), `
-		INSERT INTO public.settings (key, value, public)
-		VALUES ('brand.forced', 'enc:whatever', TRUE)`)
-	require.Error(t, err, "the check constraint must refuse the pair")
-	_ = settings
+	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
+
+	rows, err := pool.Query(t.Context(), `
+		SELECT column_name FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'settings'
+		ORDER BY ordinal_position`)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var columns []string
+	for rows.Next() {
+		var column string
+		require.NoError(t, rows.Scan(&column))
+		columns = append(columns, column)
+	}
+	require.NoError(t, rows.Err())
+	assert.Equal(t, []string{"key", "value", "created_at", "updated_at"}, columns)
 }
 
 // isSealed answers whether a stored value rests sealed — the same test the

@@ -257,26 +257,21 @@ var ProcedureRules = map[string]Entry{
 	notificationv1connect.NotificationServiceWatchNotificationsProcedure:       {Rule: Authenticated},
 
 	// The application-configuration surface is the deployment's own settings.
-	// GetAll and the test-email send are administrative: the read names every
-	// non-secret setting the process runs on, and the send proves the mailer
-	// from the settings screen — neither is an account read, so there is no
-	// self rule to name a field for. Get is the public bootstrap read: it
-	// carries only the facts a login screen may show, and it must answer
-	// before any sign-in exists.
-	systemv1connect.AppConfigServiceGetProcedure:       {Rule: Public},
-	systemv1connect.AppConfigServiceGetAllProcedure:    {Rule: Admin},
+	// The test-email send is administrative: it proves the mailer from the
+	// settings screen, so it is not an account read, and there is no self
+	// rule to name a field for. The configuration read is REST —
+	// `GET /api/configuration` in RestRules — not a procedure here.
 	systemv1connect.AppConfigServiceTestEmailProcedure: {Rule: Admin},
 
 	// The settings surface is the database-backed, product-flow settings.
-	// ListPublic is the one public read: it publishes only the rows flagged
-	// public, which the write and the table both keep free of sealed values,
-	// so an unauthenticated caller can never reach a ciphertext. The rest is
-	// administrative — the values travel in the clear, and the write carries
-	// the flags, which is not an account read either.
+	// ListPublic is the one public read: it publishes only the catalog items
+	// flagged public, and a public item never rests sealed — the catalog
+	// refuses that pair — so an unauthenticated caller can never reach a
+	// ciphertext. The rest is administrative: the values travel in the
+	// clear, which is not an account read either.
 	settingsv1connect.SettingsServiceListProcedure:       {Rule: Admin},
-	settingsv1connect.SettingsServiceGetProcedure:        {Rule: Admin},
-	settingsv1connect.SettingsServiceSetProcedure:        {Rule: Admin},
-	settingsv1connect.SettingsServiceDeleteProcedure:     {Rule: Admin},
+	settingsv1connect.SettingsServiceUpdateProcedure:     {Rule: Admin},
+	settingsv1connect.SettingsServiceResetProcedure:      {Rule: Admin},
 	settingsv1connect.SettingsServiceListPublicProcedure: {Rule: Public},
 }
 
@@ -344,6 +339,14 @@ var RestRules = []RestEntry{
 	// file's own read carries. The catch-all is the rule's shape because a
 	// storage key carries slashes inside it.
 	{Method: http.MethodGet, Pattern: "/api/uploads/{key...}", Rule: Authenticated},
+
+	// The configuration read is the deployment's bootstrap document: the
+	// public subset to an anonymous caller, the full non-secret document to
+	// an administrator's token. The middleware authenticates
+	// opportunistically on a public route — a token is verified when
+	// presented, an anonymous caller is never refused — and the handler
+	// reads the caller the context carries.
+	{Method: http.MethodGet, Pattern: "/api/configuration", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

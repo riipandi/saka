@@ -223,15 +223,16 @@ const (
 	// request may have redirected away from the caller's own.
 	EventTestEmailSent = "test_email_sent"
 
-	// EventSettingUpdated is a database-backed setting written — created or
-	// replaced — through the settings surface. The payload names the key
-	// and the flags, never the value: a value may be a secret, and the log
-	// is not the place a secret is kept a second time.
+	// EventSettingUpdated is a database-backed setting written — an override
+	// created or replaced — through the settings surface. The payload names
+	// the key and the flags, never the value: a value may be a secret, and
+	// the log is not the place a secret is kept a second time.
 	EventSettingUpdated = "setting_updated"
 
-	// EventSettingDeleted is a database-backed setting removed. The record
-	// commits in the transaction that drops the row.
-	EventSettingDeleted = "setting_deleted"
+	// EventSettingReset is a database-backed setting returned to its catalog
+	// default — the override removed. The record commits in the transaction
+	// that drops the row.
+	EventSettingReset = "setting_reset"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

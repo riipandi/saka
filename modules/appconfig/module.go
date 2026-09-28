@@ -1,11 +1,13 @@
 // Package appconfig is the application-configuration area: the deployment's
 // own settings surface, in both senses the word carries.
 //
-// The system configuration is the JSON file's: AppConfigService publishes
-// the deployment's resolved configuration read-only and sends its test
-// email. The database-backed settings are the product flows': the settings
-// feature keeps key/value rows editable at runtime, sealing a sensitive
-// value under the deployment's shared cipher.
+// The system configuration is the JSON file's: the configuration endpoint
+// (`GET /api/configuration`) publishes the deployment's resolved
+// configuration read-only — the public subset to anyone, the full
+// non-secret document to an administrator — and the test-email RPC sends
+// its smoke message. The database-backed settings are the product flows':
+// the settings feature keeps catalog items whose overrides are editable at
+// runtime, sealing a sealed item under the deployment's shared cipher.
 //
 // It is an area of its own rather than a feature of identity because the
 // settings it serves are the deployment's, not any account's. The area owns
@@ -41,12 +43,11 @@ import (
 // write rather than storing a value it cannot protect.
 var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
-		cfg := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		mail := do.MustInvoke[*mailer.Service](i)
 		log := do.MustInvoke[*slog.Logger](i)
-		return NewService(*cfg, pool, recorder, mail, log), nil
+		return NewService(pool, recorder, mail, log), nil
 	}),
 	do.Lazy(func(i do.Injector) (*Settings, error) {
 		cfg := do.MustInvoke[*config.Config](i)
@@ -56,11 +57,11 @@ var Package = do.Package(
 		if err != nil {
 			return nil, err
 		}
-		return NewSettings(pool, cipher, recorder), nil
+		return NewSettings(pool, cipher, recorder)
 	}),
 )
 
-// settingsCipher builds the cipher a sensitive value seals under. An empty
+// settingsCipher builds the cipher a sealed value encrypts under. An empty
 // secret key is the run that carries none — the feature answers that at the
 // call site — while a key that is set but unreadable is a broken
 // deployment, and it fails the run.
@@ -78,7 +79,9 @@ func settingsCipher(secretKey string) (*crypto.Cipher, error) {
 // Mount resolves what this area needs and builds the module the router
 // mounts. It is the other half of the seam the composition root uses.
 func Mount(i do.Injector) (kernel.Module, error) {
+	cfg := do.MustInvoke[*config.Config](i)
 	return NewModule(
+		*cfg,
 		do.MustInvoke[*Service](i),
 		do.MustInvoke[*Settings](i),
 	), nil
