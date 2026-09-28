@@ -1,6 +1,6 @@
 # API Endpoints
 
-The surfaces the server answers, reconciled against the code on 2026-09-27. The agent-facing
+The surfaces the server answers, reconciled against the code on 2026-09-29. The agent-facing
 matrix with per-row status and test evidence is `.llms/endpoint-reference.md`; the code is the
 only record of what is served.
 
@@ -16,26 +16,26 @@ the token pair plus the session view; `remember` selects the long or short sessi
 confirmed TOTP enrollment turns a successful sign-in into a pending bridge instead —
 `MultifactorService/CompleteSignIn` spends it (see MFA below).
 
-| Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
-| -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
-| POST     | `/rpc/tango.auth.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
-| POST     | `/rpc/tango.auth.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
-| POST     | `/rpc/tango.auth.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
-| POST     | `/rpc/tango.auth.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
-| POST     | `/rpc/tango.auth.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
-| POST     | `/rpc/tango.auth.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
-| POST     | `/rpc/tango.auth.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
-| POST     | `/rpc/tango.auth.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
-| POST     | `/rpc/tango.auth.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
-| POST     | `/rpc/tango.auth.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
+| Method   | Procedure / Endpoint                                          | Protocol     | Summary                             |
+| -------- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
+| POST     | `/rpc/tango.authn.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
+| POST     | `/rpc/tango.authn.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
+| POST     | `/rpc/tango.authn.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
+| POST     | `/rpc/tango.authn.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
+| POST     | `/rpc/tango.authn.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
+| POST     | `/rpc/tango.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
+| POST     | `/rpc/tango.authn.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
+| POST     | `/rpc/tango.authn.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
+| POST     | `/rpc/tango.authn.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
+| POST     | `/rpc/tango.authn.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
 
 ## Password Recovery (tango-only)
 
 | Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
-| POST     | `/rpc/tango.auth.v1.PasswordRecoveryService/ForgotPassword`  | ConnectRPC   | Request a password reset (anti-enumeration) |
-| POST     | `/rpc/tango.auth.v1.PasswordRecoveryService/ResetPassword`   | ConnectRPC   | Reset with the emailed token        |
-| POST     | `/rpc/tango.auth.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
+| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
+| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
+| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
 
 The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
 email and stored only as a hash.
@@ -50,10 +50,10 @@ less, twelve above — and stored as SHA-256 hashes. The email paths are gated b
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
 | -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/tango.auth.v1.OneTimeAccessService/CreateToken`                        | ConnectRPC   | Create one-time access token for user (admin) |
-| POST     | `/rpc/tango.auth.v1.OneTimeAccessService/ExchangeToken`                      | ConnectRPC   | Exchange one-time access token               |
-| POST     | `/rpc/tango.auth.v1.OneTimeAccessService/RequestEmailAsAdmin`                | ConnectRPC   | Request one-time access email (admin)        |
-| POST     | `/rpc/tango.auth.v1.OneTimeAccessService/RequestEmail`                       | ConnectRPC   | Request one-time access email                |
+| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/CreateToken`                      | ConnectRPC   | Create one-time access token for user (admin) |
+| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/ExchangeToken`                    | ConnectRPC   | Exchange one-time access token               |
+| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
+| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
 
 ## MFA TOTP
 
@@ -61,17 +61,17 @@ Tango-only; upstream Pocket ID has no TOTP. A confirmed enrollment turns a succe
 sign-in into a pending bridge (5-minute TTL, 3-wrong-codes budget) that only `CompleteSignIn`
 completes — with a TOTP code or a recovery code.
 
-| Method   | Procedure / Endpoint                                         | Protocol     | Summary                      |
-| -------- | ------------------------------------------------------------ | ------------ | ---------------------------- |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/BeginTotpEnrollment`  | ConnectRPC   | Start TOTP enrollment (secret shown once, sealed at rest) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/ConfirmTotpEnrollment`| ConnectRPC   | Confirm and enable TOTP (recovery codes shown once) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/ListTotpEnrollments`  | ConnectRPC   | List the account's authenticators (never a secret) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/DeleteTotpEnrollment` | ConnectRPC   | Delete one authenticator (second-factor proof) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/CompleteSignIn`       | ConnectRPC   | Complete a pending sign-in   |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/RegenerateRecoveryCodes` | ConnectRPC | Rotate recovery codes (shown once) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/DisableMfa`           | ConnectRPC   | Disable MFA (second-factor proof) |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
-| POST     | `/rpc/tango.auth.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
+| Method   | Procedure / Endpoint                                          | Protocol     | Summary                      |
+| -------- | ------------------------------------------------------------- | ------------ | ---------------------------- |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/BeginTotpEnrollment`  | ConnectRPC   | Start TOTP enrollment (secret shown once, sealed at rest) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/ConfirmTotpEnrollment`| ConnectRPC   | Confirm and enable TOTP (recovery codes shown once) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/ListTotpEnrollments`  | ConnectRPC   | List the account's authenticators (never a secret) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/DeleteTotpEnrollment` | ConnectRPC   | Delete one authenticator (second-factor proof) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/CompleteSignIn`       | ConnectRPC   | Complete a pending sign-in   |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/RegenerateRecoveryCodes` | ConnectRPC | Rotate recovery codes (shown once) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/DisableMfa`           | ConnectRPC   | Disable MFA (second-factor proof) |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
+| POST     | `/rpc/tango.authn.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
 
 ## API Key
 
@@ -86,6 +86,25 @@ stored as a SHA-256 hash of the presented `<prefix>.<secret>` string.
 | POST     | `/rpc/tango.apikey.v1.ApiKeyService/RenewAPIKey`                             | ConnectRPC   | Renew API key    |
 | POST     | `/rpc/tango.apikey.v1.ApiKeyService/RevokeAPIKey`                            | ConnectRPC   | Revoke API key   |
 | POST     | `/rpc/tango.apikey.v1.ApiKeyService/ListAllAPIKeys`                          | ConnectRPC   | List all API keys (tango-only, administrative) |
+
+## Authorization
+
+Permissions are code-declared `resource:id:action`; a role is a named set; grants are the
+account's roles plus its direct grants. The catalog is seeded and read-only.
+
+| Method   | Procedure / Endpoint                                                        | Protocol     | Summary          |
+| -------- | --------------------------------------------------------------------------- | ------------ | ---------------- |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListPermissions`                   | ConnectRPC   | List the permission catalog |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListRoles`                         | ConnectRPC   | List roles       |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/GetRole`                           | ConnectRPC   | Get role by ID   |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/CreateRole`                        | ConnectRPC   | Create role      |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/UpdateRole`                        | ConnectRPC   | Update role      |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/DeleteRole`                        | ConnectRPC   | Delete role      |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetRolePermissions`                | ConnectRPC   | Replace a role's permissions |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListUserRoles`                     | ConnectRPC   | List an account's roles |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetUserRoles`                      | ConnectRPC   | Replace an account's roles |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListUserPermissions`               | ConnectRPC   | List an account's direct grants |
+| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetUserPermissions`                | ConnectRPC   | Replace an account's direct grants |
 
 ## Audit Logs
 
@@ -152,6 +171,102 @@ membership update is a replace: the request names the whole member set.
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm link to the new address) |
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
 
+## Notifications
+
+Audiences `global`, `users`, `user_groups` — resolved by query at read time, never fanned out at
+create. Read state is one receipt per account. `WatchNotifications` is the in-process broker's
+stream; `system` notices target accounts and carry neither a topic nor a global audience.
+
+| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
+| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
+| POST     | `/rpc/tango.notification.v1.NotificationService/CreateNotification`          | ConnectRPC   | Create a notification (admin)                   |
+| POST     | `/rpc/tango.notification.v1.NotificationService/GetNotification`             | ConnectRPC   | Get one notification                            |
+| POST     | `/rpc/tango.notification.v1.NotificationService/ListAllNotifications`        | ConnectRPC   | List every notification (admin)                 |
+| POST     | `/rpc/tango.notification.v1.NotificationService/CancelNotification`          | ConnectRPC   | Cancel one notification (admin)                 |
+| POST     | `/rpc/tango.notification.v1.NotificationService/ListNotifications`           | ConnectRPC   | List the caller's notifications                 |
+| POST     | `/rpc/tango.notification.v1.NotificationService/MarkNotificationRead`        | ConnectRPC   | Mark one read                                   |
+| POST     | `/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead`    | ConnectRPC   | Mark every notification read                    |
+| POST     | `/rpc/tango.notification.v1.NotificationService/UnreadCount`                 | ConnectRPC   | Count unread notifications                      |
+| POST     | `/rpc/tango.notification.v1.NotificationService/WatchNotifications`          | ConnectRPC   | Stream the broker (server-streaming)            |
+
+## Settings
+
+Tango-only. The catalog in code declares every item; `public.settings` stores the overrides
+alone. A sealed item seals its value (AES-256-GCM); a public item never rests sealed.
+
+| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
+| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
+| POST     | `/rpc/tango.settings.v1.SettingsService/List`                                | ConnectRPC   | List settings with effective values (admin)     |
+| POST     | `/rpc/tango.settings.v1.SettingsService/Update`                              | ConnectRPC   | Update one setting (admin)                      |
+| POST     | `/rpc/tango.settings.v1.SettingsService/Reset`                               | ConnectRPC   | Reset one setting to its default (admin)        |
+| POST     | `/rpc/tango.settings.v1.SettingsService/ListPublic`                          | ConnectRPC   | List public settings (anonymous)                |
+
+## Application Configuration
+
+| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
+| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
+| GET      | `/api/configuration`                                                         | HTTP/REST    | The configuration document: the public subset to an anonymous caller, every non-secret setting to an administrator |
+| POST     | `/rpc/tango.system.v1.AppConfigService/TestEmail`                            | ConnectRPC   | Send a test email (admin)                       |
+
+The configuration's source is the JSON file resolved at startup; there is no write surface.
+
+## OIDC Federation
+
+The provider surface: client management and consent over ConnectRPC, the protocol itself as REST
+under `/oidc` (the specifications' own shapes). Discovery at
+`/.well-known/openid-configuration`; JWKS at `/.well-known/jwks.json`.
+
+| Method   | Service / Endpoint                                                            | Protocol     | Summary                                     |
+| -------- | ----------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/ListClients`                      | ConnectRPC   | List OIDC clients (admin)                   |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/CreateClient`                     | ConnectRPC   | Create OIDC client (admin; first secret shown once) |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/GetClient`                        | ConnectRPC   | Get OIDC client (admin)                     |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/UpdateClient`                     | ConnectRPC   | Update OIDC client (admin)                  |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteClient`                     | ConnectRPC   | Delete OIDC client (admin)                  |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups`          | ConnectRPC   | Replace a client's allowed groups (admin)   |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta`                    | ConnectRPC   | Get client metadata (admin)                 |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/PreviewClient`                    | ConnectRPC   | Preview the claims a client would receive (admin) |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/UploadLogo`                       | ConnectRPC   | Upload client logo (admin)                  |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo`                       | ConnectRPC   | Delete client logo (admin)                  |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/ListSecrets`                      | ConnectRPC   | List client secrets (admin)                 |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/CreateSecret`                     | ConnectRPC   | Create client secret (admin; shown once)    |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret`                     | ConnectRPC   | Delete client secret (admin)                |
+| POST     | `/rpc/tango.federation.v1.OidcClientService/RefreshClient`                    | ConnectRPC   | Re-fetch a CIMD client's document (admin)   |
+| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients`         | ConnectRPC   | The caller's consent ledger                 |
+| POST     | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`        | ConnectRPC   | Revoke the caller's consent for one client  |
+| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients`                   | ConnectRPC   | The clients the caller may authorize        |
+| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients`       | ConnectRPC   | One account's consent ledger (admin)        |
+| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients`        | ConnectRPC   | The deployment-wide ledger (admin)          |
+| POST     | `/rpc/tango.federation.v1.CustomClaimService/Suggest`                         | ConnectRPC   | Custom-claim key suggestions (admin)        |
+| POST     | `/rpc/tango.federation.v1.CustomClaimService/List{User,Group}Claims`          | ConnectRPC   | List a subject's claims (admin)             |
+| POST     | `/rpc/tango.federation.v1.CustomClaimService/Create{User,Group}Claim`         | ConnectRPC   | Create a claim on a subject (admin)         |
+| POST     | `/rpc/tango.federation.v1.CustomClaimService/Update{User,Group}Claim`         | ConnectRPC   | Replace one claim row (admin)               |
+| POST     | `/rpc/tango.federation.v1.CustomClaimService/Delete{User,Group}Claim`         | ConnectRPC   | Delete one claim row (admin)                |
+| POST     | `/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients`               | ConnectRPC   | Replace a group's client allowlist (admin)  |
+| GET, POST | `/oidc/authorize`                                                            | HTTP/REST    | Authorization endpoint                      |
+| POST     | `/oidc/token`                                                                 | HTTP/REST    | Token endpoint (code, refresh, device grants) |
+| GET, POST | `/oidc/userinfo`                                                             | HTTP/REST    | Userinfo (bearer)                           |
+| POST     | `/oidc/introspect`                                                            | HTTP/REST    | Introspection (client-scoped, RFC 7662)     |
+| POST     | `/oidc/par`                                                                   | HTTP/REST    | Pushed authorization request (RFC 9126)     |
+| POST     | `/oidc/device_authorization`                                                  | HTTP/REST    | Device authorization grant (RFC 8628)       |
+| GET, POST | `/oidc/device[/{callback}]`                                                  | HTTP/REST    | Device verification (browser)               |
+| GET, POST | `/oidc/end-session`                                                          | HTTP/REST    | RP-initiated logout                         |
+| GET      | `/oidc/clients/{id}/logo`                                                     | HTTP/REST    | Client logo (public)                        |
+
+## Device Login
+
+The passkey-less pairing sign-in: a browser that cannot sign itself in creates a request, another
+browser approves it, and the creating browser's long poll answers. The user code is
+`XXXX-XXXX` over an alphabet without ambiguous characters; the code and the pairing secret live
+only as SHA-256 hashes; decisions are single-use.
+
+| Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
+| -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| POST     | `/api/device-login/requests`                                  | HTTP/REST    | Create a pairing request (pairing cookie rides the response) |
+| POST     | `/api/device-login/requests/{id}/exchange`                    | HTTP/REST    | Long-poll the decision (25s window; 202 while pending) |
+| POST     | `/rpc/tango.authn.v1.DeviceApprovalService/Inspect`           | ConnectRPC   | Read the request the code names (authenticated) |
+| POST     | `/rpc/tango.authn.v1.DeviceApprovalService/Decide`            | ConnectRPC   | Approve or deny (authenticated; single decision) |
+
 ## Health Check
 
 | Method   | Procedure / Endpoint                               | Protocol     | Summary                    |
@@ -165,6 +280,7 @@ membership update is a replace: the request names the whole member set.
 | Method   | Service / Endpoint                          | Protocol    | Summary                                       |
 | -------- | ------------------------------------------- | ----------- | --------------------------------------------- |
 | GET      | `/.well-known/jwks.json`                    | HTTP/REST   | JSON Web Key Set (bare RFC 7517 JWK Set)      |
+| GET      | `/.well-known/openid-configuration`         | HTTP/REST   | OpenID Connect discovery (when `oidc.enabled`) |
 
 ## Infrastructure
 
@@ -189,11 +305,7 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |
 | WebAuthn passkeys | `modules/identity/webauthn` (kept deliberately) | `/api/webauthn/{register,login}/{begin,finish}` + `UserService` passkey procedures |
-| OIDC federation | `modules/federation/{oidc,discovery}` | `OidcClientService`, `OidcConsentService`, `/authorize`, `/api/oidc/*`, discovery documents |
 | SCIM sync | `modules/federation/scimsync` | `ScimProviderService` |
-| Custom claims | `modules/federation/customclaim` | `CustomClaimService` |
-| Device login | `modules/devicelogin` | `/api/device-login/*` + `DeviceApprovalService` |
-| Application configuration | `modules/appconfig` | `AppConfigService` + `/api/application-configuration` |
 | Webhooks | `modules/webhook` | `WebhookService` |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
