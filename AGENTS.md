@@ -11,6 +11,43 @@ One binary: HTTP/ConnectRPC API, embedded SPA, CLI. Rules live here. Per-package
 - Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
 - Porting a plan into code means implementing it. A doc may describe a larger surface than the code has.
 
+## Ambiguous decisions
+
+Stop and confirm before writing code, migrations, protos, or config when scope, system design, or an architecture choice is unclear. Do not pick a design silently and ship it.
+
+Ask when any of these is true:
+
+- The request fits more than one package, area, table, or transport.
+- A new surface, job, queue, config key, grant, or migration is implied but not named.
+- `.llms/architecture.md` and this file leave more than one valid shape.
+- The change would be hard to undo (schema, public contract, seed, authz rule, secret, storage key).
+- You would have to invent a product rule (who can call it, what is stored, what is async).
+
+Do not ask about rules this file already settles: stack, DI, SQL style, guard refusal codes, log frontend, goose layout, JSON v2, file size habits.
+
+How to ask:
+
+1. One line: what is unclear and what breaks if the wrong option ships.
+2. A numbered list of concrete options (usually 2–4). Each option is a design, not a vibe.
+3. Mark exactly one option `recommended` and give one sentence of why (constraint in this repo, blast radius, or fit with an existing package).
+4. Always add a final free-input option so the human can name a different path in their own words.
+5. Wait. Do not implement, generate, or migrate until they pick a number or write their own.
+
+Template:
+
+```text
+Unclear: <decision> — wrong pick means <cost>.
+
+1. <option> — <one-line consequence>
+2. <option> — <one-line consequence>  [recommended: <one reason>]
+3. <option> — <one-line consequence>
+4. Other — reply with the design you want
+```
+
+Must-ask examples: new area vs extend an existing package; new table vs reuse; sync handler vs queue vs job; a guard rule the proto cannot express; dual-write or a compatibility shim (forbidden unless they override); a config key that is not yet in `types.go` / schema / `secretKeys`.
+
+If they already chose in the same thread, do not re-ask. If new facts change the choice, confirm the delta only.
+
 ## Stack
 
 - Go 1.27.1, Node >= 24.21, pnpm 12.6.0, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do`, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, S3 and local storage.
@@ -49,6 +86,7 @@ An area module lists features, builds one router each, and takes a `Deps` struct
 
 ## How to change it
 
+- Confirm first when the change is a scope, system-design, or architecture fork. See **Ambiguous decisions**. Implementation detail that this file already names does not need a question.
 - **Config** resolves only in `internal/config`: defaults, then the JSON file, then CLI args. Commands read `configFrom` / `fullConfigFrom`. They do not read `os.Getenv` or flags. Environment is a value table the file references (`${NAME}` inline, `env:NAME` as a whole value). Only `flagBindings` become flags, and only `serve` has them. A flag that changes what a command does (`--dry-run`, `--force`) is never a binding. Root `--env-file` adds a dotenv file to that table. It is not a layer and not a write target. Subcommands that write a file declare the flag themselves. `app.config.json` is required. `initConfig` stores success and failure on the context. A command that reads config reports the failure. Failing in `Before` would break `config:generate` and `key:generate`.
 - Every new config key has a `config.Default`, a `config.Validate` rule, and an entry in `public/config.schema.json`. A secret is listed in `secretKeys` and nowhere else. `Redacted`, `RedactDSN`, and `RedactKVURL` read that list. `.env.example` carries secrets and deployment variables only. Config lives in one file per stage: `types.go`, `values.go`, `defaults.go`, `keys.go`, `file.go`, `env.go`, `flags.go`, `validate.go`, `predicates.go`, `redact.go`, `config.go`. Do not add a file for one function.
 - **SQL** against application tables uses `go-sqlbuilder`, PostgreSQL flavor, as in `internal/queue/store.go`. Raw SQL is for tests and `database/` maintenance. A `SELECT` of a function uses `sb.Var`, never hand-written `$1`. `sb.Join` is an inner join. A left join is `sb.JoinWithOption(sqlbuilder.LeftJoin, ...)` — an inner join to `users` hides rows kept by `ON DELETE SET NULL`. There is no `SelectBuilder.Count`; write `count(*)`. Single-use state (replay, code consumption) belongs in the `UPDATE`'s `WHERE`. Zero `RowsAffected` becomes `datastore.ErrNoRows`.
