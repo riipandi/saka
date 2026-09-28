@@ -41,6 +41,15 @@ type Service struct {
 	// procedures only; the preview then carries the standard claims alone.
 	claims ClaimSource
 
+	// fetcher is the outbound client the CIMD materializations run on. It
+	// is nil in the tests that exercise the management procedures only;
+	// the CIMD path refuses while it is absent.
+	fetcher CIMDFetcher
+
+	// cimdAllowlist is the URL patterns a metadata document may be fetched
+	// from. An empty list is the feature off: nothing is ever fetched.
+	cimdAllowlist []string
+
 	// pictures is the storage engine the logos live in. It is nil in the
 	// tests that exercise the management procedures only; the logo
 	// procedures refuse while it is absent.
@@ -76,6 +85,19 @@ func (s *Service) WithUserDirectory(users UserDirectory) *Service {
 // WithClaimSource wires the operator-defined claims the preview merges.
 func (s *Service) WithClaimSource(claims ClaimSource) *Service {
 	s.claims = claims
+	return s
+}
+
+// WithCIMDFetcher wires the outbound fetch the metadata documents come by.
+func (s *Service) WithCIMDFetcher(fetcher CIMDFetcher) *Service {
+	s.fetcher = fetcher
+	return s
+}
+
+// WithCIMDAllowlist sets the URL patterns a metadata document may be
+// fetched from. An empty list is the feature off.
+func (s *Service) WithCIMDAllowlist(patterns []string) *Service {
+	s.cimdAllowlist = patterns
 	return s
 }
 

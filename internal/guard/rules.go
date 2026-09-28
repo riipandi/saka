@@ -300,6 +300,7 @@ var ProcedureRules = map[string]Entry{
 	federationv1connect.OidcClientServiceListSecretsProcedure:             {Rule: Admin},
 	federationv1connect.OidcClientServiceCreateSecretProcedure:            {Rule: Admin},
 	federationv1connect.OidcClientServiceDeleteSecretProcedure:            {Rule: Admin},
+	federationv1connect.OidcClientServiceRefreshClientProcedure:           {Rule: Admin},
 
 	// The custom-claim surface is administrative end to end, like the
 	// client surface beside it: a claim rides every token the account or

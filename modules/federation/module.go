@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/federation/customclaim"
@@ -80,6 +81,7 @@ var Package = do.Package(
 		users := do.MustInvoke[*user.Service](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
 		claims := do.MustInvoke[*customclaim.Service](i)
+		httpFetcher := do.MustInvoke[*fetcher.Client](i)
 		// The account facts ride the user service directly — its GetUser
 		// is the method set the preview's seam names — and the logos ride
 		// the shared storage engine, the way the profile pictures do. A
@@ -87,7 +89,9 @@ var Package = do.Package(
 		// an interface would happily hold; the preview refuses a directory
 		// it cannot call, so the typed nil is dropped at the seam.
 		service := oidc.NewService(pool, recorder, log).WithPictures(pictures).
-			WithClaimSource(claimAdapter{service: claims})
+			WithClaimSource(claimAdapter{service: claims}).
+			WithCIMDFetcher(oidc.FetcherAdapter(httpFetcher)).
+			WithCIMDAllowlist(c.OIDC.CIMDURLAllowlist)
 		if users != nil {
 			service = service.WithUserDirectory(users)
 		}

@@ -38,7 +38,7 @@ var clientColumns = []string{
 	"requires_reauthentication", "requires_pushed_authorization_requests",
 	"skip_consent", "is_group_restricted", "client_type", "logo_path",
 	"access_token_duration_minutes", "refresh_token_duration_minutes",
-	"created_by_id", "created_at",
+	"metadata_expires_at", "metadata_grant_types", "created_by_id", "created_at",
 }
 
 // clientSortColumns is the whitelist a list's sort key resolves through. The
@@ -55,7 +55,7 @@ var clientSortColumns = map[string]string{
 // wire form of a list or a document.
 func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 	var row ClientSchema
-	var callbacks, logoutCallbacks []byte
+	var callbacks, logoutCallbacks, metadataGrants []byte
 	err := scan(
 		&row.ID, &row.Name, &row.Description, &callbacks, &logoutCallbacks,
 		&row.LaunchURL, &row.Credentials, &row.IsPublic, &row.PkceEnabled,
@@ -63,13 +63,14 @@ func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 		&row.RequiresPushedAuthorizationRequests, &row.SkipConsent,
 		&row.IsGroupRestricted, &row.ClientType, &row.LogoPath,
 		&row.AccessTokenDurationMinutes, &row.RefreshTokenDurationMinutes,
-		&row.CreatedByID, &row.CreatedAt,
+		&row.MetadataExpiresAt, &metadataGrants, &row.CreatedByID, &row.CreatedAt,
 	)
 	if err != nil {
 		return ClientSchema{}, err
 	}
 	row.CallbackURLs = stringList(callbacks)
 	row.LogoutCallbackURLs = stringList(logoutCallbacks)
+	row.MetadataGrantTypes = stringList(metadataGrants)
 	return row, nil
 }
 
@@ -203,6 +204,10 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 	if err != nil {
 		return err
 	}
+	metadataGrants, err := jsonText(row.MetadataGrantTypes)
+	if err != nil {
+		return err
+	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(ClientTable)
@@ -212,7 +217,7 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		"requires_reauthentication", "requires_pushed_authorization_requests",
 		"skip_consent", "is_group_restricted", "client_type",
 		"access_token_duration_minutes", "refresh_token_duration_minutes",
-		"created_by_id",
+		"metadata_expires_at", "metadata_grant_types", "created_by_id",
 	)
 	ib.Values(
 		row.ID, row.Name, row.Description, callbacks, logoutCallbacks,
@@ -221,7 +226,7 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		row.RequiresPushedAuthorizationRequests, row.SkipConsent,
 		row.IsGroupRestricted, row.ClientType,
 		row.AccessTokenDurationMinutes, row.RefreshTokenDurationMinutes,
-		row.CreatedByID,
+		row.MetadataExpiresAt, metadataGrants, row.CreatedByID,
 	)
 
 	query, args := ib.Build()
@@ -229,6 +234,43 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		return fmt.Errorf("oidc: create client: %w", err)
 	}
 	return nil
+}
+
+// UpdateCIMDClient rewrites the fields a metadata document names — the
+// display name, the redirect URIs, the declared grants, the refresh
+// deadline. The secrets, the logo, the restriction, and the token windows
+// are not the document's to change.
+func (r *Repository) UpdateCIMDClient(ctx context.Context, db datastore.Querier, row ClientSchema) (bool, error) {
+	callbacks, err := jsonText(row.CallbackURLs)
+	if err != nil {
+		return false, err
+	}
+	logoutCallbacks, err := jsonText(row.LogoutCallbackURLs)
+	if err != nil {
+		return false, err
+	}
+	metadataGrants, err := jsonText(row.MetadataGrantTypes)
+	if err != nil {
+		return false, err
+	}
+
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(ClientTable)
+	ub.Set(
+		ub.Assign("name", row.Name),
+		ub.Assign("callback_urls", callbacks),
+		ub.Assign("logout_callback_urls", logoutCallbacks),
+		ub.Assign("metadata_expires_at", row.MetadataExpiresAt),
+		ub.Assign("metadata_grant_types", metadataGrants),
+	)
+	ub.Where(ub.Equal("id", row.ID), ub.Equal("client_type", ClientTypeCIMD))
+
+	query, args := ub.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oidc: update cimd client: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // UpdateClient replaces a client's fields. The secrets, the logo, and the

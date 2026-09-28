@@ -85,4 +85,5 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(federationv1connect.OidcClientServiceListSecretsProcedure, handler)
 	r.Handle(federationv1connect.OidcClientServiceCreateSecretProcedure, handler)
 	r.Handle(federationv1connect.OidcClientServiceDeleteSecretProcedure, handler)
+	r.Handle(federationv1connect.OidcClientServiceRefreshClientProcedure, handler)
 }

@@ -582,9 +582,13 @@ consuming package names the interface, the area wires it post-construction,
 and a typed-nil dependency is dropped at the seam rather than held in an
 interface the first call would panic through.
 
-CIMD (`client_type = 'cimd'`, the metadata-document clients) is **deferred**:
-the schema's columns wait, every client today is `standard`, and the
-`RefreshClient` procedure is not served.
+CIMD (client-id metadata document) is **implemented on the management side**:
+`client_type = 'cimd'` materializes from a fetched document whose URL is the
+client's own identifier, gated by the `oidc.cimd_url_allowlist` config
+patterns (an empty list is the feature off), and `RefreshClient` forces the
+re-fetch. The protocol-time materialization — an authorize request carrying
+a CIMD id that has not been seen yet — lands with the protocol core, where
+the client lookup consults the same materializer.
 
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**

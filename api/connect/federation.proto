@@ -81,6 +81,13 @@ service OidcClientService { // ListClients answers one page of the clients, newe
 
   // DeleteSecret withdraws one secret. A client left with none can still
   // authenticate nothing new, but its public-client grants are untouched.
+  // RefreshClient forces a re-fetch of a CIMD client's metadata document.
+  // Only a metadata-document client refreshes — a registered client has no
+  // document behind it — and the allowlist is judged again at the fetch.
+  rpc RefreshClient(RefreshOidcClientRequest) returns (RefreshOidcClientResponse);
+
+  // DeleteSecret withdraws one secret. A client left with none can still
+  // authenticate nothing new, but its public-client grants are untouched.
   rpc DeleteSecret(DeleteOidcClientSecretRequest) returns (DeleteOidcClientSecretResponse);
 }
 
@@ -142,8 +149,8 @@ message OidcClient {
   bool is_group_restricted = 13;
 
   // client_type names the client's origin: `standard` for one defined
-  // here, `cimd` for one materialized from a metadata document. The CIMD
-  // type is not served yet; every client today is standard.
+  // here, `cimd` for one materialized from a metadata document — whose
+  // identifier is the document's URL.
   string client_type = 14;
 
   // has_logo says whether the logo endpoint answers bytes.
@@ -164,15 +171,23 @@ message OidcClient {
   // lives for.
   int64 refresh_token_duration_minutes = 19;
 
+  // metadata_expires_at is when the surface may re-fetch a CIMD client's
+  // metadata document on its own; absent for a registered client.
+  optional google.protobuf.Timestamp metadata_expires_at = 20;
+
+  // metadata_grant_types is the grant list a CIMD document declared — the
+  // capabilities the client cannot be granted beyond.
+  repeated string metadata_grant_types = 21;
+
   // allowed_user_groups are the groups the restriction names, resolved to
   // the group views the group surface answers with.
-  repeated tango.identity.v1.UserGroup allowed_user_groups = 20;
+  repeated tango.identity.v1.UserGroup allowed_user_groups = 30;
 
   // created_by_id is the account that defined the client, in its wire form.
-  optional string created_by_id = 21;
+  optional string created_by_id = 31;
 
   // created_at is the creation instant.
-  google.protobuf.Timestamp created_at = 22;
+  google.protobuf.Timestamp created_at = 32;
 }
 
 // OidcClientCredentials is the credentials block a client view carries.
@@ -714,6 +729,29 @@ message DeleteOidcClientSecretResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 2;
+}
+
+// RefreshOidcClientRequest names the CIMD client to re-fetch.
+message RefreshOidcClientRequest {
+  // id is the client's identifier — for a CIMD client, the metadata
+  // document's URL.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 512
+  }];
+}
+
+// RefreshOidcClientResponse is the client after the re-fetch.
+message RefreshOidcClientResponse {
+  // client is the client's view.
+  OidcClient client = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
 // CustomClaimService administers the claims an operator hangs on accounts

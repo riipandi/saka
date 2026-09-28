@@ -14,6 +14,7 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -39,6 +40,10 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// the composition root guarantees, and the logo procedures refuse
 		// while the management procedures serve.
 		do.Eager[*storage.Manager](nil),
+		// The CIMD materializations fetch through the shared client; nil
+		// stands in for the wiring the composition root guarantees, and
+		// the CIMD path refuses while the management procedures serve.
+		do.Eager[*fetcher.Client](nil),
 		// The features write audit records through the shared recorder;
 		// nil stands in for the wiring the composition root guarantees,
 		// and the recorder is nil-safe so a feature runs without one.

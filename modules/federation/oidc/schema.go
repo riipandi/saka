@@ -23,9 +23,13 @@ const AllowedGroupsTable = "public.oidc_clients_allowed_user_groups"
 const ResourceOidcClient = "oidc_client"
 
 // ClientTypeStandard is the client_type of a client defined on this server.
-// The `cimd` type — a client materialized from a metadata document — is not
-// served yet; the schema carries its columns for that phase.
 const ClientTypeStandard = "standard"
+
+// ClientTypeCIMD is the client_type of a client materialized from a
+// client-id metadata document: the identifier IS the document's URL, the
+// client is public with PKCE forced on, and the document changes through
+// the refresh, never through an authorize request.
+const ClientTypeCIMD = "cimd"
 
 // The token windows a creation that leaves the fields unset writes. They are
 // the schema's defaults, spelled here because the row is written once, whole.
@@ -89,8 +93,14 @@ type ClientSchema struct {
 	LogoPath                            *string
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
-	CreatedByID                         *uuid.UUID
-	CreatedAt                           time.Time
+	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
+	// on its own; a registered client carries nil. MetadataGrantTypes is
+	// the grant list the document declared — the capabilities the client
+	// neither asked for beyond nor can be granted beyond.
+	MetadataExpiresAt  *time.Time
+	MetadataGrantTypes []string
+	CreatedByID        *uuid.UUID
+	CreatedAt          time.Time
 }
 
 // ClientView is a client as the procedures answer it: the fields an operator
@@ -115,9 +125,13 @@ type ClientView struct {
 	Secrets                             []SecretView
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
-	AllowedGroups                       []GroupRef
-	CreatedByID                         string
-	CreatedAt                           time.Time
+	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
+	// on its own; a registered client carries nil.
+	MetadataExpiresAt  *time.Time
+	MetadataGrantTypes []string
+	AllowedGroups      []GroupRef
+	CreatedByID        string
+	CreatedAt          time.Time
 }
 
 // GroupRef is one group the restriction names, in the shape the account
@@ -169,6 +183,8 @@ func (c ClientSchema) view(now time.Time) ClientView {
 		Secrets:                             secrets,
 		AccessTokenDurationMinutes:          c.AccessTokenDurationMinutes,
 		RefreshTokenDurationMinutes:         c.RefreshTokenDurationMinutes,
+		MetadataExpiresAt:                   c.MetadataExpiresAt,
+		MetadataGrantTypes:                  c.MetadataGrantTypes,
 		CreatedByID:                         wireCreatedBy(c.CreatedByID),
 		CreatedAt:                           c.CreatedAt,
 	}

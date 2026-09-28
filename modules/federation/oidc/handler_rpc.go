@@ -242,3 +242,16 @@ func (h *rpcHandler) DeleteSecret(ctx context.Context, req *connect.Request[fede
 		Message: "the client secret was deleted",
 	}), nil
 }
+
+// RefreshClient forces a CIMD client's metadata document to be re-fetched.
+func (h *rpcHandler) RefreshClient(ctx context.Context, req *connect.Request[federationv1.RefreshOidcClientRequest]) (*connect.Response[federationv1.RefreshOidcClientResponse], error) {
+	client, err := h.service.RefreshCIMDClient(ctx, req.Msg.Id)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&federationv1.RefreshOidcClientResponse{
+		Client:  wireClient(client),
+		Status:  responder.StatusSuccess,
+		Message: "the client metadata document was refreshed",
+	}), nil
+}

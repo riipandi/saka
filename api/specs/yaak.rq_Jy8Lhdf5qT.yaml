@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_Jy8Lhdf5qT
 createdAt: 2026-09-28T16:58:30.504514
-updatedAt: 2026-09-28T16:59:44.704416
+updatedAt: 2026-09-28T17:00:01.869009
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_iMD6Wv2JMZ
 authentication: {}
@@ -35,7 +35,7 @@ headers:
   id: null
 method: POST
 name: '[Pocket ID] Update allowed OIDC clients (group side)'
-sortPriority: 0.0
+sortPriority: 5277.777777777778
 url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients
 urlParameters: []
 settingSendCookies:
