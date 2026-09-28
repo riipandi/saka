@@ -98,7 +98,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 	module.Mount(httpRouter)
 	logoClaimed := false
 	for _, route := range httpRouter.Routes() {
-		if _, ok := route.Handlers[http.MethodGet]; ok && route.Pattern == "/api/oidc/clients/{id}/logo" {
+		if _, ok := route.Handlers[http.MethodGet]; ok && route.Pattern == "/oidc/clients/{id}/logo" {
 			logoClaimed = true
 		}
 	}

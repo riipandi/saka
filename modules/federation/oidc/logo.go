@@ -181,6 +181,6 @@ func (s *Service) logoURL(view ClientView) *string {
 	if !view.HasLogo {
 		return nil
 	}
-	url := s.baseURL + "/api/oidc/clients/" + view.ID + "/logo"
+	url := s.baseURL + "/oidc/clients/" + view.ID + "/logo"
 	return &url
 }

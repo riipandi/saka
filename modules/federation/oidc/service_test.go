@@ -429,7 +429,7 @@ func TestTheLogoLifecycleCoversTheKindCheckAndTheReset(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, view.HasLogo)
 	require.NotNil(t, view.LogoURL)
-	assert.True(t, strings.HasSuffix(*view.LogoURL, "/api/oidc/clients/"+issued.Client.ID+"/logo"))
+	assert.True(t, strings.HasSuffix(*view.LogoURL, "/oidc/clients/"+issued.Client.ID+"/logo"))
 
 	logo, err := service.Logo(t.Context(), issued.Client.ID)
 	require.NoError(t, err)

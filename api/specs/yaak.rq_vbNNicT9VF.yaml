@@ -20,7 +20,7 @@ headers: []
 method: GET
 name: '[Pocket ID] Get client logo'
 sortPriority: 7000.0
-url: ${[ apiBaseURL ]}/api/oidc/clients/:clientId/logo
+url: ${[ apiBaseURL ]}/oidc/clients/:clientId/logo
 urlParameters:
 - enabled: true
   name: id

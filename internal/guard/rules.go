@@ -394,7 +394,7 @@ var RestRules = []RestEntry{
 	// fetches it before any credential exists, the way the account
 	// pictures are read. A client without a logo answers not found, never
 	// a substitute.
-	{Method: http.MethodGet, Pattern: "/api/oidc/clients/{id}/logo", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/clients/{id}/logo", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

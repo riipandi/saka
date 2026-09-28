@@ -36,7 +36,7 @@ func (m *Module) Name() string { return ModuleName }
 // unknown-client and no-logo states are refusals the handler itself states,
 // in the envelope the REST surface answers.
 func (m *Module) Mount(r chi.Router) {
-	r.Get("/api/oidc/clients/{id}/logo", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/oidc/clients/{id}/logo", func(w http.ResponseWriter, r *http.Request) {
 		logo, err := m.service.Logo(r.Context(), chi.URLParam(r, "id"))
 		switch {
 		case errors.Is(err, ErrClientNotFound):

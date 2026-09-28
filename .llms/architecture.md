@@ -570,7 +570,7 @@ the extension the bytes earn, staged then synced in-request, the replaced file
 deleted before its replacement is stored. The staging metadata names no owner,
 so no upload-finished notice mails an operator about their own administrative
 write. The read is the one REST route the feature claims:
-`GET /api/oidc/clients/{id}/logo`, public on the guard's books, 404 for an
+`GET /oidc/clients/{id}/logo`, public on the guard's books, 404 for an
 unknown client or an absent logo — never a substitute image.
 
 **The preview is a pure function of the account's own views.** PreviewClient

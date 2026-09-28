@@ -377,26 +377,103 @@ The tables below record the whole planned surface; an unbuilt row is uncallable.
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | planned — sub-phase c | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | planned — sub-phase c; admin | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | planned — sub-phase c; admin-wide | — |
-| GET | `/api/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
-| GET | `/api/oidc/interaction/{id}` | Read the authorization interaction | planned — sub-phase b/c, browser protocol flow | — |
-| POST | `/api/oidc/interaction/{id}/approve` | Approve the authorization interaction | planned — sub-phase b/c, browser session and redirect behavior | — |
-| GET, POST | `/authorize` | Authorization endpoint | planned — sub-phase b, REST, redirect and OAuth error contract | — |
-| POST | `/api/oidc/token` | Token endpoint | planned — sub-phase b, REST, form encoding, client authentication, RFC errors | — |
-| POST | `/api/oidc/introspect` | Introspect OIDC tokens | planned — sub-phase c, REST, client-scoped RFC 7662 | — |
-| POST | `/api/oidc/par` | Push authorization request | planned — sub-phase c, REST, RFC 9126; one-time request_uri | — |
-| POST | `/api/oidc/device/authorize` | Device authorization grant | planned — sub-phase d, REST, RFC 8628; hashed codes | — |
-| GET | `/api/oidc/device/info` | Device code info for the consent page | planned — sub-phase d, REST | — |
-| POST | `/api/oidc/device/verify` | Approve or deny a device code | planned — sub-phase d, REST, browser session; single approval | — |
-| GET, POST | `/api/oidc/end-session` | RP-initiated logout | planned — sub-phase b, REST, redirect behavior | — |
-| GET, POST | `/api/oidc/userinfo` | Get user information | planned — sub-phase b, REST, bearer token, RFC-style errors | — |
+| GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
+| GET | `/oidc/interactions/{id}` | Read the authorization interaction | planned — sub-phase b/c, browser protocol flow | — |
+| POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | planned — sub-phase b/c, browser session and redirect behavior | — |
+| GET, POST | `/oidc/authorize` | Authorization endpoint | planned — sub-phase b, REST, redirect and OAuth error contract | — |
+| POST | `/oidc/token` | Token endpoint | planned — sub-phase b, REST, form encoding, client authentication, RFC errors | — |
+| POST | `/oidc/introspect` | Introspect OIDC tokens | planned — sub-phase c, REST, client-scoped RFC 7662 | — |
+| POST | `/oidc/par` | Push authorization request | planned — sub-phase c, REST, RFC 9126; one-time request_uri | — |
+| POST | `/oidc/device/authorize` | Device authorization grant | planned — sub-phase d, REST, RFC 8628; hashed codes | — |
+| GET | `/oidc/device/info` | Device code info for the consent page | planned — sub-phase d, REST | — |
+| POST | `/oidc/device/verify` | Approve or deny a device code | planned — sub-phase d, REST, browser session; single approval | — |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | planned — sub-phase b, REST, redirect behavior | — |
+| GET, POST | `/oidc/userinfo` | Get user information | planned — sub-phase b, REST, bearer token, RFC-style errors | — |
 
 The design contract for the protocol phases (device-flow and PAR details, the
 end-session `id_token_hint` verification chain, the discovery metadata fields)
-is written with sub-phase b, before any protocol code exists. The engine
-decision for the protocol core is recorded in `.llms/architecture.md` under
-"Library decision records" once the comparison lands. The JWKS endpoint that
-exists is tango's own (`/.well-known/jwks.json`, `modules/identity/jwks`), not
-the federation module's.
+is written below; it is the acceptance criteria for the federation phases. The
+JWKS endpoint that exists is tango's own (`/.well-known/jwks.json`,
+`modules/identity/jwks`), not the federation module's.
+
+### Design contract — protocol core (slice 5), consent (6), device (7)
+
+**Engine.** `github.com/luikyv/go-oidc` v0.25.0, mounted as REST under the
+`/oidc` prefix via `provider.WithPathPrefix("/oidc")` + `Provider.Handler()` on
+the transport router. `provider.New(goidcConfig)` reads: `Issuer` =
+`app.base_url`, `JWKS` = the jwks service's key set (the same material
+`/.well-known/jwks.json` publishes), `IDTokenAlgs` = the resolved signing
+algorithm (`jwks.Service.SigningAlgorithm`), `Manager` = the grant manager.
+
+**Endpoints (the specification's own shapes, never the envelope).**
+Authorization = `GET,POST /oidc/authorize`; token = `POST /oidc/token`;
+userinfo = `GET,POST /oidc/userinfo`; end-session = `GET,POST /oidc/end-session`;
+interactions = `GET /oidc/interactions/{id}`, `POST /oidc/interactions/{id}/complete`;
+introspect = `POST /oidc/introspect` (slice 6); PAR = `POST /oidc/par` (slice 6);
+device = `POST /oidc/device/authorize`, `GET /oidc/device/info`,
+`POST /oidc/device/verify` (slice 7); device login pairs with it. Discovery
+advertises exactly the user-specified URLs: issuer = `app.base_url`,
+authorization = `/oidc/authorize`, token = `/oidc/token`, userinfo =
+`/oidc/userinfo`, end-session = `/oidc/end-session`, jwks_uri =
+`/.well-known/jwks.json`, plus the standard metadata fields upstream carries
+(grant/scopes/claims/response types, `pushed_authorization_request_endpoint`,
+`client_id_metadata_document_supported: true`).
+
+**Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
+`(kind,key)`, JSONB `request_data`): grants (`kind='grant'`, keyed by grant id,
+`index_key` carries the refresh-token hash for `GrantByRefreshToken`),
+authorization sessions (`kind='authn'`, `index_key` = auth-code hash for
+`GrantByAuthCode` and the PAR id for `SessionByPushedAuthReqID`), logout
+sessions (`kind='logout'`), device sessions (`kind='device'`, `index_key` =
+device-code and user-code hashes). A new migration adds `oauth2_sessions.index_key`
+with an index — the secondary lookups the managers require. Client resolution
+(`DCRManager.Client`) reads `oidc_clients`: a standard client maps grant types
+and the secret hashes to `goidc.Client`; an unknown `https://…` identifier
+inside the CIMD allowlist materializes through the cimd feature first.
+
+**Authorize flow.** `AuthnPolicy`'s authenticate callback answers
+`StatusInProgress` whenever the browser carries no live account — the provider
+redirects to the SPA's interaction page with the callback id; the SPA signs in
+(or reuses its bearer) and completes via `POST /oidc/interactions/{id}/complete`
+with the scopes it consents to. Consent is required when the client does not
+skip it, the account has not authorized the client before, or `prompt=consent` —
+first authorization writes `user_authorized_oidc_clients` (scope list +
+`last_used_at`). `pkce_supported` is stamped when a client presents a
+code challenge the requirement did not demand. PKCE is enforced for public
+clients; `plain` and `S256` are accepted.
+
+**Token issuance.** Grants `authorization_code` + `refresh_token` (+ client
+credentials for confidential clients); client authentication via
+`client_secret_basic`, `client_secret_post`, `none` against the hashed secrets
+in `credentials`; refresh rotation; access tokens are JWTs signed by the jwks
+key set; ID tokens carry a token-type discriminator claim (tango:
+`tango:token_type = id-token`) — the end-session chain's requirement. Claims
+follow the scope mapping upstream keeps: `sub` always; `profile` → the custom
+claims (JSON-parsed) + `given_name`, `family_name`, `name`, `display_name`,
+`preferred_username`, `picture`; `email` → `email`, `email_verified` only when
+an address exists; `groups` → the group names. At issuance the account is
+re-judged: disabled, banned, or outside the client's group restriction fails
+the grant.
+
+**End-session.** `id_token_hint` verified (issuer, skew ≤1 minute, the
+`id-token` type claim — an access token is refused), `aud` must equal
+`client_id` when both arrive, the subject must have an authorized-client row;
+success revokes the account's grants and tokens for that client; a
+`post_logout_redirect_uri` not registered on the client is ignored (never an
+open redirect) and the flow ends at the logout page.
+
+**Rate limits (guard's REST classification).** `/oidc/token`,
+`/oidc/device/authorize`, `/oidc/par` ride the credential bucket
+(`rate_limit.auth_limit`); `/oidc/authorize`, `/oidc/userinfo`,
+`/oidc/introspect`, `/oidc/end-session`, and the interaction reads are
+exempt. The classification moves to the REST routes, which the limiter's
+tables will name directly.
+
+**Switch.** `oidc.enabled` (default `true`) gates the `/oidc/*` mounts and the
+discovery documents; off, they answer 404 while the management surface runs.
+
+**Cleanup.** A recurring job (`oidc_cleanup`, the `audit_cleanup` pattern)
+deletes expired `oauth2_sessions` rows and stale authorization codes.
 
 ## SCIM
 
