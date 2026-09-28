@@ -25,7 +25,7 @@ func NewRepository() *Repository {
 
 // sessionColumns are the columns the session procedures read, in scan order.
 var sessionColumns = []string{
-	"id", "user_id", "provider", "user_agent", "ip_address",
+	"id", "user_id", "provider", "token_hash", "user_agent", "ip_address",
 	"remember", "created_at", "expires_at", "refreshed_at", "revoked_at",
 	// The ender reads through its text form: the column is a nullable UUID,
 	// and a nil is the empty string the scan carries rather than a type the
@@ -44,7 +44,7 @@ func scanSession(scan func(dest ...any) error) (SessionSchema, error) {
 	var row SessionSchema
 	var rawID, rawEnder, rawActor string
 	err := scan(
-		&rawID, &row.UserID, &row.Provider, &row.UserAgent, &row.IPAddress,
+		&rawID, &row.UserID, &row.Provider, &row.TokenHash, &row.UserAgent, &row.IPAddress,
 		&row.Remember, &row.CreatedAt, &row.ExpiresAt, &row.RefreshedAt, &row.RevokedAt,
 		&rawEnder, &rawActor, &row.RotatedTokenHash,
 	)
@@ -132,21 +132,19 @@ func (r *Repository) FindActiveByTokenHash(ctx context.Context, db datastore.Que
 	return row, nil
 }
 
-// Revoke stamps the end of one session: who ended it, and when. The WHERE
-// clause excludes an already-ended row, so a second revocation answers false
-// — the state it names is the one the session is already in — and the
-// service treats that as the success it is. The refresh token dies with the
-// stamp; the access token does not, by the statelessness the protocol
-// settles.
-// FindByRotatedTokenHash answers the live session whose last rotation
-// replaced the presented hash. A hit is a replayed token: the one competent
-// explanation is a duplicated credential, and the caller revokes the row as
-// compromised rather than merely refusing it.
-func (r *Repository) FindByRotatedTokenHash(ctx context.Context, db datastore.Querier, hash string) (SessionSchema, error) {
+// LockByRefreshHash locks the session row a presented refresh hash names —
+// its current secret, or the one its last rotation replaced — and answers the
+// row. The row lock is the serialization the renewal depends on: two
+// in-flight renewals of one token queue here, and the second reads what the
+// first committed rather than the snapshot it started from. A caller whose
+// hash no longer equals the row's `token_hash` is presenting a spent
+// credential, and that is the reuse the caller revokes.
+func (r *Repository) LockByRefreshHash(ctx context.Context, db datastore.Querier, hash string) (SessionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(sessionColumns...)
 	sb.From(SessionTable)
-	sb.Where(sb.Equal("rotated_token_hash", hash), sb.IsNull("revoked_at"))
+	sb.Where(sb.Or(sb.Equal("token_hash", hash), sb.Equal("rotated_token_hash", hash)))
+	sb.ForUpdate()
 
 	query, args := sb.Build()
 	row, err := scanSession(func(dest ...any) error {
@@ -156,11 +154,17 @@ func (r *Repository) FindByRotatedTokenHash(ctx context.Context, db datastore.Qu
 		return SessionSchema{}, datastore.ErrNoRows
 	}
 	if err != nil {
-		return SessionSchema{}, fmt.Errorf("session: find by rotated token: %w", err)
+		return SessionSchema{}, fmt.Errorf("session: lock by refresh hash: %w", err)
 	}
 	return row, nil
 }
 
+// Revoke stamps the end of one session: who ended it, and when. The WHERE
+// clause excludes an already-ended row, so a second revocation answers false
+// — the state it names is the one the session is already in — and the
+// service treats that as the success it is. The refresh token dies with the
+// stamp; the access token does not, by the statelessness the protocol
+// settles.
 func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id SessionID, by *uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(SessionTable)
@@ -181,9 +185,11 @@ func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id Sessio
 }
 
 // Rotate replaces a live session's refresh token and window. The WHERE
-// clause is the race: a session that was revoked or expired between the read
-// and this write answers false, and the renewal dies before it spent anything
-// — the new secret is thrown away and the caller tries again.
+// clause is the race: a session that was revoked between the read and this
+// write answers false, and the renewal dies before it spent anything — the
+// new secret is thrown away and the caller tries again. The hash the caller
+// read is part of that guard, so a rotation that lost the row to a concurrent
+// renewal matches nothing rather than overwriting the winner's secret.
 func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id SessionID, hash, previousHash string, refreshedAt, expiresAt time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(SessionTable)
@@ -196,7 +202,7 @@ func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id Sessio
 		ub.Assign("refreshed_at", refreshedAt),
 		ub.Assign("expires_at", expiresAt),
 	)
-	ub.Where(ub.Equal("id", id.UUID()), ub.IsNull("revoked_at"))
+	ub.Where(ub.Equal("id", id.UUID()), ub.Equal("token_hash", previousHash), ub.IsNull("revoked_at"))
 
 	query, args := ub.Build()
 	tag, err := db.Exec(ctx, query, args...)

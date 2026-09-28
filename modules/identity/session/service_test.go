@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -509,6 +510,65 @@ func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
 
 	// The delegation survives its renewal — the actor pair is re-signed.
 	assert.NotEmpty(t, refreshed.AccessToken)
+}
+
+// Presenting a refresh token a rotation already replaced is the one
+// competent explanation of a duplicated credential: the renewal refuses the
+// caller and revokes the session the spent token names, with the audit
+// record written in the same transaction.
+// Two in-flight renewals of one token serialize on the row lock: the second
+// finds a `token_hash` that is no longer the one it presented, which is the
+// reuse the session dies for. Only one renewal answers a pair, and the session
+// the token named is revoked as compromised.
+func TestConcurrentRefreshOfOneTokenSerializesAndRevokesTheReuse(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testService(t, pool)
+	userID := seedAccount(t, pool, "hermione")
+	sid, token := seedSession(t, pool, userID, "one", "password", false)
+
+	const callers = 4
+	results := make([]Refreshed, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			results[i], errs[i] = service.Refresh(context.Background(), token)
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	succeeded := 0
+	for _, err := range errs {
+		if err == nil {
+			succeeded++
+			continue
+		}
+		assert.ErrorIs(t, err, ErrSessionEnded, "every loser is refused, not handed a second pair")
+	}
+	assert.Equal(t, 1, succeeded, "exactly one renewal wins the token")
+
+	// The reuse is not a silent refusal: the session is revoked outright, and
+	// the winning pair dies with it — the whole credential is retired, not
+	// just the token that leaked.
+	row, err := service.repo.GetSession(t.Context(), pool, sid)
+	require.NoError(t, err)
+	require.NotNil(t, row.RevokedAt)
+	for _, r := range results {
+		if r.RefreshToken == "" {
+			continue
+		}
+		_, refreshErr := service.Refresh(t.Context(), r.RefreshToken)
+		assert.ErrorIs(t, refreshErr, ErrSessionEnded)
+	}
+	assert.Greater(t, auditCount(t, pool, audit.EventSessionRevoked, sid.UUID()), 0,
+		"the overlapping reuse is an audit record, not a silent refusal")
 }
 
 // Presenting a refresh token a rotation already replaced is the one

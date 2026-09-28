@@ -378,14 +378,17 @@ func (s *Service) revokeBulk(ctx context.Context, callerSession, callerID, reaso
 // renewals, and the old access token's claims name a session that still
 // exists.
 //
-// The rotation's write carries the gate in its WHERE clause, so a session
-// that was revoked between the read and the write costs the new secret and
-// nothing else: the renewal dies before it spent anything, and the caller
-// signs in again.
+// The read, the reuse judgement, and the rotation run in one transaction over
+// a row lock, so two in-flight renewals of the same token serialize instead
+// of both passing a stale read: the loser sees a `token_hash` that is no
+// longer the one it presented, which is the reuse the session dies for. A
+// renewal that arrives after the session was revoked or its window closed
+// costs the new secret and nothing else, and the caller signs in again.
 //
-// No audit record is written: a renewal is the session continuing, not a
-// happening an operator audits for, and one line per heartbeat would drown
-// the log in the very renewals it exists to see past.
+// No audit record is written for an ordinary renewal: a renewal is the
+// session continuing, not a happening an operator audits for, and one line
+// per heartbeat would drown the log in the very renewals it exists to see
+// past.
 func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, error) {
 	if presented == "" {
 		return Refreshed{}, ErrSessionEnded
@@ -393,72 +396,91 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 
 	now := s.now()
 	hash := crypto.HashRefreshToken(presented)
-	row, err := s.repo.FindActiveByTokenHash(ctx, s.pool, hash, now)
-	if errors.Is(err, datastore.ErrNoRows) {
-		// A hash the active lookup misses may still name a live session —
-		// the one a rotation replaced. Presenting a spent token is the one
-		// competent explanation of a duplicated credential, so the session
-		// it belongs to is revoked outright rather than merely refused.
-		spent, spentErr := s.repo.FindByRotatedTokenHash(ctx, s.pool, hash)
-		if errors.Is(spentErr, datastore.ErrNoRows) {
-			return Refreshed{}, ErrSessionEnded
-		}
-		if spentErr != nil {
-			return Refreshed{}, spentErr
-		}
-		if revokeErr := s.revokeCompromised(ctx, spent); revokeErr != nil {
-			return Refreshed{}, revokeErr
-		}
-		return Refreshed{}, ErrSessionEnded
-	}
-	if err != nil {
-		return Refreshed{}, err
-	}
-
-	// The account's state is the issuer's check, the way every way of
-	// continuing a session refuses the same: a disabled or banned account's
-	// renewal ends here, not at the next request.
-	view, err := user.ReadAccount(ctx, s.pool, row.UserID)
-	if err != nil {
-		return Refreshed{}, err
-	}
-	if view.Disabled || bannedAt(view, now) {
-		return Refreshed{}, ErrSessionEnded
-	}
-
 	replacement, err := crypto.NewRefreshTokenPair()
 	if err != nil {
 		return Refreshed{}, fmt.Errorf("session: refresh token: %w", err)
 	}
 
-	// The renewal's window: the caller's lifetime, capped for a delegation —
-	// the impersonation window is a hard bound, and a renewal that handed a
-	// delegated session a fresh full lifetime would let it outlive the
-	// administration that opened it. A delegation whose window has passed
-	// renews no further.
-	lifetime := s.issuer.SessionLifetime(row.Remember)
-	expiresAt := now.Add(lifetime)
-	if row.Provider == ImpersonationProvider {
-		hardEnd := row.CreatedAt.Add(ImpersonationTTL)
-		if !now.Before(hardEnd) {
-			return Refreshed{}, ErrSessionEnded
-		}
-		expiresAt = hardEnd
-		lifetime = expiresAt.Sub(now)
-	}
-
-	var rotated bool
+	var (
+		row       SessionSchema
+		view      user.UserView
+		lifetime  time.Duration
+		expiresAt time.Time
+		reused    bool
+	)
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		var rotateErr error
-		rotated, rotateErr = s.repo.Rotate(ctx, tx, row.ID, replacement.Hash, hash, now, expiresAt)
-		return rotateErr
+		// The row lock is taken before anything is read from it: a concurrent
+		// renewal of the same token waits here and then sees what this one
+		// committed, so the two cannot both believe they hold the live token.
+		locked, lockErr := s.repo.LockByRefreshHash(ctx, tx, hash)
+		if errors.Is(lockErr, datastore.ErrNoRows) {
+			return ErrSessionEnded
+		}
+		if lockErr != nil {
+			return lockErr
+		}
+		if locked.RevokedAt != nil || !locked.ExpiresAt.After(now) {
+			return ErrSessionEnded
+		}
+		// The presented hash no longer matches the row's current secret: the
+		// only way to reach a live session through a spent hash is a
+		// duplicated credential, so the session is revoked outright rather
+		// than merely refused. The revocation commits — the flag carries the
+		// refusal out of the transaction — because a reuse that rolled back
+		// would leave the leaked session live.
+		if locked.TokenHash != hash {
+			if revokeErr := s.revokeCompromised(ctx, tx, locked); revokeErr != nil {
+				return revokeErr
+			}
+			reused = true
+			return nil
+		}
+
+		// The account's state is the issuer's check, the way every way of
+		// continuing a session refuses the same: a disabled or banned
+		// account's renewal ends here, not at the next request.
+		account, readErr := user.ReadAccount(ctx, tx, locked.UserID)
+		if readErr != nil {
+			return readErr
+		}
+		if account.Disabled || bannedAt(account, now) {
+			return ErrSessionEnded
+		}
+
+		// The renewal's window: the caller's lifetime, capped for a
+		// delegation — the impersonation window is a hard bound, and a
+		// renewal that handed a delegated session a fresh full lifetime would
+		// let it outlive the administration that opened it. A delegation
+		// whose window has passed renews no further.
+		lifetime = s.issuer.SessionLifetime(locked.Remember)
+		expiresAt = now.Add(lifetime)
+		if locked.Provider == ImpersonationProvider {
+			hardEnd := locked.CreatedAt.Add(ImpersonationTTL)
+			if !now.Before(hardEnd) {
+				return ErrSessionEnded
+			}
+			expiresAt = hardEnd
+			lifetime = expiresAt.Sub(now)
+		}
+
+		rotated, rotateErr := s.repo.Rotate(ctx, tx, locked.ID, replacement.Hash, hash, now, expiresAt)
+		if rotateErr != nil {
+			return rotateErr
+		}
+		if !rotated {
+			// The session ended between the lock and the write, which the
+			// lock should make impossible; the new secret is thrown away and
+			// the caller signs in again.
+			return ErrSessionEnded
+		}
+
+		row, view = locked, account
+		return nil
 	})
 	if err != nil {
 		return Refreshed{}, err
 	}
-	if !rotated {
-		// The session ended between the read and the write: the new secret
-		// is thrown away and the caller signs in again.
+	if reused {
 		return Refreshed{}, ErrSessionEnded
 	}
 
@@ -504,27 +526,21 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 }
 
 // revokeCompromised ends the session a replayed token named and writes the
-// audit record in the same transaction: a reuse is a security happening an
-// operator must see even if the process dies mid-write.
-func (s *Service) revokeCompromised(ctx context.Context, spent SessionSchema) error {
-	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if _, revokeErr := s.repo.Revoke(ctx, tx, spent.ID, nil, s.now()); revokeErr != nil {
-			return revokeErr
-		}
-		s.audit.Record(ctx, tx, audit.Entry{
-			Event:        audit.EventSessionRevoked,
-			Trigger:      audit.TriggerSystem,
-			Status:       audit.StatusFailed,
-			UserID:       spent.UserID.String(),
-			ResourceType: "session",
-			ResourceID:   spent.ID.UUID(),
-			Payload:      map[string]string{"reason": "refresh_token_reuse"},
-		})
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("session: refresh reuse revocation: %w", err)
+// audit record in the caller's transaction: a reuse is a security happening
+// an operator must see even if the process dies mid-write.
+func (s *Service) revokeCompromised(ctx context.Context, tx datastore.Querier, spent SessionSchema) error {
+	if _, revokeErr := s.repo.Revoke(ctx, tx, spent.ID, nil, s.now()); revokeErr != nil {
+		return revokeErr
 	}
+	s.audit.Record(ctx, tx, audit.Entry{
+		Event:        audit.EventSessionRevoked,
+		Trigger:      audit.TriggerSystem,
+		Status:       audit.StatusFailed,
+		UserID:       spent.UserID.String(),
+		ResourceType: "session",
+		ResourceID:   spent.ID.UUID(),
+		Payload:      map[string]string{"reason": "refresh_token_reuse"},
+	})
 	return nil
 }
 
