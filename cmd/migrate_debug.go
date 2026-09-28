@@ -66,11 +66,18 @@ var migrateResetCmd = &cli.Command{
 	Category: "Development commands",
 	Usage:    "Rollback all migrations",
 	Description: `Rolls back every applied migration, newest first. Pass --up to
-re-apply them afterwards, which rebuilds the schema from scratch.`,
+re-apply them afterwards, which rebuilds the schema from scratch.
+Pass --seed to run the seeders after the re-apply, so one command
+leaves a fresh schema with its initial data; --seed needs --up,
+because seeding writes rows onto the schema the re-apply builds.`,
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "up",
 			Usage: "Re-apply all migrations after the rollback (fresh schema)",
+		},
+		&cli.BoolFlag{
+			Name:  "seed",
+			Usage: "Run the seeders after the re-apply (requires --up)",
 		},
 		&cli.BoolFlag{
 			Name:  "dry-run",
@@ -137,6 +144,14 @@ func runMigrateSeed(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	return seedDatabase(ctx, cmd, pool, p)
+}
+
+// seedDatabase applies every seeder and reports what each one created.
+// `migrate:seed` and the seed half of `migrate:reset --up --seed` answer
+// through it: the flags the two commands share — --dry-run, --force — mean
+// the same thing on both, so the reading of them lives here once.
+func seedDatabase(ctx context.Context, cmd *cli.Command, pool *datastore.Postgres, p printext.Palette) error {
 	dryRun := cmd.Bool("dry-run")
 
 	// A dry run writes nothing, so it needs no confirmation and no
@@ -280,6 +295,14 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	defer closeDB()
 
 	reapply := cmd.Bool("up")
+	seed := cmd.Bool("seed")
+
+	// Seeding writes rows onto the schema the re-apply builds; without the up
+	// half there is no rebuilt schema to hold them, so the pair is refused
+	// rather than half-served.
+	if seed && !reapply {
+		return fmt.Errorf("the --seed flag needs --up: seeding writes rows onto the schema the re-apply builds")
+	}
 
 	applied, err := migrator.Applied(ctx)
 	if err != nil {
@@ -296,7 +319,13 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 		if err = reportTarget(p, dsn); err != nil {
 			return err
 		}
-		return planReset(ctx, migrator, p, applied, reapply)
+		if err = planReset(ctx, migrator, p, applied, reapply); err != nil {
+			return err
+		}
+		if !seed {
+			return nil
+		}
+		return p.Printf("%s%s\n", progressIndent, p.Dim("would seed the database"))
 	}
 
 	// A fresh database has no rollback to do, so --up is a plain apply.
@@ -304,7 +333,17 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 		if err = reportTarget(p, dsn); err != nil {
 			return err
 		}
-		return applyResetUp(ctx, cmd, migrator, p, report)
+		var didApply bool
+		didApply, err = applyResetUp(ctx, cmd, migrator, p, report)
+		if err != nil {
+			return err
+		}
+		// A refused apply or a database with nothing pending left the schema
+		// where it was, so the seed half has nothing it can rely on.
+		if !seed || !didApply {
+			return nil
+		}
+		return seedAfterReset(ctx, cmd, p)
 	}
 
 	question := fmt.Sprintf("roll back all %d %s?", len(applied), printext.Plural(len(applied), "migration"))
@@ -371,33 +410,42 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	if err := report.failed(); err != nil {
 		return err
 	}
-	return printSummary(p, len(reapplied), "applied", "migration", report.elapsed())
+	if err := printSummary(p, len(reapplied), "applied", "migration", report.elapsed()); err != nil {
+		return err
+	}
+	if !seed {
+		return nil
+	}
+	return seedAfterReset(ctx, cmd, p)
 }
 
 // applyResetUp runs the --up half on a database with nothing applied. It asks
-// the same question migrate:up asks, because it does the same work.
+// the same question migrate:up asks, because it does the same work. The bool
+// reports whether migrations were applied: a refusal and a database with
+// nothing pending leave the schema where it was, so a --seed half that
+// followed would have nothing to stand on.
 func applyResetUp(
 	ctx context.Context,
 	cmd *cli.Command,
 	migrator *database.Migrator,
 	p printext.Palette,
 	report *reporter,
-) error {
+) (bool, error) {
 	pending, err := migrator.Pending(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(pending) == 0 {
-		return printStatusLine(p, "no pending migrations")
+		return false, printStatusLine(p, "no pending migrations")
 	}
 
 	proceed, err := confirm(p, cmd, terminalCheck(cmd),
 		fmt.Sprintf("apply all %d pending %s?", len(pending), printext.Plural(len(pending), "migration")))
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !proceed {
-		return printStatusLine(p, "%d pending %s left unapplied",
+		return false, printStatusLine(p, "%d pending %s left unapplied",
 			len(pending), printext.Plural(len(pending), "migration"))
 	}
 
@@ -408,14 +456,37 @@ func applyResetUp(
 	results, err := migrator.Up(ctx)
 	if err != nil {
 		if writeErr := report.failed(); writeErr != nil {
-			return writeErr
+			return false, writeErr
 		}
-		return err
+		return false, err
 	}
 	if err := report.failed(); err != nil {
+		return false, err
+	}
+	return true, printSummary(p, len(results), "applied", "migration", report.elapsed())
+}
+
+// seedAfterReset runs the seed half of `migrate:reset --up --seed`. It
+// re-opens the store the seed command uses — the migrator holds the schema
+// half's pinned connection, closed by the reset's own defer — and answers
+// through the same seeding body migrate:seed serves, so both commands
+// confirm, report, and fail the same way.
+func seedAfterReset(ctx context.Context, cmd *cli.Command, p printext.Palette) error {
+	cfg, err := configFrom(ctx)
+	if err != nil {
 		return err
 	}
-	return printSummary(p, len(results), "applied", "migration", report.elapsed())
+	if err = requireMigrated(ctx, cfg); err != nil {
+		return err
+	}
+
+	pool, err := openStore(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer pool.Shutdown(context.Background())
+
+	return seedDatabase(ctx, cmd, pool, p)
 }
 
 // planReset prints both halves of a reset without touching the database. The

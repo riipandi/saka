@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/riipandi/tango/database"
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/pkg/envfile"
 	"github.com/riipandi/tango/pkg/testutils"
 )
@@ -202,6 +203,115 @@ func TestMigrateResetDeclinedLeavesDatabase(t *testing.T) {
 func runMigrateResetCmd(t *testing.T, stdin string, args ...string) (string, error) {
 	t.Helper()
 	return runMigrateCmd(t, migrateResetCmd, stdin, args...)
+}
+
+// --seed writes rows onto the schema the re-apply builds, so the pair without
+// --up is refused rather than half-served.
+func TestMigrateResetSeedNeedsUp(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	envFile := writeEnvFile(t, container.NewDatabase(t))
+
+	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
+	require.NoError(t, err)
+
+	_, err = runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--seed")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--seed")
+	assert.Contains(t, err.Error(), "--up")
+}
+
+// --up --seed rebuilds the schema and fills it in one run, through the same
+// seeding body migrate:seed serves.
+func TestMigrateResetWithUpAndSeedReappliesAndSeeds(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	dsn := container.NewDatabase(t)
+	envFile := writeEnvFile(t, dsn)
+
+	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
+	require.NoError(t, err)
+
+	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up", "--seed")
+	require.NoError(t, err)
+	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", migrationTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", migrationTotal()))
+	assert.Contains(t, out, "created", "the seed half must report the records it wrote")
+	assert.Greater(t, seededAccounts(t, dsn), int64(0),
+		"the seed half must leave the default account behind")
+}
+
+// The dry run lists the seed half without running it.
+func TestMigrateResetDryRunWithSeedReportsTheSeedHalf(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	dsn := container.NewDatabase(t)
+	envFile := writeEnvFile(t, dsn)
+
+	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
+	require.NoError(t, err)
+
+	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--dry-run", "--up", "--seed")
+	require.NoError(t, err)
+	assert.Contains(t, out, "would seed the database")
+	assert.Zero(t, seededAccounts(t, dsn), "a dry run must not write any rows")
+}
+
+// On a fresh database the seed half follows the plain apply.
+func TestMigrateResetWithUpAndSeedOnFreshDatabase(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	dsn := container.NewDatabase(t)
+	envFile := writeEnvFile(t, dsn)
+
+	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up", "--seed")
+	require.NoError(t, err)
+	assert.NotContains(t, out, "no applied migrations")
+	assert.Contains(t, out, "created")
+	assert.Greater(t, seededAccounts(t, dsn), int64(0))
+}
+
+// A declined apply leaves the schema unbuilt, so the seed half must not run.
+func TestMigrateResetWithSeedDeclinedAppliesNothing(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	dsn := container.NewDatabase(t)
+	envFile := writeEnvFile(t, dsn)
+
+	terminalCheck = func(*cli.Command) bool { return true }
+	t.Cleanup(func() { terminalCheck = isTerminal })
+
+	out, err := runMigrateResetCmd(t, "n\n", "--env-file="+envFile, "--up", "--seed")
+	require.NoError(t, err)
+	assert.Contains(t, out, fmt.Sprintf("%d pending migrations left unapplied", migrationTotal()))
+	assert.NotContains(t, out, "created")
+	assert.False(t, tableExists(t, dsn, "users"),
+		"a declined apply must not leave a schema the seed half could write into")
+}
+
+// seededAccounts counts the rows the seeders wrote into the accounts table.
+func seededAccounts(t *testing.T, dsn string) int64 {
+	t.Helper()
+
+	db, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	var count int64
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*) FROM public.users").Scan(&count))
+	return count
+}
+
+// tableExists reports whether the schema holds the named table, so a test can
+// assert the schema was never built rather than that it is empty.
+func tableExists(t *testing.T, dsn, table string) bool {
+	t.Helper()
+
+	db, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	var exists bool
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT exists (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1)",
+		table).Scan(&exists))
+	return exists
 }
 
 // migrate:create must need no database, so a schema can be started before
