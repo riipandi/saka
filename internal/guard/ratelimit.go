@@ -79,10 +79,13 @@ const rpcPathPrefix = "/rpc"
 
 // RateAuthRestPaths names the REST paths the limiter counts under the
 // credential bucket — the protocol endpoints a token is bought at, where
-// the attempt is the abuse. The authorize and userinfo surfaces are
-// exempt: the redirect is free, and the bearer already paid.
+// the attempt is the abuse. The PAR endpoint authenticates the same
+// clients and issues one-time request URIs, so it rides the bucket too.
+// The authorize and userinfo surfaces are exempt: the redirect is free,
+// and the bearer already paid.
 var RateAuthRestPaths = map[string]struct{}{
 	"/oidc/token": {},
+	"/oidc/par":   {},
 }
 
 // RateBucketFor answers the bucket a procedure is counted under, or false

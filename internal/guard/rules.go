@@ -315,6 +315,17 @@ var ProcedureRules = map[string]Entry{
 	federationv1connect.CustomClaimServiceCreateGroupClaimProcedure: {Rule: Admin},
 	federationv1connect.CustomClaimServiceUpdateGroupClaimProcedure: {Rule: Admin},
 	federationv1connect.CustomClaimServiceDeleteGroupClaimProcedure: {Rule: Admin},
+
+	// The consent surface splits in two: the self-service procedures read
+	// and undo the calling account's own ledger — being signed in is the
+	// whole requirement, the account rides the token — while the two
+	// administrative reads name the account in the request and demand the
+	// role. Declared explicitly, like the surfaces above.
+	federationv1connect.OidcConsentServiceListMyAuthorizedClientsProcedure:   {Rule: Authenticated},
+	federationv1connect.OidcConsentServiceRevokeMyAuthorizedClientProcedure:  {Rule: Authenticated},
+	federationv1connect.OidcConsentServiceListMyClientsProcedure:             {Rule: Authenticated},
+	federationv1connect.OidcConsentServiceListUserAuthorizedClientsProcedure: {Rule: Admin},
+	federationv1connect.OidcConsentServiceListAllAuthorizedClientsProcedure:  {Rule: Admin},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not
@@ -410,6 +421,11 @@ var RestRules = []RestEntry{
 	{Method: http.MethodPost, Pattern: "/oidc/userinfo", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/oidc/end-session", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/end-session", Rule: Public},
+	// Introspection and PAR are client-authenticated from the form or the
+	// Basic header, the way the token endpoint is: public in the bearer
+	// sense, the library refusing a request whose secret does not verify.
+	{Method: http.MethodPost, Pattern: "/oidc/introspect", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/par", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

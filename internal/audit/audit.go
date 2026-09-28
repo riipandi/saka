@@ -277,6 +277,11 @@ const (
 	// from what the document now declares.
 	EventOidcClientMetadataRefreshed = "oidc_client_metadata_refreshed"
 
+	// EventOidcConsentRevoked is an account's consent for a client
+	// withdrawn. The withdrawal kills the grants and tokens the consent
+	// issued, so the payload names the account and the client.
+	EventOidcConsentRevoked = "oidc_consent_revoked"
+
 	// EventGroupAllowedClientsUpdated is the group's client allowlist
 	// replaced — the group-side direction of the client restriction, the
 	// mirror of the members' own event. The payload counts the roll.

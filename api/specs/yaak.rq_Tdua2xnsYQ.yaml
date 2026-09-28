@@ -28,7 +28,7 @@ headers:
 method: POST
 name: '[Tango] Stop impersonating'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.SessionService/StopImpersonating
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/StopImpersonating
 urlParameters: []
 settingSendCookies:
   enabled: false

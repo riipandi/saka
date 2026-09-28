@@ -736,7 +736,7 @@ message RefreshOidcClientRequest {
   // id is the client's identifier — for a CIMD client, the metadata
   // document's URL.
   string id = 1 [(buf.validate.field).string = {
-    min_len: 1,
+    min_len: 1
     max_len: 512
   }];
 }
@@ -752,6 +752,158 @@ message RefreshOidcClientResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 3;
+}
+
+// OidcConsentService reads and undoes the account consents the
+// authorization flow records. The self-service half answers the account's
+// own ledger — the grants it handed to relying parties, and the withdrawal
+// of one — while the administrative half reads any account's ledger, the
+// same surface the audit trail's administrative reads sit beside.
+//
+// A withdrawal cascades: the grants the account made to the client lose
+// their tokens, so a revoked consent is a consent the client cannot use.
+service OidcConsentService {
+  // ListMyAuthorizedClients answers the clients the calling account has
+  // authorized, each with the scopes the consent carries.
+  rpc ListMyAuthorizedClients(ListMyAuthorizedClientsRequest) returns (ListMyAuthorizedClientsResponse);
+
+  // RevokeMyAuthorizedClient withdraws the calling account's consent for
+  // one client. The client's live grants and tokens for the account die
+  // with the ledger row.
+  rpc RevokeMyAuthorizedClient(RevokeMyAuthorizedClientRequest) returns (RevokeMyAuthorizedClientResponse);
+
+  // ListMyClients answers the clients the calling account may authorize:
+  // every unrestricted client, plus the restricted ones the account's
+  // groups admit it to.
+  rpc ListMyClients(ListMyOidcClientsRequest) returns (ListMyOidcClientsResponse);
+
+  // ListUserAuthorizedClients answers one account's authorized clients —
+  // the administrative read of the ledger.
+  rpc ListUserAuthorizedClients(ListUserAuthorizedClientsRequest) returns (ListUserAuthorizedClientsResponse);
+
+  // ListAllAuthorizedClients answers every ledger row, the deployment-wide
+  // view of who has authorized what.
+  rpc ListAllAuthorizedClients(ListAllAuthorizedClientsRequest) returns (ListAllAuthorizedClientsResponse);
+}
+
+// AuthorizedOidcClient is one ledger row: the client, the scopes the
+// consent carries, and the last time the consent was used.
+message AuthorizedOidcClient {
+  // client is the authorized client's view.
+  OidcClient client = 1;
+
+  // scopes are the scope words the consent covers.
+  repeated string scopes = 2;
+
+  // last_used_at is when a grant last rode this consent.
+  google.protobuf.Timestamp last_used_at = 3;
+}
+
+// ListMyAuthorizedClientsRequest is empty: the caller is the subject.
+message ListMyAuthorizedClientsRequest {}
+
+// ListMyAuthorizedClientsResponse is the calling account's ledger.
+message ListMyAuthorizedClientsResponse {
+  // clients are the authorized clients, most recently used first.
+  repeated AuthorizedOidcClient clients = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// RevokeMyAuthorizedClientRequest names the client to forget.
+message RevokeMyAuthorizedClientRequest {
+  // client_id is the client whose consent is withdrawn — the identifier
+  // the relying party presents as its client_id.
+  string client_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+}
+
+// RevokeMyAuthorizedClientResponse is empty: a successful withdrawal says
+// so with the protocol, and an unknown client answers the not-found code.
+message RevokeMyAuthorizedClientResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListMyOidcClientsRequest is empty: the caller is the subject.
+message ListMyOidcClientsRequest {}
+
+// ListMyOidcClientsResponse is the clients the account may authorize.
+message ListMyOidcClientsResponse {
+  // clients are the accessible clients, by name.
+  repeated OidcClient clients = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ListUserAuthorizedClientsRequest names the account whose ledger is read.
+message ListUserAuthorizedClientsRequest {
+  // user_id is the account, in its wire form.
+  string user_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// ListUserAuthorizedClientsResponse is that account's ledger.
+message ListUserAuthorizedClientsResponse {
+  // clients are the authorized clients, most recently used first.
+  repeated AuthorizedOidcClient clients = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ListAllAuthorizedClientsRequest is empty: the answer is every ledger row.
+message ListAllAuthorizedClientsRequest {}
+
+// ListAllAuthorizedClientsResponse is the deployment-wide ledger.
+message ListAllAuthorizedClientsResponse {
+  // entries are the ledger rows, most recently used first.
+  repeated AuthorizedOidcClientEntry entries = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// AuthorizedOidcClientEntry is one ledger row with the account named —
+// the wide view needs the subject beside the client.
+message AuthorizedOidcClientEntry {
+  // user_id is the account that granted the consent, in its wire form.
+  string user_id = 1;
+
+  // client is the authorized client's view.
+  OidcClient client = 2;
+
+  // scopes are the scope words the consent covers.
+  repeated string scopes = 3;
+
+  // last_used_at is when a grant last rode this consent.
+  google.protobuf.Timestamp last_used_at = 4;
 }
 
 // CustomClaimService administers the claims an operator hangs on accounts

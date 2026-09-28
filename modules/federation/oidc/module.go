@@ -86,4 +86,11 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(federationv1connect.OidcClientServiceCreateSecretProcedure, handler)
 	r.Handle(federationv1connect.OidcClientServiceDeleteSecretProcedure, handler)
 	r.Handle(federationv1connect.OidcClientServiceRefreshClientProcedure, handler)
+
+	_, consent := federationv1connect.NewOidcConsentServiceHandler(newConsentHandler(m.service))
+	r.Handle(federationv1connect.OidcConsentServiceListMyAuthorizedClientsProcedure, consent)
+	r.Handle(federationv1connect.OidcConsentServiceRevokeMyAuthorizedClientProcedure, consent)
+	r.Handle(federationv1connect.OidcConsentServiceListMyClientsProcedure, consent)
+	r.Handle(federationv1connect.OidcConsentServiceListUserAuthorizedClientsProcedure, consent)
+	r.Handle(federationv1connect.OidcConsentServiceListAllAuthorizedClientsProcedure, consent)
 }

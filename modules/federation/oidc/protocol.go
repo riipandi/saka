@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -26,11 +27,18 @@ const (
 	protocolAuthorizeEndpoint  = "/oidc/authorize"
 	protocolTokenEndpoint      = "/oidc/token"
 	protocolUserInfoEndpoint   = "/oidc/userinfo"
+	protocolIntrospectEndpoint = "/oidc/introspect"
+	protocolPAREndpoint        = "/oidc/par"
 	protocolEndSessionEndpoint = "/oidc/end-session"
 	protocolJWKSEndpoint       = "/.well-known/jwks.json"
 
 	// interactionPath is the SPA route the sign-in-less browser lands on.
 	interactionPath = "/interaction"
+
+	// protocolPARLifetimeSecs is how long a pushed request stays valid —
+	// the window the relying party has to send the browser into the flow
+	// it pushed.
+	protocolPARLifetimeSecs = 300
 )
 
 // Protocol builds the OIDC provider the federation area mounts. The
@@ -104,6 +112,14 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithAuthPolicies(signInPolicy(service), interactionPolicy(service)),
 			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256, goidc.CodeChallengeMethodPlain},
 				provider.WithPKCERequired()),
+			// PAR rides the same session store: the pushed request creates
+			// an authorization session whose id the authorize endpoint
+			// resolves through the pointer row. One endpoint, short life —
+			// the request URI is a one-time ticket into the flow.
+			provider.WithPAR(authnStore{protocolStore: stores},
+				provider.WithPAREndpoint(protocolPAREndpoint),
+				provider.WithPARLifetime(protocolPARLifetimeSecs),
+			),
 		),
 		provider.WithRefreshTokenGrant(grantStore{protocolStore: stores}, provider.WithRefreshTokenRotation()),
 		provider.WithClientSecretVerifier(clientSecretVerifier),
@@ -114,6 +130,13 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		provider.WithUserInfoClaims(userInfoClaims(service)),
 		provider.WithLogout(provider.LogoutConfig{Manager: logoutStore{protocolStore: stores}},
 			provider.WithLogoutEndpoint(protocolEndSessionEndpoint)),
+		// Introspection is client-scoped: a client reads only the tokens
+		// minted to it. RFC 7662 leaves the policy open; tango's answer is
+		// that a token says nothing to a stranger.
+		provider.WithTokenIntrospection(func(_ context.Context, client *goidc.Client, info goidc.TokenInfo) bool {
+			return info.ClientID == client.ID
+		}),
+		provider.WithTokenIntrospectionEndpoint(protocolIntrospectEndpoint),
 	)
 	if err != nil {
 		return nil, err
@@ -127,12 +150,44 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 // refusal covers everything under /oidc the protocol does not serve.
 func (p *Protocol) Mount(r chi.Router) {
 	handler := p.provider.Handler()
+	flatten := flattenBasicAuth()
 	r.Handle(protocolAuthorizeEndpoint, handler)
 	r.Handle(protocolAuthorizeEndpoint+"/*", handler)
-	r.Handle(protocolTokenEndpoint, handler)
+	r.Handle(protocolTokenEndpoint, flatten(handler))
 	r.Handle(protocolUserInfoEndpoint, handler)
+	r.Handle(protocolIntrospectEndpoint, flatten(handler))
+	r.Handle(protocolPAREndpoint, flatten(handler))
 	r.Handle(protocolEndSessionEndpoint, handler)
 	r.Handle("/.well-known/openid-configuration", handler)
+}
+
+// flattenBasicAuth copies the Authorization header's Basic credentials
+// onto the form, when the form carries none of its own. The endpoints it
+// wraps authenticate a client from the form — the library reads one
+// authentication method per client, and secret-post is the one tango's
+// clients declare — while RFC 6749 §2.3.1 lets the same client present
+// the same pair in the Basic header.
+func flattenBasicAuth() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if id, secret, ok := r.BasicAuth(); ok && id != "" &&
+				r.PostFormValue("client_id") == "" && r.PostFormValue("client_secret") == "" {
+				// The body is bounded before anything parses it: a
+				// credentials document is a few hundred bytes, anything
+				// larger is a request no endpoint here serves. The parse
+				// marks the form filled, so the handler's own reads keep
+				// the values this sets.
+				r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+				if err := r.ParseForm(); err == nil {
+					r.PostForm.Set("client_id", id)
+					r.PostForm.Set("client_secret", secret)
+					r.Form.Set("client_id", id)
+					r.Form.Set("client_secret", secret)
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // jwksFunc renders the signing key set the provider signs and publishes

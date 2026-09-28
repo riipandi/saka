@@ -31,7 +31,7 @@ headers:
 method: POST
 name: '[Tango] Begin TOTP enrollment'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/BeginTotpEnrollment
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/BeginTotpEnrollment
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -16,7 +16,9 @@ body:
   text: '{}'
 bodyType: application/x-www-form-urlencoded
 description: |-
-  Pass a token to verify if it is considered valid.
+  Client-scoped RFC 7662 introspection: a client reads only the tokens minted to it; a stranger answers access_denied. Client authentication rides the Basic header or the form.
+
+  Endpoint: `POST /oidc/introspect`
 
   Mirror of Pocket ID `POST /api/oidc/introspect`.
 
@@ -32,9 +34,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Introspect OIDC tokens (unimplemented)'
+name: '[Pocket ID] Introspect OIDC tokens'
 sortPriority: 16000.0
-url: ${[ apiBaseURL ]}/api/oidc/introspect
+url: ${[ apiBaseURL ]}/oidc/introspect
 urlParameters: []
 settingSendCookies:
   enabled: false

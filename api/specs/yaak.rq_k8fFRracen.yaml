@@ -31,7 +31,7 @@ headers:
 method: POST
 name: '[Tango] Regenerate recovery codes'
 sortPriority: 4111.111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/RegenerateRecoveryCodes
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/RegenerateRecoveryCodes
 urlParameters: []
 settingSendCookies:
   enabled: false

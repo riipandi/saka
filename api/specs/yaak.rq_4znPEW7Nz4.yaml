@@ -27,7 +27,7 @@ headers:
 method: POST
 name: '[Tango] Sign out other sessions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.SessionService/SignOutOtherSessions
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/SignOutOtherSessions
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -26,7 +26,7 @@ headers:
 method: POST
 name: '[Tango] Enroll password recovery'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.PasswordRecoveryService/ForgotPassword
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.PasswordRecoveryService/ForgotPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

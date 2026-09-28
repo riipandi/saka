@@ -11,12 +11,9 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  Revoke the authorization for a specific OIDC client for the current user
+  Withdraw the calling account's consent for one client. The client's live grants and tokens for the account die with the ledger row.
 
-  Mirror of Pocket ID `DELETE /api/oidc/users/me/authorized-clients/{clientId}`.
-
-  Parameters:
-  - clientId (path, required): Client ID to revoke authorization for
+  Procedure: `tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`
 headers:
 - enabled: true
   name: Content-Type
@@ -27,7 +24,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Revoke authorization for an OIDC client (unimplemented)'
+name: '[Pocket ID] Revoke authorization for an OIDC client'
 sortPriority: 16267.489711934157
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient
 urlParameters:

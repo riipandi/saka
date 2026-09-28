@@ -31,7 +31,7 @@ headers:
 method: POST
 name: '[Tango] Refresh token pair'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.SessionService/Refresh
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/Refresh
 urlParameters: []
 settingSendCookies:
   enabled: false

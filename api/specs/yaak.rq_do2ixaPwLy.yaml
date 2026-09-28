@@ -23,7 +23,7 @@ headers:
 method: POST
 name: '[Tango] Disable user MFA (admin)'
 sortPriority: 5160.493827160494
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/AdminDisableMfa
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/AdminDisableMfa
 urlParameters: []
 settingSendCookies:
   enabled: false

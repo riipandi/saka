@@ -15,7 +15,9 @@ body:
     }
 bodyType: application/json
 description: |-
-  Get a list of OIDC clients that the current user can access
+  The clients the calling account may authorize: every client whose allowed-groups roll is empty, plus the restricted ones the account's groups admit it to.
+
+  Procedure: `tango.federation.v1.OidcConsentService/ListMyClients`
 
   Mirror of Pocket ID `GET /api/oidc/users/me/clients`.
 
@@ -35,7 +37,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] List accessible OIDC clients for current user (unimplemented)'
+name: '[Pocket ID] List accessible OIDC clients for current user'
 sortPriority: 16333.333333333334
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListMyClients
 urlParameters:

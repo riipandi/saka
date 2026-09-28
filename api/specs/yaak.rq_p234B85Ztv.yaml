@@ -25,7 +25,7 @@ headers:
 method: POST
 name: '[Tango] List sessions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.SessionService/ListSessions
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/ListSessions
 urlParameters: []
 settingSendCookies:
   enabled: false

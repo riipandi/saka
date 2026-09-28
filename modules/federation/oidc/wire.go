@@ -73,6 +73,33 @@ func wireClients(views []ClientView) []*federationv1.OidcClient {
 	return clients
 }
 
+// wireAuthorizedClient maps one ledger row: the client's view, the scopes
+// the consent covers, and the last-use instant when a grant rode it.
+func wireAuthorizedClient(view AuthorizedClientView) *federationv1.AuthorizedOidcClient {
+	entry := &federationv1.AuthorizedOidcClient{
+		Client: wireClient(view.Client),
+		Scopes: view.Scopes,
+	}
+	if view.LastUsedAt != nil {
+		entry.LastUsedAt = timestamppb.New(*view.LastUsedAt)
+	}
+	return entry
+}
+
+// wireLedgerEntry maps one ledger row of the deployment-wide read, the
+// account named in its wire form.
+func wireLedgerEntry(entry LedgerEntry) *federationv1.AuthorizedOidcClientEntry {
+	wide := &federationv1.AuthorizedOidcClientEntry{
+		UserId: entry.UserWire,
+		Client: wireClient(entry.Client),
+		Scopes: entry.Scopes,
+	}
+	if entry.LastUsedAt != nil {
+		wide.LastUsedAt = timestamppb.New(*entry.LastUsedAt)
+	}
+	return wide
+}
+
 // wireCredentials maps a page of secret views.
 func wireCredentials(secrets []SecretView) *federationv1.OidcClientCredentials {
 	list := make([]*federationv1.OidcClientSecret, 0, len(secrets))

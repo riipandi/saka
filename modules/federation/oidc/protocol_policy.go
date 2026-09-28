@@ -2,6 +2,9 @@ package oidc
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json/v2"
 	"errors"
 	"io"
@@ -196,19 +199,43 @@ func writeInteraction(w http.ResponseWriter, status int, body map[string]any) {
 }
 
 // clientSecretVerifier matches a presented secret against every live
-// hash the client's credentials document carries. The hashes are PHC
-// strings the password hasher reads.
+// hash the client's credentials document carries. Each hash names its
+// algorithm: a `sha256` entry is the plain hex digest the management
+// surface stores, anything else a PHC string the password hasher reads —
+// the shape a carried-over credential may hold.
 func clientSecretVerifier(ctx context.Context, stored, presented string) error {
-	hasher := crypto.NewPasswordHasher()
 	for _, hash := range strings.Split(stored, "\n") {
 		if hash == "" {
 			continue
 		}
-		if ok, _ := hasher.Verify(presented, hash); ok {
+		if verifyClientSecret(hash, presented) {
 			return nil
 		}
 	}
 	return errors.New("oidc: the client secret does not verify")
+}
+
+// verifyClientSecret answers whether one stored hash matches the
+// presented value, by the algorithm the entry names.
+func verifyClientSecret(stored, presented string) bool {
+	if storedAlgorithm(stored) == "sha256" {
+		digest := sha256.Sum256([]byte(presented))
+		return subtle.ConstantTimeCompare([]byte(hex.EncodeToString(digest[:])), []byte(stored)) == 1
+	}
+	ok, _ := crypto.NewPasswordHasher().Verify(presented, stored)
+	return ok
+}
+
+// storedAlgorithm names the algorithm a stored hash carries. A `sha256`
+// hash is exactly 64 lowercase hex characters; anything else is PHC.
+func storedAlgorithm(stored string) string {
+	if len(stored) == 64 {
+		_, err := hex.DecodeString(stored)
+		if err == nil {
+			return "sha256"
+		}
+	}
+	return "phc"
 }
 
 // groupIDs are the UUIDs behind an account view's memberships.

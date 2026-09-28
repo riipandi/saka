@@ -1,32 +1,29 @@
 type: http_request
 model: http_request
-id: rq_rMFy9xx22T
-createdAt: 2026-09-26T19:47:06.071535
-updatedAt: 2026-09-26T21:55:20.455702
+id: rq_xoWqRoPXNX
+createdAt: 2026-09-28T20:29:03.944202
+updatedAt: 2026-09-28T20:29:03.944203
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_egyHKUMnQU
+folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
+  bodyType: application/json
   text: '{}'
 bodyType: application/json
 description: |-
-  Names the caller's authenticators — identity, name, `confirmed_at`, `last_used_at` — the shape a settings page renders. It never carries a secret.
+  The deployment-wide ledger: every consent with its account named in the wire form. Administrative.
 
-  Guard: Session.
+  Procedure: `tango.federation.v1.OidcConsentService/ListAllAuthorizedClients`
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: bNJ4xpHNir
-- enabled: true
-  name: Connect-Protocol-Version
-  value: '1'
-  id: YfsBqt3TxT
+  id: null
 method: POST
-name: '[Tango] List TOTP enrollments'
-sortPriority: 3111.1111111111113
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/ListTotpEnrollments
+name: '[Pocket ID] List every authorized client'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients
 urlParameters: []
 settingSendCookies:
   enabled: false

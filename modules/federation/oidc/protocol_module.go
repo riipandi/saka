@@ -19,7 +19,11 @@ func NewProtocolModule(protocol *Protocol) *protocolModule {
 // Name reports the feature the composition logs.
 func (m *protocolModule) Name() string { return "oidc-protocol" }
 
-// Mount registers the provider's paths.
+// Mount registers the provider's paths. The flattening middleware reads
+// the Basic header onto the form the provider's secret-post verifier
+// consumes, so a confidential client may present its secret either way —
+// the library binds one authentication method per client, the contract
+// admits both spellings.
 func (m *protocolModule) Mount(r chi.Router) {
 	m.protocol.Mount(r)
 }

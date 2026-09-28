@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Send a one-time access code to the address the caller names, from the sign-in page. An address no account holds answers the same success, so the procedure cannot enumerate addresses. The response carries the device token the exchange demands back. Refused while `auth.one_time_access_email_as_unauthenticated_enabled` is off.
 
-  Mirror of Pocket ID `POST /api/one-time-access-email`, ported as the RPC procedure `tango.auth.v1.OneTimeAccessService/RequestEmail`.
+  Mirror of Pocket ID `POST /api/one-time-access-email`, ported as the RPC procedure `tango.authn.v1.OneTimeAccessService/RequestEmail`.
 
   Body:
   - email: the address the code should go to
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Request one-time access email'
 sortPriority: 22000.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.OneTimeAccessService/RequestEmail
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

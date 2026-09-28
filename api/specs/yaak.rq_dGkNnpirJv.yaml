@@ -28,7 +28,7 @@ headers:
 method: POST
 name: '[Tango] Finalize password recovery'
 sortPriority: 333.3333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.PasswordRecoveryService/ResetPassword
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.PasswordRecoveryService/ResetPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

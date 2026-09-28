@@ -28,7 +28,7 @@ headers:
 method: POST
 name: '[Tango] Sign in with password'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.AuthService/SignIn
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.AuthService/SignIn
 urlParameters: []
 settingSendCookies:
   enabled: false

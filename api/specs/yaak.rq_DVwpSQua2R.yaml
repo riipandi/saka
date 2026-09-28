@@ -32,7 +32,7 @@ headers:
 method: POST
 name: '[Tango] Complete MFA sign-in'
 sortPriority: 3333.3333333333335
-url: ${[ apiBaseURL ]}/rpc/tango.auth.v1.MultifactorService/CompleteSignIn
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/CompleteSignIn
 urlParameters: []
 settingSendCookies:
   enabled: false

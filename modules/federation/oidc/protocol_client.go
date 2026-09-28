@@ -96,6 +96,10 @@ func protocolClient(row ClientSchema, baseURL string) goidc.Client {
 	} else {
 		client.TokenAuthnMethod = goidc.AuthnMethodSecretPost
 	}
+	// A client whose definition demands PAR may only enter the flow
+	// through the pushed endpoint; the library refuses the plain
+	// authorization request.
+	client.PARRequired = row.RequiresPushedAuthorizationRequests
 	return client
 }
 
