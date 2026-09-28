@@ -16,6 +16,8 @@ import (
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	notificationv1 "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1"
 	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
+	settingsv1 "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1"
+	settingsv1connect "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1/settingsv1connect"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -264,6 +266,18 @@ var ProcedureRules = map[string]Entry{
 	systemv1connect.AppConfigServiceGetProcedure:       {Rule: Public},
 	systemv1connect.AppConfigServiceGetAllProcedure:    {Rule: Admin},
 	systemv1connect.AppConfigServiceTestEmailProcedure: {Rule: Admin},
+
+	// The settings surface is the database-backed, product-flow settings.
+	// ListPublic is the one public read: it publishes only the rows flagged
+	// public, which the write and the table both keep free of sealed values,
+	// so an unauthenticated caller can never reach a ciphertext. The rest is
+	// administrative — the values travel in the clear, and the write carries
+	// the flags, which is not an account read either.
+	settingsv1connect.SettingsServiceListProcedure:       {Rule: Admin},
+	settingsv1connect.SettingsServiceGetProcedure:        {Rule: Admin},
+	settingsv1connect.SettingsServiceSetProcedure:        {Rule: Admin},
+	settingsv1connect.SettingsServiceDeleteProcedure:     {Rule: Admin},
+	settingsv1connect.SettingsServiceListPublicProcedure: {Rule: Public},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not
@@ -347,6 +361,7 @@ func ContractProcedures() []string {
 		authzv1.File_authz_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
+		settingsv1.File_settings_proto,
 		systemv1.File_system_proto,
 	}
 

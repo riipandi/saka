@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	settingsv1connect "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1/settingsv1connect"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -18,16 +19,18 @@ import (
 // qualifies it, so the name is the feature alone.
 const ModuleName = "appconfig"
 
-// Module serves the application-configuration procedures: the RPC surface,
-// all of it. Authentication is the transport's middleware; the module reads
-// the caller the context carries, it never verifies a token itself.
+// Module serves the application-configuration area's procedures: the system
+// configuration surface and the database-backed settings surface, all of it
+// RPC. Authentication is the transport's middleware; the module reads the
+// caller the context carries, it never verifies a token itself.
 type Module struct {
-	service *Service
+	service  *Service
+	settings *Settings
 }
 
-// NewModule builds the module over the application-configuration service.
-func NewModule(service *Service) *Module {
-	return &Module{service: service}
+// NewModule builds the module over the area's two features.
+func NewModule(service *Service, settings *Settings) *Module {
+	return &Module{service: service, settings: settings}
 }
 
 // Name reports the module in composition reports.
@@ -45,6 +48,13 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(systemv1connect.AppConfigServiceGetProcedure, handler)
 	r.Handle(systemv1connect.AppConfigServiceGetAllProcedure, handler)
 	r.Handle(systemv1connect.AppConfigServiceTestEmailProcedure, handler)
+
+	_, settingsHandler := settingsv1connect.NewSettingsServiceHandler(newSettingsHandler(m.settings), opts...)
+	r.Handle(settingsv1connect.SettingsServiceListProcedure, settingsHandler)
+	r.Handle(settingsv1connect.SettingsServiceGetProcedure, settingsHandler)
+	r.Handle(settingsv1connect.SettingsServiceSetProcedure, settingsHandler)
+	r.Handle(settingsv1connect.SettingsServiceDeleteProcedure, settingsHandler)
+	r.Handle(settingsv1connect.SettingsServiceListPublicProcedure, settingsHandler)
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -110,7 +120,13 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeUnavailable, errors.New("mailer is not configured"))
 	case errors.Is(err, ErrUnknownAccount):
 		return connect.NewError(connect.CodeNotFound, errors.New("account not found"))
+	case errors.Is(err, ErrUnknownSetting):
+		return connect.NewError(connect.CodeNotFound, errors.New("setting not found"))
+	case errors.Is(err, ErrSealedNotPublic), errors.Is(err, ErrReservedPrefix):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the setting is not writable as asked"))
+	case errors.Is(err, ErrSealUnavailable):
+		return connect.NewError(connect.CodeUnavailable, errors.New("no cipher is configured to seal a sensitive value"))
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("test email failed"))
+		return connect.NewError(connect.CodeInternal, errors.New("the app configuration area could not serve the call"))
 	}
 }

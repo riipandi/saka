@@ -74,20 +74,25 @@ CREATE TABLE IF NOT EXISTS public.oidc_client_api_grant_permissions (
 CREATE INDEX IF NOT EXISTS idx_grant_permissions_client ON public.oidc_client_api_grant_permissions (client_id);
 
 -- --------------------------------------------------------
--- Table: public.app_config — admin-editable application
--- configuration: key/value rows override the env-backed defaults
--- (upstream app_config; tango trims the key set — SMTP/LDAP stay
--- env-only).
+-- Table: public.settings — database-backed application settings
+-- for product flows, as distinct from the system configuration
+-- (the JSON file, served read-only by AppConfigService). One row
+-- per namespaced key. Whether a value rests sealed is told by its
+-- enc: prefix alone, and a public row never rests sealed — the
+-- unauthenticated read can never carry a ciphertext.
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.app_config (
-    key TEXT NOT NULL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS public.settings (
+    key TEXT NOT NULL PRIMARY KEY CHECK (char_length(key) BETWEEN 1 AND 350),
     value TEXT NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    public BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT NULL,
+    CONSTRAINT chk_settings_public_not_sealed CHECK (NOT (public AND value LIKE 'enc:%'))
 ) USING heap;
 
-CREATE TRIGGER trg_app_config_updated_at
-    BEFORE UPDATE ON public.app_config
+CREATE TRIGGER trg_settings_updated_at
+    BEFORE UPDATE ON public.settings
     FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
 
 -- --------------------------------------------------------
@@ -129,7 +134,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_name_user_id ON public.api_keys U
 -- +goose StatementBegin
 
 DROP TRIGGER IF EXISTS trg_api_keys_updated_at ON public.api_keys;
-DROP TRIGGER IF EXISTS trg_app_config_updated_at ON public.app_config;
+DROP TRIGGER IF EXISTS trg_settings_updated_at ON public.settings;
 DROP TRIGGER IF EXISTS trg_oidc_client_api_grants_updated_at ON public.oidc_client_api_grants;
 DROP TRIGGER IF EXISTS trg_api_permissions_updated_at ON public.api_permissions;
 DROP TRIGGER IF EXISTS trg_apis_updated_at ON public.apis;
@@ -148,7 +153,7 @@ DROP INDEX IF EXISTS idx_apis_name;
 DROP INDEX IF EXISTS idx_apis_created_at;
 
 DROP TABLE IF EXISTS public.api_keys;
-DROP TABLE IF EXISTS public.app_config;
+DROP TABLE IF EXISTS public.settings;
 DROP TABLE IF EXISTS public.oidc_client_api_grant_permissions;
 DROP TABLE IF EXISTS public.oidc_client_api_grants;
 DROP TABLE IF EXISTS public.api_permissions;

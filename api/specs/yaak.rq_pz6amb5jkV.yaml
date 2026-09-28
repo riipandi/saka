@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_pz6amb5jkV
+createdAt: 2026-09-28T09:24:49.759335
+updatedAt: 2026-09-28T09:24:49.759335
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Answers every database-backed setting to an administrator, values in the clear (sealed rows are opened).
+
+  Tango procedure tango.settings.v1.SettingsService/List. Guard: admin.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] List settings'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/List
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

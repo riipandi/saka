@@ -1,20 +1,23 @@
 // Package appconfig is the application-configuration area: the deployment's
-// own settings surface.
+// own settings surface, in both senses the word carries.
+//
+// The system configuration is the JSON file's: AppConfigService publishes
+// the deployment's resolved configuration read-only and sends its test
+// email. The database-backed settings are the product flows': the settings
+// feature keeps key/value rows editable at runtime, sealing a sensitive
+// value under the deployment's shared cipher.
 //
 // It is an area of its own rather than a feature of identity because the
-// settings it serves are the deployment's, not any account's — the caller is
-// always an administrator acting on the application itself.
-//
-// The area owns no tables today. The one procedure it serves reads the
-// caller's account through the identity area's user package, the way the
-// audit-log reader does; a configuration store of its own arrives with the
-// configuration read and update procedures, which are still planned.
+// settings it serves are the deployment's, not any account's. The area owns
+// one table — settings — and reads accounts through the identity area's
+// user package, the way the audit-log reader does.
 //
 // The area owns its own wiring, like every other: the registry names it and
-// knows nothing about its service.
+// knows nothing about its services.
 package appconfig
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/samber/do/v2"
@@ -24,14 +27,18 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/mailer"
+	"github.com/riipandi/tango/pkg/crypto"
 )
 
-// Package registers the service this area owns.
+// Package registers the services this area owns.
 //
 // The composition root applies it while the container is built, so it only
-// registers: the service is constructed when something resolves it. The
-// mailer is the infrastructure the registry's prewarm walk resolves, so a
-// process that reaches the listener has it.
+// registers: a service is constructed when something resolves it. The
+// mailer and the pool are infrastructure the registry's prewarm walk
+// resolves, so a process that reaches the listener has them. The cipher is
+// the deployment's shared one, built from the secret key; a run without a
+// secret key carries a nil cipher, and the feature refuses the sensitive
+// write rather than storing a value it cannot protect.
 var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
 		cfg := do.MustInvoke[*config.Config](i)
@@ -41,10 +48,38 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		return NewService(*cfg, pool, recorder, mail, log), nil
 	}),
+	do.Lazy(func(i do.Injector) (*Settings, error) {
+		cfg := do.MustInvoke[*config.Config](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		cipher, err := settingsCipher(cfg.App.SecretKey)
+		if err != nil {
+			return nil, err
+		}
+		return NewSettings(pool, cipher, recorder), nil
+	}),
 )
+
+// settingsCipher builds the cipher a sensitive value seals under. An empty
+// secret key is the run that carries none — the feature answers that at the
+// call site — while a key that is set but unreadable is a broken
+// deployment, and it fails the run.
+func settingsCipher(secretKey string) (*crypto.Cipher, error) {
+	if secretKey == "" {
+		return nil, nil
+	}
+	cipher, err := crypto.NewCipherFromHex(secretKey)
+	if err != nil {
+		return nil, fmt.Errorf("appconfig: read the cipher key: %w", err)
+	}
+	return cipher, nil
+}
 
 // Mount resolves what this area needs and builds the module the router
 // mounts. It is the other half of the seam the composition root uses.
 func Mount(i do.Injector) (kernel.Module, error) {
-	return NewModule(do.MustInvoke[*Service](i)), nil
+	return NewModule(
+		do.MustInvoke[*Service](i),
+		do.MustInvoke[*Settings](i),
+	), nil
 }

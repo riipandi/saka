@@ -1,0 +1,141 @@
+// The database-backed application settings for product flows.
+//
+// Settings are one row per namespaced key, editable at runtime — the
+// counterpart of the system configuration, which the JSON file owns and
+// AppConfigService publishes read-only. Whether a value rests sealed is
+// told by its enc: prefix alone; the reader opens it, and the wire never
+// carries the sealed form. A public setting is never sealed, so the
+// unauthenticated read can never carry one.
+syntax = "proto3";
+
+package tango.settings.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1;settingsv1";
+
+// SettingsService manages the deployment's database-backed settings.
+// The administrative procedures carry the values in the clear to an
+// administrator — the same trust the full configuration read gets; the
+// record of a change never carries a value, because the value may be a
+// secret.
+service SettingsService {
+  // List answers every setting, sensitive ones opened.
+  rpc List(ListRequest) returns (ListResponse);
+
+  // Get answers one setting by key.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Set creates or replaces one setting. The write is an upsert: the
+  // request carries the whole row, and flags a request omits are unset.
+  rpc Set(SetRequest) returns (SetResponse);
+
+  // Delete removes one setting. Deleting an unknown key is a refusal,
+  // not a silence.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+// ListPublic answers the settings an unauthenticated client may read:
+// the rows flagged public. The flag and a sealed value are mutually
+// exclusive — at the table as well as at the write — so this read never
+// carries a sealed value.
+  rpc ListPublic(ListPublicRequest) returns (ListPublicResponse);
+}
+
+// ListRequest is empty: there is one settings table per deployment.
+message ListRequest {}
+
+// ListResponse carries every setting, newest change last.
+message ListResponse {
+  // settings are the rows, ordered by key.
+  repeated Setting settings = 1;
+}
+
+// GetRequest names one setting.
+message GetRequest {
+  // key is the setting's namespaced name, as written, e.g. product.name.
+  string key = 1 [(buf.validate.field).string = {min_len: 1, max_len: 350}];
+}
+
+// GetResponse carries the one setting the key names.
+message GetResponse {
+  // setting is the row, its value opened if it rests sealed.
+  Setting setting = 1;
+}
+
+// SetRequest carries the whole row. The write is an upsert keyed by the
+// setting's key. The sensitive flag is a write instruction, not stored
+// state: it seals the value before it reaches the table, and a value that
+// rests sealed is told by its enc: prefix alone.
+message SetRequest {
+  // key is the setting's namespaced name. It is written as given and never
+  // translated, so a reader must use the same namespace.
+  string key = 1 [(buf.validate.field).string = {min_len: 1, max_len: 350}];
+
+  // value is the setting's value in the clear. A sensitive flag seals it
+  // before it reaches the table; the value itself never travels further
+  // than this request.
+  string value = 2 [(buf.validate.field).string.max_len = 65536];
+
+  // sensitive seals the value in the table. A sealed setting cannot also
+  // be public.
+  bool sensitive = 3;
+
+  // public marks a setting the unauthenticated read publishes. A public
+  // setting cannot also be sealed.
+  bool public = 4;
+}
+
+// SetResponse carries the row as it now rests.
+message SetResponse {
+  // setting is the row that was written, its value in the clear.
+  Setting setting = 1;
+}
+
+// DeleteRequest names one setting.
+message DeleteRequest {
+  // key is the setting's namespaced name, as written.
+  string key = 1 [(buf.validate.field).string = {min_len: 1, max_len: 350}];
+}
+
+// DeleteResponse is empty: acceptance says the row is gone.
+message DeleteResponse {}
+
+// ListPublicRequest is empty: the public set is the same for every caller.
+message ListPublicRequest {}
+
+// ListPublicResponse carries the settings an unauthenticated client may
+// read, ordered by key.
+message ListPublicResponse {
+  // settings are the public rows: names and values, no flags and no
+  // instants, because a caller before sign-in needs the values alone.
+  repeated PublicSetting settings = 1;
+}
+
+// PublicSetting is one public row: the name and the value, nothing else.
+message PublicSetting {
+  // key is the setting's namespaced name.
+  string key = 1;
+
+  // value is the setting's value in the clear. A public setting is never
+  // sealed, so this is the stored value exactly.
+  string value = 2;
+}
+
+// Setting is one row of the settings table. A value that rests sealed
+// behind the enc: prefix is carried here opened — the prefix is storage
+// state, not a field of the row, and the reader learns it from nothing
+// else than the value having been sealed when it was written.
+message Setting {
+  // key is the setting's namespaced name.
+  string key = 1;
+
+  // value is the setting's value in the clear, whatever the table rests.
+  string value = 2;
+
+  // public says whether the unauthenticated read publishes the row.
+  bool public = 3;
+
+  // updated_at is when the row last changed, absent until it did.
+  google.protobuf.Timestamp updated_at = 4;
+}

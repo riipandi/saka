@@ -232,10 +232,31 @@ The read procedures are served by `tango.system.v1.AppConfigService` in
 `api/connect/system.proto`: `Get` answers the public subset to any caller,
 `GetAll` answers every non-secret setting to an administrator. Both read the
 configuration resolved at startup — the JSON file is the only source for the
-system sector; the database-backed configuration store arrives with the
-product-level settings, which are a different surface. The test-email
-procedure is on the same service. The other SMTP checks stay with the mailer
-smoke probe (`task mailer:smoke`).
+system sector. The test-email procedure is on the same service. The other
+SMTP checks stay with the mailer smoke probe (`task mailer:smoke`).
+
+## Settings
+
+Tango-only surface — Pocket ID has no generic settings CRUD; its `app_config`
+table is the closest thing, and tango's `public.settings` table replaces the
+one `00005` used to carry.
+
+| Method | Procedure | Summary / Yaak Title | Status | Evidence |
+| ------ | --------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.settings.v1.SettingsService/List` | List settings | implemented — admin; every row, values in the clear (sealed rows are opened) | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/Get` | Get setting | implemented — admin; unknown key is `not_found` | `modules/appconfig/settings.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/Set` | Set setting | implemented — admin upsert; `sensitive` seals the value (AES-256-GCM, `enc:` prefix); a sealed setting cannot be public | `modules/appconfig/settings.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/Delete` | Delete setting | implemented — admin; unknown key is `not_found` | `modules/appconfig/settings.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only rows flagged `public`, names and values, never a sealed value | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+
+The settings table lives in `00005_create_platform_tables.sql`. Whether a
+value rests sealed is told by its `enc:` prefix alone — there is no flag
+column — and a public row never rests sealed: the write refuses the pair and
+a check constraint backs it. Other features read through the `Settings`
+service (`Get`, `GetString`, `GetBool`, `GetInt64`, `Set`, `Delete`), which
+the appconfig area's `Package` provides; the RPC writes (`SetFor`,
+`DeleteFor`) record `setting_updated` / `setting_deleted` in the causing
+transaction, with the key in the payload and never the value.
 
 ## Application Images
 

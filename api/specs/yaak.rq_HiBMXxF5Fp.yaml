@@ -1,0 +1,62 @@
+type: http_request
+model: http_request
+id: rq_HiBMXxF5Fp
+createdAt: 2026-09-28T09:24:57.873922
+updatedAt: 2026-09-28T09:24:57.873922
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "key": "product.name",
+      "value": "Hogwarts",
+      "sensitive": false,
+      "public": true
+    }
+bodyType: application/json
+description: |-
+  Creates or replaces one setting; the write is an upsert keyed by key.
+
+  Tango procedure tango.settings.v1.SettingsService/Set. Guard: admin.
+
+  sensitive seals the value before it reaches the table (AES-256-GCM, enc: prefix). A sealed setting cannot also be public - the pair is refused, and the table check constraint backs the refusal.
+
+  Parameters:
+  - key (body, required): the setting namespaced name
+  - value (body, required): the value in the clear
+  - sensitive (body): seal the value
+  - public (body): publish to the unauthenticated read
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Set setting'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Set
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto
