@@ -249,6 +249,61 @@ func TestPostgresQueryAndTransaction(t *testing.T) {
 	assert.Equal(t, 1, count, "the panicking transaction must be rolled back")
 }
 
+func TestWithSavepointContainsAFailedStatement(t *testing.T) {
+	// A failed statement poisons its transaction until rollback: every later
+	// statement, and the commit, fail with `25P02`. The savepoint is what
+	// lets a caller ignore a side effect's failure and still commit its own
+	// work.
+	pg := newTestPostgres(t)
+	ctx := t.Context()
+
+	table := scratchTable(t, pg, "id int PRIMARY KEY, name text NOT NULL")
+
+	sentinel := errors.New("the side effect failed")
+	err := pg.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// A duplicate key, the shape a failed insert takes.
+		_, firstErr := tx.Exec(ctx, "INSERT INTO "+table+" (id, name) VALUES ($1, $2)", 1, "kept")
+		require.NoError(t, firstErr)
+
+		sideEffect := datastore.WithSavepoint(ctx, tx, func(ctx context.Context, q datastore.Querier) error {
+			if _, dupErr := q.Exec(ctx, "INSERT INTO "+table+" (id, name) VALUES ($1, $2)", 1, "duplicate"); dupErr != nil {
+				return dupErr
+			}
+			return sentinel
+		})
+		require.Error(t, sideEffect, "the side effect's failure must reach the caller")
+
+		// The transaction is still usable, which is the whole point.
+		_, secondErr := tx.Exec(ctx, "INSERT INTO "+table+" (id, name) VALUES ($1, $2)", 2, "also-kept")
+		return secondErr
+	})
+	require.NoError(t, err, "the caller's transaction must still commit")
+
+	var count int
+	require.NoError(t, pg.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&count))
+	assert.Equal(t, 2, count, "both caller rows must survive the failed side effect")
+}
+
+func TestWithSavepointOnThePoolRunsTheFunctionDirectly(t *testing.T) {
+	// A pool has no surrounding transaction to poison, so there is nothing to
+	// contain: the function runs on the surface as given, and its failure is
+	// returned unchanged.
+	pg := newTestPostgres(t)
+	table := scratchTable(t, pg, "id int PRIMARY KEY")
+
+	sentinel := errors.New("boom")
+	err := datastore.WithSavepoint(t.Context(), pg, func(ctx context.Context, q datastore.Querier) error {
+		_, execErr := q.Exec(ctx, "INSERT INTO "+table+" (id) VALUES ($1)", 1)
+		require.NoError(t, execErr)
+		return sentinel
+	})
+	require.ErrorIs(t, err, sentinel, "the function's error is what the caller sees")
+
+	var count int
+	require.NoError(t, pg.QueryRow(t.Context(), "SELECT count(*) FROM "+table).Scan(&count))
+	assert.Equal(t, 1, count, "the insert ran and was not rolled back by the helper")
+}
+
 func TestPostgresStatsExposePoolCounters(t *testing.T) {
 	pg := newTestPostgres(t)
 

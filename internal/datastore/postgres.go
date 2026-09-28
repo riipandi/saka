@@ -315,6 +315,52 @@ func (p *Postgres) WithTx(ctx context.Context, fn func(ctx context.Context, tx Q
 	return nil
 }
 
+// WithSavepoint runs fn inside a savepoint on the query surface it is given,
+// so a statement that fails inside fn leaves the surrounding transaction
+// usable.
+//
+// Postgres aborts a transaction on any statement error until the transaction
+// is rolled back (`25P02`): every later statement, and the commit, fails with
+// "current transaction is aborted" rather than with the original reason. A
+// side effect that is allowed to fail without failing the caller — an audit
+// record, a metric row — therefore cannot simply ignore its own error: it
+// would take the caller's change down with it. Rolling back to a savepoint
+// clears the aborted state, and the caller's transaction commits what it
+// meant to.
+//
+// The surface decides how. A transaction opens a nested transaction, which
+// pgx implements as a savepoint. A pool has no surrounding transaction to
+// poison — the statement is its own transaction, so a failure is already
+// contained — and fn runs on the surface as given. The caller passes whatever
+// it holds, so the same code works inside and outside a transaction.
+//
+// fn's error is returned, not the savepoint's: the caller is deciding what a
+// failed side effect means, and the reason it failed is what it needs.
+func WithSavepoint(ctx context.Context, q Querier, fn func(ctx context.Context, q Querier) error) error {
+	tx, ok := q.(pgx.Tx)
+	if !ok {
+		return fn(ctx, q)
+	}
+
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("datastore: begin savepoint: %w", err)
+	}
+
+	if err := fn(ctx, sp); err != nil {
+		// The rollback runs on a context that survives caller cancellation,
+		// the same way WithTx's does: a request that gave up must still
+		// clear the aborted state it left behind. Rolling back a savepoint
+		// that was already released is an error we ignore.
+		_ = sp.Rollback(context.WithoutCancel(ctx))
+		return err
+	}
+	if err := sp.Commit(ctx); err != nil {
+		return fmt.Errorf("datastore: release savepoint: %w", err)
+	}
+	return nil
+}
+
 // Ping reports whether the database is reachable.
 func (p *Postgres) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)

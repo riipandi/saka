@@ -218,6 +218,65 @@ func TestANilRecorderWritesNothing(t *testing.T) {
 	})
 }
 
+// TestAFailedRecordDoesNotAbortTheCallersTransaction is the property the
+// savepoint exists for: an audit insert that fails must lose the record and
+// nothing else. On Postgres a failed statement poisons its transaction until
+// rollback (`25P02`), so without the savepoint the caller's own change would
+// fail with it — and the error the caller saw would not name the audit insert.
+func TestAFailedRecordDoesNotAbortTheCallersTransaction(t *testing.T) {
+	pool := migratedPool(t)
+	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+
+	// The user_id names no account, so the insert's foreign key refuses it.
+	// That is the shape a bad identifier takes in production too.
+	const missingAccount = "01a0da1c-cb41-779d-bd02-99b3eb5da999"
+
+	err := pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
+		// The record fails here...
+		recorder.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventSignIn,
+			UserID: missingAccount,
+		})
+		// ...and the caller's own statement must still run, and commit.
+		_, execErr := tx.Exec(ctx,
+			`INSERT INTO public.audit_logs (event, trigger_type) VALUES ($1, 'user')`,
+			"the_caller_change")
+		return execErr
+	})
+	require.NoError(t, err, "the failed record must not fail the caller's transaction")
+
+	// The change committed and the record did not: the savepoint contained it.
+	var callerRows, failedRows int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.audit_logs WHERE event = 'the_caller_change'`).Scan(&callerRows))
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.audit_logs WHERE event = $1`, audit.EventSignIn).Scan(&failedRows))
+	assert.Equal(t, 1, callerRows, "the caller's change must survive the failed record")
+	assert.Zero(t, failedRows, "the failed record itself must not be written")
+}
+
+// TestAFailedRecordOnThePoolIsContained covers the other surface: a job or a
+// command writes through the pool, where the statement is its own transaction
+// and a failure is already contained. The record is still lost, and nothing
+// else is.
+func TestAFailedRecordOnThePoolIsContained(t *testing.T) {
+	pool := migratedPool(t)
+	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+
+	const missingAccount = "01a0da1c-cb41-779d-bd02-99b3eb5da999"
+	assert.NotPanics(t, func() {
+		recorder.Record(t.Context(), pool, audit.Entry{
+			Event:  audit.EventAccountDeleted,
+			UserID: missingAccount,
+		})
+	})
+
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.audit_logs`).Scan(&count))
+	assert.Zero(t, count, "the refused record must not be written")
+}
+
 // TestTheRecordedInstantComesFromTheDatabase pins where the timestamp comes
 // from: the column's own default, so two writers cannot disagree about when an
 // action happened and a clock skew cannot reorder the log.

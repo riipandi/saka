@@ -101,6 +101,13 @@ func NewRecorder(log *slog.Logger) *Recorder {
 // that documents it. The failure is logged instead, with the event, so a
 // broken audit trail is visible without being fatal.
 //
+// The insert runs under a savepoint (datastore.WithSavepoint). A failed
+// statement poisons its transaction — every later statement and the commit
+// fail with `25P02` — so ignoring the error on a bare insert would abort the
+// caller's change along with the record, and report a failure that names
+// neither. The savepoint contains the damage: the record is lost, the change
+// the caller asked for commits.
+//
 // The signature takes the query surface rather than reaching for the pool,
 // which is the whole reason a record can join the caller's transaction.
 func (r *Recorder) Record(ctx context.Context, db datastore.Querier, entry Entry) {
@@ -120,30 +127,34 @@ func (r *Recorder) Record(ctx context.Context, db datastore.Querier, entry Entry
 	}
 	entry.Payload = withActor(ctx, entry.Payload)
 
-	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(Table)
-	ib.Cols(
-		"event", "trigger_type", "action_status", "payload",
-		"ip_address", "user_agent", "device_fingerprint",
-		"country", "city", "resource_type", "resource_id", "user_id",
-	)
-	ib.Values(
-		entry.Event,
-		trigger(entry.Trigger),
-		status(entry.Status),
-		payloadJSON(entry.Payload),
-		addr(entry.Client.IPAddress),
-		entry.Client.UserAgent,
-		entry.Client.Fingerprint,
-		entry.Client.Country,
-		entry.Client.City,
-		entry.ResourceType,
-		nullableUUID(entry.ResourceID),
-		nullableUUID(entry.UserID),
-	)
+	err := datastore.WithSavepoint(ctx, db, func(ctx context.Context, q datastore.Querier) error {
+		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+		ib.InsertInto(Table)
+		ib.Cols(
+			"event", "trigger_type", "action_status", "payload",
+			"ip_address", "user_agent", "device_fingerprint",
+			"country", "city", "resource_type", "resource_id", "user_id",
+		)
+		ib.Values(
+			entry.Event,
+			trigger(entry.Trigger),
+			status(entry.Status),
+			payloadJSON(entry.Payload),
+			addr(entry.Client.IPAddress),
+			entry.Client.UserAgent,
+			entry.Client.Fingerprint,
+			entry.Client.Country,
+			entry.Client.City,
+			entry.ResourceType,
+			nullableUUID(entry.ResourceID),
+			nullableUUID(entry.UserID),
+		)
 
-	query, args := ib.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
+		query, args := ib.Build()
+		_, execErr := q.Exec(ctx, query, args...)
+		return execErr
+	})
+	if err != nil {
 		// The event is the one field that identifies which action went
 		// unrecorded, so it is what the line carries.
 		r.log.ErrorContext(ctx, "audit: record not written",
