@@ -73,6 +73,24 @@ func New(cfg config.Config) (Store, error) {
 	}
 }
 
+// ctxReader stops a copy when the context ends. Neither `sha256` nor the
+// local file system watches a context, so the sync's hash pass and `FS.Put`
+// wrap their source in this reader; without it a copy outlasting the queue's
+// release window keeps the row claimed while the first worker is still
+// inside `io.Copy`. The check is per read, so a read already underway
+// completes and the stop is bounded by one read.
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
+}
+
 // Key builds a storage key from flexible parts, the naming a multi-purpose
 // store needs: the first part is the purpose the files belong to — avatar,
 // user-files, export — the rest free, so a feature names its files its own

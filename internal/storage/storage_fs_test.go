@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
@@ -106,6 +107,41 @@ func TestFSStoreDeletePrunesTheEmptyDirs(t *testing.T) {
 
 	_, err := os.Stat(filepath.Join(store.root, filesDir, "avatars", "usr_1"))
 	assert.True(t, os.IsNotExist(err), "an emptied subtree must not linger")
+}
+
+func TestFSStorePutStopsWhenTheContextEnds(t *testing.T) {
+	store, key, data := newFSStore(t)
+
+	// The local write is the one leg of an upload with no network call to
+	// notice a cancelled request, so the reader is what makes the caller's
+	// deadline real: a copy on a dead context stops at its first read.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), "image/png")
+	assert.ErrorIs(t, err, context.Canceled)
+
+	// A cancelled copy leaves no half file and no temp file behind.
+	_, err = store.Get(t.Context(), key)
+	assert.ErrorIs(t, err, ErrNotFound)
+	keys, listErr := listedKeys(t.Context(), store)
+	require.NoError(t, listErr)
+	assert.Empty(t, keys)
+}
+
+func TestCtxReaderStopsWhenTheContextEnds(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	source := bytes.NewReader([]byte("payload"))
+	reader := ctxReader{ctx: ctx, r: source}
+
+	buf := make([]byte, 4)
+	n, err := reader.Read(buf)
+	require.NoError(t, err)
+	assert.Equal(t, 4, n, "a live context passes the read through")
+
+	cancel()
+	_, err = reader.Read(buf)
+	assert.ErrorIs(t, err, context.Canceled, "a dead context stops the next read")
 }
 
 func TestContentHashIsTheWholeFile(t *testing.T) {

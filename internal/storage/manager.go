@@ -269,7 +269,7 @@ func (m *Manager) sync(ctx context.Context, key string) (string, int64, error) {
 	contentHash := prior.ContentHash
 	if !reuse {
 		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
+		if _, err := io.Copy(h, ctxReader{ctx: ctx, r: f}); err != nil {
 			return uploadError, 0, fmt.Errorf("storage: hash staging %q: %w", key, err)
 		}
 		contentHash = hex.EncodeToString(h.Sum(nil))

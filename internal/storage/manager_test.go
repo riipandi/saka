@@ -207,6 +207,28 @@ func TestManagerSyncWithoutAStagingFileIsQuiet(t *testing.T) {
 	assert.NoError(t, manager.Sync(t.Context(), "never-staged"))
 }
 
+func TestManagerSyncStopsHashingWhenTheContextEnds(t *testing.T) {
+	// The hash pass is a plain `io.Copy` over the whole file, so the
+	// context is the only thing that can stop it: a cancelled sync must
+	// fail before the checkpoint, leaving the manifest as the stage wrote
+	// it and the staging file in place for the retry.
+	manager, _, _ := newManager(t)
+
+	data := bytes.Repeat([]byte("deadline"), 200)
+	require.NoError(t, manager.Stage(t.Context(), "k", bytes.NewReader(data), nil))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err := manager.Sync(ctx, "k")
+	assert.ErrorIs(t, err, context.Canceled)
+
+	manifest, err := manager.Manifest(t.Context(), "k")
+	require.NoError(t, err)
+	assert.Equal(t, StatusPending, manifest.Status)
+	assert.Empty(t, manifest.ContentHash, "the hash never finished, so nothing was recorded")
+	assert.FileExists(t, manager.stagingPath("k"))
+}
+
 // listedKeys reads the backend's own listing, the view the garbage
 // collection walks.
 func listedKeys(ctx context.Context, store *FS) ([]string, error) {

@@ -50,7 +50,12 @@ func (s *FS) Get(_ context.Context, key string) (io.ReadCloser, error) {
 // collection's listing skips — instead of a truncated one. The content type
 // is the local filesystem's to have no opinion about: the feature serves it
 // from the manifest's own record.
-func (s *FS) Put(_ context.Context, key string, r io.Reader, _ int64, _ string) error {
+//
+// The copy watches the context: a local write is the one leg of an upload
+// with no network call to notice a cancelled request, so the reader is what
+// makes the caller's deadline real here. A cancelled copy removes its temp
+// file and leaves the key's previous bytes untouched.
+func (s *FS) Put(ctx context.Context, key string, r io.Reader, _ int64, _ string) error {
 	path := s.path(key)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("storage: file directory: %w", err)
@@ -59,7 +64,7 @@ func (s *FS) Put(_ context.Context, key string, r io.Reader, _ int64, _ string) 
 	if err != nil {
 		return fmt.Errorf("storage: write file %s: %w", key, err)
 	}
-	if _, err = io.Copy(tmp, r); err != nil {
+	if _, err = io.Copy(tmp, ctxReader{ctx: ctx, r: r}); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
 		return fmt.Errorf("storage: write file %s: %w", key, err)
