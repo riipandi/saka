@@ -1,0 +1,58 @@
+type: http_request
+model: http_request
+id: rq_WkfEp4WCz9
+createdAt: 2026-09-28T16:43:14.618144
+updatedAt: 2026-09-28T16:43:14.618144
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_auMsw4bdee
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "user_replace_with_wire_id",
+      "key": "department",
+      "value": "Potions"
+    }
+bodyType: application/json
+description: |-
+  Hangs a claim on an account. The key is unique per subject; the value may be a plain string or a JSON document — the tokens carry it as the document it names.
+
+  Tango procedure tango.federation.v1.CustomClaimService/CreateUserClaim. Guard: admin.
+
+  Parameters:
+  - user_id (body, required): the account, in its wire form (user_...)
+  - key (body, required): the claim's name in the token
+  - value (body, required): the value
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Create user custom claim'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

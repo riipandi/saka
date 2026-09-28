@@ -73,6 +73,15 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		federationv1connect.OidcClientServiceListSecretsProcedure,
 		federationv1connect.OidcClientServiceCreateSecretProcedure,
 		federationv1connect.OidcClientServiceDeleteSecretProcedure,
+		federationv1connect.CustomClaimServiceSuggestProcedure,
+		federationv1connect.CustomClaimServiceListUserClaimsProcedure,
+		federationv1connect.CustomClaimServiceCreateUserClaimProcedure,
+		federationv1connect.CustomClaimServiceUpdateUserClaimProcedure,
+		federationv1connect.CustomClaimServiceDeleteUserClaimProcedure,
+		federationv1connect.CustomClaimServiceListGroupClaimsProcedure,
+		federationv1connect.CustomClaimServiceCreateGroupClaimProcedure,
+		federationv1connect.CustomClaimServiceUpdateGroupClaimProcedure,
+		federationv1connect.CustomClaimServiceDeleteGroupClaimProcedure,
 	} {
 		assert.True(t, claimed[procedure],
 			"the area must forward its features' procedures to the RPC router: %s", procedure)

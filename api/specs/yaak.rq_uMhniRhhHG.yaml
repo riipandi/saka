@@ -1,20 +1,25 @@
 type: http_request
 model: http_request
-id: rq_Hn9GMgTMWo
-createdAt: 2026-09-26T11:38:19.941676
-updatedAt: 2026-09-26T11:41:54.441619
+id: rq_uMhniRhhHG
+createdAt: 2026-09-28T16:43:05.970361
+updatedAt: 2026-09-28T16:43:05.970361
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_auMsw4bdee
 authentication: {}
 authenticationType: null
 body:
-  bodyType: application/json
-  text: '{}'
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
 bodyType: application/json
 description: |-
-  Get a list of suggested custom claim names
+  Answers the claims one account carries, ordered by key.
 
-  Mirror of Pocket ID `GET /api/custom-claims/suggestions`.
+  Tango procedure tango.federation.v1.CustomClaimService/ListUserClaims. Guard: admin.
+
+  Parameters:
+  - user_id (body, required): the account, in its wire form (user_...)
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Update custom claims for a user (unimplemented)'
-sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.CustomClaimService/UpdateUserClaims
+name: '[Pocket ID] List user custom claims'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/ListUserClaims
 urlParameters: []
 settingSendCookies:
   enabled: false

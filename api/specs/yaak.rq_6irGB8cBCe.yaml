@@ -1,20 +1,25 @@
 type: http_request
 model: http_request
-id: rq_6qQLJGecbP
-createdAt: 2026-09-18T23:55:27.474214
-updatedAt: 2026-09-26T11:39:37.946911
+id: rq_6irGB8cBCe
+createdAt: 2026-09-28T16:43:29.380850
+updatedAt: 2026-09-28T16:43:29.380851
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_auMsw4bdee
 authentication: {}
 authenticationType: null
 body:
-  bodyType: application/json
-  text: '{}'
+  text: |-
+    {
+      "id": "cclm_replace_with_claim_id"
+    }
 bodyType: application/json
 description: |-
-  Get a list of suggested custom claim names
+  Removes one of an account's claims. A claim row the group surface owns is refused; an unknown or malformed identifier is the not-found refusal.
 
-  Mirror of Pocket ID `GET /api/custom-claims/suggestions`.
+  Tango procedure tango.federation.v1.CustomClaimService/DeleteUserClaim. Guard: admin.
+
+  Parameters:
+  - id (body, required): the claim row's identifier, a TypeID (cclm_...)
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Get custom claim suggestions (unimplemented)'
+name: '[Pocket ID] Delete user custom claim'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.CustomClaimService/Suggest
+url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/DeleteUserClaim
 urlParameters: []
 settingSendCookies:
   enabled: false
