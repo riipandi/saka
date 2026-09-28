@@ -164,9 +164,10 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 // mismatch leaves the code spendable, because the caller's mistake is not the
 // code's spend.
 func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client audit.ClientInfo) (signin.Result, error) {
+	hash := crypto.HashHexToken(rawCode)
 	var result signin.Result
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		row, err := s.repo.FindTokenByHash(ctx, tx, crypto.HashHexToken(rawCode))
+		row, err := s.repo.FindTokenByHash(ctx, tx, hash)
 		if errors.Is(err, datastore.ErrNoRows) {
 			return ErrTokenInvalid
 		}
@@ -179,26 +180,29 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 		if row.DeviceToken != nil && subtle.ConstantTimeCompare([]byte(*row.DeviceToken), []byte(deviceToken)) != 1 {
 			// The device pair failed: the wrong guess rides the row, and the
 			// guess that fills the budget ends the token — a device-bound
-			// code that keeps failing is one a third party is holding.
+			// code that keeps failing is one a third party is holding. The
+			// delete carries the hash this caller resolved, so a code a
+			// re-issue replaced is not swept by the stale read.
 			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, tx, row.ID, maxAttempts)
 			if budgetErr != nil {
 				return budgetErr
 			}
 			if !live {
-				if _, delErr := s.repo.DeleteToken(ctx, tx, row.ID); delErr != nil {
+				if _, delErr := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess); delErr != nil {
 					return delErr
 				}
 			}
 			return ErrDeviceMismatch
 		}
 
-		spent, err := s.repo.DeleteToken(ctx, tx, row.ID)
+		spent, err := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess)
 		if err != nil {
 			return err
 		}
 		if spent == 0 {
-			// Another exchange reached the delete first: the code is spent,
-			// and this caller answers the same refusal an unknown one does.
+			// Another exchange reached the delete first, or a re-issue
+			// replaced the row this caller read: the code is spent, and this
+			// caller answers the same refusal an unknown one does.
 			return ErrTokenInvalid
 		}
 

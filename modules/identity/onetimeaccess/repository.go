@@ -160,11 +160,17 @@ func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Quer
 	return attempts < max, nil
 }
 
-func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID) (int64, error) { // pgconn's CommandTag counts the rows the statement touched; a second
+// DeleteToken consumes a code row: the delete is the spend, and the count it
+// reports is what a second caller loses the race with. The caller checks the
+// expiry and the device token before it deletes, so the delete's guard is the
+// last word on whether the code was still there to spend. The WHERE carries
+// the hash the caller resolved, so a re-issue that replaced the row cannot be
+// consumed by the stale read that named it.
+func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, tokenHash, purpose string) (int64, error) { // pgconn's CommandTag counts the rows the statement touched; a second
 	// caller that lost the race sees zero, which is the code already spent.
 	db2 := sqlbuilder.PostgreSQL.NewDeleteBuilder()
 	db2.DeleteFrom(tokenTable)
-	db2.Where(db2.Equal("id", id))
+	db2.Where(db2.Equal("id", id), db2.Equal("token_hash", tokenHash), db2.Equal("purpose", purpose))
 
 	query, args := db2.Build()
 	tag, err := db.Exec(ctx, query, args...)

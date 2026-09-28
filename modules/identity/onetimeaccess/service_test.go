@@ -196,6 +196,34 @@ func TestCreateTokenReplacesAnOlderCode(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// A re-issue replaces the pending row under the same id. The spend carries
+// the hash the caller resolved, so a stale read cannot delete the replacement:
+// the code it names is no longer the live one.
+func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool, false, false)
+	userID := seedUser(t, pool, "hermione", "hermione@example.com")
+
+	first, _, err := service.CreateToken(t.Context(), wireOf(t, userID), 0)
+	require.NoError(t, err)
+	stale, err := service.repo.FindTokenByHash(t.Context(), pool, crypto.HashHexToken(first))
+	require.NoError(t, err)
+
+	second, _, err := service.CreateToken(t.Context(), wireOf(t, userID), 0)
+	require.NoError(t, err)
+
+	spent, err := service.repo.DeleteToken(t.Context(), pool, stale.ID, crypto.HashHexToken(first), PurposeOneTimeAccess)
+	require.NoError(t, err)
+	assert.Zero(t, spent, "a stale hash removes nothing")
+	assert.Equal(t, 1, countTokens(t, pool, userID), "the live code survives the stale delete")
+
+	result, err := service.Exchange(t.Context(), second, "", audit.ClientInfo{})
+	require.NoError(t, err)
+	assert.Equal(t, "hermione", result.User.Username)
+}
+
 func TestExchangeRefusesAnExpiredCode(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
