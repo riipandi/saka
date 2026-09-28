@@ -378,7 +378,6 @@ message AuthenticatedUser {
 
   // display_name is the name shown in the UI.
   string display_name = 4;
-
 }
 
 // SignOutRequest is empty: the session it ends is the one the access token

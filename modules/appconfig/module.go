@@ -25,6 +25,7 @@ import (
 	"github.com/samber/do/v2"
 
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/kernel"
@@ -53,11 +54,12 @@ var Package = do.Package(
 		cfg := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
+		kvCache := do.MustInvoke[cache.Cache](i)
 		cipher, err := settingsCipher(cfg.App.SecretKey)
 		if err != nil {
 			return nil, err
 		}
-		return NewSettings(pool, cipher, recorder)
+		return NewSettings(pool, cipher, recorder, kvCache)
 	}),
 )
 

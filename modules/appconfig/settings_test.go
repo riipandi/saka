@@ -26,7 +26,7 @@ func settingsService(t *testing.T) (*Settings, *datastore.Postgres) {
 	cipher, err := crypto.NewCipherFromHex(testCipherKey)
 	require.NoError(t, err)
 	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
-	settings, err := NewSettings(pool, cipher, recorder)
+	settings, err := NewSettings(pool, cipher, recorder, nil)
 	require.NoError(t, err)
 	return settings, pool
 }
@@ -39,7 +39,7 @@ func blindSettings(t *testing.T) (*Settings, *datastore.Postgres) {
 
 	pool := migratedPool(t)
 	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
-	settings, err := NewSettings(pool, nil, recorder)
+	settings, err := NewSettings(pool, nil, recorder, nil)
 	require.NoError(t, err)
 	return settings, pool
 }
@@ -255,13 +255,13 @@ func TestTheCatalogRefusesAPublicSealedItem(t *testing.T) {
 	pool := migratedPool(t)
 
 	_, err := newSettings(pool, nil, nil,
-		[]SettingDef{{Key: "bad.item", Default: "x", Sealed: true, Public: true}})
+		[]SettingDef{{Key: "bad.item", Default: "x", Sealed: true, Public: true}}, nil)
 	require.ErrorIs(t, err, ErrInvalidCatalog)
 
 	_, err = newSettings(pool, nil, nil, []SettingDef{
 		{Key: "dup.item", Default: "x"},
 		{Key: "dup.item", Default: "y"},
-	})
+	}, nil)
 	require.ErrorIs(t, err, ErrInvalidCatalog, "a catalog that names a key twice is broken too")
 }
 

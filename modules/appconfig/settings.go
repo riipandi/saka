@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/pkg/crypto"
 )
@@ -121,25 +122,39 @@ type Settings struct {
 	// in — and byKey is the lookup the reads and writes resolve with.
 	defs  []SettingDef
 	byKey map[string]SettingDef
+
+	// cache carries the reads the surface serves from: the public listing
+	// and the effective value of an unsealed item. It is the shared Cache
+	// the registry builds — Noop while caching is off, so a feature never
+	// branches on the question — and nil only in a test that built the
+	// feature by hand, which the reads below answer uncached.
+	cache cache.Cache
 }
 
+// Cache keys the settings reads store under. The public listing is one
+// document; a gate's value rests one entry per catalog key, so a change
+// invalidates the one item it touched instead of the family.
+const (
+	listPublicCacheKey = "settings:public"
+	gateCacheKeyPrefix = "settings:gate:"
+)
+
 // NewSettings builds the feature over the pool and the deployment's cipher.
-// A nil cipher is a deployment without a secret key: reads and plain writes
-// serve, sealed writes are refused at the call site. A catalog that asks
+// A nil cipher is a deployment without a secret key: reads and plain writes// serve, sealed writes are refused at the call site. A catalog that asks
 // for the impossible — a public item that rests sealed — is refused here,
 // so the run fails before the surface opens.
-func NewSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder) (*Settings, error) {
-	return newSettings(pool, cipher, recorder, Catalog())
+func NewSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, cache cache.Cache) (*Settings, error) {
+	return newSettings(pool, cipher, recorder, Catalog(), cache)
 }
 
 // newSettings builds the feature over an explicit catalog. It is the
 // constructor's body, separate so a test can drive a catalog the shipped
-// one does not carry.
-func newSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, defs []SettingDef) (*Settings, error) {
+// one does not carry. A nil cache serves every read uncached.
+func newSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, defs []SettingDef, cache cache.Cache) (*Settings, error) {
 	ordered := slices.Clone(defs)
 	slices.SortFunc(ordered, func(a, b SettingDef) int { return strings.Compare(a.Key, b.Key) })
 	settings := &Settings{
-		pool: pool, cipher: cipher, audit: recorder,
+		pool: pool, cipher: cipher, audit: recorder, cache: cache,
 		defs: ordered, byKey: map[string]SettingDef{},
 	}
 	for _, def := range ordered {
@@ -156,12 +171,32 @@ func newSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audi
 
 // Get answers the effective value in the clear, or ErrUnknownSetting when
 // the key is not in the catalog. A sealed value is opened on the way out.
+//
+// An unsealed item's effective value is read through the cache: the gates a
+// feature checks per request — a feature flag, an enabled flow — pay one
+// query per window instead of one per call. A sealed item is never cached:
+// the value it opens is a secret, and the cache's backends outlive a
+// request. The reads a change brings also age out on their own — Update and
+// Reset drop the entries the change touches.
 func (s *Settings) Get(ctx context.Context, key string) (string, error) {
-	setting, err := s.GetSetting(ctx, key)
-	if err != nil {
-		return "", err
+	def, ok := s.byKey[key]
+	if !ok {
+		return "", ErrUnknownSetting
 	}
-	return setting.Value, nil
+	if def.Sealed || s.cache == nil {
+		setting, err := s.GetSetting(ctx, key)
+		if err != nil {
+			return "", err
+		}
+		return setting.Value, nil
+	}
+	return cache.Fetch(ctx, s.cache, gateCacheKeyPrefix+key, 0, false, func(ctx context.Context) (string, error) {
+		setting, err := s.GetSetting(ctx, key)
+		if err != nil {
+			return "", err
+		}
+		return setting.Value, nil
+	})
 }
 
 // GetString is Get under the name a typed caller reads it as. The value is
@@ -232,8 +267,11 @@ func (s *Settings) GetSetting(ctx context.Context, key string) (Setting, error) 
 // already rest, and the item's flags are the catalog's, not the call's. It
 // records nothing — the calling feature owns its audit trail.
 func (s *Settings) Update(ctx context.Context, key, value string) error {
-	_, err := s.store(ctx, s.pool, key, value)
-	return err
+	if _, err := s.store(ctx, s.pool, key, value); err != nil {
+		return err
+	}
+	s.invalidate(ctx, key)
+	return nil
 }
 
 // Reset removes the override, so the item answers its catalog default
@@ -249,10 +287,10 @@ func (s *Settings) Reset(ctx context.Context, key string) error {
 	db.Where(db.Equal("key", key))
 
 	query, args := db.Build()
-	_, err := s.pool.Exec(ctx, query, args...)
-	if err != nil {
+	if _, err := s.pool.Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("appconfig: reset setting: %w", err)
 	}
+	s.invalidate(ctx, key)
 	return nil
 }
 
@@ -284,7 +322,26 @@ func (s *Settings) List(ctx context.Context) ([]Setting, error) {
 // the ones flagged public, their effective values. A public item never
 // rests sealed — the catalog refuses the pair — so there is nothing to
 // open here that the catalog has not already promised is plain.
+//
+// The answer is one document every caller reads the same, so it is served
+// from one cached entry; a change through Update or Reset drops it. A
+// bypassed call reads the source and leaves the cached entry alone.
 func (s *Settings) ListPublic(ctx context.Context) ([]Setting, error) {
+	return s.ListPublicBypassingCache(ctx, false)
+}
+
+// ListPublicBypassingCache is ListPublic with the caller-facing bypass: a
+// request that carries the flag reads the source without disturbing what
+// the cache holds.
+func (s *Settings) ListPublicBypassingCache(ctx context.Context, bypass bool) ([]Setting, error) {
+	if s.cache == nil {
+		return s.listPublic(ctx)
+	}
+	return cache.Fetch(ctx, s.cache, listPublicCacheKey, 0, bypass, s.listPublic)
+}
+
+// listPublic is ListPublic's own read.
+func (s *Settings) listPublic(ctx context.Context) ([]Setting, error) {
 	overrides, err := s.overrides(ctx, true)
 	if err != nil {
 		return nil, err
@@ -307,6 +364,18 @@ func (s *Settings) ListPublic(ctx context.Context) ([]Setting, error) {
 		settings = append(settings, setting)
 	}
 	return settings, nil
+}
+
+// invalidate drops the cache entries a change to one setting touches: the
+// public listing that carries it and the gate value the features read. The
+// call runs after the write commits, so a cache that answers again is the
+// database's answer.
+func (s *Settings) invalidate(ctx context.Context, key string) {
+	if s.cache == nil {
+		return
+	}
+	s.cache.Del(ctx, listPublicCacheKey)
+	s.cache.Del(ctx, gateCacheKeyPrefix+key)
 }
 
 // UpdateFor is the RPC surface's write: the upsert with the audit record of
@@ -341,7 +410,11 @@ func (s *Settings) UpdateFor(ctx context.Context, callerID, key, value string) (
 		})
 		return nil
 	})
-	return setting, err
+	if err != nil {
+		return Setting{}, err
+	}
+	s.invalidate(ctx, key)
+	return setting, nil
 }
 
 // ResetFor is the RPC surface's reset: the override is removed and the item
@@ -380,7 +453,11 @@ func (s *Settings) ResetFor(ctx context.Context, callerID, key string) (Setting,
 		setting = s.atDefault(def)
 		return nil
 	})
-	return setting, err
+	if err != nil {
+		return Setting{}, err
+	}
+	s.invalidate(ctx, key)
+	return setting, nil
 }
 
 // atDefault builds the item as its catalog default, with no override to

@@ -25,7 +25,6 @@ package tango.authz.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
-import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1;authzv1";
 
@@ -171,24 +170,40 @@ message ListPermissionsRequest {
   string search = 1;
   // resource narrows the catalog to one resource's entries — the first
   // segment of the slug. Empty answers every resource.
-  string resource = 2 [
-    (buf.validate.field).string = {
-      in: ["", "user", "user_group", "role", "permission", "session", "api_key", "signup_token", "audit_log", "notification", "file"]
-    }
-  ];
+  string resource = 2 [(buf.validate.field).string = {
+    in: [
+      "",
+      "user",
+      "user_group",
+      "role",
+      "permission",
+      "session",
+      "api_key",
+      "signup_token",
+      "audit_log",
+      "notification",
+      "file"
+    ]
+  }];
   // sort_by orders the catalog: slug or description. Empty keeps the
   // catalog order — grouped by resource, slugs alphabetical inside it.
-  string sort_by = 3 [
-    (buf.validate.field).string = {
-      in: ["", "slug", "description"]
-    }
-  ];
+  string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "",
+      "slug",
+      "description"
+    ]
+  }];
   // sort_order is asc or desc; asc is the default.
-  string sort_order = 4 [
-    (buf.validate.field).string = {
-      in: ["", "asc", "desc"]
-    }
-  ];
+  string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "",
+      "asc",
+      "desc"
+    ]
+  }];
+  // nocache true reads the source and leaves the cached answer alone.
+  bool nocache = 5;
 }
 
 // ListPermissionsResponse carries the catalog in the order the request
@@ -212,22 +227,27 @@ message ListRolesRequest {
   // search narrows the page to roles whose name or slug matches.
   string search = 3;
   // sort_by orders the page: name, slug, or created_at.
-  string sort_by = 4 [
-    (buf.validate.field).string = {
-      in: ["", "name", "slug", "created_at"]
-    }
-  ];
+  string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "",
+      "name",
+      "slug",
+      "created_at"
+    ]
+  }];
   // sort_order is asc or desc; desc is the default.
-  string sort_order = 5 [
-    (buf.validate.field).string = {
-      in: ["", "asc", "desc"]
-    }
-  ];
+  string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "",
+      "asc",
+      "desc"
+    ]
+  }];
   // type narrows the page to one kind of role. Unspecified answers every
   // role — the system ones the seed created and the custom ones.
-  optional RoleType type = 6 [
-    (buf.validate.field).enum.defined_only = true
-  ];
+  optional RoleType type = 6 [(buf.validate.field).enum.defined_only = true];
+  // nocache true reads the source and leaves the cached answer alone.
+  bool nocache = 7;
 }
 
 // ListRolesResponse answers one page of the roles with the pagination
@@ -246,6 +266,9 @@ message GetRoleRequest {
   // id is the role's identifier in its wire form, a TypeID (`role_…`). One
   // without the prefix names no role.
   string id = 1;
+
+  // nocache true reads the source and leaves the cached answer alone.
+  bool nocache = 2;
 }
 
 // GetRoleResponse answers one role with its permission slugs.

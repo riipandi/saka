@@ -229,7 +229,7 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler_rest.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
+| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
 | POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
@@ -261,7 +261,7 @@ it, and a key not in the catalog is refused everywhere.
 | POST | `/rpc/tango.settings.v1.SettingsService/List` | List settings | implemented — admin; every catalog item with its effective value (override resting, else default) and the default it falls back to | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
 | POST | `/rpc/tango.settings.v1.SettingsService/Update` | Update setting | implemented — admin; catalog keys only; a sealed item seals the value (AES-256-GCM, `enc:` prefix) | `modules/appconfig/settings.go` |
 | POST | `/rpc/tango.settings.v1.SettingsService/Reset` | Reset setting to default | implemented — admin; drops the override; an item already at its default answers unchanged | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value; served from one cache entry a change drops, `nocache` in the body reads the source | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
 
 Whether a value rests sealed is told by its `enc:` prefix alone — there is
 no flag column — and a public item never rests sealed: the catalog refuses
@@ -507,9 +507,9 @@ Identifiers are TypeIDs on the wire, the columns stay UUIDs: a notification is `
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListPermissions` | [Tango] List permissions | done — Admin; the code-declared catalog read-only (`perm_…` id, slug, description; search, resource filter, sort by slug/description) | `modules/identity/authorization` + `internal/authz` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListRoles` | [Tango] List roles | done — Admin; page + `search` + `sort_by`/`sort_order` (name, slug, created_at) + `type` filter (system/custom), `permission_count` per row | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/GetRole` | [Tango] Get role | done — Admin; the row plus the permission slugs it carries | `modules/identity/authorization` |
+| POST | `/rpc/tango.authz.v1.AuthorizationService/ListPermissions` | [Tango] List permissions | done — Admin; the code-declared catalog read-only (`perm_…` id, slug, description; search, resource filter, sort by slug/description); cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` + `internal/authz` |
+| POST | `/rpc/tango.authz.v1.AuthorizationService/ListRoles` | [Tango] List roles | done — Admin; page + `search` + `sort_by`/`sort_order` (name, slug, created_at) + `type` filter (system/custom), `permission_count` per row; cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
+| POST | `/rpc/tango.authz.v1.AuthorizationService/GetRole` | [Tango] Get role | done — Admin; the row plus the permission slugs it carries; cached by id, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
 | POST | `/rpc/tango.authz.v1.AuthorizationService/CreateRole` | [Tango] Create role | done — Admin; unique name and slug, born with no permissions | `modules/identity/authorization` |
 | POST | `/rpc/tango.authz.v1.AuthorizationService/UpdateRole` | [Tango] Update role | done — Admin; name + description only; slug and type immutable; a system role refuses | `modules/identity/authorization` |
 | POST | `/rpc/tango.authz.v1.AuthorizationService/DeleteRole` | [Tango] Delete role | done — Admin; custom roles only, refused while accounts hold it | `modules/identity/authorization` |

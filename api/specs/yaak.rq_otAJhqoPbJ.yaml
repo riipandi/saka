@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_otAJhqoPbJ
 createdAt: 2026-09-27T11:44:29.619327
-updatedAt: 2026-09-27T11:50:59.956831
+updatedAt: 2026-09-28T11:29:02.048466
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_MbztvSdMtC
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "${[ response.body.path() ]}"
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}"
     }
 bodyType: application/json
 description: '[Tango] Remove a custom role. A system role is refused, as is any role accounts still hold - the grants must be lifted first. Administrative: requires the admin role.'
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Delete Role
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/DeleteRole
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/DeleteRole
 urlParameters: []
 settingSendCookies:
   enabled: false

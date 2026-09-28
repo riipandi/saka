@@ -15,6 +15,7 @@ import (
 	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/kernel"
@@ -50,6 +51,10 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// stands in for the wiring the composition root guarantees, and the
 		// recorder is nil-safe so a feature runs without one.
 		do.Eager[*audit.Recorder](nil),
+		// The settings and the authorization features read through the
+		// shared cache; the driver that answers every read a miss stands in
+		// for the wiring the composition root guarantees.
+		do.Eager[cache.Cache](cache.Noop{}),
 	)
 	Package(i)
 

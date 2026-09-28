@@ -22,6 +22,7 @@ import (
 	"github.com/samber/do/v2"
 
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/jobs"
@@ -314,7 +315,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return authorization.NewService(pool, recorder, log), nil
+		return authorization.NewService(pool, recorder, log, do.MustInvoke[cache.Cache](i)), nil
 	}),
 )
 

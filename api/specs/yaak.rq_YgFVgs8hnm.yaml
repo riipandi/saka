@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_YgFVgs8hnm
 createdAt: 2026-09-27T11:44:29.663186
-updatedAt: 2026-09-27T11:48:32.070748
+updatedAt: 2026-09-28T11:29:12.442649
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_MbztvSdMtC
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "role_01a0e2000000000000000000000",
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}",
       "permission_slugs": [
         "user:*:read",
         "user:*:list"
@@ -30,7 +30,7 @@ headers:
 method: POST
 name: Set Role Permissions
 sortPriority: 7111.111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/SetRolePermissions
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/SetRolePermissions
 urlParameters: []
 settingSendCookies:
   enabled: false

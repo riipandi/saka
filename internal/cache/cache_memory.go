@@ -211,6 +211,47 @@ func (c *Memory) DelMany(ctx context.Context, keys []string) {
 	}
 }
 
+// DelPrefix implements Cache. The index maps hashes to entries, so a prefix
+// removal walks the index of every shard and drops the entries whose stored
+// key bytes begin with the prefix — the entries carry their own keys, which
+// is what makes the walk possible without a second data structure.
+func (c *Memory) DelPrefix(_ context.Context, prefix string) {
+	for i := range c.shards {
+		shard := &c.shards[i]
+
+		shard.mu.Lock()
+		for h, entry := range shard.m {
+			if shard.startsWith(entry, prefix) {
+				delete(shard.m, h)
+			}
+		}
+		for h, entry := range shard.collisions {
+			if shard.startsWith(entry, prefix) {
+				delete(shard.collisions, h)
+			}
+		}
+		shard.mu.Unlock()
+	}
+}
+
+// startsWith reads the key stored at the entry's location and reports
+// whether it begins with the prefix. spans walks the bytes across the chunk
+// boundary, so the comparison never materializes the key.
+func (s *memoryShard) startsWith(entry memoryEntry, prefix string) bool {
+	if entry.keyLen < len(prefix) {
+		return false
+	}
+	consumed := 0
+	s.spans(entry.chunk, entry.off, len(prefix), func(b []byte) {
+		if consumed < 0 || string(b) != prefix[consumed:consumed+len(b)] {
+			consumed = -1
+			return
+		}
+		consumed += len(b)
+	})
+	return consumed >= 0
+}
+
 // Reset drops every entry and winds the rings back, keeping the memory the
 // shards already grew. It is what an operator or a test runs to reclaim
 // space before the ring would have reached it on its own — the only drain

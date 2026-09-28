@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_eik9ua9AvF
 createdAt: 2026-09-27T11:44:29.575321
-updatedAt: 2026-09-27T11:47:37.679563
+updatedAt: 2026-09-28T11:28:57.743092
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_MbztvSdMtC
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "role_01a0e2000000000000000000000",
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}",
       "name": "Content Editor",
       "description": "Edits the content"
     }
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: Update Role
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/UpdateRole
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/UpdateRole
 urlParameters: []
 settingSendCookies:
   enabled: false

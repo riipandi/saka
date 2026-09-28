@@ -134,6 +134,31 @@ func (c *Valkey) DelMany(ctx context.Context, keys []string) {
 	c.client.Do(ctx, c.client.B().Del().Key(c.prefixed(keys)...).Build())
 }
 
+// DelPrefix implements Cache. The backend has no atomic prefix removal, so
+// the driver scans the keys the namespace holds and deletes the ones the
+// pattern matches, batch by batch — an O(dataset) walk like the memory
+// driver's index walk, and as best-effort: a scan that fails leaves the
+// entries it did not reach for the TTL to end.
+func (c *Valkey) DelPrefix(ctx context.Context, prefix string) {
+	pattern := c.prefix + prefix + "*"
+
+	var cursor uint64
+	for {
+		scan := c.client.B().Scan().Cursor(cursor).Match(pattern).Count(100).Build()
+		resp, err := c.client.Do(ctx, scan).AsScanEntry()
+		if err != nil {
+			return
+		}
+		if len(resp.Elements) > 0 {
+			c.client.Do(ctx, c.client.B().Del().Key(resp.Elements...).Build())
+		}
+		if resp.Cursor == 0 {
+			return
+		}
+		cursor = resp.Cursor
+	}
+}
+
 // prefixed names the keys within the namespace the driver owns.
 func (c *Valkey) prefixed(keys []string) []string {
 	names := make([]string, len(keys))

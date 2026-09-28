@@ -2,10 +2,14 @@ package authorization
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"uuid"
@@ -14,6 +18,7 @@ import (
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/authz"
+	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/responder"
@@ -62,30 +67,92 @@ type Service struct {
 	audit *audit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
+
+	// cache carries the catalog reads the administrative surfaces serve
+	// from — the lists and the detail a console loads on open. It is the
+	// shared Cache the registry builds (Noop while caching is off) and nil
+	// only in a hand-built test, which the reads answer uncached. Every
+	// write below drops the family, so a cached answer is always one
+	// committed change behind at most.
+	cache cache.Cache
 }
 
-// NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+// cacheKeyPrefix is the family every catalog read caches under. A prefix,
+// not a key, because the lists fingerprint their query — the parameters
+// the request carried — and a change invalidates the family in one call
+// rather than enumerating fingerprints it cannot know.
+const cacheKeyPrefix = "authz:"
+
+// fingerprint reduces a list's parameters to the tail of its cache key.
+func fingerprint(parts ...string) string {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(sum[:8])
+}
+
+// NewService builds the service over the shared pool. A nil cache serves
+// every read uncached.
+func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger, cache cache.Cache) *Service {
 	return &Service{
 		pool:  pool,
 		repo:  NewRepository(),
 		audit: recorder,
 		log:   log,
 		now:   time.Now,
+		cache: cache,
 	}
 }
 
 // ListPermissions answers the permission catalog as the database holds it —
 // the rows the seed writes from the code's own list, so the response and
 // the grants that reference these rows by id cannot disagree — narrowed by
-// the request's search and resource, ordered as the caller asked.
-func (s *Service) ListPermissions(ctx context.Context, search, resource, sortBy string, ascending bool) ([]PermissionSchema, error) {
+// the request's search and resource, ordered as the caller asked. The read
+// is served through the cache under the query's fingerprint; a bypassed
+// call reads the source and leaves the cached answer alone.
+func (s *Service) ListPermissions(ctx context.Context, bypass bool, search, resource, sortBy string, ascending bool) ([]PermissionSchema, error) {
+	if s.cache == nil {
+		return s.listPermissions(ctx, search, resource, sortBy, ascending)
+	}
+	key := cacheKeyPrefix + "permissions:" + fingerprint(search, resource, sortBy, strconv.FormatBool(ascending))
+	return cache.Fetch(ctx, s.cache, key, 0, bypass, func(ctx context.Context) ([]PermissionSchema, error) {
+		return s.listPermissions(ctx, search, resource, sortBy, ascending)
+	})
+}
+
+// listPermissions is ListPermissions' own read.
+func (s *Service) listPermissions(ctx context.Context, search, resource, sortBy string, ascending bool) ([]PermissionSchema, error) {
 	return s.repo.ListPermissions(ctx, s.pool, search, resource, sortBy, ascending)
 }
 
+// roleList is the pair a roles page answers, the shape the cache stores.
+type roleList struct {
+	Rows       []RoleRow
+	Pagination responder.Pagination
+}
+
 // ListRoles answers one page of the roles, ordered as the caller asked,
-// optionally filtered by a search term and a role kind.
-func (s *Service) ListRoles(ctx context.Context, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
+// optionally filtered by a search term and a role kind. The read is served
+// through the cache under the query's fingerprint, the way
+// ListPermissions is.
+func (s *Service) ListRoles(ctx context.Context, bypass bool, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
+	if s.cache == nil {
+		return s.listRoles(ctx, search, roleType, sortBy, ascending, page, limit)
+	}
+	key := cacheKeyPrefix + "roles:" + fingerprint(search, roleType, sortBy, strconv.FormatBool(ascending), strconv.Itoa(page), strconv.Itoa(limit))
+	cached, err := cache.Fetch(ctx, s.cache, key, 0, bypass, func(ctx context.Context) (roleList, error) {
+		rows, pagination, err := s.listRoles(ctx, search, roleType, sortBy, ascending, page, limit)
+		if err != nil {
+			return roleList{}, err
+		}
+		return roleList{Rows: rows, Pagination: pagination}, nil
+	})
+	if err != nil {
+		return nil, responder.Pagination{}, err
+	}
+	return cached.Rows, cached.Pagination, nil
+}
+
+// listRoles is ListRoles' own read.
+func (s *Service) listRoles(ctx context.Context, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
 	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
 
 	rows, total, err := s.repo.ListRoles(ctx, s.pool, search, roleType, sortBy, ascending, responder.Offset(page, limit), limit)
@@ -95,13 +162,30 @@ func (s *Service) ListRoles(ctx context.Context, search, roleType, sortBy string
 	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
-// GetRole answers one role with the permission slugs it carries.
-func (s *Service) GetRole(ctx context.Context, id string) (RoleDetail, error) {
+// GetRole answers one role with the permission slugs it carries. The read
+// is served through the cache under the role's identifier; every write to
+// the role family drops the whole family, so a cached detail is never
+// older than the change that names it.
+func (s *Service) GetRole(ctx context.Context, bypass bool, id string) (RoleDetail, error) {
 	roleID, err := parseRoleID(id)
 	if err != nil {
 		return RoleDetail{}, err
 	}
-	return s.readDetail(ctx, s.pool, roleID)
+	if s.cache == nil {
+		return s.readDetail(ctx, s.pool, roleID)
+	}
+	return cache.Fetch(ctx, s.cache, cacheKeyPrefix+"role:"+id, 0, bypass, func(ctx context.Context) (RoleDetail, error) {
+		return s.readDetail(ctx, s.pool, roleID)
+	})
+}
+
+// invalidate drops every cached catalog read. It runs after a write
+// commits, so a cache that answers again is the database's answer.
+func (s *Service) invalidate(ctx context.Context) {
+	if s.cache == nil {
+		return
+	}
+	s.cache.DelPrefix(ctx, cacheKeyPrefix)
 }
 
 // CreateParams carries the fields a custom role is made of.
@@ -158,6 +242,7 @@ func (s *Service) CreateRole(ctx context.Context, params CreateParams) (RoleDeta
 	if err != nil {
 		return RoleDetail{}, err
 	}
+	s.invalidate(ctx)
 	return created, nil
 }
 
@@ -217,6 +302,7 @@ func (s *Service) UpdateRole(ctx context.Context, id string, params CreateParams
 	if err != nil {
 		return RoleDetail{}, err
 	}
+	s.invalidate(ctx)
 	return updated, nil
 }
 
@@ -229,7 +315,7 @@ func (s *Service) DeleteRole(ctx context.Context, id string) error {
 		return err
 	}
 
-	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		existing, getErr := s.repo.GetRole(ctx, tx, roleID)
 		if errors.Is(getErr, datastore.ErrNoRows) {
 			return ErrRoleNotFound
@@ -268,6 +354,11 @@ func (s *Service) DeleteRole(ctx context.Context, id string) error {
 		})
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	s.invalidate(ctx)
+	return nil
 }
 
 // SetRolePermissions replaces the permission set one role carries. Every
@@ -322,6 +413,7 @@ func (s *Service) SetRolePermissions(ctx context.Context, id string, slugs []str
 	if err != nil {
 		return RoleDetail{}, err
 	}
+	s.invalidate(ctx)
 	return updated, nil
 }
 

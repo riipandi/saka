@@ -77,7 +77,7 @@ func newRPCHandler(service *Service) authzv1connect.AuthorizationServiceHandler 
 func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[authzv1.ListPermissionsRequest]) (*connect.Response[authzv1.ListPermissionsResponse], error) {
 	ascending := req.Msg.GetSortOrder() != "desc"
 
-	entries, err := h.service.ListPermissions(ctx, req.Msg.GetSearch(), req.Msg.GetResource(), req.Msg.GetSortBy(), ascending)
+	entries, err := h.service.ListPermissions(ctx, req.Msg.GetNocache(), req.Msg.GetSearch(), req.Msg.GetResource(), req.Msg.GetSortBy(), ascending)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -103,6 +103,7 @@ func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1
 
 	roles, pagination, err := h.service.ListRoles(
 		ctx,
+		req.Msg.GetNocache(),
 		req.Msg.GetSearch(), parseRoleType(req.Msg.Type), sortBy, ascending,
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()),
 	)
@@ -124,7 +125,7 @@ func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1
 
 // GetRole answers one role with its permission slugs.
 func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[authzv1.GetRoleRequest]) (*connect.Response[authzv1.GetRoleResponse], error) {
-	role, err := h.service.GetRole(ctx, req.Msg.Id)
+	role, err := h.service.GetRole(ctx, req.Msg.GetNocache(), req.Msg.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}

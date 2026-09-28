@@ -47,6 +47,11 @@ type Cache interface {
 	Del(ctx context.Context, key string)
 	// DelMany removes the entries under every named key, if any.
 	DelMany(ctx context.Context, keys []string)
+	// DelPrefix removes every entry whose key begins with prefix. It is how
+	// a feature invalidates a family of keys it cannot enumerate — the
+	// entries a query's parameters name one by one — in one call. An empty
+	// prefix removes every entry the cache holds.
+	DelPrefix(ctx context.Context, prefix string)
 }
 
 // Noop is the driver that caches nothing: every read is a miss, every write
@@ -73,6 +78,9 @@ func (Noop) Del(context.Context, string) {}
 
 // DelMany drops the deletes.
 func (Noop) DelMany(context.Context, []string) {}
+
+// DelPrefix drops the delete.
+func (Noop) DelPrefix(context.Context, string) {}
 
 // New hands back the driver the configuration names, or Noop where caching
 // does not run:

@@ -146,6 +146,28 @@ an entry under a different key.
 
 Removals, best-effort by the nature of a cache.
 
+### `DelPrefix(ctx, prefix)`
+
+Removes every entry whose key begins with `prefix` — the family a feature cannot enumerate
+because its keys fingerprint the queries that wrote them. The memory driver walks its index;
+the kvstore driver scans the namespace. An empty prefix removes everything.
+
+### `Fetch[T](ctx, c, key, ttl, bypass, load) (T, error)`
+
+The read-through helper a feature's service calls. A miss loads through `load`, stores the
+value as JSON, and answers it; a hit answers the stored value. A loader failure is returned
+and nothing is stored. `bypass` true is a pure bypass: the source answers and the cache is
+neither read nor written, so the entry the other callers share keeps aging on its own. This
+is what a request's `nocache` flag sets — ConnectRPC carries it in the request body, REST as
+the `?nocache=1` query parameter.
+
+The surfaces that read through it today: the settings feature (the public listing and every
+unsealed gate value, invalidated by Update and Reset), and the authorization feature's
+catalog reads (the lists under their query fingerprints and a role's detail, invalidated
+by DelPrefix on every role write). The JWKS endpoint and `GET /api/configuration` predate
+it: the key set is read through `jwtutils.NewCachedKeyProvider` and the published
+configuration is resolved in memory, so neither pays a query to serve.
+
 ## Testing
 
 The memory driver is tested without a backend; the Valkey driver runs against a real server

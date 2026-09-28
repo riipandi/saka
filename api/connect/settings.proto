@@ -87,8 +87,12 @@ message ResetResponse {
   Setting setting = 1;
 }
 
-// ListPublicRequest is empty: the public set is the same for every caller.
-message ListPublicRequest {}
+// ListPublicRequest carries the bypass flag: `nocache` true reads the
+// source and leaves the cached answer alone, so a caller that distrusts the
+// cached listing reads the table without disturbing what the others see.
+message ListPublicRequest {
+  bool nocache = 1;
+}
 
 // ListPublicResponse carries the settings an unauthenticated client may
 // read, ordered by key.

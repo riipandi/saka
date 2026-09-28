@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_EZgZkL6eiL
 createdAt: 2026-09-27T11:44:29.487814
-updatedAt: 2026-09-27T11:50:36.321223
+updatedAt: 2026-09-28T11:28:47.266734
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_MbztvSdMtC
 authentication: {}
@@ -10,10 +10,13 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "${[ response.body.path() ]}"
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Read one role with the permission slugs it carries. id is the role TypeID (role_...). Administrative: requires the admin role.'
+description: |-
+  [Tango] Read one role with the permission slugs it carries. id is the role TypeID (role_...). Administrative: requires the admin role.
+
+  The detail is served from a cache; every role write drops the family. `nocache` true reads the source and leaves the cached answer alone.
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -26,7 +29,7 @@ headers:
 method: POST
 name: Get Role
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/GetRole
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/GetRole
 urlParameters: []
 settingSendCookies:
   enabled: false
