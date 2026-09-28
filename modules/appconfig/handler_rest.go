@@ -19,9 +19,11 @@ import (
 // here is not a gate — the endpoint answers to everyone — which is why the
 // check reads the caller's own claims instead of a rule in the tables.
 //
-// The secrets are absent from the published document by construction, in
-// either scope. The configuration is resolved once at startup, so the
-// answer describes the running process, not the file on disk.
+// The secrets cross only through the redaction path publish.go builds
+// them from: a set secret is `[redacted]`, an unset one omitted, the
+// datastore URLs reduced to host:port/database — in either scope. The
+// configuration is resolved once at startup, so the answer describes the
+// running process, not the file on disk.
 func (m *Module) serveConfiguration(w http.ResponseWriter, r *http.Request) {
 	caller, _ := jwtutils.CallerFrom(r.Context())
 

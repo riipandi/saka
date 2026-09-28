@@ -249,12 +249,9 @@ func (s *Settings) Reset(ctx context.Context, key string) error {
 	db.Where(db.Equal("key", key))
 
 	query, args := db.Build()
-	tag, err := s.pool.Exec(ctx, query, args...)
+	_, err := s.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("appconfig: reset setting: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return nil // already at the default
 	}
 	return nil
 }
