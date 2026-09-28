@@ -106,7 +106,8 @@ services:
 
   nginx:
     <<: *common
-    image: docker.io/nginx:${NGINX_VERSION:-mainline-alpine-slim}
+    # image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-slim}
+    image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-otel}
     hostname: nginx
     ports: ["9180:9180", "3443:3443", "8443:8443"]
     volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
@@ -120,6 +121,7 @@ services:
       silo: { condition: service_started }
 
 configs:
+  # https://uptrace.dev/guides/opentelemetry-nginx
   nginx_config:
     content: |
       # Access logs ship as one JSON object per line: Vector reads this file and
