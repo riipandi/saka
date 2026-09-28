@@ -866,3 +866,41 @@ func TestValidationRejectsABadHeaderName(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "server.cors.allowed_headers")
 }
+
+// TestTheAlgorithmMaterialRuleIsShared pins that the exported material rule
+// and the validation agree: a mismatch Validate refuses is the same one
+// jwks.Service answers, and an unset algorithm is every caller's nil.
+func TestTheAlgorithmMaterialRuleIsShared(t *testing.T) {
+	cases := []struct {
+		name       string
+		algorithm  string
+		privateKey string
+		secretKey  string
+		want       string
+	}{
+		{"unset is nil", "", "", "", ""},
+		{"hs with secret", "HS256", "", "configured", ""},
+		{"hs without secret", "HS256", "configured", "", `auth.jwt_algorithm: "HS256" requires auth.secret_key`},
+		{"pair without private", "ES256", "", "configured", `auth.jwt_algorithm: "ES256" requires auth.private_key`},
+		{"pair with private", "ES256", "configured", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := config.JWTAlgorithmMaterialError(tc.algorithm, tc.privateKey, tc.secretKey)
+			if tc.want == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tc.want, err.Error())
+		})
+	}
+
+	// The deployment path reaches the same rule through checkAuth: a file
+	// naming an algorithm without its material fails validation with the
+	// shared message. The empty secret_key overrides the base body's, so the
+	// file is one that names HS256 without the material it requires.
+	err := resolveFile(t, `"auth": {"jwt_algorithm": "HS256", "secret_key": ""}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), `auth.jwt_algorithm: "HS256" requires auth.secret_key`)
+}

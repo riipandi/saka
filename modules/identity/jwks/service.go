@@ -138,17 +138,32 @@ func (s *Service) checkConfiguredAlgorithm() error {
 	if s.configured == "" {
 		return nil
 	}
-	alg, ok := jwa.LookupSignatureAlgorithm(s.configured)
-	if !ok {
+	if _, ok := jwa.LookupSignatureAlgorithm(s.configured); !ok {
 		return fmt.Errorf("jwks: auth.jwt_algorithm: %q is not a signature algorithm", s.configured)
 	}
-	if alg.IsSymmetric() && s.hmacKey == nil {
-		return fmt.Errorf("jwks: auth.jwt_algorithm: %q requires auth.secret_key", s.configured)
+	// The material rule is the config package's: the same mismatch Validate
+	// refuses at start-up is refused here, for a Service built without
+	// validating.
+	return config.JWTAlgorithmMaterialError(
+		s.configured, s.configuredPrivateKey(), s.configuredSecretKey())
+}
+
+// configuredPrivateKey reports the key pair's presence in the form the shared
+// material rule reads: the configured value, not the parsed key.
+func (s *Service) configuredPrivateKey() string {
+	if s.privateKey != nil {
+		return "configured"
 	}
-	if !alg.IsSymmetric() && s.privateKey == nil {
-		return fmt.Errorf("jwks: auth.jwt_algorithm: %q requires auth.private_key", s.configured)
+	return ""
+}
+
+// configuredSecretKey reports the HMAC secret's presence in the form the
+// shared material rule reads.
+func (s *Service) configuredSecretKey() string {
+	if s.hmacKey != nil {
+		return "configured"
 	}
-	return nil
+	return ""
 }
 
 // parseKeyPair reads the asymmetric half.
@@ -249,15 +264,13 @@ func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
 		if !ok {
 			return jwa.NoSignature(), fmt.Errorf("jwks: auth.jwt_algorithm: %q is not a signature algorithm", s.configured)
 		}
-		// The named algorithm must match the material. A symmetric one needs
-		// the secret; an asymmetric one needs the key pair. Configuration
+		// The named algorithm must match the material. Configuration
 		// validation refuses the mismatch at start-up, so reaching here is a
-		// caller that built a Service without validating.
-		if alg.IsSymmetric() && s.hmacKey == nil {
-			return jwa.NoSignature(), fmt.Errorf("jwks: auth.jwt_algorithm: %q requires auth.secret_key", s.configured)
-		}
-		if !alg.IsSymmetric() && s.privateKey == nil {
-			return jwa.NoSignature(), fmt.Errorf("jwks: auth.jwt_algorithm: %q requires auth.private_key", s.configured)
+		// caller that built a Service without validating; the shared rule
+		// answers the same way either path built it.
+		if err := config.JWTAlgorithmMaterialError(
+			s.configured, s.configuredPrivateKey(), s.configuredSecretKey()); err != nil {
+			return jwa.NoSignature(), err
 		}
 		return alg, nil
 	}

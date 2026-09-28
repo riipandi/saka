@@ -519,6 +519,31 @@ func (c Config) kvStoreDrivers() []string {
 // the value is read.
 const maxS3SignedURLExpires = 7 * 24 * time.Hour
 
+// JWTAlgorithmMaterialError reports a named auth.jwt_algorithm whose signing
+// material is missing. nil means the algorithm is unset (the material then
+// decides) or matches what is configured.
+//
+// The key pair and the HMAC secret are alternatives: a token is signed with
+// one or the other, so a symmetric algorithm needs auth.secret_key and an
+// asymmetric one needs auth.private_key. This function is the single source
+// of that rule — Validate refuses the deployment on it, and jwks.Service
+// answers it for a caller that built the service without validating.
+func JWTAlgorithmMaterialError(algorithm, privateKey, secretKey string) error {
+	if algorithm == "" {
+		return nil
+	}
+	if IsHMACAlgorithm(algorithm) {
+		if secretKey == "" {
+			return fmt.Errorf("auth.jwt_algorithm: %q requires auth.secret_key", algorithm)
+		}
+		return nil
+	}
+	if privateKey == "" {
+		return fmt.Errorf("auth.jwt_algorithm: %q requires auth.private_key", algorithm)
+	}
+	return nil
+}
+
 // checkAuth validates the JWT signing material.
 func checkAuth(c *Config, check func(ok bool, format string, args ...any)) {
 	// The key pair and the HMAC secret are alternatives: a token is signed with
@@ -529,18 +554,10 @@ func checkAuth(c *Config, check func(ok bool, format string, args ...any)) {
 		"auth.public_key: required when auth.private_key is set")
 	check(c.Auth.JWTAlgorithm == "" || isOneOf(c.Auth.JWTAlgorithm, JWTAlgorithms...),
 		"auth.jwt_algorithm: %q is not one of %s", c.Auth.JWTAlgorithm, joinValues(JWTAlgorithms...))
-	// A named algorithm must match the material the deployment configured. A
-	// symmetric algorithm needs the secret; an asymmetric one needs the pair.
-	// Both are checked only when the algorithm is named, so an unset value
-	// derives the right answer from whatever is configured.
-	if c.Auth.JWTAlgorithm != "" {
-		if IsHMACAlgorithm(c.Auth.JWTAlgorithm) {
-			check(c.Auth.SecretKey != "",
-				"auth.jwt_algorithm: %q requires auth.secret_key", c.Auth.JWTAlgorithm)
-		} else {
-			check(c.Auth.PrivateKey != "",
-				"auth.jwt_algorithm: %q requires auth.private_key", c.Auth.JWTAlgorithm)
-		}
+	// A named algorithm must match the material the deployment configured. The
+	// rule lives in JWTAlgorithmMaterialError, shared with jwks.Service.
+	if err := JWTAlgorithmMaterialError(c.Auth.JWTAlgorithm, c.Auth.PrivateKey, c.Auth.SecretKey); err != nil {
+		check(false, "%s", err.Error())
 	}
 	check(c.Auth.Issuer != "", "auth.issuer: must not be empty")
 	check(c.Auth.AccessTTL > 0, "auth.access_ttl: must be positive")
