@@ -206,12 +206,14 @@ CREATE TABLE IF NOT EXISTS public.oauth2_sessions (
     access_token_signature TEXT NOT NULL DEFAULT '',
     active BOOLEAN NOT NULL DEFAULT TRUE,
     request_data JSONB NOT NULL,
-    client_id TEXT NOT NULL,
+    -- A logout session may name no client: an RP-initiated logout
+    -- without a client_id or an id_token_hint is still a flow the
+    -- provider tracks.
+    client_id TEXT,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES public.oidc_clients(id) ON DELETE CASCADE,
-    CONSTRAINT chk_oauth2_sessions_client_id
-        CHECK (client_id = request_data ->> 'client_id')
+    CONSTRAINT chk_oauth2_sessions_client_id CHECK (client_id IS NULL OR client_id = request_data ->> 'client_id')
 ) USING heap;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth2_sessions_kind_key ON public.oauth2_sessions (kind, key);

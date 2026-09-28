@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -42,7 +43,11 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.PrivateKey = ""
 	cfg.Auth.PublicKey = ""
-	cfg.Auth.SecretKey = ""
+	// The OIDC protocol signs through the jwks service; a run without a
+	// configured key refuses to start, so the stub carries the HMAC key
+	// a bare deployment has.
+	cfg.Auth.SecretKey = strings.Repeat("ab", 32)
+	cfg.App.BaseURL = "https://idp.example.com"
 	cfg.Database.URL = "postgres://u:p@127.0.0.1:1/none?connect_timeout=1"
 
 	extra := registry.Area{

@@ -27,6 +27,7 @@ import (
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/federation/customclaim"
 	"github.com/riipandi/tango/modules/federation/oidc"
+	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/user"
 )
 
@@ -41,6 +42,10 @@ type Deps struct {
 
 	// Claims administers the custom claims the tokens carry.
 	Claims *customclaim.Service
+
+	// Protocol is the OIDC provider the /oidc surface serves. It is
+	// nil when the switch is off or the jwks service cannot sign.
+	Protocol *oidc.Protocol
 }
 
 // Module mounts every federation feature.
@@ -109,10 +114,20 @@ var Package = do.Package(
 // Mount resolves what this area's features need and builds the module the
 // router mounts. It is the other half of the seam the composition root uses.
 func Mount(i do.Injector) (kernel.Module, error) {
-	return NewModule(Deps{
+	c := do.MustInvoke[*config.Config](i)
+	deps := Deps{
 		Clients: do.MustInvoke[*oidc.Service](i),
 		Claims:  do.MustInvoke[*customclaim.Service](i),
-	}), nil
+	}
+	if c.OIDC.Enabled {
+		keys := do.MustInvoke[*jwks.Service](i)
+		protocol, err := oidc.NewProtocol(do.MustInvoke[*datastore.Postgres](i), deps.Clients, keys, do.MustInvoke[*slog.Logger](i))
+		if err != nil {
+			return nil, err
+		}
+		deps.Protocol = protocol
+	}
+	return NewModule(deps), nil
 }
 
 // features is the area's feature list, the one place a federation feature is
@@ -124,6 +139,9 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.Claims != nil {
 		modules = append(modules, customclaim.NewModule(deps.Claims))
+	}
+	if deps.Protocol != nil {
+		modules = append(modules, oidc.NewProtocolModule(deps.Protocol))
 	}
 	return modules
 }

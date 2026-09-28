@@ -17,6 +17,7 @@ import (
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/user"
 )
 
@@ -48,6 +49,11 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// nil stands in for the wiring the composition root guarantees,
 		// and the recorder is nil-safe so a feature runs without one.
 		do.Eager[*audit.Recorder](nil),
+		// The protocol feature resolves the signing service; nil stands
+		// in for the wiring the composition root guarantees, and the
+		// test's configuration switches the protocol off — the
+		// forwarding contract is the management surface's.
+		do.Eager[*jwks.Service](nil),
 	)
 	Package(i)
 
@@ -112,5 +118,8 @@ func testConfig(t *testing.T) config.Config {
 
 	cfg := config.Default()
 	cfg.App.BaseURL = "https://idp.example.com"
+	// The forwarding contract is the management surface's; the protocol
+	// feature needs a signing key the test container does not carry.
+	cfg.OIDC.Enabled = false
 	return cfg
 }

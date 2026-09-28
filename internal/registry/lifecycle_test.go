@@ -2,6 +2,7 @@ package registry_test
 
 import (
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/samber/do/v2"
@@ -34,6 +35,10 @@ func servedInjector(t *testing.T) *do.RootScope {
 	cfg := config.Default()
 	cfg.Database.URL = dsn
 	cfg.Storage.Watch.Enable = true
+	cfg.App.BaseURL = "https://idp.example.com"
+	// The protocol feature signs through the jwks service; the HMAC key
+	// is the signing key a bare run carries.
+	cfg.Auth.SecretKey = strings.Repeat("ab", 32)
 
 	injector := registry.New(t.Context(), cfg, nil, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { injector.Shutdown() })

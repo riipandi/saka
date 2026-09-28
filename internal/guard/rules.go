@@ -395,6 +395,20 @@ var RestRules = []RestEntry{
 	// pictures are read. A client without a logo answers not found, never
 	// a substitute.
 	{Method: http.MethodGet, Pattern: "/oidc/clients/{id}/logo", Rule: Public},
+	// The OIDC protocol surface: the wire shapes the specifications
+	// define, every one public in the bearer sense — the token endpoint
+	// authenticates its client from the form or the Basic header, the
+	// interaction callback from the SPA's own credential, and the
+	// authorize endpoint opens the browser flow.
+	{Method: http.MethodGet, Pattern: "/oidc/authorize", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/authorize", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/authorize/*", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/authorize/*", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/token", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/userinfo", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/userinfo", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/end-session", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/end-session", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.
