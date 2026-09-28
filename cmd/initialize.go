@@ -28,7 +28,8 @@ var initializeCmd = &cli.Command{
 	ArgsUsage: "",
 	Category:  "Deployment commands",
 	Description: `Applies the system seed — the permission catalog and the system
-roles the application's own surfaces depend on — and creates the first
+roles the application's own surfaces depend on, and the settings
+catalog the product flows read — and creates the first
 administrator account.
 
 The command is the deployment's one-time bootstrap: it refuses to run

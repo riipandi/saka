@@ -31,9 +31,10 @@ type Result struct {
 // All returns every seeder in the order they must run: a seeder may depend on a
 // record an earlier one created. The authorization seeder runs first — the
 // user seeder grants its default account the administrator role the moment
-// the account exists, and the grant names a role row.
+// the account exists, and the grant names a role row. The settings seeder
+// depends on nothing but the migration, so it closes the list.
 func All() []Seeder {
-	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification()}
+	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), Settings()}
 }
 
 // System is the seed a production deployment needs: the data the
@@ -41,7 +42,7 @@ func All() []Seeder {
 // `initialize` applies it; the development fixtures travel with `All` and
 // `migrate:seed` alone.
 func System() []Seeder {
-	return []Seeder{Authorization()}
+	return []Seeder{Authorization(), Settings()}
 }
 
 // Run applies each seeder in order over the same querier.

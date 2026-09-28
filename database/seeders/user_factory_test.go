@@ -94,7 +94,7 @@ func TestUserSeederCreatesTheDefaultAccount(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 5)
+	require.Len(t, results, 6)
 	assert.Equal(t, seeders.UserSeederName, results[1].Name)
 	// The default account leads the list; the scenario accounts follow it,
 	// the scenario-role grants close it, and the direct permission grant

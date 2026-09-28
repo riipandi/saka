@@ -69,7 +69,7 @@ func TestUserGroupSeederCreatesTheGroupsAndMemberships(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 5)
+	require.Len(t, results, 6)
 	require.Equal(t, seeders.UserGroupSeederName, results[2].Name)
 
 	require.Len(t, results[2].Created, 6)
@@ -105,7 +105,7 @@ func TestAPIKeySeederCreatesTheScenarioKeys(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 5)
+	require.Len(t, results, 6)
 	require.Equal(t, seeders.APIKeySeederName, results[3].Name)
 	require.Len(t, results[3].Created, 3)
 	assert.Empty(t, results[3].Skipped)
