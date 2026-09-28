@@ -12,6 +12,7 @@ import (
 
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/envfile"
+	"github.com/riipandi/tango/pkg/printext"
 	"github.com/urfave/cli/v3"
 )
 
@@ -165,21 +166,11 @@ func writeSecretKeys(out io.Writer, path, keyPair, secret string, keys crypto.Ge
 	if replaced > 0 {
 		if _, err := fmt.Fprintf(out,
 			"warning: replaced %d existing %s — data encrypted or signed with the previous keys is no longer readable\n",
-			replaced, pluralize("key", "keys", replaced)); err != nil {
+			replaced, printext.Plural(replaced, "key")); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// pluralize returns singular for a count of one and plural otherwise. It is used
-// for the "key"/"keys" wording, which printext.Plural cannot express because the
-// plural is not the singular plus an "s".
-func pluralize(singular, plural string, count int) string {
-	if count == 1 {
-		return singular
-	}
-	return plural
 }
 
 var keyRotateCmd = &cli.Command{

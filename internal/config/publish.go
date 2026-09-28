@@ -259,7 +259,8 @@ type PublishedCORS struct {
 	MaxAge           Duration `json:"max_age,omitzero"`
 }
 
-// PublishedStorage is the storage section without the S3 key secret.
+// PublishedStorage is the storage section. The S3 credentials are published
+// only as their redactions.
 type PublishedStorage struct {
 	Driver    string         `json:"driver,omitzero"`
 	LocalPath string         `json:"local_path,omitzero"`
@@ -286,11 +287,6 @@ type PublishedS3 struct {
 	SignedURLExpires Duration `json:"signed_url_expires,omitzero"`
 }
 
-// Published projects the configuration onto the document the endpoint
-// serves. The public scope fills only the facts an unauthenticated client
-// may read — the mode, the addresses, and the toggles that decide which
-// sign-in options exist; the full scope adds everything else the process
-// runs on, which is what an administrator gets.
 // publishedSecretRender renders a secret for the published document. An
 // empty secret stays empty — an unset key is omitted, not redacted — and
 // everything else is the placeholder Redacted prints, so the document is
@@ -302,6 +298,11 @@ func publishedSecretRender(secret string) string {
 	return redacted
 }
 
+// Published projects the configuration onto the document the endpoint
+// serves. The public scope fills only the facts an unauthenticated client
+// may read — the mode, the addresses, and the toggles that decide which
+// sign-in options exist; the full scope adds everything else the process
+// runs on, which is what an administrator gets.
 func (c Config) Published(full bool) Published {
 	public := Published{
 		App: PublishedApp{

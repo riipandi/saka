@@ -91,10 +91,6 @@ const DefaultCORSMaxAge = time.Hour
 // more replaces it through the configuration.
 const DefaultCacheMaxMemory = 32 << 20
 
-// into, in bytes. Large enough that a chunk header is noise against its
-// payload, small enough that a one-byte edit near the end of a large file
-// re-uploads a fraction of it.
-
 // DefaultStorageWatchDebounce is how long a staging path must stay quiet
 // before the watcher enqueues its upload, so a file written in many small
 // writes triggers one upload, not one per write.

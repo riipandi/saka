@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json/v2"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,4 +113,56 @@ func TestTheFullScopeCarriesTheRealNonSecretValues(t *testing.T) {
 	app := body["app"].(map[string]any)
 	assert.Equal(t, ModeStaging, app["mode"])
 	assert.Equal(t, float64(4080), body["server"].(map[string]any)["port"])
+}
+
+// TestEverySecretKeyPublishesItsRedaction is the drift guard: every key the
+// one secretKeys list names must reach the full document only through the
+// redaction path. A new secret published from the configuration directly —
+// a field wired to the wrong copy — fails here, because its probe would
+// still be in the body. The two datastore URLs are the exception on purpose:
+// their reduced form carries the target and no credential, so the assertion
+// for them is that the credentials are gone.
+func TestEverySecretKeyPublishesItsRedaction(t *testing.T) {
+	cfg := Default()
+	fillStrings(reflect.ValueOf(&cfg).Elem(), probeSecret)
+
+	document, err := json.Marshal(cfg.Published(true))
+	require.NoError(t, err)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(document, &body))
+
+	for _, key := range secretKeys {
+		value, ok := valueAtPath(body, key)
+		require.True(t, ok, "%s must be in the full document", key)
+		if key == "database.url" || key == "kvstore.url" {
+			assert.NotContains(t, value, "user:pass", key)
+			continue
+		}
+		// A map key, otel.headers, is a secret as a whole: every entry's
+		// value is the placeholder, the names kept.
+		if headers, mapKey := value.(map[string]any); mapKey {
+			for name, entry := range headers {
+				assert.Equal(t, redacted, entry, key+"."+name)
+			}
+			continue
+		}
+		assert.Equal(t, redacted, value, key)
+	}
+}
+
+// valueAtPath reads the dotted path into the parsed document, the shape the
+// endpoint answers with.
+func valueAtPath(body map[string]any, path string) (any, bool) {
+	var current any = body
+	for segment := range strings.SplitSeq(path, ".") {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = object[segment]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
 }
