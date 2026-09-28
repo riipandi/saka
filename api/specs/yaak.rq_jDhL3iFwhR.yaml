@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_jDhL3iFwhR
 createdAt: 2026-09-18T23:55:13.786761
-updatedAt: 2026-09-28T08:18:21.212851
+updatedAt: 2026-09-28T08:57:34.853334
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -12,20 +12,25 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  Get all application configurations including private ones
+  Answers the deployment configuration to an administrator.
 
-  Mirror of Pocket ID `GET /api/application-configuration/all`.
+  Tango procedure tango.system.v1.AppConfigService/GetAll (mirror of Pocket ID GET /api/application-configuration/all).
+
+  Guard: admin. Secrets are never published: key material, SMTP password, S3 key secret, collector headers, and the datastore URLs are absent by construction.
+
+  Parameters:
+  - body (empty): one configuration per process
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: null
+  id: uMIiUGMTmx
 - enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: null
+  id: 6qZtcmcbBk
 method: POST
-name: '[Pocket ID] List all application configurations (unimplemented)'
+name: '[Tango] List all application configurations'
 sortPriority: 333.3333333333333
 url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/GetAll
 urlParameters: []

@@ -221,16 +221,21 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.AppConfigService/Get` | Public bootstrap configuration | planned — the SPA bootstrap read has no procedure yet | — |
-| POST | `/rpc/tango.system.v1.AppConfigService/GetAll` | List all application configurations | planned — admin | — |
+| POST | `/rpc/tango.system.v1.AppConfigService/Get` | Public bootstrap configuration | implemented — public; the public subset only (mode, base URL, assets URL, sign-in and announcement toggles), resolved at startup | `modules/appconfig`, `internal/guard/rules.go` |
+| POST | `/rpc/tango.system.v1.AppConfigService/GetAll` | List all application configurations | implemented — admin; every non-secret setting, sectioned like the JSON file; secrets are absent by construction | `modules/appconfig`, `internal/guard/rules.go` |
 | POST | `/rpc/tango.system.v1.AppConfigService/Update` | Update application configurations | planned — partial update | — |
 | POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
-| GET | `/api/application-configuration` | List public application configurations | planned — unauthenticated bootstrap read | — |
+| GET | `/api/application-configuration` | List public application configurations | planned — unauthenticated bootstrap read; the facts it would serve are already published by `AppConfigService/Get` on the RPC surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
 
-The test-email procedure is served by `tango.system.v1.AppConfigService` in
-`api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
-probe (`task mailer:smoke`).
+The read procedures are served by `tango.system.v1.AppConfigService` in
+`api/connect/system.proto`: `Get` answers the public subset to any caller,
+`GetAll` answers every non-secret setting to an administrator. Both read the
+configuration resolved at startup — the JSON file is the only source for the
+system sector; the database-backed configuration store arrives with the
+product-level settings, which are a different surface. The test-email
+procedure is on the same service. The other SMTP checks stay with the mailer
+smoke probe (`task mailer:smoke`).
 
 ## Application Images
 

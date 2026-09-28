@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"uuid"
 
+	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -30,8 +32,12 @@ var (
 // header says the same thing, and the smoke command sends the same line.
 const testEmailSubject = "SMTP Test Successful"
 
-// Service sends the deployment's test email.
+// Service answers the deployment's configuration and sends its test email.
 type Service struct {
+	// cfg is the configuration the process was started with. It is resolved
+	// once at startup, so every answer describes the running process, not the
+	// file on disk.
+	cfg  config.Config
 	pool *datastore.Postgres
 	// users is the identity area's account read. The caller's address on
 	// record is the message's default recipient, and the identity area is
@@ -47,17 +53,31 @@ type Service struct {
 // NewService builds the service. The mailer is the infrastructure the
 // composition root resolves; its configuration decides whether the
 // procedure can serve at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, mail *mailer.Service, log *slog.Logger) *Service {
+func NewService(cfg config.Config, pool *datastore.Postgres, recorder *audit.Recorder, mail *mailer.Service, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
 	return &Service{
+		cfg:   cfg,
 		pool:  pool,
 		users: user.NewRepository(),
 		audit: recorder,
 		mail:  mail,
 		log:   log,
 	}
+}
+
+// GetPublic answers the configuration an unauthenticated client may read:
+// the public subset only. It never touches the database, so the SPA can
+// bootstrap before any sign-in exists.
+func (s *Service) GetPublic() *systemv1.AppConfigPublic {
+	return publicConfig(s.cfg)
+}
+
+// GetAll answers the deployment's configuration to an administrator: every
+// non-secret setting the process runs on.
+func (s *Service) GetAll() *systemv1.AppConfig {
+	return fullConfig(s.cfg)
 }
 
 // SendTestEmail renders the test template and submits one message. The send

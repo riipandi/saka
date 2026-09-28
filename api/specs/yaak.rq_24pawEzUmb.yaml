@@ -2,22 +2,36 @@ type: http_request
 model: http_request
 id: rq_24pawEzUmb
 createdAt: 2026-09-14T09:48:01.887234
-updatedAt: 2026-09-28T08:18:19.441873
+updatedAt: 2026-09-28T08:57:30.198842
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
 authenticationType: null
-body: {}
-bodyType: null
+body:
+  text: '{}'
+bodyType: application/json
 description: |-
-  Get all public application configurations
+  Answers the configuration an unauthenticated client may read: the public subset only.
 
-  Mirror of Pocket ID `GET /api/application-configuration`.
-headers: []
-method: GET
-name: '[Pocket ID] List public application configurations (unimplemented)'
+  Tango procedure tango.system.v1.AppConfigService/Get (mirror of Pocket ID GET /api/application-configuration).
+
+  Guard: public. Carries the app mode, the base and assets URLs, and the sign-in and announcement toggles; nothing deployment-private.
+
+  Parameters:
+  - body (empty)
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: QMFdAAhQu5
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: mRzKKuTAqT
+method: POST
+name: '[Tango] Get public configuration'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/api/application-configuration
+url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/Get
 urlParameters: []
 settingSendCookies:
   enabled: false

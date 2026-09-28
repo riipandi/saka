@@ -254,10 +254,15 @@ var ProcedureRules = map[string]Entry{
 	notificationv1connect.NotificationServiceUnreadCountProcedure:              {Rule: Authenticated},
 	notificationv1connect.NotificationServiceWatchNotificationsProcedure:       {Rule: Authenticated},
 
-	// The application-configuration surface is the deployment's own settings,
-	// so every procedure it serves today is administrative. The test-email
-	// send proves the mailer from the settings screen; it is not an account
-	// read, so there is no self rule to name a field for.
+	// The application-configuration surface is the deployment's own settings.
+	// GetAll and the test-email send are administrative: the read names every
+	// non-secret setting the process runs on, and the send proves the mailer
+	// from the settings screen — neither is an account read, so there is no
+	// self rule to name a field for. Get is the public bootstrap read: it
+	// carries only the facts a login screen may show, and it must answer
+	// before any sign-in exists.
+	systemv1connect.AppConfigServiceGetProcedure:       {Rule: Public},
+	systemv1connect.AppConfigServiceGetAllProcedure:    {Rule: Admin},
 	systemv1connect.AppConfigServiceTestEmailProcedure: {Rule: Admin},
 }
 

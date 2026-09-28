@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_LoEENExLKC
 createdAt: 2026-09-19T12:33:32.164794
-updatedAt: 2026-09-28T08:18:24.193010
+updatedAt: 2026-09-28T08:57:38.023217
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -14,9 +14,11 @@ body:
     }
 bodyType: application/json
 description: |-
-  Update application configuration settings
+  Update application configuration settings.
 
-  Mirror of Pocket ID `PUT /api/application-configuration`.
+  Mirror of Pocket ID PUT /api/application-configuration.
+
+  NOT implemented in Tango: the system configuration sector is read-only — the JSON file is its source and it resolves once at startup, so this procedure stays unimplemented until the database-backed product configuration arrives. The procedure answers unknown.
 
   Parameters:
   - body (body, required): Application Configuration
@@ -24,13 +26,13 @@ headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: null
+  id: qS27uPhSQe
 - enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: null
+  id: thiHzC4Ki6
 method: POST
-name: '[Pocket ID] Update application configurations (unimplemented)'
+name: '[Tango] Update application configurations'
 sortPriority: 407.4074074074074
 url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/Update
 urlParameters: []

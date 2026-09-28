@@ -20,6 +20,7 @@ import (
 	"github.com/samber/do/v2"
 
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/mailer"
@@ -33,11 +34,12 @@ import (
 // process that reaches the listener has it.
 var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
+		cfg := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		mail := do.MustInvoke[*mailer.Service](i)
 		log := do.MustInvoke[*slog.Logger](i)
-		return NewService(pool, recorder, mail, log), nil
+		return NewService(*cfg, pool, recorder, mail, log), nil
 	}),
 )
 
