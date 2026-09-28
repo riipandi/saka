@@ -74,7 +74,7 @@ func newSessionRouter(t *testing.T, auth transport.Authenticator, pool *datastor
 	cfg := config.Default()
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	users := user.NewService(pool, nil, nil, nil)
 	service := session.NewService(pool, issuer, users,
 		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
@@ -108,7 +108,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	account := signin.Account{ID: mustUUID(t, hermioneSessionOwner), Username: "hermione",
 		Email: "hermione@example.com", DisplayName: "Hermione Granger"}
 	result, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderPassword,

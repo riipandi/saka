@@ -178,7 +178,7 @@ func TestTheAreaMountsItsFeatures(t *testing.T) {
 	// A service with no configured key still mounts: the endpoint serves an
 	// empty set rather than being absent.
 	router := chi.NewRouter()
-	NewModule(Deps{KeySet: jwks.NewService(testConfig(t), nil, nil)}).Mount(router)
+	NewModule(Deps{KeySet: jwks.NewService(testConfig(t), nil, nil, nil)}).Mount(router)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, jwks.Path, nil))

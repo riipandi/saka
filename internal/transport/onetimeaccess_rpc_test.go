@@ -92,7 +92,7 @@ func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *da
 	require.NoError(t, err)
 
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	service := onetimeaccess.NewService(cfg, pool, issuer,
 		audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 

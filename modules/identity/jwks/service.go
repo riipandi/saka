@@ -52,6 +52,19 @@ type Source interface {
 	ActiveSigningKeys(ctx context.Context) ([]StoredKey, error)
 }
 
+// PairSource is the optional extension a Source implements when its rows
+// carry a sealed private key: the read the OAuth provider signs from. The
+// publishing path keeps the public-only contract of Source.
+type PairSource interface {
+	ActiveSigningKeyPairs(ctx context.Context) ([]SigningKeyPair, error)
+}
+
+// ErrNoStoredKeys reports a source that carries no signing pairs, or no
+// source at all. The OAuth provider refuses to run on it: minting tokens
+// with the configured key while the deployment meant the database to sign
+// would put a key in the published set that no row explains.
+var ErrNoStoredKeys = errors.New("jwks: no signing key pairs in the database; generate one with tango jwks:generate")
+
 // Service owns the published key set and the configured signing material.
 type Service struct {
 	source Source
@@ -70,6 +83,11 @@ type Service struct {
 	// verifies locally and is never published.
 	hmacKey jwk.Key
 
+	// cipher unseals a stored signing pair's private key for the OAuth
+	// provider. A run without a secret key has nothing to unseal; the
+	// OIDC signing keys fail closed on it.
+	cipher *crypto.Cipher
+
 	// configured is auth.jwt_algorithm, empty when the deployment lets the
 	// material decide.
 	configured string
@@ -79,12 +97,13 @@ type Service struct {
 
 // NewService builds the service. source may be nil, which is a run with no
 // OAuth provider tables to read: the published set is then the configured keys
-// alone.
-func NewService(cfg config.Config, source Source, log *slog.Logger) *Service {
+// alone. cipher may be nil — a run without a secret key cannot unseal a
+// stored private key, and the OIDC signing keys fail closed on it.
+func NewService(cfg config.Config, source Source, cipher *crypto.Cipher, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	service := &Service{source: source, log: log}
+	service := &Service{source: source, cipher: cipher, log: log}
 	// The parse runs here rather than on the first request: a key that cannot
 	// be read is a broken deployment, and it should be reported before the
 	// listener opens instead of as a 500 on a client's first verification.
@@ -391,6 +410,80 @@ func (s *Service) storedKeys(ctx context.Context) ([]StoredKey, error) {
 		return nil, nil
 	}
 	return s.source.ActiveSigningKeys(ctx)
+}
+
+// OIDCSigningKeys reads the database's active signing key pairs and parses
+// them into keys that carry their private material, so the OAuth provider
+// can both sign with them and publish their public halves. The `kid`,
+// `alg`, and `use` members are stamped here: a token names the kid to
+// select the key, and introspection refuses a key without the usage.
+//
+// The database is the OIDC signing authority — the configured key pair is
+// the internal one — so an empty or unwired source fails closed. A row
+// whose sealed private key cannot be opened is skipped with an error log;
+// one unusable row must not take the provider down.
+func (s *Service) OIDCSigningKeys(ctx context.Context) ([]jwk.Key, error) {
+	if s.parseErr != nil {
+		return nil, s.parseErr
+	}
+	pairs, ok := s.source.(PairSource)
+	if !ok || pairs == nil {
+		return nil, ErrNoStoredKeys
+	}
+
+	rows, err := pairs.ActiveSigningKeyPairs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, ErrNoStoredKeys
+	}
+
+	keys := make([]jwk.Key, 0, len(rows))
+	for _, row := range rows {
+		opened, err := s.openSealedKey(ctx, row)
+		if err != nil {
+			s.log.ErrorContext(ctx, "jwks: skipping an unusable signing pair",
+				"kid", row.KeyID, "err", err)
+			continue
+		}
+		if err := opened.Set(jwk.KeyIDKey, row.KeyID); err != nil {
+			return nil, fmt.Errorf("jwks: set kid: %w", err)
+		}
+		if row.Algorithm != "" {
+			if err := opened.Set(jwk.AlgorithmKey, row.Algorithm); err != nil {
+				return nil, fmt.Errorf("jwks: set alg: %w", err)
+			}
+		}
+		if err := opened.Set(jwk.KeyUsageKey, KeyUsageSignature); err != nil {
+			return nil, fmt.Errorf("jwks: set use: %w", err)
+		}
+		keys = append(keys, opened)
+	}
+	if len(keys) == 0 {
+		return nil, ErrNoStoredKeys
+	}
+	return keys, nil
+}
+
+// openSealedKey unseals one row's private key and parses it. A symmetric
+// result is refused: a shared secret has no place in a published set.
+func (s *Service) openSealedKey(ctx context.Context, row SigningKeyPair) (jwk.Key, error) {
+	if s.cipher == nil {
+		return nil, errors.New("no secret key is configured to unseal the private key")
+	}
+	opened, err := s.cipher.Decrypt(string(row.PrivateKey))
+	if err != nil {
+		return nil, fmt.Errorf("unseal private key: %w", err)
+	}
+	parsed, err := jwk.ParseKey([]byte(opened))
+	if err != nil {
+		return nil, fmt.Errorf("parse private key: %w", err)
+	}
+	if symErr := rejectSymmetric(parsed); symErr != nil {
+		return nil, symErr
+	}
+	return parsed, nil
 }
 
 // ErrSymmetricKey reports a key that cannot be published. A symmetric key has

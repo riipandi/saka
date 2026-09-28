@@ -51,7 +51,7 @@ func testConfig() config.Config {
 // testService builds the service over a real pool and a real key-set service.
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(testConfig(), pool, NewRepository(pool), jwks.NewService(testConfig(), nil, nil), nil, nil)
+	return NewService(testConfig(), pool, NewRepository(pool), jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
 }
 
 type accountFixture struct {
@@ -129,7 +129,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	// The access token verifies against the same material the deployment
 	// signs with: the issuer from configuration, the subject the account.
 	cfg := testConfig()
-	keys := jwks.NewService(cfg, nil, nil)
+	keys := jwks.NewService(cfg, nil, nil, nil)
 	key, err := keys.HMACKey(ctx)
 	require.NoError(t, err)
 	algorithm, err := keys.HMACAlgorithm()
@@ -308,7 +308,7 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 	cfg := testConfig()
 	cfg.Auth.RefreshShortTTL = 1 * time.Hour
 	cfg.Auth.RefreshLongTTL = 48 * time.Hour
-	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil), nil, nil)
+	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
 
 	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
 

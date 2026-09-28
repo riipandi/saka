@@ -31,6 +31,7 @@ var rootCmd = &cli.Command{
 		adminResetPasswordCmd,
 		keyGenerateCmd,
 		keyRotateCmd,
+		jwksGenerateCmd,
 		initializeCmd,
 		healthCheckCmd,
 		configGenerateCmd,

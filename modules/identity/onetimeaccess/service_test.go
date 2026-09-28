@@ -67,7 +67,7 @@ func testService(t *testing.T, pool *datastore.Postgres, adminEmail, publicEmail
 	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil)
 
 	issuer := signin.NewService(testConfig(), pool, signin.NewRepository(pool),
-		jwks.NewService(testConfig(), nil, nil), nil, nil)
+		jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
 	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 }
 

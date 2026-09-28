@@ -62,3 +62,7 @@ tasks:
   key:generate:
     desc: Generate application secret keys
     cmd: go run -tags debug ./cmd key:generate {{.CLI_ARGS}}
+
+  jwks:generate:
+    desc: Generate a signing key pair for the OAuth provider (public.jwks)
+    cmd: go run -tags debug ./cmd jwks:generate --env-file=.env.local {{.CLI_ARGS}}

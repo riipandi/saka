@@ -391,7 +391,10 @@ func Default() Config {
 			Window:    time.Minute,
 		},
 		OIDC: OIDC{
-			Enabled: true,
+			// Off by default: the provider signs with the database's
+			// stored keys, and a run without one is not an issuer —
+			// opting in is the operator's decision.
+			Enabled: false,
 		},
 		Queue: Queue{
 			NumWorkers:      DefaultQueueNumWorkers,

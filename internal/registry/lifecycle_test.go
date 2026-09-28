@@ -1,18 +1,27 @@
 package registry_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
 
+	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.jetify.com/typeid"
 
 	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/registry"
+	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
@@ -30,19 +39,54 @@ func servedInjector(t *testing.T) *do.RootScope {
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
 
 	cfg := config.Default()
 	cfg.Database.URL = dsn
 	cfg.Storage.Watch.Enable = true
 	cfg.App.BaseURL = "https://idp.example.com"
 	// The protocol feature signs through the jwks service; the HMAC key
-	// is the signing key a bare run carries.
+	// is the signing key a bare run carries. The stored pair is sealed
+	// with the same secret the run opens it with.
 	cfg.Auth.SecretKey = strings.Repeat("ab", 32)
+	cfg.App.SecretKey = strings.Repeat("ab", 32)
+	seedSigningKey(t, migrationDB, cfg.App.SecretKey)
+	require.NoError(t, migrationDB.Close())
 
 	injector := registry.New(t.Context(), cfg, nil, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { injector.Shutdown() })
 	return injector
+}
+
+// seedSigningKey stages one active signing row: the OIDC protocol the
+// prewarm walk builds refuses to serve a run whose signing table is empty.
+func seedSigningKey(t *testing.T, migrationDB *sql.DB, secretKey string) {
+	t.Helper()
+
+	raw, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	key, err := jwk.Import(raw)
+	require.NoError(t, err)
+	kid, err := typeid.New[jwks.JWKSKeyID]()
+	require.NoError(t, err)
+	require.NoError(t, key.Set(jwk.KeyIDKey, kid.String()))
+	require.NoError(t, key.Set(jwk.AlgorithmKey, "ES256"))
+	require.NoError(t, key.Set(jwk.KeyUsageKey, jwks.KeyUsageSignature))
+	private, err := json.Marshal(key)
+	require.NoError(t, err)
+	cipher, err := crypto.NewCipherFromHex(secretKey)
+	require.NoError(t, err)
+	sealed, err := cipher.Encrypt(string(private))
+	require.NoError(t, err)
+	public, err := jwk.PublicKeyOf(key)
+	require.NoError(t, err)
+	publicJSON, err := json.Marshal(public)
+	require.NoError(t, err)
+
+	_, err = migrationDB.ExecContext(t.Context(),
+		`INSERT INTO public.jwks (key_id, algorithm, key_type, public_key, private_key, use_for, is_active)
+		 VALUES ($1, 'ES256', 'EC', $2, $3, 'sig', TRUE)`,
+		kid, publicJSON, []byte(sealed))
+	require.NoError(t, err)
 }
 
 // TestPrewarmResolvesEveryBlockingService is the warm-up contract: a run with

@@ -219,7 +219,7 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 	// The real authenticator, the composition root's shape: the bearer half
 	// over the key set, the machine half over the key service, joined by the
 	// middleware the transport owns.
-	auth := middleware.APIKeyAuth(identity.Authenticate(jwks.NewService(cfg, nil, nil), cfg), keyService)
+	auth := middleware.APIKeyAuth(identity.Authenticate(jwks.NewService(cfg, nil, nil, nil), cfg), keyService)
 	router := transport.NewRouter(transport.Options{
 		Config:        cfg,
 		Checker:       health.NewChecker(),

@@ -62,3 +62,42 @@ func (r *Repository) ActiveSigningKeys(ctx context.Context) ([]StoredKey, error)
 	}
 	return keys, nil
 }
+
+// ActiveSigningKeyPairs returns the same rows as ActiveSigningKeys, with the
+// sealed private key in place of the public one. It is the read the OAuth
+// provider signs from; the publishing path must not use it.
+func (r *Repository) ActiveSigningKeyPairs(ctx context.Context) ([]SigningKeyPair, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("key_id", "algorithm", "private_key")
+	sb.From(TableJWKS)
+	sb.Where(
+		sb.Equal("is_active", true),
+		sb.Equal("use_for", UseSignature),
+		sb.IsNotNull("private_key"),
+		sb.Or(
+			sb.IsNull("expires_at"),
+			sb.GreaterThan("expires_at", time.Now()),
+		),
+	)
+	sb.OrderBy("key_id")
+	query, args := sb.Build()
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("jwks: read active key pairs: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []SigningKeyPair
+	for rows.Next() {
+		var key SigningKeyPair
+		if err := rows.Scan(&key.KeyID, &key.Algorithm, &key.PrivateKey); err != nil {
+			return nil, fmt.Errorf("jwks: scan active key pair: %w", err)
+		}
+		keys = append(keys, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("jwks: read active key pairs: %w", err)
+	}
+	return keys, nil
+}

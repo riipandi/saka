@@ -29,7 +29,7 @@ func testVerifier(t *testing.T, subject string) (*jwtutils.AccessVerifier, strin
 
 	cfg := config.Default()
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
-	keys := jwks.NewService(cfg, nil, nil)
+	keys := jwks.NewService(cfg, nil, nil, nil)
 	key, err := keys.HMACKey(t.Context())
 	require.NoError(t, err)
 	algorithm, err := keys.SigningAlgorithm()

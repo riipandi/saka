@@ -144,7 +144,19 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		return jwks.NewService(*c, jwks.NewRepository(pool), log), nil
+		// The cipher unseals a stored private key for the OAuth
+		// provider; a run without a secret key has nothing to open,
+		// and the OIDC signing keys answer that state on the first
+		// call rather than failing a run that never serves OIDC.
+		var cipher *crypto.Cipher
+		if c.App.SecretKey != "" {
+			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+			if err != nil {
+				return nil, fmt.Errorf("identity: jwks cipher: %w", err)
+			}
+			cipher = built
+		}
+		return jwks.NewService(*c, jwks.NewRepository(pool), cipher, log), nil
 	}),
 
 	// The published key set is read behind a cache: a client that verifies

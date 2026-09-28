@@ -56,7 +56,7 @@ func TestTheAlgorithmListMatchesTheJWSLibrary(t *testing.T) {
 func TestBothStacksSignAndVerify(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.SecretKey = hmacSecret(t, 32)
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	ctx := context.Background()
@@ -106,7 +106,7 @@ func TestBothStacksSignAndVerify(t *testing.T) {
 func TestTheHMACSecretNeverReachesTheKeySet(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.SecretKey = hmacSecret(t, 32)
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	set, err := service.VerifyKeySet(context.Background())
@@ -135,7 +135,7 @@ func TestTheHMACAlgorithmFollowsTheSecretLength(t *testing.T) {
 	for _, tc := range cases {
 		cfg := testConfig(t)
 		cfg.Auth.SecretKey = hmacSecret(t, tc.size)
-		service := NewService(cfg, nil, nil)
+		service := NewService(cfg, nil, nil, nil)
 		require.NoError(t, service.Err())
 
 		alg, err := service.HMACAlgorithm()
@@ -151,7 +151,7 @@ func TestAConfiguredAlgorithmWinsOverTheDerivedOne(t *testing.T) {
 	cfg.Auth.SecretKey = hmacSecret(t, 32)
 	cfg.Auth.JWTAlgorithm = "HS256"
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	alg, err := service.SigningAlgorithm()
@@ -173,7 +173,7 @@ func TestTheDerivedAlgorithmComesFromTheKeyPair(t *testing.T) {
 	cfg.Auth.SecretKey = ""
 	cfg.Auth.JWTAlgorithm = ""
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	alg, err := service.SigningAlgorithm()
@@ -187,7 +187,7 @@ func TestAConfiguredAlgorithmWithoutItsMaterialIsRefused(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.JWTAlgorithm = "HS256" // the key pair is configured, not the secret
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.Error(t, service.Err())
 	assert.Contains(t, service.Err().Error(), "auth.secret_key")
@@ -200,7 +200,7 @@ func TestSigningRefusesWhenNothingIsConfigured(t *testing.T) {
 	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = ""
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	_, err := service.SigningAlgorithm()
@@ -221,7 +221,7 @@ func TestAKeyPairThatDisagreesFailsTheRun(t *testing.T) {
 	cfg.Auth.PrivateKey = first[crypto.EnvAuthPrivateKey]
 	cfg.Auth.PublicKey = second[crypto.EnvAuthPublicKey] // a different key
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.Error(t, service.Err())
 	assert.Contains(t, service.Err().Error(), "auth.public_key")
@@ -233,7 +233,7 @@ func TestAShorterHMACSecretThanHS256IsRefused(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.SecretKey = "aabbccdd" // 4 bytes
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.Error(t, service.Err())
 	assert.Contains(t, service.Err().Error(), "auth.secret_key")
@@ -247,7 +247,7 @@ func TestHS384AndHS512SecretsAreAccepted(t *testing.T) {
 		cfg := testConfig(t)
 		cfg.Auth.SecretKey = hmacSecret(t, size)
 
-		service := NewService(cfg, nil, nil)
+		service := NewService(cfg, nil, nil, nil)
 		require.NoError(t, service.Err(), "a %d-byte secret must be accepted", size)
 
 		key, err := service.HMACKey(context.Background())
@@ -261,7 +261,7 @@ func TestHS384AndHS512SecretsAreAccepted(t *testing.T) {
 func TestAnHMACKeySignsAHeaderTheVerifierMatches(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.SecretKey = hmacSecret(t, 32)
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	key, err := service.HMACKey(context.Background())

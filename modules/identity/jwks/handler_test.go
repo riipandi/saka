@@ -105,7 +105,7 @@ func storedPublicKey(t *testing.T, algorithm, kid string) StoredKey {
 }
 
 func TestEndpointPublishesTheConfiguredKey(t *testing.T) {
-	service := NewService(testConfig(t), nil, nil)
+	service := NewService(testConfig(t), nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	rec := serve(t, service)
@@ -126,7 +126,7 @@ func TestEndpointPublishesTheConfiguredKey(t *testing.T) {
 // module: the published document is what an unauthenticated client reads, so
 // a private field in it would be a key disclosure.
 func TestEndpointNeverPublishesPrivateMaterial(t *testing.T) {
-	service := NewService(testConfig(t), nil, nil)
+	service := NewService(testConfig(t), nil, nil, nil)
 	rec := serve(t, service)
 
 	for _, key := range decodeKeys(t, rec) {
@@ -139,7 +139,7 @@ func TestEndpointNeverPublishesPrivateMaterial(t *testing.T) {
 
 func TestEndpointMergesTheStoredKeys(t *testing.T) {
 	source := stubSource{keys: []StoredKey{storedPublicKey(t, "ES384", "stored-key-1")}}
-	service := NewService(testConfig(t), source, nil)
+	service := NewService(testConfig(t), source, nil, nil)
 
 	keys := decodeKeys(t, serve(t, service))
 
@@ -155,7 +155,7 @@ func TestEndpointMergesTheStoredKeys(t *testing.T) {
 // must not appear beside it.
 func TestConfiguredKeyWinsADuplicateKid(t *testing.T) {
 	cfg := testConfig(t)
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
 	configured, err := service.SignKey(context.Background())
@@ -164,7 +164,7 @@ func TestConfiguredKeyWinsADuplicateKid(t *testing.T) {
 	require.True(t, ok)
 
 	duplicate := storedPublicKey(t, "ES256", kid)
-	merged := NewService(cfg, stubSource{keys: []StoredKey{duplicate}}, nil)
+	merged := NewService(cfg, stubSource{keys: []StoredKey{duplicate}}, nil, nil)
 
 	keys := decodeKeys(t, serve(t, merged))
 	assert.Len(t, keys, 1, "one key named twice is a set a client cannot index")
@@ -175,7 +175,7 @@ func TestConfiguredKeyWinsADuplicateKid(t *testing.T) {
 // verification down.
 func TestSourceFailureStillServesTheConfiguredKey(t *testing.T) {
 	source := stubSource{err: errors.New("connection refused")}
-	service := NewService(testConfig(t), source, nil)
+	service := NewService(testConfig(t), source, nil, nil)
 
 	rec := serve(t, service)
 
@@ -190,7 +190,7 @@ func TestUnusableStoredKeyIsSkipped(t *testing.T) {
 		{KeyID: "broken", Algorithm: "ES256", PublicKey: []byte("not a jwk")},
 		storedPublicKey(t, "ES256", "good"),
 	}}
-	service := NewService(testConfig(t), source, nil)
+	service := NewService(testConfig(t), source, nil, nil)
 
 	keys := decodeKeys(t, serve(t, service))
 
@@ -202,7 +202,7 @@ func TestUnreadableConfiguredKeyFailsTheRun(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.PublicKey = "not base64!"
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.Error(t, service.Err(), "a key that cannot be read must fail before serving")
 }
@@ -215,7 +215,7 @@ func TestHMACOnlyConfigurationHasNoKeySet(t *testing.T) {
 	cfg.Auth.PublicKey = ""
 	cfg.Auth.PrivateKey = ""
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.NoError(t, service.Err())
 	rec := serve(t, service)
@@ -228,7 +228,7 @@ func TestSignKeyRefusesWithoutAKeyPair(t *testing.T) {
 	cfg.Auth.PublicKey = ""
 	cfg.Auth.PrivateKey = ""
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 	_, err := service.SignKey(context.Background())
 
 	assert.ErrorIs(t, err, ErrNoSigningKey)
@@ -258,7 +258,7 @@ func (s *countingSource) ActiveSigningKeys(context.Context) ([]StoredKey, error)
 // verification into a query.
 func TestTheCachedProviderReadsTheSourceOncePerTTL(t *testing.T) {
 	source := &countingSource{}
-	service := NewService(testConfig(t), source, nil)
+	service := NewService(testConfig(t), source, nil, nil)
 	cached := jwtutils.NewCachedKeyProvider(service, time.Hour)
 
 	router := chi.NewRouter()
@@ -304,7 +304,7 @@ func TestASymmetricStoredKeyIsNeverPublished(t *testing.T) {
 		Algorithm: "HS256",
 		PublicKey: encoded,
 	}}}
-	service := NewService(testConfig(t), source, nil)
+	service := NewService(testConfig(t), source, nil, nil)
 
 	rec := serve(t, service)
 
@@ -329,7 +329,7 @@ func TestASymmetricConfiguredKeyFailsTheRun(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.PublicKey = base64.RawStdEncoding.EncodeToString(encoded)
 
-	service := NewService(cfg, nil, nil)
+	service := NewService(cfg, nil, nil, nil)
 
 	require.ErrorIs(t, service.Err(), ErrSymmetricKey)
 }

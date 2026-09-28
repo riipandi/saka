@@ -3,11 +3,14 @@ package oidc
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 
@@ -41,11 +44,27 @@ type Protocol struct {
 // NewProtocol wires the provider: the jwks service signs, the stores
 // persist, the policy walks the browser through the SPA's interaction
 // page.
+// The database is the OIDC signing authority: the configured key pair is
+// the internal one, and every token the provider mints is signed with an
+// active signing row. A run whose table carries no pair fails here — an
+// issuer that cannot sign is a run that must not open its listener.
 func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service, log *slog.Logger) (*Protocol, error) {
 	baseURL := service.baseURL
-	alg, err := keys.SigningAlgorithm()
+	signingKeys, err := keys.OIDCSigningKeys(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: %w", err)
+	}
+	algs := make([]goidc.SignatureAlgorithm, 0, len(signingKeys))
+	for _, key := range signingKeys {
+		// jwx v3 reports the alg member as (value, ok).
+		alg, ok := key.Algorithm()
+		if !ok || alg.String() == jwa.NoSignature().String() {
+			continue
+		}
+		algs = append(algs, goidc.SignatureAlgorithm(alg.String()))
+	}
+	if len(algs) == 0 {
+		return nil, errors.New("oidc: the database signing rows name no signature algorithm")
 	}
 
 	stores := protocolStore{pool: pool}
@@ -60,11 +79,11 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		},
 	}
 
-	idTokenAlg := goidc.SignatureAlgorithm(alg.String())
+	idTokenAlgs := algs
 	p, err := provider.New(provider.Config{
 		Issuer:      baseURL,
 		JWKS:        jwksFunc(keys),
-		IDTokenAlgs: []goidc.SignatureAlgorithm{idTokenAlg},
+		IDTokenAlgs: idTokenAlgs,
 		Manager:     grantStore{protocolStore: stores},
 	},
 		// The client lookup runs through the DCR manager; the
@@ -117,23 +136,32 @@ func (p *Protocol) Mount(r chi.Router) {
 }
 
 // jwksFunc renders the signing key set the provider signs and publishes
-// from. The jwx key marshals to its standard JWK document — private
-// material included — and the provider's JSONWebKey reads that document.
+// from: the database's active signing rows, private material included so
+// the provider can sign, their public halves what discovery hands out.
+// The set is read per call, so a rotation lands without a restart.
 func jwksFunc(keys *jwks.Service) goidc.JWKSFunc {
 	return func(ctx context.Context) (goidc.JSONWebKeySet, error) {
-		key, err := keys.SignKey(ctx)
+		stored, err := keys.OIDCSigningKeys(ctx)
 		if err != nil {
 			return goidc.JSONWebKeySet{}, err
 		}
-		document, err := json.Marshal(key)
-		if err != nil {
-			return goidc.JSONWebKeySet{}, err
+		set := goidc.JSONWebKeySet{}
+		for _, key := range stored {
+			document, err := json.Marshal(key)
+			if err != nil {
+				return goidc.JSONWebKeySet{}, err
+			}
+			var webKey goidc.JSONWebKey
+			if err := json.Unmarshal(document, &webKey); err != nil {
+				return goidc.JSONWebKeySet{}, err
+			}
+			// Token introspection only accepts a key that declares the
+			// signature usage; the stored JWK document carries no "use"
+			// member, so set it here where the set is published.
+			webKey.Use = "sig"
+			set.Keys = append(set.Keys, webKey)
 		}
-		var webKey goidc.JSONWebKey
-		if err := json.Unmarshal(document, &webKey); err != nil {
-			return goidc.JSONWebKeySet{}, err
-		}
-		return goidc.JSONWebKeySet{Keys: []goidc.JSONWebKey{webKey}}, nil
+		return set, nil
 	}
 }
 
@@ -175,7 +203,13 @@ func userInfoClaims(service *Service) goidc.UserInfoClaimsFunc {
 // words choose the sections, the custom claims join under profile.
 func subjectClaims(ctx context.Context, service *Service, claims ClaimSource, grant *goidc.Grant) map[string]any {
 	result := map[string]any{}
-	view, err := service.users.GetUser(ctx, grant.Subject)
+	// The grant carries the raw UUID the rows store; the directory
+	// speaks the wire form.
+	wire, err := user.IDFromUUIDString(grant.Subject)
+	if err != nil {
+		return result
+	}
+	view, err := service.users.GetUser(ctx, wire.String())
 	if err != nil || view.ID == "" {
 		return result
 	}
