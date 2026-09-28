@@ -9,6 +9,8 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 	"slices"
+
+	"github.com/riipandi/tango/internal/audit"
 )
 
 // The consent ledger: user_authorized_oidc_clients answers the question
@@ -60,6 +62,20 @@ func (s *Service) recordAuthorization(ctx context.Context, userID, clientID stri
 func encodeScopeJSON(scopes []string) []byte {
 	data, _ := json.Marshal(scopes)
 	return data
+}
+
+// recordDeviceAuthorization writes the device flow's own audit record:
+// a user code was approved at the verification endpoint. Best-effort —
+// the approval itself has already committed, and a failed log must not
+// fail the flow the account just completed. The device and user codes
+// never ride the record.
+func (s *Service) recordDeviceAuthorization(ctx context.Context, userID, clientID string) {
+	s.audit.Record(ctx, s.pool, audit.Entry{
+		Event:        audit.EventOidcDeviceAuthorized,
+		Status:       audit.StatusSuccess,
+		ResourceType: ResourceOidcClient,
+		Payload:      map[string]string{"client_id": clientID, "user_id": userID},
+	})
 }
 
 // decodeScopeJSON reads the stored JSONB onto the scope list. A column

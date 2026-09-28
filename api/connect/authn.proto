@@ -893,3 +893,82 @@ message AdminDisableMfaResponse {
   // message is the human-readable sentence describing what the call did.
   string message = 2;
 }
+
+// DeviceApprovalService is the approving side of the device login flow:
+// a browser that cannot sign itself in creates a pairing request over
+// REST, and the account holder — signed in on a device that can — reads
+// what the request names and answers it here. The service is tango-only;
+// upstream Pocket ID has no passkey-less sign-in to approve.
+service DeviceApprovalService {
+  // Inspect answers the request the presented user code names: the code
+  // as the device should render it, the requesting browser's address and
+  // agent, and the instant the request dies. An unknown, expired, or
+  // already-decided code answers not_found — the answer never says which.
+  rpc Inspect(InspectDeviceLoginRequest) returns (InspectDeviceLoginResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // Decide stamps the answer. A request decided once is decided forever:
+  // a second decision answers not_found, the same refusal an unknown
+  // code does. Approval names the deciding account in the row, so the
+  // creating browser's exchange mints the session for them.
+  rpc Decide(DecideDeviceLoginRequest) returns (DecideDeviceLoginResponse);
+}
+
+// InspectDeviceLoginRequest carries the code the requesting device
+// rendered — with or without its reading hyphen, in any case the
+// normalization folds.
+message InspectDeviceLoginRequest {
+  // code is the user code as typed: `XXXX-XXXX` or the bare eight
+  // characters.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 8,
+    (buf.validate.field).string.max_len = 9
+  ];
+}
+
+// InspectDeviceLoginResponse is the request's own facts, the view the
+// approving device renders before the human answers.
+message InspectDeviceLoginResponse {
+  // user_code is the code in its display form, `XXXX-XXXX`.
+  string user_code = 1;
+
+  // ip_address is the requesting browser's address as the create saw it.
+  string ip_address = 2;
+
+  // user_agent is the requesting browser's own word for itself.
+  string user_agent = 3;
+
+  // expires_at is the instant the request dies, unanswered requests
+  // included.
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// DecideDeviceLoginRequest carries the code and the answer.
+message DecideDeviceLoginRequest {
+  // code is the user code as typed, the same shape Inspect takes.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 8,
+    (buf.validate.field).string.max_len = 9
+  ];
+
+  // decision is the answer: `approve` or `deny`, the only words the
+  // contract accepts.
+  string decision = 2 [(buf.validate.field).string = {
+    in: [
+      "approve",
+      "deny"
+    ]
+  }];
+}
+
+// DecideDeviceLoginResponse is empty: the protocol carries the success,
+// and the creating browser learns of the decision at its next exchange.
+message DecideDeviceLoginResponse {
+  // status is the outcome word the client checks — success; a failure
+  // never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}

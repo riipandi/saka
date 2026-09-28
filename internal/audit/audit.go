@@ -282,6 +282,21 @@ const (
 	// issued, so the payload names the account and the client.
 	EventOidcConsentRevoked = "oidc_consent_revoked"
 
+	// EventOidcDeviceAuthorized is a device flow user code approved at
+	// the verification endpoint. The payload names the client and the
+	// account; the device code itself never rides the record.
+	EventOidcDeviceAuthorized = "oidc_device_authorized"
+
+	// EventDeviceLoginApproved is a device login pairing request the
+	// approving device accepted — the browser on the other side will
+	// open its session at the next exchange. The payload names the
+	// request row.
+	EventDeviceLoginApproved = "device_login_approved"
+
+	// EventDeviceLoginDenied is a pairing request refused. The payload
+	// names the request row.
+	EventDeviceLoginDenied = "device_login_denied"
+
 	// EventGroupAllowedClientsUpdated is the group's client allowlist
 	// replaced — the group-side direction of the client restriction, the
 	// mirror of the members' own event. The payload counts the roll.

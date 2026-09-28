@@ -27,6 +27,7 @@ import (
 const (
 	policySignInID       = "tango-sign-in"
 	policyInteractionID  = "tango-interaction"
+	policyDeviceID       = "tango-device"
 	consentBodyByteLimit = 8192
 )
 
@@ -44,12 +45,12 @@ type consentDecision struct {
 func signInPolicy(service *Service) goidc.AuthnPolicy {
 	return goidc.NewPolicy(policySignInID,
 		func(r *http.Request, _ *goidc.AuthnSession, _ *goidc.Client) bool {
-			return r.URL.Path == protocolAuthorizeEndpoint
+			return r.URL.Path == protocolPrefix+protocolAuthorizeEndpoint
 		},
 		func(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession, client *goidc.Client) (goidc.Status, error) {
 			caller, ok := jwtutils.CallerFrom(r.Context())
 			if !ok {
-				interactionRedirect(w, r, protocolAuthorizeEndpoint, session.ID)
+				interactionRedirect(w, r, protocolPrefix+protocolAuthorizeEndpoint, session.ID)
 				return goidc.StatusPending, nil
 			}
 			return completeAuthentication(r.Context(), service, w, r, session, client, caller)
@@ -60,12 +61,33 @@ func signInPolicy(service *Service) goidc.AuthnPolicy {
 func interactionPolicy(service *Service) goidc.AuthnPolicy {
 	return goidc.NewPolicy(policyInteractionID,
 		func(r *http.Request, _ *goidc.AuthnSession, _ *goidc.Client) bool {
-			return strings.HasPrefix(r.URL.Path, protocolAuthorizeEndpoint+"/")
+			return strings.HasPrefix(r.URL.Path, protocolPrefix+protocolAuthorizeEndpoint+"/")
 		},
 		func(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession, client *goidc.Client) (goidc.Status, error) {
 			caller, ok := jwtutils.CallerFrom(r.Context())
 			if !ok {
-				interactionRedirect(w, r, protocolAuthorizeEndpoint, session.ID)
+				interactionRedirect(w, r, protocolPrefix+protocolAuthorizeEndpoint, session.ID)
+				return goidc.StatusPending, nil
+			}
+			return completeAuthentication(r.Context(), service, w, r, session, client, caller)
+		})
+}
+
+// devicePolicy runs on the device verification path. The flow enters two
+// ways: the browser's first visit — with the user code in the query or
+// the callback the prompt page followed — where the account signs in at
+// the SPA; and the callback's continuation, where the SPA posts the
+// consent decision. The callback is the session's id under the
+// verification endpoint, the shape the provider's routes carry.
+func devicePolicy(service *Service) goidc.AuthnPolicy {
+	return goidc.NewPolicy(policyDeviceID,
+		func(r *http.Request, _ *goidc.AuthnSession, _ *goidc.Client) bool {
+			return strings.HasPrefix(r.URL.Path, protocolPrefix+protocolDeviceVerificationEndpoint)
+		},
+		func(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession, client *goidc.Client) (goidc.Status, error) {
+			caller, ok := jwtutils.CallerFrom(r.Context())
+			if !ok {
+				interactionRedirect(w, r, protocolPrefix+protocolDeviceVerificationEndpoint, session.ID)
 				return goidc.StatusPending, nil
 			}
 			return completeAuthentication(r.Context(), service, w, r, session, client, caller)
@@ -84,10 +106,14 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 			errors.New("the client is not known"))
 	}
 	account := subjectFor(caller)
+	isDevice := strings.HasPrefix(r.URL.Path, protocolPrefix+protocolDeviceVerificationEndpoint)
 	if view.SkipConsent {
 		session.GrantedScopes = strings.Join(requestedScopes(session), " ")
 		session.Subject = account.subject
 		session.Username = account.username
+		if isDevice {
+			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
+		}
 		return goidc.StatusSuccess, nil
 	}
 
@@ -97,6 +123,9 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		session.Username = account.username
 		if err := service.recordAuthorization(ctx, account.subject, client.ID, approved); err != nil {
 			return goidc.StatusFailure, err
+		}
+		if isDevice {
+			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
 		}
 		return goidc.StatusSuccess, nil
 	}
@@ -108,6 +137,9 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		session.GrantedScopes = strings.Join(requestedScopes(session), " ")
 		session.Subject = account.subject
 		session.Username = account.username
+		if isDevice {
+			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
+		}
 		return goidc.StatusSuccess, nil
 	}
 	writeInteraction(w, http.StatusOK, map[string]any{

@@ -19,12 +19,15 @@ import (
 // owns it, keyed by the token's SHA-256 so no presented credential sits
 // in the database in plain text.
 const (
-	sessionKindGrant    = "grant"
-	sessionKindAuthn    = "authn"
-	sessionKindLogout   = "logout"
-	sessionKindAuthCode = "authcode"
-	sessionKindRefresh  = "refresh"
-	sessionKindPAR      = "par"
+	sessionKindGrant     = "grant"
+	sessionKindAuthn     = "authn"
+	sessionKindLogout    = "logout"
+	sessionKindAuthCode  = "authcode"
+	sessionKindRefresh   = "refresh"
+	sessionKindPAR       = "par"
+	sessionKindDevice    = "device"
+	sessionKindUserCode  = "usercode"
+	sessionKindDeviceCod = "devicecode"
 )
 
 // tokenPointer is the request_data of a pointer row: the row it resolves
@@ -139,6 +142,20 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 			return err
 		}
 	}
+	// A device grant resolves by its device code the same way a code grant
+	// resolves by its authorization code; a consumed device code loses its
+	// pointer, so the second redemption is a not-found.
+	if grant.DeviceCode != "" && grant.DeviceCodeConsumedAt == 0 {
+		if err := s.savePointer(ctx, sessionKindDeviceCod, hashToken(grant.DeviceCode), grant.ClientID, grant.DeviceCodeExpiresAt,
+			tokenPointer{GrantID: grant.ID, ClientID: grant.ClientID}); err != nil {
+			return err
+		}
+	}
+	if grant.DeviceCodeConsumedAt != 0 {
+		if err := s.delete(ctx, sessionKindDeviceCod, hashToken(grant.DeviceCode)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -164,6 +181,10 @@ func (s grantStore) GrantByAuthCode(ctx context.Context, code string) (*goidc.Gr
 
 func (s grantStore) GrantByRefreshToken(ctx context.Context, token string) (*goidc.Grant, error) {
 	return s.grantByPointer(ctx, sessionKindRefresh, token)
+}
+
+func (s grantStore) GrantByDeviceCode(ctx context.Context, deviceCode string) (*goidc.Grant, error) {
+	return s.grantByPointer(ctx, sessionKindDeviceCod, deviceCode)
 }
 
 // authnStore is the goidc.AuthManager and the PAR lookup. The PAR id has
@@ -203,6 +224,65 @@ func (s authnStore) SessionByPushedAuthReqID(ctx context.Context, pushedAuthReqI
 // code's grant is the grant store's pointer row.
 func (s authnStore) GrantByAuthCode(ctx context.Context, code string) (*goidc.Grant, error) {
 	return grantStore(s).GrantByAuthCode(ctx, code)
+}
+
+// deviceStore is the goidc.DeviceAuthManager. The device and user codes
+// ride the same pointer pattern as the authorization code: the session
+// row keys by its own id, the codes resolve through hashed pointer rows,
+// so no presented code sits in the database in plain text.
+type deviceStore struct {
+	protocolStore
+}
+
+func (s deviceStore) SaveSession(ctx context.Context, session *goidc.AuthnSession) error {
+	if err := s.save(ctx, sessionKindDevice, session.ID, session.ClientID, session.ExpiresAt, session); err != nil {
+		return err
+	}
+	if session.DeviceCode != "" {
+		if err := s.savePointer(ctx, sessionKindDeviceCod, hashToken(session.DeviceCode), session.ClientID, session.ExpiresAt,
+			tokenPointer{SessionID: session.ID, ClientID: session.ClientID}); err != nil {
+			return err
+		}
+	}
+	if session.UserCode == "" {
+		return nil
+	}
+	// The user code is the credential a human carries to the browser, so
+	// a re-entered code re-points at the newest session holding it and the
+	// superseded pointer dies — two live sessions never share one code.
+	if err := s.delete(ctx, sessionKindUserCode, hashToken(session.UserCode)); err != nil {
+		return err
+	}
+	return s.savePointer(ctx, sessionKindUserCode, hashToken(session.UserCode), session.ClientID, session.ExpiresAt,
+		tokenPointer{SessionID: session.ID, ClientID: session.ClientID})
+}
+
+func (s deviceStore) Session(ctx context.Context, id string) (*goidc.AuthnSession, error) {
+	var session goidc.AuthnSession
+	if err := s.load(ctx, sessionKindDevice, id, &session); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s deviceStore) sessionByPointer(ctx context.Context, kind, code string) (*goidc.AuthnSession, error) {
+	pointer, err := s.loadPointer(ctx, kind, hashToken(code))
+	if err != nil {
+		return nil, err
+	}
+	return s.Session(ctx, pointer.SessionID)
+}
+
+func (s deviceStore) SessionByUserCode(ctx context.Context, userCode string) (*goidc.AuthnSession, error) {
+	return s.sessionByPointer(ctx, sessionKindUserCode, userCode)
+}
+
+func (s deviceStore) SessionByDeviceCode(ctx context.Context, deviceCode string) (*goidc.AuthnSession, error) {
+	return s.sessionByPointer(ctx, sessionKindDeviceCod, deviceCode)
+}
+
+func (s deviceStore) GrantByDeviceCode(ctx context.Context, deviceCode string) (*goidc.Grant, error) {
+	return grantStore(s).GrantByDeviceCode(ctx, deviceCode)
 }
 
 // logoutStore is the goidc.LogoutManager.

@@ -117,6 +117,15 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.PasswordRecoveryServiceResetPasswordProcedure:          {Rule: Public},
 	authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {Rule: Admin},
 
+	// The device login approvals. Both procedures answer a signed-in
+	// account holder reading and answering a pairing request — `Session`
+	// names them for the same reason the multifactor surfaces carry it: a
+	// machine credential has no browser to pair, and the handler refuses
+	// an impersonated caller, so a token acting for another cannot mint
+	// sessions for a third device.
+	authnv1connect.DeviceApprovalServiceInspectProcedure: {Rule: Session},
+	authnv1connect.DeviceApprovalServiceDecideProcedure:  {Rule: Session},
+
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and
 	// the access token a renewal is fixing may already be expired, so the
@@ -426,6 +435,21 @@ var RestRules = []RestEntry{
 	// sense, the library refusing a request whose secret does not verify.
 	{Method: http.MethodPost, Pattern: "/oidc/introspect", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/par", Rule: Public},
+	// The device flow: the device itself authenticates at the
+	// authorization endpoint like a token request; the verification
+	// endpoint is the browser's, carrying its own credential or none —
+	// an anonymous visit renders the user-code prompt.
+	{Method: http.MethodPost, Pattern: "/oidc/device_authorization", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/device", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/device", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oidc/device/*", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/device/*", Rule: Public},
+	// The device login pairing surface: the creating browser holds no
+	// token — that being the point of the feature — so both routes are
+	// public in the bearer sense and the pairing cookie is the credential
+	// the exchange judges.
+	{Method: http.MethodPost, Pattern: "/api/device-login/requests", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/api/device-login/requests/{id}/exchange", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

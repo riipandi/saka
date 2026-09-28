@@ -383,7 +383,10 @@ func TestMigrateDownDeclinedLeavesDatabase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "roll back 1 migration? [y/N]")
 	assert.Contains(t, out, "1 migration left applied")
-	assert.Equal(t, int64(11), currentVersion(t, dsn))
+	// The declined rollback leaves the database at its full version: the
+	// count the answer refused is one, and the version is the last
+	// migration's.
+	assert.Equal(t, int64(migrationTotal()), currentVersion(t, dsn))
 }
 
 // An accepted rollback applies, proving the prompt gate is not the only path.
@@ -456,7 +459,7 @@ func TestMigrateStatus(t *testing.T) {
 	out, err := runMigrateStatusCmd(t, "--env-file="+envFile)
 	require.NoError(t, err)
 	assert.Contains(t, out, "00001 pending -                   initialize_schema")
-	assert.Contains(t, out, "version 00000; 0 of 11 applied")
+	assert.Contains(t, out, fmt.Sprintf("version 00000; 0 of %d applied", migrationTotal()))
 	assert.Contains(t, out, "no migrations applied yet")
 
 	_, err = runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")

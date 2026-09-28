@@ -30,6 +30,7 @@ import (
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/devicelogin"
 	"github.com/riipandi/tango/modules/identity/authorization"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
@@ -84,6 +85,11 @@ type Deps struct {
 	// PasswordRecovery is the forgot-password flow: reset tokens, the
 	// emails that carry them, and the swap a spent token buys.
 	PasswordRecovery *password.Service
+
+	// DeviceLogin is the passkey-less pairing sign-in: the REST surface
+	// the creating browser polls and the approval procedures the other
+	// device answers. Nil when the feature is off.
+	DeviceLogin *devicelogin.Service
 
 	// ExposeResetToken mirrors `app.expose_reset_token`, gated on the
 	// development mode: the deployment's decision whether ForgotPassword
@@ -329,6 +335,14 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		return authorization.NewService(pool, recorder, log, do.MustInvoke[cache.Cache](i)), nil
 	}),
+
+	do.Lazy(func(i do.Injector) (*devicelogin.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		users := do.MustInvoke[*user.Service](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		return devicelogin.NewService(pool, users, recorder, c.App.BaseURL), nil
+	}),
 )
 
 // Mount resolves what this area's features need and builds the module the
@@ -369,6 +383,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
 		UserGroups:       do.MustInvoke[*usergroup.Service](i),
 		Authorization:    do.MustInvoke[*authorization.Service](i),
+		DeviceLogin:      do.MustInvoke[*devicelogin.Service](i),
 	}), nil
 }
 
@@ -412,6 +427,9 @@ func features(deps Deps) []kernel.Module {
 	if deps.PasswordRecovery != nil {
 		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery).
 			WithExposedResetToken(deps.ExposeResetToken))
+	}
+	if deps.DeviceLogin != nil {
+		modules = append(modules, devicelogin.NewModule(deps.DeviceLogin))
 	}
 	return modules
 }

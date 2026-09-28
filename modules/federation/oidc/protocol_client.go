@@ -89,7 +89,10 @@ func protocolClient(row ClientSchema, baseURL string) goidc.Client {
 			client.GrantTypes = append(client.GrantTypes, goidc.GrantType(grant))
 		}
 	} else {
-		client.GrantTypes = []goidc.GrantType{goidc.GrantAuthorizationCode, goidc.GrantRefreshToken}
+		// Every registered client may use the device grant: the consent
+		// question and the group restriction are the real gate, and the
+		// management surface keeps no per-client grant list.
+		client.GrantTypes = []goidc.GrantType{goidc.GrantAuthorizationCode, goidc.GrantRefreshToken, goidc.GrantDeviceCode}
 	}
 	if row.IsPublic {
 		client.TokenAuthnMethod = goidc.AuthnMethodNone

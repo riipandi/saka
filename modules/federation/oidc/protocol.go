@@ -2,11 +2,14 @@ package oidc
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -20,17 +23,27 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 )
 
-// The paths the protocol serves. The endpoints keep the prefix the
-// discovery document publishes; the discovery and JWKS documents stay at
-// the well-known root.
+// The paths the protocol serves. The provider registers its routes with
+// its own endpoint prefix (WithPathPrefix), so the endpoints carry the
+// bare names and every full path the router, the guard, and the policies
+// see is protocolPrefix + the endpoint. The JWKS document stays at the
+// well-known root — its chi mount is separate from the prefix.
 const (
-	protocolAuthorizeEndpoint  = "/oidc/authorize"
-	protocolTokenEndpoint      = "/oidc/token"
-	protocolUserInfoEndpoint   = "/oidc/userinfo"
-	protocolIntrospectEndpoint = "/oidc/introspect"
-	protocolPAREndpoint        = "/oidc/par"
-	protocolEndSessionEndpoint = "/oidc/end-session"
+	protocolPrefix = "/oidc"
+
+	protocolAuthorizeEndpoint  = "/authorize"
+	protocolTokenEndpoint      = "/token"
+	protocolUserInfoEndpoint   = "/userinfo"
+	protocolIntrospectEndpoint = "/introspect"
+	protocolPAREndpoint        = "/par"
+	protocolEndSessionEndpoint = "/end-session"
 	protocolJWKSEndpoint       = "/.well-known/jwks.json"
+	// The device endpoints are the library's defaults — v0.25.0 names no
+	// setter for them. The verification endpoint is where the browser
+	// enters the user code and answers the consent question; the device
+	// itself reaches the authorization endpoint.
+	protocolDeviceAuthorizeEndpoint    = "/device_authorization"
+	protocolDeviceVerificationEndpoint = "/device"
 
 	// interactionPath is the SPA route the sign-in-less browser lands on.
 	interactionPath = "/interaction"
@@ -99,6 +112,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		// the patterns Mount registers name the protocol's routes
 		// alone.
 		provider.WithDCR(clientManager),
+		provider.WithPathPrefix(protocolPrefix),
 		provider.WithTokenEndpoint(protocolTokenEndpoint),
 		provider.WithAuthorizeEndpoint(protocolAuthorizeEndpoint),
 		provider.WithUserInfoEndpoint(protocolUserInfoEndpoint),
@@ -122,6 +136,28 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			),
 		),
 		provider.WithRefreshTokenGrant(grantStore{protocolStore: stores}, provider.WithRefreshTokenRotation()),
+		// The device grant rides the same session store: the device code
+		// and the user code resolve through hashed pointer rows, the
+		// approval walks the SPA interaction like the authorization flow.
+		provider.WithDeviceGrant(provider.DeviceGrantConfig{
+			Manager: deviceStore{protocolStore: stores},
+			// The prompt renders nothing a browser needs — every
+			// verification visit redirects into the SPA, which carries
+			// the user code in its route.
+			PromptFunc: func(w http.ResponseWriter, r *http.Request) error {
+				http.Redirect(w, r, interactionPath+"?callback="+url.QueryEscape(protocolDeviceVerificationEndpoint), http.StatusFound)
+				return nil
+			},
+			// The approval ends at the SPA's device confirmation state;
+			// a bare success body is all the library demands here.
+			ConfirmationFunc: func(w http.ResponseWriter, _ *http.Request) error {
+				w.WriteHeader(http.StatusOK)
+				return nil
+			},
+		},
+			provider.WithDeviceCodeFunc(defaultDeviceCodeFunc()),
+			provider.WithDevicePolicies(devicePolicy(service)),
+		),
 		provider.WithClientSecretVerifier(clientSecretVerifier),
 		provider.WithNoneAuthn(),
 		provider.WithSecretPostAuthn(),
@@ -151,14 +187,31 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 func (p *Protocol) Mount(r chi.Router) {
 	handler := p.provider.Handler()
 	flatten := flattenBasicAuth()
-	r.Handle(protocolAuthorizeEndpoint, handler)
-	r.Handle(protocolAuthorizeEndpoint+"/*", handler)
-	r.Handle(protocolTokenEndpoint, flatten(handler))
-	r.Handle(protocolUserInfoEndpoint, handler)
-	r.Handle(protocolIntrospectEndpoint, flatten(handler))
-	r.Handle(protocolPAREndpoint, flatten(handler))
-	r.Handle(protocolEndSessionEndpoint, handler)
+	r.Handle(protocolPrefix+protocolAuthorizeEndpoint, handler)
+	r.Handle(protocolPrefix+protocolAuthorizeEndpoint+"/*", handler)
+	r.Handle(protocolPrefix+protocolTokenEndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolUserInfoEndpoint, handler)
+	r.Handle(protocolPrefix+protocolIntrospectEndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolPAREndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolEndSessionEndpoint, handler)
+	// The device verification endpoint serves the browser's entry and
+	// its callback continuation, so the subtree mounts with the handler.
+	r.Handle(protocolPrefix+protocolDeviceAuthorizeEndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint, handler)
+	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint+"/*", handler)
 	r.Handle("/.well-known/openid-configuration", handler)
+}
+
+// defaultDeviceCodeFunc draws the device code the same way the library
+// draws its defaults: high-entropy random hex, opaque to every party.
+func defaultDeviceCodeFunc() goidc.RandomFunc {
+	return func(_ context.Context) string {
+		buf := make([]byte, 32)
+		if _, err := rand.Read(buf); err != nil {
+			panic(err)
+		}
+		return hex.EncodeToString(buf)
+	}
 }
 
 // flattenBasicAuth copies the Authorization header's Basic credentials

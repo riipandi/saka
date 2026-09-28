@@ -84,8 +84,9 @@ const rpcPathPrefix = "/rpc"
 // The authorize and userinfo surfaces are exempt: the redirect is free,
 // and the bearer already paid.
 var RateAuthRestPaths = map[string]struct{}{
-	"/oidc/token": {},
-	"/oidc/par":   {},
+	"/oidc/token":                {},
+	"/oidc/par":                  {},
+	"/oidc/device_authorization": {},
 }
 
 // RateBucketFor answers the bucket a procedure is counted under, or false
