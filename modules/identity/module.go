@@ -14,6 +14,7 @@
 package identity
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -162,7 +163,23 @@ var Package = do.Package(
 			}
 			cipher = built
 		}
-		return jwks.NewService(*c, jwks.NewRepository(pool), cipher, log), nil
+		service := jwks.NewService(*c, jwks.NewRepository(pool), cipher, log)
+		// The derived algorithm is worth a line at startup: when
+		// auth.jwt_algorithm is unset, the material decides, and the
+		// HMAC half decides by the secret's length alone. A deployment
+		// that replaced AUTH_SECRET_KEY with a different-sized value
+		// would change the algorithm silently; the log makes that
+		// visible without a second configuration key.
+		if err := service.Err(); err != nil {
+			return nil, fmt.Errorf("identity: jwks: %w", err)
+		}
+		if alg, err := service.SigningAlgorithm(); err == nil {
+			log.Info("jwks: signing algorithm resolved", "algorithm", alg.String(),
+				"source", resolvedAlgorithmSource(c))
+		} else if !errors.Is(err, jwks.ErrNoSigningKey) {
+			return nil, fmt.Errorf("identity: jwks: resolve algorithm: %w", err)
+		}
+		return service, nil
 	}),
 
 	// The published key set is read behind a cache: a client that verifies
@@ -432,4 +449,18 @@ func features(deps Deps) []kernel.Module {
 		modules = append(modules, devicelogin.NewModule(deps.DeviceLogin))
 	}
 	return modules
+}
+
+// resolvedAlgorithmSource names where the signing algorithm came from, for
+// the startup log: the configuration when auth.jwt_algorithm is set, the
+// material's own kind otherwise. It describes, it does not decide — the
+// decision is jwks.Service.SigningAlgorithm's.
+func resolvedAlgorithmSource(c *config.Config) string {
+	if c.Auth.JWTAlgorithm != "" {
+		return "configured"
+	}
+	if c.Auth.PrivateKey != "" {
+		return "key pair"
+	}
+	return "secret length"
 }

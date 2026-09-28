@@ -185,3 +185,29 @@ func decodeJWK(t *testing.T, encoded string) jwk.Key {
 	require.NoError(t, err)
 	return key
 }
+
+// TestTheSecretLengthRoundTripsThroughTheAlgorithm pins the single source of
+// the length-to-algorithm rule: a secret key:generate sized for an algorithm
+// reads back as that same algorithm, so the generator and the jwks service
+// cannot drift apart.
+func TestTheSecretLengthRoundTripsThroughTheAlgorithm(t *testing.T) {
+	for _, algorithm := range []string{"HS256", "HS384", "HS512"} {
+		generator, err := NewKeyGenerator(algorithm)
+		require.NoError(t, err)
+
+		keys, err := generator.Generate()
+		require.NoError(t, err)
+
+		secret, err := ParseHMACKeyHex(keys[EnvAuthSecretKey])
+		require.NoError(t, err)
+
+		derived, ok := HMACAlgorithmForSecret(len(secret))
+		require.True(t, ok, "a %s-sized secret must name an algorithm", algorithm)
+		assert.Equal(t, algorithm, derived)
+	}
+
+	// Below the table's floor nothing is named: the caller refuses rather
+	// than defaulting to HS256.
+	_, ok := HMACAlgorithmForSecret(16)
+	assert.False(t, ok)
+}

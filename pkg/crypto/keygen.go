@@ -277,3 +277,26 @@ func hmacKeySize(algorithm string) (int, bool) {
 		return 0, false
 	}
 }
+
+// HMACAlgorithmForSecret is the algorithm an HMAC secret of a given length
+// signs with. It is the single source of the length-to-algorithm rule:
+// key:generate sizes the secret by it (hmacKeySize) and the jwks service
+// reads the algorithm back from the secret's length by it, so the two ends
+// of AUTH_SECRET_KEY cannot drift apart.
+//
+// The length is the only signal a hex secret carries — there is no alg
+// member on a symmetric key — so a secret sized outside this table (shorter
+// than 32, or between the table's steps) reports not-ok and the caller
+// refuses it.
+func HMACAlgorithmForSecret(length int) (string, bool) {
+	switch {
+	case length >= 64:
+		return "HS512", true
+	case length >= 48:
+		return "HS384", true
+	case length >= 32:
+		return "HS256", true
+	default:
+		return "", false
+	}
+}

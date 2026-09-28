@@ -315,11 +315,9 @@ func (s *Service) HMACKey(context.Context) (jwk.Key, error) {
 }
 
 // HMACAlgorithm returns the algorithm the configured HMAC secret is used
-// with, chosen by its length: 32 bytes is HS256, 48 is HS384, 64 is HS512.
-//
-// The length is the only signal available — a hex secret carries no algorithm
-// of its own — and it is the same rule key:generate follows when it picks the
-// secret's size, so the two agree without a second configuration key.
+// with, chosen by its length. The mapping lives in
+// crypto.HMACAlgorithmForSecret — the same rule key:generate follows when it
+// sizes the secret — so the two ends of AUTH_SECRET_KEY cannot disagree.
 func (s *Service) HMACAlgorithm() (jwa.SignatureAlgorithm, error) {
 	key, err := s.HMACKey(context.Background())
 	if err != nil {
@@ -333,14 +331,16 @@ func (s *Service) HMACAlgorithm() (jwa.SignatureAlgorithm, error) {
 	if !ok {
 		return jwa.NoSignature(), fmt.Errorf("jwks: auth.secret_key: no key material")
 	}
-	switch {
-	case len(octets) >= 64:
-		return jwa.HS512(), nil
-	case len(octets) >= 48:
-		return jwa.HS384(), nil
-	default:
-		return jwa.HS256(), nil
+	name, ok := crypto.HMACAlgorithmForSecret(len(octets))
+	if !ok {
+		return jwa.NoSignature(), fmt.Errorf(
+			"jwks: auth.secret_key: %d bytes names no HMAC algorithm (32, 48, or 64)", len(octets))
 	}
+	alg, ok := jwa.LookupSignatureAlgorithm(name)
+	if !ok {
+		return jwa.NoSignature(), fmt.Errorf("jwks: auth.secret_key: %q is not a signature algorithm", name)
+	}
+	return alg, nil
 }
 
 // VerifyKeySet returns the public keys a token may be verified against: the
