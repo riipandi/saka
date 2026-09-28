@@ -92,6 +92,21 @@ func (d *stubDirectory) GetUser(_ context.Context, id string) (user.UserView, er
 	return view, nil
 }
 
+// stubClaims is the operator-defined claims the preview merges, standing in
+// for the customclaim service the area wires.
+type stubClaims struct {
+	userClaims  []Claim
+	groupClaims []Claim
+}
+
+func (s *stubClaims) UserClaims(_ context.Context, _ uuid.UUID) ([]Claim, error) {
+	return s.userClaims, nil
+}
+
+func (s *stubClaims) GroupClaims(_ context.Context, _ []uuid.UUID) ([]Claim, error) {
+	return s.groupClaims, nil
+}
+
 // TestCreateMintsASecretTheRowCannotReplay covers the creation's two halves:
 // the client is stored whole — the identifier the operator chose or the one
 // generated — and the raw secret exists in the response alone, the row
@@ -333,28 +348,37 @@ func TestExpiredSecretsReadInactive(t *testing.T) {
 // does not exist is its own refusal beside the client's.
 func TestPreviewBuildsTheClaimMapsForTheAccount(t *testing.T) {
 	pool := migratedPool(t)
-	service := testService(t, pool).WithBaseURL("https://idp.example.com").WithUserDirectory(&stubDirectory{
-		accounts: map[string]user.UserView{
-			"usr_hermione": {
-				ID:            "usr_hermione",
-				Username:      "hermione",
-				Email:         "hermione@hogwarts.example",
-				DisplayName:   "Hermione Granger",
-				EmailVerified: true,
-				Groups: []user.GroupSummary{
-					{ID: "ugrp_gryffindor", Name: "gryffindor", DisplayName: "Gryffindor"},
+	// The account facts ride the user service directly; the stub answers
+	// one account, named by a real wire identifier.
+	accountWire, err := user.FormatID(uuid.NewV7()), error(nil)
+	require.NoError(t, err)
+	service := testService(t, pool).WithBaseURL("https://idp.example.com").
+		WithUserDirectory(&stubDirectory{
+			accounts: map[string]user.UserView{
+				accountWire: {
+					ID:            accountWire,
+					Username:      "hermione",
+					Email:         "hermione@hogwarts.example",
+					DisplayName:   "Hermione Granger",
+					EmailVerified: true,
+					Groups: []user.GroupSummary{
+						{ID: "ugrp_gryffindor", Name: "gryffindor", DisplayName: "Gryffindor"},
+					},
 				},
 			},
-		},
-	})
+		}).
+		WithClaimSource(&stubClaims{
+			userClaims:  []Claim{{Key: "wand", Value: "vine"}},
+			groupClaims: []Claim{{Key: "common_room", Value: "\"gryffindor-tower\""}},
+		})
 
 	owner := seedAccount(t, pool, "hermione")
 	issued, err := service.Create(t.Context(), owner, createParams("Hogwarts Portal"))
 	require.NoError(t, err)
 
-	idToken, accessToken, userInfo, err := service.Preview(t.Context(), issued.Client.ID, "usr_hermione")
+	idToken, accessToken, userInfo, err := service.Preview(t.Context(), issued.Client.ID, accountWire)
 	require.NoError(t, err)
-	assert.Equal(t, "usr_hermione", idToken["sub"])
+	assert.Equal(t, accountWire, idToken["sub"])
 	assert.Equal(t, "hermione", idToken["preferred_username"])
 	assert.Equal(t, "Hermione Granger", idToken["name"])
 	assert.Equal(t, true, idToken["email_verified"])
@@ -365,10 +389,15 @@ func TestPreviewBuildsTheClaimMapsForTheAccount(t *testing.T) {
 	assert.Equal(t, issued.Client.ID, accessToken["client_id"])
 	assert.Equal(t, issued.Client.ID, accessToken["aud"])
 
+	// The custom claims ride the preview: the account's own as the string
+	// it is, the group's parsed as the JSON document it names.
+	assert.Equal(t, "vine", idToken["wand"])
+	assert.Equal(t, "gryffindor-tower", idToken["common_room"])
+
 	// The client's own absence and the account's are different refusals.
-	_, _, _, err = service.Preview(t.Context(), "unknown-client", "usr_hermione")
+	_, _, _, err = service.Preview(t.Context(), "unknown-client", accountWire)
 	assert.ErrorIs(t, err, ErrClientNotFound)
-	_, _, _, err = service.Preview(t.Context(), issued.Client.ID, "usr_ron")
+	_, _, _, err = service.Preview(t.Context(), issued.Client.ID, "user_ron")
 	assert.ErrorIs(t, err, ErrPreviewUnknownUser)
 }
 

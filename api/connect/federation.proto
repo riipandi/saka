@@ -30,8 +30,7 @@ option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/federation
 // signs accounts into is the operator's power, the way the authorization
 // surface is. The surface refuses nothing a caller's role allows, and a
 // caller without the administrator role learns nothing about it.
-service OidcClientService {
-  // ListClients answers one page of the clients, newest first.
+service OidcClientService { // ListClients answers one page of the clients, newest first.
   rpc ListClients(ListOidcClientsRequest) returns (ListOidcClientsResponse);
 
   // CreateClient defines a client and mints its first secret. The raw
@@ -709,6 +708,305 @@ message DeleteOidcClientSecretRequest {
 // DeleteOidcClientSecretResponse is empty: a successful withdrawal says so
 // with the protocol, and an unknown secret answers the not-found code.
 message DeleteOidcClientSecretResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// CustomClaimService administers the claims an operator hangs on accounts
+// and groups: extras the tokens carry beside the standard claims, which the
+// userinfo endpoint merges into its answers and the preview renders.
+//
+// Every procedure is administrative, like the client surface beside it: a
+// claim rides every token the account or its groups produce, so defining
+// one is deciding what a foreign client learns.
+service CustomClaimService {
+  // Suggest answers the claim keys already in use, ordered by how often
+  // they are used — the autocomplete list a claim form offers.
+  rpc Suggest(SuggestCustomClaimsRequest) returns (SuggestCustomClaimsResponse);
+
+  // ListUserClaims answers the claims an account carries.
+  rpc ListUserClaims(ListUserCustomClaimsRequest) returns (ListUserCustomClaimsResponse);
+
+  // CreateUserClaim hangs a claim on an account.
+  rpc CreateUserClaim(CreateUserCustomClaimRequest) returns (CreateUserCustomClaimResponse);
+
+  // UpdateUserClaim rewrites one of an account's claims.
+  rpc UpdateUserClaim(UpdateUserCustomClaimRequest) returns (UpdateUserCustomClaimResponse);
+
+  // DeleteUserClaim removes one of an account's claims.
+  rpc DeleteUserClaim(DeleteUserCustomClaimRequest) returns (DeleteUserCustomClaimResponse);
+
+  // ListGroupClaims answers the claims a group carries.
+  rpc ListGroupClaims(ListGroupCustomClaimsRequest) returns (ListGroupCustomClaimsResponse);
+
+  // CreateGroupClaim hangs a claim on a group — the claim every member's
+  // tokens then carry.
+  rpc CreateGroupClaim(CreateGroupCustomClaimRequest) returns (CreateGroupCustomClaimResponse);
+
+  // UpdateGroupClaim rewrites one of a group's claims.
+  rpc UpdateGroupClaim(UpdateGroupCustomClaimRequest) returns (UpdateGroupCustomClaimResponse);
+
+  // DeleteGroupClaim removes one of a group's claims.
+  rpc DeleteGroupClaim(DeleteGroupCustomClaimRequest) returns (DeleteGroupCustomClaimResponse);
+}
+
+// CustomClaim is one claim as the procedures answer it.
+message CustomClaim {
+  // id is the claim row's identifier, a TypeID (`cclm_…`).
+  string id = 1;
+
+  // key is the claim's name in the token.
+  string key = 2;
+
+  // value is the claim's value — a plain string, or a JSON document when
+  // the operator wrote one.
+  string value = 3;
+}
+
+// SuggestCustomClaimsRequest is empty: the suggestions are the deployment's
+// own usage.
+message SuggestCustomClaimsRequest {}
+
+// SuggestedCustomClaimKey is one key in the autocomplete list.
+message SuggestedCustomClaimKey {
+  // key is the claim key.
+  string key = 1;
+
+  // usage_count is how many claims carry it.
+  int64 usage_count = 2;
+}
+
+// SuggestCustomClaimsResponse is the autocomplete list, most-used first.
+message SuggestCustomClaimsResponse {
+  // keys are the claim keys, ordered by use.
+  repeated SuggestedCustomClaimKey keys = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ListUserCustomClaimsRequest names the account.
+message ListUserCustomClaimsRequest {
+  // user_id is the account, in its wire form.
+  string user_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// ListUserCustomClaimsResponse is the account's claims.
+message ListUserCustomClaimsResponse {
+  // claims are the claims, ordered by key.
+  repeated CustomClaim claims = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateUserCustomClaimRequest hangs a claim on an account.
+message CreateUserCustomClaimRequest {
+  // user_id is the account, in its wire form.
+  string user_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+
+  // key is the claim's name in the token.
+  string key = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // value is the claim's value — a plain string, or a JSON document when
+  // the operator writes one.
+  string value = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 4096
+  ];
+}
+
+// CreateUserCustomClaimResponse is the created claim.
+message CreateUserCustomClaimResponse {
+  // claim is the claim's view.
+  CustomClaim claim = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateUserCustomClaimRequest rewrites one of an account's claims.
+message UpdateUserCustomClaimRequest {
+  // id is the claim row's identifier, a TypeID (`cclm_…`).
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+
+  // key is the claim's new name.
+  string key = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // value is the claim's new value.
+  string value = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 4096
+  ];
+}
+
+// UpdateUserCustomClaimResponse is the claim after the rewrite.
+message UpdateUserCustomClaimResponse {
+  // claim is the claim's view.
+  CustomClaim claim = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteUserCustomClaimRequest names the claim to remove.
+message DeleteUserCustomClaimRequest {
+  // id is the claim row's identifier, a TypeID (`cclm_…`).
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// DeleteUserCustomClaimResponse is empty: a successful deletion says so
+// with the protocol, and an unknown claim answers the not-found code.
+message DeleteUserCustomClaimResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListGroupCustomClaimsRequest names the group.
+message ListGroupCustomClaimsRequest {
+  // user_group_id is the group, in its wire form.
+  string user_group_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// ListGroupCustomClaimsResponse is the group's claims.
+message ListGroupCustomClaimsResponse {
+  // claims are the claims, ordered by key.
+  repeated CustomClaim claims = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateGroupCustomClaimRequest hangs a claim on a group.
+message CreateGroupCustomClaimRequest {
+  // user_group_id is the group, in its wire form.
+  string user_group_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+
+  // key is the claim's name in the token.
+  string key = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // value is the claim's value — a plain string, or a JSON document when
+  // the operator writes one.
+  string value = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 4096
+  ];
+}
+
+// CreateGroupCustomClaimResponse is the created claim.
+message CreateGroupCustomClaimResponse {
+  // claim is the claim's view.
+  CustomClaim claim = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateGroupCustomClaimRequest rewrites one of a group's claims.
+message UpdateGroupCustomClaimRequest {
+  // id is the claim row's identifier, a TypeID (`cclm_…`).
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+
+  // key is the claim's new name.
+  string key = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // value is the claim's new value.
+  string value = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 4096
+  ];
+}
+
+// UpdateGroupCustomClaimResponse is the claim after the rewrite.
+message UpdateGroupCustomClaimResponse {
+  // claim is the claim's view.
+  CustomClaim claim = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteGroupCustomClaimRequest names the claim to remove.
+message DeleteGroupCustomClaimRequest {
+  // id is the claim row's identifier, a TypeID (`cclm_…`).
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// DeleteGroupCustomClaimResponse is empty: a successful deletion says so
+// with the protocol, and an unknown claim answers the not-found code.
+message DeleteGroupCustomClaimResponse {
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
   string status = 1;

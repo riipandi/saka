@@ -36,6 +36,11 @@ type Service struct {
 	// while it is absent.
 	users UserDirectory
 
+	// claims is the operator-defined claims the preview merges beside the
+	// account's own. It is nil in the tests that exercise the management
+	// procedures only; the preview then carries the standard claims alone.
+	claims ClaimSource
+
 	// pictures is the storage engine the logos live in. It is nil in the
 	// tests that exercise the management procedures only; the logo
 	// procedures refuse while it is absent.
@@ -65,6 +70,12 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Lo
 // WithUserDirectory wires the account facts the preview reads.
 func (s *Service) WithUserDirectory(users UserDirectory) *Service {
 	s.users = users
+	return s
+}
+
+// WithClaimSource wires the operator-defined claims the preview merges.
+func (s *Service) WithClaimSource(claims ClaimSource) *Service {
+	s.claims = claims
 	return s
 }
 

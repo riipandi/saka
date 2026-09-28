@@ -11,6 +11,9 @@
 package federation
 
 import (
+	"context"
+	"uuid"
+
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
@@ -21,6 +24,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/federation/customclaim"
 	"github.com/riipandi/tango/modules/federation/oidc"
 	"github.com/riipandi/tango/modules/identity/user"
 )
@@ -33,6 +37,9 @@ const ModuleName = "federation"
 type Deps struct {
 	// Clients administers the OIDC clients.
 	Clients *oidc.Service
+
+	// Claims administers the custom claims the tokens carry.
+	Claims *customclaim.Service
 }
 
 // Module mounts every federation feature.
@@ -72,17 +79,26 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		users := do.MustInvoke[*user.Service](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
+		claims := do.MustInvoke[*customclaim.Service](i)
 		// The account facts ride the user service directly — its GetUser
 		// is the method set the preview's seam names — and the logos ride
 		// the shared storage engine, the way the profile pictures do. A
 		// container without the identity area hands a typed nil here, which
 		// an interface would happily hold; the preview refuses a directory
 		// it cannot call, so the typed nil is dropped at the seam.
-		service := oidc.NewService(pool, recorder, log).WithPictures(pictures)
+		service := oidc.NewService(pool, recorder, log).WithPictures(pictures).
+			WithClaimSource(claimAdapter{service: claims})
 		if users != nil {
 			service = service.WithUserDirectory(users)
 		}
 		return service.WithBaseURL(c.App.BaseURL), nil
+	}),
+
+	do.Lazy(func(i do.Injector) (*customclaim.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		return customclaim.NewService(pool, recorder, log), nil
 	}),
 )
 
@@ -91,6 +107,7 @@ var Package = do.Package(
 func Mount(i do.Injector) (kernel.Module, error) {
 	return NewModule(Deps{
 		Clients: do.MustInvoke[*oidc.Service](i),
+		Claims:  do.MustInvoke[*customclaim.Service](i),
 	}), nil
 }
 
@@ -101,5 +118,41 @@ func features(deps Deps) []kernel.Module {
 	if deps.Clients != nil {
 		modules = append(modules, oidc.NewModule(deps.Clients))
 	}
+	if deps.Claims != nil {
+		modules = append(modules, customclaim.NewModule(deps.Claims))
+	}
 	return modules
+}
+
+// claimAdapter maps the customclaim service's claims onto the preview
+// seam's — the same key/value shape with a different type identity, which
+// is the adapter's whole reason to exist: the seam's method set is the
+// consuming feature's contract, and the claim feature must not import the
+// client feature to satisfy it.
+type claimAdapter struct {
+	service *customclaim.Service
+}
+
+func (a claimAdapter) UserClaims(ctx context.Context, userID uuid.UUID) ([]oidc.Claim, error) {
+	claims, err := a.service.UserClaims(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return convertClaims(claims), nil
+}
+
+func (a claimAdapter) GroupClaims(ctx context.Context, groupIDs []uuid.UUID) ([]oidc.Claim, error) {
+	claims, err := a.service.GroupClaims(ctx, groupIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertClaims(claims), nil
+}
+
+func convertClaims(claims []customclaim.Claim) []oidc.Claim {
+	converted := make([]oidc.Claim, 0, len(claims))
+	for _, claim := range claims {
+		converted = append(converted, oidc.Claim{Key: claim.Key, Value: claim.Value})
+	}
+	return converted
 }

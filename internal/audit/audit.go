@@ -271,6 +271,16 @@ const (
 
 	// EventOidcClientLogoDeleted is a client's logo removed.
 	EventOidcClientLogoDeleted = "oidc_client_logo_deleted"
+
+	// EventCustomClaimCreated is a claim that did not exist now does, on an
+	// account or a group — the payload's subject names which.
+	EventCustomClaimCreated = "custom_claim_created"
+
+	// EventCustomClaimUpdated is a claim's key or value rewritten.
+	EventCustomClaimUpdated = "custom_claim_updated"
+
+	// EventCustomClaimDeleted is a claim removed.
+	EventCustomClaimDeleted = "custom_claim_deleted"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

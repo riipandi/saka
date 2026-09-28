@@ -291,21 +291,38 @@ The writer is `internal/audit` (shared infrastructure, injected into the feature
 
 ## Custom Claims
 
-**Not implemented.** The scaffold lives at `modules/federation/customclaim` (moved out of
-`modules/identity` — claims are an OIDC token-issuance concern, so they belong beside the
-federation surface that would mint them). No proto, no procedures.
+Implemented in `modules/federation/customclaim` — the contract is
+`tango.federation.v1.CustomClaimService` in `api/connect/federation.proto`
+(the claims are a token-issuance concern, so the surface lives in the
+federation area beside the clients the claims ride; the earlier plan's
+`tango.identity.v1` namespace is superseded). A claim is unique per subject
+(`(key, user_id, user_group_id)`, `NULLS NOT DISTINCT`), its value is a plain
+string or a JSON document — the tokens carry it as the document it names —
+and the identifiers travel as TypeIDs (`cclm_…`). The user and group
+surfaces answer the same table, and each refuses a row that belongs to the
+other subject kind, so a claim cannot silently move between subjects.
+
+Upstream replaces a subject's whole claim set in one PUT; tango addresses
+each row (create, update, delete by identifier) — the deviation
+`.llms/tango-deviations.md` carries. The merge into the tokens happens at
+issuance time (userinfo and the ID token), the same merge the preview
+renders.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/Suggest` | Get custom claim suggestions | planned — keys ordered by usage count | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | planned | — |
-| POST | `/rpc/tango.identity.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | planned | — |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/Suggest` | Get custom claim suggestions | done — admin; the keys in use, ordered by how often they carry | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done — admin; duplicate key on the subject is `already_exists`, an unknown account is `failed_precondition` | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done — admin; full replace of key and value; a group claim is refused | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | done — admin; idempotent not-found | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done — admin; the claim every member's tokens carry | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done — admin; a user claim is refused | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | done — admin | `modules/federation/customclaim` (service tests) |
+
+Audit events: `custom_claim_created`, `custom_claim_updated`,
+`custom_claim_deleted` — recorded in the causing transaction, the payload
+naming the subject kind and the key, never the value.
 
 ## Device Login
 

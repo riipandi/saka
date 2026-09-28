@@ -2,10 +2,13 @@ package oidc
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"time"
+	"uuid"
 
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/usergroup"
 )
 
 // UserDirectory is the account facts the preview builds its claims from.
@@ -14,6 +17,24 @@ import (
 // feature never reaches the account feature's own surface.
 type UserDirectory interface {
 	GetUser(ctx context.Context, id string) (user.UserView, error)
+}
+
+// ClaimSource is the extra claims the tokens carry: the operator-defined
+// rows the customclaim feature owns, merged into the claims the account and
+// its groups produce. The consuming feature owns the interface; the
+// customclaim service reaches it through the area's adapter.
+type ClaimSource interface {
+	// UserClaims answers the claims an account carries.
+	UserClaims(ctx context.Context, userID uuid.UUID) ([]Claim, error)
+	// GroupClaims answers the claims the account's groups carry, merged.
+	GroupClaims(ctx context.Context, groupIDs []uuid.UUID) ([]Claim, error)
+}
+
+// Claim is one operator-defined claim: the key the token names it by and
+// the value it carries.
+type Claim struct {
+	Key   string
+	Value string
 }
 
 // ErrPreviewUnknownUser is a preview whose account names no account. It is
@@ -74,7 +95,57 @@ func (s *Service) Preview(ctx context.Context, clientID, wireUserID string) (map
 		"iat":       now.Unix(),
 		"exp":       now.Add(time.Duration(accessTokenSeconds) * time.Second).Unix(),
 	}
+	if mergeErr := s.mergeCustomClaims(ctx, profile, account); mergeErr != nil {
+		return nil, nil, nil, mergeErr
+	}
 	return profile, access, profile, nil
+}
+
+// mergeCustomClaims folds the operator-defined claims — the account's own
+// and its groups' — into the profile map. A value that parses as JSON
+// travels as the document it names, the way the token surface will carry
+// it; a value that does not stays the string it is.
+func (s *Service) mergeCustomClaims(ctx context.Context, profile map[string]any, account user.UserView) error {
+	if s.claims == nil {
+		return nil
+	}
+
+	extra := make([]Claim, 0, 8)
+	accountID, err := user.UUIDFromWire(account.ID)
+	if err != nil {
+		return err
+	}
+	own, err := s.claims.UserClaims(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	extra = append(extra, own...)
+
+	if len(account.Groups) > 0 {
+		groupIDs := make([]uuid.UUID, 0, len(account.Groups))
+		for _, group := range account.Groups {
+			id, err := usergroup.UUIDFromWire(group.ID)
+			if err != nil {
+				continue
+			}
+			groupIDs = append(groupIDs, id)
+		}
+		grouped, err := s.claims.GroupClaims(ctx, groupIDs)
+		if err != nil {
+			return err
+		}
+		extra = append(extra, grouped...)
+	}
+
+	for _, claim := range extra {
+		var jsonValue any
+		if err := json.Unmarshal([]byte(claim.Value), &jsonValue); err == nil {
+			profile[claim.Key] = jsonValue
+		} else {
+			profile[claim.Key] = claim.Value
+		}
+	}
+	return nil
 }
 
 // groupNames flattens the account's memberships into the claim the protocol

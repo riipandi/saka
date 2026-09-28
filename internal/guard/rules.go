@@ -296,6 +296,20 @@ var ProcedureRules = map[string]Entry{
 	federationv1connect.OidcClientServiceListSecretsProcedure:             {Rule: Admin},
 	federationv1connect.OidcClientServiceCreateSecretProcedure:            {Rule: Admin},
 	federationv1connect.OidcClientServiceDeleteSecretProcedure:            {Rule: Admin},
+
+	// The custom-claim surface is administrative end to end, like the
+	// client surface beside it: a claim rides every token the account or
+	// its groups produce, so defining one is deciding what a foreign
+	// client learns.
+	federationv1connect.CustomClaimServiceSuggestProcedure:          {Rule: Admin},
+	federationv1connect.CustomClaimServiceListUserClaimsProcedure:   {Rule: Admin},
+	federationv1connect.CustomClaimServiceCreateUserClaimProcedure:  {Rule: Admin},
+	federationv1connect.CustomClaimServiceUpdateUserClaimProcedure:  {Rule: Admin},
+	federationv1connect.CustomClaimServiceDeleteUserClaimProcedure:  {Rule: Admin},
+	federationv1connect.CustomClaimServiceListGroupClaimsProcedure:  {Rule: Admin},
+	federationv1connect.CustomClaimServiceCreateGroupClaimProcedure: {Rule: Admin},
+	federationv1connect.CustomClaimServiceUpdateGroupClaimProcedure: {Rule: Admin},
+	federationv1connect.CustomClaimServiceDeleteGroupClaimProcedure: {Rule: Admin},
 }
 
 // RuleFor answers the rule a procedure gets. A procedure the table does not
