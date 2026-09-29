@@ -7,6 +7,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
@@ -17,6 +18,7 @@ type Signer[T any] struct {
 	issuer    string
 	audience  []string
 	ttl       time.Duration
+	typ       string
 }
 
 // NewSigner builds a signer with the given key and algorithm.
@@ -79,6 +81,16 @@ func (s *Signer[T]) WithAudience(audience ...string) *Signer[T] {
 func (s *Signer[T]) WithTTL(ttl time.Duration) *Signer[T] {
 	clone := *s
 	clone.ttl = ttl
+	return &clone
+}
+
+// WithTyp sets the JOSE type member the compact token's header carries —
+// the discriminator a relying party reads before it reads the claims, the
+// way RFC 9068's at+jwt names an access token and the logout token
+// names itself logout+jwt. An empty typ (the default) sets no member.
+func (s *Signer[T]) WithTyp(typ string) *Signer[T] {
+	clone := *s
+	clone.typ = typ
 	return &clone
 }
 
@@ -151,6 +163,21 @@ func (s *Signer[T]) Sign(claims T, std Standard) (string, error) {
 		if setErr := tok.Set(name, value); setErr != nil {
 			return "", setErr
 		}
+	}
+
+	// The JOSE type member is a header, not a claim: it rides the
+	// protected headers the signing options carry, so a discriminating
+	// verifier reads it before it reads any claim.
+	if s.typ != "" {
+		headers := jws.NewHeaders()
+		if err := headers.Set(jws.TypeKey, s.typ); err != nil {
+			return "", err
+		}
+		signed, err := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key, jws.WithProtectedHeaders(headers)))
+		if err != nil {
+			return "", err
+		}
+		return string(signed), nil
 	}
 
 	signed, err := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key))

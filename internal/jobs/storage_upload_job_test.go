@@ -23,7 +23,7 @@ func TestChunkUploadJobSyncsAStagedFile(t *testing.T) {
 	pool, client := migratedClient(t, dsn)
 	store := storage.NewFS(t.TempDir())
 	manager := storage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
-	Register(client, time.Hour, manager, nil, pool, "", false, false, nil, nil, nil)
+	Register(client, time.Hour, manager, nil, pool, "", false, false, nil, nil, nil, nil)
 
 	data := bytes.Repeat([]byte("queued"), 40)
 	require.NoError(t, manager.Stage(t.Context(), "uploads/report.bin", bytes.NewReader(data), nil))

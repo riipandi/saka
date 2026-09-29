@@ -38,7 +38,9 @@ var clientColumns = []string{
 	"requires_reauthentication", "requires_pushed_authorization_requests",
 	"skip_consent", "is_group_restricted", "client_type", "logo_path",
 	"access_token_duration_minutes", "refresh_token_duration_minutes",
-	"metadata_expires_at", "metadata_grant_types", "created_by_id", "created_at",
+	"metadata_expires_at", "metadata_grant_types",
+	"backchannel_logout_uri", "backchannel_logout_session_required",
+	"created_by_id", "created_at",
 }
 
 // clientSortColumns is the whitelist a list's sort key resolves through. The
@@ -63,7 +65,9 @@ func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 		&row.RequiresPushedAuthorizationRequests, &row.SkipConsent,
 		&row.IsGroupRestricted, &row.ClientType, &row.LogoPath,
 		&row.AccessTokenDurationMinutes, &row.RefreshTokenDurationMinutes,
-		&row.MetadataExpiresAt, &metadataGrants, &row.CreatedByID, &row.CreatedAt,
+		&row.MetadataExpiresAt, &metadataGrants,
+		&row.BackchannelLogoutURI, &row.BackchannelLogoutSessionRequired,
+		&row.CreatedByID, &row.CreatedAt,
 	)
 	if err != nil {
 		return ClientSchema{}, err
@@ -217,7 +221,9 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		"requires_reauthentication", "requires_pushed_authorization_requests",
 		"skip_consent", "is_group_restricted", "client_type",
 		"access_token_duration_minutes", "refresh_token_duration_minutes",
-		"metadata_expires_at", "metadata_grant_types", "created_by_id",
+		"metadata_expires_at", "metadata_grant_types",
+		"backchannel_logout_uri", "backchannel_logout_session_required",
+		"created_by_id",
 	)
 	ib.Values(
 		row.ID, row.Name, row.Description, callbacks, logoutCallbacks,
@@ -226,7 +232,9 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		row.RequiresPushedAuthorizationRequests, row.SkipConsent,
 		row.IsGroupRestricted, row.ClientType,
 		row.AccessTokenDurationMinutes, row.RefreshTokenDurationMinutes,
-		row.MetadataExpiresAt, metadataGrants, row.CreatedByID,
+		row.MetadataExpiresAt, metadataGrants,
+		row.BackchannelLogoutURI, row.BackchannelLogoutSessionRequired,
+		row.CreatedByID,
 	)
 
 	query, args := ib.Build()
@@ -305,6 +313,8 @@ func (r *Repository) UpdateClient(ctx context.Context, db datastore.Querier, row
 		ub.Assign("is_group_restricted", row.IsGroupRestricted),
 		ub.Assign("access_token_duration_minutes", row.AccessTokenDurationMinutes),
 		ub.Assign("refresh_token_duration_minutes", row.RefreshTokenDurationMinutes),
+		ub.Assign("backchannel_logout_uri", row.BackchannelLogoutURI),
+		ub.Assign("backchannel_logout_session_required", row.BackchannelLogoutSessionRequired),
 	)
 	ub.Where(ub.Equal("id", row.ID))
 

@@ -93,6 +93,12 @@ type ClientSchema struct {
 	LogoPath                            *string
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
+	// BackchannelLogoutURI is where the provider POSTs the logout token
+	// when a signed-in session ends. An empty one is the client opted
+	// out; BackchannelLogoutSessionRequired is the OIDC Session
+	// Management signal the token carries.
+	BackchannelLogoutURI             string
+	BackchannelLogoutSessionRequired bool
 	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
 	// on its own; a registered client carries nil. MetadataGrantTypes is
 	// the grant list the document declared — the capabilities the client
@@ -125,6 +131,8 @@ type ClientView struct {
 	Secrets                             []SecretView
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
+	BackchannelLogoutURI                string
+	BackchannelLogoutSessionRequired    bool
 	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
 	// on its own; a registered client carries nil.
 	MetadataExpiresAt  *time.Time
@@ -183,6 +191,8 @@ func (c ClientSchema) view(now time.Time) ClientView {
 		Secrets:                             secrets,
 		AccessTokenDurationMinutes:          c.AccessTokenDurationMinutes,
 		RefreshTokenDurationMinutes:         c.RefreshTokenDurationMinutes,
+		BackchannelLogoutURI:                c.BackchannelLogoutURI,
+		BackchannelLogoutSessionRequired:    c.BackchannelLogoutSessionRequired,
 		MetadataExpiresAt:                   c.MetadataExpiresAt,
 		MetadataGrantTypes:                  c.MetadataGrantTypes,
 		CreatedByID:                         wireCreatedBy(c.CreatedByID),

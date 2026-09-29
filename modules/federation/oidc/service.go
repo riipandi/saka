@@ -63,6 +63,14 @@ type Service struct {
 	// read per call, so an operator's change lands without a restart. A
 	// nil source answers off.
 	consentRevocation ConsentRevocationSource
+
+	// backchannelSource is the runtime switch the back-channel logout
+	// delivery reads, backchannelSigner the signing the token rides, and
+	// backchannelDispatcher the durable queue it delivers through. Any
+	// of them nil is the delivery off — a logout ends without it.
+	backchannelSource     BackchannelLogoutSource
+	backchannelSigner     LogoutTokenSigner
+	backchannelDispatcher BackchannelLogoutDispatcher
 }
 
 // ConsentRevocationSource is the runtime switch the end-session flow
@@ -154,6 +162,8 @@ type CreateParams struct {
 	SkipConsent                         bool
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
+	BackchannelLogoutURI                string
+	BackchannelLogoutSessionRequired    bool
 	AllowedGroupWires                   []string
 }
 
@@ -181,6 +191,8 @@ type UpdateParams struct {
 	SkipConsent                         bool
 	AccessTokenDurationMinutes          int64
 	RefreshTokenDurationMinutes         int64
+	BackchannelLogoutURI                string
+	BackchannelLogoutSessionRequired    bool
 }
 
 // List answers one page of the clients, newest first unless the caller sorts
@@ -256,6 +268,8 @@ func (s *Service) Create(ctx context.Context, callerID uuid.UUID, params CreateP
 		ClientType:                          ClientTypeStandard,
 		AccessTokenDurationMinutes:          durationOrDefault(params.AccessTokenDurationMinutes, DefaultAccessTokenMinutes),
 		RefreshTokenDurationMinutes:         durationOrDefault(params.RefreshTokenDurationMinutes, DefaultRefreshTokenMinutes),
+		BackchannelLogoutURI:                params.BackchannelLogoutURI,
+		BackchannelLogoutSessionRequired:    params.BackchannelLogoutSessionRequired,
 		CreatedByID:                         &callerID,
 	}
 	stored := credentials{Secrets: []Secret{secret}}
@@ -327,6 +341,8 @@ func (s *Service) Update(ctx context.Context, id string, params UpdateParams) (C
 		row.LogoutCallbackURLs = params.LogoutCallbackURLs
 		row.LaunchURL = params.LaunchURL
 		row.IsPublic = params.IsPublic
+		row.BackchannelLogoutURI = params.BackchannelLogoutURI
+		row.BackchannelLogoutSessionRequired = params.BackchannelLogoutSessionRequired
 		// A public client cannot keep a secret, so PKCE is not its choice:
 		// the kind forces the toggle on. The observed-capability flag dies
 		// with the requirement it was observed beside — a client whose

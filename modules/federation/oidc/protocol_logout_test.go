@@ -55,7 +55,7 @@ func TestEndSessionKillsTheGrantsAndKeepsTheConsent(t *testing.T) {
 	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
 	grant := seedGrant(t, pool, userID.String(), issued.Client.ID)
 
-	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""))
 
 	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
@@ -76,7 +76,7 @@ func TestEndSessionWithConsentRevocationDropsTheLedger(t *testing.T) {
 	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
 	grant := seedGrant(t, pool, userID.String(), issued.Client.ID)
 
-	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""))
 
 	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
 	require.NoError(t, err)

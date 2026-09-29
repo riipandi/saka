@@ -664,7 +664,17 @@ client-scoped check refuses a token minted to another client (403
 access tokens are JWTs the store never sees by themselves — a
 revocation names its grant instead, the grant carries `revoked_at`, and
 the next refresh redemption answers `invalid_grant`. An unknown token is
-the same empty 200 as a known one.
+the same empty 200 as a known one. **Back-channel logout** is a
+delivery, not an endpoint: a client that registered
+`backchannel_logout_uri` receives a logout token — signed by the same
+material the provider signs with (`typ: logout+jwt`, the
+back-channel-logout events member, `aud` the client, `sub` the account,
+`sid` only when the hint named one, never a `nonce`) — through the
+`backchannel_logout` queue, a form POST expecting an empty 200, five
+attempts. The enqueue rides the committed end of `EndSession`, a
+preparation failure is a logged loss and never a failed logout, and the
+whole feature rides the `oidc.backchannel_logout_enabled` setting,
+read per call.
 
 **The device grant (RFC 8628) and the prefix.** The provider registers
 its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no

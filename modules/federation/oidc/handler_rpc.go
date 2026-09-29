@@ -60,6 +60,8 @@ func (h *rpcHandler) CreateClient(ctx context.Context, req *connect.Request[fede
 		SkipConsent:                         req.Msg.SkipConsent,
 		AccessTokenDurationMinutes:          req.Msg.GetAccessTokenDurationMinutes(),
 		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
+		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
+		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
 		AllowedGroupWires:                   req.Msg.AllowedUserGroups,
 	})
 	if err != nil {
@@ -101,6 +103,8 @@ func (h *rpcHandler) UpdateClient(ctx context.Context, req *connect.Request[fede
 		SkipConsent:                         req.Msg.SkipConsent,
 		AccessTokenDurationMinutes:          req.Msg.GetAccessTokenDurationMinutes(),
 		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
+		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
+		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
 	})
 	if err != nil {
 		return nil, mapError(err)

@@ -45,7 +45,9 @@ var ledgerClientColumns = []string{
 	"c.requires_reauthentication", "c.requires_pushed_authorization_requests", "c.skip_consent",
 	"c.is_group_restricted", "c.client_type", "c.logo_path",
 	"c.access_token_duration_minutes", "c.refresh_token_duration_minutes",
-	"c.metadata_expires_at", "c.metadata_grant_types", "c.created_by_id", "c.created_at",
+	"c.metadata_expires_at", "c.metadata_grant_types",
+	"c.backchannel_logout_uri", "c.backchannel_logout_session_required",
+	"c.created_by_id", "c.created_at",
 }
 
 // scanLedgerRow reads one ledger join row. The client's columns land in
@@ -222,9 +224,11 @@ func (s *Service) RevokeMyAuthorizedClient(ctx context.Context, userID, clientID
 // account made to the client and every token riding them. The
 // authorized-client ledger survives unless the
 // `oidc.end_session_revokes_consent` setting says otherwise — off, the
-// client's next sign-in skips consent; on, it asks again.
-func (s *Service) EndSession(ctx context.Context, userID, clientID string) error {
-	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+// client's next sign-in skips consent; on, it asks again. The sessionID
+// is the OP session identifier the hint carried, when it named one — the
+// back-channel delivery's sid, nothing in this database names.
+func (s *Service) EndSession(ctx context.Context, userID, clientID, sessionID string) error {
+	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		// The switch is read per call, so an operator's change lands on
 		// the next logout without a restart. A read error answers off —
 		// the conservative side of the switch: the ledger survives, the
@@ -251,6 +255,14 @@ func (s *Service) EndSession(ctx context.Context, userID, clientID string) error
 		})
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// The delivery rides the committed end — a token the transaction
+	// rolled back must never reach the relying party.
+	s.dispatchBackchannelLogout(ctx, userID, clientID, sessionID)
+	return nil
 }
 
 // endSessionRevokesConsent answers the wired source, a nil one off.

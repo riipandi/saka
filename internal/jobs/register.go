@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/scheduler"
@@ -21,11 +22,15 @@ import (
 // run through. A nil uploader registers none of its jobs: a queue that
 // cannot answer its tasks is not a schedule, it is a failure. mail is the
 // service the verification email submits through, and the same rule applies.
+// http is the outbound client the back-channel logout deliveries POST
+// through; a nil client registers the delivery queue anyway, and its
+// attempts fail until the wiring lands — the logout itself never waits
+// on it.
 // expiryEmailEnabled says whether the API-key expiry reminder runs — its
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, log *slog.Logger) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, http *fetcher.Client, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool)
 	}))
@@ -39,6 +44,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 	// carries are the one deletion path they have.
 	client.Register(queue.NewQueue[ProtocolCleanupTask](func(ctx context.Context, task ProtocolCleanupTask) error {
 		return protocolCleanupProcessor(ctx, task, pool)
+	}))
+	// The back-channel logout deliveries ride the shared fetch client: a
+	// token is POSTed to the relying party's registered destination, and
+	// a failed attempt is the queue's retry, not the logout's failure.
+	client.Register(queue.NewQueue[BackchannelLogoutTask](func(ctx context.Context, task BackchannelLogoutTask) error {
+		return backchannelLogoutProcessor(ctx, task, http)
 	}))
 	if uploader != nil {
 		client.Register(queue.NewQueue[ChunkUploadTask](func(ctx context.Context, task ChunkUploadTask) error {

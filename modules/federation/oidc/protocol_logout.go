@@ -63,12 +63,32 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 				userID = wire
 			}
 
-			if err := service.EndSession(req.Context(), userID.String(), session.ClientID); err != nil {
+			// The hint's sid names the OP session the RP correlates — a
+			// token the provider minted itself carries none, tango never
+			// writing the member; a third-party hint's answer rides
+			// through so the client's session matching keeps working.
+			sid := hintSessionID(claims)
+
+			if err := service.EndSession(req.Context(), userID.String(), session.ClientID, sid); err != nil {
 				return goidc.StatusFailure, fmt.Errorf("could not end the session: %w", err)
 			}
 			return goidc.StatusSuccess, nil
 		},
 	)
+}
+
+// hintSessionID reads the session identifier a hint's claims carry, when
+// one does. The delivery's sid is the RP's correlation, not tango's —
+// the row's identity never names it.
+func hintSessionID(claims *goidc.IDToken) string {
+	if claims == nil {
+		return ""
+	}
+	raw, ok := claims.AdditionalClaims["sid"].(string)
+	if !ok {
+		return ""
+	}
+	return raw
 }
 
 // joseTypeMember reads the type member of the first JOSE header of a

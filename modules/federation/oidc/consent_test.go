@@ -105,7 +105,7 @@ func TestEndSessionReadsTheSwitchPerCall(t *testing.T) {
 	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
 
 	// Off: the ledger survives, the grants die.
-	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""))
 	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
 	require.NoError(t, err)
 	assert.Len(t, views, 1, "the ledger survives the off switch")
@@ -113,7 +113,7 @@ func TestEndSessionReadsTheSwitchPerCall(t *testing.T) {
 	// On, without a rebuild: the whole consent goes with the next logout.
 	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
 	flip.value = true
-	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""))
 	views, err = service.MyAuthorizedClients(t.Context(), userID.String())
 	require.NoError(t, err)
 	assert.Empty(t, views, "the flipped switch lands on the next logout")
@@ -130,7 +130,7 @@ func TestEndSessionWithAnUnreadableSwitchRevokesTheGrantsOnly(t *testing.T) {
 	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
 	grant := seedGrant(t, pool, userID.String(), issued.Client.ID)
 
-	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID),
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""),
 		"an unreadable switch fails closed, it does not fail the logout")
 
 	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)

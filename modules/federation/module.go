@@ -24,7 +24,9 @@ import (
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/federation/customclaim"
@@ -110,6 +112,20 @@ var Package = do.Package(
 			// owns, and the logout flow asks it per call.
 			WithEndSessionRevokesConsentSource(consentRevocationAdapter{
 				settings: do.MustInvoke[*appconfig.Settings](i),
+			}).
+			// The back-channel logout delivery rides the same settings
+			// feature for its switch, signs through the jwks service the
+			// provider publishes from, and enqueues through the shared
+			// queue client — a nil service of the three is the delivery
+			// off, the way the test containers wire them.
+			WithBackchannelLogoutSource(backchannelSwitchAdapter{
+				settings: do.MustInvoke[*appconfig.Settings](i),
+			}).
+			WithBackchannelLogoutSigner(oidc.LogoutTokenSignerFor(
+				do.MustInvoke[*jwks.Service](i), c.App.BaseURL,
+			)).
+			WithBackchannelLogoutDispatcher(backchannelDispatchAdapter{
+				queue: do.MustInvoke[*queue.Client](i),
 			})
 		if users != nil {
 			service = service.WithUserDirectory(users)
@@ -209,6 +225,35 @@ type consentRevocationAdapter struct {
 
 func (a consentRevocationAdapter) EndSessionRevokesConsent(ctx context.Context) (bool, error) {
 	return a.settings.GetBool(ctx, appconfig.SettingOIDCEndSessionRevokesConsent)
+}
+
+// backchannelSwitchAdapter reads the back-channel logout switch from the
+// settings feature, the same catalog the consent switch rides.
+type backchannelSwitchAdapter struct {
+	settings *appconfig.Settings
+}
+
+func (a backchannelSwitchAdapter) BackchannelLogoutEnabled(ctx context.Context) (bool, error) {
+	return a.settings.GetBool(ctx, appconfig.SettingOIDCBackchannelLogoutEnabled)
+}
+
+// backchannelDispatchAdapter enqueues one delivery through the shared
+// queue client: the task type and the retry live in internal/jobs, and
+// the adapter is the seam the oidc service's contract names.
+type backchannelDispatchAdapter struct {
+	queue *queue.Client
+}
+
+func (a backchannelDispatchAdapter) DispatchBackchannelLogout(ctx context.Context, dispatch oidc.BackchannelLogoutDispatch) error {
+	_, err := a.queue.Add(jobs.BackchannelLogoutTask{
+		ClientID: dispatch.ClientID,
+		URL:      dispatch.URI,
+		Token:    dispatch.Token,
+	}).Ctx(ctx).Save()
+	if err != nil {
+		return fmt.Errorf("federation: enqueue back-channel logout: %w", err)
+	}
+	return nil
 }
 
 func (a claimAdapter) UserClaims(ctx context.Context, userID uuid.UUID) ([]oidc.Claim, error) {

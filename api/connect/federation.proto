@@ -179,6 +179,16 @@ message OidcClient {
   // capabilities the client cannot be granted beyond.
   repeated string metadata_grant_types = 21;
 
+  // backchannel_logout_uri is where the provider POSTs the logout token
+  // when a signed-in session for this client ends. Absent, the client is
+  // opted out of back-channel logout.
+  optional string backchannel_logout_uri = 33;
+
+  // backchannel_logout_session_required is the OIDC Session Management
+  // signal the logout token carries: the client demands the session
+  // identity be included in the delivery.
+  bool backchannel_logout_session_required = 34;
+
   // allowed_user_groups are the groups the restriction names, resolved to
   // the group views the group surface answers with.
   repeated tango.identity.v1.UserGroup allowed_user_groups = 30;
@@ -334,6 +344,15 @@ message CreateOidcClientRequest {
     (buf.validate.field).repeated.max_items = 100,
     (buf.validate.field).repeated.items.string.max_len = 64
   ];
+
+  // backchannel_logout_uri is where the provider POSTs the logout token
+  // when a signed-in session for this client ends. Absent, the client is
+  // opted out of back-channel logout.
+  optional string backchannel_logout_uri = 15 [(buf.validate.field).string.uri = true];
+
+  // backchannel_logout_session_required is the OIDC Session Management
+  // signal the logout token carries.
+  bool backchannel_logout_session_required = 16;
 }
 
 // CreateOidcClientResponse is the created client and its first secret.
@@ -436,6 +455,15 @@ message UpdateOidcClientRequest {
   // refresh_token_duration_minutes is the window an issued refresh token
   // lives for; absent, the default applies.
   optional int64 refresh_token_duration_minutes = 13 [(buf.validate.field).int64.gte = 1];
+
+  // backchannel_logout_uri is where the provider POSTs the logout token
+  // when a signed-in session for this client ends. Absent, the client is
+  // opted out of back-channel logout.
+  optional string backchannel_logout_uri = 15 [(buf.validate.field).string.uri = true];
+
+  // backchannel_logout_session_required is the OIDC Session Management
+  // signal the logout token carries.
+  bool backchannel_logout_session_required = 16;
 }
 
 // UpdateOidcClientResponse is the client after the rewrite.

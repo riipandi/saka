@@ -77,7 +77,7 @@ func runRetention(t *testing.T, pool *datastore.Postgres, client *queue.Client, 
 	// The processors are wired first, the way a serve run wires them: a task
 	// whose processor is not registered never runs, and the successor this
 	// helper waits for is the processor's own last step.
-	Register(client, time.Hour, nil, nil, pool, "", false, false, nil, nil, nil)
+	Register(client, time.Hour, nil, nil, pool, "", false, false, nil, nil, nil, nil)
 
 	_, err := client.Add(AuditCleanupTask{
 		IntervalMillis: time.Hour.Milliseconds(),

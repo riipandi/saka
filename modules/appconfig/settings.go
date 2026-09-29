@@ -67,6 +67,12 @@ const (
 	// logout withdraws: off, the grants and tokens die and the
 	// authorized-client ledger survives; on, the whole consent goes.
 	SettingOIDCEndSessionRevokesConsent = "oidc.end_session_revokes_consent"
+
+	// SettingOIDCBackchannelLogoutEnabled gates the back-channel logout
+	// delivery: off, no logout token is ever minted, whatever the clients
+	// declare; on, the provider POSTs one to every client's registered
+	// backchannel_logout_uri when a signed-in session ends.
+	SettingOIDCBackchannelLogoutEnabled = "oidc.backchannel_logout_enabled"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -79,6 +85,11 @@ func Catalog() []SettingDef {
 			Key:         SettingOIDCEndSessionRevokesConsent,
 			Default:     "false",
 			Description: "What a successful RP-initiated logout withdraws. Off, the account's grants and tokens for the client die and the authorized-client ledger survives (the next sign-in skips consent). On, the whole consent is withdrawn and the next sign-in asks again.",
+		},
+		{
+			Key:         SettingOIDCBackchannelLogoutEnabled,
+			Default:     "false",
+			Description: "Whether the provider delivers back-channel logout tokens: a signed logout token POSTed to every client's registered backchannel_logout_uri when a signed-in session ends. Off, no delivery is ever minted.",
 		},
 	}
 }

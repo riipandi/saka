@@ -16,6 +16,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -60,6 +61,9 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// test's configuration switches the protocol off — the
 		// forwarding contract is the management surface's.
 		do.Eager[*jwks.Service](nil),
+		// The back-channel logout dispatch enqueues through the shared
+		// client; nil stands in for the wiring, the delivery off.
+		do.Eager[*queue.Client](nil),
 		do.Eager(settings),
 	)
 	Package(i)

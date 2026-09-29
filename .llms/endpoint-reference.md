@@ -411,7 +411,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
-| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when the `oidc.end_session_revokes_consent` setting is on), redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`), `internal/guard` (RestRules) |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when the `oidc.end_session_revokes_consent` setting is on), delivers a back-channel logout token when the client registered a URI and the `oidc.backchannel_logout_enabled` setting is on, redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`, `backchannel.go`), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
 The protocol design notes below record implementation behavior for device flow,
@@ -528,6 +528,25 @@ switch is a settings read per logout, so an operator's change lands
 without a restart) — records
 `oidc_session_ended`, and redirects to the registered URI with `state`
 when one was given, to the SPA root otherwise.
+
+**Back-channel logout delivers after the commit.** A client whose
+`backchannel_logout_uri` is registered receives a logout token when an
+end-session for it succeeds: signed by the provider's signing material
+with `typ: logout+jwt`, `events` carrying the
+`http://schemas.openid.net/event/backchannel-logout` member, `aud` the
+client, `sub` the account, `iat`/`exp` a two-minute window, `jti` a
+random draw, and `sid` the session identifier the hint carried — none
+when the hint named none, and never a `nonce`. The delivery is the
+`backchannel_logout` queue's job (`internal/jobs`): a form POST
+(`logout_token=…`) expecting an empty 200, five attempts, one-minute
+backoff — a failure logs and retries, it never fails the logout that
+succeeded, and a token the queue redelivers after every attempt expired
+is the client's safe refusal. The whole feature rides the
+`oidc.backchannel_logout_enabled` setting (off by default), read per
+logout like the consent switch. The client contract carries the fields:
+`backchannel_logout_uri` (optional absolute URL) and
+`backchannel_logout_session_required` on create, update, and the view.
+`TODO(frontend)`: the client form needs fields for both.
 
 **Rate limits (guard's REST classification).** `/oidc/token`,
 `/oidc/device/authorize`, `/oidc/par` ride the credential bucket

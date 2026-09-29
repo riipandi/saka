@@ -39,8 +39,12 @@ func wireClient(view ClientView) *federationv1.OidcClient {
 		Credentials:                         wireCredentials(view.Secrets),
 		AccessTokenDurationMinutes:          view.AccessTokenDurationMinutes,
 		RefreshTokenDurationMinutes:         view.RefreshTokenDurationMinutes,
+		BackchannelLogoutSessionRequired:    view.BackchannelLogoutSessionRequired,
 		CreatedById:                         &view.CreatedByID,
 		CreatedAt:                           timestamppb.New(view.CreatedAt),
+	}
+	if view.BackchannelLogoutURI != "" {
+		client.BackchannelLogoutUri = &view.BackchannelLogoutURI
 	}
 	if view.Description == "" {
 		client.Description = nil
