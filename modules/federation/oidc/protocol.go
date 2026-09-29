@@ -35,6 +35,7 @@ const (
 	protocolTokenEndpoint      = "/token"
 	protocolUserInfoEndpoint   = "/userinfo"
 	protocolIntrospectEndpoint = "/introspect"
+	protocolRevokeEndpoint     = "/revoke"
 	protocolPAREndpoint        = "/par"
 	protocolEndSessionEndpoint = "/end-session"
 	protocolJWKSEndpoint       = "/.well-known/jwks.json"
@@ -182,11 +183,30 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			return info.ClientID == client.ID
 		}),
 		provider.WithTokenIntrospectionEndpoint(protocolIntrospectEndpoint),
+		// RFC 7009 revocation is open to every registered client — the
+		// ownership of the presented token is the library's own
+		// client-scoped check — and an access-token hint must reach the
+		// grant, because tango's access tokens are JWTs the store never
+		// sees by themselves.
+		provider.WithTokenRevocation(revocationPolicy(),
+			provider.WithTokenRevocationRevokeGrantOnAccessToken(),
+			provider.WithTokenRevocationEndpoint(protocolRevokeEndpoint)),
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Protocol{provider: p, baseURL: baseURL}, nil
+}
+
+// revocationPolicy is the RFC 7009 gate the provider runs after it has
+// authenticated the client: any registered client may call the endpoint.
+// Whether the presented token belongs to the caller is not this policy's
+// question — the library answers it against the token's own client, and
+// a stranger's token is refused there.
+func revocationPolicy() goidc.IsClientAllowedFunc {
+	return func(context.Context, *goidc.Client) bool {
+		return true
+	}
 }
 
 // Mount registers the protocol's paths on the router. The patterns name
@@ -206,6 +226,7 @@ func (p *Protocol) Mount(r chi.Router) {
 	r.Handle(protocolPrefix+protocolTokenEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolUserInfoEndpoint, handler)
 	r.Handle(protocolPrefix+protocolIntrospectEndpoint, snapshots(flatten(handler)))
+	r.Handle(protocolPrefix+protocolRevokeEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolPAREndpoint, flatten(handler))
 	r.Handle(protocolPrefix+protocolEndSessionEndpoint, handler)
 	// The device verification endpoint serves the browser's entry and

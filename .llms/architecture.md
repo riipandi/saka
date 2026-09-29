@@ -657,7 +657,14 @@ whose pointer row resolves by the PAR id, the request URI is
 whose `requires_pushed_authorization_requests` is set is refused at the
 plain authorize endpoint. `/oidc/token` and `/oidc/par` ride the
 credential bucket; introspection is exempt — the client already paid with
-its secret.
+its secret. **Revocation** (RFC 7009) rides the credential bucket too:
+any registered client may call `/oidc/revoke`, the library's own
+client-scoped check refuses a token minted to another client (403
+`access_denied`), and the grant-revocation switch is on because tango's
+access tokens are JWTs the store never sees by themselves — a
+revocation names its grant instead, the grant carries `revoked_at`, and
+the next refresh redemption answers `invalid_grant`. An unknown token is
+the same empty 200 as a known one.
 
 **The device grant (RFC 8628) and the prefix.** The provider registers
 its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no
@@ -711,9 +718,13 @@ lookup allowance, so nothing is deleted while a lookup could still accept
 it, and the batches keep a backlog from a stopped deployment off one
 long-running statement. The consent cascade deletes what revocation kills
 at once; the sweep is for the rows nothing revokes — the codes never
-exchanged, the sessions abandoned, the grants left to age out.
-`oauth2_jtis` and `interaction_sessions` are scaffold tables with no
-writers, so they carry no sweep.
+exchanged, the sessions abandoned, the grants left to age out. The sweep
+also reaps `oauth2_jtis`, whose rows are the JTI claims the replay
+protection holds: `provider.WithJTIConsumer` claims every jti a
+client-presented JWT carries (a DPoP proof, a client assertion) with a
+fifteen-minute window, the INSERT's unique index makes the second
+presentation lose, and the sweep frees the id once its window passes.
+`interaction_sessions` remains a scaffold table with no writer.
 
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**

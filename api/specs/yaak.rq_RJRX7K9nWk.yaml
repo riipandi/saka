@@ -1,0 +1,58 @@
+type: http_request
+model: http_request
+id: rq_RJRX7K9nWk
+createdAt: 2026-09-29T12:43:41.160730
+updatedAt: 2026-09-29T12:43:41.160730
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: token
+    value: REPLACE_REFRESH_OR_ACCESS_TOKEN
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+  - enabled: true
+    name: client_secret
+    value: REPLACE_CLIENT_SECRET
+  text: '{}'
+bodyType: application/x-www-form-urlencoded
+description: |-
+  RFC 7009 token revocation: any registered client may call it, the token must be its own — a token minted to another client answers 403 access_denied, an unknown token is a quiet 200. The revocation marks the presented tokens grant: the next refresh redemption answers invalid_grant and introspection answers active: false; an already-minted JWT access token keeps verifying until its own expiry.
+
+  Endpoint: `POST /oidc/revoke`
+
+  Mirror of Pocket ID `POST /api/oidc/revoke`.
+
+  Parameters:
+  - token (formData, required): The refresh or access token to revoke.
+  - client_id (formData, required): The client the credential names.
+  - client_secret (formData, required): The client credential.
+headers: []
+method: POST
+name: '[Pocket ID] Revoke OIDC tokens'
+sortPriority: 16500.0
+url: ${[ apiBaseURL ]}/oidc/revoke
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

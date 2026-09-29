@@ -440,10 +440,13 @@ var RestRules = []RestEntry{
 	{Method: http.MethodPost, Pattern: "/oidc/userinfo", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/oidc/end-session", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/end-session", Rule: Public},
-	// Introspection and PAR are client-authenticated from the form or the
-	// Basic header, the way the token endpoint is: public in the bearer
-	// sense, the library refusing a request whose secret does not verify.
+	// Introspection and revocation are client-authenticated from the form
+	// or the Basic header, the way the token endpoint is: public in the
+	// bearer sense, the library refusing a request whose secret does not
+	// verify — and revocation refusing a token that belongs to another
+	// client.
 	{Method: http.MethodPost, Pattern: "/oidc/introspect", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/revoke", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/par", Rule: Public},
 	// The device flow: the device itself authenticates at the
 	// authorization endpoint like a token request; the verification

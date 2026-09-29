@@ -407,6 +407,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | GET, POST | `/oidc/authorize` | Authorization endpoint | done — REST, public, redirect and OAuth error contract | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/token` | Token endpoint | done — REST, public, form encoding, client authentication, RFC errors | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/introspect` | Introspect OIDC tokens | done — REST, client-scoped RFC 7662 (own tokens only) | `modules/federation/oidc` (protocol mount), protocol tests |
+| POST | `/oidc/revoke` | Revoke OIDC tokens | done — REST, RFC 7009; client-scoped, an unknown token is a quiet 200, a stranger's token is 403 `access_denied`; the revocation marks the grant, the next refresh redemption answers `invalid_grant` and introspection answers `active: false` | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules, credential bucket) |
 | POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
@@ -432,7 +433,8 @@ Authorization = `GET,POST /oidc/authorize`; token = `POST /oidc/token`;
 userinfo = `GET,POST /oidc/userinfo`; end-session = `GET,POST /oidc/end-session`;
 the interaction continuation rides the authorization callback itself —
 `GET,POST /oidc/authorize/{id}`, the session id the SPA's interaction page
-carries back; introspect = `POST /oidc/introspect`; PAR = `POST /oidc/par`;
+carries back; introspect = `POST /oidc/introspect`; revoke = `POST /oidc/revoke`
+(RFC 7009, the grant-wide mark); PAR = `POST /oidc/par`;
 device = `POST /oidc/device_authorization` and the verification surface
 `GET,POST /oidc/device[/{callback}]` (the library's default
 names, its v0.25.0 API exposing no endpoint setter; the provider
@@ -456,7 +458,9 @@ a not-found rather than a row. No `index_key` column exists — the
 pointer rows are the secondary lookups. Rows expire per object
 (`expires_at`): the grant's refresh window, the session's timeout, the
 pointer's code lifetime; lookups refuse what the column judges dead and
-the `protocol_cleanup` job reaps the rest (`internal/jobs`). Client
+the `protocol_cleanup` job reaps the rest (`internal/jobs`), the claimed
+`oauth2_jtis` rows included — every jti a client-presented JWT carries
+is claimed once there, a second presentation loses to the unique index. Client
 resolution
 (`DCRManager.Client`) reads `oidc_clients`: a standard client maps grant types
 and the secret hashes to `goidc.Client`; an unknown `https://…` identifier
