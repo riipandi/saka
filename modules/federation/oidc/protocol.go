@@ -162,6 +162,11 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		provider.WithNoneAuthn(),
 		provider.WithSecretPostAuthn(),
 		provider.WithSecretBasicAuthn(),
+		// The JTI consumer claims every jti a client-presented JWT
+		// carries — a DPoP proof, a client assertion, a pushed request
+		// object — so a replayed JWT is refused by the store and not by
+		// luck. The sweep reaps the claims as they pass.
+		provider.WithJTIConsumer(stores.consumeJTI),
 		provider.WithIDTokenClaims(idTokenClaims(service)),
 		provider.WithUserInfoClaims(userInfoClaims(service)),
 		provider.WithLogout(provider.LogoutConfig{

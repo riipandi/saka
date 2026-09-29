@@ -82,9 +82,13 @@ func protocolCleanupProcessor(ctx context.Context, task ProtocolCleanupTask, poo
 	if err != nil {
 		return err
 	}
-	if deleted > 0 {
-		slog.InfoContext(ctx, "protocol: expired sessions deleted",
-			"deleted", deleted)
+	jtisDeleted, err := deleteExpiredJTIs(ctx, pool, cutoff)
+	if err != nil {
+		return err
+	}
+	if deleted > 0 || jtisDeleted > 0 {
+		slog.InfoContext(ctx, "protocol: expired state deleted",
+			"sessions", deleted, "jtis", jtisDeleted)
 	}
 
 	// The next run is queued before this one succeeds, so the schedule never
@@ -114,6 +118,30 @@ func deleteExpiredProtocolSessions(ctx context.Context, pool *datastore.Postgres
 			 )`, cutoff, protocolCleanupBatch)
 		if err != nil {
 			return total, fmt.Errorf("protocol_cleanup: delete: %w", err)
+		}
+		removed := int(tag.RowsAffected())
+		total += removed
+		if removed < protocolCleanupBatch || total >= protocolCleanupRunBound {
+			return total, nil
+		}
+	}
+}
+
+// deleteExpiredJTIs reaps the claimed JWT IDs whose replay window passed,
+// the same bounded-batch shape the sessions sweep takes. The expiry is
+// NOT NULL here, so the sessions sweep's NULL carve-out does not apply.
+func deleteExpiredJTIs(ctx context.Context, pool *datastore.Postgres, cutoff time.Time) (int, error) {
+	total := 0
+	for {
+		tag, err := pool.Exec(ctx,
+			`DELETE FROM public.oauth2_jtis
+			 WHERE ctid IN (
+				 SELECT ctid FROM public.oauth2_jtis
+				 WHERE expires_at < $1
+				 LIMIT $2
+			 )`, cutoff, protocolCleanupBatch)
+		if err != nil {
+			return total, fmt.Errorf("protocol_cleanup: delete jtis: %w", err)
 		}
 		removed := int(tag.RowsAffected())
 		total += removed
