@@ -82,8 +82,8 @@ wants the process collectors registers them here, deliberately.
 ## Requirements
 
 - Go >= 1.27
-- OpenTelemetry SDK + OTLP exporters (`otlptracegrpc`/`otlptracehttp`,
-  `otlpmetricgrpc`/`otlpmetrichttp`) and `prometheus/client_golang`
+- OpenTelemetry SDK + OTLP/HTTP exporters (`otlptracehttp`, `otlpmetrichttp`) and
+  `prometheus/client_golang`
 - A collector — only when a signal is enabled (`task metrics:up` runs the local stack)
 
 ## Wiring
@@ -124,7 +124,6 @@ The recording call enqueues and returns; the background processors carry it out.
 		"endpoint": "http://localhost:4318",
 		"service_name": "tango",
 		"environment": "staging",
-		"protocol": "http/protobuf",
 		"compression": "gzip",
 		"tracing": { "enable": true, "sampler": "parent_ratio", "ratio": 0.1 },
 		"metrics": { "enable": true, "interval": 60, "prometheus_path": "/metrics" }
@@ -142,7 +141,6 @@ default and is rendered through the same path every secret takes.
 | `otel.endpoint` | — | The collector's OTLP address; the scheme decides whether HTTP is TLS. Read when any signal is enabled |
 | `otel.service_name` | app identifier | The service every signal is attributed to |
 | `otel.environment` | — | The deployment a signal came from — a resource attribute |
-| `otel.protocol` | `http/protobuf` | The wire protocol every signal is sent with — `http/protobuf`, `http/json`, or `grpc`; a collector accepts one protocol per listener |
 | `otel.compression` | gzip | `gzip` or `none` (none saves the CPU on a loopback collector) |
 | `otel.headers` | — | Sent with every export; values are secrets |
 | `otel.queue.max_size` | 4096 | What one signal buffers before dropping the oldest |
@@ -176,9 +174,9 @@ Drains the providers in reverse construction order. Called by the injector's shu
 
 The Prometheus exposition, or nil when metrics are switched off.
 
-### `GRPCTransport(secure bool)` / `TLSConfig(secure bool)` / `Compressor(name string)` / `SignalPath(configured, endpointPath, fallback string)`
+### `TLSConfig(secure bool)` / `SignalPath(configured, endpointPath, fallback string)`
 
-The exporter plumbing shared with the logger's OTLP sink: explicit credentials and TLS close
+The exporter plumbing shared with the logger's OTLP sink: an explicit TLS configuration closes
 the `OTEL_EXPORTER_OTLP_CERTIFICATE` door at the point the exporter opens it; `SignalPath`
 prefers the configured path, then keeps an endpoint that already names one, then falls back to
 the protocol's own route.
@@ -193,8 +191,6 @@ without a collector:
 go test ./internal/observer/
 ```
 
-The gRPC export paths are exercised against a real collector in `grpc_test.go`
-(testcontainers).
 
 ## Design Decisions
 
@@ -204,7 +200,7 @@ The gRPC export paths are exercised against a real collector in `grpc_test.go`
 | Batch/periodic export off the request path | A slow or absent collector costs dropped telemetry, never a slow request |
 | Bounded queues, oldest dropped | The alternative is unbounded memory or blocking producers; the SDK counts what it dropped |
 | One collector address, per-signal paths | A collector is one endpoint receiving three signals; a second address is a second collector |
-| Protocol shared across signals | A collector accepts one protocol per listener; two protocols would mean two collectors |
+| OTLP/HTTP only (`http/protobuf`) | One wire protocol keeps the exporter set, the config surface, and the collector side aligned; the exporters dial the endpoint URL as written |
 | Fresh Prometheus registry | Only this application's instruments are attributed to it; nothing is inherited by accident |
 | Fails rather than degrades | A deployment that asked for traces and did not get them has lost the telemetry it is being trusted with |
 | Traces built before metrics | Shutdown drains in reverse, so the metric provider stops before the tracer provider it does not depend on |

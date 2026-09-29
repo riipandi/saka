@@ -6,9 +6,8 @@ in any combination. Application code never touches LogLayer; it calls slog, and 
 decides where the entry goes.
 
 > **Relation to the observer:** the OTLP sink is built from `internal/observer`'s exporter
-> plumbing (`GRPCTransport`, `TLSConfig`, `Compressor`, `SignalPath`) rather than carrying a
-> copy — one collector receives every signal, and the two packages describe the same service
-> from the same configuration.
+> plumbing (`TLSConfig`, `SignalPath`) rather than carrying a copy — one collector receives
+> every signal, and the two packages describe the same service from the same configuration.
 >
 > **Relation to feature code:** `Slog()` is the only frontend. A dependency that accepts a
 > `*slog.Logger` is handed this one and lands in the same pipeline.

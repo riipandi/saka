@@ -632,91 +632,18 @@ func TestValidationAcceptsAnOTLPDeployment(t *testing.T) {
 	}
 }
 
-func TestValidationRefusesAnUnknownProtocol(t *testing.T) {
-	// A name outside the specification's three is refused rather than mapped to
-	// a default: a deployment that asked for one protocol and silently got
-	// another has telemetry its collector may reject without saying so.
-	err := resolveFile(t, `"log": {"transport": ["otlp"]}, "otel": {"protocol": "http"}`)
+func TestValidationHoldsTheEndpointToAURL(t *testing.T) {
+	// The exporters dial HTTP only, so the address is held to a URL: a value
+	// that would fail at the first export fails here instead, beside the key
+	// that caused it.
+	err := resolveFile(t, `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4318"}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "otel.protocol")
-	assert.Contains(t, err.Error(), "http/protobuf")
-}
-
-func TestValidationHoldsTheEndpointToTheConfiguredProtocol(t *testing.T) {
-	// The two protocols address a service differently: HTTP wants a URL, gRPC
-	// wants host:port. Each is held to its own form, so a value that would fail
-	// at the first export fails here instead, beside the key that caused it.
-	for _, protocol := range []string{"http/protobuf", "http/json"} {
-		body := `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4318", "protocol": ` +
-			strconv.Quote(protocol) + `}`
-		err := resolveFile(t, body)
-		require.ErrorIs(t, err, config.ErrInvalid, protocol)
-		assert.Contains(t, err.Error(), "must be an absolute http or https URL", protocol)
-	}
-
-	// A scheme on a gRPC address is refused rather than stripped: the exporter
-	// would accept it and ignore the scheme, so a user who wrote one has likely
-	// mistaken the port as well.
-	body := `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "http://localhost:4317", "protocol": "grpc"}`
-	err := resolveFile(t, body)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "must be host:port")
-
-	// The HTTP default port is refused for gRPC: switching the protocol without
-	// moving the address is the one change that looks applied and sends nothing,
-	// because the collector's two protocols are two listeners.
-	body = `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4318", "protocol": "grpc"}`
-	err = resolveFile(t, body)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "is the HTTP port")
-	assert.Contains(t, err.Error(), "4317")
+	assert.Contains(t, err.Error(), "must be an absolute http or https URL")
 
 	assert.NoError(t, resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4317", "protocol": "grpc"}`))
-}
-
-func TestValidationRefusesJSONForTheSignalsTheSDKCannotEncode(t *testing.T) {
-	// Only the trace exporter encodes JSON. Metrics and logs would send protobuf
-	// to a collector expecting JSON, so the mismatch is refused by name rather
-	// than shipped — and the message names the signal that would be wrong.
-	err := resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"protocol": "http/json", "tracing": {"enable": true}}`)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "http/json")
-	assert.Contains(t, err.Error(), "logs")
-
-	// Traces alone are fine: that exporter is the one that implements it.
+		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "http://localhost:4318"}`))
 	assert.NoError(t, resolveFile(t,
-		`"log": {"transport": ["console"]}, "otel": {"protocol": "http/json", "tracing": {"enable": true}}`))
-
-	// Metrics are refused, and both offending signals are named in one message.
-	err = resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"protocol": "http/json", "metrics": {"enable": true}}`)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "logs")
-	assert.Contains(t, err.Error(), "metrics")
-}
-
-func TestValidationRefusesAPathTheGRPCProtocolCannotFollow(t *testing.T) {
-	// A gRPC exporter is addressed by host and port alone, so a per-signal path
-	// would be a value nothing reads. The combination is refused by name rather
-	// than silently ignored, and only for the signals that are switched on.
-	err := resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4317", "protocol": "grpc", `+
-			`"tracing": {"enable": true, "path": "/v1/traces"}}`)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "otel.tracing.path")
-	assert.Contains(t, err.Error(), "host and port")
-
-	// The same path is fine over HTTP, which is the protocol that follows it.
-	assert.NoError(t, resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"tracing": {"enable": true, "path": "/v1/traces"}}`))
-
-	// A path on a signal that is off is not flagged: it is a value nothing
-	// reads either way, and the grpc check only names paths a signal would use.
-	assert.NoError(t, resolveFile(t,
-		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4317", "protocol": "grpc", `+
-			`"metrics": {"path": "/v1/metrics"}}`))
+		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "https://collector.example.com:4318"}`))
 }
 
 func TestValidationAcceptsHeadersInBothForms(t *testing.T) {
@@ -770,31 +697,17 @@ func TestRedactedHidesHeaderValuesButKeepsTheirNames(t *testing.T) {
 	assert.NotContains(t, masked.OTEL.Headers["authorization"], "super-secret")
 }
 
-func TestCollectorEndpointServesBothProtocolForms(t *testing.T) {
-	// One endpoint is shared by the three signals, and the two protocols address
-	// a service differently. The gRPC form is the URL reduced to its host and
-	// port, so the same value reaches both exporters.
+func TestCollectorEndpointCarriesTheScheme(t *testing.T) {
+	// One endpoint is shared by the three signals, and the exporters dial it as
+	// written. The scheme is what decides TLS.
 	cfg := config.Default()
-	cfg.OTEL.Endpoint = "http://collector.example.com:4317"
-
-	cfg.OTEL.Protocol = config.OTELProtocolHTTPProtobuf
-	assert.Equal(t, "http://collector.example.com:4317", cfg.CollectorEndpoint())
+	cfg.OTEL.Endpoint = "http://collector.example.com:4318"
+	assert.Equal(t, "http://collector.example.com:4318", cfg.CollectorEndpoint())
 	assert.False(t, cfg.CollectorSecure())
 
-	cfg.OTEL.Protocol = config.OTELProtocolGRPC
-	assert.Equal(t, "collector.example.com:4317", cfg.CollectorEndpoint(),
-		"a gRPC exporter wants host:port, not the URL")
-
-	// The scheme is what decides TLS, for both protocols: a gRPC address carries
-	// none of its own, so an https URL is how a secure connection is asked for.
-	cfg.OTEL.Endpoint = "https://collector.example.com:4317"
-	assert.Equal(t, "collector.example.com:4317", cfg.CollectorEndpoint())
+	cfg.OTEL.Endpoint = "https://collector.example.com:4318"
+	assert.Equal(t, "https://collector.example.com:4318", cfg.CollectorEndpoint())
 	assert.True(t, cfg.CollectorSecure())
-
-	// A bare host:port is plaintext, which is what a collector on the same host
-	// or the same private network wants.
-	cfg.OTEL.Endpoint = "collector.example.com:4317"
-	assert.False(t, cfg.CollectorSecure())
 }
 
 func TestRedactedLeavesTheLogTargetsAlone(t *testing.T) {

@@ -299,15 +299,12 @@ type OIDC struct {
 // Every signal is opt-in and none is required, like every other external
 // backend: a run that enables nothing dials nothing and needs no collector.
 type OTEL struct {
-	// Endpoint is the collector's OTLP address: http://localhost:4318 or
-	// https://collector.example.com:4318 for an HTTP protocol, and
-	// localhost:4317 for gRPC. The scheme decides whether an HTTP connection is
-	// TLS, so it is not a separate setting.
+	// Endpoint is the collector's OTLP/HTTP address: http://localhost:4318 or
+	// https://collector.example.com:4318. The scheme decides whether the
+	// connection is TLS, so it is not a separate setting.
 	//
-	// One address serves every signal, including the protocol that addresses a
-	// service by host and port alone: an HTTP collector and a gRPC collector are
-	// two listeners of one collector, so a deployment that runs both points this
-	// at the one its signals use.
+	// One address serves every signal, and one collector receives the three of
+	// them — an HTTP exporter dials the URL as written.
 	//
 	// It is read when any signal is enabled: logs name the otlp transport,
 	// traces set tracing.enable, or metrics set metrics.enable.
@@ -320,11 +317,6 @@ type OTEL struct {
 	// or staging. It is a resource attribute, so one collector can tell two
 	// deployments apart.
 	Environment string `koanf:"environment" json:"environment"`
-	// Protocol is one of OTELProtocols, the wire protocol every signal is sent
-	// with. It is shared rather than per-signal because a collector accepts one
-	// protocol per listener: a deployment that needs two would be running two
-	// collectors, which is what a second address would be.
-	Protocol string `koanf:"protocol" json:"protocol"`
 	// Compression is OTELCompressionGzip or OTELCompressionNone. Gzip is the
 	// protocol's own default; none saves the CPU on a collector reached over a
 	// loopback or a local network.

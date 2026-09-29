@@ -105,7 +105,6 @@ var envKeys = map[string]string{
 	"otel.endpoint":                    "OTEL_ENDPOINT",
 	"otel.environment":                 "OTEL_ENVIRONMENT",
 	"otel.metrics.enable":              "OTEL_METRICS_ENABLE",
-	"otel.protocol":                    "OTEL_PROTOCOL",
 	"otel.service_name":                "OTEL_SERVICE_NAME",
 	"otel.tracing.enable":              "OTEL_TRACING_ENABLE",
 	"server.cors.allowed_origins":      "CORS_ALLOWED_ORIGINS",

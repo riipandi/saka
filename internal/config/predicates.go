@@ -1,7 +1,6 @@
 package config
 
 import (
-	"net"
 	"net/mail"
 	"net/url"
 	"strconv"
@@ -139,25 +138,6 @@ func isToken(value string) bool {
 // tokenExtraChars are the punctuation an HTTP token may carry besides letters
 // and digits, as RFC 9110 defines them.
 const tokenExtraChars = "!#$%&'*+-.^_`|~"
-
-// isGRPCTarget reports whether value is what a gRPC exporter accepts as an
-// address: a bare host:port, such as localhost:4317.
-//
-// A scheme is refused rather than stripped. The gRPC exporter takes the host
-// from a URL and ignores everything else, so http://localhost:4317 would work
-// while looking like it meant something — and a user who writes it has probably
-// mistaken the port as well. Naming the expected form is more useful than
-// quietly accepting one that is nearly right.
-func isGRPCTarget(value string) bool {
-	if strings.Contains(value, "://") || strings.Contains(value, "/") {
-		return false
-	}
-	_, port, err := net.SplitHostPort(value)
-	if err != nil {
-		return false
-	}
-	return port != ""
-}
 
 // isOTELPath reports whether value is a usable OTLP route: empty, or a URL path
 // that starts with a slash and carries no scheme or host.

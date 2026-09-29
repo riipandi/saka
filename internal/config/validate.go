@@ -133,8 +133,6 @@ func (c Config) Validate() error {
 			c.unsetNote("otel.endpoint", "must not be empty when log.transport names otlp"))
 	}
 
-	check(isOneOf(c.OTEL.Protocol, OTELProtocols()...),
-		"otel.protocol: %q is not one of %s", c.OTEL.Protocol, joinValues(OTELProtocols()...))
 	check(isOneOf(c.OTEL.Compression, OTELCompressions()...),
 		"otel.compression: %q is not one of %s", c.OTEL.Compression, joinValues(OTELCompressions()...))
 	check(c.OTEL.Queue.MaxSize > 0, "otel.queue.max_size: must be positive")
@@ -157,40 +155,14 @@ func (c Config) Validate() error {
 		check(name != "", "otel.headers: a header name must not be empty")
 	}
 
-	// http/json is the one protocol combination the Go exporters do not all
-	// implement: only the trace exporter encodes JSON. Metrics and logs would
-	// silently send protobuf to a collector expecting JSON, so the mismatch is
-	// refused by name instead of shipped. The signals are named in one message
-	// so a deployment that enabled both fixes both in one pass.
-	if c.OTEL.Protocol == OTELProtocolHTTPJSON {
-		check(len(c.jsonUnsupportedSignals()) == 0,
-			"otel.protocol: %q is not supported for %s; use %q",
-			OTELProtocolHTTPJSON, joinValues(c.jsonUnsupportedSignals()...), OTELProtocolHTTPProtobuf)
-	}
-
 	// The address is checked whenever any signal is enabled, and the scheme
-	// decides TLS, so a bad one fails here rather than at the first export. gRPC
-	// addresses a service by host and port, so it is held to that instead of to
-	// a URL.
+	// decides TLS, so a bad one fails here rather than at the first export.
+	// The exporters travel over HTTP only, so the address is held to a URL.
 	if c.otelEnabled() {
 		check(c.OTEL.Endpoint != "", "otel.endpoint: %s",
 			c.unsetNote("otel.endpoint", "must not be empty when a signal is enabled"))
-		if UsesHTTP(c.OTEL.Protocol) {
-			check(c.OTEL.Endpoint == "" || isHTTPURL(c.OTEL.Endpoint),
-				"otel.endpoint: %q must be an absolute http or https URL for protocol %q",
-				c.OTEL.Endpoint, c.OTEL.Protocol)
-		} else {
-			check(c.OTEL.Endpoint == "" || isGRPCTarget(c.OTEL.Endpoint),
-				"otel.endpoint: %q must be host:port for protocol %q", c.OTEL.Endpoint, c.OTEL.Protocol)
-			// The HTTP default port is the trap this catches: switching the
-			// protocol without moving the address is the one change that looks
-			// applied and sends nothing, because the collector's two protocols
-			// are two listeners. A host other than the default's is left alone,
-			// since a deployment may legitimately front both on one port.
-			check(!strings.HasSuffix(c.OTEL.Endpoint, ":"+DefaultOTELHTTPPort),
-				"otel.endpoint: %q is the HTTP port; protocol %q listens on %s",
-				c.OTEL.Endpoint, c.OTEL.Protocol, DefaultOTELGRPCPort)
-		}
+		check(c.OTEL.Endpoint == "" || isHTTPURL(c.OTEL.Endpoint),
+			"otel.endpoint: %q must be an absolute http or https URL", c.OTEL.Endpoint)
 		check(c.OTEL.ServiceName != "", "otel.service_name: must not be empty")
 	}
 
@@ -242,28 +214,6 @@ func (c Config) Validate() error {
 	if c.OTEL.Metrics.Push {
 		check(isOTELPath(c.OTEL.Metrics.Path),
 			"otel.metrics.path: %q must be a path such as /v1/metrics", c.OTEL.Metrics.Path)
-	}
-
-	// A gRPC exporter is addressed by host and port alone, so a per-signal path
-	// is a setting the exporter never reads. The combination is refused by name
-	// rather than silently ignored: a path that says where a signal goes while
-	// nothing follows it is the trap a configuration check exists for.
-	if c.OTEL.Protocol == OTELProtocolGRPC {
-		paths := []struct{ key, value string }{}
-		if c.logTransport(LogTransportOTLP) {
-			paths = append(paths, struct{ key, value string }{"log.otlp.path", c.Log.OTLP.Path})
-		}
-		if c.OTEL.Tracing.Enable {
-			paths = append(paths, struct{ key, value string }{"otel.tracing.path", c.OTEL.Tracing.Path})
-		}
-		if c.OTEL.Metrics.Push {
-			paths = append(paths, struct{ key, value string }{"otel.metrics.path", c.OTEL.Metrics.Path})
-		}
-		for _, p := range paths {
-			check(p.value == "",
-				"%s: %q has no effect with protocol %q; a gRPC exporter is addressed by host and port",
-				p.key, p.value, OTELProtocolGRPC)
-		}
 	}
 
 	// The key-value backend is opt-in. Its Enable flag and the per-feature driver
@@ -487,21 +437,6 @@ func (c Config) logTransport(name string) bool {
 // nothing dials and the values are not read.
 func (c Config) otelEnabled() bool {
 	return c.logTransport(LogTransportOTLP) || c.OTEL.Tracing.Enable || c.OTEL.Metrics.Enable
-}
-
-// jsonUnsupportedSignals names the enabled signals whose exporter cannot encode
-// JSON. It is what turns the one protocol the Go SDK implements unevenly into a
-// message naming the signal that would be wrong, rather than a bare refusal of a
-// value the specification allows.
-func (c Config) jsonUnsupportedSignals() []string {
-	var signals []string
-	if c.OTEL.Metrics.Enable {
-		signals = append(signals, "metrics")
-	}
-	if c.logTransport(LogTransportOTLP) {
-		signals = append(signals, "logs")
-	}
-	return signals
 }
 
 // kvStoreDrivers returns the feature keys whose driver is the key-value backend.

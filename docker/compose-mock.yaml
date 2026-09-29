@@ -64,43 +64,8 @@ services:
       OIDC_DO_INTROSPECTION: false
       OIDC_DO_USER_INFO: false
       OIDC_TLS_VERIFY: true
-    # healthcheck:
-    #   test: ["CMD", "nc", "-vz", "127.0.0.1", "9009"]
-    #   interval: 3s
-    #   timeout: 5s
-    #   retries: 3
     depends_on:
       ngauth-google: { condition: service_healthy }
-
-  #####################################################################
-  # oidc-test-client-tango drives Tango's own OIDC/OAuth surface in E2E:
-  # Tango answers on the host (dev :3080 or the disposable E2E port; the
-  # localhost extra_hosts mapping resolves it from inside the container).
-  # Before the run, mint a client through Tango's admin RPC with callback
-  # http://localhost:9010/auth/callback (verify the callback path against
-  # the image at first use) and pass the credentials:
-  #   TANGO_TEST_CLIENT_ID=... TANGO_TEST_CLIENT_SECRET=... \
-  #     docker compose -f docker/compose-mock.yaml up -d oidc-test-client-tango
-  # Take the container down with the E2E artifacts. ngauth-google above
-  # stays pointed at itself — it belongs to the future social sign-in work.
-  #####################################################################
-
-  oidc-test-client-tango:
-    <<: *common
-    image: ghcr.io/beryju/oidc-test-client:${OIDC_TEST_CLIENT_VERSION:-latest}
-    hostname: oidc-test-client-tango
-    ports: ["9010:9009"]
-    environment:
-      OIDC_BIND: 0.0.0.0:9009
-      OIDC_CLIENT_ID: ${TANGO_TEST_CLIENT_ID:-change-me}
-      OIDC_CLIENT_SECRET: ${TANGO_TEST_CLIENT_SECRET:-change-me}
-      OIDC_ROOT_URL: http://localhost:9010
-      OIDC_PROVIDER: ${TANGO_ISSUER:-http://localhost:3080}
-      OIDC_SCOPES: "openid,profile,email"
-      OIDC_DO_REFRESH: true
-      OIDC_DO_INTROSPECTION: true
-      OIDC_DO_USER_INFO: true
-      OIDC_TLS_VERIFY: true
 
 volumes:
   ngauth_google_data:

@@ -7,7 +7,6 @@ import (
 
 	"go.loglayer.dev/transports/otellog/v3"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -87,31 +86,16 @@ func newOTLPSink(cfg config.Config) (*otlpSink, error) {
 	}, nil
 }
 
-// newLogExporter builds the log exporter for the configured protocol.
+// newLogExporter builds the log exporter.
 //
-// Logs have no JSON encoder in the Go SDK, so the protocol reaches here as
-// either gRPC or http/protobuf: Validate refuses http/json before the sink is
-// built, which is why there is no third branch to write.
+// Every exporter setting is passed explicitly, including the ones left at their
+// default. The exporter otherwise reads OTEL_EXPORTER_OTLP_* variables for its
+// endpoint, headers, compression, and TLS material, which would be a second
+// configuration source deciding what a deployment logs and where: a stray export
+// in a shell could redirect the logs, inject a header, or trust a certificate
+// the config file never mentioned. Passing a value for each closes that door and
+// leaves the config file as the only thing that decides.
 func newLogExporter(cfg config.Config) (sdklog.Exporter, error) {
-	if !config.UsesHTTP(cfg.OTEL.Protocol) {
-		options := []otlploggrpc.Option{
-			otlploggrpc.WithEndpoint(cfg.CollectorEndpoint()),
-			otlploggrpc.WithHeaders(cfg.OTEL.Headers),
-			otlploggrpc.WithCompressor(observer.Compressor(cfg.OTEL.Compression)),
-			otlploggrpc.WithTimeout(cfg.Log.OTLP.Timeout),
-			// Explicit credentials rather than WithInsecure: the two reach the
-			// same place, but credentials take priority over anything the
-			// environment contributed, so an OTEL_EXPORTER_OTLP_CERTIFICATE in
-			// the shell cannot turn a plaintext connection into a TLS one.
-			otlploggrpc.WithTLSCredentials(observer.GRPCTransport(cfg.CollectorSecure())),
-		}
-		exporter, err := otlploggrpc.New(context.Background(), options...)
-		if err != nil {
-			return nil, fmt.Errorf("logger: otlp exporter: %w", err)
-		}
-		return exporter, nil
-	}
-
 	endpoint, err := url.Parse(cfg.OTEL.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("logger: otlp endpoint: %w", err)

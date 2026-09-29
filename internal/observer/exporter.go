@@ -1,39 +1,24 @@
 // Exporter plumbing shared by every OTLP exporter this process builds.
 //
-// internal/observer builds four exporters across two protocols, and
-// internal/logger builds the fifth — the log sink — against the same collector.
-// The settings that close the environment door are the same for all of them, so
-// they live here once, and a decision about what an exporter may read from the
-// environment cannot drift between the packages that depend on it.
+// internal/observer builds three exporters, and internal/logger builds the
+// fourth — the log sink — against the same collector. The settings that close
+// the environment door are the same for all of them, so they live here once,
+// and a decision about what an exporter may read from the environment cannot
+// drift between the packages that depend on it.
 //
 // The rule the helpers carry out: the resolved configuration is the only source
 // of truth for where telemetry goes. The exporters otherwise read
 // OTEL_EXPORTER_OTLP_* on their own — endpoint, headers, compression, TLS
 // material — and a stray export in a shell could redirect a signal, inject a
 // header, or trust a certificate the config file never mentioned.
+//
+// Every exporter travels over http/protobuf; there is no gRPC leg to configure.
 
 package observer
 
 import (
 	"crypto/tls"
-
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
-
-// GRPCTransport returns the transport credentials for a gRPC exporter.
-//
-// Explicit credentials are what stop the exporter from applying the TLS material
-// OTEL_EXPORTER_OTLP_CERTIFICATE and its friends describe: those options are
-// appended before a caller's, and transport credentials take priority over both
-// the insecure and the TLS default, so passing them closes the door at the point
-// where the exporter opens it.
-func GRPCTransport(secure bool) credentials.TransportCredentials {
-	if secure {
-		return credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
-	}
-	return insecure.NewCredentials()
-}
 
 // TLSConfig returns the TLS configuration for an HTTP collector endpoint.
 //
@@ -47,17 +32,6 @@ func TLSConfig(secure bool) *tls.Config {
 		return &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 	return nil
-}
-
-// Compressor maps a configured compression name onto what a gRPC exporter
-// accepts. gRPC supports gzip alone, so `none` is an empty compressor and
-// anything else is gzip. Validate has already refused a third value by the time
-// this runs.
-func Compressor(compression string) string {
-	if compression == "none" {
-		return ""
-	}
-	return "gzip"
 }
 
 // SignalPath returns the route a signal takes on the collector, or empty when

@@ -42,12 +42,6 @@ const DefaultS3Region = "us-east-1"
 // collector is one endpoint receiving three signals.
 const DefaultOTLPEndpoint = "http://localhost:4318"
 
-// DefaultOTELGRPCPort is the port a gRPC collector listens on. It is the
-// protocol's own default, and it is why a gRPC address must not be left at the
-// HTTP default port: the two protocols listen on different ports of the same
-// collector, so flipping otel.protocol without the address moves nothing.
-const DefaultOTELGRPCPort = "4317"
-
 // DefaultOTELHTTPPort is the port the default endpoint belongs to, and the one a
 // gRPC configuration is refused at.
 const DefaultOTELHTTPPort = "4318"
@@ -336,10 +330,6 @@ func Default() Config {
 			// The collector a local receiver listens on, so enabling a signal
 			// is the only step needed.
 			Endpoint: DefaultOTLPEndpoint,
-			// HTTP/protobuf, the specification's own default and the one the
-			// default endpoint's port belongs to. It is also the protocol an
-			// HTTP deployment can proxy.
-			Protocol:    OTELProtocolHTTPProtobuf,
 			ServiceName: AppIdentifier,
 			Compression: OTELCompressionGzip,
 			// No headers: a collector that checks nothing needs nothing sent.

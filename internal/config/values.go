@@ -53,43 +53,6 @@ func usesOTELRatio(sampler string) bool {
 	return sampler == OTELSamplerRatio || sampler == OTELSamplerParentRatio
 }
 
-// Protocol names OTEL.Protocol accepts, spelled the way the OpenTelemetry
-// specification spells them so a value can be copied from its documentation.
-const (
-	// OTELProtocolGRPC is the protobuf payload over gRPC, on the protocol's own
-	// port (4317).
-	OTELProtocolGRPC = "grpc"
-	// OTELProtocolHTTPProtobuf is the protobuf payload over HTTP, on port 4318.
-	// It is the default here because it is the protocol an HTTP deployment can
-	// put behind the same proxy, TLS terminator, and firewall rule as the rest
-	// of its traffic.
-	OTELProtocolHTTPProtobuf = "http/protobuf"
-	// OTELProtocolHTTPJSON is the JSON payload over HTTP. It is readable with
-	// curl, which is what makes it useful against a collector being debugged.
-	//
-	// The Go exporters implement it unevenly — only the trace exporter encodes
-	// JSON — so Validate refuses it for metrics and logs rather than sending
-	// them as protobuf to a collector expecting JSON.
-	OTELProtocolHTTPJSON = "http/json"
-)
-
-// OTELProtocols returns every accepted protocol name.
-//
-// The three are the whole set the specification defines. A name outside it is
-// refused rather than mapped to a default, because a deployment that asked for
-// one protocol and silently got another has telemetry its collector may reject
-// without saying so.
-func OTELProtocols() []string {
-	return []string{OTELProtocolGRPC, OTELProtocolHTTPProtobuf, OTELProtocolHTTPJSON}
-}
-
-// UsesHTTP reports whether the protocol travels over HTTP, which is what decides
-// whether a signal's path and the endpoint's own path mean anything. A gRPC
-// service is addressed by host and port alone.
-func UsesHTTP(protocol string) bool {
-	return protocol != OTELProtocolGRPC
-}
-
 // Compression names OTEL.Compression accepts.
 const (
 	// OTELCompressionGzip compresses every export. It is the protocol's own
@@ -125,32 +88,20 @@ func LogTransports() []string {
 	return []string{LogTransportConsole, LogTransportFile, LogTransportOTLP}
 }
 
-// CollectorEndpoint returns the collector address in the form the configured
-// protocol's exporter wants.
+// CollectorEndpoint returns the collector address for the exporters.
 //
-// The two forms differ because the two protocols address a service differently.
-// An HTTP exporter wants the URL it can dial, scheme included. A gRPC exporter
-// wants host:port and takes the scheme from the credentials instead, so an
-// endpoint written as a URL is reduced to its host and port: the same value
-// serves both protocols, which is what one shared endpoint means.
+// Every exporter here travels over HTTP, so the endpoint is the URL it dials,
+// scheme included.
 func (c Config) CollectorEndpoint() string {
-	if UsesHTTP(c.OTEL.Protocol) {
-		return c.OTEL.Endpoint
-	}
-	parsed, err := url.Parse(c.OTEL.Endpoint)
-	if err != nil || parsed.Host == "" {
-		return c.OTEL.Endpoint
-	}
-	return parsed.Host
+	return c.OTEL.Endpoint
 }
 
 // CollectorSecure reports whether the collector connection uses TLS.
 //
 // It is read from the endpoint's own scheme, so there is no second setting that
-// could disagree with the address: an https URL is TLS for an HTTP protocol, and
-// an https:// URL is what turns it on for gRPC, whose address carries no scheme
-// of its own. A bare host:port is plaintext, which is what a collector on the
-// same host or the same private network wants.
+// could disagree with the address: an https URL is TLS. A plain http URL is
+// plaintext, which is what a collector on the same host or the same private
+// network wants.
 func (c Config) CollectorSecure() bool {
 	parsed, err := url.Parse(c.OTEL.Endpoint)
 	return err == nil && parsed.Scheme == "https"

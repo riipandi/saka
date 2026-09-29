@@ -440,17 +440,6 @@
                     "description": "Deployment a signal came from, e.g. production or staging.",
                     "$ref": "#/$defs/stringOrEnv"
                 },
-                "protocol": {
-                    "description": "Wire protocol every signal is sent with.",
-                    "anyOf": [
-                        {
-                            "enum": ["grpc", "http/protobuf", "http/json"]
-                        },
-                        {
-                            "$ref": "#/$defs/envDirective"
-                        }
-                    ]
-                },
                 "compression": {
                     "anyOf": [
                         {

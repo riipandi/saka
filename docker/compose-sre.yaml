@@ -12,6 +12,38 @@ x-common: &common
   cpus: 1.0 # set CPUs limit
 
 services:
+  openobserve:
+    <<: *common
+    # @ref: https://openobserve.ai/docs/administration/configuration/environment-variables
+    # image: public.ecr.aws/zinclabs/openobserve:${OPENOBSERVE_VERSION:-v1.0.4-debug}
+    image: public.ecr.aws/zinclabs/openobserve-enterprise:${OPENOBSERVE_VERSION:-v0.40.32}
+    hostname: openobserve
+    ports: ['5080:5080']
+    environment:
+        ZO_DATA_DIR: "/data"
+        ZO_HTTP_ADDR: "0.0.0.0"
+        ZO_HTTP_PORT: 5080
+        ZO_ROOT_USER_EMAIL: "admin@example.com"
+        ZO_ROOT_USER_PASSWORD: "@DMin123"
+        ZO_S3_ACCESS_KEY: "s3admin"
+        ZO_S3_BUCKET_NAME: "devbucket"
+        ZO_S3_BUCKET_PREFIX: "openobserve/"
+        ZO_S3_PROVIDER: "minio"
+        ZO_S3_REGION_NAME: "auto"
+        ZO_S3_SECRET_KEY: "s3passw0rd"
+        ZO_S3_SERVER_URL: "http://silo:9100"
+        # Authorization: "Basic YWRtaW5AZXhhbXBsZS5jb206ZHVtbXk="
+        ZO_ROOT_USER_TOKEN: "dummy"
+        ZO_TELEMETRY: false
+    volumes: ['../.storage/openobserve_data:/data:rw']
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:5080']
+      interval: 3s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      vector: { condition: service_healthy }
+
   perses:
     <<: *common
     # @ref: https://perses.dev/perses/docs/configuration/configuration
@@ -228,10 +260,11 @@ configs:
           metrics_path: /metrics
 
 volumes:
+  perses_data:
+  openobserve_data:
   victoria_metrics_data:
   victoria_logs_data:
   victoria_traces_data:
-  perses_data:
 
 networks:
   intranet:

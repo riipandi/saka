@@ -185,7 +185,6 @@ type PublishedOTEL struct {
 	Endpoint    string               `json:"endpoint,omitzero"`
 	ServiceName string               `json:"service_name,omitzero"`
 	Environment string               `json:"environment,omitzero"`
-	Protocol    string               `json:"protocol,omitzero"`
 	Compression string               `json:"compression,omitzero"`
 	Headers     map[string]string    `json:"headers,omitzero"`
 	Queue       PublishedOTELQueue   `json:"queue,omitzero"`
@@ -430,7 +429,6 @@ func (c Config) Published(full bool) Published {
 		Endpoint:    c.OTEL.Endpoint,
 		ServiceName: c.OTEL.ServiceName,
 		Environment: c.OTEL.Environment,
-		Protocol:    c.OTEL.Protocol,
 		Compression: c.OTEL.Compression,
 		Headers:     sealed.OTEL.Headers,
 		Queue:       PublishedOTELQueue{MaxSize: c.OTEL.Queue.MaxSize},

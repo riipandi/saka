@@ -10,9 +10,9 @@ tasks:
   # ----------------------------------------------------------------------------
 
   metrics:up:
-    desc: Start the observability stack (collector, VictoriaMetrics/Logs/Traces, Perses)
+    desc: Start the observability stack (Vector collector, VictoriaMetrics/Logs/Traces, Perses)
     cmds:
-      - docker compose -f docker/compose.yaml up --detach --remove-orphans otel-collector victoria-metrics victoria-logs victoria-traces perses
+      - docker compose -f docker/compose.yaml up --detach --remove-orphans vector victoria-metrics victoria-logs victoria-traces perses
       - task: metrics:health
 
   metrics:health:
