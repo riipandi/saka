@@ -76,8 +76,6 @@ func redactHeaders(headers map[string]string, render secretRenderer) map[string]
 func (c Config) withSecrets(render secretRenderer) Config {
 	out := c
 	out.App.SecretKey = render(c.App.SecretKey)
-	out.Auth.PrivateKey = render(c.Auth.PrivateKey)
-	out.Auth.PublicKey = render(c.Auth.PublicKey)
 	out.Auth.SecretKey = render(c.Auth.SecretKey)
 	out.Database.URL = RedactDSN(c.Database.URL)
 	out.KVStore.URL = RedactKVURL(c.KVStore.URL)

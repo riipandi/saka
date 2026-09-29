@@ -2,6 +2,7 @@ package jwks
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
@@ -51,12 +52,14 @@ func TestTheAlgorithmListMatchesTheJWSLibrary(t *testing.T) {
 	}
 }
 
-// TestBothStacksSignAndVerify is the dual-stack contract: the key pair and the
-// HMAC secret each sign a token the application verifies.
+// TestBothStacksSignAndVerify is the dual-stack contract: the database's
+// key pair and the configured HMAC secret each sign a token the application
+// verifies.
 func TestBothStacksSignAndVerify(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.SecretKey = hmacSecret(t, 32)
-	service := NewService(cfg, nil, nil, nil)
+	pair, key := storedPair(t)
+	service := NewService(cfg, pairSource{pairs: []SigningKeyPair{pair}, keys: []StoredKey{key}}, testCipher(t), nil)
 	require.NoError(t, service.Err())
 
 	ctx := context.Background()
@@ -159,33 +162,36 @@ func TestAConfiguredAlgorithmWinsOverTheDerivedOne(t *testing.T) {
 	assert.Equal(t, jwa.HS256(), alg, "the configured algorithm decides, not the key pair")
 }
 
-// TestTheDerivedAlgorithmComesFromTheKeyPair covers the common deployment: one
-// stack, so the material answers without a configuration key.
-func TestTheDerivedAlgorithmComesFromTheKeyPair(t *testing.T) {
-	generator, err := crypto.NewKeyGenerator("ES384")
+// TestTheDerivedAlgorithmComesFromTheRow covers the common deployment: no
+// algorithm override, so the active signing row's own alg is the answer.
+func TestTheDerivedAlgorithmComesFromTheRow(t *testing.T) {
+	private, public, err := crypto.GenerateKeyPair("ES384")
 	require.NoError(t, err)
-	keys, err := generator.Generate()
+	parsed, err := crypto.DecodeJWK(public)
 	require.NoError(t, err)
+	kid, _ := parsed.KeyID()
 
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = keys[crypto.EnvAuthPrivateKey]
-	cfg.Auth.PublicKey = keys[crypto.EnvAuthPublicKey]
 	cfg.Auth.SecretKey = ""
 	cfg.Auth.JWTAlgorithm = ""
+	source := pairSource{
+		pairs: []SigningKeyPair{{KeyID: kid, Algorithm: "ES384", PrivateKey: []byte(private)}},
+		keys:  []StoredKey{{KeyID: kid, Algorithm: "ES384", PublicKey: []byte(public)}},
+	}
 
-	service := NewService(cfg, nil, nil, nil)
+	service := NewService(cfg, source, nil, nil)
 	require.NoError(t, service.Err())
 
 	alg, err := service.SigningAlgorithm()
 	require.NoError(t, err)
-	assert.Equal(t, jwa.ES384(), alg, "the key pair's own alg is the answer")
+	assert.Equal(t, jwa.ES384(), alg, "the row's own alg is the answer")
 }
 
 // TestAConfiguredAlgorithmWithoutItsMaterialIsRefused keeps the mismatch from
 // reaching signing time.
 func TestAConfiguredAlgorithmWithoutItsMaterialIsRefused(t *testing.T) {
-	cfg := testConfig(t)
-	cfg.Auth.JWTAlgorithm = "HS256" // the key pair is configured, not the secret
+	cfg := config.Default()
+	cfg.Auth.JWTAlgorithm = "HS256" // no secret is configured
 
 	service := NewService(cfg, nil, nil, nil)
 
@@ -196,35 +202,13 @@ func TestAConfiguredAlgorithmWithoutItsMaterialIsRefused(t *testing.T) {
 // TestSigningRefusesWhenNothingIsConfigured covers the empty configuration.
 func TestSigningRefusesWhenNothingIsConfigured(t *testing.T) {
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = ""
 
-	service := NewService(cfg, nil, nil, nil)
+	service := NewService(cfg, stubSource{}, nil, nil)
 	require.NoError(t, service.Err())
 
 	_, err := service.SigningAlgorithm()
 	assert.ErrorIs(t, err, ErrNoSigningKey)
-}
-
-// TestAKeyPairThatDisagreesFailsTheRun keeps a mismatched pair from signing
-// tokens no client could verify.
-func TestAKeyPairThatDisagreesFailsTheRun(t *testing.T) {
-	generator, err := crypto.NewKeyGenerator("ES256")
-	require.NoError(t, err)
-	first, err := generator.Generate()
-	require.NoError(t, err)
-	second, err := generator.Generate()
-	require.NoError(t, err)
-
-	cfg := config.Default()
-	cfg.Auth.PrivateKey = first[crypto.EnvAuthPrivateKey]
-	cfg.Auth.PublicKey = second[crypto.EnvAuthPublicKey] // a different key
-
-	service := NewService(cfg, nil, nil, nil)
-
-	require.Error(t, service.Err())
-	assert.Contains(t, service.Err().Error(), "auth.public_key")
 }
 
 // TestAShorterHMACSecretThanHS256IsRefused covers the floor: a secret below
@@ -285,4 +269,13 @@ func TestAnHMACKeySignsAHeaderTheVerifierMatches(t *testing.T) {
 	alg, ok := header.Algorithm()
 	require.True(t, ok)
 	assert.Equal(t, "HS256", alg.String())
+}
+
+// testCipher builds the cipher the seal-and-unseal round trips share.
+func testCipher(t *testing.T) *crypto.Cipher {
+	t.Helper()
+
+	cipher, err := crypto.NewCipherFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+	return cipher
 }

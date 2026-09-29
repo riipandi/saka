@@ -130,16 +130,16 @@ func TestInterpolationMissingVariableIsDeferred(t *testing.T) {
 
 func TestUnresolvedVariableDoesNotBlockAnUnrelatedKey(t *testing.T) {
 	// This is the property the whole design rests on: migrate:status reads
-	// database.url and must not be stopped by a JWT key it never touches.
+	// database.url and must not be stopped by a secret it never touches.
 	cfg, err := config.Load(config.Options{
-		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}, "auth": {"private_key": "env:NOT_SET"}}`),
+		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}, "auth": {"secret_key": "env:NOT_SET"}}`),
 		Environ:    baseEnv(),
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, dsn, cfg.Database.URL)
-	require.Equal(t, "NOT_SET", cfg.Unresolved()["auth.private_key"])
-	require.Empty(t, cfg.Auth.PrivateKey)
+	require.Equal(t, "NOT_SET", cfg.Unresolved()["auth.secret_key"])
+	require.Empty(t, cfg.Auth.SecretKey)
 }
 
 func TestEmptyVariableIsAValueNotAnUnresolvedDirective(t *testing.T) {

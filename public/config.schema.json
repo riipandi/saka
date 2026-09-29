@@ -61,14 +61,6 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-                "private_key": {
-                    "description": "Base64 (raw, unpadded) JWK JSON of the signing key. Secret.",
-                    "$ref": "#/$defs/stringOrEnv"
-                },
-                "public_key": {
-                    "description": "Base64 (raw, unpadded) JWK JSON of the verifying key, required when private_key is set.",
-                    "$ref": "#/$defs/stringOrEnv"
-                },
                 "secret_key": {
                     "description": "Hex-encoded HMAC key, used when no key pair is given. Secret.",
                     "$ref": "#/$defs/stringOrEnv"

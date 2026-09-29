@@ -25,8 +25,6 @@ import (
 // secret to one without the other fails.
 var secretKeys = []string{
 	"app.secret_key",
-	"auth.private_key",
-	"auth.public_key",
 	"auth.secret_key",
 	"database.url",
 	"kvstore.url",

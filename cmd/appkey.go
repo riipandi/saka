@@ -19,13 +19,12 @@ import (
 var keyGenerateCmd = &cli.Command{
 	Name:  "key:generate",
 	Usage: "Generate the application secret keys",
-	Description: `Generates APP_SECRET_KEY (AES-256), AUTH_PRIVATE_KEY and AUTH_PUBLIC_KEY
-(base64-encoded JWK JSON), and AUTH_SECRET_KEY (HMAC). All four are always
-generated: the key pair and the HMAC secret are independent.
+	Description: `Generates APP_SECRET_KEY (AES-256) and AUTH_SECRET_KEY (HMAC).
 
-Without --algorithm the key pair uses ES256 and AUTH_SECRET_KEY uses HS256. An
-asymmetric --algorithm replaces the key pair; an HS* algorithm replaces the HMAC
-secret. The other role keeps its default.
+Without --algorithm the HMAC secret uses HS256; an HS* --algorithm replaces
+it. The JWT signing key pair is not generated here — it lives in the
+database's public.jwks table, provisioned by tango initialize and rotated by
+jwks:generate.
 
 Without --env-file the values are only printed to stdout. With --env-file a
 missing file is created; an existing file is updated only after confirmation, or
@@ -77,8 +76,8 @@ func runKeyGenerate(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	keyPair, secret := generator.Algorithms()
-	return writeSecretKeys(out, path, keyPair, secret, keys)
+	secret := generator.Algorithms()
+	return writeSecretKeys(out, path, secret, keys)
 }
 
 // mayWriteEnvFile reports whether the env file may be written. A missing
@@ -138,7 +137,7 @@ func printSecretKeys(out io.Writer, keys crypto.GeneratedKeys) error {
 // writeSecretKeys replaces the generated variables in the env file and
 // appends the ones that are missing, printing the values and a short
 // summary.
-func writeSecretKeys(out io.Writer, path, keyPair, secret string, keys crypto.GeneratedKeys) error {
+func writeSecretKeys(out io.Writer, path, secret string, keys crypto.GeneratedKeys) error {
 	file, err := envfile.Load(path)
 	if err != nil {
 		return err
@@ -159,8 +158,8 @@ func writeSecretKeys(out io.Writer, path, keyPair, secret string, keys crypto.Ge
 		return err
 	}
 
-	if _, err := fmt.Fprintf(out, "\nwrote %s (%d added, %d replaced; key pair %s, secret %s)\n",
-		path, added, replaced, keyPair, secret); err != nil {
+	if _, err := fmt.Fprintf(out, "\nwrote %s (%d added, %d replaced; secret %s)\n",
+		path, added, replaced, secret); err != nil {
 		return err
 	}
 	if replaced > 0 {

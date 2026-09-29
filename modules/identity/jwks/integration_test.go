@@ -36,11 +36,11 @@ func TestEndpointPublishesAStoredKeyFromTheDatabase(t *testing.T) {
 
 	keys := decodeKeys(t, serve(t, service))
 
-	require.Len(t, keys, 2, "the configured key and the stored one")
-	assert.Equal(t, "provider-key", keys[1]["kid"])
-	assert.Equal(t, "ES384", keys[1]["alg"])
-	assert.Equal(t, KeyUsageSignature, keys[1]["use"])
-	assert.NotContains(t, keys[1], "d", "a stored private key must not be published")
+	require.Len(t, keys, 1, "the stored one")
+	assert.Equal(t, "provider-key", keys[0]["kid"])
+	assert.Equal(t, "ES384", keys[0]["alg"])
+	assert.Equal(t, KeyUsageSignature, keys[0]["use"])
+	assert.NotContains(t, keys[0], "d", "a stored private key must not be published")
 }
 
 // TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet is the contract
@@ -53,14 +53,12 @@ func TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet(t *testing.T) {
 	ctx := t.Context()
 
 	// The provider generates a key pair and stores the public half.
-	generator, err := crypto.NewKeyGenerator("ES384")
-	require.NoError(t, err)
-	generated, err := generator.Generate()
+	privateEncoded, publicEncoded, err := crypto.GenerateKeyPair("ES384")
 	require.NoError(t, err)
 
-	privateKey := parseGenerated(t, generated[crypto.EnvAuthPrivateKey], "signer-key")
-	publicKey := parseGenerated(t, generated[crypto.EnvAuthPublicKey], "signer-key")
-	encodedPublic, err := json.Marshal(publicKey)
+	privateKey := parseGenerated(t, privateEncoded, "signer-key")
+	_ = parseGenerated(t, publicEncoded, "signer-key")
+	encodedPublic, err := json.Marshal(parseGenerated(t, publicEncoded, "signer-key"))
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx, `
@@ -78,7 +76,7 @@ func TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet(t *testing.T) {
 	service := NewService(testConfig(t), NewRepository(pool), nil, nil)
 	set, err := service.VerifyKeySet(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 2, set.Len(), "the configured key and the stored one")
+	require.Equal(t, 1, set.Len(), "the stored one")
 
 	// The published key is the public half: the set must not carry the
 	// private material the signer holds.

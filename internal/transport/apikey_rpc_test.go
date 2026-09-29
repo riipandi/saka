@@ -204,8 +204,6 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 	pool := apiKeyPool(t)
 
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 
 	keyService := apikey.NewService(pool,

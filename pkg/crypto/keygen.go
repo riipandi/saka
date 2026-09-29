@@ -18,14 +18,13 @@ import (
 
 // Environment variable names of the generated secret keys.
 const (
-	EnvAppSecretKey   = "APP_SECRET_KEY"
-	EnvAuthPrivateKey = "AUTH_PRIVATE_KEY"
-	EnvAuthPublicKey  = "AUTH_PUBLIC_KEY"
-	EnvAuthSecretKey  = "AUTH_SECRET_KEY"
+	EnvAppSecretKey  = "APP_SECRET_KEY"
+	EnvAuthSecretKey = "AUTH_SECRET_KEY"
 )
 
-// DefaultSignatureAlgorithm is the JWT algorithm used for the key pair
-// when none is given.
+// DefaultSignatureAlgorithm is the JWT algorithm the signing key pair
+// uses when none is given — the default tango initialize and
+// jwks:generate store with.
 const DefaultSignatureAlgorithm = "ES256"
 
 // DefaultSecretAlgorithm is the HMAC algorithm used for AUTH_SECRET_KEY
@@ -42,7 +41,7 @@ var ErrUnsupportedAlgorithm = errors.New("crypto: unsupported signature algorith
 type GeneratedKeys map[string]string
 
 // generatedKeyOrder is the order used when reporting generated variables.
-var generatedKeyOrder = []string{EnvAppSecretKey, EnvAuthPrivateKey, EnvAuthPublicKey, EnvAuthSecretKey}
+var generatedKeyOrder = []string{EnvAppSecretKey, EnvAuthSecretKey}
 
 // Names returns the generated variable names in canonical order.
 func (k GeneratedKeys) Names() []string {
@@ -55,21 +54,20 @@ func (k GeneratedKeys) Names() []string {
 	return names
 }
 
-// KeyGenerator creates the application secret keys. It always emits
-// APP_SECRET_KEY, AUTH_PRIVATE_KEY, AUTH_PUBLIC_KEY, and AUTH_SECRET_KEY:
-// the key pair and the HMAC secret are independent, so an algorithm
-// selects the role it can fill and the other role keeps its default.
+// KeyGenerator creates the application secret keys. It emits
+// APP_SECRET_KEY and AUTH_SECRET_KEY: the signing key pair is the
+// database's (provisioned by tango initialize, rotated by jwks:generate),
+// so no key-pair material is written to the environment.
 type KeyGenerator struct {
-	keyAlgorithm    string
 	secretAlgorithm string
 }
 
 // NewKeyGenerator builds a KeyGenerator for a signature algorithm name.
-// Symmetric algorithms (HS*) set AUTH_SECRET_KEY; asymmetric algorithms
-// set the key pair. An empty name keeps both defaults.
+// Symmetric algorithms (HS*) select AUTH_SECRET_KEY's algorithm; an
+// asymmetric name has no role here anymore and is refused. An empty name
+// keeps the default.
 func NewKeyGenerator(algorithm string) (*KeyGenerator, error) {
 	generator := &KeyGenerator{
-		keyAlgorithm:    DefaultSignatureAlgorithm,
 		secretAlgorithm: DefaultSecretAlgorithm,
 	}
 	if algorithm == "" {
@@ -80,40 +78,30 @@ func NewKeyGenerator(algorithm string) (*KeyGenerator, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedAlgorithm, algorithm)
 	}
-	if alg.IsSymmetric() {
-		if _, supported := hmacKeySize(algorithm); !supported {
-			return nil, fmt.Errorf("%w: %q", ErrUnsupportedAlgorithm, algorithm)
-		}
-		generator.secretAlgorithm = algorithm
-		return generator, nil
+	if !alg.IsSymmetric() {
+		return nil, fmt.Errorf(
+			"%w: %q signs the key pair's role, and the signing key pair lives in the database (tango jwks:generate)",
+			ErrUnsupportedAlgorithm, algorithm)
 	}
-	if !supportsKeyPair(algorithm) {
+	if _, supported := hmacKeySize(algorithm); !supported {
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedAlgorithm, algorithm)
 	}
-	generator.keyAlgorithm = algorithm
+	generator.secretAlgorithm = algorithm
 	return generator, nil
 }
 
-// Algorithms returns the key-pair and HMAC algorithms in use.
-func (g *KeyGenerator) Algorithms() (keyPair, secret string) {
-	return g.keyAlgorithm, g.secretAlgorithm
+// Algorithms returns the HMAC algorithm in use.
+func (g *KeyGenerator) Algorithms() (secret string) {
+	return g.secretAlgorithm
 }
 
-// Generate returns a fresh APP_SECRET_KEY, a signing key pair encoded as
-// base64 JWK JSON, and the HMAC secret.
+// Generate returns a fresh APP_SECRET_KEY and the HMAC secret.
 func (g *KeyGenerator) Generate() (GeneratedKeys, error) {
 	appSecret, err := GenerateKeyHex()
 	if err != nil {
 		return nil, err
 	}
 	keys := GeneratedKeys{EnvAppSecretKey: appSecret}
-
-	private, public, err := g.keyPair()
-	if err != nil {
-		return nil, err
-	}
-	keys[EnvAuthPrivateKey] = private
-	keys[EnvAuthPublicKey] = public
 
 	alg, _ := jwa.LookupSignatureAlgorithm(g.secretAlgorithm)
 	secret, err := symmetricSecret(alg)
@@ -126,8 +114,14 @@ func (g *KeyGenerator) Generate() (GeneratedKeys, error) {
 
 // keyPair generates the signing key and returns both sides as
 // base64-encoded JWK JSON.
-func (g *KeyGenerator) keyPair() (private, public string, err error) {
-	material, err := rawKeyPair(g.keyAlgorithm)
+// GenerateKeyPair produces a fresh asymmetric signing key pair for the
+// database's public.jwks rows: the private half as sealable JWK JSON, the
+// public half as publishable JWK JSON, both carrying the algorithm and a
+// shared `jwk_` TypeID kid. This is the generator jwks:generate and
+// tango initialize store from — the environment never holds key-pair
+// material.
+func GenerateKeyPair(algorithm string) (private, public string, err error) {
+	material, err := rawKeyPair(algorithm)
 	if err != nil {
 		return "", "", err
 	}
@@ -136,7 +130,7 @@ func (g *KeyGenerator) keyPair() (private, public string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("crypto: import private key: %w", err)
 	}
-	if metadataErr := setKeyMetadata(priv, g.keyAlgorithm); metadataErr != nil {
+	if metadataErr := setKeyMetadata(priv, algorithm); metadataErr != nil {
 		return "", "", metadataErr
 	}
 
@@ -147,7 +141,7 @@ func (g *KeyGenerator) keyPair() (private, public string, err error) {
 	// The pair shares one kid: a token's header names it and the published
 	// set matches it, so the derived public half copies the private half's
 	// id rather than minting its own. Only the algorithm is stamped here.
-	if algErr := pub.Set(jwk.AlgorithmKey, g.keyAlgorithm); algErr != nil {
+	if algErr := pub.Set(jwk.AlgorithmKey, algorithm); algErr != nil {
 		return "", "", fmt.Errorf("crypto: set alg: %w", algErr)
 	}
 
@@ -202,9 +196,8 @@ func encodeJWK(key jwk.Key) (string, error) {
 	return base64.RawStdEncoding.EncodeToString(encoded), nil
 }
 
-// DecodeJWK reads a key from the base64-encoded JSON encodeJWK writes. It is
-// the other half of that pair, so a caller reading AUTH_PRIVATE_KEY or
-// AUTH_PUBLIC_KEY does not restate the encoding.
+// DecodeJWK reads a key from the base64-encoded JSON encodeJWK writes — the
+// form the jwks table's columns store.
 func DecodeJWK(encoded string) (jwk.Key, error) {
 	raw, err := base64.RawStdEncoding.DecodeString(encoded)
 	if err != nil {
@@ -222,17 +215,7 @@ type keyMaterial struct {
 	private any
 }
 
-// supportsKeyPair reports whether the algorithm has a raw key generator.
-func supportsKeyPair(algorithm string) bool {
-	switch algorithm {
-	case "ES256", "ES384", "ES512", "EdDSA",
-		"RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
-		return true
-	default:
-		return false
-	}
-}
-
+// rawKeyPair generates the raw private key material an algorithm names.
 func rawKeyPair(algorithm string) (keyMaterial, error) {
 	switch algorithm {
 	case "ES256":

@@ -29,6 +29,9 @@ func NewRepository(db datastore.Querier) *Repository {
 // key is skipped rather than failing the whole set: one unusable row must not
 // take the published keyset down for every client.
 func (r *Repository) ActiveSigningKeys(ctx context.Context) ([]StoredKey, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("jwks: no database is wired")
+	}
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key_id", "algorithm", "public_key", "expires_at")
 	sb.From(TableJWKS)
@@ -67,6 +70,9 @@ func (r *Repository) ActiveSigningKeys(ctx context.Context) ([]StoredKey, error)
 // sealed private key in place of the public one. It is the read the OAuth
 // provider signs from; the publishing path must not use it.
 func (r *Repository) ActiveSigningKeyPairs(ctx context.Context) ([]SigningKeyPair, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("jwks: no database is wired")
+	}
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key_id", "algorithm", "private_key")
 	sb.From(TableJWKS)

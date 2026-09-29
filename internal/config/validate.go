@@ -378,9 +378,10 @@ func (c Config) Validate() error {
 //
 // An unset variable is reported only where it leaves the key unusable, not for
 // every key that references one: app.mode falls back to development and
-// auth.private_key to the HMAC secret, so naming those would report a choice the
-// user made on purpose. The caller supplies the wording for the resolved case,
-// so the message reads the same whether the file named a variable or not.
+// auth.jwt_algorithm to the material's own answer, so naming those would report
+// a choice the user made on purpose. The caller supplies the wording for the
+// resolved case, so the message reads the same whether the file named a
+// variable or not.
 func (c Config) unsetNote(key, resolved string) string {
 	name, ok := c.unresolved[key]
 	if !ok {
@@ -523,12 +524,14 @@ const maxS3SignedURLExpires = 7 * 24 * time.Hour
 // material is missing. nil means the algorithm is unset (the material then
 // decides) or matches what is configured.
 //
-// The key pair and the HMAC secret are alternatives: a token is signed with
-// one or the other, so a symmetric algorithm needs auth.secret_key and an
-// asymmetric one needs auth.private_key. This function is the single source
-// of that rule — Validate refuses the deployment on it, and jwks.Service
-// answers it for a caller that built the service without validating.
-func JWTAlgorithmMaterialError(algorithm, privateKey, secretKey string) error {
+// The HMAC secret and the database signing rows are alternatives: a token is
+// signed with one or the other, so a symmetric algorithm needs
+// auth.secret_key and an asymmetric one needs an active row in public.jwks.
+// The rows are not visible here — the database is not part of the config —
+// so an asymmetric algorithm is only checked against the key that could
+// still satisfy it: none. The jwks.Service answers the same rule with the
+// row set it reads.
+func JWTAlgorithmMaterialError(algorithm, secretKey string) error {
 	if algorithm == "" {
 		return nil
 	}
@@ -538,25 +541,18 @@ func JWTAlgorithmMaterialError(algorithm, privateKey, secretKey string) error {
 		}
 		return nil
 	}
-	if privateKey == "" {
-		return fmt.Errorf("auth.jwt_algorithm: %q requires auth.private_key", algorithm)
-	}
 	return nil
 }
 
-// checkAuth validates the JWT signing material.
+// checkAuth validates the JWT signing settings.
 func checkAuth(c *Config, check func(ok bool, format string, args ...any)) {
-	// The key pair and the HMAC secret are alternatives: a token is signed with
-	// one or the other, so at least one must be present.
-	check(c.Auth.PrivateKey != "" || c.Auth.SecretKey != "",
-		"auth: set auth.private_key or auth.secret_key")
-	check(c.Auth.PrivateKey == "" || c.Auth.PublicKey != "",
-		"auth.public_key: required when auth.private_key is set")
 	check(c.Auth.JWTAlgorithm == "" || isOneOf(c.Auth.JWTAlgorithm, JWTAlgorithms...),
 		"auth.jwt_algorithm: %q is not one of %s", c.Auth.JWTAlgorithm, joinValues(JWTAlgorithms...))
-	// A named algorithm must match the material the deployment configured. The
-	// rule lives in JWTAlgorithmMaterialError, shared with jwks.Service.
-	if err := JWTAlgorithmMaterialError(c.Auth.JWTAlgorithm, c.Auth.PrivateKey, c.Auth.SecretKey); err != nil {
+	// A named algorithm must match the material the deployment configured.
+	// The asymmetric half's material is the database's signing row, which is
+	// not visible here; the rule lives in JWTAlgorithmMaterialError, shared
+	// with jwks.Service, which reads the rows.
+	if err := JWTAlgorithmMaterialError(c.Auth.JWTAlgorithm, c.Auth.SecretKey); err != nil {
 		check(false, "%s", err.Error())
 	}
 	check(c.Auth.Issuer != "", "auth.issuer: must not be empty")

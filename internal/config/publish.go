@@ -62,10 +62,10 @@ type PublishedApp struct {
 	SecretKey          string `json:"secret_key,omitzero"`
 }
 
-// PublishedAuth is the auth section. The signing keys are published only as
-// their redactions — the public key's real value is served at
-// /.well-known/jwks.json anyway, and the private one is nobody's to read
-// back. The one-time access toggles are public: they decide which sign-in
+// PublishedAuth is the auth section. The HMAC secret is published only as its
+// redaction — the asymmetric signing keys live in the database (public.jwks)
+// and their public halves are served at /.well-known/jwks.json anyway. The
+// one-time access toggles are public: they decide which sign-in
 // options the login screen offers.
 type PublishedAuth struct {
 	JWTAlgorithm       string   `json:"jwt_algorithm,omitzero"`
@@ -79,9 +79,7 @@ type PublishedAuth struct {
 	OneTimeAccessEmailAsAdminEnabled           bool `json:"one_time_access_email_as_admin_enabled,omitzero"`
 	OneTimeAccessEmailAsUnauthenticatedEnabled bool `json:"one_time_access_email_as_unauthenticated_enabled,omitzero"`
 
-	PrivateKey string `json:"private_key,omitzero"`
-	PublicKey  string `json:"public_key,omitzero"`
-	SecretKey  string `json:"secret_key,omitzero"`
+	SecretKey string `json:"secret_key,omitzero"`
 }
 
 // PublishedCache is the cache section.
@@ -355,8 +353,6 @@ func (c Config) Published(full bool) Published {
 	public.Auth.RefreshLongTTL = seconds(c.Auth.RefreshLongTTL)
 	public.Auth.ExpiryEmailEnabled = c.Auth.ExpiryEmailEnabled
 	public.Auth.SessionDriver = c.Auth.SessionDriver
-	public.Auth.PrivateKey = sealed.Auth.PrivateKey
-	public.Auth.PublicKey = sealed.Auth.PublicKey
 	public.Auth.SecretKey = sealed.Auth.SecretKey
 	public.Cache = PublishedCache{
 		Enable:    c.Cache.Enable,

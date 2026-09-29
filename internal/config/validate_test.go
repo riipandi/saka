@@ -51,21 +51,15 @@ func TestValidationRejectsBadDriver(t *testing.T) {
 	assert.Contains(t, err.Error(), "cache.driver")
 }
 
-func TestValidationRequiresASigningKey(t *testing.T) {
-	// The key pair and the HMAC secret are alternatives; neither present means
-	// no token could be signed.
+func TestValidationAcceptsAConfigWithNoSigningMaterial(t *testing.T) {
+	// The asymmetric signing key is the database's (tango initialize
+	// provisions it) and the HMAC secret is optional, so a config naming
+	// neither is a valid deployment: the key pairs come from the rows.
 	_, err := resolveAndValidate(t, config.Options{
 		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`),
 		Environ:    []string{"DATABASE_URL=" + dsn},
 	})
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "auth.private_key or auth.secret_key")
-}
-
-func TestValidationRequiresPublicKeyWithPrivateKey(t *testing.T) {
-	err := resolveFile(t, `"auth": {"private_key": "abc"}`)
-	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "auth.public_key")
+	require.NoError(t, err)
 }
 
 func TestValidationRejectsMinAboveMax(t *testing.T) {
@@ -869,24 +863,24 @@ func TestValidationRejectsABadHeaderName(t *testing.T) {
 
 // TestTheAlgorithmMaterialRuleIsShared pins that the exported material rule
 // and the validation agree: a mismatch Validate refuses is the same one
-// jwks.Service answers, and an unset algorithm is every caller's nil.
+// jwks.Service answers, and an unset algorithm is every caller's nil. The
+// asymmetric half's material is the database's signing row — not visible to
+// the config — so only the HMAC leg carries a refusal here.
 func TestTheAlgorithmMaterialRuleIsShared(t *testing.T) {
 	cases := []struct {
-		name       string
-		algorithm  string
-		privateKey string
-		secretKey  string
-		want       string
+		name      string
+		algorithm string
+		secretKey string
+		want      string
 	}{
-		{"unset is nil", "", "", "", ""},
-		{"hs with secret", "HS256", "", "configured", ""},
-		{"hs without secret", "HS256", "configured", "", `auth.jwt_algorithm: "HS256" requires auth.secret_key`},
-		{"pair without private", "ES256", "", "configured", `auth.jwt_algorithm: "ES256" requires auth.private_key`},
-		{"pair with private", "ES256", "configured", "", ""},
+		{"unset is nil", "", "", ""},
+		{"hs with secret", "HS256", "configured", ""},
+		{"hs without secret", "HS256", "", `auth.jwt_algorithm: "HS256" requires auth.secret_key`},
+		{"asymmetric names no config material", "ES256", "", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := config.JWTAlgorithmMaterialError(tc.algorithm, tc.privateKey, tc.secretKey)
+			err := config.JWTAlgorithmMaterialError(tc.algorithm, tc.secretKey)
 			if tc.want == "" {
 				assert.NoError(t, err)
 				return

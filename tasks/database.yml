@@ -47,6 +47,10 @@ tasks:
     desc: Seed the database with default records (add -- --dry-run)
     cmd: go run -tags debug ./cmd migrate:seed --env-file=.env.local {{.CLI_ARGS}}
 
+  db:initialize:
+    desc: Bootstrap a fresh database — system seed, signing key pair, first administrator
+    cmd: go run -tags debug ./cmd initialize --env-file=.env.local {{.CLI_ARGS}}
+
   db:export:
     desc: Export the database to a SQL file (add -- --compression=gzip)
     cmd: go run -tags debug ./cmd db:export --env-file=.env.local {{.CLI_ARGS}}

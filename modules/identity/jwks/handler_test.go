@@ -2,8 +2,6 @@ package jwks
 
 import (
 	"context"
-	stdhash "crypto"
-	_ "crypto/sha256"
 	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
@@ -32,20 +30,66 @@ func base64Decode(encoded string) ([]byte, error) {
 	return base64.RawStdEncoding.DecodeString(encoded)
 }
 
-// testConfig returns a configuration whose key pair is freshly generated, so
-// no test depends on a checked-in key.
+// testConfig returns a configuration with a fresh HMAC secret, so no test
+// depends on a checked-in value. The signing key pair lives in the database;
+// a test that needs one wires pairSource.
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
 
-	generator, err := crypto.NewKeyGenerator(crypto.DefaultSignatureAlgorithm)
+	generator, err := crypto.NewKeyGenerator(crypto.DefaultSecretAlgorithm)
 	require.NoError(t, err)
 	keys, err := generator.Generate()
 	require.NoError(t, err)
 
 	cfg := config.Default()
-	cfg.Auth.PublicKey = keys[crypto.EnvAuthPublicKey]
-	cfg.Auth.PrivateKey = keys[crypto.EnvAuthPrivateKey]
+	cfg.Auth.SecretKey = keys[crypto.EnvAuthSecretKey]
 	return cfg
+}
+
+// pairSource is a PairSource whose answer the test controls: the same rows
+// seen through the Source view (public only) and the PairSource view (the
+// sealed private half included).
+type pairSource struct {
+	pairs []SigningKeyPair
+	keys  []StoredKey
+}
+
+func (s pairSource) ActiveSigningKeys(context.Context) ([]StoredKey, error) {
+	return s.keys, nil
+}
+
+func (s pairSource) ActiveSigningKeyPairs(context.Context) ([]SigningKeyPair, error) {
+	return s.pairs, nil
+}
+
+// storedPair generates one signing key pair the tests sign through, returned
+// in both source views. The row carries the JWK JSON the table stores — the
+// column is the document, not its base64 envelope.
+func storedPair(t *testing.T) (SigningKeyPair, StoredKey) {
+	t.Helper()
+
+	private, public, err := crypto.GenerateKeyPair(crypto.DefaultSignatureAlgorithm)
+	require.NoError(t, err)
+	parsed, err := crypto.DecodeJWK(public)
+	require.NoError(t, err)
+	kid, ok := parsed.KeyID()
+	require.True(t, ok)
+
+	document, err := json.Marshal(parsed)
+	require.NoError(t, err)
+	// The private half is stored sealed; the tests sign through the same
+	// unseal path the server runs, so the pair carries the ciphertext. The
+	// plaintext is the JWK JSON the table stores, not its base64 envelope.
+	privateDoc, err := crypto.DecodeJWK(private)
+	require.NoError(t, err)
+	privateJSON, err := json.Marshal(privateDoc)
+	require.NoError(t, err)
+	cipher, err := crypto.NewCipherFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+	sealed, err := cipher.Encrypt(string(privateJSON))
+	require.NoError(t, err)
+	return SigningKeyPair{KeyID: kid, Algorithm: crypto.DefaultSignatureAlgorithm, PrivateKey: []byte(sealed)},
+		StoredKey{KeyID: kid, Algorithm: crypto.DefaultSignatureAlgorithm, PublicKey: document}
 }
 
 // stubSource is a Source whose answer the test controls.
@@ -85,15 +129,10 @@ func decodeKeys(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 func storedPublicKey(t *testing.T, algorithm, kid string) StoredKey {
 	t.Helper()
 
-	generator, err := crypto.NewKeyGenerator(algorithm)
-	require.NoError(t, err)
-	keys, err := generator.Generate()
+	_, public, err := crypto.GenerateKeyPair(algorithm)
 	require.NoError(t, err)
 
-	raw, err := base64Decode(keys[crypto.EnvAuthPublicKey])
-	require.NoError(t, err)
-
-	key, err := jwk.ParseKey(raw)
+	key, err := crypto.DecodeJWK(public)
 	require.NoError(t, err)
 	require.NoError(t, key.Set(jwk.KeyIDKey, kid))
 
@@ -107,8 +146,9 @@ func storedPublicKey(t *testing.T, algorithm, kid string) StoredKey {
 	}
 }
 
-func TestEndpointPublishesTheConfiguredKey(t *testing.T) {
-	service := NewService(testConfig(t), nil, nil, nil)
+func TestEndpointPublishesTheStoredKeys(t *testing.T) {
+	_, key := storedPair(t)
+	service := NewService(testConfig(t), pairSource{keys: []StoredKey{key}}, nil, nil)
 	require.NoError(t, service.Err())
 
 	rec := serve(t, service)
@@ -129,7 +169,8 @@ func TestEndpointPublishesTheConfiguredKey(t *testing.T) {
 // module: the published document is what an unauthenticated client reads, so
 // a private field in it would be a key disclosure.
 func TestEndpointNeverPublishesPrivateMaterial(t *testing.T) {
-	service := NewService(testConfig(t), nil, nil, nil)
+	_, key := storedPair(t)
+	service := NewService(testConfig(t), pairSource{keys: []StoredKey{key}}, nil, nil)
 	rec := serve(t, service)
 
 	for _, key := range decodeKeys(t, rec) {
@@ -141,49 +182,42 @@ func TestEndpointNeverPublishesPrivateMaterial(t *testing.T) {
 }
 
 func TestEndpointMergesTheStoredKeys(t *testing.T) {
-	source := stubSource{keys: []StoredKey{storedPublicKey(t, "ES384", "stored-key-1")}}
+	_, first := storedPair(t)
+	_, second := storedPair(t)
+	second.KeyID = "stored-key-2"
+	second.Algorithm = "ES384"
+	source := pairSource{keys: []StoredKey{first, second}}
 	service := NewService(testConfig(t), source, nil, nil)
 
 	keys := decodeKeys(t, serve(t, service))
 
-	require.Len(t, keys, 2, "the configured key and the stored one")
-	// The configured key is added first, so the stored one follows it.
-	assert.Equal(t, "stored-key-1", keys[1]["kid"])
+	require.Len(t, keys, 2, "every stored row is published")
+	assert.Equal(t, "stored-key-2", keys[1]["kid"])
 	assert.Equal(t, "ES384", keys[1]["alg"])
 	assert.Equal(t, KeyUsageSignature, keys[1]["use"])
 }
 
-// TestConfiguredKeyWinsADuplicateKid pins the precedence: the configured key
-// is the default, so a stored row carrying its id must not replace it and
-// must not appear beside it.
-func TestConfiguredKeyWinsADuplicateKid(t *testing.T) {
-	cfg := testConfig(t)
-	service := NewService(cfg, nil, nil, nil)
-	require.NoError(t, service.Err())
+// TestADuplicateKidAppearsOnce pins that a set naming one key twice is
+// never served: a client cannot index it.
+func TestADuplicateKidAppearsOnce(t *testing.T) {
+	_, key := storedPair(t)
+	source := pairSource{keys: []StoredKey{key, key}}
+	service := NewService(testConfig(t), source, nil, nil)
 
-	configured, err := service.SignKey(context.Background())
-	require.NoError(t, err)
-	kid, ok := configured.KeyID()
-	require.True(t, ok)
-
-	duplicate := storedPublicKey(t, "ES256", kid)
-	merged := NewService(cfg, stubSource{keys: []StoredKey{duplicate}}, nil, nil)
-
-	keys := decodeKeys(t, serve(t, merged))
+	keys := decodeKeys(t, serve(t, service))
 	assert.Len(t, keys, 1, "one key named twice is a set a client cannot index")
 }
 
-// TestSourceFailureStillServesTheConfiguredKey pins the degradation: a
-// provider table that cannot be read must not take the application's own
-// verification down.
-func TestSourceFailureStillServesTheConfiguredKey(t *testing.T) {
+// TestSourceFailureFailsTheSet pins that the database is the one authority:
+// a source that cannot be read cannot be bridged from the configuration,
+// because there is no configured key to bridge to. The failure is visible,
+// not a partial set a client would read as "no key is valid".
+func TestSourceFailureFailsTheSet(t *testing.T) {
 	source := stubSource{err: errors.New("connection refused")}
 	service := NewService(testConfig(t), source, nil, nil)
 
-	rec := serve(t, service)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Len(t, decodeKeys(t, rec), 1)
+	_, err := service.VerifyKeySet(context.Background())
+	require.Error(t, err)
 }
 
 // TestUnusableStoredKeyIsSkipped pins that one bad row does not cost the
@@ -197,28 +231,14 @@ func TestUnusableStoredKeyIsSkipped(t *testing.T) {
 
 	keys := decodeKeys(t, serve(t, service))
 
-	require.Len(t, keys, 2, "the configured key and the usable stored one")
-	assert.Equal(t, "good", keys[1]["kid"])
+	require.Len(t, keys, 1, "the usable stored one")
+	assert.Equal(t, "good", keys[0]["kid"])
 }
 
-func TestUnreadableConfiguredKeyFailsTheRun(t *testing.T) {
-	cfg := testConfig(t)
-	cfg.Auth.PublicKey = "not base64!"
-
-	service := NewService(cfg, nil, nil, nil)
-
-	require.Error(t, service.Err(), "a key that cannot be read must fail before serving")
-}
-
-// TestHMACOnlyConfigurationHasNoKeySet covers the deployment that signs with
-// the HMAC secret alone: there is no key pair to publish, and that is not an
-// error.
-func TestHMACOnlyConfigurationHasNoKeySet(t *testing.T) {
-	cfg := config.Default()
-	cfg.Auth.PublicKey = ""
-	cfg.Auth.PrivateKey = ""
-
-	service := NewService(cfg, nil, nil, nil)
+// TestAnEmptyTableAnswersAnEmptySet pins the fresh-database shape: no rows
+// is not an error at the endpoint, and a client reads it as "no key yet".
+func TestAnEmptyTableAnswersAnEmptySet(t *testing.T) {
+	service := NewService(testConfig(t), stubSource{}, nil, nil)
 
 	require.NoError(t, service.Err())
 	rec := serve(t, service)
@@ -227,14 +247,10 @@ func TestHMACOnlyConfigurationHasNoKeySet(t *testing.T) {
 }
 
 func TestSignKeyRefusesWithoutAKeyPair(t *testing.T) {
-	cfg := config.Default()
-	cfg.Auth.PublicKey = ""
-	cfg.Auth.PrivateKey = ""
-
-	service := NewService(cfg, nil, nil, nil)
+	service := NewService(testConfig(t), stubSource{}, nil, nil)
 	_, err := service.SignKey(context.Background())
 
-	assert.ErrorIs(t, err, ErrNoSigningKey)
+	assert.ErrorIs(t, err, ErrNoStoredKeys)
 }
 
 // TestServiceSatisfiesTheKeyProvider pins the wiring contract the signer and
@@ -314,102 +330,11 @@ func TestASymmetricStoredKeyIsNeverPublished(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.NotContains(t, rec.Body.String(), "hmac-key",
 		"a symmetric key must not reach the published document")
-	// The configured key is still published: one refused row must not empty
-	// the set.
-	assert.Len(t, decodeKeys(t, rec), 1)
-}
-
-// TestASymmetricConfiguredKeyFailsTheRun covers the other path into the set:
-// an auth.public_key that holds a shared secret is a broken deployment, and it
-// must fail before the listener opens rather than publish the secret.
-func TestASymmetricConfiguredKeyFailsTheRun(t *testing.T) {
-	secret := []byte("a-32-byte-hmac-secret-goes-here")
-	oct, err := jwk.Import(secret)
-	require.NoError(t, err)
-	encoded, err := json.Marshal(oct)
-	require.NoError(t, err)
-
-	cfg := testConfig(t)
-	cfg.Auth.PublicKey = base64.RawStdEncoding.EncodeToString(encoded)
-
-	service := NewService(cfg, nil, nil, nil)
-
-	require.ErrorIs(t, service.Err(), ErrSymmetricKey)
+	// One refused row must not empty the set.
+	assert.Empty(t, decodeKeys(t, rec), "the only row was the refused one")
 }
 
 // TestModuleNameIsReported keeps the composition report readable.
 func TestModuleNameIsReported(t *testing.T) {
 	assert.Equal(t, "jwks", NewModule(nil).Name())
-}
-
-// TestALegacyConfiguredKeyIsRenamedToAJwkKid pins the fallback: a configured
-// key pair generated before the `jwk_` convention carries the old
-// thumbprint kid, and the parse renames it so the published set is uniform.
-// The private half adopts the new kid, so a token's header still names a
-// key the set carries.
-func TestALegacyConfiguredKeyIsRenamedToAJwkKid(t *testing.T) {
-	cfg := testConfig(t)
-
-	// Roll the pair back to the thumbprint kid the old generator wrote.
-	public, err := crypto.DecodeJWK(cfg.Auth.PublicKey)
-	require.NoError(t, err)
-	thumbprint, thumbErr := public.Thumbprint(stdhash.SHA256)
-	require.NoError(t, thumbErr)
-	legacy := base64.RawURLEncoding.EncodeToString(thumbprint)
-	require.NoError(t, public.Set(jwk.KeyIDKey, legacy))
-	legacyPublic, err := json.Marshal(public)
-	require.NoError(t, err)
-	private, err := crypto.DecodeJWK(cfg.Auth.PrivateKey)
-	require.NoError(t, err)
-	private.Set(jwk.KeyIDKey, legacy)
-	legacyPrivate, err := json.Marshal(private)
-	require.NoError(t, err)
-	encodedPublic := base64.RawStdEncoding.EncodeToString(legacyPublic)
-	encodedPrivate := base64.RawStdEncoding.EncodeToString(legacyPrivate)
-	cfg.Auth.PublicKey = encodedPublic
-	cfg.Auth.PrivateKey = encodedPrivate
-
-	service := NewService(cfg, nil, nil, nil)
-	require.NoError(t, service.Err(), "the rename is not a parse failure")
-
-	keys := decodeKeys(t, serve(t, service))
-	require.Len(t, keys, 1)
-	kid, ok := keys[0]["kid"].(string)
-	require.True(t, ok)
-	assert.True(t, strings.HasPrefix(kid, "jwk_"),
-		"the published kid %q must carry the jwk_ prefix", kid)
-	assert.NotEqual(t, legacy, kid, "the thumbprint kid must not survive")
-
-	// The signing key answers with the renamed kid, so a token minted now
-	// names a key the published set carries.
-	signKey, err := service.SignKey(context.Background())
-	require.NoError(t, err)
-	signedKid, ok := signKey.KeyID()
-	require.True(t, ok)
-	assert.Equal(t, kid, signedKid, "both halves must answer the renamed kid")
-
-	// A current pair (the generator stamps jwk_ itself) keeps its kid: the
-	// fallback only rewrites what predates the convention.
-	current := testConfig(t)
-	currentService := NewService(current, nil, nil, nil)
-	require.NoError(t, currentService.Err())
-	currentPublic, err := crypto.DecodeJWK(current.Auth.PublicKey)
-	require.NoError(t, err)
-	assert.Equal(t, mustGeneratedKid(t, currentPublic), mustServicePublishedKid(t, currentService))
-}
-
-func mustGeneratedKid(t *testing.T, key jwk.Key) string {
-	t.Helper()
-	kid, ok := key.KeyID()
-	require.True(t, ok)
-	return kid
-}
-
-func mustServicePublishedKid(t *testing.T, service *Service) string {
-	t.Helper()
-	keys := decodeKeys(t, serve(t, service))
-	require.Len(t, keys, 1)
-	kid, ok := keys[0]["kid"].(string)
-	require.True(t, ok)
-	return kid
 }

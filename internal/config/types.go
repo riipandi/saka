@@ -67,16 +67,16 @@ type App struct {
 	AuditRetentionDays int `koanf:"audit_retention_days" json:"audit_retention_days"`
 }
 
-// Auth holds the JWT signing material.
+// Auth holds the JWT signing settings. The asymmetric signing key lives in
+// the database (public.jwks, provisioned by tango initialize); the config
+// carries only the optional HMAC secret and the algorithm override.
 type Auth struct {
-	// PrivateKey and PublicKey are base64 (raw, unpadded) JWK JSON.
-	PrivateKey string `koanf:"private_key" json:"private_key"`
-	PublicKey  string `koanf:"public_key" json:"public_key"`
 	// SecretKey is the hex-encoded HMAC key, used when no key pair is given.
 	SecretKey string `koanf:"secret_key" json:"secret_key"`
 	// JWTAlgorithm names the algorithm a token is signed with when the
-	// deployment configures both stacks. An empty value derives it: the key
-	// pair's own `alg` when there is one, the HMAC secret's length otherwise.
+	// deployment configures both stacks. An empty value derives it: the
+	// algorithm the active signing row carries when the database holds one,
+	// the HMAC secret's length otherwise.
 	//
 	// It exists because two configured stacks are otherwise ambiguous, and
 	// which one signs is a deployment decision. It is not part of the sample

@@ -42,8 +42,6 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 // testConfig is the one-stack configuration: the HMAC secret alone signs.
 func testConfig() config.Config {
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = testSecretHex
 	return cfg
 }

@@ -69,8 +69,6 @@ func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *da
 	t.Helper()
 
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 
 	// The mailer reports configured on any host and dials nothing until a

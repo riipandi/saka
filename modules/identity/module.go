@@ -151,6 +151,14 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
+		// A nil pool is the area-test state: the wiring test resolves the
+		// area without a database, and a source over nothing must answer
+		// "no rows" rather than dereference the pool. The composition root
+		// never passes one, so this is a guard, not a path.
+		var source jwks.Source
+		if pool != nil {
+			source = jwks.NewRepository(pool)
+		}
 		// The cipher unseals a stored private key for the OAuth
 		// provider; a run without a secret key has nothing to open,
 		// and the OIDC signing keys answer that state on the first
@@ -163,7 +171,7 @@ var Package = do.Package(
 			}
 			cipher = built
 		}
-		service := jwks.NewService(*c, jwks.NewRepository(pool), cipher, log)
+		service := jwks.NewService(*c, source, cipher, log)
 		// The derived algorithm is worth a line at startup: when
 		// auth.jwt_algorithm is unset, the material decides, and the
 		// HMAC half decides by the secret's length alone. A deployment
@@ -176,7 +184,12 @@ var Package = do.Package(
 		if alg, err := service.SigningAlgorithm(); err == nil {
 			log.Info("jwks: signing algorithm resolved", "algorithm", alg.String(),
 				"source", resolvedAlgorithmSource(c))
-		} else if !errors.Is(err, jwks.ErrNoSigningKey) {
+		} else if errors.Is(err, jwks.ErrNoSigningKey) || errors.Is(err, jwks.ErrNoStoredKeys) {
+			// A table with no rows yet is a fresh database: initialize
+			// provisions, and the run still serves — signing answers the
+			// missing key on the first call that needs it.
+			log.Warn("jwks: no signing key yet; run tango initialize")
+		} else {
 			return nil, fmt.Errorf("identity: jwks: resolve algorithm: %w", err)
 		}
 		return service, nil
@@ -459,8 +472,8 @@ func resolvedAlgorithmSource(c *config.Config) string {
 	if c.Auth.JWTAlgorithm != "" {
 		return "configured"
 	}
-	if c.Auth.PrivateKey != "" {
-		return "key pair"
+	if c.Auth.SecretKey != "" {
+		return "secret length"
 	}
-	return "secret length"
+	return "database row"
 }

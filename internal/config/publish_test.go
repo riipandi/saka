@@ -19,8 +19,6 @@ const planted = "plant-hogwarts-secret-0123456789"
 func plantedConfig() Config {
 	cfg := Default()
 	cfg.App.SecretKey = planted
-	cfg.Auth.PrivateKey = planted
-	cfg.Auth.PublicKey = planted
 	cfg.Auth.SecretKey = planted
 	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/pocketid"
 	cfg.KVStore.URL = "redis://:hunter2@cache.example.com:6379/2"
@@ -57,7 +55,7 @@ func TestTheFullScopeRedactsEverySecret(t *testing.T) {
 	// Nothing planted may survive, and every secret slot the document
 	// carries is the placeholder.
 	assert.NotContains(t, string(document), planted)
-	for _, key := range []string{"secret_key", "private_key", "public_key", "smtp_password", "access_key_secret"} {
+	for _, key := range []string{"secret_key", "smtp_password", "access_key_secret"} {
 		assert.Contains(t, string(document), `"`+key+`":"[redacted]"`, key)
 	}
 

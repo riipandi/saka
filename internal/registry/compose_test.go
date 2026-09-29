@@ -18,6 +18,7 @@ import (
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/registry"
 	"github.com/riipandi/tango/internal/transport/middleware"
+	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/pkg/jwtutils"
 )
 
@@ -41,10 +42,8 @@ func (reportsArea) Mount(r chi.Router) {
 // nowhere and its route answered 404.
 func TestAConsumerServesItsOwnArea(t *testing.T) {
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	// The OIDC protocol signs through the jwks service; a run without a
-	// configured key refuses to start, so the stub carries the HMAC key
+	// signing row refuses to start, so the stub carries the HMAC key
 	// a bare deployment has.
 	cfg.Auth.SecretKey = strings.Repeat("ab", 32)
 	cfg.App.BaseURL = "https://idp.example.com"
@@ -65,6 +64,15 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 	// about reaching a database, and the health check that holds the pool runs
 	// on request rather than at construction.
 	do.OverrideValue(injector, &datastore.Postgres{})
+	// The key service is replaced with one whose source is nil: the signing
+	// algorithm now reads the database's signing rows, and the stub pool has
+	// none — a resolution the area must survive, because a run without a
+	// signing row yet still serves everything but sign-in.
+	do.Override[*jwks.Service](injector, func(i do.Injector) (*jwks.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		return jwks.NewService(*c, nil, nil, log), nil
+	})
 	// The limiter is stubbed for the same reason. It reads the pool by
 	// default, and the stub above has no connections: the throttling itself is
 	// covered by internal/transport, and what this test asserts is that an

@@ -257,8 +257,6 @@ func TestEverySampleSecretIsRendered(t *testing.T) {
 	// print in full.
 	cfg := Default()
 	cfg.App.SecretKey = probeSecret
-	cfg.Auth.PrivateKey = probeSecret
-	cfg.Auth.PublicKey = probeSecret
 	cfg.Auth.SecretKey = probeSecret
 	cfg.Database.URL = probeDSN
 	cfg.KVStore.URL = probeKVURL
@@ -361,10 +359,6 @@ func valueAt(cfg Config, key string) string {
 	switch key {
 	case "app.secret_key":
 		return cfg.App.SecretKey
-	case "auth.private_key":
-		return cfg.Auth.PrivateKey
-	case "auth.public_key":
-		return cfg.Auth.PublicKey
 	case "auth.secret_key":
 		return cfg.Auth.SecretKey
 	case "database.url":

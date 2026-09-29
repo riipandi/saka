@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/pkg/crypto"
 )
 
 // Seeder creates the default records of one kind.
@@ -33,17 +34,48 @@ type Result struct {
 // user seeder grants its default account the administrator role the moment
 // the account exists, and the grant names a role row. The settings seeder
 // depends on nothing but the migration, so it closes the list.
+//
+// All returns every seeder in the order they must run: a seeder may depend on a
+// record an earlier one created. The authorization seeder runs first — the
+// user seeder grants its default account the administrator role the moment
+// the account exists, and the grant names a role row. The settings seeder
+// depends on nothing but the migration, so it closes the list.
+//
+// The JWKS seeder is not in the list: it needs a cipher to seal the private
+// half, and a development seed resolves that from the environment. Callers
+// that can seal append it through SeedJWKS.
 func All() []Seeder {
 	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), Settings()}
+}
+
+// SeedJWKS returns All plus the JWKS provisioning seeder. It answers All
+// unchanged when there is no application secret to seal with — the caller
+// then seeds without provisioning, and a later initialize provisions.
+func SeedJWKS(cipher *crypto.Cipher, signingAlgorithm string) []Seeder {
+	if cipher == nil {
+		return All()
+	}
+	return append(All(), JWKS(cipher, signingAlgorithm))
+}
+
+// System is the seed a production deployment needs: the data the
+// application's own surfaces depend on, with no sample content beside it.
+// `initialize` applies it. The signing key pair is part of that — a
+// deployment that ran initialize can sign in. The algorithm is the
+// deployment's default signature choice (crypto.DefaultSignatureAlgorithm
+// when empty).
+func System(cipher *crypto.Cipher, signingAlgorithm string) []Seeder {
+	return []Seeder{Authorization(), JWKS(cipher, signingAlgorithm), Settings()}
 }
 
 // System is the seed a production deployment needs: the data the
 // application's own surfaces depend on, with no sample content beside it.
 // `initialize` applies it; the development fixtures travel with `All` and
 // `migrate:seed` alone.
-func System() []Seeder {
-	return []Seeder{Authorization(), Settings()}
-}
+//
+// The JWKS seeder needs a cipher to seal the private half, so All does not
+// include it: the development seed's caller resolves the environment's
+// APP_SECRET_KEY and appends it through SeedJWKS.
 
 // Run applies each seeder in order over the same querier.
 //

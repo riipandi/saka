@@ -334,6 +334,11 @@ const (
 	// payload counts what the pass created, updated, and deleted on the
 	// remote; the remote's own data never rides the record.
 	EventScimSyncCompleted = "scim_sync_completed"
+
+	// EventJwksProvisioned is a signing key pair stored in the database's
+	// jwks table. The payload names the kid and the algorithm; the private
+	// material is sealed at rest and never rides the record.
+	EventJwksProvisioned = "jwks_provisioned"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

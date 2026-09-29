@@ -156,8 +156,6 @@ func rowID(t *testing.T, wire string) string {
 
 func testConfig() config.Config {
 	cfg := config.Default()
-	cfg.Auth.PrivateKey = ""
-	cfg.Auth.PublicKey = ""
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	return cfg
 }

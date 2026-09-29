@@ -1,17 +1,17 @@
-// Package jwks publishes the JSON Web Key Set the application signs with and
+// Package jwks owns the JSON Web Key Set the application signs with and
 // verifies against.
 //
-// Signing is dual stack. The configuration holds an asymmetric key pair
-// (`auth.private_key` / `auth.public_key`) and an HMAC secret
-// (`auth.secret_key`); which one signs a given token is the caller's choice,
-// made where the token is created. The database holds the keys of a deployment
-// that acts as an OAuth provider, which is how a further key joins the set
-// without a redeploy.
+// The database is the one signing authority. Every asymmetric key — the one
+// the internal surfaces sign with and the ones the OAuth provider offers —
+// lives in public.jwks, its private half sealed with the application secret.
+// tango initialize provisions the first key pair; jwks:generate stages a
+// further one for rotation. The configuration carries no key-pair material.
 //
-// Only the asymmetric keys are published. A JWKS is a public document, and a
-// symmetric key's "public" form is the secret itself, so the HMAC secret
-// verifies locally and never leaves the process. That is what the HS* half of
-// the dual stack costs, and it is the same trade every deployment makes.
+// Signing stays dual stack. The HMAC secret (auth.secret_key) signs tokens
+// that are verified by this process alone and never published — a JWKS that
+// carried a symmetric key would hand every reader the ability to mint
+// tokens. Which stack signs a given token is the caller's choice, made
+// where the token is created.
 //
 // The service satisfies jwtutils.KeyProvider, so the endpoint that publishes
 // the set and the code that verifies a token read the same source: a key that
@@ -24,23 +24,21 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"go.jetify.com/typeid"
 
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/pkg/crypto"
 )
 
-// ErrNoSigningKey reports a configuration with no key to sign with. It is
-// returned by the accessor for the stack the deployment did not configure,
-// not refused at start-up: a run with only the key pair is a valid one, and so
-// is a run with only the HMAC secret.
-var ErrNoSigningKey = errors.New("jwks: no signing key configured")
+// ErrNoSigningKey reports a deployment whose signing material is missing. The
+// asymmetric half comes from the database and the symmetric half from the
+// configuration, so the message names both doors: tango initialize provisions
+// the first key pair, key:generate writes the HMAC secret.
+var ErrNoSigningKey = errors.New("jwks: no signing key: run tango initialize to provision a signing key pair, or key:generate to write auth.secret_key")
 
 // KeyCacheTTL is how long a built key set is reused before the source is read
 // again. It is short because the value is cheap to rebuild and a rotation
@@ -55,39 +53,32 @@ type Source interface {
 }
 
 // PairSource is the optional extension a Source implements when its rows
-// carry a sealed private key: the read the OAuth provider signs from. The
-// publishing path keeps the public-only contract of Source.
+// carry a sealed private key: the read every signing walks. The publishing
+// path keeps the public-only contract of Source.
 type PairSource interface {
 	ActiveSigningKeyPairs(ctx context.Context) ([]SigningKeyPair, error)
 }
 
 // ErrNoStoredKeys reports a source that carries no signing pairs, or no
-// source at all. The OAuth provider refuses to run on it: minting tokens
-// with the configured key while the deployment meant the database to sign
-// would put a key in the published set that no row explains.
-var ErrNoStoredKeys = errors.New("jwks: no signing key pairs in the database; generate one with tango jwks:generate")
+// source at all. Nothing in the process can mint a token without one.
+var ErrNoStoredKeys = errors.New("jwks: no signing key pair in the database; run tango initialize to provision one")
 
 // Service owns the published key set and the configured signing material.
 type Service struct {
 	source Source
 	log    *slog.Logger
 
-	// once guards the parse of the configured keys: they are read from
-	// strings that do not change for the life of the process, and a parse
-	// failure is remembered rather than retried on every request.
+	// once guards the parse of the configured HMAC secret: it is read from
+	// a string that does not change for the life of the process, and a
+	// parse failure is remembered rather than retried on every request.
 	once sync.Once
-
-	// privateKey and publicKey are the asymmetric half of the dual stack.
-	privateKey jwk.Key
-	publicKey  jwk.Key
 
 	// hmacKey is the symmetric half, from auth.secret_key. It signs and
 	// verifies locally and is never published.
 	hmacKey jwk.Key
 
-	// cipher unseals a stored signing pair's private key for the OAuth
-	// provider. A run without a secret key has nothing to unseal; the
-	// OIDC signing keys fail closed on it.
+	// cipher unseals a stored signing pair's private key. A run without a
+	// secret key has nothing to unseal; signing fails closed on it.
 	cipher *crypto.Cipher
 
 	// configured is auth.jwt_algorithm, empty when the deployment lets the
@@ -98,31 +89,28 @@ type Service struct {
 }
 
 // NewService builds the service. source may be nil, which is a run with no
-// OAuth provider tables to read: the published set is then the configured keys
-// alone. cipher may be nil — a run without a secret key cannot unseal a
-// stored private key, and the OIDC signing keys fail closed on it.
+// signing table to read: signing then fails closed until a source is wired.
+// cipher may be nil — a run without a secret key cannot unseal a stored
+// private key, and signing fails closed on it.
 func NewService(cfg config.Config, source Source, cipher *crypto.Cipher, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
 	service := &Service{source: source, cipher: cipher, log: log}
-	// The parse runs here rather than on the first request: a key that cannot
-	// be read is a broken deployment, and it should be reported before the
-	// listener opens instead of as a 500 on a client's first verification.
+	// The parse runs here rather than on the first request: a secret that
+	// cannot be read is a broken deployment, and it should be reported
+	// before the listener opens instead of as a 500 on a client's first
+	// verification.
 	service.parse(cfg)
 	return service
 }
 
-// parse reads the configured keys once. A missing half is not an error — a
-// deployment may configure either stack — but a value that is present and
-// unreadable is.
+// parse reads the configured HMAC secret once. A missing secret is not an
+// error — the asymmetric stack signs from the database — but a value that
+// is present and unreadable is.
 func (s *Service) parse(cfg config.Config) {
 	s.once.Do(func() {
 		s.configured = cfg.Auth.JWTAlgorithm
-		if err := s.parseKeyPair(cfg); err != nil {
-			s.parseErr = err
-			return
-		}
 		s.parseHMAC(cfg)
 		if s.parseErr != nil {
 			return
@@ -147,16 +135,7 @@ func (s *Service) checkConfiguredAlgorithm() error {
 	// refuses at start-up is refused here, for a Service built without
 	// validating.
 	return config.JWTAlgorithmMaterialError(
-		s.configured, s.configuredPrivateKey(), s.configuredSecretKey())
-}
-
-// configuredPrivateKey reports the key pair's presence in the form the shared
-// material rule reads: the configured value, not the parsed key.
-func (s *Service) configuredPrivateKey() string {
-	if s.privateKey != nil {
-		return "configured"
-	}
-	return ""
+		s.configured, s.configuredSecretKey())
 }
 
 // configuredSecretKey reports the HMAC secret's presence in the form the
@@ -166,71 +145,6 @@ func (s *Service) configuredSecretKey() string {
 		return "configured"
 	}
 	return ""
-}
-
-// parseKeyPair reads the asymmetric half.
-func (s *Service) parseKeyPair(cfg config.Config) error {
-	if cfg.Auth.PublicKey == "" {
-		return nil
-	}
-	public, err := crypto.DecodeJWK(cfg.Auth.PublicKey)
-	if err != nil {
-		return fmt.Errorf("jwks: auth.public_key: %w", err)
-	}
-	// A symmetric key has no public half: its "public" form is the secret
-	// itself, so publishing it would disclose the signing key. An HS*
-	// deployment signs with auth.secret_key, which is never published.
-	if symErr := rejectSymmetric(public); symErr != nil {
-		return fmt.Errorf("jwks: auth.public_key: %w", symErr)
-	}
-	// The `use` is stamped here, once, rather than at publish time: the key
-	// is shared by every request, so mutating it while serving would be a
-	// data race.
-	if setErr := public.Set(jwk.KeyUsageKey, KeyUsageSignature); setErr != nil {
-		return fmt.Errorf("jwks: auth.public_key: set use: %w", setErr)
-	}
-	// A key pair generated before the `jwk_` kid convention carries the
-	// thumbprint the old generator wrote, or none. The published set must
-	// name its keys uniformly, so such a key is renamed here: the kid rides
-	// every token's JOSE header, and a token minted after this parse names
-	// the new kid. Verifiers outside the process read the kid back from the
-	// published set, so nothing breaks — but a cached set from before the
-	// restart goes stale until the client re-fetches.
-	if kid, ok := public.KeyID(); !ok || !strings.HasPrefix(kid, "jwk_") {
-		if mintErr := stampGeneratedKid(public); mintErr != nil {
-			return fmt.Errorf("jwks: auth.public_key: %w", mintErr)
-		}
-	}
-	s.publicKey = public
-
-	if cfg.Auth.PrivateKey == "" {
-		return nil
-	}
-	private, err := crypto.DecodeJWK(cfg.Auth.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("jwks: auth.private_key: %w", err)
-	}
-	if symErr := rejectSymmetric(private); symErr != nil {
-		return fmt.Errorf("jwks: auth.private_key: %w", symErr)
-	}
-	// The private key is the one the published key was derived from. A pair
-	// that does not agree would sign tokens no client could verify, so it is
-	// refused here rather than discovered by a rejected token.
-	if err := keyPairAgrees(private, public); err != nil {
-		return fmt.Errorf("jwks: auth.private_key: %w", err)
-	}
-	// The pair signs under one kid: a token's header names the kid the
-	// published set carries, so the private half adopts whatever the public
-	// half ended up with — including the rename an old thumbprint kid got.
-	if newKid, ok := public.KeyID(); ok {
-		if oldKid, had := private.KeyID(); !had || oldKid != newKid {
-			if setErr := private.Set(jwk.KeyIDKey, newKid); setErr != nil {
-				return fmt.Errorf("jwks: auth.private_key: sync kid: %w", setErr)
-			}
-		}
-	}
-	s.privateKey = private
-	return nil
 }
 
 // parseHMAC reads the symmetric half.
@@ -258,42 +172,14 @@ func (s *Service) parseHMAC(cfg config.Config) {
 	s.hmacKey = key
 }
 
-// stampGeneratedKid mints a fresh `jwk_` TypeID kid onto the key. It is the
-// rename path for a configured key pair that predates the convention — the
-// generator (pkg/crypto) stamps the kid itself, so a current deployment
-// never reaches this.
-func stampGeneratedKid(key jwk.Key) error {
-	kid, err := typeid.New[JWKSKeyID]()
-	if err != nil {
-		return fmt.Errorf("mint kid: %w", err)
-	}
-	if err := key.Set(jwk.KeyIDKey, kid.String()); err != nil {
-		return fmt.Errorf("set kid: %w", err)
-	}
-	return nil
-}
-
-// keyPairAgrees reports whether the public key is the one the private key
-// yields. A private key carries its own public part, so the comparison is
-// local and needs no configuration.
-func keyPairAgrees(private, public jwk.Key) error {
-	derived, err := jwk.PublicKeyOf(private)
-	if err != nil {
-		return fmt.Errorf("derive public key: %w", err)
-	}
-	if !jwk.Equal(derived, public) {
-		return errors.New("does not match auth.public_key")
-	}
-	return nil
-}
-
 // SigningAlgorithm reports the algorithm a token is signed with.
 //
 // The configured auth.jwt_algorithm wins when it is set: that is the value a
-// deployment gives when it configures both stacks, and the only way it can say
-// which one signs. When it is unset the answer is derived — the key pair's own
-// `alg` if there is a key pair, the HMAC secret's length otherwise — so a
-// deployment with one stack never has to state what its material already says.
+// deployment gives when it configures both stacks, and the only way it can
+// say which one signs. When it is unset the answer is derived from the
+// material — the algorithm the active signing row carries when the database
+// holds one, the HMAC secret's length otherwise — so a deployment with one
+// stack never has to state what its material already says.
 func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
 	if s.parseErr != nil {
 		return jwa.NoSignature(), s.parseErr
@@ -308,25 +194,29 @@ func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
 		// caller that built a Service without validating; the shared rule
 		// answers the same way either path built it.
 		if err := config.JWTAlgorithmMaterialError(
-			s.configured, s.configuredPrivateKey(), s.configuredSecretKey()); err != nil {
+			s.configured, s.configuredSecretKey()); err != nil {
 			return jwa.NoSignature(), err
 		}
 		return alg, nil
 	}
 
-	if s.privateKey != nil {
-		alg, ok := s.privateKey.Algorithm()
-		if !ok {
-			// The generator always stamps `alg`, so a key pair without one was
+	// The asymmetric half signs from the database: an active signing row
+	// carries the algorithm in its own column, so the row decides when the
+	// deployment names no override.
+	if pairs, err := s.signingPairs(context.Background()); err == nil && len(pairs) > 0 {
+		row := pairs[0]
+		if row.Algorithm == "" {
+			// The generator always stamps `alg`, so a row without one was
 			// written by hand. The curve determines the algorithm, but the
 			// mapping lives in an internal jwx package, so rather than
 			// restating it here the deployment is asked to say what it means.
-			return jwa.NoSignature(), errors.New(
-				"jwks: auth.private_key carries no alg; set auth.jwt_algorithm")
+			return jwa.NoSignature(), fmt.Errorf(
+				"jwks: signing key %s carries no algorithm; set auth.jwt_algorithm", row.KeyID)
 		}
-		looked, ok := jwa.LookupSignatureAlgorithm(alg.String())
+		looked, ok := jwa.LookupSignatureAlgorithm(row.Algorithm)
 		if !ok {
-			return jwa.NoSignature(), fmt.Errorf("jwks: auth.private_key: %q is not a signature algorithm", alg)
+			return jwa.NoSignature(), fmt.Errorf(
+				"jwks: signing key %s: %q is not a signature algorithm", row.KeyID, row.Algorithm)
 		}
 		return looked, nil
 	}
@@ -339,17 +229,53 @@ func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
 // Err reports the parse failure of the configured keys, if any.
 func (s *Service) Err() error { return s.parseErr }
 
-// SignKey returns the asymmetric private key, the default for stateless JWTs.
-// It is the key a client verifies against the published set, so it is what a
-// token meant for an outside caller is signed with.
-func (s *Service) SignKey(context.Context) (jwk.Key, error) {
+// signingPairs reads the database's active signing key pairs. A nil or
+// non-PairSource source answers nothing: a run with no table wired cannot
+// sign asymmetrically.
+func (s *Service) signingPairs(ctx context.Context) ([]SigningKeyPair, error) {
+	pairs, ok := s.source.(PairSource)
+	if !ok || pairs == nil {
+		return nil, ErrNoStoredKeys
+	}
+	return pairs.ActiveSigningKeyPairs(ctx)
+}
+
+// SignKey returns the active signing key pair's private key, the default for
+// stateless JWTs. It is the key a client verifies against the published set,
+// so it is what a token meant for an outside caller is signed with.
+func (s *Service) SignKey(ctx context.Context) (jwk.Key, error) {
 	if s.parseErr != nil {
 		return nil, s.parseErr
 	}
-	if s.privateKey == nil {
-		return nil, ErrNoSigningKey
+	return s.signingPrivateKey(ctx)
+}
+
+// signingPrivateKey unseals the first active signing row's private key. The
+// rows are ordered stably, so the first row is the key every mint names.
+func (s *Service) signingPrivateKey(ctx context.Context) (jwk.Key, error) {
+	pairs, err := s.signingPairs(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return s.privateKey, nil
+	if len(pairs) == 0 {
+		return nil, ErrNoStoredKeys
+	}
+	opened, err := s.openSealedKey(ctx, pairs[0])
+	if err != nil {
+		return nil, err
+	}
+	// A token's header names the row's kid, and the published set matches
+	// it by that name, so the unsealed key adopts the row's kid — the JWK
+	// JSON a rotation wrote earlier is not the authority, the row is.
+	if err := opened.Set(jwk.KeyIDKey, pairs[0].KeyID); err != nil {
+		return nil, fmt.Errorf("jwks: set kid: %w", err)
+	}
+	if pairs[0].Algorithm != "" {
+		if err := opened.Set(jwk.AlgorithmKey, pairs[0].Algorithm); err != nil {
+			return nil, fmt.Errorf("jwks: set alg: %w", err)
+		}
+	}
+	return opened, nil
 }
 
 // HMACKey returns the symmetric signing key. It is the other half of the dual
@@ -395,21 +321,18 @@ func (s *Service) HMACAlgorithm() (jwa.SignatureAlgorithm, error) {
 	return alg, nil
 }
 
-// VerifyKeySet returns the public keys a token may be verified against: the
-// configured public key first, then every active signing key the database
-// holds.
+// VerifyKeySet returns the public keys a token may be verified against:
+// every active signing key the database holds.
 //
 // The HMAC secret is deliberately absent. A JWKS is a public document, and a
 // symmetric key's "public" form is the secret itself, so publishing it would
 // hand every reader the ability to mint tokens. A caller that must verify an
 // HS* token takes HMACKey instead.
 //
-// A database that cannot be read degrades the set to the configured key
-// rather than failing the call. The configured key is the one the application
-// signs with, so a caller verifying its own token still succeeds while the
-// provider tables are unavailable; the alternative — refusing every
-// verification because a future feature's table is unreachable — would turn a
-// partial outage into a total one. The failure is logged, not swallowed.
+// A database that cannot be read fails the call rather than answering a
+// partial set: the set is the source of truth for what verifies, and a
+// reader that misses a row it should have would refuse a valid token — the
+// failure must be visible, not silent.
 func (s *Service) VerifyKeySet(ctx context.Context) (jwk.Set, error) {
 	if s.parseErr != nil {
 		return nil, s.parseErr
@@ -418,25 +341,15 @@ func (s *Service) VerifyKeySet(ctx context.Context) (jwk.Set, error) {
 	set := jwk.NewSet()
 	seen := make(map[string]struct{}, 1)
 
-	if s.publicKey != nil {
-		if err := set.AddKey(s.publicKey); err != nil {
-			return nil, fmt.Errorf("jwks: add configured key: %w", err)
-		}
-		if kid, ok := s.publicKey.KeyID(); ok {
-			seen[kid] = struct{}{}
-		}
-	}
-
 	stored, err := s.storedKeys(ctx)
 	if err != nil {
-		s.log.ErrorContext(ctx, "jwks: reading stored keys failed; publishing the configured key alone", "err", err)
-		return set, nil
+		return nil, err
 	}
 
 	for _, key := range stored {
-		// The configured key is the default, so a database row carrying the
-		// same `kid` does not replace it and does not appear twice: a set
-		// with one key named twice is a set a client cannot index.
+		// A row carrying the same `kid` as one already added does not appear
+		// twice: a set with one key named twice is a set a client cannot
+		// index.
 		if _, duplicate := seen[key.KeyID]; duplicate {
 			continue
 		}

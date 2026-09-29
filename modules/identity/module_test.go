@@ -35,7 +35,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 	cfg := testConfig(t)
 	i := do.New(
 		do.Eager(&cfg),
-		do.Eager[*slog.Logger](nil),
+		do.Eager[*slog.Logger](slog.New(slog.DiscardHandler)),
 		do.Eager[*datastore.Postgres](nil),
 		// The verification feature builds over the infrastructure the
 		// registry resolves; the area test pins the forwarding, not the
@@ -201,13 +201,11 @@ func TestTheAreaMountsWithoutEveryDependency(t *testing.T) {
 	})
 }
 
-// testConfig returns a configuration with no key pair, which is the state a
-// deployment that signs with the HMAC secret alone is in.
+// testConfig returns a configuration with no signing material, which is the
+// state a fresh deployment whose signing key the database still holds back
+// is in.
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
 
-	cfg := config.Default()
-	cfg.Auth.PublicKey = ""
-	cfg.Auth.PrivateKey = ""
-	return cfg
+	return config.Default()
 }

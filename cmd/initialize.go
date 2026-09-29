@@ -15,6 +15,7 @@ import (
 	"github.com/riipandi/tango/database/seeders"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/authz"
+	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -27,8 +28,8 @@ var initializeCmd = &cli.Command{
 	Usage:     "Prepare a fresh database: the system seed and the first administrator",
 	ArgsUsage: "",
 	Category:  "Deployment commands",
-	Description: `Applies the system seed — the permission catalog and the system
-roles the application's own surfaces depend on, and the settings
+	Description: `Applies the system seed — the permission catalog, the signing
+key pair the application signs its tokens with, and the settings
 catalog the product flows read — and creates the first
 administrator account.
 
@@ -136,13 +137,50 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("initialize: hash credential: %w", err)
 	}
 
+	// The signing key pair is provisioned in the same transaction as the
+	// system seed: a deployment that runs initialize is one that can sign
+	// in, and signing needs a key the database holds. A run without the
+	// application secret cannot seal the private half and stops here —
+	// there is nothing to bootstrap without one.
+	if cfg.App.SecretKey == "" {
+		return errors.New("initialize: APP_SECRET_KEY is required to seal the signing key pair")
+	}
+	cipher, err := crypto.NewCipherFromHex(cfg.App.SecretKey)
+	if err != nil {
+		return fmt.Errorf("initialize: APP_SECRET_KEY: %w", err)
+	}
+	signingAlgorithm := cfg.Auth.JWTAlgorithm
+	if signingAlgorithm == "" || config.IsHMACAlgorithm(signingAlgorithm) {
+		signingAlgorithm = crypto.DefaultSignatureAlgorithm
+	}
+
 	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
 	var results []seeders.Result
+	var provisionedKid string
 	err = pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		var seedErr error
-		results, seedErr = seeders.Run(ctx, tx, false, seeders.System()...)
+		results, seedErr = seeders.Run(ctx, tx, false, seeders.System(cipher, signingAlgorithm)...)
 		if seedErr != nil {
 			return seedErr
+		}
+		// The seeder reports the kid among its created rows when it
+		// provisioned; the audit record names it so a rotation's history
+		// starts at the first key.
+		for _, result := range results {
+			if result.Name == seeders.JWKSKeyPairSeederName && len(result.Created) > 0 {
+				provisionedKid = result.Created[0]
+			}
+		}
+		if provisionedKid != "" {
+			recorder.Record(ctx, tx, audit.Entry{
+				Event:  audit.EventJwksProvisioned,
+				Status: audit.StatusSuccess,
+				Payload: map[string]string{
+					"kid":       provisionedKid,
+					"algorithm": signingAlgorithm,
+					"source":    "initialize",
+				},
+			})
 		}
 
 		repo := user.NewRepository()

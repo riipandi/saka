@@ -11,7 +11,9 @@ import (
 
 	"github.com/riipandi/tango/database"
 	"github.com/riipandi/tango/database/seeders"
+	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/printext"
 )
 
@@ -144,21 +146,40 @@ func runMigrateSeed(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	return seedDatabase(ctx, cmd, pool, p)
+	return seedDatabase(ctx, cmd, pool, p, developmentSeeders(cfg))
+}
+
+// developmentSeeders resolves the seeder list a development seed runs: every
+// seeder, plus the JWKS provisioning when the environment carries an
+// application secret to seal the private half with.
+func developmentSeeders(cfg config.Config) []seeders.Seeder {
+	cipher, err := crypto.NewCipherFromHex(cfg.App.SecretKey)
+	if err != nil {
+		return seeders.All()
+	}
+	signingAlgorithm := cfg.Auth.JWTAlgorithm
+	if signingAlgorithm == "" || config.IsHMACAlgorithm(signingAlgorithm) {
+		signingAlgorithm = crypto.DefaultSignatureAlgorithm
+	}
+	return seeders.SeedJWKS(cipher, signingAlgorithm)
 }
 
 // seedDatabase applies every seeder and reports what each one created.
 // `migrate:seed` and the seed half of `migrate:reset --up --seed` answer
 // through it: the flags the two commands share — --dry-run, --force — mean
 // the same thing on both, so the reading of them lives here once.
-func seedDatabase(ctx context.Context, cmd *cli.Command, pool *datastore.Postgres, p printext.Palette) error {
+//
+// The JWKS provisioning rides the development seed when the environment
+// carries an application secret to seal with: a seeded database is one a
+// developer signs in against, and sign-in needs a signing key.
+func seedDatabase(ctx context.Context, cmd *cli.Command, pool *datastore.Postgres, p printext.Palette, list []seeders.Seeder) error {
 	dryRun := cmd.Bool("dry-run")
 
 	// A dry run writes nothing, so it needs no confirmation and no
 	// transaction: there is nothing to roll back.
 	if dryRun {
 		started := time.Now()
-		results, err := seeders.Run(ctx, pool, true, seeders.All()...)
+		results, err := seeders.Run(ctx, pool, true, list...)
 		if err != nil {
 			return err
 		}
@@ -186,7 +207,7 @@ func seedDatabase(ctx context.Context, cmd *cli.Command, pool *datastore.Postgre
 	var results []seeders.Result
 	err = pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		var seedErr error
-		results, seedErr = seeders.Run(ctx, tx, false, seeders.All()...)
+		results, seedErr = seeders.Run(ctx, tx, false, list...)
 		return seedErr
 	})
 
@@ -486,7 +507,7 @@ func seedAfterReset(ctx context.Context, cmd *cli.Command, p printext.Palette) e
 	}
 	defer pool.Shutdown(context.Background())
 
-	return seedDatabase(ctx, cmd, pool, p)
+	return seedDatabase(ctx, cmd, pool, p, developmentSeeders(cfg))
 }
 
 // planReset prints both halves of a reset without touching the database. The
