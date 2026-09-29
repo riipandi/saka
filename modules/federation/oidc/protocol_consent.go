@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"encoding/json/v2"
@@ -16,6 +17,30 @@ import (
 // The consent ledger: user_authorized_oidc_clients answers the question
 // the authorization flow asks — has this account agreed to this client
 // for these scopes already — and records the agreement when it is made.
+
+// accountAdmitted answers whether the client's group restriction lets the
+// account in. A client is restricted when its restriction flag is set or its
+// allowed-groups roll carries rows; a restricted client admits only accounts
+// that belong to at least one of those groups — flag set with an empty roll
+// admits nobody.
+func (s *Service) accountAdmitted(ctx context.Context, userID, clientID string, restricted bool) (bool, error) {
+	if !restricted {
+		return true, nil
+	}
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("EXISTS (SELECT 1 FROM public.oidc_clients_allowed_user_groups g " +
+		"JOIN public.user_groups_users m ON m.user_group_id = g.user_group_id " +
+		"WHERE g.oidc_client_id = " + sb.Var(clientID) +
+		" AND m.user_id = " + sb.Var(userID) + ")")
+	query, args := sb.Build()
+
+	var admitted bool
+	err := s.pool.QueryRow(ctx, query, args...).Scan(&admitted)
+	if err != nil {
+		return false, fmt.Errorf("oidc: check group restriction: %w", err)
+	}
+	return admitted, nil
+}
 
 // authorizedScopes reads the scopes an earlier consent stored.
 func (s *Service) authorizedScopes(ctx context.Context, userID, clientID string) ([]string, error) {

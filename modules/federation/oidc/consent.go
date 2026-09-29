@@ -150,19 +150,22 @@ func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, erro
 	return entries, rows.Err()
 }
 
-// MyClients answers the clients the account may authorize: the ones with
-// no group restriction, plus the restricted ones one of the account's
-// groups admits it to. The restriction is the allowed-groups roll — a
-// client that names no groups admits every account. The answer is the
-// consent page's catalogue, not the account's ledger.
+// MyClients answers the clients the account may authorize. The rule is
+// fail-closed: a client is restricted when its flag is set or its
+// allowed-groups roll carries rows, and restricted clients appear only for
+// accounts in one of those groups — a flag with an empty roll admits
+// nobody. The answer is the consent page's catalogue, not the ledger.
 func (s *Service) MyClients(ctx context.Context, userID string) ([]ClientView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedClientColumns("c")...)
 	sb.From("public.oidc_clients c")
 	sb.Where(
 		sb.Or(
-			"NOT EXISTS (SELECT 1 FROM public.oidc_clients_allowed_user_groups g "+
-				"WHERE g.oidc_client_id = c.id)",
+			sb.And(
+				"NOT c.is_group_restricted",
+				"NOT EXISTS (SELECT 1 FROM public.oidc_clients_allowed_user_groups g "+
+					"WHERE g.oidc_client_id = c.id)",
+			),
 			"EXISTS (SELECT 1 FROM public.oidc_clients_allowed_user_groups g "+
 				"JOIN public.user_groups_users m ON m.user_group_id = g.user_group_id "+
 				"WHERE g.oidc_client_id = c.id AND m.user_id = "+sb.Var(userID)+")",

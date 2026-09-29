@@ -169,9 +169,11 @@ func groupMembers(ctx context.Context, db datastore.Querier, groupID uuid.UUID, 
 	return members, rows.Err()
 }
 
-// clientRestriction reads the client-side group restriction: whether the
-// client is restricted, and which groups it admits. The inverse table —
-// the groups' own client allowlists — does not participate: a client's
+// clientRestriction reads the client-side group restriction with the same
+// fail-closed rule the protocol and the catalogue use: a client is
+// restricted when its flag is set or its allowed-groups roll carries rows —
+// flag set with an empty roll admits nobody. The inverse table — the
+// groups' own client allowlists — does not participate: a client's
 // provisioning roll is what the client names, not what a group does.
 func clientRestriction(ctx context.Context, db datastore.Querier, clientID string) (ClientRestriction, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -180,16 +182,13 @@ func clientRestriction(ctx context.Context, db datastore.Querier, clientID strin
 	sb.Where(sb.Equal("c.id", clientID))
 	query, args := sb.Build()
 
-	var restricted bool
-	err := db.QueryRow(ctx, query, args...).Scan(&restricted)
+	var flagRestricted bool
+	err := db.QueryRow(ctx, query, args...).Scan(&flagRestricted)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ClientRestriction{}, ErrNoProvider
 	}
 	if err != nil {
 		return ClientRestriction{}, fmt.Errorf("scimsync: read the client's restriction: %w", err)
-	}
-	if !restricted {
-		return ClientRestriction{}, nil
 	}
 
 	gb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -204,7 +203,7 @@ func clientRestriction(ctx context.Context, db datastore.Querier, clientID strin
 	}
 	defer grows.Close()
 
-	restriction := ClientRestriction{IsGroupRestricted: true}
+	restriction := ClientRestriction{}
 	for grows.Next() {
 		var id uuid.UUID
 		if err := grows.Scan(&id); err != nil {
@@ -212,7 +211,12 @@ func clientRestriction(ctx context.Context, db datastore.Querier, clientID strin
 		}
 		restriction.AllowedGroupIDs = append(restriction.AllowedGroupIDs, id)
 	}
-	return restriction, grows.Err()
+	if err := grows.Err(); err != nil {
+		return ClientRestriction{}, fmt.Errorf("scimsync: read the client's allowed groups: %w", err)
+	}
+
+	restriction.IsGroupRestricted = flagRestricted || len(restriction.AllowedGroupIDs) > 0
+	return restriction, nil
 }
 
 func toAny[T any](values []T) []any {

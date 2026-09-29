@@ -106,6 +106,20 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 			errors.New("the client is not known"))
 	}
 	account := subjectFor(caller)
+	// Group restriction gate: a client counts as restricted when its flag is
+	// set or its allowed-groups roll carries rows. Restricted clients admit
+	// only accounts in an allowed group — flag set with an empty roll admits
+	// nobody. The check runs before any grant, consent write, or device
+	// approval, so a direct protocol call cannot bypass the catalogue rule.
+	restricted := view.IsGroupRestricted || len(view.AllowedGroups) > 0
+	admitted, admitErr := service.accountAdmitted(ctx, account.subject, client.ID, restricted)
+	if admitErr != nil {
+		return goidc.StatusFailure, admitErr
+	}
+	if !admitted {
+		return goidc.StatusFailure, goidc.WrapError(goidc.ErrorCodeAccessDenied, "access denied",
+			errors.New("the account is not allowed to authorize this client"))
+	}
 	isDevice := strings.HasPrefix(r.URL.Path, protocolPrefix+protocolDeviceVerificationEndpoint)
 	if view.SkipConsent {
 		session.GrantedScopes = strings.Join(requestedScopes(session), " ")

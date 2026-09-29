@@ -613,11 +613,14 @@ the self-service procedures (`ListMyAuthorizedClients`,
 `RevokeMyAuthorizedClient`, `ListMyClients`) ride `Authenticated` — the
 account is the token's subject — and the two administrative reads
 (`ListUserAuthorizedClients`, `ListAllAuthorizedClients`) ride `Admin`.
-`ListMyClients` answers the catalogue the consent page offers: the clients
-whose allowed-groups roll is empty, plus the restricted ones the account's
-groups admit it to (the restriction **is** the roll; the
-`is_group_restricted` column is upstream's explicit flag and carries no
-write in tango yet). A revocation is one transaction: the ledger row dies,
+`ListMyClients` answers the catalogue the consent page offers, under the
+fail-closed restriction rule the protocol and SCIM share: a client is
+restricted when its `is_group_restricted` flag is set **or** its
+allowed-groups roll carries rows, restricted clients appear only for
+accounts in one of those groups, and a flag with an empty roll admits
+nobody (the `is_group_restricted` column is upstream's explicit flag and
+carries no write in tango yet — the roll alone restricts). A revocation is
+one transaction: the ledger row dies,
 the account's grants for the client die with it (the grant document's
 `sub` names the account), and every code and refresh pointer riding those
 grants dies too — a revoked consent is a consent the client cannot use.

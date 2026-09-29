@@ -464,9 +464,14 @@ end-session verification chain. Scopes are `openid`, `profile`, `email`, and
 `groups` (not `offline_access`). Claims: `sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
-exists; `groups` adds group names. **Known gap:** the authorization policy does not enforce the client's group
-restriction at consent or device-grant completion. The catalogue and SCIM views
-apply the restriction, but a direct authorize request can bypass the catalogue.
+exists; `groups` adds group names. **Group restriction is enforced server-side**
+(settled 2026-09-29): the authorization policy checks membership before any
+grant, consent write, or device approval — a client counts as restricted when
+its `is_group_restricted` flag is set or its allowed-groups roll carries rows,
+a restricted client admits only accounts in an allowed group, and a flag with
+an empty roll admits nobody. An ineligible account receives `access_denied`;
+an existing consent does not bypass the gate. The consent catalogue
+(`ListMyClients`) and the SCIM visibility roll follow the same rule.
 
 **End-session.** `id_token_hint` verified (issuer, skew ≤1 minute, the
 `id-token` type claim — an access token is refused), `aud` must equal
