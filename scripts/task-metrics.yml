@@ -2,32 +2,46 @@
 
 version: "3"
 
+vars:
+  # The stack's OpenObserve credentials (compose-sre.yaml). The query API is
+  # Basic-auth'd with the root user; the same pair the collector's exporter
+  # carries.
+  O2_API: 'http://localhost:5080/api/default'
+  # base64 of ZO_ROOT_USER_EMAIL:ZO_ROOT_USER_PASSWORD (compose-sre.yaml):
+  #   printf '%s' 'admin@example.com:@DMin123' | base64
+  O2_AUTH: 'Basic YWRtaW5AZXhhbXBsZS5jb206QERNaW4xMjM='
+
 tasks:
   # ----------------------------------------------------------------------------
   # Observability stack — the services live in docker/compose-dev.yaml, which
-  # includes compose-sre.yaml. These are the shortcuts for wiring the
-  # application to the stack: start it, check it, read back what it shipped.
+  # includes compose-sre.yaml (openobserve + otel-collector). These are the
+  # shortcuts for wiring the application to the stack: start it, check it,
+  # read back what it shipped.
   # ----------------------------------------------------------------------------
 
   metrics:up:
-    desc: Start the observability stack (Vector collector, VictoriaMetrics/Logs/Traces, Perses)
+    desc: Start the observability stack (OpenObserve + OTel collector)
     cmds:
-      - docker compose -f docker/compose.yaml up --detach --remove-orphans vector victoria-metrics victoria-logs victoria-traces perses
+      - docker compose -f docker/compose.yaml up --detach --remove-orphans openobserve otelcol
       - task: metrics:health
 
   metrics:health:
     desc: Probe every stack endpoint from the host and fail when one does not come up
-    # Perses answers on /api/v1/health, the rest on /health; each target carries
-    # its path as PORT/path. Plain shell, not a Task `for`: a Task variable
-    # holding a space would be quoted into one word. Each target is retried,
-    # because `metrics:up` calls this while the containers are still starting.
+    # OpenObserve answers /healthz; the collector's health_check extension
+    # answers /. Each target carries its path as PORT/path. Plain shell, not a
+    # Task `for`: a Task variable holding a space would be quoted into one
+    # word. Each target is retried, because `metrics:up` calls this while the
+    # containers are still starting.
     vars:
       TIMEOUT: '{{.TIMEOUT | default "60"}}'
     cmd: |
-      for target in 33802/health 33801/health 33803/health 3380/api/v1/health; do
+      for target in 5080/healthz 4318/; do
         url="http://localhost:${target%%/*}/${target#*/}"
         deadline=$((SECONDS + {{.TIMEOUT}}))
-        until curl --silent --fail --max-time 5 "$url" >/dev/null 2>&1; do
+        # The collector answers 404 on GET / (the OTLP endpoints are
+        # POST-only) — any HTTP response proves the server is up, so only
+        # connection failures count as down.
+        until curl --silent --output /dev/null --max-time 5 "$url" 2>/dev/null; do
           if [ "$SECONDS" -ge "$deadline" ]; then
             echo "down $url (no answer within {{.TIMEOUT}}s)"
             exit 1
@@ -40,36 +54,54 @@ tasks:
   metrics:endpoints:
     desc: Print the stack endpoints and the variables that reach them
     cmds:
-      - echo "OTLP fan-out (Vector) http://localhost:4318 (the one address the app dials)"
-      - echo "VictoriaLogs query http://localhost:33801/select/logsql/query"
-      - echo "VictoriaMetrics    http://localhost:33802"
-      - echo "VictoriaTraces     http://localhost:33803/select/jaeger"
-      - echo "Perses UI          http://localhost:3380"
-      - echo "Perses MCP         http://localhost:3880/mcp"
+      - echo "OTLP intake (collector) http://localhost:4318 (the one address the app dials)"
+      - echo "OpenObserve UI          http://localhost:5080 (admin@example.com / @dmin123)"
+      - echo "OpenObserve query API   {{.O2_API}}"
       - echo ""
       - echo "Set these in .env.local to ship from the application:"
       - echo "  LOG_TRANSPORT=console,otlp"
       - echo "  OTEL_ENDPOINT=http://localhost:4318"
+      - echo "  OTEL_HEADERS=Authorization=Basic <base64 of email:password>"
       - echo "  OTEL_TRACING_ENABLE=true"
       - echo "  OTEL_METRICS_ENABLE=true"
 
   metrics:query:
-    desc: Run a LogsQL query against the local log store (pass the query after --)
+    desc: Run a SQL query against the OpenObserve default org (pass the query after --)
+    # start_time/end_time live INSIDE query (the docs' own shape) and are
+    # microseconds: last hour by default. The stream name in the default
+    # query matches the ingestion stream-name header the collector sets.
+    # The query travels through the environment (not task substitution), so
+    # the shell quoting in a custom query stays intact; jq -Rs escapes it
+    # into one JSON string for the payload.
     vars:
-      QUERY: '{{.CLI_ARGS | default "*"}}'
+      QUERY: '{{.CLI_ARGS | default "SELECT marker, count(*) AS n FROM \"default\" GROUP BY marker LIMIT 20"}}'
+    env:
+      OO_QUERY: '{{.QUERY}}'
     cmd: |
-      # Unquoted on purpose: Task already quotes a substituted variable, and
-      # quoting again would lose the spaces a LogsQL query contains.
-      curl -sS --get --data-urlencode query={{.QUERY}} --data-urlencode 'limit=20' \
-      http://localhost:33801/select/logsql/query
+      NOW=$(( $(date +%s) * 1000000 ))
+      START=$((NOW - 3600000000))
+      # Task's env substitution wraps the value in quotes; strip one leading
+      # and one trailing quote whatever their kind before escaping to JSON.
+      RAW=$OO_QUERY
+      RAW=${RAW#\'}; RAW=${RAW%\'}
+      RAW=${RAW#\"}; RAW=${RAW%\"}
+      SQL=$(printf '%s' "$RAW" | jq -Rs .)
+      curl -sS -X POST '{{.O2_API}}/_search' \
+        -H "Authorization: {{.O2_AUTH}}" \
+        -H 'Content-Type: application/json' \
+        -d "{\"query\":{\"sql\":$SQL,\"start_time\":$START,\"end_time\":$NOW,\"from\":0,\"size\":20}}"
 
   metrics:traces:
-    desc: List the services VictoriaTraces has received spans for
-    cmd: curl -sS 'http://localhost:33803/select/jaeger/api/services' | jq -r '.data[]'
+    desc: List the trace streams OpenObserve holds with their document counts
+    cmd: |
+      curl -sS '{{.O2_API}}/streams?type=traces' -H "Authorization: {{.O2_AUTH}}" \
+        | jq -r '.list[]? | "\(.name)\t\(.stats.doc_num)"'
 
-  metrics:targets:
-    desc: Show the scrape targets VictoriaMetrics is collecting
-    cmd: curl -sS 'http://localhost:33802/api/v1/targets?state=active' | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.scrapeUrl)\t\(.health)"'
+  metrics:streams:
+    desc: List every stream OpenObserve holds with its document count
+    cmd: |
+      curl -sS '{{.O2_API}}/streams' -H "Authorization: {{.O2_AUTH}}" \
+        | jq -r '.list[]? | "\(.stream_type // "logs")\t\(.name)\t\(.stats.doc_num)"'
 
   metrics:smoke:
     desc: Ship one line through every configured transport and read it back
@@ -81,4 +113,4 @@ tasks:
 
   metrics:down:
     desc: Stop the observability stack
-    cmd: docker compose -f docker/compose.yaml stop vector victoria-metrics victoria-logs victoria-traces perses
+    cmd: docker compose -f docker/compose.yaml stop openobserve otelcol

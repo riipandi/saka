@@ -10,6 +10,11 @@ x-common: &common
   shm_size: 128m # set shared memory limit
   mem_limit: 256m # set memory limit
   cpus: 1.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
 
 #####################################################################
 # ngauth comes with pre-seeded data for immediate testing:
@@ -44,9 +49,6 @@ services:
       NODE_ENV: development
     healthcheck:
       test: ["CMD", "nc", "-vz", "127.0.0.1", "3000"]
-      interval: 3s
-      timeout: 5s
-      retries: 3
 
   oidc-test-client:
     <<: *common

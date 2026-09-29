@@ -7,9 +7,12 @@ x-common: &common
     - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
-  shm_size: 128m # set shared memory limit
-  mem_limit: 256m # set memory limit
   cpus: 1.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
 
 services:
   pgsql:
@@ -31,9 +34,6 @@ services:
     mem_limit: 512m # set memory limit
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 3s
-      timeout: 5s
-      retries: 3
 
   valkey:
     <<: *common
@@ -45,38 +45,15 @@ services:
       ALLOW_EMPTY_PASSWORD: "no" # recommended only for development
       VALKEY_DISABLE_COMMANDS: FLUSHDB,FLUSHALL
     command: "--appendonly yes --appendfsync everysec --requirepass securedb"
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
     healthcheck:
       test: ["CMD-SHELL", "valkey-cli --no-auth-warning -a securedb ping | grep PONG"]
-      interval: 1s
-      timeout: 3s
-      retries: 5
     ulimits:
       memlock: -1
       nofile:
         soft: 262144
         hard: 262144
-
-  mailpit:
-    <<: *common
-    image: docker.io/axllent/mailpit:${MAILPIT_VERSION:-latest}
-    hostname: mailpit
-    volumes: ["../.storage/mailpit_data:/data:rw"]
-    ports: ["1025:1025", "8025:8025"]
-    environment:
-      TZ: Asia/Jakarta
-      MP_TAGS_USERNAME: true
-      MP_DISABLE_VERSION_CHECK: true
-      MP_ALLOW_UNTRUSTED_TLS: true
-      MP_UI_BIND_ADDR: 0.0.0.0:8025
-      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
-      MP_SMTP_AUTH_ALLOW_INSECURE: true
-      MP_SMTP_AUTH: "maileruser1:mailerpass1 maileruser2:mailerpass2"
-    healthcheck:
-      test: ["CMD-SHELL", "nc -vz 127.0.0.1 8025 || exit 1"]
-      interval: 1m30s
-      timeout: 5s
-      retries: 2
-      start_period: 10s
 
   silo:
     <<: *common
@@ -98,11 +75,30 @@ services:
       - command: sh -c "/usr/bin/mc mb local/dbarchive --ignore-existing"
       - command: sh -c "/usr/bin/mc anonymous set download local/devbucket"
       - command: sh -c "/usr/bin/mc anonymous set download local/testbucket"
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
     healthcheck:
       test: ["CMD", "/usr/bin/silo", "healthcheck", "ready", "--address", "127.0.0.1:9100"]
-      interval: 3s
-      timeout: 10s
-      retries: 3
+
+  mailpit:
+    <<: *common
+    image: docker.io/axllent/mailpit:${MAILPIT_VERSION:-latest}
+    hostname: mailpit
+    volumes: ["../.storage/mailpit_data:/data:rw"]
+    ports: ["1025:1025", "8025:8025"]
+    environment:
+      TZ: Asia/Jakarta
+      MP_TAGS_USERNAME: true
+      MP_DISABLE_VERSION_CHECK: true
+      MP_ALLOW_UNTRUSTED_TLS: true
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+      MP_SMTP_AUTH: "maileruser1:mailerpass1 maileruser2:mailerpass2"
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "nc -vz 127.0.0.1 8025 || exit 1"]
 
   nginx:
     <<: *common
@@ -112,11 +108,10 @@ services:
     ports: ["9180:9180", "3443:3443", "8443:8443"]
     volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
     configs: [{ source: nginx_config, target: /etc/nginx/templates/default.conf.template }]
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
     healthcheck:
       test: ["CMD", "nc", "-vz", "127.0.0.1", "9180"]
-      interval: 3s
-      timeout: 5s
-      retries: 3
     depends_on:
       silo: { condition: service_started }
 

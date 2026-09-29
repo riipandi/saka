@@ -7,9 +7,14 @@ x-common: &common
     - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
-  shm_size: 256m # set shared memory limit
-  mem_limit: 512m # set memory limit
-  cpus: 1.0 # set CPUs limit
+  shm_size: 512m # set shared memory limit
+  mem_limit: 1g # set memory limit
+  cpus: 2.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
 
 services:
   openobserve:
@@ -20,251 +25,47 @@ services:
     hostname: openobserve
     ports: ['5080:5080']
     environment:
-        ZO_DATA_DIR: "/data"
-        ZO_HTTP_ADDR: "0.0.0.0"
-        ZO_HTTP_PORT: 5080
-        ZO_ROOT_USER_EMAIL: "admin@example.com"
-        ZO_ROOT_USER_PASSWORD: "@DMin123"
-        ZO_S3_ACCESS_KEY: "s3admin"
-        ZO_S3_BUCKET_NAME: "devbucket"
-        ZO_S3_BUCKET_PREFIX: "openobserve/"
-        ZO_S3_PROVIDER: "minio"
-        ZO_S3_REGION_NAME: "auto"
-        ZO_S3_SECRET_KEY: "s3passw0rd"
-        ZO_S3_SERVER_URL: "http://silo:9100"
-        # Authorization: "Basic YWRtaW5AZXhhbXBsZS5jb206ZHVtbXk="
-        ZO_ROOT_USER_TOKEN: "dummy"
-        ZO_TELEMETRY: false
+      ZO_DATA_DIR: '/data'
+      ZO_HTTP_ADDR: '0.0.0.0'
+      ZO_HTTP_PORT: 5080
+      ZO_LOCAL_MODE: true
+      ZO_LOCAL_MODE_STORAGE: disk
+      # Authorization: "Basic YWRtaW5AZXhhbXBsZS5jb206ZHVtbXk="
+      ZO_ROOT_USER_EMAIL: '${OPENOBSERVE_ROOT_EMAIL:-admin@example.com}'
+      ZO_ROOT_USER_PASSWORD: '${OPENOBSERVE_ROOT_PASSWORD:-@DMin123}'
+      ZO_ROOT_USER_TOKEN: '${OPENOBSERVE_ROOT_USER_TOKEN:-dummy}'
+      ZO_S3_ACCESS_KEY: 's3admin'
+      ZO_S3_BUCKET_NAME: 'devbucket'
+      ZO_S3_BUCKET_PREFIX: 'openobserve/'
+      ZO_S3_PROVIDER: 'minio'
+      ZO_S3_REGION_NAME: 'auto'
+      ZO_S3_SECRET_KEY: 's3passw0rd'
+      ZO_S3_SERVER_URL: 'http://silo:9100'
+      ZO_TELEMETRY: false
     volumes: ['../.storage/openobserve_data:/data:rw']
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:5080']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      vector: { condition: service_healthy }
+      test: ['CMD-SHELL', 'curl -sf http://localhost:5080/healthz || exit 1']
 
-  perses:
+  otelcol:
     <<: *common
-    # @ref: https://perses.dev/perses/docs/configuration/configuration
-    image: docker.io/persesdev/perses:${PERSES_VERSION:-v0.55-distroless}
-    hostname: perses
-    ports: ['3380:3380']
-    volumes: ['../.storage/perses_data:/perses:rw', './perses:/etc/perses/provisioning:ro']
-    configs: [{ source: perses_config, target: /etc/perses/config.yaml }]
-    command: '-web.listen-address=0.0.0.0:3380 -log.level=error --config=/etc/perses/config.yaml'
-    healthcheck:
-      test: ['CMD', 'percli', 'version']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      victoria-metrics: { condition: service_healthy }
-      victoria-logs: { condition: service_healthy }
-      victoria-traces: { condition: service_healthy }
-      vector: { condition: service_healthy }
-
-  # perses-mcp:
-  #   <<: *common
-  #   image: docker.io/persesdev/mcp-server:${PERSES_MCP_VERSION:-v0.2-distroless}
-  #   hostname: perses-mcp
-  #   ports: ['3880:3880']
-  #   configs: [{ source: perses_mcp_config, target: /etc/perses-mcp-config.yaml }]
-  #   command: '--config=/etc/perses-mcp-config.yaml'
-  #   depends_on:
-  #     perses: { condition: service_healthy }
-
-  vector:
-    <<: *common
-    image: docker.io/timberio/vector:${VECTOR_VERSION:-nightly-2026-09-23-debian}
-    hostname: vector
-    ports:
-      - '4318:4318' # OTLP/HTTP, the endpoint the application dials by default
-      - '4317:4317' # OTLP/gRPC, for otel.protocol: grpc
-      - '9598:9598' # Vector's own pipeline, scraped by VictoriaMetrics
-      - '9599:9599' # The edge (nginx) metrics, scraped under the nginx job
-    volumes: ['./vector.yaml:/etc/vector/vector.yaml:ro', '../.storage/nginx_logs:/var/log/nginx:ro']
-    command: ['--config', '/etc/vector/vector.yaml']
-    healthcheck:
-      test: ['CMD', 'vector', 'validate']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      victoria-metrics: { condition: service_healthy }
-      victoria-logs: { condition: service_healthy }
-      victoria-traces: { condition: service_healthy }
-
-  # VictoriaLogs v1.52+ and VictoriaTraces v0.11+ are distroless: no shell, 
-  # no HTTP client. Using `-version` is workaround until `-health` ships 
-  # (VictoriaLogs#1741).
-
-  victoria-metrics:
-    <<: *common
-    image: docker.io/victoriametrics/victoria-metrics:${VICTORIA_METRICS_VERSION:-v1.152.0}
-    hostname: victoria-metrics
-    ports: ['33802:8428']
-    volumes: ['../.storage/victoria_metrics_data:/victoria_metrics_data']
-    configs: [{ source: victoria_metrics_config, target: /victoria_metrics_data/scrape.yaml }]
-    command: >-
-      -storageDataPath=/victoria_metrics_data
-      -promscrape.config=/victoria_metrics_data/scrape.yaml
-    healthcheck:
-      test: ['CMD', 'nc', '-vz', '127.0.0.1', '8428']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      postgres-exporter: { condition: service_healthy }
-
-  victoria-logs:
-    <<: *common
-    image: docker.io/victoriametrics/victoria-logs:${VICTORIA_LOGS_VERSION:-v1.52.0}
-    hostname: victoria-logs
-    ports: ['33801:9428']
-    volumes: ['../.storage/victoria_logs_data:/victoria_logs_data']
-    command: >-
-      -storageDataPath=/victoria_logs_data
-      -retentionPeriod=14d
-      -opentelemetry.maxRequestSize=16777216
-    healthcheck:
-      test: ['CMD', '/victoria-logs-prod', '-version']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-
-  victoria-traces:
-    <<: *common
-    image: docker.io/victoriametrics/victoria-traces:${VICTORIA_TRACES_VERSION:-v0.11.1}
-    hostname: victoria-traces
-    ports: ['33803:10428']
-    volumes: ['../.storage/victoria_traces_data:/victoria_traces_data']
-    command: >-
-      -storageDataPath=/victoria_traces_data
-      -retentionPeriod=8w
-    healthcheck:
-      test: ['CMD', '/victoria-traces-prod', '-version']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-
-  postgres-exporter:
-    <<: *common
-    image: quay.io/prometheuscommunity/postgres-exporter:${PG_EXPORTER_VERSION:-latest}
-    hostname: postgres-exporter
-    ports: ['9187:9187']
+    image: docker.io/otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.162.0-amd64}
+    platform: linux/amd64
+    hostname: otelcol
+    ports: ['4318:4318']
+    volumes: ['./otel-collector.yaml:/etc/otelcol/config.yaml:ro']
     environment:
-      DATA_SOURCE_URI: pgsql:5432/postgres?sslmode=disable
-      DATA_SOURCE_USER: postgres
-      DATA_SOURCE_PASS: securedb
-    healthcheck:
-      test: ['CMD', 'nc', '-vz', '127.0.0.1', '9187']
-      interval: 3s
-      timeout: 5s
-      retries: 3
+      # The Basic credential the exporter's Authorization header interpolates:
+      # ZO_ROOT_USER_EMAIL : ZO_ROOT_USER_PASSWORD, base64-encoded once — the
+      # same pair the metrics:* tasks and the UI log in with. Regenerate when
+      # either changes: printf '%s' 'admin@example.com:@DMin123' | base64
+      OPENOBSERVE_AUTH: '${OPENOBSERVE_AUTH:-YWRtaW5AZXhhbXBsZS5jb206QERNaW4xMjM=}'
+    command: ['--config', '/etc/otelcol/config.yaml']
+    #healthcheck:
+    #  test: ['CMD-SHELL', 'curl -sf http://localhost:13133/ || exit 1']
     depends_on:
+      openobserve: { condition: service_healthy }
       pgsql: { condition: service_healthy }
-
-  redis-exporter:
-    <<: *common
-    image: docker.io/cleanstart/redis-exporter:${REDIS_EXPORTER_VERSION:-latest}
-    hostname: redis-exporter
-    ports: ['9121:9121']
-    environment:
-      REDIS_USER: default
-      REDIS_PASSWORD: securedb
-      REDIS_ADDR: redis://valkey:6379
-      REDIS_EXPORTER_WEB_LISTEN_ADDRESS: 0.0.0.0:9121
-    healthcheck:
-      test: ['CMD', '/usr/bin/redis_exporter', '--version']
-      interval: 3s
-      timeout: 5s
-      retries: 3
-    depends_on:
       valkey: { condition: service_healthy }
-
-# ================================================================================================
-# Configuration file
-# Behind Cloudflare: proxy_set_header X-Client-IP $http_cf_connecting_ip;
-# ================================================================================================
-
-configs:
-  perses_config:
-    content: |
-      security:
-        readonly: false
-        enable_auth: false
-        encryption_key: ef7b4e8c2595a15f9872c01144dc4ff8
-      database:
-        file:
-          folder: '/perses'
-          extension: 'json'
-      plugin:
-        disabled: []
-      dashboard:
-      datasource:
-        project:
-          disable: true
-        disable_local: true
-      provisioning:
-        folders:
-          - '/etc/perses/provisioning'
-
-  perses_mcp_config:
-    content: |
-      transport: http
-      listen_address: "0.0.0.0:3880"
-      read_only: false
-      resources: ""
-      perses_server:
-        url: "http://perses:3380"
-
-  victoria_metrics_config:
-    content: |
-      scrape_configs:
-        - job_name: victoria-metrics
-          static_configs:
-            - targets: ['http://localhost:8428/metrics']
-        - job_name: postgres-db
-          static_configs:
-            - targets: ['postgres-exporter:9187']
-              labels:
-                instance: pg-server-01
-        - job_name: redis-db
-          static_configs:
-            - targets: ['redis-exporter:9121']
-              labels:
-                instance: redis-server-01
-          metrics_path: /scrape
-          params:
-            target: ['valkey:6379']
-          relabel_configs:
-            - target_label: __address__
-              replacement: redis-exporter:9121
-        - job_name: redis-exporter
-          static_configs:
-            - targets: ['redis-exporter:9121']
-        - job_name: vector
-          static_configs:
-            - targets: ['vector:9598']
-              labels:
-                instance: vector-01
-        - job_name: nginx
-          static_configs:
-            - targets: ['vector:9599']
-              labels:
-                instance: nginx-proxy-01
-        - job_name: tango
-          static_configs:
-            - targets: ['host.docker.internal:3080']
-          metrics_path: /metrics
-
-volumes:
-  perses_data:
-  openobserve_data:
-  victoria_metrics_data:
-  victoria_logs_data:
-  victoria_traces_data:
 
 networks:
   intranet:

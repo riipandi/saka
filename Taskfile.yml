@@ -17,34 +17,28 @@ vars:
 # so a task in one file can depend on a task in another by its plain name.
 includes:
   dev:
-    taskfile: ./scripts/task-dev.yml
+    taskfile: ./scripts/task-development.yml
     flatten: true
   build:
     taskfile: ./scripts/task-build.yml
+    flatten: true
+  command:
+    taskfile: ./scripts/task-command.yml
     flatten: true
   database:
     taskfile: ./scripts/task-database.yml
     flatten: true
   cert:
-    taskfile: ./scripts/task-cert.yml
+    taskfile: ./scripts/task-generate.yml
     flatten: true
   test:
     taskfile: ./scripts/task-test.yml
-    flatten: true
-  lint:
-    taskfile: ./scripts/task-lint.yml
-    flatten: true
-  rpc:
-    taskfile: ./scripts/task-rpc.yml
-    flatten: true
-  deps:
-    taskfile: ./scripts/task-deps.yml
     flatten: true
   cleanup:
     taskfile: ./scripts/task-cleanup.yml
     flatten: true
   docker:
-    taskfile: ./scripts/task-docker.yml
+    taskfile: ./scripts/task-container.yml
     flatten: true
   metrics:
     taskfile: ./scripts/task-metrics.yml

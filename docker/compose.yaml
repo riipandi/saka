@@ -58,6 +58,8 @@ include:
 #     depends_on:
 #       pgsql: { condition: service_healthy }
 #       silo: { condition: service_healthy }
+#       mailpit: { condition: service_healthy }
+#       valkey: { condition: service_healthy }
 
 #   oidc-test-tango:
 #     <<: *common

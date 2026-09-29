@@ -1,6 +1,0 @@
-# The project the provisioned dashboards live in. Provisioning applies
-# projects before the project-scoped resources, so this file is what lets the
-# dashboards in dashboards/ exist.
-kind: Project
-metadata:
-  name: tango

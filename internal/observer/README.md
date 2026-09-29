@@ -55,8 +55,8 @@ flowchart TB
     end
 
     subgraph Backends
-        COL[(OTLP collector)]
-        PROM[Prometheus scraper]
+        COL[(OTLP collector\n→ OpenObserve)]
+        PROM[Prometheus-mode scraper]
     end
 
     CODE -->|span| TP
@@ -98,7 +98,7 @@ Prove tracing and metrics end to end:
 ```bash
 task metrics:up
 OTEL_TRACING_ENABLE=true OTEL_METRICS_ENABLE=true task metrics:smoke:otel
-task metrics:traces   # and the tango_otel_smoke_total query against VictoriaMetrics
+task metrics:traces   # and the tango_otel_smoke_total query against OpenObserve
 ```
 
 ## Quick Start

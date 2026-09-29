@@ -329,7 +329,7 @@ func Default() Config {
 		OTEL: OTEL{
 			// The collector a local receiver listens on, so enabling a signal
 			// is the only step needed.
-			Endpoint: DefaultOTLPEndpoint,
+			Endpoint:    DefaultOTLPEndpoint,
 			ServiceName: AppIdentifier,
 			Compression: OTELCompressionGzip,
 			// No headers: a collector that checks nothing needs nothing sent.
