@@ -63,36 +63,29 @@ type remoteMeta struct {
 	LastModified *time.Time `json:"lastModified,omitempty"`
 }
 
-// remoteList is the SCIM list-response wrapper. `Resources` is capitalized
-// per RFC 7644 §3.4.2, the one member the spec spells in title case.
+// remoteList is the SCIM list-response wrapper, decoded with presence
+// detection: the pointer fields tell a missing member apart from a zero
+// one, so a body that is not a well-formed SCIM list cannot decode into
+// the empty snapshot the reconcile would act on. `Resources` is
+// capitalized per RFC 7644 §3.4.2, the one member the spec spells in
+// title case.
 type remoteList[T any] struct {
-	Schemas      []string `json:"schemas"`
-	TotalResults int      `json:"totalResults"`
-	StartIndex   int      `json:"startIndex"`
-	ItemsPerPage int      `json:"itemsPerPage"`
-	Resources    []T      `json:"Resources"`
+	Schemas      []string `json:"schemas,omitempty"`
+	TotalResults *int     `json:"totalResults"`
+	StartIndex   *int     `json:"startIndex,omitempty"`
+	ItemsPerPage *int     `json:"itemsPerPage,omitempty"`
+	Resources    *[]T     `json:"Resources"`
 }
 
 // pathEscape makes a remote id safe in a URL path segment.
 func pathEscape(raw string) string { return url.PathEscape(raw) }
 
-// findByExternalID answers the remote row one local id provisioned, nil
-// when the remote does not carry it.
-func findByExternalID[T any](rows []T, externalID string, keyOf func(*T) string) *T {
-	for i := range rows {
-		if keyOf(&rows[i]) == externalID {
-			return &rows[i]
-		}
-	}
-	return nil
-}
-
-func userExternalID(u *remoteUser) string   { return u.ExternalID }
-func groupExternalID(g *remoteGroup) string { return g.ExternalID }
-
 // reconcile pushes the snapshot onto the remote: users first, so the
 // groups' member references exist; groups second. Per-row failures are
 // joined — one account the remote refuses must not stop the pass.
+// Before any write, the listings are validated and indexed: a remote
+// row without its identifiers makes the snapshot unusable, and the pass
+// fails without touching the remote.
 func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) error {
 	remoteUsers, err := s.listRemoteUsers(ctx, snap)
 	if err != nil {
@@ -102,18 +95,26 @@ func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) er
 	if err != nil {
 		return err
 	}
+	if err := validateRemoteSnapshot(remoteUsers, remoteGroups); err != nil {
+		return err
+	}
 
 	var errs []error
+
+	// The pass matches by externalId: one index per resource kind, built
+	// once, keeps the reconcile at O(local + remote) lookups. The first
+	// row wins a duplicate externalId — the listing order is the
+	// remote's, so the choice is deterministic.
+	userIndex := indexByExternalID(remoteUsers, func(r *remoteUser) string { return r.ExternalID })
+	groupIndex := indexByExternalID(remoteGroups, func(r *remoteGroup) string { return r.ExternalID })
 
 	// The groups' members reference the remote user ids, so the pass
 	// carries the mapping from the local id to the remote one: the
 	// listing's rows for what already exists, the creates' answers for
-	// what the pass just made.
-	remoteUserID := make(map[string]string, len(remoteUsers))
-	for _, r := range remoteUsers {
-		if r.ExternalID != "" && r.ID != "" {
-			remoteUserID[r.ExternalID] = r.ID
-		}
+	// what the pass just makes.
+	remoteUserID := make(map[string]string, len(userIndex))
+	for externalID, row := range userIndex {
+		remoteUserID[externalID] = row.ID
 	}
 
 	// Push the local accounts, then remove the remote rows the snapshot no
@@ -121,7 +122,7 @@ func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) er
 	localUsers := make(map[string]struct{}, len(snap.users))
 	for _, u := range snap.users {
 		localUsers[u.ID.String()] = struct{}{}
-		existing := findByExternalID(remoteUsers, u.ID.String(), userExternalID)
+		existing := userIndex[u.ID.String()]
 		remoteID, err := s.pushUser(ctx, snap, u, existing)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
@@ -150,7 +151,7 @@ func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) er
 	localGroups := make(map[string]struct{}, len(snap.groups))
 	for _, g := range snap.groups {
 		localGroups[g.ID.String()] = struct{}{}
-		existing := findByExternalID(remoteGroups, g.ID.String(), groupExternalID)
+		existing := groupIndex[g.ID.String()]
 		if err := s.pushGroup(ctx, snap, g, existing, remoteUserID, stats); err != nil {
 			errs = append(errs, fmt.Errorf("group %s: %w", g.ID, err))
 		}
@@ -167,6 +168,40 @@ func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) er
 	}
 
 	return errors.Join(errs...)
+}
+
+// validateRemoteSnapshot refuses a listing whose rows lack the
+// identifiers the reconcile works with: the remote id a delete targets
+// and the externalId the match is keyed by. Tango provisions every
+// resource with an externalId, so a row without one is not a row the
+// snapshot contract describes — the pass fails before any write rather
+// than deleting what it cannot read.
+func validateRemoteSnapshot(users []remoteUser, groups []remoteGroup) error {
+	var errs []error
+	for i := range users {
+		if users[i].ID == "" || users[i].ExternalID == "" {
+			errs = append(errs, fmt.Errorf("remote user row %d carries no id or externalId", i+1))
+		}
+	}
+	for i := range groups {
+		if groups[i].ID == "" || groups[i].ExternalID == "" {
+			errs = append(errs, fmt.Errorf("remote group row %d carries no id or externalId", i+1))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// indexByExternalID maps one resource kind's rows by their externalId,
+// preserving first-wins on duplicates for deterministic matching.
+func indexByExternalID[T any](rows []T, keyOf func(*T) string) map[string]*T {
+	index := make(map[string]*T, len(rows))
+	for i := range rows {
+		key := keyOf(&rows[i])
+		if _, seen := index[key]; !seen {
+			index[key] = &rows[i]
+		}
+	}
+	return index
 }
 
 // pushUser creates or updates one account on the remote, and answers the
@@ -260,17 +295,21 @@ func (s *Service) deleteRemote(ctx context.Context, snap snapshot, p string) err
 }
 
 // scimURL joins a provider's base endpoint with a resource path and a
-// query, the way the requests above build their targets.
+// query. The resource path arrives with its ids already escaped
+// (pathEscape), so the join is plain concatenation: routing an escaped
+// segment through url.URL's Path field would re-encode the percent
+// signs, and url.URL cannot represent an encoded slash inside one
+// segment at all. The base's own path — a deployment behind a prefix —
+// is preserved as the operator wrote it.
 func scimURL(endpoint, p string, query url.Values) string {
-	parsed, err := url.Parse(endpoint)
-	if err != nil {
+	if _, err := url.Parse(endpoint); err != nil {
 		return endpoint + p
 	}
-	parsed.Path = path.Join(strings.TrimRight(parsed.Path, "/"), p)
+	target := strings.TrimSuffix(endpoint, "/") + p
 	if query != nil {
-		parsed.RawQuery = query.Encode()
+		target += "?" + query.Encode()
 	}
-	return parsed.String()
+	return target
 }
 
 // userPayload renders one account's SCIM document.
@@ -312,26 +351,52 @@ func (s *Service) listRemoteGroups(ctx context.Context, snap snapshot) ([]remote
 }
 
 // listRemote pages one resource type until the remote says it is done.
+// Every page is validated before it joins the snapshot: a body that is
+// not a well-formed SCIM list, negative or contradictory counts, or a
+// remote that never advances the page cursor fails the listing. The
+// reconcile behind the listing deletes what the snapshot does not name,
+// so an untrusted page must never be able to read as an empty or
+// partial one — a malformed listing fails the pass, it never truncates.
 func listRemote[T any](ctx context.Context, s *Service, snap snapshot, basePath string) ([]T, error) {
 	var all []T
 	startIndex := 1
-	for {
-		var page remoteList[T]
+	for page := 1; ; page++ {
+		if page > scimMaxPages {
+			return nil, fmt.Errorf("remote %s listing exceeded %d pages", basePath, scimMaxPages)
+		}
+
+		var decoded remoteList[T]
 		query := url.Values{
 			"startIndex": {strconv.Itoa(startIndex)},
 			"count":      {strconv.Itoa(scimPageCount)},
 		}
-		if err := s.scimCallQuery(ctx, snap, http.MethodGet, basePath, query, nil, &page); err != nil {
+		if err := s.scimCallQuery(ctx, snap, http.MethodGet, basePath, query, nil, &decoded); err != nil {
 			return nil, err
 		}
-		all = append(all, page.Resources...)
-		if len(all) >= page.TotalResults || len(page.Resources) == 0 {
+		if decoded.TotalResults == nil || decoded.Resources == nil {
+			return nil, fmt.Errorf("remote %s page %d is not a well-formed SCIM list response", basePath, page)
+		}
+		total, resources := *decoded.TotalResults, *decoded.Resources
+		if total < 0 || total < len(resources) {
+			return nil, fmt.Errorf("remote %s page %d reports %d total results against %d rows", basePath, page, total, len(resources))
+		}
+		if len(resources) == 0 {
+			if total > len(all) {
+				return nil, fmt.Errorf("remote %s page %d stopped serving pages after %d of %d results", basePath, page, len(all), total)
+			}
 			return all, nil
 		}
-		startIndex += page.ItemsPerPage
-		if page.ItemsPerPage == 0 {
+		if len(all)+len(resources) > scimMaxResources {
+			return nil, fmt.Errorf("remote %s listing exceeded %d resources", basePath, scimMaxResources)
+		}
+		all = append(all, resources...)
+		if len(all) >= total {
 			return all, nil
 		}
+		if decoded.ItemsPerPage == nil || *decoded.ItemsPerPage <= 0 {
+			return nil, fmt.Errorf("remote %s page %d carries no page size to advance by", basePath, page)
+		}
+		startIndex += *decoded.ItemsPerPage
 	}
 }
 

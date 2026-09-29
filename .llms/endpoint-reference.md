@@ -515,7 +515,13 @@ members), so provisioning cannot admit an account the sign-in would refuse. The 
 hourly (`scim_sync` queue, `internal/jobs`) and, debounced five minutes, after account or group
 changes (`scim_sync_notifier`). Schema: `public.scim_service_providers` (migration 00004, one
 provider per client by unique index). Audit: `scim_provider_created/updated/deleted`,
-`scim_sync_completed`.
+`scim_sync_completed`. The listings the pass reads are validated before any write: a body that
+is not a well-formed SCIM list, negative or contradictory counts, a cursor that never advances,
+a listing beyond 100 pages / 100,000 resources, or a row without `id`/`externalId` fails the
+pass without deletes — a malformed snapshot can never read as an empty one. A restriction with
+no allowed groups legitimately deprovisions the remote whole. Matching is indexed by
+`externalId` (O(local + remote)); `scimURL` joins by concatenation so an escaped id is never
+re-encoded.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |

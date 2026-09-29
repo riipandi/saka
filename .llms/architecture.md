@@ -541,16 +541,28 @@ protocol section settles is the area's shape: **management is ConnectRPC**
 **the protocol endpoints are REST** — the shapes the specifications define,
 the third naming exception beside SCIM and WebAuthn.
 
-SCIM is **outbound provisioning** (`modules/federation/scimsync`, ported from
-Pocket ID): tango is the SCIM client, not the server. One
+**SCIM is outbound provisioning** (`modules/federation/scimsync`, ported from
+Pocket ID): tango is the SCIM client, not the server. The visibility roll is
+the client's own — one fail-closed rule everywhere: a client is restricted
+when its `is_group_restricted` flag is set or its allowed-groups roll carries
+rows, and restricted clients admit only their allowed groups' members, a
+flag with an empty roll admitting nobody. The listings the sync reads are
+validated before any write — a body that is not a well-formed SCIM list,
+contradictory counts, a cursor that never advances, a listing beyond the
+100-page/100,000-resource bounds, or a row without `id`/`externalId` fails
+the pass without deletes, so a malformed snapshot can never read as an
+empty one and wipe the remote; a restriction with no groups is the one
+legitimate empty snapshot, and it deprovisions the remote whole. Matching
+is indexed by `externalId`, and resource URLs are joined by concatenation,
+so an escaped id is never re-encoded. One
 `scim_service_providers` row per OIDC client names a remote base URL and the
 bearer token the sync presents — sealed `enc:` at rest, shown once in the
 Create answer, never read back. One pass (`ScimProviderService/Sync`, the
 hourly `scim_sync` job, or the five-minute debounced notifier) pushes the
 client's visible accounts and groups out until the remote matches the local
-snapshot. The visibility roll is the client's own — unrestricted means
-everyone, restricted means its allowed groups' members — so provisioning
-cannot admit an account the sign-in would refuse; banned and disabled
+snapshot. The visibility roll follows the fail-closed restriction rule the
+protocol and the catalogue share, so provisioning cannot admit an account
+the sign-in would refuse; banned and disabled
 accounts push `active: false`. Users go before groups, so the members'
 remote ids exist when the groups reference them, and a member the remote
 refuses skips the group rather than writing it half-blind. The SCIM JSON

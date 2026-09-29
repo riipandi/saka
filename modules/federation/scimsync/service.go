@@ -27,6 +27,15 @@ const (
 	scimContentType    = "application/scim+json"
 	scimPageCount      = 1000
 	scimErrorBodyLimit = 4 << 10
+
+	// The bounds one listing may walk before the pass refuses it. A
+	// remote that reports endless results, or pages that never advance,
+	// would otherwise accumulate without limit; 100 pages of the 1000
+	// rows a page may carry is 100,000 resources, far above any
+	// deployment this sync targets, and the answer is an error the pass
+	// reports — never a silently truncated snapshot.
+	scimMaxPages     = 100
+	scimMaxResources = 100 * scimPageCount
 )
 
 // ErrNoDirectory reports a service built without an account or group

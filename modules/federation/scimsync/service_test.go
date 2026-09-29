@@ -32,8 +32,9 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 }
 
 // testService builds the service over the pool with a cipher from a fixed
-// key and a stub HTTP client the test inspects.
-func testService(t *testing.T, pool *datastore.Postgres, remote *stubRemote) *Service {
+// key and a stub HTTP client the test inspects. The stub is the seam's
+// interface, so the scripted-remote and the paged-listing stubs both fit.
+func testService(t *testing.T, pool *datastore.Postgres, remote HTTPClient) *Service {
 	t.Helper()
 	cipher, err := crypto.NewCipherFromHex(cipherKey)
 	require.NoError(t, err)
@@ -91,6 +92,33 @@ func seedMembership(t *testing.T, pool *datastore.Postgres, groupID, userID uuid
 	query, args := ib.Build()
 	_, err := pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
+}
+
+// intPtr is the presence-detected list response's counter form.
+func intPtr(v int) *int { return &v }
+
+// userList scripts a well-formed SCIM user listing: the counters set and
+// the rows the pass should see — an empty argument list is a legitimate
+// empty snapshot.
+func userList(rows ...remoteUser) remoteList[remoteUser] {
+	resources := append([]remoteUser{}, rows...)
+	return remoteList[remoteUser]{
+		Schemas:      []string{scimListSchema},
+		TotalResults: intPtr(len(resources)),
+		ItemsPerPage: intPtr(scimPageCount),
+		Resources:    &resources,
+	}
+}
+
+// groupList scripts a well-formed SCIM group listing.
+func groupList(rows ...remoteGroup) remoteList[remoteGroup] {
+	resources := append([]remoteGroup{}, rows...)
+	return remoteList[remoteGroup]{
+		Schemas:      []string{scimListSchema},
+		TotalResults: intPtr(len(resources)),
+		ItemsPerPage: intPtr(scimPageCount),
+		Resources:    &resources,
+	}
 }
 
 // stubRemote records what the sync sent and answers SCIM documents from a
@@ -261,8 +289,8 @@ func TestSyncProvisionsTheVisibleAccountsAndGroups(t *testing.T) {
 	// The remote starts empty: the listings answer nothing, and each
 	// create answers a document that stamps the remote id the group's
 	// member references need.
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, remoteList[remoteUser]{})
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, remoteList[remoteGroup]{})
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList())
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
 	remote.answer(http.MethodPost, "https://sp.example/scim/v2/Users", http.StatusCreated, remoteUser{
 		ID: "remote-user-1", Schemas: []string{scimUserSchema},
 	})
@@ -324,8 +352,8 @@ func TestSyncDeactivatesABannedAccount(t *testing.T) {
 	_, err := pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
 
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, remoteList[remoteUser]{})
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, remoteList[remoteGroup]{})
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList())
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
 
 	svc := testService(t, pool, remote)
 	provider, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "token-1")
@@ -348,14 +376,12 @@ func TestSyncDeletesARemoteRowTheSnapshotNoLongerNames(t *testing.T) {
 	clientID := "55555555-5555-5555-8555-555555555555"
 	seedClient(t, pool, clientID, false)
 
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, remoteList[remoteUser]{
-		Resources: []remoteUser{{
-			ID:         "remote-orphan",
-			ExternalID: "66666666-6666-5666-8666-666666666666",
-			UserName:   "Teabing",
-		}},
-	})
-	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, remoteList[remoteGroup]{})
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList(remoteUser{
+		ID:         "remote-orphan",
+		ExternalID: "66666666-6666-5666-8666-666666666666",
+		UserName:   "Teabing",
+	}))
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
 	remote.answer(http.MethodDelete, "https://sp.example/scim/v2/Users/remote-orphan", http.StatusNoContent, nil)
 
 	svc := testService(t, pool, remote)
