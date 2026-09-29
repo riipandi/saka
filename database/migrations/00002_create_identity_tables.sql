@@ -206,14 +206,16 @@ CREATE INDEX IF NOT EXISTS idx_signup_tokens_user_groups_user_group_id
 
 CREATE TABLE IF NOT EXISTS public.device_login_requests (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    code TEXT NOT NULL UNIQUE,             -- short user code (P + 7 chars)
+    user_code_hash TEXT NOT NULL UNIQUE,   -- the code lives only as a hash
     device_token_hash TEXT NOT NULL,       -- binds the polling device
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'consumed')),
+    decided_at TIMESTAMPTZ DEFAULT NULL,   -- the instant the paired browser answered
     user_id UUID REFERENCES public.users (id) ON DELETE CASCADE,
     ip_address TEXT NOT NULL DEFAULT '',
     user_agent TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMPTZ NOT NULL
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT chk_device_login_requests_expiry CHECK (expires_at > created_at)
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_device_login_requests_expires_at ON public.device_login_requests (expires_at);

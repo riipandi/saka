@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS public.oidc_clients (
     logo_path TEXT, -- Blob path; NULL = no logo
     access_token_duration_minutes BIGINT NOT NULL DEFAULT 60,
     refresh_token_duration_minutes BIGINT NOT NULL DEFAULT 43200,
+    -- The back-channel logout delivery: where the provider POSTs the
+    -- logout token when a signed-in session ends. An empty URI is the
+    -- client opted out — the delivery runs only for the clients that
+    -- named a destination. The session-required flag is the OIDC Session
+    -- Management signal the delivery carries with the token.
+    backchannel_logout_uri TEXT NOT NULL DEFAULT '',
+    backchannel_logout_session_required BOOLEAN NOT NULL DEFAULT FALSE,
     created_by_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE SET NULL
