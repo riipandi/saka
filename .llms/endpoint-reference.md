@@ -359,7 +359,7 @@ the approval. Audit events: `device_login_approved`,
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/api/device-login/requests` | Create device login request | done — REST, public; the pairing cookie rides the response, the device token never travels the body | `modules/devicelogin` (service tests), `internal/guard` (RestRules) |
+| POST | `/api/device-login/requests` | Create device login request | done — REST, public; the pairing cookie rides the response, the device token never travels the body; one browser holds at most 8 live requests — a ninth creation answers 429 until one expires | `modules/devicelogin` (service tests), `internal/guard` (RestRules) |
 | POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | done — REST, public; long-poll, the pairing cookie proves the creating browser; the approval answers the account view | `modules/devicelogin` (service tests) |
 | POST | `/rpc/tango.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
 | POST | `/rpc/tango.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
@@ -469,7 +469,12 @@ clients; `plain` and `S256` are accepted.
 `urn:ietf:params:oauth:grant-type:device_code`; Tango does not implement
 `client_credentials`. Client authentication via `client_secret_basic`,
 `client_secret_post`, or `none` against hashed secrets in `credentials`; refresh
-token rotation; access tokens are JWTs signed by the JWKS key set. ID tokens
+token rotation; access tokens are JWTs signed by the JWKS key set. Every
+one-time grant's consumption is atomic under concurrency (settled 2026-09-29):
+the token endpoint's save demands the stored grant still hold the document the
+request read, so of the requests racing on one authorization code or device
+code exactly one receives tokens — the losers answer `invalid_grant` (the
+code already redeemed or gone) and never reach issuance. ID tokens
 carry a token-type discriminator claim (`tango:token_type = id-token`) for the
 end-session verification chain. Scopes are `openid`, `profile`, `email`, and
 `groups` (not `offline_access`). Claims: `sub` always; `profile` adds the

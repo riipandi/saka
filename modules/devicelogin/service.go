@@ -23,10 +23,14 @@ import (
 // the comparisons strip.
 const userCodeCharset = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
-// The account state checks are the issuer's: an exchange against a
-// disabled or banned account is refused, the way the sign-in flows
-// refuse it.
+// ErrCodeUnknown is the one refusal every pairing surface answers: an
+// unknown, expired, or already decided request never says which.
 var ErrCodeUnknown = errors.New("devicelogin: the request is unknown, expired, or already decided")
+
+// ErrTooManyPendingRequests is a creation beyond the pairing cap: one
+// browser holds at most maxPendingRequests live requests, so a page
+// cannot fill the table with rows nothing will ever decide.
+var ErrTooManyPendingRequests = errors.New("devicelogin: the pairing cap for this browser is reached")
 
 // Service is the pairing surface: a browser that cannot sign itself in
 // creates a request, another browser approves it, and the creating
@@ -68,7 +72,7 @@ func (s *Service) Create(ctx context.Context, deviceToken, ipAddress, userAgent 
 		return CreatedView{}, fmt.Errorf("devicelogin: generate user code: %w", err)
 	}
 
-	req, err := s.repo.Create(ctx, HashUserCode(code), HashDeviceToken(deviceToken), ipAddress, userAgent, time.Now().UTC().Add(requestLifetime))
+	req, err := s.repo.CreateWithinLimit(ctx, HashUserCode(code), HashDeviceToken(deviceToken), ipAddress, userAgent, time.Now().UTC().Add(requestLifetime), maxPendingRequests)
 	if err != nil {
 		return CreatedView{}, fmt.Errorf("devicelogin: create request: %w", err)
 	}

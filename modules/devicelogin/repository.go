@@ -27,6 +27,41 @@ func NewRepository(pool *datastore.Postgres) *Repository {
 // user code and the device token; the raw values never reach the
 // database.
 func (r *Repository) Create(ctx context.Context, userCodeHash, deviceTokenHash, ipAddress, userAgent string, expiresAt time.Time) (Request, error) {
+	return r.insert(ctx, r.pool, userCodeHash, deviceTokenHash, ipAddress, userAgent, expiresAt)
+}
+
+// CreateWithinLimit inserts one pending row under the pairing cap. The
+// advisory lock on the device token's hash serializes one browser's
+// creations, and the count decides inside the lock — a bare
+// count-then-insert would race past the cap with concurrent creates.
+// The transaction owns the lock, so a refused or failed create releases
+// it for the next attempt.
+func (r *Repository) CreateWithinLimit(ctx context.Context, userCodeHash, deviceTokenHash, ipAddress, userAgent string, expiresAt time.Time, limit int) (Request, error) {
+	var req Request
+	err := r.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, err := tx.Exec(ctx,
+			`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, deviceTokenHash); err != nil {
+			return err
+		}
+		live, err := r.countLiveForToken(ctx, tx, deviceTokenHash)
+		if err != nil {
+			return err
+		}
+		if live >= limit {
+			return ErrTooManyPendingRequests
+		}
+		req, err = r.insert(ctx, tx, userCodeHash, deviceTokenHash, ipAddress, userAgent, expiresAt)
+		return err
+	})
+	if err != nil {
+		return Request{}, err
+	}
+	return req, nil
+}
+
+// insert writes one row on the query surface it is handed, so a
+// caller's transaction carries it.
+func (r *Repository) insert(ctx context.Context, db datastore.Querier, userCodeHash, deviceTokenHash, ipAddress, userAgent string, expiresAt time.Time) (Request, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	sb.InsertInto(requestTable)
 	sb.Cols("user_code_hash", "device_token_hash", "ip_address", "user_agent", "expires_at")
@@ -35,7 +70,7 @@ func (r *Repository) Create(ctx context.Context, userCodeHash, deviceTokenHash, 
 	query, args := sb.Build()
 
 	var req Request
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&req.ID, &req.CreatedAt)
+	err := db.QueryRow(ctx, query, args...).Scan(&req.ID, &req.CreatedAt)
 	if err != nil {
 		return Request{}, err
 	}
@@ -138,15 +173,21 @@ func (r *Repository) Consume(ctx context.Context, id string) (bool, error) {
 
 // CountLiveForToken answers how many unexpired requests the creating
 // browser already holds — the cap that keeps one page from filling the
-// table with rows nothing will ever decide.
-func (r *Repository) CountLiveForToken(ctx context.Context, deviceTokenHash string) (int, error) {
+// table with rows nothing will ever decide. The query runs on the
+// surface it is handed, so the cap's transaction reads its own lock's
+// view.
+func (r *Repository) CountLiveForToken(ctx context.Context, db datastore.Querier, deviceTokenHash string) (int, error) {
+	return r.countLiveForToken(ctx, db, deviceTokenHash)
+}
+
+func (r *Repository) countLiveForToken(ctx context.Context, db datastore.Querier, deviceTokenHash string) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
 	sb.From(requestTable)
 	sb.Where(sb.Equal("device_token_hash", deviceTokenHash), sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()
 	var count int
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&count)
+	err := db.QueryRow(ctx, query, args...).Scan(&count)
 	return count, err
 }
 

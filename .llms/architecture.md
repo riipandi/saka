@@ -671,7 +671,13 @@ kinds `devicecode` and `usercode`, a re-entered user code moving the
 pointer to the newest session holding it. Every registered client may
 use the grant; the approval walks the SPA interaction the authorize
 flow walks, and `oidc_device_authorized` is the approval's own audit
-record.
+record. One-time redemption is atomic without a library seam: the token
+endpoint's request carries a snapshot cache (`grant_cas.go`), the grant
+store remembers the document each read produced, and `SaveGrant` runs a
+compare-and-swap against it — of the requests racing on one code,
+exactly one saves and issues; a loser's save is refused, and the same
+rule protects the authorization code's consumption and the refresh
+rotation's rewrite.
 
 **Device login is a second feature, not the device grant.**
 `modules/devicelogin` is the passkey-less pairing sign-in: a browser
@@ -686,7 +692,10 @@ sessions for a third device. Codes are drawn from
 `23456789ABCDEFGHJKMNPQRSTUVWXYZ` and rendered `XXXX-XXXX`; the code
 and the pairing secret live only as SHA-256 hashes; decisions are
 single-use in the UPDATE's WHERE, and the exchange's consumption is
-first-writer-wins.
+first-writer-wins. One creating browser holds at most
+`maxPendingRequests` (8) live requests, enforced inside an advisory
+lock on the token's hash so concurrent creations cannot race past the
+cap; expiry frees the room, and a refused creation answers 429.
 
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**

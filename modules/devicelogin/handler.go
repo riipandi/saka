@@ -48,7 +48,11 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view, err := h.service.Create(r.Context(), token, remoteIP(r), r.UserAgent())
-	if err != nil {
+	switch {
+	case errors.Is(err, ErrTooManyPendingRequests):
+		responder.Fail(w, r, http.StatusTooManyRequests, "this browser already holds the maximum number of pairing requests")
+		return
+	case err != nil:
 		responder.Fail(w, r, http.StatusInternalServerError, "the pairing request could not be created")
 		return
 	}
