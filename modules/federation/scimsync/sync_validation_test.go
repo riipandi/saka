@@ -249,7 +249,7 @@ func TestARowWithoutItsIdentifiersFailsThePassWithoutDeleting(t *testing.T) {
 	// One row the remote answered without its externalId: the pass
 	// cannot tell what it names, so it refuses the snapshot whole.
 	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, remoteList[remoteUser]{
-		TotalResults: intPtr(1),
+		TotalResults: new(1),
 		Resources:    &[]remoteUser{{ID: "remote-1", UserName: "Teabing"}},
 	})
 	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())

@@ -12,12 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"uuid"
+
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/modules/federation/oidc"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
-	"uuid"
 )
 
 // sqlb is the builder flavor the feature's queries use.
@@ -94,9 +95,6 @@ func seedMembership(t *testing.T, pool *datastore.Postgres, groupID, userID uuid
 	require.NoError(t, err)
 }
 
-// intPtr is the presence-detected list response's counter form.
-func intPtr(v int) *int { return &v }
-
 // userList scripts a well-formed SCIM user listing: the counters set and
 // the rows the pass should see — an empty argument list is a legitimate
 // empty snapshot.
@@ -104,8 +102,8 @@ func userList(rows ...remoteUser) remoteList[remoteUser] {
 	resources := append([]remoteUser{}, rows...)
 	return remoteList[remoteUser]{
 		Schemas:      []string{scimListSchema},
-		TotalResults: intPtr(len(resources)),
-		ItemsPerPage: intPtr(scimPageCount),
+		TotalResults: new(len(resources)),
+		ItemsPerPage: new(scimPageCount),
 		Resources:    &resources,
 	}
 }
@@ -115,8 +113,8 @@ func groupList(rows ...remoteGroup) remoteList[remoteGroup] {
 	resources := append([]remoteGroup{}, rows...)
 	return remoteList[remoteGroup]{
 		Schemas:      []string{scimListSchema},
-		TotalResults: intPtr(len(resources)),
-		ItemsPerPage: intPtr(scimPageCount),
+		TotalResults: new(len(resources)),
+		ItemsPerPage: new(scimPageCount),
 		Resources:    &resources,
 	}
 }

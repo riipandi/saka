@@ -437,7 +437,7 @@ func TestUpdateUserAppliesAndLiftsTheBan(t *testing.T) {
 		LastName:     "Granger",
 		DisplayName:  "hermione",
 		BanExpiresAt: &expires,
-		BanReason:    strPtr("unruly behaviour"),
+		BanReason:    new("unruly behaviour"),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, banned.BannedAt)
@@ -515,11 +515,6 @@ func TestDeleteUserRefusesTheSignedInAccount(t *testing.T) {
 
 	err = service.DeleteUser(t.Context(), other.ID, "hermione")
 	assert.ErrorIs(t, err, ErrUserNotFound)
-}
-
-// strPtr hands a ban reason its pointer form.
-func strPtr(value string) *string {
-	return &value
 }
 
 func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
