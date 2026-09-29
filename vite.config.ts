@@ -79,6 +79,7 @@ export default defineConfig({
   publicDir: resolve('public'),
   root: resolve('web'),
   build: {
+    manifest: true,
     emptyOutDir: true,
     chunkSizeWarningLimit: 1024 * 4,
     outDir: resolve('web/output'),
@@ -88,6 +89,13 @@ export default defineConfig({
     }
   },
   worker: { plugins: () => [comlink()] },
-  server: isStorybook ? undefined : { port: 3000, strictPort: true, proxy: viteProxy },
+  server: isStorybook
+    ? undefined
+    : {
+        port: 3000,
+        strictPort: true,
+        cors: { origin: '*' },
+        proxy: viteProxy
+      },
   preview: { proxy: viteProxy }
 })
