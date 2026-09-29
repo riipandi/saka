@@ -284,8 +284,8 @@ type PublishedWatch struct {
 // PublishedS3 is the object-storage settings. Both credentials are
 // published only as their redactions.
 type PublishedS3 struct {
-	AccessKeyID      string   `json:"access_key_id,omitzero"`
-	AccessKeySecret  string   `json:"access_key_secret,omitzero"`
+	AccessKey        string   `json:"access_key,omitzero"`
+	SecretKey        string   `json:"secret_key,omitzero"`
 	BucketName       string   `json:"bucket_name,omitzero"`
 	EndpointURL      string   `json:"endpoint_url,omitzero"`
 	ForcePathStyle   bool     `json:"force_path_style,omitzero"`
@@ -488,8 +488,8 @@ func (c Config) Published(full bool) Published {
 			Debounce: seconds(c.Storage.Watch.Debounce),
 		},
 		S3: PublishedS3{
-			AccessKeyID:      sealed.Storage.S3.AccessKeyID,
-			AccessKeySecret:  sealed.Storage.S3.AccessKeySecret,
+			AccessKey:        sealed.Storage.S3.AccessKey,
+			SecretKey:        sealed.Storage.S3.SecretKey,
 			BucketName:       c.Storage.S3.BucketName,
 			EndpointURL:      c.Storage.S3.EndpointURL,
 			ForcePathStyle:   c.Storage.S3.ForcePathStyle,

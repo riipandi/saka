@@ -737,11 +737,11 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                        "access_key_id": {
+                        "access_key": {
                             "description": "Secret.",
                             "$ref": "#/$defs/stringOrEnv"
                         },
-                        "access_key_secret": {
+                        "secret_key": {
                             "description": "Secret.",
                             "$ref": "#/$defs/stringOrEnv"
                         },

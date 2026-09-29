@@ -300,10 +300,10 @@ func (c Config) Validate() error {
 			c.unsetNote("storage.s3.bucket_name", "must not be empty when storage.driver is s3"))
 		check(s3.Region != "", "storage.s3.region: %s",
 			c.unsetNote("storage.s3.region", "must not be empty when storage.driver is s3"))
-		check(s3.AccessKeyID != "", "storage.s3.access_key_id: %s",
-			c.unsetNote("storage.s3.access_key_id", "must not be empty when storage.driver is s3"))
-		check(s3.AccessKeySecret != "", "storage.s3.access_key_secret: %s",
-			c.unsetNote("storage.s3.access_key_secret", "must not be empty when storage.driver is s3"))
+		check(s3.AccessKey != "", "storage.s3.access_key: %s",
+			c.unsetNote("storage.s3.access_key", "must not be empty when storage.driver is s3"))
+		check(s3.SecretKey != "", "storage.s3.secret_key: %s",
+			c.unsetNote("storage.s3.secret_key", "must not be empty when storage.driver is s3"))
 		check(s3.EndpointURL == "" || isHTTPURL(s3.EndpointURL),
 			"storage.s3.endpoint_url: %q must be an absolute http or https URL", s3.EndpointURL)
 		// The protocol caps a signed link at seven days, and the client takes a

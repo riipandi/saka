@@ -80,8 +80,8 @@ func (c Config) withSecrets(render secretRenderer) Config {
 	out.Database.URL = RedactDSN(c.Database.URL)
 	out.KVStore.URL = RedactKVURL(c.KVStore.URL)
 	out.Mailer.SMTPPassword = render(c.Mailer.SMTPPassword)
-	out.Storage.S3.AccessKeyID = render(c.Storage.S3.AccessKeyID)
-	out.Storage.S3.AccessKeySecret = render(c.Storage.S3.AccessKeySecret)
+	out.Storage.S3.AccessKey = render(c.Storage.S3.AccessKey)
+	out.Storage.S3.SecretKey = render(c.Storage.S3.SecretKey)
 	out.OTEL.Headers = redactHeaders(c.OTEL.Headers, render)
 	out.origin = nil
 	out.unresolved = nil

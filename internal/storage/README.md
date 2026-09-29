@@ -201,7 +201,7 @@ removed, err := manager.CollectGarbage(ctx)
 | `storage.local_path`    | `storage` | The one data directory: `files/` (the local backend), `staging/`, and the log sink live under it |
 | `storage.watch.enable`  | true      | The staging watcher enqueues uploads as staging paths settle                     |
 | `storage.watch.debounce`| 2         | Seconds a path must stay quiet before its upload is enqueued                     |
-| `storage.s3.*`          | —         | `access_key_id`, `access_key_secret` (both secrets), `bucket_name`, `endpoint_url`, `force_path_style`, `path_prefix`, `region` |
+| `storage.s3.*`          | —         | `access_key`, `secret_key` (both secrets), `bucket_name`, `endpoint_url`, `force_path_style`, `path_prefix`, `region` |
 
 The local path needs no flag and no variable of its own — a deployment sets it in the config
 file. Postgres plus local storage are enough; no backend is required.

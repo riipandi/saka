@@ -258,8 +258,8 @@ func TestEverySampleSecretIsRendered(t *testing.T) {
 	cfg.KVStore.URL = probeKVURL
 	cfg.Mailer.SMTPPassword = probeSecret
 	cfg.OTEL.Headers = map[string]string{"authorization": probeSecret}
-	cfg.Storage.S3.AccessKeyID = probeSecret
-	cfg.Storage.S3.AccessKeySecret = probeSecret
+	cfg.Storage.S3.AccessKey = probeSecret
+	cfg.Storage.S3.SecretKey = probeSecret
 
 	for name, rendered := range map[string]Config{
 		"Redacted": cfg.Redacted(),
@@ -365,10 +365,10 @@ func valueAt(cfg Config, key string) string {
 		return cfg.Mailer.SMTPPassword
 	case "otel.headers":
 		return strings.Join(slices.Sorted(maps.Values(cfg.OTEL.Headers)), ",")
-	case "storage.s3.access_key_id":
-		return cfg.Storage.S3.AccessKeyID
-	case "storage.s3.access_key_secret":
-		return cfg.Storage.S3.AccessKeySecret
+	case "storage.s3.access_key":
+		return cfg.Storage.S3.AccessKey
+	case "storage.s3.secret_key":
+		return cfg.Storage.S3.SecretKey
 	default:
 		return ""
 	}
@@ -450,8 +450,8 @@ func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
 			"STORAGE_S3_BUCKET_NAME=devbucket",
 			"STORAGE_S3_ENDPOINT_URL=http://localhost:9100",
 			"STORAGE_S3_REGION=us-east-1",
-			"STORAGE_S3_ACCESS_KEY_ID=s3admin",
-			"STORAGE_S3_ACCESS_KEY_SECRET=s3passw0rd",
+			"STORAGE_S3_ACCESS_KEY=s3admin",
+			"STORAGE_S3_SECRET_KEY=s3passw0rd",
 		},
 	})
 	require.NoError(t, err)
@@ -464,6 +464,6 @@ func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
 	assert.Equal(t, "devbucket", cfg.Storage.S3.BucketName)
 	assert.Equal(t, "http://localhost:9100", cfg.Storage.S3.EndpointURL)
 	assert.Equal(t, "us-east-1", cfg.Storage.S3.Region)
-	assert.Equal(t, "s3admin", cfg.Storage.S3.AccessKeyID)
-	assert.Equal(t, "s3passw0rd", cfg.Storage.S3.AccessKeySecret)
+	assert.Equal(t, "s3admin", cfg.Storage.S3.AccessKey)
+	assert.Equal(t, "s3passw0rd", cfg.Storage.S3.SecretKey)
 }

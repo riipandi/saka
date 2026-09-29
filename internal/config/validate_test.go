@@ -392,8 +392,8 @@ func TestValidationRequiresTheS3SettingsWhenTheDriverIsS3(t *testing.T) {
 
 	for _, key := range []string{
 		"storage.s3.bucket_name",
-		"storage.s3.access_key_id",
-		"storage.s3.access_key_secret",
+		"storage.s3.access_key",
+		"storage.s3.secret_key",
 	} {
 		assert.Contains(t, err.Error(), key)
 	}
@@ -412,7 +412,7 @@ func TestValidationFallsBackToARegionTheClientWillAccept(t *testing.T) {
 			"storage": {"driver": "s3",
 				"s3": {"bucket_name": "devbucket",
 					"region": "env:STORAGE_S3_REGION",
-					"access_key_id": "s3admin", "access_key_secret": "s3passw0rd"}}
+					"access_key": "s3admin", "secret_key": "s3passw0rd"}}
 		}`),
 		Environ: baseEnv(),
 	})
@@ -422,7 +422,7 @@ func TestValidationFallsBackToARegionTheClientWillAccept(t *testing.T) {
 	// and gave it no value, which the client would reject at request time.
 	err = resolveFile(t, `"storage": {"driver": "s3",
 		"s3": {"bucket_name": "b", "region": "",
-			"access_key_id": "k", "access_key_secret": "s"}}`)
+			"access_key": "k", "secret_key": "s"}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "storage.s3.region")
 }
@@ -437,20 +437,20 @@ func TestValidationNamesTheUnsetS3Variable(t *testing.T) {
 			"storage": {"driver": "s3",
 				"s3": {"bucket_name": "env:STORAGE_S3_BUCKET_NAME",
 					"region": "us-east-1",
-					"access_key_id": "env:STORAGE_S3_ACCESS_KEY_ID",
-					"access_key_secret": "env:STORAGE_S3_ACCESS_KEY_SECRET"}}
+					"access_key": "env:STORAGE_S3_ACCESS_KEY",
+					"secret_key": "env:STORAGE_S3_SECRET_KEY"}}
 		}`),
 		Environ: baseEnv(),
 	})
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "STORAGE_S3_BUCKET_NAME variable is not set")
-	assert.Contains(t, err.Error(), "STORAGE_S3_ACCESS_KEY_ID variable is not set")
+	assert.Contains(t, err.Error(), "STORAGE_S3_ACCESS_KEY variable is not set")
 }
 
 func TestValidationAcceptsAnS3Deployment(t *testing.T) {
 	err := resolveFile(t, `"storage": {"driver": "s3",
 		"s3": {"bucket_name": "devbucket", "region": "us-east-1",
-			"access_key_id": "s3admin", "access_key_secret": "s3passw0rd"}}`)
+			"access_key": "s3admin", "secret_key": "s3passw0rd"}}`)
 	assert.NoError(t, err)
 }
 
@@ -459,7 +459,7 @@ func TestValidationAcceptsAnAWSStyleDeploymentWithoutAnEndpoint(t *testing.T) {
 	// complete configuration, not a missing one.
 	err := resolveFile(t, `"storage": {"driver": "s3",
 		"s3": {"bucket_name": "devbucket", "region": "eu-west-1",
-			"access_key_id": "AKIAEXAMPLE", "access_key_secret": "s3passw0rd",
+			"access_key": "AKIAEXAMPLE", "secret_key": "s3passw0rd",
 			"force_path_style": false}}`)
 	assert.NoError(t, err)
 }
@@ -467,7 +467,7 @@ func TestValidationAcceptsAnAWSStyleDeploymentWithoutAnEndpoint(t *testing.T) {
 func TestValidationRejectsAnS3EndpointThatIsNotAURL(t *testing.T) {
 	err := resolveFile(t, `"storage": {"driver": "s3",
 		"s3": {"bucket_name": "b", "region": "us-east-1",
-			"access_key_id": "k", "access_key_secret": "s",
+			"access_key": "k", "secret_key": "s",
 			"endpoint_url": "localhost:9100"}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "storage.s3.endpoint_url")
@@ -480,7 +480,7 @@ func TestValidationHoldsTheSignedURLLifetimeInsideSevenDays(t *testing.T) {
 	for _, seconds := range []int{-1, 0, 604801} {
 		body := `"storage": {"driver": "s3",
 			"s3": {"bucket_name": "b", "region": "us-east-1",
-				"access_key_id": "k", "access_key_secret": "s",
+				"access_key": "k", "secret_key": "s",
 				"signed_url_expires": ` + strconv.Itoa(seconds) + `}}`
 		err := resolveFile(t, body)
 		require.ErrorIs(t, err, config.ErrInvalid, "signed_url_expires=%d", seconds)
@@ -491,7 +491,7 @@ func TestValidationHoldsTheSignedURLLifetimeInsideSevenDays(t *testing.T) {
 	for _, seconds := range []int{1, 3600, 604800} {
 		body := `"storage": {"driver": "s3",
 			"s3": {"bucket_name": "b", "region": "us-east-1",
-				"access_key_id": "k", "access_key_secret": "s",
+				"access_key": "k", "secret_key": "s",
 				"signed_url_expires": ` + strconv.Itoa(seconds) + `}}`
 		assert.NoError(t, resolveFile(t, body), "signed_url_expires=%d", seconds)
 	}
@@ -725,15 +725,15 @@ func TestRedactedLeavesTheLogTargetsAlone(t *testing.T) {
 
 func TestRedactedHidesTheS3Credentials(t *testing.T) {
 	cfg := config.Default()
-	cfg.Storage.S3.AccessKeyID = "AKIAIOSFODNN7EXAMPLE"
-	cfg.Storage.S3.AccessKeySecret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	cfg.Storage.S3.AccessKey = "AKIAIOSFODNN7EXAMPLE"
+	cfg.Storage.S3.SecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
 	for name, rendered := range map[string]config.Config{
 		"Redacted": cfg.Redacted(),
 		"Masked":   cfg.Masked(),
 	} {
-		assert.NotContains(t, rendered.Storage.S3.AccessKeyID, "AKIAIOSFODNN7EXAMPLE", name)
-		assert.NotContains(t, rendered.Storage.S3.AccessKeySecret, "wJalrXUtnFEMI", name)
+		assert.NotContains(t, rendered.Storage.S3.AccessKey, "AKIAIOSFODNN7EXAMPLE", name)
+		assert.NotContains(t, rendered.Storage.S3.SecretKey, "wJalrXUtnFEMI", name)
 	}
 	assert.NotContains(t, cfg.String(), "wJalrXUtnFEMI")
 

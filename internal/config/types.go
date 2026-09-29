@@ -623,10 +623,10 @@ type Watch struct {
 // style, and the lifetime of a signed link. A common prefix on every one of them
 // would be noise the nesting already carries.
 type S3 struct {
-	// AccessKeyID and AccessKeySecret authenticate every request. Both are
-	// secrets, so Redacted hides them and Sample writes them as directives.
-	AccessKeyID     string `koanf:"access_key_id" json:"access_key_id"`
-	AccessKeySecret string `koanf:"access_key_secret" json:"access_key_secret"`
+	// AccessKey and SecretKey authenticate every request. Both are secrets,
+	// so Redacted hides them and Sample writes them as directives.
+	AccessKey string `koanf:"access_key" json:"access_key"`
+	SecretKey string `koanf:"secret_key" json:"secret_key"`
 	// BucketName is the bucket objects are written to.
 	BucketName string `koanf:"bucket_name" json:"bucket_name"`
 	// EndpointURL is the base URL of a service other than AWS, such as

@@ -35,7 +35,7 @@ services:
       ZO_ROOT_USER_PASSWORD: '${OPENOBSERVE_ROOT_PASSWORD:-@DMin123}'
       ZO_ROOT_USER_TOKEN: '${OPENOBSERVE_ROOT_USER_TOKEN:-dummy}'
       ZO_S3_ACCESS_KEY: 's3admin'
-      ZO_S3_BUCKET_NAME: 'devbucket'
+      ZO_S3_BUCKET_NAME: 'otelbucket'
       ZO_S3_BUCKET_PREFIX: 'openobserve/'
       ZO_S3_PROVIDER: 'minio'
       ZO_S3_REGION_NAME: 'auto'

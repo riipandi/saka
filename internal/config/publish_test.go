@@ -23,8 +23,8 @@ func plantedConfig() Config {
 	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/pocketid"
 	cfg.KVStore.URL = "redis://:hunter2@cache.example.com:6379/2"
 	cfg.Mailer.SMTPPassword = planted
-	cfg.Storage.S3.AccessKeyID = planted
-	cfg.Storage.S3.AccessKeySecret = planted
+	cfg.Storage.S3.AccessKey = planted
+	cfg.Storage.S3.SecretKey = planted
 	cfg.OTEL.Headers = map[string]string{"authorization": planted}
 	return cfg
 }
@@ -55,7 +55,7 @@ func TestTheFullScopeRedactsEverySecret(t *testing.T) {
 	// Nothing planted may survive, and every secret slot the document
 	// carries is the placeholder.
 	assert.NotContains(t, string(document), planted)
-	for _, key := range []string{"secret_key", "smtp_password", "access_key_secret"} {
+	for _, key := range []string{"secret_key", "smtp_password", "secret_key"} {
 		assert.Contains(t, string(document), `"`+key+`":"[redacted]"`, key)
 	}
 

@@ -30,8 +30,8 @@ var secretKeys = []string{
 	"kvstore.url",
 	"mailer.smtp_password",
 	"otel.headers",
-	"storage.s3.access_key_id",
-	"storage.s3.access_key_secret",
+	"storage.s3.access_key",
+	"storage.s3.secret_key",
 }
 
 // omittedKeys stay on Config and keep the built-in default, but a generated

@@ -35,7 +35,7 @@ func NewS3(cfg config.S3) (*S3, error) {
 	opts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.Region),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			cfg.AccessKeyID, cfg.AccessKeySecret,
+			cfg.AccessKey, cfg.SecretKey,
 			"", // session token: a long-lived deployment key has none
 		)),
 	}

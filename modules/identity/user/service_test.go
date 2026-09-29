@@ -787,13 +787,13 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	pool := migratedPool(t)
 	backend := testutils.StartMinIO(t.Context(), t)
 	store, err := storage.NewS3(config.S3{
-		AccessKeyID:     backend.AccessKey,
-		AccessKeySecret: backend.Secret,
-		BucketName:      "tango-user-test",
-		EndpointURL:     backend.Endpoint,
-		ForcePathStyle:  true,
-		Region:          "us-east-1",
-		PathPrefix:      "tango-user-test/",
+		AccessKey:      backend.AccessKey,
+		SecretKey:      backend.Secret,
+		BucketName:     "tango-user-test",
+		EndpointURL:    backend.Endpoint,
+		ForcePathStyle: true,
+		Region:         "us-east-1",
+		PathPrefix:     "tango-user-test/",
 	})
 	require.NoError(t, err)
 	// The shared container starts empty: the bucket is this test's to make,
