@@ -49,8 +49,8 @@ func clientCredentialsProvider(t *testing.T, pool *revokePool) http.Handler {
 	p, err := provider.New(provider.Config{
 		Issuer: "https://tango.example",
 		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
-			document, err := json.Marshal(keys)
-			require.NoError(t, err)
+			document, docErr := json.Marshal(keys)
+			require.NoError(t, docErr)
 			var set goidc.JSONWebKeySet
 			require.NoError(t, json.Unmarshal(document, &set))
 			return set, nil

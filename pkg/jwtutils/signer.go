@@ -170,12 +170,12 @@ func (s *Signer[T]) Sign(claims T, std Standard) (string, error) {
 	// verifier reads it before it reads any claim.
 	if s.typ != "" {
 		headers := jws.NewHeaders()
-		if err := headers.Set(jws.TypeKey, s.typ); err != nil {
-			return "", err
+		if headersErr := headers.Set(jws.TypeKey, s.typ); headersErr != nil {
+			return "", headersErr
 		}
-		signed, err := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key, jws.WithProtectedHeaders(headers)))
-		if err != nil {
-			return "", err
+		signed, signErr := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key, jws.WithProtectedHeaders(headers)))
+		if signErr != nil {
+			return "", signErr
 		}
 		return string(signed), nil
 	}

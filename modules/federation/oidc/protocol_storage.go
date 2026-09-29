@@ -157,8 +157,11 @@ func hashToken(value string) string {
 }
 
 // grantStore is the goidc.GrantManager and the two lookups the code and
-// refresh grants resolve by. The grant's own tokens are stripped from the
-// stored document — the pointer rows are their only database presence.
+// refresh grants resolve by. The grant document keeps the live refresh
+// token — the token endpoint returns it on the authorization-code
+// exchange and every rotation — while the pointer rows carry only its
+// hash; the authorization code is stripped, its one-time redemption is
+// the pointer row's whole job.
 type grantStore struct {
 	protocolStore
 }
@@ -172,10 +175,22 @@ var ErrGrantConcurrentlyModified = errors.New("oidc: the grant changed while thi
 func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 	stored := *grant
 	stored.AuthCode = ""
-	stored.RefreshToken = ""
 	data, marshalErr := json.Marshal(&stored)
 	if marshalErr != nil {
 		return marshalErr
+	}
+
+	// A rotation retires the pointer the request loaded: the presented
+	// token's row goes away as the replacement lands, so the retired
+	// token redeems nothing and a replay finds not-found.
+	if rotations := refreshRotationsFrom(ctx); rotations != nil && grant.RefreshToken != "" {
+		for _, retired := range rotations.retired() {
+			if retired != hashToken(grant.RefreshToken) {
+				if err := s.delete(ctx, sessionKindRefresh, retired); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	// A request that armed the compare-and-swap and has already read
@@ -258,7 +273,19 @@ func (s grantStore) grantByPointer(ctx context.Context, kind, presented string) 
 	if err != nil {
 		return nil, err
 	}
-	return s.Grant(ctx, pointer.GrantID)
+	grant, err := s.Grant(ctx, pointer.GrantID)
+	if err != nil {
+		return nil, err
+	}
+	// A refresh-token lookup names the pointer its rotation retires: the
+	// save that swaps the token in deletes this one, so the retired
+	// token answers not-found and a replayed one finds no row.
+	if kind == sessionKindRefresh {
+		if rotations := refreshRotationsFrom(ctx); rotations != nil {
+			rotations.remember(hashToken(presented))
+		}
+	}
+	return grant, nil
 }
 
 func (s grantStore) GrantByAuthCode(ctx context.Context, code string) (*goidc.Grant, error) {

@@ -44,6 +44,32 @@ func withGrantSnapshotCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, grantSnapshotsKey{}, &grantSnapshots{docs: map[string][]byte{}})
 }
 
+// refreshRotations is one request's record of the refresh-token pointers
+// it loaded — the rows a rotation retires when the replacement lands.
+type refreshRotations struct {
+	mu   sync.Mutex
+	keys []string
+}
+
+func (rr *refreshRotations) remember(hash string) {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	rr.keys = append(rr.keys, hash)
+}
+
+func (rr *refreshRotations) retired() []string {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	return append([]string(nil), rr.keys...)
+}
+
+type refreshRotationsKey struct{}
+
+func refreshRotationsFrom(ctx context.Context) *refreshRotations {
+	rotations, _ := ctx.Value(refreshRotationsKey{}).(*refreshRotations)
+	return rotations
+}
+
 func grantSnapshotsFrom(ctx context.Context) *grantSnapshots {
 	snapshots, _ := ctx.Value(grantSnapshotsKey{}).(*grantSnapshots)
 	return snapshots
@@ -54,6 +80,8 @@ func grantSnapshotsFrom(ctx context.Context) *grantSnapshots {
 // planted here reaches the store adapters the handler calls into.
 func grantSnapshotMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r.WithContext(withGrantSnapshotCache(r.Context())))
+		ctx := withGrantSnapshotCache(r.Context())
+		ctx = context.WithValue(ctx, refreshRotationsKey{}, &refreshRotations{})
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

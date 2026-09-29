@@ -249,29 +249,9 @@ CREATE TABLE IF NOT EXISTS public.oauth2_jtis (
 
 CREATE INDEX IF NOT EXISTS idx_oauth2_jtis_expires_at ON public.oauth2_jtis (expires_at);
 
--- --------------------------------------------------------
--- Table: public.interaction_sessions (OIDC login/consent flow state)
--- --------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS public.interaction_sessions (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    consent_required BOOLEAN NOT NULL DEFAULT FALSE,
-    reauthentication_required BOOLEAN NOT NULL DEFAULT FALSE,
-    authentication_required BOOLEAN NOT NULL DEFAULT FALSE,
-    account_selection_required BOOLEAN NOT NULL DEFAULT FALSE,
-    scopes JSONB NOT NULL DEFAULT '[]',
-    client_id TEXT NOT NULL,
-    user_id UUID,
-    requested_at TIMESTAMPTZ NOT NULL,
-    reauthenticated_at TIMESTAMPTZ,
-    parameters JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (client_id) REFERENCES public.oidc_clients(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
-) USING heap;
-
-CREATE INDEX IF NOT EXISTS idx_interaction_sessions_client_id ON public.interaction_sessions (client_id);
-CREATE INDEX IF NOT EXISTS idx_interaction_sessions_user_id ON public.interaction_sessions (user_id);
+-- The protocol's login/consent state lives in oauth2_sessions (one kind
+-- per manager pointer); the historical interaction_sessions draft never
+-- shipped and no code claims it.
 
 -- --------------------------------------------------------
 -- Table: public.scim_service_providers
@@ -299,8 +279,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_scim_providers_client ON public.scim_servi
 DROP TRIGGER IF EXISTS trg_jwks_updated_at ON public.jwks;
 
 DROP INDEX IF EXISTS idx_scim_providers_client;
-DROP INDEX IF EXISTS idx_interaction_sessions_client_id;
-DROP INDEX IF EXISTS idx_interaction_sessions_user_id;
 DROP INDEX IF EXISTS idx_oauth2_jtis_expires_at;
 DROP INDEX IF EXISTS idx_oauth2_sessions_client_subject;
 DROP INDEX IF EXISTS idx_oauth2_sessions_expires_at;
@@ -320,7 +298,6 @@ DROP INDEX IF EXISTS idx_jwks_algorithm;
 DROP INDEX IF EXISTS idx_jwks_active;
 
 DROP TABLE IF EXISTS public.scim_service_providers;
-DROP TABLE IF EXISTS public.interaction_sessions;
 DROP TABLE IF EXISTS public.oauth2_jtis;
 DROP TABLE IF EXISTS public.oauth2_sessions;
 DROP TABLE IF EXISTS public.oidc_device_codes;

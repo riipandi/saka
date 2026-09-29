@@ -60,6 +60,10 @@ const (
 	// it pushed.
 	protocolPARLifetimeSecs = 300
 
+	// protocolAuthCodeLifetimeSecs is how long an authorization code
+	// stays redeemable — one exchange, inside a minute.
+	protocolAuthCodeLifetimeSecs = 60
+
 	// clientCredentialsLifetimeSecs is the window a machine-to-machine
 	// access token lives for: shorter than a user session's, because the
 	// client can mint a successor with its credential whenever it needs.
@@ -141,6 +145,9 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
 		},
 			provider.WithAuthPolicies(signInPolicy(service), interactionPolicy(service)),
+			// The code's window is pinned: the grant document records the
+			// deadline and the token endpoint refuses an expired one.
+			provider.WithAuthCodeLifetime(protocolAuthCodeLifetimeSecs),
 			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256, goidc.CodeChallengeMethodPlain},
 				provider.WithPKCERequired()),
 			// Third-party initiated login: the authorization response carries

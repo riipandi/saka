@@ -381,6 +381,7 @@ var RestRules = []RestEntry{
 	// without one answers the bundled default by redirect.
 	{Method: http.MethodGet, Pattern: "/.well-known/jwks.json", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/.well-known/openid-configuration", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/.well-known/oauth-authorization-server", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/api/users/{id}/profile-picture.png", Rule: Public},
 
 	// The `/me` writes come before the `/{id}` write: the table is matched
