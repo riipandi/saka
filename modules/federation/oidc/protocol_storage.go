@@ -78,17 +78,50 @@ func (st protocolStore) savePointer(ctx context.Context, kind, hash, clientID st
 // load reads one object row and renders it onto the value. An unknown key
 // is goidc.ErrNotFound, the refusal the managers' contract names.
 func (st protocolStore) load(ctx context.Context, kind, key string, value any) error {
+	data, err := st.loadDocument(ctx, kind, key)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, value)
+}
+
+// loadDocument reads one object row's raw document. The bytes are what a
+// compare-and-swap save expects the row to still hold.
+func (st protocolStore) loadDocument(ctx context.Context, kind, key string) ([]byte, error) {
 	var data []byte
 	err := st.pool.QueryRow(ctx,
 		`SELECT request_data FROM public.oauth2_sessions WHERE kind = $1 AND key = $2 AND active`,
 		kind, key).Scan(&data)
 	if err != nil {
 		if errors.Is(err, datastore.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			return goidc.ErrNotFound
+			return nil, goidc.ErrNotFound
 		}
-		return err
+		return nil, err
 	}
-	return json.Unmarshal(data, value)
+	return data, nil
+}
+
+// saveCAS rewrites one row only while the row still holds the document
+// the caller read. Zero rows affected means another request wrote the
+// row in between — the caller's state is stale and the save is refused.
+func (st protocolStore) saveCAS(ctx context.Context, kind, key, clientID string, expiresAt int, data, expected []byte) (bool, error) {
+	var expires any
+	if expiresAt != 0 {
+		expires = time.Unix(int64(expiresAt), 0).UTC()
+	}
+	var client any
+	if clientID != "" {
+		client = clientID
+	}
+	tag, err := st.pool.Exec(ctx,
+		`UPDATE public.oauth2_sessions
+		 SET request_data = $1, client_id = $2, expires_at = $3
+		 WHERE kind = $4 AND key = $5 AND request_data = $6`,
+		data, client, expires, kind, key, expected)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // loadPointer reads a pointer row and answers the row it names.
@@ -116,11 +149,41 @@ type grantStore struct {
 	protocolStore
 }
 
+// ErrGrantConcurrentlyModified is a save whose request read a grant
+// document that another request has since rewritten. For a one-time
+// grant that is the second redemption losing the race — the code is
+// spent, no second token may be minted.
+var ErrGrantConcurrentlyModified = errors.New("oidc: the grant changed while this request was working on it")
+
 func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 	stored := *grant
 	stored.AuthCode = ""
 	stored.RefreshToken = ""
-	if err := s.save(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, &stored); err != nil {
+	data, marshalErr := json.Marshal(&stored)
+	if marshalErr != nil {
+		return marshalErr
+	}
+
+	// A request that armed the compare-and-swap and has already read
+	// this grant saves against the document it read: the write lands
+	// only while the row still holds it, which is what makes a one-time
+	// grant's consumption atomic. A grant the request created itself
+	// carries no snapshot — the row is its own, the plain write holds.
+	if snapshots := grantSnapshotsFrom(ctx); snapshots != nil {
+		expected, known := snapshots.expected(grant.ID)
+		if known {
+			saved, err := s.saveCAS(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, data, expected)
+			if err != nil {
+				return err
+			}
+			if !saved {
+				return ErrGrantConcurrentlyModified
+			}
+			snapshots.remember(grant.ID, data)
+		} else if err := s.save(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, &stored); err != nil {
+			return err
+		}
+	} else if err := s.save(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, &stored); err != nil {
 		return err
 	}
 	// The pointers track the tokens as they are issued; a consumed code
@@ -160,9 +223,18 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 }
 
 func (s grantStore) Grant(ctx context.Context, id string) (*goidc.Grant, error) {
-	var grant goidc.Grant
-	if err := s.load(ctx, sessionKindGrant, id, &grant); err != nil {
+	data, err := s.loadDocument(ctx, sessionKindGrant, id)
+	if err != nil {
 		return nil, err
+	}
+	var grant goidc.Grant
+	if err := json.Unmarshal(data, &grant); err != nil {
+		return nil, err
+	}
+	// The document as read is the snapshot the request's own save will
+	// demand — the read half of the compare-and-swap.
+	if snapshots := grantSnapshotsFrom(ctx); snapshots != nil {
+		snapshots.remember(id, data)
 	}
 	return &grant, nil
 }

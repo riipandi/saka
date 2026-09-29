@@ -187,11 +187,16 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 func (p *Protocol) Mount(r chi.Router) {
 	handler := p.provider.Handler()
 	flatten := flattenBasicAuth()
+	// The grant snapshot middleware arms the compare-and-swap a one-time
+	// grant's consumption needs: on these routes the library reads a
+	// grant and saves it back apart, and the save must find the row
+	// holding the document the request read.
+	snapshots := grantSnapshotMiddleware
 	r.Handle(protocolPrefix+protocolAuthorizeEndpoint, handler)
 	r.Handle(protocolPrefix+protocolAuthorizeEndpoint+"/*", handler)
-	r.Handle(protocolPrefix+protocolTokenEndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolTokenEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolUserInfoEndpoint, handler)
-	r.Handle(protocolPrefix+protocolIntrospectEndpoint, flatten(handler))
+	r.Handle(protocolPrefix+protocolIntrospectEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolPAREndpoint, flatten(handler))
 	r.Handle(protocolPrefix+protocolEndSessionEndpoint, handler)
 	// The device verification endpoint serves the browser's entry and
