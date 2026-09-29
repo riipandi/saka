@@ -16,7 +16,7 @@ x-common: &common
 include:
   - ./compose-dev.yaml
   - ./compose-sre.yaml
-# - ./compose-mock.yaml
+  - ./compose-mock.yaml
 
 # services:
 #   tango:
