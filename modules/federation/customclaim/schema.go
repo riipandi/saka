@@ -100,7 +100,32 @@ var (
 	// surface, or the reverse. The two surfaces answer the same table, and
 	// each refuses what belongs to the other.
 	ErrClaimWrongSubject = errors.New("customclaim: the claim belongs to the other subject kind")
+
+	// ErrReservedClaim is a create or update whose key collides with a
+	// claim the protocol itself mints. A custom claim must not redefine
+	// what the tokens already carry, so the write is refused outright.
+	ErrReservedClaim = errors.New("customclaim: the key is reserved by the protocol")
 )
+
+// reservedClaimKeys are the claim names the tokens own: the registered JWT
+// claim names, the standard OIDC profile claims tango emits, and the
+// internal token-type discriminator. The comparison is exact — JSON object
+// keys are case-sensitive, so a differently cased variant cannot collide
+// with a protected claim and is deliberately not blocked.
+var reservedClaimKeys = map[string]struct{}{
+	"sub": {}, "iss": {}, "aud": {}, "exp": {}, "iat": {}, "nbf": {}, "jti": {},
+	"auth_time": {}, "nonce": {}, "acr": {}, "amr": {}, "azp": {}, "client_id": {},
+	"given_name": {}, "family_name": {}, "name": {}, "email": {}, "email_verified": {},
+	"preferred_username": {}, "display_name": {}, "groups": {},
+	"tango:token_type": {},
+}
+
+// IsReservedClaimKey answers whether a key may not be written as a custom
+// claim because the protocol mints it itself.
+func IsReservedClaimKey(key string) bool {
+	_, reserved := reservedClaimKeys[key]
+	return reserved
+}
 
 // ClaimSchema is one row of ClaimTable. Exactly one of UserID and
 // GroupID is set — the schema's check constraint holds the pair — and the

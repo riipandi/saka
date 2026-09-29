@@ -104,6 +104,9 @@ func (s *Service) ListByGroup(ctx context.Context, wireGroupID string) ([]ClaimV
 
 // CreateByUser hangs a claim on an account.
 func (s *Service) CreateByUser(ctx context.Context, wireUserID, key, value string) (ClaimView, error) {
+	if IsReservedClaimKey(key) {
+		return ClaimView{}, ErrReservedClaim
+	}
 	userID, err := userUUID(wireUserID)
 	if err != nil {
 		return ClaimView{}, ErrSubjectNotFound
@@ -132,6 +135,9 @@ func (s *Service) CreateByUser(ctx context.Context, wireUserID, key, value strin
 
 // CreateByGroup hangs a claim on a group.
 func (s *Service) CreateByGroup(ctx context.Context, wireGroupID, key, value string) (ClaimView, error) {
+	if IsReservedClaimKey(key) {
+		return ClaimView{}, ErrReservedClaim
+	}
 	groupID, err := groupUUID(wireGroupID)
 	if err != nil {
 		return ClaimView{}, ErrSubjectNotFound
@@ -200,6 +206,9 @@ func (k subjectKind) holds(row ClaimSchema) bool {
 }
 
 func (s *Service) update(ctx context.Context, wireClaimID, key, value string, kind subjectKind) (ClaimView, error) {
+	if IsReservedClaimKey(key) {
+		return ClaimView{}, ErrReservedClaim
+	}
 	claimID, err := parseClaimID(wireClaimID)
 	if err != nil {
 		return ClaimView{}, ErrClaimNotFound

@@ -21,6 +21,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the named subject does not exist"))
 	case errors.Is(err, ErrClaimWrongSubject):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the claim belongs to the other subject kind"))
+	case errors.Is(err, ErrReservedClaim):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the claim key is reserved by the protocol and cannot be used as a custom claim"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("custom claim operation failed"))
 	}

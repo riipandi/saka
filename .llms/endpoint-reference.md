@@ -301,6 +301,17 @@ string or a JSON document — the tokens carry it as the document it names —
 and the identifiers travel as TypeIDs (`cclm_…`). The user and group
 surfaces answer the same table, and each refuses a row that belongs to the
 other subject kind, so a claim cannot silently move between subjects.
+**Reserved keys** (settled 2026-09-29, mirroring Pocket ID v2.14.0's
+`isReservedClaim` plus tango's own discriminator): the registered JWT claim
+names (`sub`, `iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `auth_time`,
+`nonce`, `acr`, `amr`, `azp`, `client_id`), the standard profile claims
+tango emits (`given_name`, `family_name`, `name`, `display_name`,
+`preferred_username`, `email`, `email_verified`, `groups`), and
+`tango:token_type` are refused on create and update with `invalid_argument`.
+The comparison is exact — a differently cased variant cannot collide with a
+protected claim and is not blocked. At issuance the merge drops protected
+keys a second time, so legacy rows predating the rule cannot overwrite
+`sub`, `iss`, `aud`, the time claims, or the token-kind marker.
 
 Upstream replaces a subject's whole claim set in one PUT; tango addresses
 each row (create, update, delete by identifier) — the deviation
@@ -312,12 +323,12 @@ renders.
 | ------ | --------- | -------------------- | ------ | -------- |
 | POST | `/rpc/tango.federation.v1.CustomClaimService/Suggest` | Get custom claim suggestions | done — admin; the keys in use, ordered by how often they carry | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
 | POST | `/rpc/tango.federation.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done — admin; duplicate key on the subject is `already_exists`, an unknown account is `failed_precondition` | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done — admin; full replace of key and value; a group claim is refused | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done — admin; duplicate key on the subject is `already_exists`, an unknown account is `failed_precondition`, a reserved key (registered JWT names, the standard profile claims, `tango:token_type`) is `invalid_argument` | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done — admin; full replace of key and value; a group claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
 | POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | done — admin; idempotent not-found | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
 | POST | `/rpc/tango.federation.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done — admin; the claim every member's tokens carry | `modules/federation/customclaim` (service tests) |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done — admin; a user claim is refused | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done — admin; the claim every member's tokens carry; a reserved key is `invalid_argument` | `modules/federation/customclaim` (service tests), `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done — admin; a user claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
 | POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | done — admin | `modules/federation/customclaim` (service tests) |
 
 Audit events: `custom_claim_created`, `custom_claim_updated`,

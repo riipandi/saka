@@ -138,6 +138,9 @@ func (s *Service) mergeCustomClaims(ctx context.Context, profile map[string]any,
 	}
 
 	for _, claim := range extra {
+		if _, protected := protectedClaimKeys[claim.Key]; protected {
+			continue
+		}
 		var jsonValue any
 		if err := json.Unmarshal([]byte(claim.Value), &jsonValue); err == nil {
 			profile[claim.Key] = jsonValue

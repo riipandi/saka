@@ -291,6 +291,23 @@ func protocolScopes() []goidc.Scope {
 // required and the subject rides every token regardless.
 var profileClaims = []string{"given_name", "family_name", "name", "display_name", "preferred_username", "picture", "email", "email_verified", "groups"}
 
+// protectedClaimKeys are the claims a custom claim must never replace:
+// the registered JWT claim names the library mints (it copies the claim
+// map over its own, so a collision would overwrite the token's subject,
+// issuer, audience, or times), the profile claims above, and the
+// internal token-type discriminator. Legacy rows carrying such a key are
+// silently dropped at issuance — the write side refuses them, this is
+// the second line of defense.
+var protectedClaimKeys = map[string]struct{}{
+	"sub": {}, "iss": {}, "aud": {}, "exp": {}, "iat": {}, "nbf": {}, "jti": {},
+	"auth_time": {}, "nonce": {}, "acr": {}, "amr": {}, "azp": {}, "client_id": {},
+	"at_hash": {}, "c_hash": {}, "s_hash": {},
+	"given_name": {}, "family_name": {}, "name": {}, "display_name": {},
+	"preferred_username": {}, "picture": {}, "email": {}, "email_verified": {},
+	"groups":           {},
+	"tango:token_type": {},
+}
+
 // idTokenClaims merges the account facts and the operator-defined claims
 // into an ID token at issuance. An account the directory no longer knows
 // names no claims — the grant fails closed downstream.
@@ -354,12 +371,16 @@ func subjectClaims(ctx context.Context, service *Service, claims ClaimSource, gr
 		if idErr == nil {
 			if own, err := claims.UserClaims(ctx, id); err == nil {
 				for _, claim := range own {
-					result[claim.Key] = claim.Value
+					if _, protected := protectedClaimKeys[claim.Key]; !protected {
+						result[claim.Key] = claim.Value
+					}
 				}
 			}
 			if groupClaims, err := claims.GroupClaims(ctx, groupIDs(view)); err == nil {
 				for _, claim := range groupClaims {
-					result[claim.Key] = claim.Value
+					if _, protected := protectedClaimKeys[claim.Key]; !protected {
+						result[claim.Key] = claim.Value
+					}
 				}
 			}
 		}
