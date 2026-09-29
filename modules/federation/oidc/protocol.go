@@ -36,6 +36,12 @@ const (
 	protocolUserInfoEndpoint   = "/userinfo"
 	protocolIntrospectEndpoint = "/introspect"
 	protocolRevokeEndpoint     = "/revoke"
+
+	// ScopeOfflineAccess is the wire word a relying party asks for when
+	// its refresh tokens must outlive a user session — the persistent
+	// access the OIDC name carries. The consent question names it, and
+	// only the authorization-code grant issues it.
+	ScopeOfflineAccess         = "offline_access"
 	protocolPAREndpoint        = "/par"
 	protocolEndSessionEndpoint = "/end-session"
 	protocolJWKSEndpoint       = "/.well-known/jwks.json"
@@ -147,6 +153,15 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			),
 		),
 		provider.WithRefreshTokenGrant(grantStore{protocolStore: stores}, provider.WithRefreshTokenRotation()),
+		// The refresh windows ride the settings, read at every issuance
+		// and rotation: the grant handler runs before the store saves a
+		// new grant, and the rotation path rewrites the row the same way
+		// the service's own expiry stamp does — a grant carrying
+		// offline_access rides the long window, the rest the standard
+		// one, and zero is the never-expiring token.
+		provider.WithGrantHandler(func(ctx context.Context, grantType goidc.GrantType, grant *goidc.Grant) error {
+			return stampRefreshWindow(ctx, service, grantType, grant)
+		}),
 		// The client-credentials grant is the machine-to-machine surface:
 		// the token names the client itself as its subject, the client's
 		// own allowed list judges the request, and the group restriction
@@ -235,6 +250,21 @@ func revocationPolicy() goidc.IsClientAllowedFunc {
 	return func(context.Context, *goidc.Client) bool {
 		return true
 	}
+}
+
+// stampRefreshWindow is the grant-handler body: the refresh window rides
+// the settings, read at every issuance and rotation, and the offline
+// scope picks the long window. Zero hours is the never-expiring token.
+func stampRefreshWindow(ctx context.Context, service *Service, grantType goidc.GrantType, grant *goidc.Grant) error {
+	if grantType != goidc.GrantAuthorizationCode && grantType != goidc.GrantRefreshToken {
+		return nil
+	}
+	if hours := service.refreshWindowHours(ctx, grant); hours > 0 {
+		grant.RefreshTokenExpiresAt = grant.CreatedAt + hours*3600
+	} else {
+		grant.RefreshTokenExpiresAt = 0
+	}
+	return nil
 }
 
 // Mount registers the protocol's paths on the router. The patterns name
@@ -356,12 +386,15 @@ func jwksFunc(keys *jwks.Service) goidc.JWKSFunc {
 	}
 }
 
-// protocolScopes are the scopes a relying party may ask for. Each is its
-// own word: a scope matches when it is named exactly, openid included —
-// the library calls the matcher for every requested word.
+// protocolScopes are the scopes a relying party may ask for. Each is
+// its own word: a scope matches when it is named exactly, openid
+// included — the library calls the matcher for every requested word.
+// offline_access is the persistent-access ask: the grant that carries
+// it receives the long refresh window, and the consent question
+// renders it as its own line.
 func protocolScopes() []goidc.Scope {
 	scopes := []goidc.Scope{}
-	for _, id := range []string{"openid", "profile", "email", "groups"} {
+	for _, id := range []string{"openid", "profile", "email", "groups", ScopeOfflineAccess} {
 		scoped := id
 		scopes = append(scopes, goidc.Scope{ID: scoped, Matches: func(requested string) bool {
 			return requested == scoped

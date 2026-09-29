@@ -71,6 +71,11 @@ type Service struct {
 	backchannelSource     BackchannelLogoutSource
 	backchannelSigner     LogoutTokenSigner
 	backchannelDispatcher BackchannelLogoutDispatcher
+
+	// refreshWindows is the runtime source the refresh windows read at
+	// every issuance and rotation. A nil source is the never-expiring
+	// token.
+	refreshWindows RefreshWindowSource
 }
 
 // ConsentRevocationSource is the runtime switch the end-session flow

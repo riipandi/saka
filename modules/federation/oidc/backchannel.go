@@ -6,11 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/luikyv/go-oidc/pkg/goidc"
 
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -34,6 +36,18 @@ const SettingOIDCBackchannelLogoutEnabled = backchannelLogoutSwitch
 type BackchannelLogoutSource interface {
 	// BackchannelLogoutEnabled answers the deployment's decision.
 	BackchannelLogoutEnabled(ctx context.Context) (bool, error)
+}
+
+// RefreshWindowSource is the runtime pair the refresh windows read: the
+// standard window a refresh token lives for, and the long one a grant
+// carrying offline_access rides. Both are hours; zero is the
+// never-expiring token. The settings feature backs it, read per
+// issuance and rotation.
+type RefreshWindowSource interface {
+	// RefreshTokenHours answers the standard window in hours.
+	RefreshTokenHours(ctx context.Context) (int, error)
+	// OfflineRefreshTokenHours answers the offline_access window.
+	OfflineRefreshTokenHours(ctx context.Context) (int, error)
 }
 
 // BackchannelLogoutDispatch is one delivery the dispatcher carries: the
@@ -81,6 +95,37 @@ func (s *Service) WithBackchannelLogoutSigner(signer LogoutTokenSigner) *Service
 func (s *Service) WithBackchannelLogoutDispatcher(dispatcher BackchannelLogoutDispatcher) *Service {
 	s.backchannelDispatcher = dispatcher
 	return s
+}
+
+// WithRefreshWindowSource wires the settings the refresh windows read at
+// every issuance and rotation. A nil source answers the library's zero —
+// the never-expiring token the historical behavior kept.
+func (s *Service) WithRefreshWindowSource(source RefreshWindowSource) *Service {
+	s.refreshWindows = source
+	return s
+}
+
+// refreshWindowHours answers the window a grant's refresh token rides:
+// the long one when the grant carries offline_access, the standard one
+// otherwise. A read error fails open to zero — the never-expiring token,
+// the historical behavior — with the warning naming the miss; a refresh
+// window is a convenience window, not a security boundary.
+func (s *Service) refreshWindowHours(ctx context.Context, grant *goidc.Grant) int {
+	if s.refreshWindows == nil {
+		return 0
+	}
+	scopes := strings.Fields(grant.Scopes)
+	read := s.refreshWindows.RefreshTokenHours
+	if slices.Contains(scopes, ScopeOfflineAccess) {
+		read = s.refreshWindows.OfflineRefreshTokenHours
+	}
+	hours, err := read(ctx)
+	if err != nil {
+		s.log.WarnContext(ctx, "oidc: the refresh window setting is unread; the token rides no expiry",
+			"error", err)
+		return 0
+	}
+	return hours
 }
 
 // dispatchBackchannelLogout delivers the logout token for one ended

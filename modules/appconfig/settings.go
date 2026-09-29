@@ -73,6 +73,15 @@ const (
 	// declare; on, the provider POSTs one to every client's registered
 	// backchannel_logout_uri when a signed-in session ends.
 	SettingOIDCBackchannelLogoutEnabled = "oidc.backchannel_logout_enabled"
+
+	// SettingOIDCRefreshTokenHours is the window an OIDC refresh token
+	// lives for, in hours. Zero restores the never-expiring token.
+	SettingOIDCRefreshTokenHours = "oidc.refresh_token_hours"
+
+	// SettingOIDCOfflineRefreshTokenHours is the window a refresh token
+	// issued for a grant carrying the offline_access scope lives for, in
+	// hours — the persistent-access answer the scope exists to name.
+	SettingOIDCOfflineRefreshTokenHours = "oidc.offline_refresh_token_hours"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -90,6 +99,16 @@ func Catalog() []SettingDef {
 			Key:         SettingOIDCBackchannelLogoutEnabled,
 			Default:     "false",
 			Description: "Whether the provider delivers back-channel logout tokens: a signed logout token POSTed to every client's registered backchannel_logout_uri when a signed-in session ends. Off, no delivery is ever minted.",
+		},
+		{
+			Key:         SettingOIDCRefreshTokenHours,
+			Default:     "336",
+			Description: "How many hours an OIDC refresh token lives for. Zero means the token never expires — the historical behavior. The window a grant rides is read fresh at every issuance and rotation, so a change lands on the next one.",
+		},
+		{
+			Key:         SettingOIDCOfflineRefreshTokenHours,
+			Default:     "720",
+			Description: "How many hours a refresh token lives for when its grant carries the offline_access scope — the persistent access the scope names. Zero means the token never expires.",
 		},
 	}
 }

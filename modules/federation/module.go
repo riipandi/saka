@@ -126,6 +126,12 @@ var Package = do.Package(
 			)).
 			WithBackchannelLogoutDispatcher(backchannelDispatchAdapter{
 				queue: do.MustInvoke[*queue.Client](i),
+			}).
+			// The refresh windows are settings reads: the standard window
+			// and the offline_access one land on the next issuance or
+			// rotation, never waiting for a restart.
+			WithRefreshWindowSource(refreshWindowAdapter{
+				settings: do.MustInvoke[*appconfig.Settings](i),
 			})
 		if users != nil {
 			service = service.WithUserDirectory(users)
@@ -254,6 +260,28 @@ func (a backchannelDispatchAdapter) DispatchBackchannelLogout(ctx context.Contex
 		return fmt.Errorf("federation: enqueue back-channel logout: %w", err)
 	}
 	return nil
+}
+
+// refreshWindowAdapter reads the two refresh windows from the settings
+// feature, the catalog keys the appconfig area owns.
+type refreshWindowAdapter struct {
+	settings *appconfig.Settings
+}
+
+func (a refreshWindowAdapter) RefreshTokenHours(ctx context.Context) (int, error) {
+	hours, err := a.settings.GetInt64(ctx, appconfig.SettingOIDCRefreshTokenHours)
+	if err != nil {
+		return 0, err
+	}
+	return int(hours), nil
+}
+
+func (a refreshWindowAdapter) OfflineRefreshTokenHours(ctx context.Context) (int, error) {
+	hours, err := a.settings.GetInt64(ctx, appconfig.SettingOIDCOfflineRefreshTokenHours)
+	if err != nil {
+		return 0, err
+	}
+	return int(hours), nil
 }
 
 func (a claimAdapter) UserClaims(ctx context.Context, userID uuid.UUID) ([]oidc.Claim, error) {

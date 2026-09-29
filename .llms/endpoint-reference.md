@@ -506,8 +506,17 @@ discriminator claim is minted: the hint's identity rides the JOSE type
 member instead — access tokens carry RFC 9068's `at+jwt` and ID tokens
 carry none, and the end-session policy refuses a hint whose member reads
 `at+jwt`. `tango:token_type` survives only as a reserved custom-claim
-key. Scopes are `openid`, `profile`, `email`, and
-`groups` (not `offline_access`). Claims: `sub` always; `profile` adds the
+key. Scopes are `openid`, `profile`, `email`,
+`groups`, and `offline_access` — the last one the persistent-access ask:
+the grant that carries it rides the long refresh window the
+`oidc.offline_refresh_token_hours` setting names (default 720 hours),
+the other grants ride `oidc.refresh_token_hours` (default 336 hours;
+zero on either is the never-expiring token the historical behavior
+kept), both settings read fresh at every issuance and rotation. The
+scope is consent-gated: the consent question names it like any other
+requested word, and the SPA's consent screen renders it distinctly.
+`TODO(frontend)`: the consent screen's offline_access line (persistent
+access wording). Claims: `sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
 exists; `groups` adds group names. **Group restriction is enforced server-side**

@@ -674,7 +674,14 @@ back-channel-logout events member, `aud` the client, `sub` the account,
 attempts. The enqueue rides the committed end of `EndSession`, a
 preparation failure is a logged loss and never a failed logout, and the
 whole feature rides the `oidc.backchannel_logout_enabled` setting,
-read per call.
+read per call. **The refresh windows ride settings too**: every grant's
+refresh token lives the `oidc.refresh_token_hours` window (zero: never
+expiring, the historical behavior), a grant carrying `offline_access`
+rides the `oidc.offline_refresh_token_hours` long one, and both are
+read at every issuance and rotation through the grant handler — an
+operator's change lands on the next issuance, never waiting for a
+restart, and an unreadable setting fails open to the never-expiring
+token.
 
 **The device grant (RFC 8628) and the prefix.** The provider registers
 its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no
