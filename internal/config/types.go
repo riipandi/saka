@@ -286,13 +286,6 @@ type OIDC struct {
 	// (a CIMD client) may materialize from. An empty list refuses CIMD
 	// entirely: no document is ever fetched.
 	CIMDURLAllowlist []string `koanf:"cimd_url_allowlist" json:"cimd_url_allowlist"`
-	// EndSessionRevokesConsent decides what a successful RP-initiated
-	// logout withdraws. Off (the default), it kills the account's grants
-	// and tokens for the client and keeps the authorized-client ledger, so
-	// the next sign-in skips consent. On, it withdraws the whole consent
-	// the way the account's own revoke procedure does, and the next sign-in
-	// asks for consent again.
-	EndSessionRevokesConsent bool `koanf:"end_session_revokes_consent" json:"end_session_revokes_consent"`
 }
 
 // OTEL holds the OpenTelemetry settings the three signals share, plus the

@@ -235,9 +235,8 @@ type PublishedQueue struct {
 // the CIMD allowlist is administrative, naming the origins the deployment
 // is willing to trust a metadata document from.
 type PublishedOIDC struct {
-	Enabled                  bool     `json:"enabled,omitzero"`
-	EndSessionRevokesConsent bool     `json:"end_session_revokes_consent,omitzero"`
-	CIMDURLAllowlist         []string `json:"cimd_url_allowlist,omitzero"`
+	Enabled          bool     `json:"enabled,omitzero"`
+	CIMDURLAllowlist []string `json:"cimd_url_allowlist,omitzero"`
 }
 
 // PublishedRateLimit is the rate_limit section.
@@ -428,9 +427,8 @@ func (c Config) Published(full bool) Published {
 		AnnouncementEmailEnabled:     c.Mailer.Notifications.AnnouncementEmailEnabled,
 	}
 	public.OIDC = PublishedOIDC{
-		Enabled:                  c.OIDC.Enabled,
-		EndSessionRevokesConsent: c.OIDC.EndSessionRevokesConsent,
-		CIMDURLAllowlist:         c.OIDC.CIMDURLAllowlist,
+		Enabled:          c.OIDC.Enabled,
+		CIMDURLAllowlist: c.OIDC.CIMDURLAllowlist,
 	}
 	public.OTEL = PublishedOTEL{
 		Endpoint:    c.OTEL.Endpoint,

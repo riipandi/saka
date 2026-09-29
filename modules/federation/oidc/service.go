@@ -59,10 +59,21 @@ type Service struct {
 	// relative URL, which a browser resolves against the host it reached.
 	baseURL string
 
-	// endSessionRevokesConsent decides what an RP-initiated logout
-	// withdraws: off, the grants and tokens die and the authorized-client
-	// ledger survives; on, the whole consent goes with them.
-	endSessionRevokesConsent bool
+	// consentRevocation is the runtime source of the end-session switch:
+	// read per call, so an operator's change lands without a restart. A
+	// nil source answers off.
+	consentRevocation ConsentRevocationSource
+}
+
+// ConsentRevocationSource is the runtime switch the end-session flow
+// reads: what a successful RP-initiated logout withdraws. Off, the grants
+// and tokens die and the authorized-client ledger survives; on, the whole
+// consent goes with them. The settings feature backs it — the switch is a
+// deployment decision an operator flips at runtime, not one a restart
+// owns — so a read error is answered at the flow, not by failing the run.
+type ConsentRevocationSource interface {
+	// EndSessionRevokesConsent answers the deployment's decision.
+	EndSessionRevokesConsent(ctx context.Context) (bool, error)
 }
 
 // NewService builds the service. The database writes run in one transaction
@@ -118,11 +129,11 @@ func (s *Service) WithBaseURL(baseURL string) *Service {
 	return s
 }
 
-// WithEndSessionRevokesConsent decides what an RP-initiated logout
-// withdraws. Off, the grants and tokens die and the authorized-client
-// ledger survives; on, the whole consent goes with them.
-func (s *Service) WithEndSessionRevokesConsent(revoke bool) *Service {
-	s.endSessionRevokesConsent = revoke
+// WithEndSessionRevokesConsentSource wires the runtime switch EndSession
+// reads: the settings-backed answer to what an RP-initiated logout
+// withdraws. A nil source answers off.
+func (s *Service) WithEndSessionRevokesConsentSource(source ConsentRevocationSource) *Service {
+	s.consentRevocation = source
 	return s
 }
 

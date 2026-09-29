@@ -650,11 +650,6 @@
                         { "$ref": "#/$defs/stringOrEnv" }
                     ],
                     "default": []
-                },
-                "end_session_revokes_consent": {
-                    "description": "What a successful RP-initiated logout withdraws. Off, the account's grants and tokens for the client die and the authorized-client ledger survives (the next sign-in skips consent). On, the whole consent is withdrawn and the next sign-in asks for consent again.",
-                    "anyOf": [{ "type": "boolean" }, { "$ref": "#/$defs/envDirective" }],
-                    "default": false
                 }
             }
         },

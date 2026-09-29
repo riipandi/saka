@@ -411,7 +411,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
-| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when `oidc.end_session_revokes_consent` is set), redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`), `internal/guard` (RestRules) |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when the `oidc.end_session_revokes_consent` setting is on), redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
 The protocol design notes below record implementation behavior for device flow,
@@ -522,8 +522,10 @@ names both) and the policy refuses a hint whose JOSE type member is
 `at+jwt` (an access token). A `post_logout_redirect_uri` that is not
 registered on the client is refused with `invalid_request`, never
 ignored. Success revokes the account's grants and tokens for the client
-in one transaction — the authorized-client ledger dies with them when
-`oidc.end_session_revokes_consent` is set, survives otherwise — records
+in one transaction — the authorized-client ledger dies with them when the
+`oidc.end_session_revokes_consent` setting is on, survives otherwise (the
+switch is a settings read per logout, so an operator's change lands
+without a restart) — records
 `oidc_session_ended`, and redirects to the registered URI with `state`
 when one was given, to the SPA root otherwise.
 

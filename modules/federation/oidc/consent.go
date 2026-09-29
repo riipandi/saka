@@ -220,12 +220,21 @@ func (s *Service) RevokeMyAuthorizedClient(ctx context.Context, userID, clientID
 
 // EndSession withdraws what an RP-initiated logout names: the grants the
 // account made to the client and every token riding them. The
-// authorized-client ledger survives unless the deployment opted into
-// revoking the whole consent — off, the client's next sign-in skips
-// consent; on, it asks again.
+// authorized-client ledger survives unless the
+// `oidc.end_session_revokes_consent` setting says otherwise — off, the
+// client's next sign-in skips consent; on, it asks again.
 func (s *Service) EndSession(ctx context.Context, userID, clientID string) error {
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if s.endSessionRevokesConsent {
+		// The switch is read per call, so an operator's change lands on
+		// the next logout without a restart. A read error answers off —
+		// the conservative side of the switch: the ledger survives, the
+		// next sign-in skips consent — and the warning names the miss.
+		revokes, err := s.endSessionRevokesConsent(ctx)
+		if err != nil {
+			s.log.WarnContext(ctx, "oidc: the end-session consent switch is unread; revoking the grants only",
+				"error", err)
+		}
+		if revokes {
 			if _, err := s.removeAuthorization(ctx, tx, userID, clientID); err != nil {
 				return err
 			}
@@ -242,6 +251,14 @@ func (s *Service) EndSession(ctx context.Context, userID, clientID string) error
 		})
 		return nil
 	})
+}
+
+// endSessionRevokesConsent answers the wired source, a nil one off.
+func (s *Service) endSessionRevokesConsent(ctx context.Context) (bool, error) {
+	if s.consentRevocation == nil {
+		return false, nil
+	}
+	return s.consentRevocation.EndSessionRevokesConsent(ctx)
 }
 
 // revokeGrants kills the grants one account holds for one client and every

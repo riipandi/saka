@@ -60,6 +60,15 @@ type SettingDef struct {
 	Description string
 }
 
+// Setting keys the features read. The catalog owns the full declaration;
+// these constants are the names a reader must not misspell.
+const (
+	// SettingOIDCEndSessionRevokesConsent decides what an RP-initiated
+	// logout withdraws: off, the grants and tokens die and the
+	// authorized-client ledger survives; on, the whole consent goes.
+	SettingOIDCEndSessionRevokesConsent = "oidc.end_session_revokes_consent"
+)
+
 // Catalog declares every setting this deployment knows. It is the contract
 // between the writers and the readers: a feature that wants a runtime value
 // names its key here, and every reader — helper or RPC — sees the same item
@@ -67,22 +76,9 @@ type SettingDef struct {
 func Catalog() []SettingDef {
 	return []SettingDef{
 		{
-			Key:         "product.name",
-			Default:     "Tango",
-			Public:      true,
-			Description: "The product name the application shows.",
-		},
-		{
-			Key:         "product.support_email",
-			Default:     "",
-			Public:      true,
-			Description: "The support address the product flows surface. Empty means none.",
-		},
-		{
-			Key:         "product.announcement",
-			Default:     "",
-			Public:      true,
-			Description: "The announcement banner text. Empty means no banner.",
+			Key:         SettingOIDCEndSessionRevokesConsent,
+			Default:     "false",
+			Description: "What a successful RP-initiated logout withdraws. Off, the account's grants and tokens for the client die and the authorized-client ledger survives (the next sign-in skips consent). On, the whole consent is withdrawn and the next sign-in asks again.",
 		},
 	}
 }

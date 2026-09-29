@@ -26,6 +26,7 @@ import (
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/federation/customclaim"
 	"github.com/riipandi/tango/modules/federation/oidc"
 	"github.com/riipandi/tango/modules/federation/scimsync"
@@ -104,7 +105,12 @@ var Package = do.Package(
 			WithClaimSource(claimAdapter{service: claims}).
 			WithCIMDFetcher(oidc.FetcherAdapter(httpFetcher)).
 			WithCIMDAllowlist(c.OIDC.CIMDURLAllowlist).
-			WithEndSessionRevokesConsent(c.OIDC.EndSessionRevokesConsent)
+			// The end-session switch is a settings read, not a boot-time
+			// value: the adapter resolves the feature the appconfig area
+			// owns, and the logout flow asks it per call.
+			WithEndSessionRevokesConsentSource(consentRevocationAdapter{
+				settings: do.MustInvoke[*appconfig.Settings](i),
+			})
 		if users != nil {
 			service = service.WithUserDirectory(users)
 		}
@@ -191,6 +197,18 @@ func features(deps Deps) []kernel.Module {
 // client feature to satisfy it.
 type claimAdapter struct {
 	service *customclaim.Service
+}
+
+// consentRevocationAdapter reads the end-session switch from the settings
+// feature, the catalog key the appconfig area owns. The interface is the
+// oidc package's, so the logout flow stays ignorant of where the value
+// rests.
+type consentRevocationAdapter struct {
+	settings *appconfig.Settings
+}
+
+func (a consentRevocationAdapter) EndSessionRevokesConsent(ctx context.Context) (bool, error) {
+	return a.settings.GetBool(ctx, appconfig.SettingOIDCEndSessionRevokesConsent)
 }
 
 func (a claimAdapter) UserClaims(ctx context.Context, userID uuid.UUID) ([]oidc.Claim, error) {

@@ -68,7 +68,7 @@ func TestEndSessionKillsTheGrantsAndKeepsTheConsent(t *testing.T) {
 
 func TestEndSessionWithConsentRevocationDropsTheLedger(t *testing.T) {
 	pool := migratedPool(t)
-	service := testService(t, pool).WithEndSessionRevokesConsent(true)
+	service := testService(t, pool).WithEndSessionRevokesConsentSource(staticRevocation{revoke: true})
 	userID := seedAccount(t, pool, "vetra")
 	issued, err := service.Create(t.Context(), userID, createParams("CERN Gateway"))
 	require.NoError(t, err)

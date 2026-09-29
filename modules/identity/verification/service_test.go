@@ -88,7 +88,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) *Servi
 	client, err := queue.NewClient(queue.ClientConfig{
 		Store:        pool,
 		NumWorkers:   1,
-		ReleaseAfter: 10 * time.Minute,
+		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
 	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil)
@@ -228,7 +228,7 @@ func TestTheFlowEndToEnd(t *testing.T) {
 	client, err := queue.NewClient(queue.ClientConfig{
 		Store:        pool,
 		NumWorkers:   1,
-		ReleaseAfter: 10 * time.Minute,
+		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
 	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil)

@@ -50,19 +50,19 @@ func blindSettings(t *testing.T) (*Settings, *datastore.Postgres) {
 func TestASettingAnswersItsDefaultUntilOverridden(t *testing.T) {
 	settings, _ := settingsService(t)
 
-	setting, err := settings.GetSetting(t.Context(), "product.name")
+	setting, err := settings.GetSetting(t.Context(), SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
-	assert.Equal(t, "Tango", setting.Value, "an item at rest answers its catalog default")
-	assert.Equal(t, "Tango", setting.Default, "the default is carried with the item")
+	assert.Equal(t, "false", setting.Value, "an item at rest answers its catalog default")
+	assert.Equal(t, "false", setting.Default, "the default is carried with the item")
 	assert.False(t, setting.Sealed)
-	assert.True(t, setting.Public)
+	assert.False(t, setting.Public)
 
-	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
+	require.NoError(t, settings.Update(t.Context(), SettingOIDCEndSessionRevokesConsent, "true"))
 
-	setting, err = settings.GetSetting(t.Context(), "product.name")
+	setting, err = settings.GetSetting(t.Context(), SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
-	assert.Equal(t, "Gringotts", setting.Value)
-	assert.Equal(t, "Tango", setting.Default, "the override never replaces the default")
+	assert.Equal(t, "true", setting.Value)
+	assert.Equal(t, "false", setting.Default, "the override never replaces the default")
 	require.NotNil(t, setting.UpdatedAt)
 }
 
@@ -161,7 +161,7 @@ func TestASealedWriteWithoutACipherRefuses(t *testing.T) {
 func TestAPlainWriteMayNotForgeTheSealedPrefix(t *testing.T) {
 	settings, _ := settingsService(t)
 
-	err := settings.Update(t.Context(), "product.name", "enc:not-really-sealed")
+	err := settings.Update(t.Context(), SettingOIDCEndSessionRevokesConsent, "enc:not-really-sealed")
 	require.ErrorIs(t, err, ErrReservedPrefix)
 }
 
@@ -171,13 +171,13 @@ func TestAPlainWriteMayNotForgeTheSealedPrefix(t *testing.T) {
 func TestResetRestoresTheCatalogDefault(t *testing.T) {
 	settings, pool := settingsService(t)
 
-	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
-	_, err := settings.ResetFor(t.Context(), "01a0da1c-cb41-779d-bd02-99b3eb5da999", "product.name")
+	require.NoError(t, settings.Update(t.Context(), SettingOIDCEndSessionRevokesConsent, "true"))
+	_, err := settings.ResetFor(t.Context(), "01a0da1c-cb41-779d-bd02-99b3eb5da999", SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
 
-	setting, err := settings.GetSetting(t.Context(), "product.name")
+	setting, err := settings.GetSetting(t.Context(), SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
-	assert.Equal(t, "Tango", setting.Value)
+	assert.Equal(t, "false", setting.Value)
 	assert.Nil(t, setting.UpdatedAt, "a reset item carries no override instant")
 
 	var count int
@@ -187,38 +187,54 @@ func TestResetRestoresTheCatalogDefault(t *testing.T) {
 
 	// The second reset is the item already at its default: unchanged, and
 	// no override left behind.
-	_, err = settings.ResetFor(t.Context(), "", "product.name")
+	_, err = settings.ResetFor(t.Context(), "", SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT count(*) FROM public.settings`).Scan(&count))
 	assert.Zero(t, count)
 }
 
+// catalogWith builds the feature over an explicit catalog, the way a test
+// drives shapes the shipped one does not carry.
+func catalogWith(t *testing.T, defs []SettingDef) (*Settings, *datastore.Postgres) {
+	t.Helper()
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	settings, err := newSettings(pool, nil, recorder, defs, nil)
+	require.NoError(t, err)
+	return settings, pool
+}
+
 // TestListMergesTheCatalogWithTheOverrides covers the two reads: List
 // answers every catalog item, ListPublic only the ones flagged public,
 // both ordered by key and both carrying effective values.
 func TestListMergesTheCatalogWithTheOverrides(t *testing.T) {
-	settings, _ := settingsService(t)
+	settings, _ := catalogWith(t, []SettingDef{
+		{Key: "a.public", Default: "one", Public: true},
+		{Key: "b.public", Default: "two", Public: true},
+		{Key: "c.private", Default: "three"},
+	})
 
-	require.NoError(t, settings.Update(t.Context(), "product.announcement", "Expecto Patronum"))
-	require.NoError(t, settings.Update(t.Context(), "product.support_email", "support@example.com"))
+	require.NoError(t, settings.Update(t.Context(), "b.public", "Expecto Patronum"))
 
 	all, err := settings.List(t.Context())
 	require.NoError(t, err)
-	require.Len(t, all, len(Catalog()))
+	require.Len(t, all, 3)
 	for i := 1; i < len(all); i++ {
 		assert.LessOrEqual(t, all[i-1].Key, all[i].Key, "the list is ordered by key")
 	}
 
 	public, err := settings.ListPublic(t.Context())
 	require.NoError(t, err)
-	require.Len(t, public, 3, "every starter item is public")
+	require.Len(t, public, 2, "the private item stays out of the public read")
 	values := map[string]string{}
 	for _, item := range public {
 		values[item.Key] = item.Value
 	}
-	assert.Equal(t, "Expecto Patronum", values["product.announcement"])
-	assert.Equal(t, "Tango", values["product.name"], "an item with no override answers its default")
+	assert.Equal(t, "Expecto Patronum", values["b.public"])
+	assert.Equal(t, "one", values["a.public"], "an item with no override answers its default")
 }
 
 // TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue covers the audit
@@ -228,9 +244,9 @@ func TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue(t *testing.T) {
 	settings, pool := settingsService(t)
 
 	caller := seedUser(t, pool, "granger", "granger@example.com")
-	_, err := settings.UpdateFor(t.Context(), caller.String(), "product.announcement", "s3cret")
+	_, err := settings.UpdateFor(t.Context(), caller.String(), SettingOIDCEndSessionRevokesConsent, "true")
 	require.NoError(t, err)
-	_, err = settings.ResetFor(t.Context(), caller.String(), "product.announcement")
+	_, err = settings.ResetFor(t.Context(), caller.String(), SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
 
 	var records int
@@ -243,8 +259,8 @@ func TestTheSettingChangeLeavesAnAuditRecordWithoutTheValue(t *testing.T) {
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT payload::text FROM public.audit_logs WHERE event = $1`,
 		audit.EventSettingUpdated).Scan(&payload))
-	assert.Contains(t, payload, "product.announcement")
-	assert.NotContains(t, payload, "s3cret", "the audit record must never carry the value")
+	assert.Contains(t, payload, SettingOIDCEndSessionRevokesConsent)
+	assert.NotContains(t, payload, "true", "the audit record must never carry the value")
 }
 
 // TestTheCatalogRefusesAPublicSealedItem pins the constructor's check: the
@@ -269,15 +285,15 @@ func TestTheCatalogRefusesAPublicSealedItem(t *testing.T) {
 // feature reads through, including the loud failure on a value that does
 // not parse.
 func TestTheTypedGettersParseTheStoredValue(t *testing.T) {
-	settings, _ := settingsService(t)
+	settings, _ := catalogWith(t, []SettingDef{{Key: "seats.limit", Default: "0"}})
 
-	require.NoError(t, settings.Update(t.Context(), "product.name", "42"))
+	require.NoError(t, settings.Update(t.Context(), "seats.limit", "42"))
 
-	seats, err := settings.GetInt64(t.Context(), "product.name")
+	seats, err := settings.GetInt64(t.Context(), "seats.limit")
 	require.NoError(t, err)
 	assert.Equal(t, int64(42), seats)
 
-	_, err = settings.GetBool(t.Context(), "product.name")
+	_, err = settings.GetBool(t.Context(), "seats.limit")
 	assert.Error(t, err, "a value that does not parse must fail loudly")
 }
 
@@ -286,7 +302,7 @@ func TestTheTypedGettersParseTheStoredValue(t *testing.T) {
 func TestTheTableKeepsTheOverrideShapeOnly(t *testing.T) {
 	settings, pool := settingsService(t)
 
-	require.NoError(t, settings.Update(t.Context(), "product.name", "Gringotts"))
+	require.NoError(t, settings.Update(t.Context(), SettingOIDCEndSessionRevokesConsent, "true"))
 
 	rows, err := pool.Query(t.Context(), `
 		SELECT column_name FROM information_schema.columns

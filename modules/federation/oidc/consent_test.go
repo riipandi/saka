@@ -1,6 +1,8 @@
 package oidc
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -72,6 +74,72 @@ func TestRevokingAConsentKillsTheGrantsAndTheirTokens(t *testing.T) {
 
 // seedGrant plants one grant row with its code and refresh pointers, the
 // state a live token issuance leaves behind. It answers the grant id.
+// staticRevocation is the test's switch: a ConsentRevocationSource whose
+// answer the test flips between calls, the way an operator's setting
+// change reaches the next logout.
+type staticRevocation struct {
+	revoke bool
+	err    error
+}
+
+func (s staticRevocation) EndSessionRevokesConsent(context.Context) (bool, error) {
+	return s.revoke, s.err
+}
+
+// flipRevocation is the same switch with a setter the test drives.
+type flipRevocation struct{ value bool }
+
+func (f *flipRevocation) EndSessionRevokesConsent(context.Context) (bool, error) {
+	return f.value, nil
+}
+
+func TestEndSessionReadsTheSwitchPerCall(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	flip := &flipRevocation{value: false}
+	service = service.WithEndSessionRevokesConsentSource(flip)
+	userID := seedAccount(t, pool, "langdon")
+	issued, err := service.Create(t.Context(), userID, createParams("Florence Portal"))
+	require.NoError(t, err)
+
+	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
+
+	// Off: the ledger survives, the grants die.
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
+	require.NoError(t, err)
+	assert.Len(t, views, 1, "the ledger survives the off switch")
+
+	// On, without a rebuild: the whole consent goes with the next logout.
+	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
+	flip.value = true
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID))
+	views, err = service.MyAuthorizedClients(t.Context(), userID.String())
+	require.NoError(t, err)
+	assert.Empty(t, views, "the flipped switch lands on the next logout")
+}
+
+func TestEndSessionWithAnUnreadableSwitchRevokesTheGrantsOnly(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool).WithEndSessionRevokesConsentSource(
+		staticRevocation{err: errors.New("settings: unreadable")})
+	userID := seedAccount(t, pool, "neveu")
+	issued, err := service.Create(t.Context(), userID, createParams("Turin Portal"))
+	require.NoError(t, err)
+
+	require.NoError(t, service.recordAuthorization(t.Context(), userID.String(), issued.Client.ID, []string{"openid"}))
+	grant := seedGrant(t, pool, userID.String(), issued.Client.ID)
+
+	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID),
+		"an unreadable switch fails closed, it does not fail the logout")
+
+	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	assert.ErrorIs(t, err, goidc.ErrNotFound, "the grants die as always")
+	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
+	require.NoError(t, err)
+	assert.Len(t, views, 1, "the ledger survives the unreadable switch")
+}
+
 func seedGrant(t *testing.T, pool *datastore.Postgres, subject, clientID string) string {
 	t.Helper()
 

@@ -17,6 +17,7 @@ import (
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/user"
 )
@@ -29,6 +30,11 @@ import (
 // that hand-builds Deps pins nothing about that wiring.
 func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 	cfg := testConfig(t)
+	// The end-session switch reads the settings feature the appconfig area
+	// owns. A settings service over the test injector: the constructor
+	// touches no database, so the nil pool stands.
+	settings, err := appconfig.NewSettings(nil, nil, nil, nil)
+	require.NoError(t, err)
 	i := do.New(
 		do.Eager(&cfg),
 		do.Eager[*slog.Logger](nil),
@@ -54,6 +60,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// test's configuration switches the protocol off — the
 		// forwarding contract is the management surface's.
 		do.Eager[*jwks.Service](nil),
+		do.Eager(settings),
 	)
 	Package(i)
 
