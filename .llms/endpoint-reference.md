@@ -396,14 +396,14 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — admin; prefixes and windows, values never returned | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — revocation cascades to grants and tokens | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — admin | — |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped | — |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped — guard `Authenticated`, the caller's own ledger | `internal/guard` (rules) |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — guard `Authenticated`; revocation cascades to the grants and the pointers riding them | `modules/federation/oidc.TestRevokingAConsentKillsTheGrantsAndTheirTokens` |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped — guard `Authenticated`; the fail-closed restriction catalogue: a client counts as restricted when its flag is set or its allowed-groups roll carries rows, restricted clients answer only for their allowed groups' members | `modules/federation/oidc.TestTheAccessibleClientListFollowsTheGroupRestriction`, `modules/federation/oidc.TestTheCatalogueHidesAFlaggedClientWithNoGroups` |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — guard `Admin` | `internal/guard` (rules) |
+| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped — guard `Admin` | `internal/guard` (rules) |
 | GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
-| GET | `/oidc/interactions/{id}` | Read the authorization interaction | done — REST, public; the SPA interaction page renders from it | `modules/federation/oidc` (protocol mount) |
-| POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | done — REST, public; the SPA posts the consent decision | `modules/federation/oidc` (protocol mount) |
+| GET | `/oidc/authorize/{id}` | Resume the authorization interaction | done — REST, public; the callback the SPA's interaction page returns to once the account is signed in; without a decision it answers the interaction document (`consent_required`) | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
+| POST | `/oidc/authorize/{id}` | Complete the authorization interaction | done — REST, public; the SPA posts the consent decision the flow grants scopes from | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
 | GET, POST | `/oidc/authorize` | Authorization endpoint | done — REST, public, redirect and OAuth error contract | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/token` | Token endpoint | done — REST, public, form encoding, client authentication, RFC errors | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/introspect` | Introspect OIDC tokens | done — REST, client-scoped RFC 7662 (own tokens only) | `modules/federation/oidc` (protocol mount), protocol tests |
@@ -430,10 +430,11 @@ algorithm (`jwks.Service.SigningAlgorithm`), `Manager` = the grant manager.
 **Endpoints (the specification's own shapes, never the envelope).**
 Authorization = `GET,POST /oidc/authorize`; token = `POST /oidc/token`;
 userinfo = `GET,POST /oidc/userinfo`; end-session = `GET,POST /oidc/end-session`;
-interactions = `GET /oidc/interactions/{id}`, `POST /oidc/interactions/{id}/complete`;
-introspect = `POST /oidc/introspect` (slice 6); PAR = `POST /oidc/par` (slice 6);
+the interaction continuation rides the authorization callback itself —
+`GET,POST /oidc/authorize/{id}`, the session id the SPA's interaction page
+carries back; introspect = `POST /oidc/introspect`; PAR = `POST /oidc/par`;
 device = `POST /oidc/device_authorization` and the verification surface
-`GET,POST /oidc/device[/{callback}]` (slice 7 — the library's default
+`GET,POST /oidc/device[/{callback}]` (the library's default
 names, its v0.25.0 API exposing no endpoint setter; the provider
 registers its routes under `WithPathPrefix("/oidc")`); device login
 pairs with it. Discovery at `/.well-known/openid-configuration` advertises
@@ -443,13 +444,20 @@ the RFC 8414 alias `/.well-known/oauth-authorization-server` added by Pocket ID
 v2.14.0.
 
 **Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
-`(kind,key)`, JSONB `request_data`): grants (`kind='grant'`, keyed by grant id,
-`index_key` carries the refresh-token hash for `GrantByRefreshToken`),
-authorization sessions (`kind='authn'`, `index_key` = auth-code hash for
-`GrantByAuthCode` and the PAR id for `SessionByPushedAuthReqID`), logout
-sessions (`kind='logout'`), device sessions (`kind='device'`, `index_key` =
-device-code and user-code hashes). A new migration adds `oauth2_sessions.index_key`
-with an index — the secondary lookups the managers require. Client resolution
+`(kind,key)`, JSONB `request_data`, nullable `expires_at`): the object
+rows — grants (`kind='grant'`, keyed by grant id), authorization sessions
+(`kind='authn'`, PAR included), logout sessions (`kind='logout'`), device
+sessions (`kind='device'`) — and one hashed **pointer row per presented
+credential**: kinds `authcode`, `refresh`, `par`, `devicecode`, and
+`usercode`, each keyed by the presented value's SHA-256 and carrying a
+`tokenPointer` document that names the row it resolves to (plus the
+client the FK checks). A consumed code loses its pointer, so a replay is
+a not-found rather than a row. No `index_key` column exists — the
+pointer rows are the secondary lookups. Rows expire per object
+(`expires_at`): the grant's refresh window, the session's timeout, the
+pointer's code lifetime; lookups refuse what the column judges dead and
+the `protocol_cleanup` job reaps the rest (`internal/jobs`). Client
+resolution
 (`DCRManager.Client`) reads `oidc_clients`: a standard client maps grant types
 and the secret hashes to `goidc.Client`; an unknown `https://…` identifier
 inside the CIMD allowlist materializes through the cimd feature first.
@@ -457,11 +465,15 @@ inside the CIMD allowlist materializes through the cimd feature first.
 **Authorize flow.** `AuthnPolicy`'s authenticate callback answers
 `StatusInProgress` whenever the browser carries no live account — the provider
 redirects to the SPA's interaction page with the callback id; the SPA signs in
-(or reuses its bearer) and completes via `POST /oidc/interactions/{id}/complete`
-with the scopes it consents to. Consent is required when the client does not
+(or reuses its bearer) and resumes at `GET /oidc/authorize/{id}`, posting the
+decision to the same callback with the scopes it consents to. Consent is
+required when the client does not
 skip it, the account has not authorized the client before, or `prompt=consent` —
 first authorization writes `user_authorized_oidc_clients` (scope list +
-`last_used_at`). `pkce_supported` is stamped when a client presents a
+`last_used_at`). The client's group restriction is judged at completion —
+before any grant, consent, or device approval (`modules/federation/oidc`
+`completeAuthentication`), fail-closed on the flag-or-roll rule. `pkce_supported`
+is stamped when a client presents a
 code challenge the requirement did not demand. PKCE is enforced for public
 clients; `plain` and `S256` are accepted.
 
