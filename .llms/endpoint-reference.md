@@ -387,7 +387,6 @@ The tables below record the whole planned surface; an unbuilt row is uncallable.
 | POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — admin; prefixes and windows, values never returned | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
 | POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetScimProvider` | Get SCIM service provider for a client | planned — the scimsync feature owns it | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — revocation cascades to grants and tokens | — |
 | POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped | — |
@@ -495,14 +494,24 @@ deletes expired `oauth2_sessions` rows and stale authorization codes.
 
 ## SCIM
 
-**Not implemented** — `modules/federation/scimsync` is a scaffold; no proto, no procedures.
+Outbound provisioning, ported from Pocket ID's `internal/scimsync`: tango is the SCIM client, not
+the server. One provider row per OIDC client names a remote base URL and the bearer token the
+sync presents (sealed `enc:` at rest, shown once in the Create answer). One pass pushes the
+client's visible accounts and groups out until the remote matches the local snapshot — the
+visibility roll is the client's own (unrestricted = everyone, restricted = its allowed groups'
+members), so provisioning cannot admit an account the sign-in would refuse. The pass also runs
+hourly (`scim_sync` queue, `internal/jobs`) and, debounced five minutes, after account or group
+changes (`scim_sync_notifier`). Schema: `public.scim_service_providers` (migration 00004, one
+provider per client by unique index). Audit: `scim_provider_created/updated/deleted`,
+`scim_sync_completed`.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Upsert` | Create SCIM service provider | planned | — |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Update` | Update SCIM service provider | planned | — |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | planned | — |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | planned — queues outbound sync | — |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/GetByClient` | Get SCIM service provider | done — admin; answers the provider one client syncs to, token always empty | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Create` | Create SCIM service provider | done — admin; token shown once, sealed `enc:` at rest; a client with a provider answers failed-precondition; the client must exist | `modules/federation/scimsync.TestCreateSealsTheTokenAndAnswersItOnce` |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Update` | Update SCIM service provider | done — admin; empty token keeps the stored one; the client binding is not replaceable | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | done — admin; the remote data the sync pushed stays where it is | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/tango.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | done — admin; one pass now, counts in the answer; E2E-probed create/update/delete against a scripted remote, banned accounts push `active: false`, remote orphans are deleted | `modules/federation/scimsync.TestSyncProvisionsTheVisibleAccountsAndGroups` |
 
 ## User Groups
 

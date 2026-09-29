@@ -184,7 +184,7 @@ The queue instruments itself through the global meter provider (`metrics.go`, sc
 
 ### jobs
 
-The concrete jobs the application runs on the queue: one job per `*_job.go` (task type, `QueueConfig`, processor), with `Register` the one place the queue list is spelled out and the recurring ones seeded, and `Scheduled` the list the cron scheduler enqueues — empty until a feature asks for a cron schedule, because a recurring job that runs on a fixed interval belongs with `Register`, whose self-enqueued successor is durable without a second mechanism. A recurring job keeps its own schedule: its processor **enqueues the next instance only after its own work has succeeded**, and `Register` seeds one only while none is pending, so a restart never multiplies the schedule. The order matters: a successor committed before the work fails stays committed, the queue's retry of the same attempt inserts another, and a few attempts leave several parallel chains — the `api_key_expiry_scan` did exactly that until it moved its enqueue behind the scan. `cleanup_job.go` purges the completed records their retention has expired, on `queue.cleanup_interval`; `audit_cleanup_job.go` applies `app.audit_retention_days` to `public.audit_logs`; `storage_gc_job.go` sweeps the backend. The engine's own goroutines know none of the jobs — jobs are application code, the queue is infrastructure.
+The concrete jobs the application runs on the queue: one job per `*_job.go` (task type, `QueueConfig`, processor), with `Register` the one place the queue list is spelled out and the recurring ones seeded, and `Scheduled` the list the cron scheduler enqueues — empty until a feature asks for a cron schedule, because a recurring job that runs on a fixed interval belongs with `Register`, whose self-enqueued successor is durable without a second mechanism. A recurring job keeps its own schedule: its processor **enqueues the next instance only after its own work has succeeded**, and `Register` seeds one only while none is pending, so a restart never multiplies the schedule. The order matters: a successor committed before the work fails stays committed, the queue's retry of the same attempt inserts another, and a few attempts leave several parallel chains — the `api_key_expiry_scan` did exactly that until it moved its enqueue behind the scan. `cleanup_job.go` purges the completed records their retention has expired, on `queue.cleanup_interval`; `audit_cleanup_job.go` applies `app.audit_retention_days` to `public.audit_logs`; `storage_gc_job.go` sweeps the backend; `scim_sync_job.go` runs the outbound provisioning passes — one recurring hourly queue (`scim_sync`, always seeded) and one debounced change-triggered queue (`scim_sync_debounced`, enqueued by `ScimSyncNotifier`), both driving `scimsync.Service.SyncAll` through the lazy `lazyScimSyncer` seam, which answers nil without the federation area. The engine's own goroutines know none of the jobs — jobs are application code, the queue is infrastructure.
 
 ### scheduler
 
@@ -535,11 +535,28 @@ The federation **area**: the surfaces a deployment serves to applications that
 federate identities to it. Sub-phase a of the OIDC provider — client
 management — is implemented here; the protocol phases (authorize, token,
 userinfo, end-session, introspect, PAR, device flow, discovery) and the
-customclaim and scimsync scaffolds join as they land. The transport split the
+customclaim scaffold join as they land. The transport split the
 protocol section settles is the area's shape: **management is ConnectRPC**
 (`tango.federation.v1.OidcClientService`, the backoffice's generated client),
 **the protocol endpoints are REST** — the shapes the specifications define,
 the third naming exception beside SCIM and WebAuthn.
+
+SCIM is **outbound provisioning** (`modules/federation/scimsync`, ported from
+Pocket ID): tango is the SCIM client, not the server. One
+`scim_service_providers` row per OIDC client names a remote base URL and the
+bearer token the sync presents — sealed `enc:` at rest, shown once in the
+Create answer, never read back. One pass (`ScimProviderService/Sync`, the
+hourly `scim_sync` job, or the five-minute debounced notifier) pushes the
+client's visible accounts and groups out until the remote matches the local
+snapshot. The visibility roll is the client's own — unrestricted means
+everyone, restricted means its allowed groups' members — so provisioning
+cannot admit an account the sign-in would refuse; banned and disabled
+accounts push `active: false`. Users go before groups, so the members'
+remote ids exist when the groups reference them, and a member the remote
+refuses skips the group rather than writing it half-blind. The SCIM JSON
+field names (`externalId`, `displayName`, RFC 7644's title-case
+`Resources`) are the specification's, the naming exception above — they
+never cross the RPC wire, which speaks the proto's snake_case.
 
 The `client_id` is the one wire identifier that is not a TypeID: it is the
 credential a foreign client presents, the operator's word (letters, digits,

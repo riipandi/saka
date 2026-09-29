@@ -253,6 +253,21 @@ under `/oidc` (the specifications' own shapes). Discovery at
 | GET, POST | `/oidc/end-session`                                                          | HTTP/REST    | RP-initiated logout                         |
 | GET      | `/oidc/clients/{id}/logo`                                                     | HTTP/REST    | Client logo (public)                        |
 
+## SCIM Provisioning
+
+Outbound provisioning: tango is the SCIM client, not the server. One provider row per OIDC
+client names a remote base URL and the bearer token the sync presents (sealed at rest, shown
+once at create). One pass pushes the client's visible accounts and groups out until the remote
+matches the local snapshot; it also runs hourly and, debounced, after account or group changes.
+
+| Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
+| -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| POST     | `/rpc/tango.federation.v1.ScimProviderService/GetByClient`    | ConnectRPC   | The provider one client syncs to (admin)   |
+| POST     | `/rpc/tango.federation.v1.ScimProviderService/Create`         | ConnectRPC   | Attach a provisioning target (admin; token shown once) |
+| POST     | `/rpc/tango.federation.v1.ScimProviderService/Update`         | ConnectRPC   | Replace endpoint and token (admin; empty token keeps the stored one) |
+| POST     | `/rpc/tango.federation.v1.ScimProviderService/Delete`         | ConnectRPC   | Remove the provisioning target (admin)     |
+| POST     | `/rpc/tango.federation.v1.ScimProviderService/Sync`           | ConnectRPC   | Run one provisioning pass now (admin; counts in the answer) |
+
 ## Device Login
 
 The passkey-less pairing sign-in: a browser that cannot sign itself in creates a request, another
@@ -305,7 +320,6 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |
 | WebAuthn passkeys | `modules/identity/webauthn` (kept deliberately) | `/api/webauthn/{register,login}/{begin,finish}` + `UserService` passkey procedures |
-| SCIM sync | `modules/federation/scimsync` | `ScimProviderService` |
 | Webhooks | `modules/webhook` | `WebhookService` |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
