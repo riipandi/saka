@@ -363,13 +363,11 @@ the approval. Audit events: `device_login_approved`,
 
 ## OIDC
 
-The provider surface is under construction in four sub-phases. **Sub-phase a —
-client management — is implemented**: `tango.federation.v1.OidcClientService`
-(ConnectRPC, `modules/federation/oidc`, schema `00004`'s `oidc_clients` and
-junctions) and the public logo route. The protocol endpoints (authorize, token,
-userinfo, end-session, introspect, PAR, device flow, discovery), the consent
-service, and the CIMD client type are still planned; every such row says so.
-The tables below record the whole planned surface; an unbuilt row is uncallable.
+The provider surface is implemented across management, protocol, consent, and
+CIMD. `tango.federation.v1.OidcClientService` and
+`OidcConsentService` use ConnectRPC (`modules/federation/oidc`); the logo and
+OAuth/OIDC protocol routes use REST. The endpoint table records active
+implementation status and evidence; planned rows remain explicitly marked.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
@@ -397,18 +395,17 @@ The tables below record the whole planned surface; an unbuilt row is uncallable.
 | POST | `/oidc/interactions/{id}/complete` | Approve the authorization interaction | done — REST, public; the SPA posts the consent decision | `modules/federation/oidc` (protocol mount) |
 | GET, POST | `/oidc/authorize` | Authorization endpoint | done — REST, public, redirect and OAuth error contract | `modules/federation/oidc` (protocol mount) |
 | POST | `/oidc/token` | Token endpoint | done — REST, public, form encoding, client authentication, RFC errors | `modules/federation/oidc` (protocol mount) |
-| POST | `/oidc/introspect` | Introspect OIDC tokens | shipped — REST, client-scoped RFC 7662 (own tokens only) | — |
-| POST | `/oidc/par` | Push authorization request | shipped — REST, RFC 9126; one-time request_uri, 5-minute lifetime | — |
+| POST | `/oidc/introspect` | Introspect OIDC tokens | done — REST, client-scoped RFC 7662 (own tokens only) | `modules/federation/oidc` (protocol mount), protocol tests |
+| POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
 | GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public, redirect behavior | `modules/federation/oidc` (protocol mount) |
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
-The design contract for the protocol phases (device-flow and PAR details, the
-end-session `id_token_hint` verification chain, the discovery metadata fields)
-is written below; it is the acceptance criteria for the federation phases. The
-JWKS endpoint that exists is tango's own (`/.well-known/jwks.json`,
-`modules/identity/jwks`), not the federation module's.
+The protocol design notes below record implementation behavior for device flow,
+PAR, end-session `id_token_hint` verification, and discovery. Tango's own JWKS
+endpoint (`/.well-known/jwks.json`, `modules/identity/jwks`) is published by the
+identity module; the federation provider uses that key set.
 
 ### Design contract — protocol core (slice 5), consent (6), device (7)
 
@@ -428,13 +425,11 @@ device = `POST /oidc/device_authorization` and the verification surface
 `GET,POST /oidc/device[/{callback}]` (slice 7 — the library's default
 names, its v0.25.0 API exposing no endpoint setter; the provider
 registers its routes under `WithPathPrefix("/oidc")`); device login
-pairs with it. Discovery advertises exactly the user-specified URLs:
-issuer = `app.base_url`, authorization = `/oidc/authorize`, token =
-`/oidc/token`, userinfo = `/oidc/userinfo`, end-session =
-`/oidc/end-session`, jwks_uri = `/.well-known/jwks.json`, plus the
-standard metadata fields upstream carries
-(grant/scopes/claims/response types, `pushed_authorization_request_endpoint`,
-`device_authorization_endpoint`, `client_id_metadata_document_supported: true`).
+pairs with it. Discovery at `/.well-known/openid-configuration` advertises
+the issuer and protocol endpoints, the JWKS URI, supported grants/scopes/claims,
+PAR and device authorization endpoints, and CIMD support. Tango does not expose
+the RFC 8414 alias `/.well-known/oauth-authorization-server` added by Pocket ID
+v2.14.0.
 
 **Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
 `(kind,key)`, JSONB `request_data`): grants (`kind='grant'`, keyed by grant id,
@@ -459,18 +454,19 @@ first authorization writes `user_authorized_oidc_clients` (scope list +
 code challenge the requirement did not demand. PKCE is enforced for public
 clients; `plain` and `S256` are accepted.
 
-**Token issuance.** Grants `authorization_code` + `refresh_token` (+ client
-credentials for confidential clients); client authentication via
-`client_secret_basic`, `client_secret_post`, `none` against the hashed secrets
-in `credentials`; refresh rotation; access tokens are JWTs signed by the jwks
-key set; ID tokens carry a token-type discriminator claim (tango:
-`tango:token_type = id-token`) — the end-session chain's requirement. Claims
-follow the scope mapping upstream keeps: `sub` always; `profile` → the custom
-claims (JSON-parsed) + `given_name`, `family_name`, `name`, `display_name`,
-`preferred_username`, `picture`; `email` → `email`, `email_verified` only when
-an address exists; `groups` → the group names. At issuance the account is
-re-judged: disabled, banned, or outside the client's group restriction fails
-the grant.
+**Token issuance.** Grants `authorization_code`, `refresh_token`, and
+`urn:ietf:params:oauth:grant-type:device_code`; Tango does not implement
+`client_credentials`. Client authentication via `client_secret_basic`,
+`client_secret_post`, or `none` against hashed secrets in `credentials`; refresh
+token rotation; access tokens are JWTs signed by the JWKS key set. ID tokens
+carry a token-type discriminator claim (`tango:token_type = id-token`) for the
+end-session verification chain. Scopes are `openid`, `profile`, `email`, and
+`groups` (not `offline_access`). Claims: `sub` always; `profile` adds the
+custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
+`preferred_username`; `email` adds `email` and `email_verified` if an address
+exists; `groups` adds group names. **Known gap:** the authorization policy does not enforce the client's group
+restriction at consent or device-grant completion. The catalogue and SCIM views
+apply the restriction, but a direct authorize request can bypass the catalogue.
 
 **End-session.** `id_token_hint` verified (issuer, skew ≤1 minute, the
 `id-token` type claim — an access token is refused), `aud` must equal
