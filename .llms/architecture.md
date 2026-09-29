@@ -697,6 +697,24 @@ first-writer-wins. One creating browser holds at most
 lock on the token's hash so concurrent creations cannot race past the
 cap; expiry frees the room, and a refused creation answers 429.
 
+**Protocol state expires twice and is swept once.** Every `oauth2_sessions`
+row carries the expiry of the object it holds — the grant's refresh window,
+the session's timeout, the pointer's code lifetime — and a lookup refuses a
+row the column judges dead, within a two-minute clock-skew allowance
+(`loadDocument`), so an expired credential fails closed even before the
+sweep reaches it; a NULL expiry — a logout session without a client, a
+grant without a refresh window — is never judged by the column. The
+`protocol_cleanup` job (`internal/jobs`, hourly, seeded like the other
+recurring jobs) reaps the rows past a one-hour grace in bounded batches of
+ten thousand, a hundred thousand per run: the grace is wider than the
+lookup allowance, so nothing is deleted while a lookup could still accept
+it, and the batches keep a backlog from a stopped deployment off one
+long-running statement. The consent cascade deletes what revocation kills
+at once; the sweep is for the rows nothing revokes — the codes never
+exchanged, the sessions abandoned, the grants left to age out.
+`oauth2_jtis` and `interaction_sessions` are scaffold tables with no
+writers, so they carry no sweep.
+
 ## Notice emails and their switches (settled 2026-09-27)
 The application sends two kinds of email, and only one of them is configurable. **Transactional**
 emails carry the flow itself — a password-reset link, a verification token, a one-time access code,

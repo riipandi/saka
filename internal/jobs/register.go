@@ -34,6 +34,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 	client.Register(queue.NewQueue[AuditCleanupTask](func(ctx context.Context, task AuditCleanupTask) error {
 		return auditCleanupProcessor(ctx, task, pool)
 	}))
+	// The protocol state's retention runs the same way: the expired
+	// oauth2_sessions rows belong to no feature, and the sweeps the queue
+	// carries are the one deletion path they have.
+	client.Register(queue.NewQueue[ProtocolCleanupTask](func(ctx context.Context, task ProtocolCleanupTask) error {
+		return protocolCleanupProcessor(ctx, task, pool)
+	}))
 	if uploader != nil {
 		client.Register(queue.NewQueue[ChunkUploadTask](func(ctx context.Context, task ChunkUploadTask) error {
 			return uploadProcessor(ctx, task, uploader)
@@ -144,6 +150,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	if err := s.seedOnce(ctx, AuditCleanupName,
 		auditCleanupSeed(DefaultAuditCleanupInterval, s.retentionDays),
 		DefaultAuditCleanupInterval); err != nil {
+		return err
+	}
+	if err := s.seedOnce(ctx, ProtocolCleanupName,
+		protocolCleanupSeed(DefaultProtocolCleanupInterval),
+		DefaultProtocolCleanupInterval); err != nil {
 		return err
 	}
 	if s.expiryEmail {

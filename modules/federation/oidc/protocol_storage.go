@@ -85,13 +85,27 @@ func (st protocolStore) load(ctx context.Context, kind, key string, value any) e
 	return json.Unmarshal(data, value)
 }
 
+// protocolSkewAllowanceSeconds is how far past the column's expiry a row
+// may still answer a lookup. The timestamps are written from the
+// application's clock while the filter compares against the database's, so
+// a row a skewed clock still considers live must not be refused outright;
+// beyond the allowance the row is dead regardless of what the payload
+// carries, and the lookup refuses it even before the sweep reaps it. The
+// sweep's grace is wider still, so nothing is deleted while a lookup could
+// accept it.
+const protocolSkewAllowanceSeconds = 120
+
 // loadDocument reads one object row's raw document. The bytes are what a
-// compare-and-swap save expects the row to still hold.
+// compare-and-swap save expects the row to still hold. An expired row
+// answers not-found here, so a timestamp the payload check missed — and a
+// row the sweep has not reached yet — fails closed all the same.
 func (st protocolStore) loadDocument(ctx context.Context, kind, key string) ([]byte, error) {
 	var data []byte
 	err := st.pool.QueryRow(ctx,
-		`SELECT request_data FROM public.oauth2_sessions WHERE kind = $1 AND key = $2 AND active`,
-		kind, key).Scan(&data)
+		`SELECT request_data FROM public.oauth2_sessions
+		 WHERE kind = $1 AND key = $2 AND active
+		   AND (expires_at IS NULL OR expires_at > now() - make_interval(secs => $3))`,
+		kind, key, protocolSkewAllowanceSeconds).Scan(&data)
 	if err != nil {
 		if errors.Is(err, datastore.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			return nil, goidc.ErrNotFound

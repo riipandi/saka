@@ -488,6 +488,11 @@ a restricted client admits only accounts in an allowed group, and a flag with
 an empty roll admits nobody. An ineligible account receives `access_denied`;
 an existing consent does not bypass the gate. The consent catalogue
 (`ListMyClients`) and the SCIM visibility roll follow the same rule.
+**Expired state fails closed and is swept:** a lookup refuses any
+`oauth2_sessions` row the `expires_at` column judges dead (two-minute
+skew allowance), and the hourly `protocol_cleanup` job reaps the rows
+past a one-hour grace in bounded batches — no `protocol` row outlives
+its expiry by more than the sweep's interval.
 
 **End-session.** `id_token_hint` verified (issuer, skew ≤1 minute, the
 `id-token` type claim — an access token is refused), `aud` must equal
