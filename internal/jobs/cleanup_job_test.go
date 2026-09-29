@@ -37,8 +37,8 @@ func seeded(ctx context.Context, client *queue.Client, pool *datastore.Postgres,
 	// The audit retention is seeded too, so a test that counts the recurring
 	// tasks sees every one a serve run seeds. It runs on the pool the
 	// migrated client was built over.
-	Register(client, cleanupInterval, uploader, nil, pool, "", false, false, nil)
-	return NewSeeder(client, cleanupInterval, uploader, defaultRetentionDays, false, slog.New(slog.DiscardHandler)).Seed(ctx)
+	Register(client, cleanupInterval, uploader, nil, pool, "", false, false, nil, nil, nil)
+	return NewSeeder(client, cleanupInterval, uploader, defaultRetentionDays, false, false, slog.New(slog.DiscardHandler)).Seed(ctx)
 }
 
 func TestRegisterSeedsOneMaintenanceTask(t *testing.T) {

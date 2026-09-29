@@ -25,7 +25,7 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool)
 	}))
@@ -88,6 +88,14 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 			return uploadFinishedProcessor(ctx, task, notices)
 		}))
 	}
+	client.Register(queue.NewQueue[ScimSyncDebouncedTask](func(ctx context.Context, task ScimSyncDebouncedTask) error {
+		return scimSyncDebouncedProcessor(ctx, task, scimSyncer, log)
+	}))
+	if scimSyncer != nil {
+		client.Register(queue.NewQueue[ScimSyncTask](func(ctx context.Context, task ScimSyncTask) error {
+			return (&scimSyncProcessor{syncer: scimSyncer, log: log}).Process(ctx, task)
+		}))
+	}
 }
 
 // Seeder seeds the recurring jobs. It is a service of its own — not a side
@@ -106,6 +114,7 @@ type Seeder struct {
 	uploader        *storage.Manager
 	retentionDays   int
 	expiryEmail     bool
+	scimSync        bool
 	log             *slog.Logger
 }
 
@@ -113,13 +122,16 @@ type Seeder struct {
 // wired. retentionDays is the audit window the retention job is seeded with;
 // a run that changes the configuration carries the new window into the
 // seeded task, which is what makes the change take effect at the next run.
-func NewSeeder(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, retentionDays int, expiryEmail bool, log *slog.Logger) *Seeder {
+// scimSync arms the hourly provisioning pass; a run without a provider row
+// still seeds it, and the pass answers nothing to push.
+func NewSeeder(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, retentionDays int, expiryEmail bool, scimSync bool, log *slog.Logger) *Seeder {
 	return &Seeder{
 		client:          client,
 		cleanupInterval: cleanupInterval,
 		uploader:        uploader,
 		retentionDays:   retentionDays,
 		expiryEmail:     expiryEmail,
+		scimSync:        scimSync,
 		log:             log,
 	}
 }
@@ -136,6 +148,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	}
 	if s.expiryEmail {
 		if err := s.seedOnce(ctx, APIKeyExpiryScanName, APIKeyExpiryScanTask{}, DefaultAPIKeyExpiryInterval); err != nil {
+			return err
+		}
+	}
+	if s.scimSync {
+		if err := s.seedOnce(ctx, ScimSyncName, scimSyncSeed(DefaultScimSyncInterval), DefaultScimSyncInterval); err != nil {
 			return err
 		}
 	}

@@ -77,7 +77,7 @@ func runRetention(t *testing.T, pool *datastore.Postgres, client *queue.Client, 
 	// The processors are wired first, the way a serve run wires them: a task
 	// whose processor is not registered never runs, and the successor this
 	// helper waits for is the processor's own last step.
-	Register(client, time.Hour, nil, nil, pool, "", false, false, nil)
+	Register(client, time.Hour, nil, nil, pool, "", false, false, nil, nil, nil)
 
 	_, err := client.Add(AuditCleanupTask{
 		IntervalMillis: time.Hour.Milliseconds(),
@@ -156,7 +156,7 @@ func TestTheSeederSeedsTheRetentionWithTheConfiguredWindow(t *testing.T) {
 
 	// Only the retention is seeded here: the other recurring jobs would need
 	// the uploader, which this test does not build.
-	seeder := NewSeeder(client, time.Hour, nil, 30, false, slog.New(slog.DiscardHandler))
+	seeder := NewSeeder(client, time.Hour, nil, 30, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, seeder.Seed(t.Context()))
 
 	pending, err := client.Pending(t.Context(), AuditCleanupName)
@@ -176,10 +176,10 @@ func TestTheSeederSeedsTheRetentionWithTheConfiguredWindow(t *testing.T) {
 func TestTheRetentionSeedDoesNotMultiply(t *testing.T) {
 	_, client := auditPool(t)
 
-	first := NewSeeder(client, time.Hour, nil, 90, false, slog.New(slog.DiscardHandler))
+	first := NewSeeder(client, time.Hour, nil, 90, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, first.Seed(t.Context()))
 
-	second := NewSeeder(client, time.Hour, nil, 90, false, slog.New(slog.DiscardHandler))
+	second := NewSeeder(client, time.Hour, nil, 90, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, second.Seed(t.Context()))
 
 	pending, err := client.Pending(t.Context(), AuditCleanupName)

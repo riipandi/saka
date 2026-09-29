@@ -2,24 +2,18 @@ type: http_request
 model: http_request
 id: rq_VhesmGBNas
 createdAt: 2026-09-19T12:32:22.306194
-updatedAt: 2026-09-26T14:38:41.497576
+updatedAt: 2026-09-29T01:36:38.478183
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_5R2gfN3X4T
+folderId: fl_Uf3pbN2b4K
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "clientId": "REPLACE_CLIENT_ID"
     }
 bodyType: application/json
-description: |-
-  Get the SCIM service provider configuration for an OIDC client
-
-  Mirror of Pocket ID `GET /api/oidc/clients/{id}/scim-service-provider`.
-
-  Parameters:
-  - id (path, required): Client ID
+description: 'Read the SCIM service provider one client syncs to. The token never appears here: it is sealed at rest and only the Create answer carries it once.\n\nUpstream: Pocket ID''s GET /api/oidc/clients/{id}/scim-service-provider; tango folds it into ScimProviderService as GetByClient keyed by clientId.\n\nParameters:\n- clientId (body, required): the OIDC client, raw UUID form'
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Get SCIM service provider (unimplemented)'
+name: '[Pocket ID] Get SCIM service provider'
 sortPriority: 12000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/GetScimProvider
+url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/GetByClient
 urlParameters:
 - enabled: true
   name: id

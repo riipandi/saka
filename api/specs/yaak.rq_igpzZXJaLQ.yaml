@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_igpzZXJaLQ
 createdAt: 2026-09-19T12:34:22.907177
-updatedAt: 2026-09-26T14:51:14.646135
+updatedAt: 2026-09-29T01:36:57.158774
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_Uf3pbN2b4K
 authentication: {}
@@ -15,14 +15,7 @@ body:
       "token": "REPLACE_SCIM_TOKEN"
     }
 bodyType: application/json
-description: |-
-  Update an existing SCIM service provider
-
-  Mirror of Pocket ID `PUT /api/scim/service-provider/{id}`.
-
-  Parameters:
-  - id (path, required): Service Provider ID
-  - serviceProvider (body, required): SCIM service provider information
+description: 'Replace a provider''s endpoint and token. An empty token keeps the stored one — a rotation is a value the caller supplies, not an absence. The client it hangs on is not replaceable.\n\nUpstream: Pocket ID''s PUT /api/scim/service-provider/{id}.\n\nParameters:\n- id (body, required): the provider''s identifier, raw UUID form\n- endpoint (body, required): SCIM base URL\n- token (body, optional): re-seal this value; empty keeps the stored token'
 headers:
 - enabled: true
   name: Content-Type
@@ -33,7 +26,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Update SCIM service provider (unimplemented)'
+name: '[Pocket ID] Update SCIM service provider'
 sortPriority: 2000.0
 url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Update
 urlParameters:

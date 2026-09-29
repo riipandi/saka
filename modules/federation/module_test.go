@@ -98,6 +98,11 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		federationv1connect.OidcConsentServiceListMyClientsProcedure,
 		federationv1connect.OidcConsentServiceListUserAuthorizedClientsProcedure,
 		federationv1connect.OidcConsentServiceListAllAuthorizedClientsProcedure,
+		federationv1connect.ScimProviderServiceGetByClientProcedure,
+		federationv1connect.ScimProviderServiceCreateProcedure,
+		federationv1connect.ScimProviderServiceUpdateProcedure,
+		federationv1connect.ScimProviderServiceDeleteProcedure,
+		federationv1connect.ScimProviderServiceSyncProcedure,
 	} {
 		assert.True(t, claimed[procedure],
 			"the area must forward its features' procedures to the RPC router: %s", procedure)

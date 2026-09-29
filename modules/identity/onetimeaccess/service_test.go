@@ -64,7 +64,7 @@ func testService(t *testing.T, pool *datastore.Postgres, adminEmail, publicEmail
 		ReleaseAfter: 10 * time.Minute,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil)
 
 	issuer := signin.NewService(testConfig(), pool, signin.NewRepository(pool),
 		jwks.NewService(testConfig(), nil, nil, nil), nil, nil)

@@ -311,6 +311,23 @@ const (
 
 	// EventCustomClaimDeleted is a claim removed.
 	EventCustomClaimDeleted = "custom_claim_deleted"
+
+	// EventScimProviderCreated is an outbound SCIM provisioning target
+	// attached to a client. The payload names the client; the token
+	// never rides the record.
+	EventScimProviderCreated = "scim_provider_created"
+
+	// EventScimProviderUpdated is a target's endpoint or token replaced.
+	EventScimProviderUpdated = "scim_provider_updated"
+
+	// EventScimProviderDeleted is a target removed. The remote data the
+	// sync pushed stays where it is.
+	EventScimProviderDeleted = "scim_provider_deleted"
+
+	// EventScimSyncCompleted is one provisioning pass that finished. The
+	// payload counts what the pass created, updated, and deleted on the
+	// remote; the remote's own data never rides the record.
+	EventScimSyncCompleted = "scim_sync_completed"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

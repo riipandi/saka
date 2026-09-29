@@ -12,6 +12,7 @@ package federation
 
 import (
 	"context"
+	"fmt"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -27,8 +28,10 @@ import (
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/federation/customclaim"
 	"github.com/riipandi/tango/modules/federation/oidc"
+	"github.com/riipandi/tango/modules/federation/scimsync"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/pkg/crypto"
 )
 
 // ModuleName is the name the area reports under.
@@ -46,6 +49,10 @@ type Deps struct {
 	// Protocol is the OIDC provider the /oidc surface serves. It is
 	// nil when the switch is off or the jwks service cannot sign.
 	Protocol *oidc.Protocol
+
+	// Scim runs the outbound provisioning passes and administers the
+	// provider rows.
+	Scim *scimsync.Service
 }
 
 // Module mounts every federation feature.
@@ -109,6 +116,32 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		return customclaim.NewService(pool, recorder, log), nil
 	}),
+
+	do.Lazy(func(i do.Injector) (*scimsync.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		httpFetcher := do.MustInvoke[*fetcher.Client](i)
+		c := do.MustInvoke[*config.Config](i)
+		// The cipher unseals a provider token for the sync and seals a
+		// Create's; a run without the app secret cannot do either, and the
+		// service answers that at the call — a run that never provisions
+		// still serves the reads.
+		var cipher *crypto.Cipher
+		if c.App.SecretKey != "" {
+			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+			if err != nil {
+				return nil, fmt.Errorf("federation: scimsync cipher: %w", err)
+			}
+			cipher = built
+		}
+		service := scimsync.NewService(pool, scimsync.NewRepository(), recorder, cipher, httpFetcher, log)
+		// The visibility roll's sources are the identity tables; the
+		// adapters here read them directly rather than through the user
+		// service, because the roll is the authorization's semantics and
+		// must not depend on the feature's CRUD surface.
+		return service.WithDirectories(scimsync.NewDirectory(), scimsync.NewGroupDirectory()), nil
+	}),
 )
 
 // Mount resolves what this area's features need and builds the module the
@@ -118,6 +151,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 	deps := Deps{
 		Clients: do.MustInvoke[*oidc.Service](i),
 		Claims:  do.MustInvoke[*customclaim.Service](i),
+		Scim:    do.MustInvoke[*scimsync.Service](i),
 	}
 	if c.OIDC.Enabled {
 		keys := do.MustInvoke[*jwks.Service](i)
@@ -142,6 +176,9 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.Protocol != nil {
 		modules = append(modules, oidc.NewProtocolModule(deps.Protocol))
+	}
+	if deps.Scim != nil {
+		modules = append(modules, scimsync.NewModule(deps.Scim))
 	}
 	return modules
 }

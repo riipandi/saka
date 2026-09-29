@@ -325,6 +325,16 @@ var ProcedureRules = map[string]Entry{
 	federationv1connect.CustomClaimServiceUpdateGroupClaimProcedure: {Rule: Admin},
 	federationv1connect.CustomClaimServiceDeleteGroupClaimProcedure: {Rule: Admin},
 
+	// The SCIM provider surface is administrative end to end: a provider
+	// row decides which external application the deployment pushes
+	// accounts to and carries the bearer secret the sync presents, so
+	// being able to administer clients is not enough to redirect it.
+	federationv1connect.ScimProviderServiceGetByClientProcedure: {Rule: Admin},
+	federationv1connect.ScimProviderServiceCreateProcedure:      {Rule: Admin},
+	federationv1connect.ScimProviderServiceUpdateProcedure:      {Rule: Admin},
+	federationv1connect.ScimProviderServiceDeleteProcedure:      {Rule: Admin},
+	federationv1connect.ScimProviderServiceSyncProcedure:        {Rule: Admin},
+
 	// The consent surface splits in two: the self-service procedures read
 	// and undo the calling account's own ledger — being signed in is the
 	// whole requirement, the account rides the token — while the two

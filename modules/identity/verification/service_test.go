@@ -91,7 +91,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) *Servi
 		ReleaseAfter: 10 * time.Minute,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil)
 
 	return NewService(pool, mail, client, nil, "http://localhost:3000", nil)
 }
@@ -231,7 +231,7 @@ func TestTheFlowEndToEnd(t *testing.T) {
 		ReleaseAfter: 10 * time.Minute,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	client.Start(ctx)

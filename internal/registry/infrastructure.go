@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/internal/transport/middleware"
 	"github.com/riipandi/tango/modules/apikey"
+	"github.com/riipandi/tango/modules/federation/scimsync"
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/notification"
@@ -55,6 +56,26 @@ func (p lazyPublisher) CreateSystemNotice(ctx context.Context, userID uuid.UUID,
 		return err
 	}
 	return service.CreateSystemNotice(ctx, userID, title, body)
+}
+
+// lazyScimSyncer resolves the federation area's sync service at task-run
+// time. A container without the federation area answers nil here: the
+// pass is skipped rather than failed, the way a deployment without a
+// provider row behaves.
+type lazyScimSyncer struct {
+	injector do.Injector
+}
+
+// SyncAll runs one provisioning pass per provider.
+func (s lazyScimSyncer) SyncAll(ctx context.Context) error {
+	service, err := do.Invoke[*scimsync.Service](s.injector)
+	if err != nil || service == nil {
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return service.SyncAll(ctx)
 }
 
 func infrastructure(ctx context.Context) func(do.Injector) {
@@ -205,8 +226,11 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			// notices resolve the notification area's service at task-run
 			// time, not build time, because that service's own provider
 			// resolves this queue for its email pass — a build-time
-			// resolution would order the two around each other.
-			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i})
+			// resolution would order the two around each other. The SCIM
+			// passes resolve the sync service the same lazy way: the
+			// federation area's provider builds it, and this wiring must
+			// not order the two around each other either.
+			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i}, lazyScimSyncer{i}, log)
 
 			// The upload's after-sync hook rides here rather than on the
 			// manager's provider: the hook enqueues through the client this
@@ -221,7 +245,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			client := do.MustInvoke[*queue.Client](i)
 			uploader := do.MustInvoke[*storage.Manager](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.Auth.ExpiryEmailEnabled, log), nil
+			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.Auth.ExpiryEmailEnabled, true, log), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*storage.Watcher, error) {
