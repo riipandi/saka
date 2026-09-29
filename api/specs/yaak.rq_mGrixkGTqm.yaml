@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_mGrixkGTqm
 createdAt: 2026-09-29T10:05:01.497813
-updatedAt: 2026-09-29T10:05:01.497814
+updatedAt: 2026-09-29T12:52:00.000000
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YNuU3gaJNQ
 authentication: {}
@@ -10,9 +10,11 @@ authenticationType: null
 body: {}
 bodyType: null
 description: |-
-  Pocket ID v2.14.0 serves the RFC 8414 authorization server metadata document at this path. Tango currently exposes OpenID Connect discovery only at `/.well-known/openid-configuration`.
+  RFC 8414 authorization server metadata: the same document the OIDC discovery endpoint serves, at the alias path — issuer, the protocol endpoints, the supported grants/scopes/claims, and the introspection and revocation surfaces with their client authentication methods.
 
-  Endpoint: `GET /.well-known/oauth-authorization-server` (Pocket ID reference)
+  Endpoint: `GET /.well-known/oauth-authorization-server`
+
+  Mirror of Pocket ID `GET /.well-known/oauth-authorization-server`.
 headers: []
 method: GET
 name: '[Pocket ID] Get OAuth authorization server metadata'
