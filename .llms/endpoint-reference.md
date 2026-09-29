@@ -483,8 +483,18 @@ code challenge the requirement did not demand. PKCE is enforced for public
 clients; `plain` and `S256` are accepted.
 
 **Token issuance.** Grants `authorization_code`, `refresh_token`, and
-`urn:ietf:params:oauth:grant-type:device_code`; Tango does not implement
-`client_credentials`. Client authentication via `client_secret_basic`,
+`urn:ietf:params:oauth:grant-type:device_code`, plus `client_credentials`
+for the clients whose `allowed_grant_types` names it — the
+machine-to-machine token names the client itself as its subject, carries
+the client's requested scopes, no user claims and no refresh token, and
+lives one hour (the `clientCredentialsLifetimeSecs` spelling). The
+allowed list is per client: create and update carry
+`allowed_grant_types` (the wire words the token endpoint judges; an
+unknown word is refused, a CIMD client's list stays within its
+document's declared grants), an absent or empty list rides the
+registered default (authorization code, refresh, device), and the view
+answers the list the client is judged by. Client authentication via
+`client_secret_basic`,
 `client_secret_post`, or `none` against hashed secrets in `credentials`; refresh
 token rotation; access tokens are JWTs signed by the JWKS key set. Every
 one-time grant's consumption is atomic under concurrency (settled 2026-09-29):
@@ -546,7 +556,9 @@ is the client's safe refusal. The whole feature rides the
 logout like the consent switch. The client contract carries the fields:
 `backchannel_logout_uri` (optional absolute URL) and
 `backchannel_logout_session_required` on create, update, and the view.
-`TODO(frontend)`: the client form needs fields for both.
+`TODO(frontend)`: the client form needs fields for both, and a
+grant-type editor for `allowed_grant_types` (checkbox list over the four
+served words).
 
 **Rate limits (guard's REST classification).** `/oidc/token`,
 `/oidc/device/authorize`, `/oidc/par` ride the credential bucket

@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -38,6 +39,62 @@ const (
 	DefaultRefreshTokenMinutes = 43200
 )
 
+// GrantAuthorizationCodeWire, GrantRefreshTokenWire, and the rest are the
+// wire words the token endpoint judges — the registered grant types a
+// client's allowed list may name, plus the client-credentials grant the
+// machine-to-machine surface rides.
+const (
+	GrantAuthorizationCodeWire = "authorization_code"
+	GrantRefreshTokenWire      = "refresh_token"
+	GrantDeviceCodeWire        = "urn:ietf:params:oauth:grant-type:device_code"
+	GrantClientCredentialsWire = "client_credentials"
+)
+
+// DefaultAllowedGrantTypes is the list a client whose create or update
+// left the field empty rides: the registered trio. A var — a slice is no
+// constant — and every reader must treat it as read-only.
+var DefaultAllowedGrantTypes = []string{
+	GrantAuthorizationCodeWire,
+	GrantRefreshTokenWire,
+	GrantDeviceCodeWire,
+}
+
+// grantWireTypes is the set a create or update may name. A CIMD
+// document's list is judged against it at materialization, so the wire
+// words are one vocabulary everywhere.
+var grantWireTypes = map[string]struct{}{
+	GrantAuthorizationCodeWire: {},
+	GrantRefreshTokenWire:      {},
+	GrantDeviceCodeWire:        {},
+	GrantClientCredentialsWire: {},
+}
+
+// validateGrantWires judges an allowed list: every word must be one the
+// provider serves. An empty list is the default, not a refusal.
+func validateGrantWires(wires []string) error {
+	for _, wire := range wires {
+		if _, ok := grantWireTypes[wire]; !ok {
+			return fmt.Errorf("%w: %s", ErrUnknownGrantType, wire)
+		}
+	}
+	return nil
+}
+
+// grantWiresWithin judges an allowed list against a CIMD document's
+// declared ceiling: the operator's list names nothing beyond it.
+func grantWiresWithin(wires, ceiling []string) error {
+	declared := make(map[string]struct{}, len(ceiling))
+	for _, wire := range ceiling {
+		declared[wire] = struct{}{}
+	}
+	for _, wire := range wires {
+		if _, ok := declared[wire]; !ok {
+			return fmt.Errorf("%w: %s is not in the metadata document's grant list", ErrUnknownGrantType, wire)
+		}
+	}
+	return nil
+}
+
 // The failures the client procedures report. The handler maps them to
 // connect codes, the way every feature's failures are mapped.
 var (
@@ -48,6 +105,10 @@ var (
 
 	// ErrClientExists is a creation whose identifier another client holds.
 	ErrClientExists = errors.New("oidc: the client id is already in use")
+
+	// ErrUnknownGrantType is an allowed-grant list naming a word the
+	// provider does not serve.
+	ErrUnknownGrantType = errors.New("oidc: the grant type is not one the provider serves")
 
 	// ErrGroupUnknown is a group restriction naming a group that does not
 	// exist. The replacement is refused whole, so the client keeps the set
@@ -99,6 +160,10 @@ type ClientSchema struct {
 	// Management signal the token carries.
 	BackchannelLogoutURI             string
 	BackchannelLogoutSessionRequired bool
+	// AllowedGrantTypes is the wire-word list the token endpoint judges.
+	// An empty list is the registered default — the code, refresh, and
+	// device trio — and a CIMD client's list is its document's.
+	AllowedGrantTypes []string
 	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
 	// on its own; a registered client carries nil. MetadataGrantTypes is
 	// the grant list the document declared — the capabilities the client
@@ -133,6 +198,7 @@ type ClientView struct {
 	RefreshTokenDurationMinutes         int64
 	BackchannelLogoutURI                string
 	BackchannelLogoutSessionRequired    bool
+	AllowedGrantTypes                   []string
 	// MetadataExpiresAt is when the surface may re-fetch a CIMD document
 	// on its own; a registered client carries nil.
 	MetadataExpiresAt  *time.Time
@@ -193,6 +259,7 @@ func (c ClientSchema) view(now time.Time) ClientView {
 		RefreshTokenDurationMinutes:         c.RefreshTokenDurationMinutes,
 		BackchannelLogoutURI:                c.BackchannelLogoutURI,
 		BackchannelLogoutSessionRequired:    c.BackchannelLogoutSessionRequired,
+		AllowedGrantTypes:                   c.AllowedGrantTypes,
 		MetadataExpiresAt:                   c.MetadataExpiresAt,
 		MetadataGrantTypes:                  c.MetadataGrantTypes,
 		CreatedByID:                         wireCreatedBy(c.CreatedByID),

@@ -40,6 +40,7 @@ func wireClient(view ClientView) *federationv1.OidcClient {
 		AccessTokenDurationMinutes:          view.AccessTokenDurationMinutes,
 		RefreshTokenDurationMinutes:         view.RefreshTokenDurationMinutes,
 		BackchannelLogoutSessionRequired:    view.BackchannelLogoutSessionRequired,
+		AllowedGrantTypes:                   view.AllowedGrantTypes,
 		CreatedById:                         &view.CreatedByID,
 		CreatedAt:                           timestamppb.New(view.CreatedAt),
 	}

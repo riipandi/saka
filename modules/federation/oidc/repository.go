@@ -40,7 +40,7 @@ var clientColumns = []string{
 	"access_token_duration_minutes", "refresh_token_duration_minutes",
 	"metadata_expires_at", "metadata_grant_types",
 	"backchannel_logout_uri", "backchannel_logout_session_required",
-	"created_by_id", "created_at",
+	"allowed_grant_types", "created_by_id", "created_at",
 }
 
 // clientSortColumns is the whitelist a list's sort key resolves through. The
@@ -57,7 +57,7 @@ var clientSortColumns = map[string]string{
 // wire form of a list or a document.
 func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 	var row ClientSchema
-	var callbacks, logoutCallbacks, metadataGrants []byte
+	var callbacks, logoutCallbacks, metadataGrants, allowedGrants []byte
 	err := scan(
 		&row.ID, &row.Name, &row.Description, &callbacks, &logoutCallbacks,
 		&row.LaunchURL, &row.Credentials, &row.IsPublic, &row.PkceEnabled,
@@ -67,7 +67,7 @@ func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 		&row.AccessTokenDurationMinutes, &row.RefreshTokenDurationMinutes,
 		&row.MetadataExpiresAt, &metadataGrants,
 		&row.BackchannelLogoutURI, &row.BackchannelLogoutSessionRequired,
-		&row.CreatedByID, &row.CreatedAt,
+		&allowedGrants, &row.CreatedByID, &row.CreatedAt,
 	)
 	if err != nil {
 		return ClientSchema{}, err
@@ -75,6 +75,7 @@ func scanClient(scan func(dest ...any) error) (ClientSchema, error) {
 	row.CallbackURLs = stringList(callbacks)
 	row.LogoutCallbackURLs = stringList(logoutCallbacks)
 	row.MetadataGrantTypes = stringList(metadataGrants)
+	row.AllowedGrantTypes = stringList(allowedGrants)
 	return row, nil
 }
 
@@ -212,6 +213,10 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 	if err != nil {
 		return err
 	}
+	allowedGrants, err := jsonText(row.AllowedGrantTypes)
+	if err != nil {
+		return err
+	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(ClientTable)
@@ -223,7 +228,7 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		"access_token_duration_minutes", "refresh_token_duration_minutes",
 		"metadata_expires_at", "metadata_grant_types",
 		"backchannel_logout_uri", "backchannel_logout_session_required",
-		"created_by_id",
+		"allowed_grant_types", "created_by_id",
 	)
 	ib.Values(
 		row.ID, row.Name, row.Description, callbacks, logoutCallbacks,
@@ -234,7 +239,7 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 		row.AccessTokenDurationMinutes, row.RefreshTokenDurationMinutes,
 		row.MetadataExpiresAt, metadataGrants,
 		row.BackchannelLogoutURI, row.BackchannelLogoutSessionRequired,
-		row.CreatedByID,
+		allowedGrants, row.CreatedByID,
 	)
 
 	query, args := ib.Build()
@@ -295,6 +300,10 @@ func (r *Repository) UpdateClient(ctx context.Context, db datastore.Querier, row
 	if err != nil {
 		return false, err
 	}
+	allowedGrants, err := jsonText(row.AllowedGrantTypes)
+	if err != nil {
+		return false, err
+	}
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(ClientTable)
@@ -315,6 +324,7 @@ func (r *Repository) UpdateClient(ctx context.Context, db datastore.Querier, row
 		ub.Assign("refresh_token_duration_minutes", row.RefreshTokenDurationMinutes),
 		ub.Assign("backchannel_logout_uri", row.BackchannelLogoutURI),
 		ub.Assign("backchannel_logout_session_required", row.BackchannelLogoutSessionRequired),
+		ub.Assign("allowed_grant_types", allowedGrants),
 	)
 	ub.Where(ub.Equal("id", row.ID))
 

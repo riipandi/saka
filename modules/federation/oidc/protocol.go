@@ -53,6 +53,16 @@ const (
 	// the window the relying party has to send the browser into the flow
 	// it pushed.
 	protocolPARLifetimeSecs = 300
+
+	// clientCredentialsLifetimeSecs is the window a machine-to-machine
+	// access token lives for: shorter than a user session's, because the
+	// client can mint a successor with its credential whenever it needs.
+	clientCredentialsLifetimeSecs = 3600
+
+	// defaultTokenLifetimeSecs mirrors the library's own default (300s)
+	// for every grant the options func answers — a zero would expire a
+	// token at mint, so the default is spelled rather than left implicit.
+	defaultTokenLifetimeSecs = 300
 )
 
 // Protocol builds the OIDC provider the federation area mounts. The
@@ -137,6 +147,24 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			),
 		),
 		provider.WithRefreshTokenGrant(grantStore{protocolStore: stores}, provider.WithRefreshTokenRotation()),
+		// The client-credentials grant is the machine-to-machine surface:
+		// the token names the client itself as its subject, the client's
+		// own allowed list judges the request, and the group restriction
+		// is silent — no account is involved.
+		provider.WithClientCredentialsGrant(),
+		provider.WithTokenOptions(func(_ context.Context, grant *goidc.Grant, _ *goidc.Client) goidc.TokenOptions {
+			// The client-credentials grant is the one whose subject is
+			// the client itself — the library mints no refresh token for
+			// it and no user session stands behind it. Its tokens live
+			// the spelled hour; the user grants ride the library's
+			// default, spelled too, because a zero would expire a token
+			// at mint.
+			lifetime := defaultTokenLifetimeSecs
+			if grant.Subject == grant.ClientID && grant.Subject != "" {
+				lifetime = clientCredentialsLifetimeSecs
+			}
+			return goidc.NewJWTTokenOptions(goidc.SignatureAlgorithm(algs[0]), lifetime)
+		}),
 		// The device grant rides the same session store: the device code
 		// and the user code resolve through hashed pointer rows, the
 		// approval walks the SPA interaction like the authorization flow.

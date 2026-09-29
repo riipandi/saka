@@ -164,7 +164,11 @@ type CreateParams struct {
 	RefreshTokenDurationMinutes         int64
 	BackchannelLogoutURI                string
 	BackchannelLogoutSessionRequired    bool
-	AllowedGroupWires                   []string
+	// AllowedGrantWires names the grant types the client may use, as the
+	// wire words the token endpoint judges. Empty, the registered
+	// default applies. An unknown word is a refusal.
+	AllowedGrantWires []string
+	AllowedGroupWires []string
 }
 
 // Issued is what a creation answers: the client's view and the raw first
@@ -193,6 +197,7 @@ type UpdateParams struct {
 	RefreshTokenDurationMinutes         int64
 	BackchannelLogoutURI                string
 	BackchannelLogoutSessionRequired    bool
+	AllowedGrantWires                   []string
 }
 
 // List answers one page of the clients, newest first unless the caller sorts
@@ -249,6 +254,10 @@ func (s *Service) Create(ctx context.Context, callerID uuid.UUID, params CreateP
 		id = uuid.NewV7().String()
 	}
 
+	if err := validateGrantWires(params.AllowedGrantWires); err != nil {
+		return Issued{}, err
+	}
+
 	secret, raw, err := s.newSecret(nil)
 	if err != nil {
 		return Issued{}, err
@@ -270,6 +279,7 @@ func (s *Service) Create(ctx context.Context, callerID uuid.UUID, params CreateP
 		RefreshTokenDurationMinutes:         durationOrDefault(params.RefreshTokenDurationMinutes, DefaultRefreshTokenMinutes),
 		BackchannelLogoutURI:                params.BackchannelLogoutURI,
 		BackchannelLogoutSessionRequired:    params.BackchannelLogoutSessionRequired,
+		AllowedGrantTypes:                   params.AllowedGrantWires,
 		CreatedByID:                         &callerID,
 	}
 	stored := credentials{Secrets: []Secret{secret}}
@@ -328,6 +338,9 @@ func (s *Service) Create(ctx context.Context, callerID uuid.UUID, params CreateP
 // the not-found failure and a concurrent secret write is preserved — the
 // rewrite never touches the credentials document.
 func (s *Service) Update(ctx context.Context, id string, params UpdateParams) (ClientView, error) {
+	if err := validateGrantWires(params.AllowedGrantWires); err != nil {
+		return ClientView{}, err
+	}
 	var updated ClientView
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		row, err := s.lockClient(ctx, tx, id)
@@ -343,6 +356,14 @@ func (s *Service) Update(ctx context.Context, id string, params UpdateParams) (C
 		row.IsPublic = params.IsPublic
 		row.BackchannelLogoutURI = params.BackchannelLogoutURI
 		row.BackchannelLogoutSessionRequired = params.BackchannelLogoutSessionRequired
+		row.AllowedGrantTypes = params.AllowedGrantWires
+		// A CIMD client's document declares the ceiling: the operator's
+		// list may name nothing the document did not.
+		if row.ClientType == ClientTypeCIMD && len(row.MetadataGrantTypes) > 0 {
+			if err := grantWiresWithin(row.AllowedGrantTypes, row.MetadataGrantTypes); err != nil {
+				return err
+			}
+		}
 		// A public client cannot keep a secret, so PKCE is not its choice:
 		// the kind forces the toggle on. The observed-capability flag dies
 		// with the requirement it was observed beside — a client whose

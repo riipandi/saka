@@ -78,6 +78,13 @@ CREATE TABLE IF NOT EXISTS public.oidc_clients (
     -- Management signal the delivery carries with the token.
     backchannel_logout_uri TEXT NOT NULL DEFAULT '',
     backchannel_logout_session_required BOOLEAN NOT NULL DEFAULT FALSE,
+    -- The grant types the client may use: the wire words the token
+    -- endpoint judges, `authorization_code`, `refresh_token`,
+    -- `urn:ietf:params:oauth:grant-type:device_code`, and
+    -- `client_credentials`. An empty list is the registered default —
+    -- the code and refresh and device trio — while a CIMD client's list
+    -- is its document's, capped by what the operator granted.
+    allowed_grant_types JSONB,
     created_by_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE SET NULL

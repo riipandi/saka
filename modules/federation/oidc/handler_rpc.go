@@ -62,6 +62,7 @@ func (h *rpcHandler) CreateClient(ctx context.Context, req *connect.Request[fede
 		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
 		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
 		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
+		AllowedGrantWires:                   req.Msg.AllowedGrantTypes,
 		AllowedGroupWires:                   req.Msg.AllowedUserGroups,
 	})
 	if err != nil {
@@ -105,6 +106,7 @@ func (h *rpcHandler) UpdateClient(ctx context.Context, req *connect.Request[fede
 		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
 		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
 		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
+		AllowedGrantWires:                   req.Msg.AllowedGrantTypes,
 	})
 	if err != nil {
 		return nil, mapError(err)

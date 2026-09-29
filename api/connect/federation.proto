@@ -189,6 +189,11 @@ message OidcClient {
   // identity be included in the delivery.
   bool backchannel_logout_session_required = 34;
 
+  // allowed_grant_types names the grant types the client may use, as the
+  // wire words the token endpoint judges. Absent, the registered default
+  // applies (authorization_code, refresh_token, the device grant).
+  repeated string allowed_grant_types = 35;
+
   // allowed_user_groups are the groups the restriction names, resolved to
   // the group views the group surface answers with.
   repeated tango.identity.v1.UserGroup allowed_user_groups = 30;
@@ -353,6 +358,15 @@ message CreateOidcClientRequest {
   // backchannel_logout_session_required is the OIDC Session Management
   // signal the logout token carries.
   bool backchannel_logout_session_required = 16;
+
+  // allowed_grant_types names the grant types the client may use. Absent
+  // or empty, the registered default applies. A word the provider does
+  // not serve is refused; a CIMD client's list stays within its
+  // document's declared grants.
+  repeated string allowed_grant_types = 17 [
+    (buf.validate.field).repeated.max_items = 10,
+    (buf.validate.field).repeated.items.string.max_len = 64
+  ];
 }
 
 // CreateOidcClientResponse is the created client and its first secret.
@@ -464,6 +478,15 @@ message UpdateOidcClientRequest {
   // backchannel_logout_session_required is the OIDC Session Management
   // signal the logout token carries.
   bool backchannel_logout_session_required = 16;
+
+  // allowed_grant_types names the grant types the client may use. Absent
+  // or empty, the registered default applies. A word the provider does
+  // not serve is refused; a CIMD client's list stays within its
+  // document's declared grants.
+  repeated string allowed_grant_types = 17 [
+    (buf.validate.field).repeated.max_items = 10,
+    (buf.validate.field).repeated.items.string.max_len = 64
+  ];
 }
 
 // UpdateOidcClientResponse is the client after the rewrite.

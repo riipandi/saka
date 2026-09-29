@@ -88,6 +88,14 @@ func protocolClient(row ClientSchema, baseURL string) goidc.Client {
 		for _, grant := range row.MetadataGrantTypes {
 			client.GrantTypes = append(client.GrantTypes, goidc.GrantType(grant))
 		}
+	} else if len(row.AllowedGrantTypes) > 0 {
+		// The operator's list is the word: the token endpoint judges the
+		// client's grants against it, and client_credentials is opt-in
+		// per client through it.
+		client.GrantTypes = make([]goidc.GrantType, 0, len(row.AllowedGrantTypes))
+		for _, grant := range row.AllowedGrantTypes {
+			client.GrantTypes = append(client.GrantTypes, goidc.GrantType(grant))
+		}
 	} else {
 		// Every registered client may use the device grant: the consent
 		// question and the group restriction are the real gate, and the

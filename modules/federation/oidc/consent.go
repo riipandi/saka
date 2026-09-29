@@ -47,7 +47,7 @@ var ledgerClientColumns = []string{
 	"c.access_token_duration_minutes", "c.refresh_token_duration_minutes",
 	"c.metadata_expires_at", "c.metadata_grant_types",
 	"c.backchannel_logout_uri", "c.backchannel_logout_session_required",
-	"c.created_by_id", "c.created_at",
+	"c.allowed_grant_types", "c.created_by_id", "c.created_at",
 }
 
 // scanLedgerRow reads one ledger join row. The client's columns land in
