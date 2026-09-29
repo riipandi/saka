@@ -164,8 +164,12 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		provider.WithSecretBasicAuthn(),
 		provider.WithIDTokenClaims(idTokenClaims(service)),
 		provider.WithUserInfoClaims(userInfoClaims(service)),
-		provider.WithLogout(provider.LogoutConfig{Manager: logoutStore{protocolStore: stores}},
-			provider.WithLogoutEndpoint(protocolEndSessionEndpoint)),
+		provider.WithLogout(provider.LogoutConfig{
+			Manager:    logoutStore{protocolStore: stores},
+			HandleFunc: defaultPostLogout,
+		},
+			provider.WithLogoutEndpoint(protocolEndSessionEndpoint),
+			provider.WithLogoutPolicies(logoutPolicy(service))),
 		// Introspection is client-scoped: a client reads only the tokens
 		// minted to it. RFC 7662 leaves the policy open; tango's answer is
 		// that a token says nothing to a stranger.

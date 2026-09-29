@@ -58,6 +58,11 @@ type Service struct {
 	// baseURL is the origin the logo URLs name. An empty one renders a
 	// relative URL, which a browser resolves against the host it reached.
 	baseURL string
+
+	// endSessionRevokesConsent decides what an RP-initiated logout
+	// withdraws: off, the grants and tokens die and the authorized-client
+	// ledger survives; on, the whole consent goes with them.
+	endSessionRevokesConsent bool
 }
 
 // NewService builds the service. The database writes run in one transaction
@@ -110,6 +115,14 @@ func (s *Service) WithPictures(pictures *storage.Manager) *Service {
 // WithBaseURL sets the origin the logo URLs name.
 func (s *Service) WithBaseURL(baseURL string) *Service {
 	s.baseURL = baseURL
+	return s
+}
+
+// WithEndSessionRevokesConsent decides what an RP-initiated logout
+// withdraws. Off, the grants and tokens die and the authorized-client
+// ledger survives; on, the whole consent goes with them.
+func (s *Service) WithEndSessionRevokesConsent(revoke bool) *Service {
+	s.endSessionRevokesConsent = revoke
 	return s
 }
 

@@ -202,35 +202,7 @@ func (s *Service) RevokeMyAuthorizedClient(ctx context.Context, userID, clientID
 		if err != nil || !removed {
 			return err
 		}
-
-		// The grant rows carry the subject in their document, the pointer
-		// rows carry the grant in theirs — one select names the grants, one
-		// delete takes the pointers, one takes the grants.
-		grants, err := s.grantKeysFor(ctx, tx, userID, clientID)
-		if err != nil {
-			return err
-		}
-		if len(grants) > 0 {
-			sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-			sb.DeleteFrom("public.oauth2_sessions")
-			sb.Where(
-				sb.In("request_data->>'grant_id'", toAny(grants)...),
-				sb.In("kind", sessionKindAuthCode, sessionKindRefresh),
-			)
-			query, args := sb.Build()
-			if _, err := tx.Exec(ctx, query, args...); err != nil {
-				return err
-			}
-		}
-		sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-		sb.DeleteFrom("public.oauth2_sessions")
-		sb.Where(
-			sb.Equal("kind", sessionKindGrant),
-			sb.Equal("client_id", clientID),
-			"request_data->>'sub' = "+sb.Var(userID),
-		)
-		query, args := sb.Build()
-		if _, err := tx.Exec(ctx, query, args...); err != nil {
+		if err := s.revokeGrants(ctx, tx, userID, clientID); err != nil {
 			return err
 		}
 
@@ -244,6 +216,67 @@ func (s *Service) RevokeMyAuthorizedClient(ctx context.Context, userID, clientID
 		})
 		return nil
 	})
+}
+
+// EndSession withdraws what an RP-initiated logout names: the grants the
+// account made to the client and every token riding them. The
+// authorized-client ledger survives unless the deployment opted into
+// revoking the whole consent — off, the client's next sign-in skips
+// consent; on, it asks again.
+func (s *Service) EndSession(ctx context.Context, userID, clientID string) error {
+	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if s.endSessionRevokesConsent {
+			if _, err := s.removeAuthorization(ctx, tx, userID, clientID); err != nil {
+				return err
+			}
+		}
+		if err := s.revokeGrants(ctx, tx, userID, clientID); err != nil {
+			return err
+		}
+
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:        audit.EventOidcSessionEnded,
+			Status:       audit.StatusSuccess,
+			ResourceType: ResourceOidcClient,
+			Payload:      map[string]string{"client_id": clientID, "user_id": userID},
+		})
+		return nil
+	})
+}
+
+// revokeGrants kills the grants one account holds for one client and every
+// code and refresh token riding them. The grant rows carry the subject in
+// their document, the pointer rows carry the grant in theirs — one select
+// names the grants, one delete takes the pointers, one takes the grants.
+func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID, clientID string) error {
+	grants, err := s.grantKeysFor(ctx, tx, userID, clientID)
+	if err != nil {
+		return err
+	}
+	if len(grants) > 0 {
+		sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+		sb.DeleteFrom("public.oauth2_sessions")
+		sb.Where(
+			sb.In("request_data->>'grant_id'", toAny(grants)...),
+			sb.In("kind", sessionKindAuthCode, sessionKindRefresh),
+		)
+		query, args := sb.Build()
+		if _, err := tx.Exec(ctx, query, args...); err != nil {
+			return err
+		}
+	}
+	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	sb.DeleteFrom("public.oauth2_sessions")
+	sb.Where(
+		sb.Equal("kind", sessionKindGrant),
+		sb.Equal("client_id", clientID),
+		"request_data->>'sub' = "+sb.Var(userID),
+	)
+	query, args := sb.Build()
+	if _, err := tx.Exec(ctx, query, args...); err != nil {
+		return err
+	}
+	return nil
 }
 
 // removeAuthorization drops the ledger row, answering whether one was

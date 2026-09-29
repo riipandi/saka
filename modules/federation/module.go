@@ -103,7 +103,8 @@ var Package = do.Package(
 		service := oidc.NewService(pool, recorder, log).WithPictures(pictures).
 			WithClaimSource(claimAdapter{service: claims}).
 			WithCIMDFetcher(oidc.FetcherAdapter(httpFetcher)).
-			WithCIMDAllowlist(c.OIDC.CIMDURLAllowlist)
+			WithCIMDAllowlist(c.OIDC.CIMDURLAllowlist).
+			WithEndSessionRevokesConsent(c.OIDC.EndSessionRevokesConsent)
 		if users != nil {
 			service = service.WithUserDirectory(users)
 		}

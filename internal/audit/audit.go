@@ -282,6 +282,12 @@ const (
 	// issued, so the payload names the account and the client.
 	EventOidcConsentRevoked = "oidc_consent_revoked"
 
+	// EventOidcSessionEnded is an RP-initiated logout completed for one
+	// account and client. The grants and tokens die with it; whether the
+	// authorized-client ledger died too is the deployment's configured
+	// answer, so a reader pairs this event with the configuration.
+	EventOidcSessionEnded = "oidc_session_ended"
+
 	// EventOidcDeviceAuthorized is a device flow user code approved at
 	// the verification endpoint. The payload names the client and the
 	// account; the device code itself never rides the record.

@@ -395,6 +395,9 @@ func Default() Config {
 			// stored keys, and a run without one is not an issuer —
 			// opting in is the operator's decision.
 			Enabled: false,
+			// Grants and tokens die at end-session; the consent ledger
+			// survives unless the operator opts in.
+			EndSessionRevokesConsent: false,
 		},
 		Queue: Queue{
 			NumWorkers:      DefaultQueueNumWorkers,
