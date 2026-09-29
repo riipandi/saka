@@ -7,6 +7,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"uuid"
 
 	"github.com/riipandi/tango/modules/identity/user"
 )
@@ -49,10 +50,17 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 					fmt.Errorf("id_token_hint carries no subject"))
 			}
 
-			userID, err := user.UUIDFromWire(claims.Subject)
+			// The provider mints the ID token's subject in the raw UUID form
+			// the grant rows store; a pairwise subject would name neither
+			// form the ledger knows, and fails the lookup below.
+			userID, err := uuid.Parse(claims.Subject)
 			if err != nil {
-				return goidc.StatusFailure, goidc.WrapError(goidc.ErrorCodeInvalidRequest, "invalid request",
-					fmt.Errorf("id_token_hint names an unknown subject"))
+				wire, wireErr := user.UUIDFromWire(claims.Subject)
+				if wireErr != nil {
+					return goidc.StatusFailure, goidc.WrapError(goidc.ErrorCodeInvalidRequest, "invalid request",
+						fmt.Errorf("id_token_hint names an unknown subject"))
+				}
+				userID = wire
 			}
 
 			if err := service.EndSession(req.Context(), userID.String(), session.ClientID); err != nil {

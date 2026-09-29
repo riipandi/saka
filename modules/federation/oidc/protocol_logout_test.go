@@ -129,11 +129,16 @@ func TestTheLogoutPolicyRevokesTheHintedSubject(t *testing.T) {
 	require.NoError(t, err)
 
 	policy := logoutPolicy(service)
-	status, err := policy.Logout(httptest.NewRecorder(), httptest.NewRequest("POST", "/oidc/end-session", nil),
-		hintSession(hintToken(t, ""), wire.String(), issued.Client.ID))
+	// The provider mints the subject claim in the raw UUID form the grant
+	// rows store; the wire form stays accepted for a pairwise-proofed
+	// future or a hint minted by the directory.
+	for _, subject := range []string{userID.String(), wire.String()} {
+		status, logoutErr := policy.Logout(httptest.NewRecorder(), httptest.NewRequest("POST", "/oidc/end-session", nil),
+			hintSession(hintToken(t, ""), subject, issued.Client.ID))
 
-	assert.Equal(t, goidc.StatusSuccess, status)
-	require.NoError(t, err)
+		assert.Equal(t, goidc.StatusSuccess, status)
+		require.NoError(t, logoutErr)
+	}
 
 	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
