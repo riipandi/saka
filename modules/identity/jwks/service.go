@@ -24,11 +24,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"go.jetify.com/typeid"
 
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/pkg/crypto"
@@ -187,6 +189,18 @@ func (s *Service) parseKeyPair(cfg config.Config) error {
 	if setErr := public.Set(jwk.KeyUsageKey, KeyUsageSignature); setErr != nil {
 		return fmt.Errorf("jwks: auth.public_key: set use: %w", setErr)
 	}
+	// A key pair generated before the `jwk_` kid convention carries the
+	// thumbprint the old generator wrote, or none. The published set must
+	// name its keys uniformly, so such a key is renamed here: the kid rides
+	// every token's JOSE header, and a token minted after this parse names
+	// the new kid. Verifiers outside the process read the kid back from the
+	// published set, so nothing breaks — but a cached set from before the
+	// restart goes stale until the client re-fetches.
+	if kid, ok := public.KeyID(); !ok || !strings.HasPrefix(kid, "jwk_") {
+		if mintErr := stampGeneratedKid(public); mintErr != nil {
+			return fmt.Errorf("jwks: auth.public_key: %w", mintErr)
+		}
+	}
 	s.publicKey = public
 
 	if cfg.Auth.PrivateKey == "" {
@@ -204,6 +218,16 @@ func (s *Service) parseKeyPair(cfg config.Config) error {
 	// refused here rather than discovered by a rejected token.
 	if err := keyPairAgrees(private, public); err != nil {
 		return fmt.Errorf("jwks: auth.private_key: %w", err)
+	}
+	// The pair signs under one kid: a token's header names the kid the
+	// published set carries, so the private half adopts whatever the public
+	// half ended up with — including the rename an old thumbprint kid got.
+	if newKid, ok := public.KeyID(); ok {
+		if oldKid, had := private.KeyID(); !had || oldKid != newKid {
+			if setErr := private.Set(jwk.KeyIDKey, newKid); setErr != nil {
+				return fmt.Errorf("jwks: auth.private_key: sync kid: %w", setErr)
+			}
+		}
 	}
 	s.privateKey = private
 	return nil
@@ -232,6 +256,21 @@ func (s *Service) parseHMAC(cfg config.Config) {
 		return
 	}
 	s.hmacKey = key
+}
+
+// stampGeneratedKid mints a fresh `jwk_` TypeID kid onto the key. It is the
+// rename path for a configured key pair that predates the convention — the
+// generator (pkg/crypto) stamps the kid itself, so a current deployment
+// never reaches this.
+func stampGeneratedKid(key jwk.Key) error {
+	kid, err := typeid.New[JWKSKeyID]()
+	if err != nil {
+		return fmt.Errorf("mint kid: %w", err)
+	}
+	if err := key.Set(jwk.KeyIDKey, kid.String()); err != nil {
+		return fmt.Errorf("set kid: %w", err)
+	}
+	return nil
 }
 
 // keyPairAgrees reports whether the public key is the one the private key

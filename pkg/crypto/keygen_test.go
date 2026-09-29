@@ -1,7 +1,10 @@
 package crypto
 
 import (
+	"crypto"
+	_ "crypto/sha256"
 	"encoding/base64"
+	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
@@ -9,6 +12,7 @@ import (
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.jetify.com/typeid"
 )
 
 func TestNewKeyGeneratorDefaults(t *testing.T) {
@@ -149,8 +153,31 @@ func mustKeyID(t *testing.T, key jwk.Key) string {
 	t.Helper()
 
 	kid, ok := key.KeyID()
-	require.True(t, ok, "a generated key carries a thumbprint kid")
+	require.True(t, ok, "a generated key carries a kid")
 	return kid
+}
+
+// TestGeneratedKidIsAJwkTypeID pins the kid convention: every generated key
+// names itself `jwk_<id>`, the same prefix the stored rows of the OAuth
+// provider use, so a published set is uniform regardless of where the key
+// came from.
+func TestGeneratedKidIsAJwkTypeID(t *testing.T) {
+	generator, err := NewKeyGenerator("ES256")
+	require.NoError(t, err)
+	keys, err := generator.Generate()
+	require.NoError(t, err)
+
+	public := decodeJWK(t, keys[EnvAuthPublicKey])
+	kid := mustKeyID(t, public)
+	assert.True(t, strings.HasPrefix(kid, "jwk_"), "kid %q must carry the jwk_ prefix", kid)
+	_, err = typeid.Parse[jWKID](kid)
+	assert.NoError(t, err, "kid %q must be a parseable TypeID", kid)
+
+	// The thumbprint the old generator wrote never appears: a renamed key
+	// would make the JWKS answer a kid the configured value does not name.
+	thumbprint, err := public.Thumbprint(crypto.SHA256)
+	require.NoError(t, err)
+	assert.NotEqual(t, base64.RawURLEncoding.EncodeToString(thumbprint), kid)
 }
 
 func TestGeneratedKeysSignAndVerify(t *testing.T) {

@@ -2,11 +2,14 @@ package jwks
 
 import (
 	"context"
+	stdhash "crypto"
+	_ "crypto/sha256"
 	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -337,4 +340,76 @@ func TestASymmetricConfiguredKeyFailsTheRun(t *testing.T) {
 // TestModuleNameIsReported keeps the composition report readable.
 func TestModuleNameIsReported(t *testing.T) {
 	assert.Equal(t, "jwks", NewModule(nil).Name())
+}
+
+// TestALegacyConfiguredKeyIsRenamedToAJwkKid pins the fallback: a configured
+// key pair generated before the `jwk_` convention carries the old
+// thumbprint kid, and the parse renames it so the published set is uniform.
+// The private half adopts the new kid, so a token's header still names a
+// key the set carries.
+func TestALegacyConfiguredKeyIsRenamedToAJwkKid(t *testing.T) {
+	cfg := testConfig(t)
+
+	// Roll the pair back to the thumbprint kid the old generator wrote.
+	public, err := crypto.DecodeJWK(cfg.Auth.PublicKey)
+	require.NoError(t, err)
+	thumbprint, thumbErr := public.Thumbprint(stdhash.SHA256)
+	require.NoError(t, thumbErr)
+	legacy := base64.RawURLEncoding.EncodeToString(thumbprint)
+	require.NoError(t, public.Set(jwk.KeyIDKey, legacy))
+	legacyPublic, err := json.Marshal(public)
+	require.NoError(t, err)
+	private, err := crypto.DecodeJWK(cfg.Auth.PrivateKey)
+	require.NoError(t, err)
+	private.Set(jwk.KeyIDKey, legacy)
+	legacyPrivate, err := json.Marshal(private)
+	require.NoError(t, err)
+	encodedPublic := base64.RawStdEncoding.EncodeToString(legacyPublic)
+	encodedPrivate := base64.RawStdEncoding.EncodeToString(legacyPrivate)
+	cfg.Auth.PublicKey = encodedPublic
+	cfg.Auth.PrivateKey = encodedPrivate
+
+	service := NewService(cfg, nil, nil, nil)
+	require.NoError(t, service.Err(), "the rename is not a parse failure")
+
+	keys := decodeKeys(t, serve(t, service))
+	require.Len(t, keys, 1)
+	kid, ok := keys[0]["kid"].(string)
+	require.True(t, ok)
+	assert.True(t, strings.HasPrefix(kid, "jwk_"),
+		"the published kid %q must carry the jwk_ prefix", kid)
+	assert.NotEqual(t, legacy, kid, "the thumbprint kid must not survive")
+
+	// The signing key answers with the renamed kid, so a token minted now
+	// names a key the published set carries.
+	signKey, err := service.SignKey(context.Background())
+	require.NoError(t, err)
+	signedKid, ok := signKey.KeyID()
+	require.True(t, ok)
+	assert.Equal(t, kid, signedKid, "both halves must answer the renamed kid")
+
+	// A current pair (the generator stamps jwk_ itself) keeps its kid: the
+	// fallback only rewrites what predates the convention.
+	current := testConfig(t)
+	currentService := NewService(current, nil, nil, nil)
+	require.NoError(t, currentService.Err())
+	currentPublic, err := crypto.DecodeJWK(current.Auth.PublicKey)
+	require.NoError(t, err)
+	assert.Equal(t, mustGeneratedKid(t, currentPublic), mustServicePublishedKid(t, currentService))
+}
+
+func mustGeneratedKid(t *testing.T, key jwk.Key) string {
+	t.Helper()
+	kid, ok := key.KeyID()
+	require.True(t, ok)
+	return kid
+}
+
+func mustServicePublishedKid(t *testing.T, service *Service) string {
+	t.Helper()
+	keys := decodeKeys(t, serve(t, service))
+	require.Len(t, keys, 1)
+	kid, ok := keys[0]["kid"].(string)
+	require.True(t, ok)
+	return kid
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"go.jetify.com/typeid"
 )
 
 // Environment variable names of the generated secret keys.
@@ -143,8 +144,11 @@ func (g *KeyGenerator) keyPair() (private, public string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("crypto: derive public key: %w", err)
 	}
-	if metadataErr := setKeyMetadata(pub, g.keyAlgorithm); metadataErr != nil {
-		return "", "", metadataErr
+	// The pair shares one kid: a token's header names it and the published
+	// set matches it, so the derived public half copies the private half's
+	// id rather than minting its own. Only the algorithm is stamped here.
+	if algErr := pub.Set(jwk.AlgorithmKey, g.keyAlgorithm); algErr != nil {
+		return "", "", fmt.Errorf("crypto: set alg: %w", algErr)
 	}
 
 	private, err = encodeJWK(priv)
@@ -158,17 +162,34 @@ func (g *KeyGenerator) keyPair() (private, public string, err error) {
 	return private, public, nil
 }
 
-// setKeyMetadata stamps the algorithm and a thumbprint-derived key ID on
-// the key so the published JWKS can be matched by `kid`.
+// setKeyMetadata stamps the algorithm and a `jwk_` TypeID key ID on the
+// key so the published JWKS can be matched by `kid` and so every signing
+// key the deployment holds names itself the same way — the database rows
+// of the OAuth provider use the same prefix.
 func setKeyMetadata(key jwk.Key, algorithm string) error {
 	if err := key.Set(jwk.AlgorithmKey, algorithm); err != nil {
 		return fmt.Errorf("crypto: set alg: %w", err)
 	}
-	if err := jwk.AssignKeyID(key); err != nil {
-		return fmt.Errorf("crypto: assign kid: %w", err)
+	kid, err := typeid.New[jWKID]()
+	if err != nil {
+		return fmt.Errorf("crypto: mint kid: %w", err)
+	}
+	if err := key.Set(jwk.KeyIDKey, kid.String()); err != nil {
+		return fmt.Errorf("crypto: set kid: %w", err)
 	}
 	return nil
 }
+
+// jWKIDPrefix is the TypeID prefix of a signing key's `kid`, shared with
+// the stored rows the OAuth provider signs from. The prefix lives here
+// because the generator stamps the kid into the JWK JSON a deployment
+// keeps in its configuration.
+type jWKIDPrefix struct{}
+
+func (jWKIDPrefix) Prefix() string { return "jwk" }
+
+// jWKID is the typed identifier a generated key pair carries as `kid`.
+type jWKID = typeid.TypeID[jWKIDPrefix]
 
 // encodeJWK serializes a key to base64-encoded JSON. Raw (unpadded)
 // base64 keeps the value free of `=` so it stays readable unquoted in
