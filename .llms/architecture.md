@@ -671,7 +671,14 @@ its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no
 setter for the device endpoints, and the prefix is the one mechanism
 that renames them: every `With*Endpoint` value is the bare name, the
 full path is always `protocolPrefix +` the endpoint, and discovery
-builds its advertised URLs from issuer + prefix + bare name. The device
+builds its advertised URLs from issuer + prefix + bare name. The RFC
+8414 alias `/.well-known/oauth-authorization-server` is tango's own
+mount: the provider registers the discovery handler on the
+openid-configuration path alone, so the alias re-points the request's
+path at it — one document, both faces, and every AS member an RFC 8414
+client reads (revocation and introspection endpoints with their
+authentication methods included) already rides the discovery document.
+The device
 code and the user code ride the same pointer pattern as the
 authorization code — session rows kind `device`, hashed pointer rows
 kinds `devicecode` and `usercode`, a re-entered user code moving the

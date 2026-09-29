@@ -441,9 +441,10 @@ names, its v0.25.0 API exposing no endpoint setter; the provider
 registers its routes under `WithPathPrefix("/oidc")`); device login
 pairs with it. Discovery at `/.well-known/openid-configuration` advertises
 the issuer and protocol endpoints, the JWKS URI, supported grants/scopes/claims,
-PAR and device authorization endpoints, and CIMD support. Tango does not expose
-the RFC 8414 alias `/.well-known/oauth-authorization-server` added by Pocket ID
-v2.14.0.
+the introspection and revocation endpoints, PAR and device authorization
+endpoints, and CIMD support. The RFC 8414 alias
+`/.well-known/oauth-authorization-server` serves the same document — one
+document cannot drift from itself.
 
 **Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
 `(kind,key)`, JSONB `request_data`, nullable `expires_at`): the object
@@ -666,7 +667,7 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
 | GET | `/.well-known/jwks.json` | Get JSON Web Key Set (JWKS) | REST — done; bare RFC 7517 JWK Set over the configured key pair + `public.jwks` signing rows, cached behind `jwtutils.KeyProvider` | `modules/identity/jwks` (handler + integration tests) |
-| GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | planned — discovery documents belong to the unbuilt federation phase | — |
+| GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | done — REST, RFC 8414; the discovery document served at the alias path, revocation and introspection surfaces included | `modules/federation/oidc` (protocol mount, `requestAt` alias) |
 | GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | planned | — |
 
 ## Notifications

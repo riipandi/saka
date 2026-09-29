@@ -235,6 +235,26 @@ func (p *Protocol) Mount(r chi.Router) {
 	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint, handler)
 	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint+"/*", handler)
 	r.Handle("/.well-known/openid-configuration", handler)
+	// The RFC 8414 alias is the OAuth face of the same document: the
+	// provider registers the discovery handler on the openid-configuration
+	// path alone, so the alias re-points the request at it. The document
+	// already names every authorization-server member an RFC 8414 client
+	// reads — issuer, the endpoints, grant types, scopes, and the
+	// introspection and revocation surfaces with their authentication
+	// methods — and one document cannot drift from itself.
+	r.Handle("/.well-known/oauth-authorization-server",
+		requestAt("/.well-known/openid-configuration", handler))
+}
+
+// requestAt re-points a request's path before the handler sees it. The
+// provider's mux matches on the URL path, so the alias is the same path
+// the registration names.
+func requestAt(path string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = path
+		r.URL.RawPath = ""
+		next.ServeHTTP(w, r)
+	})
 }
 
 // defaultDeviceCodeFunc draws the device code the same way the library
