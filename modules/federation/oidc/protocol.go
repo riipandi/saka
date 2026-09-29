@@ -143,6 +143,11 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithAuthPolicies(signInPolicy(service), interactionPolicy(service)),
 			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256, goidc.CodeChallengeMethodPlain},
 				provider.WithPKCERequired()),
+			// Third-party initiated login: the authorization response carries
+			// the iss parameter (RFC 9207), so a relying party that linked
+			// the browser here can tell the answer apart from any other
+			// provider's response landing on the same callback.
+			provider.WithIssuerResponseParameter(),
 			// PAR rides the same session store: the pushed request creates
 			// an authorization session whose id the authorize endpoint
 			// resolves through the pointer row. One endpoint, short life —

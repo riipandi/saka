@@ -162,6 +162,11 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		"client_name":      client.Name,
 		"requested_scopes": requestedScopes(session),
 		"consent_required": true,
+		// Third-party initiated login: the hint the relying party sent
+		// — a username or email — prefills or highlights the account
+		// the flow is for. The SPA treats it as a display hint only:
+		// the signed-in credential decides the subject.
+		"login_hint": session.LoginHint,
 	})
 	return goidc.StatusPending, nil
 }

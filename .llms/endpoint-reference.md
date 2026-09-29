@@ -482,6 +482,29 @@ is stamped when a client presents a
 code challenge the requirement did not demand. PKCE is enforced for public
 clients; `plain` and `S256` are accepted.
 
+**Third-party initiated login.** A relying party links the browser
+straight to `GET /oidc/authorize` with its own `client_id`, an optional
+`login_hint` (a username or email), and `state` — the standard
+authorization-request parameters the endpoint already accepts, no
+separate entry point. The hint surfaces in the interaction document the
+SPA receives (`login_hint` field, empty string when none) as a display
+prefill; the signed-in credential, not the hint, decides the subject.
+Every authorization response — success and error redirect alike —
+carries the `iss` parameter (RFC 9207,
+`authorization_response_iss_parameter_supported` in the discovery
+document), so a page that framed the flow can tell this provider's
+answer apart from any other landing on the same callback.
+
+**Deferred: `check_session_iframe` and front-channel session
+management.** The OP iframe's postMessage session polling waits for the
+frontend's session-cookie story — the SPA owns the browser session
+today, and a backend route without a frontend consumer answers nothing
+the session RPCs (`ListSessions`, `RevokeSession`,
+`SignOutAllSessions`) do not already cover. A decision someone makes,
+not an accident; the discovery document does not advertise the field
+until it ships. `TODO(frontend)`: the consent screen's `login_hint`
+prefill.
+
 **Token issuance.** Grants `authorization_code`, `refresh_token`, and
 `urn:ietf:params:oauth:grant-type:device_code`, plus `client_credentials`
 for the clients whose `allowed_grant_types` names it — the
@@ -710,7 +733,7 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 | ------ | -------- | -------------------- | ------ | -------- |
 | GET | `/.well-known/jwks.json` | Get JSON Web Key Set (JWKS) | REST — done; bare RFC 7517 JWK Set over the configured key pair + `public.jwks` signing rows, cached behind `jwtutils.KeyProvider` | `modules/identity/jwks` (handler + integration tests) |
 | GET | `/.well-known/oauth-authorization-server` | Get OAuth 2.0 authorization server metadata | done — REST, RFC 8414; the discovery document served at the alias path, revocation and introspection surfaces included | `modules/federation/oidc` (protocol mount, `requestAt` alias) |
-| GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | planned | — |
+| GET | `/.well-known/openid-configuration` | Get OpenID Connect discovery configuration | done — REST; the provider's discovery document: issuer, endpoints, scopes (`openid`, `profile`, `email`, `groups`, `offline_access`), `authorization_response_iss_parameter_supported` (RFC 9207 on), revocation and introspection surfaces | `modules/federation/oidc` (protocol mount) |
 
 ## Notifications
 
