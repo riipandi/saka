@@ -12,42 +12,42 @@ vars:
   IMAGE:
     sh: jq -r .config.image package.json 2>/dev/null || echo ghcr.io/riipandi/tango
 
-# Every group lives in tasks/. Each include is flattened, so a task keeps
+# Every group lives in scripts/task-. Each include is flattened, so a task keeps
 # the name it had when this file held it. That also keeps one flat namespace,
 # so a task in one file can depend on a task in another by its plain name.
 includes:
   dev:
-    taskfile: ./tasks/dev.yml
+    taskfile: ./scripts/task-dev.yml
     flatten: true
   build:
-    taskfile: ./tasks/build.yml
+    taskfile: ./scripts/task-build.yml
     flatten: true
   database:
-    taskfile: ./tasks/database.yml
+    taskfile: ./scripts/task-database.yml
     flatten: true
   cert:
-    taskfile: ./tasks/cert.yml
+    taskfile: ./scripts/task-cert.yml
     flatten: true
   test:
-    taskfile: ./tasks/test.yml
+    taskfile: ./scripts/task-test.yml
     flatten: true
   lint:
-    taskfile: ./tasks/lint.yml
+    taskfile: ./scripts/task-lint.yml
     flatten: true
   rpc:
-    taskfile: ./tasks/rpc.yml
+    taskfile: ./scripts/task-rpc.yml
     flatten: true
   deps:
-    taskfile: ./tasks/deps.yml
+    taskfile: ./scripts/task-deps.yml
     flatten: true
   cleanup:
-    taskfile: ./tasks/cleanup.yml
+    taskfile: ./scripts/task-cleanup.yml
     flatten: true
   docker:
-    taskfile: ./tasks/docker.yml
+    taskfile: ./scripts/task-docker.yml
     flatten: true
   metrics:
-    taskfile: ./tasks/metrics.yml
+    taskfile: ./scripts/task-metrics.yml
     flatten: true
 
 tasks:

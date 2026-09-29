@@ -38,10 +38,10 @@ func TestKeyGeneratePrintsAllKeys(t *testing.T) {
 	out, err := runKeyGenerateCmd(t, "")
 	require.NoError(t, err)
 
-	for _, name := range []string{"APP_SECRET_KEY", "AUTH_PRIVATE_KEY", "AUTH_PUBLIC_KEY", "AUTH_SECRET_KEY"} {
+	for _, name := range []string{"APP_SECRET_KEY", "AUTH_SECRET_KEY"} {
 		assert.Contains(t, out, name+"=")
 	}
-	assert.Equal(t, 4, strings.Count(out, "\n"))
+	assert.Equal(t, 2, strings.Count(out, "\n"))
 }
 
 // Without --env-file the command must not prompt or touch any file, even
@@ -58,7 +58,7 @@ func TestKeyGenerateWithoutEnvFileTouchesNothing(t *testing.T) {
 
 	assert.NotContains(t, out, "already exists")
 	assert.NotContains(t, out, "left unchanged")
-	assert.Equal(t, 4, strings.Count(out, "\n"))
+	assert.Equal(t, 2, strings.Count(out, "\n"))
 
 	raw, err := os.ReadFile(filepath.Join(dir, ".env.local"))
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestKeyGenerateIgnoresRootEnvFile(t *testing.T) {
 
 	assert.NotContains(t, out.String(), "already exists")
 	assert.NotContains(t, out.String(), "wrote ")
-	assert.Equal(t, 4, strings.Count(out.String(), "\n"))
+	assert.Equal(t, 2, strings.Count(out.String(), "\n"))
 
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -96,11 +96,16 @@ func TestKeyGenerateIgnoresRootEnvFile(t *testing.T) {
 }
 
 func TestKeyGeneratePrintsAllKeysForEveryAlgorithm(t *testing.T) {
-	for _, algorithm := range []string{"ES384", "EdDSA", "RS256", "HS512"} {
-		out, err := runKeyGenerateCmd(t, "", "--algorithm="+algorithm)
-		require.NoError(t, err)
+	for _, algorithm := range []string{"ES384", "EdDSA", "RS256"} {
+		_, err := runKeyGenerateCmd(t, "", "--algorithm="+algorithm)
+		require.ErrorIs(t, err, crypto.ErrUnsupportedAlgorithm, algorithm)
+	}
 
-		for _, name := range []string{"APP_SECRET_KEY", "AUTH_PRIVATE_KEY", "AUTH_PUBLIC_KEY", "AUTH_SECRET_KEY"} {
+	for _, algorithm := range []string{"HS256", "HS384", "HS512"} {
+		out, err := runKeyGenerateCmd(t, "", "--algorithm="+algorithm)
+		require.NoError(t, err, algorithm)
+
+		for _, name := range []string{"APP_SECRET_KEY", "AUTH_SECRET_KEY"} {
 			assert.Contains(t, out, name+"=", algorithm)
 		}
 	}
@@ -116,11 +121,11 @@ func TestKeyGenerateCreatesMissingEnvFile(t *testing.T) {
 
 	out, err := runKeyGenerateCmd(t, "", "--env-file="+path)
 	require.NoError(t, err)
-	assert.Contains(t, out, "(4 added, 0 replaced; key pair ES256, secret HS256)")
+	assert.Contains(t, out, "(2 added, 0 replaced; secret HS256)")
 
 	file, err := envfile.Load(path)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"APP_SECRET_KEY", "AUTH_PRIVATE_KEY", "AUTH_PUBLIC_KEY", "AUTH_SECRET_KEY"},
+	assert.Equal(t, []string{"APP_SECRET_KEY", "AUTH_SECRET_KEY"},
 		file.Keys())
 }
 
@@ -132,7 +137,7 @@ func TestKeyGenerateAsksBeforeReplacing(t *testing.T) {
 	out, err := runKeyGenerateCmd(t, "y\n", "--env-file="+path)
 	require.NoError(t, err)
 	assert.Contains(t, out, "already exists — replace its key values? [y/N]")
-	assert.Contains(t, out, "(3 added, 1 replaced; key pair ES256, secret HS256)")
+	assert.Contains(t, out, "(1 added, 1 replaced; secret HS256)")
 
 	file, err := envfile.Load(path)
 	require.NoError(t, err)
@@ -175,14 +180,14 @@ func TestKeyGenerateOverwriteSkipsConfirmation(t *testing.T) {
 	out, err := runKeyGenerateCmd(t, "", "--env-file="+path, "--overwrite")
 	require.NoError(t, err)
 	assert.NotContains(t, out, "already exists")
-	assert.Contains(t, out, "(3 added, 1 replaced; key pair ES256, secret HS256)")
+	assert.Contains(t, out, "(1 added, 1 replaced; secret HS256)")
 
 	file, err := envfile.Load(path)
 	require.NoError(t, err)
 	secret, ok := file.Get("APP_SECRET_KEY")
 	require.True(t, ok)
 	assert.NotEqual(t, "stale", secret)
-	assert.Equal(t, []string{"HOST", "APP_SECRET_KEY", "AUTH_PRIVATE_KEY", "AUTH_PUBLIC_KEY", "AUTH_SECRET_KEY"},
+	assert.Equal(t, []string{"HOST", "APP_SECRET_KEY", "AUTH_SECRET_KEY"},
 		file.Keys())
 }
 
@@ -191,15 +196,15 @@ func TestKeyGenerateReportsAlgorithms(t *testing.T) {
 
 	out, err := runKeyGenerateCmd(t, "", "--env-file="+path)
 	require.NoError(t, err)
-	assert.Contains(t, out, "key pair ES256, secret HS256)")
+	assert.Contains(t, out, "secret HS256)")
 
 	out, err = runKeyGenerateCmd(t, "y\n", "--env-file="+path, "--algorithm=HS512")
 	require.NoError(t, err)
-	assert.Contains(t, out, "key pair ES256, secret HS512)")
+	assert.Contains(t, out, "secret HS512)")
 
-	out, err = runKeyGenerateCmd(t, "y\n", "--env-file="+path, "--algorithm=ES384")
-	require.NoError(t, err)
-	assert.Contains(t, out, "key pair ES384, secret HS256)")
+	_, err = runKeyGenerateCmd(t, "y\n", "--env-file="+path, "--algorithm=ES384")
+	require.ErrorIs(t, err, crypto.ErrUnsupportedAlgorithm,
+		"the key pair's algorithm is the database's (jwks:generate), not the secret's")
 }
 
 func TestKeyGenerateFailsOnUnwritablePath(t *testing.T) {

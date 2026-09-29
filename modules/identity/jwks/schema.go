@@ -61,4 +61,8 @@ type SigningKeyPair struct {
 	Algorithm string
 	// PrivateKey is the sealed (`enc:`) private JWK JSON of the row.
 	PrivateKey []byte
+	// SealFP is the fingerprint of the key that sealed PrivateKey. A
+	// reader whose current fingerprint differs knows the auth secret
+	// rotated under this row; the row is retired, not decrypted.
+	SealFP string
 }

@@ -21,16 +21,20 @@ package jwks
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
+	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/pkg/crypto"
 )
 
@@ -63,6 +67,97 @@ type PairSource interface {
 // source at all. Nothing in the process can mint a token without one.
 var ErrNoStoredKeys = errors.New("jwks: no signing key pair in the database; run tango initialize to provision one")
 
+// Sealer is the write seam the auto-invalidation runs through. The
+// repository implements it; the interface keeps a test able to stand in.
+// It retires rows sealed by a key the process no longer holds and stages
+// the replacement pair the rotation needs. Querier exposes the write
+// surface the audit record rides, so the invalidation is recorded on the
+// same database the change ran on.
+type Sealer interface {
+	RetireStaleSeals(ctx context.Context, current string) (int64, error)
+	InsertProvisionedPair(ctx context.Context, pair ProvisionedPair) error
+	Querier() datastore.Querier
+}
+
+// ProvisionedPair is one generated pair the sealer stores: the sealed
+// private half, the publishable public half, and the row's algorithm.
+type ProvisionedPair struct {
+	KeyID     string
+	Algorithm string
+	KeyType   string
+	PublicKey string
+	SealedKey string
+	SealFP    string
+}
+
+// PairGenerator mints one fresh signing pair. It is satisfied by the
+// seeders package's builder in production; the interface keeps the service
+// from importing the seeders (which import this package).
+type PairGenerator func(algorithm string) (ProvisionedPair, error)
+
+// GeneratePair mints one fresh signing pair sealed with the service's
+// cipher. It is the production PairGenerator: the row shape is this
+// package's decision, so the generation lives beside the schema, and the
+// seeders and the jwks:generate command build on the same function.
+func (s *Service) GeneratePair(algorithm string) (ProvisionedPair, error) {
+	return generatePair(algorithm, s.cipher)
+}
+
+// GeneratePairWith is the free-standing builder the seeders package and the
+// jwks:generate command call. It is the same generation the Service's
+// GeneratePair method runs, without needing a Service.
+func GeneratePairWith(algorithm string, cipher *crypto.Cipher) (ProvisionedPair, error) {
+	return generatePair(algorithm, cipher)
+}
+
+// generatePair is the shared builder. It lives free-standing so the
+// seeders package can call it without a Service.
+func generatePair(algorithm string, cipher *crypto.Cipher) (ProvisionedPair, error) {
+	private, public, err := crypto.GenerateKeyPair(algorithm)
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("generate key pair: %w", err)
+	}
+
+	// The columns carry the JWK JSON documents, not the base64 envelope the
+	// generator writes: the published set and the unseal path both parse the
+	// column value directly. Both halves are re-encoded here, so the row and
+	// the reader agree on the shape.
+	privateParsed, err := crypto.DecodeJWK(private)
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("read private key: %w", err)
+	}
+	publicParsed, err := crypto.DecodeJWK(public)
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("read public key: %w", err)
+	}
+	privateDoc, err := json.Marshal(privateParsed)
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("encode private key: %w", err)
+	}
+	publicDoc, err := json.Marshal(publicParsed)
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("encode public key: %w", err)
+	}
+
+	// The public half's kid and alg are what the row stores; the same stamp
+	// rides the private half, so the pair answers one name.
+	kid, _ := publicParsed.KeyID()
+	keyType := publicParsed.KeyType().String()
+
+	sealed, err := cipher.Encrypt(string(privateDoc))
+	if err != nil {
+		return ProvisionedPair{}, fmt.Errorf("seal private key: %w", err)
+	}
+	return ProvisionedPair{
+		KeyID:     kid,
+		Algorithm: algorithm,
+		KeyType:   keyType,
+		PublicKey: string(publicDoc),
+		SealedKey: sealed,
+		SealFP:    cipher.Fingerprint(),
+	}, nil
+}
+
 // Service owns the published key set and the configured signing material.
 type Service struct {
 	source Source
@@ -81,11 +176,37 @@ type Service struct {
 	// secret key has nothing to unseal; signing fails closed on it.
 	cipher *crypto.Cipher
 
+	// sealer is the optional write seam: when wired, a row whose seal
+	// fingerprint no longer matches the cipher's is retired in place and a
+	// replacement pair is provisioned, so an AUTH_SECRET_KEY rotation
+	// recovers on the next sign-in instead of staying broken until an
+	// operator runs a command.
+	sealer    Sealer
+	generate  PairGenerator
+	algorithm string
+	recorder  *audit.Recorder
+
 	// configured is auth.jwt_algorithm, empty when the deployment lets the
 	// material decide.
 	configured string
 
 	parseErr error
+}
+
+// WithSealer wires the auto-invalidation write path. generate mints a
+// fresh pair (the seeders builder in production) and algorithm names the
+// algorithm the replacement is generated with — the configured
+// auth.jwt_algorithm's asymmetric answer, or the package default. Without
+// a sealer, a stale-fingerprint row fails signing with its decrypt error
+// and the operator recovers with jwks:generate. recorder may be nil — a
+// record is best effort, and an invalidation that cannot be recorded has
+// still restored signing.
+func (s *Service) WithSealer(sealer Sealer, generate PairGenerator, algorithm string, recorder *audit.Recorder) *Service {
+	s.sealer = sealer
+	s.generate = generate
+	s.algorithm = algorithm
+	s.recorder = recorder
+	return s
 }
 
 // NewService builds the service. source may be nil, which is a run with no
@@ -252,6 +373,8 @@ func (s *Service) SignKey(ctx context.Context) (jwk.Key, error) {
 
 // signingPrivateKey unseals the first active signing row's private key. The
 // rows are ordered stably, so the first row is the key every mint names.
+// An AUTH_SECRET_KEY rotation discovered on the way re-provisions the rows,
+// so the read runs once more before the failure is answered.
 func (s *Service) signingPrivateKey(ctx context.Context) (jwk.Key, error) {
 	pairs, err := s.signingPairs(ctx)
 	if err != nil {
@@ -261,21 +384,30 @@ func (s *Service) signingPrivateKey(ctx context.Context) (jwk.Key, error) {
 		return nil, ErrNoStoredKeys
 	}
 	opened, err := s.openSealedKey(ctx, pairs[0])
+	if errors.Is(err, errRetryAfterInvalidation) {
+		// The rotation re-read: the fresh rows carry the current fingerprint,
+		// so this open cannot trip the retry again.
+		var retryErr error
+		pairs, retryErr = s.signingPairs(ctx)
+		if retryErr != nil {
+			return nil, retryErr
+		}
+		if len(pairs) == 0 {
+			return nil, ErrNoStoredKeys
+		}
+		opened, err = s.openSealedKey(ctx, pairs[0])
+	}
 	if err != nil {
 		return nil, err
 	}
 	// A token's header names the row's kid, and the published set matches
 	// it by that name, so the unsealed key adopts the row's kid — the JWK
 	// JSON a rotation wrote earlier is not the authority, the row is.
-	if err := opened.Set(jwk.KeyIDKey, pairs[0].KeyID); err != nil {
-		return nil, fmt.Errorf("jwks: set kid: %w", err)
+	stamped, err := s.stampSigningKey(opened, pairs[0])
+	if err != nil {
+		return nil, err
 	}
-	if pairs[0].Algorithm != "" {
-		if err := opened.Set(jwk.AlgorithmKey, pairs[0].Algorithm); err != nil {
-			return nil, fmt.Errorf("jwks: set alg: %w", err)
-		}
-	}
-	return opened, nil
+	return stamped, nil
 }
 
 // HMACKey returns the symmetric signing key. It is the other half of the dual
@@ -406,24 +538,44 @@ func (s *Service) OIDCSigningKeys(ctx context.Context) ([]jwk.Key, error) {
 
 	keys := make([]jwk.Key, 0, len(rows))
 	for _, row := range rows {
-		opened, err := s.openSealedKey(ctx, row)
-		if err != nil {
+		opened, openErr := s.openSealedKey(ctx, row)
+		if errors.Is(openErr, errRetryAfterInvalidation) {
+			// The rotation retired this row mid-set; the re-read names the
+			// replacement, and its rows carry the current fingerprint.
+			var readErr error
+			rows, readErr = pairs.ActiveSigningKeyPairs(ctx)
+			if readErr != nil {
+				return nil, readErr
+			}
+			if len(rows) == 0 {
+				return nil, ErrNoStoredKeys
+			}
+			keys = keys[:0]
+			for _, fresh := range rows {
+				retryOpened, retryErr := s.openSealedKey(ctx, fresh)
+				if retryErr != nil {
+					s.log.ErrorContext(ctx, "jwks: skipping an unusable signing pair",
+						"kid", fresh.KeyID, "err", retryErr)
+					continue
+				}
+				key, stampErr := s.stampSigningKey(retryOpened, fresh)
+				if stampErr != nil {
+					return nil, stampErr
+				}
+				keys = append(keys, key)
+			}
+			break
+		}
+		if openErr != nil {
 			s.log.ErrorContext(ctx, "jwks: skipping an unusable signing pair",
-				"kid", row.KeyID, "err", err)
+				"kid", row.KeyID, "err", openErr)
 			continue
 		}
-		if err := opened.Set(jwk.KeyIDKey, row.KeyID); err != nil {
-			return nil, fmt.Errorf("jwks: set kid: %w", err)
+		key, err := s.stampSigningKey(opened, row)
+		if err != nil {
+			return nil, err
 		}
-		if row.Algorithm != "" {
-			if err := opened.Set(jwk.AlgorithmKey, row.Algorithm); err != nil {
-				return nil, fmt.Errorf("jwks: set alg: %w", err)
-			}
-		}
-		if err := opened.Set(jwk.KeyUsageKey, KeyUsageSignature); err != nil {
-			return nil, fmt.Errorf("jwks: set use: %w", err)
-		}
-		keys = append(keys, opened)
+		keys = append(keys, key)
 	}
 	if len(keys) == 0 {
 		return nil, ErrNoStoredKeys
@@ -431,11 +583,50 @@ func (s *Service) OIDCSigningKeys(ctx context.Context) ([]jwk.Key, error) {
 	return keys, nil
 }
 
+// stampSigningKey names an unsealed private key after its row: the kid the
+// token header carries and the algorithm the row declares.
+func (s *Service) stampSigningKey(opened jwk.Key, row SigningKeyPair) (jwk.Key, error) {
+	if err := opened.Set(jwk.KeyIDKey, row.KeyID); err != nil {
+		return nil, fmt.Errorf("jwks: set kid: %w", err)
+	}
+	if row.Algorithm != "" {
+		if err := opened.Set(jwk.AlgorithmKey, row.Algorithm); err != nil {
+			return nil, fmt.Errorf("jwks: set alg: %w", err)
+		}
+	}
+	if err := opened.Set(jwk.KeyUsageKey, KeyUsageSignature); err != nil {
+		return nil, fmt.Errorf("jwks: set use: %w", err)
+	}
+	return opened, nil
+}
+
 // openSealedKey unseals one row's private key and parses it. A symmetric
 // result is refused: a shared secret has no place in a published set.
+//
+// A row whose seal fingerprint differs from the cipher's was sealed by an
+// AUTH_SECRET_KEY the process no longer holds — its ciphertext can never
+// open again. When the sealer is wired the rotation runs here once: the
+// stale rows are retired in place and a replacement pair is provisioned,
+// and the caller retries against the new first row. Without a sealer the
+// mismatch is the returned error, and jwks:generate is the operator's way
+// out.
 func (s *Service) openSealedKey(ctx context.Context, row SigningKeyPair) (jwk.Key, error) {
 	if s.cipher == nil {
-		return nil, errors.New("no secret key is configured to unseal the private key")
+		return nil, errors.New("no auth secret is configured to unseal the private key")
+	}
+	if row.SealFP != "" && row.SealFP != s.cipher.Fingerprint() {
+		invalidated, err := s.invalidateStaleSeals(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if invalidated {
+			// The stale rows are gone and a fresh pair rests as the first
+			// row; the caller's cached slice no longer names it.
+			return nil, errRetryAfterInvalidation
+		}
+		return nil, fmt.Errorf(
+			"unseal private key: sealed by a previous AUTH_SECRET_KEY (seal_fp %s…) — run tango jwks:generate",
+			row.SealFP[:min(8, len(row.SealFP))])
 	}
 	opened, err := s.cipher.Decrypt(string(row.PrivateKey))
 	if err != nil {
@@ -449,6 +640,52 @@ func (s *Service) openSealedKey(ctx context.Context, row SigningKeyPair) (jwk.Ke
 		return nil, symErr
 	}
 	return parsed, nil
+}
+
+// errRetryAfterInvalidation is the internal signal the unseal path answers
+// after it retired stale rows and provisioned a replacement: the caller
+// re-reads the rows once and signs with the new first row. It never
+// escapes the service.
+var errRetryAfterInvalidation = errors.New("jwks: signing rows were re-provisioned")
+
+// invalidateStaleSeals retires every row the current seal fingerprint does
+// not name and provisions one replacement pair. It answers whether the
+// rotation ran. The write is idempotent by construction: a second run
+// finds no stale row (the retire is the WHERE clause) and does nothing.
+// The run is recorded on the repository's own query surface — the retire
+// and the insert are separate statements here, not one transaction, so a
+// crash between them leaves the retired rows sealed-by-nothing (already
+// unopenable) and the next run provisions.
+func (s *Service) invalidateStaleSeals(ctx context.Context) (bool, error) {
+	if s.sealer == nil || s.generate == nil {
+		return false, nil
+	}
+	retired, err := s.sealer.RetireStaleSeals(ctx, s.cipher.Fingerprint())
+	if err != nil {
+		return false, fmt.Errorf("jwks: retire stale seals: %w", err)
+	}
+	pair, err := s.generate(s.algorithm)
+	if err != nil {
+		return false, fmt.Errorf("jwks: generate replacement pair: %w", err)
+	}
+	if err := s.sealer.InsertProvisionedPair(ctx, pair); err != nil {
+		return false, fmt.Errorf("jwks: store replacement pair: %w", err)
+	}
+	s.log.WarnContext(ctx, "jwks: AUTH_SECRET_KEY rotated — stale signing keys retired and a replacement provisioned",
+		"kid", pair.KeyID, "algorithm", pair.Algorithm, "retired", retired)
+	if s.recorder != nil {
+		q := s.sealer.Querier()
+		s.recorder.Record(ctx, q, audit.Entry{
+			Event:  audit.EventJwksInvalidated,
+			Status: audit.StatusSuccess,
+			Payload: map[string]string{
+				"kid":       pair.KeyID,
+				"algorithm": pair.Algorithm,
+				"retired":   strconv.FormatInt(retired, 10),
+			},
+		})
+	}
+	return true, nil
 }
 
 // ErrSymmetricKey reports a key that cannot be published. A symmetric key has

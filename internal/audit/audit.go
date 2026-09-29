@@ -339,6 +339,12 @@ const (
 	// jwks table. The payload names the kid and the algorithm; the private
 	// material is sealed at rest and never rides the record.
 	EventJwksProvisioned = "jwks_provisioned"
+
+	// EventJwksInvalidated is the auto-invalidation an AUTH_SECRET_KEY
+	// rotation runs: the rows sealed by the previous secret are retired
+	// and a replacement pair is provisioned. The payload names the
+	// replacement's kid and algorithm plus how many rows were retired.
+	EventJwksInvalidated = "jwks_invalidated"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

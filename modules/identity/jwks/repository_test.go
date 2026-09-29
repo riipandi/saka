@@ -47,7 +47,7 @@ func TestActiveSigningKeysFiltersTheRows(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	keys, err := NewRepository(pool).ActiveSigningKeys(ctx)
+	keys, err := NewRepository(pool, testCipher(t)).ActiveSigningKeys(ctx)
 	require.NoError(t, err)
 
 	got := make([]string, 0, len(keys))
@@ -70,7 +70,7 @@ func TestActiveSigningKeysNeverReadsThePrivateColumn(t *testing.T) {
 		VALUES ('with-private', 'ES256', 'EC', '{"kty":"EC"}', 'enc:sealed-value', 'sig', TRUE)`)
 	require.NoError(t, err)
 
-	keys, err := NewRepository(pool).ActiveSigningKeys(t.Context())
+	keys, err := NewRepository(pool, testCipher(t)).ActiveSigningKeys(t.Context())
 	require.NoError(t, err)
 
 	require.Len(t, keys, 1)

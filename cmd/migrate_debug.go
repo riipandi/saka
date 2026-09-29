@@ -150,10 +150,10 @@ func runMigrateSeed(ctx context.Context, cmd *cli.Command) error {
 }
 
 // developmentSeeders resolves the seeder list a development seed runs: every
-// seeder, plus the JWKS provisioning when the environment carries an
-// application secret to seal the private half with.
+// seeder, plus the JWKS provisioning when the environment carries an auth
+// secret to seal the private half with.
 func developmentSeeders(cfg config.Config) []seeders.Seeder {
-	cipher, err := crypto.NewCipherFromHex(cfg.App.SecretKey)
+	cipher, err := crypto.NewAuthCipher(cfg.Auth.SecretKey)
 	if err != nil {
 		return seeders.All()
 	}

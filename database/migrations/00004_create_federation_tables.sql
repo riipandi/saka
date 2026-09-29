@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS public.jwks (
     key_type TEXT NOT NULL, -- e.g. RSA, EC, oct
     public_key BYTEA NOT NULL, -- public key for verification (encrypted)
     private_key BYTEA, -- nullable, only for internal use (encrypted)
+    -- seal_fp records a non-secret fingerprint of the key that sealed
+    -- private_key (crypto.Cipher.Fingerprint). A reader whose current
+    -- seal fingerprint differs knows the secret key rotated under the
+    -- row and retires it instead of failing every decrypt.
+    seal_fp TEXT NOT NULL DEFAULT '',
     use_for TEXT NOT NULL DEFAULT 'sig', -- 'sig' (signature) or 'enc' (encryption)
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     expires_at TIMESTAMPTZ DEFAULT NULL,

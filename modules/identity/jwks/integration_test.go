@@ -31,7 +31,7 @@ func TestEndpointPublishesAStoredKeyFromTheDatabase(t *testing.T) {
 		stored.KeyID, stored.Algorithm, stored.PublicKey, time.Now().Add(time.Hour))
 	require.NoError(t, err)
 
-	service := NewService(testConfig(t), NewRepository(pool), nil, nil)
+	service := NewService(testConfig(t), NewRepository(pool, testCipher(t)), nil, nil)
 	require.NoError(t, service.Err())
 
 	keys := decodeKeys(t, serve(t, service))
@@ -73,7 +73,7 @@ func TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet(t *testing.T) {
 	require.NoError(t, err)
 
 	// The set the endpoint publishes is what a verifier reads.
-	service := NewService(testConfig(t), NewRepository(pool), nil, nil)
+	service := NewService(testConfig(t), NewRepository(pool, testCipher(t)), nil, nil)
 	set, err := service.VerifyKeySet(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, set.Len(), "the stored one")

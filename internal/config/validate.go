@@ -1,10 +1,10 @@
 package config
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -460,11 +460,19 @@ func isHexKey(value string) bool {
 	if len(value) != 64 {
 		return false
 	}
-	_, err := strconv.ParseUint(value[:16], 16, 64)
-	if err != nil {
+	return isHexSecret(value)
+}
+
+// isHexSecret reports whether value is an even-length hex string of at least
+// 64 characters (32 bytes) — the widest constraint every reader of
+// auth.secret_key shares: the HMAC parse takes any of the signing lengths,
+// and the auth seal derivation hashes whatever it is given, but both refuse
+// anything shorter or not hex.
+func isHexSecret(value string) bool {
+	if len(value) < 64 || len(value)%2 != 0 {
 		return false
 	}
-	_, err = strconv.ParseUint(value[48:], 16, 64)
+	_, err := hex.DecodeString(value)
 	return err == nil
 }
 
@@ -548,6 +556,13 @@ func JWTAlgorithmMaterialError(algorithm, secretKey string) error {
 func checkAuth(c *Config, check func(ok bool, format string, args ...any)) {
 	check(c.Auth.JWTAlgorithm == "" || isOneOf(c.Auth.JWTAlgorithm, JWTAlgorithms...),
 		"auth.jwt_algorithm: %q is not one of %s", c.Auth.JWTAlgorithm, joinValues(JWTAlgorithms...))
+	// The secret is hex, the form key:generate writes, and at least 32 bytes:
+	// the HS256 minimum. Its length is otherwise free — 48 or 64 bytes sign
+	// HS384 or HS512 — and the same value derives the AES key that seals
+	// auth-related storage (the signing pairs, the TOTP secrets), so a value
+	// the HMAC reader refuses would also break every seal.
+	check(c.Auth.SecretKey == "" || isHexSecret(c.Auth.SecretKey),
+		"auth.secret_key: must be hex-encoded, at least 64 characters (32 bytes)")
 	// A named algorithm must match the material the deployment configured.
 	// The asymmetric half's material is the database's signing row, which is
 	// not visible here; the rule lives in JWTAlgorithmMaterialError, shared

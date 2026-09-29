@@ -140,14 +140,16 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 	// The signing key pair is provisioned in the same transaction as the
 	// system seed: a deployment that runs initialize is one that can sign
 	// in, and signing needs a key the database holds. A run without the
-	// application secret cannot seal the private half and stops here —
-	// there is nothing to bootstrap without one.
-	if cfg.App.SecretKey == "" {
-		return errors.New("initialize: APP_SECRET_KEY is required to seal the signing key pair")
+	// auth secret cannot seal the private half and stops here — there is
+	// nothing to bootstrap without one. The seal key is the auth half
+	// (AUTH_SECRET_KEY, derived), so rotating it later is what invalidates
+	// the pair, and rotating the application secret never touches signing.
+	if cfg.Auth.SecretKey == "" {
+		return fmt.Errorf("initialize: AUTH_SECRET_KEY is required (app=%q unresolved=%v)", cfg.App.SecretKey, cfg.Unresolved())
 	}
-	cipher, err := crypto.NewCipherFromHex(cfg.App.SecretKey)
+	cipher, err := crypto.NewAuthCipher(cfg.Auth.SecretKey)
 	if err != nil {
-		return fmt.Errorf("initialize: APP_SECRET_KEY: %w", err)
+		return fmt.Errorf("initialize: AUTH_SECRET_KEY: %w", err)
 	}
 	signingAlgorithm := cfg.Auth.JWTAlgorithm
 	if signingAlgorithm == "" || config.IsHMACAlgorithm(signingAlgorithm) {

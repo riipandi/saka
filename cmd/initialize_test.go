@@ -43,6 +43,9 @@ func freshMigratedDatabase(t *testing.T) initializedDatabase {
 	envFile := writeEnvFile(t, dsn)
 	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
+	// After the migration run: it writes its own database-only config file,
+	// and initialize reads the deployment one — both secrets plus the DSN.
+	configForDeployment(t)
 	return initializedDatabase{dsn: dsn, envFile: envFile}
 }
 

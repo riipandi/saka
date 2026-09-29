@@ -63,8 +63,25 @@ func writeEnvFile(t *testing.T, dsn string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), ".env.local")
-	require.NoError(t, os.WriteFile(path, []byte(envfile.DatabaseURL+"="+dsn+"\n"), 0o600))
+	body := envfile.DatabaseURL + "=" + dsn + "\n" +
+		"APP_SECRET_KEY=" + testSecret + "\n" +
+		"AUTH_SECRET_KEY=" + testSecret + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 	return path
+}
+
+// configForDeployment is the config file the deployment-command tests
+// resolve against: the database and both secret keys, each left to the
+// environment, which writeEnvFile fills. initialize seals the signing key
+// pair with the auth secret, so both directives must resolve.
+func configForDeployment(t *testing.T) {
+	t.Helper()
+
+	useConfig(t, `{
+		"database": {"url": "env:DATABASE_URL"},
+		"app": {"secret_key": "env:APP_SECRET_KEY"},
+		"auth": {"secret_key": "env:AUTH_SECRET_KEY"}
+	}`)
 }
 
 // runMigrateCmd executes a migration command with args and returns stdout.

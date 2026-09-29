@@ -155,23 +155,44 @@ var Package = do.Package(
 		// area without a database, and a source over nothing must answer
 		// "no rows" rather than dereference the pool. The composition root
 		// never passes one, so this is a guard, not a path.
-		var source jwks.Source
-		if pool != nil {
-			source = jwks.NewRepository(pool)
-		}
 		// The cipher unseals a stored private key for the OAuth
-		// provider; a run without a secret key has nothing to open,
-		// and the OIDC signing keys answer that state on the first
-		// call rather than failing a run that never serves OIDC.
+		// provider and the internal signing path; it is the auth
+		// half — derived from AUTH_SECRET_KEY, not the application
+		// secret — so rotating the auth secret invalidates the
+		// sealed rows (the service retires and re-provisions them)
+		// while rotating the application secret leaves the signing
+		// keys untouched. A run without the auth secret has nothing
+		// to open, and the signing paths answer that state on the
+		// first call rather than failing a run that never serves.
 		var cipher *crypto.Cipher
-		if c.App.SecretKey != "" {
-			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+		if c.Auth.SecretKey != "" {
+			built, err := crypto.NewAuthCipher(c.Auth.SecretKey)
 			if err != nil {
 				return nil, fmt.Errorf("identity: jwks cipher: %w", err)
 			}
 			cipher = built
 		}
+		var source jwks.Source
+		if pool != nil {
+			// The repository seals generated pairs with the same cipher the
+			// service unseals with, so every row it writes carries the
+			// current fingerprint.
+			source = jwks.NewRepository(pool, cipher)
+		}
 		service := jwks.NewService(*c, source, cipher, log)
+		// The auto-invalidation write path: a row sealed by a previous
+		// AUTH_SECRET_KEY is retired and a replacement provisioned on the
+		// next signing read, so the rotation recovers without downtime.
+		// The replacement's algorithm follows the configured override or
+		// the package default, mirroring initialize's choice.
+		if repo, ok := source.(*jwks.Repository); ok {
+			algorithm := c.Auth.JWTAlgorithm
+			if algorithm == "" || config.IsHMACAlgorithm(algorithm) {
+				algorithm = crypto.DefaultSignatureAlgorithm
+			}
+			recorder := do.MustInvoke[*audit.Recorder](i)
+			service.WithSealer(repo, repo.GeneratePair, algorithm, recorder)
+		}
 		// The derived algorithm is worth a line at startup: when
 		// auth.jwt_algorithm is unset, the material decides, and the
 		// HMAC half decides by the secret's length alone. A deployment
@@ -297,15 +318,19 @@ var Package = do.Package(
 		issuer := do.MustInvoke[*signin.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		c := do.MustInvoke[*config.Config](i)
-		// The cipher is built only when the configuration carries a key: a
-		// test or a consumer area that named no secret key has no sealing to
-		// run, and the service answers that state on the first ceremony
-		// rather than failing a run that never touches the feature. A real
-		// deployment always carries the key — validation demands it — so the
-		// production path never sees the nil.
+		// The cipher seals each enrollment's TOTP secret; it is the auth
+		// half — derived from AUTH_SECRET_KEY, not the application secret —
+		// because the secret is account-authentication material: rotating
+		// the auth secret is what invalidates it, and rotating the
+		// application secret never touches a second factor. A test or a
+		// consumer area that named no secret key has no sealing to run, and
+		// the service answers that state on the first ceremony rather than
+		// failing a run that never touches the feature. A real deployment
+		// always carries the key — validation demands it — so the production
+		// path never sees the nil.
 		var cipher *crypto.Cipher
-		if c.App.SecretKey != "" {
-			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+		if c.Auth.SecretKey != "" {
+			built, err := crypto.NewAuthCipher(c.Auth.SecretKey)
 			if err != nil {
 				return nil, fmt.Errorf("identity: multifactor cipher: %w", err)
 			}

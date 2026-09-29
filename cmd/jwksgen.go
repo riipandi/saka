@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/riipandi/tango/database/seeders"
+	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/urfave/cli/v3"
 )
@@ -20,7 +21,7 @@ is how a rotation adds a key without touching the deployment. tango
 initialize provisions the first pair on a fresh database.
 
 Without --algorithm the pair uses ES256. The private half is sealed with
-APP_SECRET_KEY before it is stored, the public half is what discovery
+AUTH_SECRET_KEY before it is stored, the public half is what discovery
 publishes. Run the command again to stage a second key for rotation.`,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -37,15 +38,15 @@ func runJwksGenerate(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	if cfg.App.SecretKey == "" {
-		return errors.New("jwks: APP_SECRET_KEY is required to seal the private key")
+	if cfg.Auth.SecretKey == "" {
+		return errors.New("jwks: AUTH_SECRET_KEY is required to seal the private key")
 	}
-	cipher, err := crypto.NewCipherFromHex(cfg.App.SecretKey)
+	cipher, err := crypto.NewAuthCipher(cfg.Auth.SecretKey)
 	if err != nil {
-		return fmt.Errorf("jwks: secret key: %w", err)
+		return fmt.Errorf("jwks: auth secret: %w", err)
 	}
 
-	pair, err := seeders.GenerateJWKSKeyPair(cmd.String("algorithm"), cipher)
+	pair, err := jwks.GeneratePairWith(cmd.String("algorithm"), cipher)
 	if err != nil {
 		return fmt.Errorf("jwks: %w", err)
 	}

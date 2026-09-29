@@ -126,8 +126,6 @@ func TestConfigGenerateWritesEveryKey(t *testing.T) {
 			"DATABASE_URL=postgresql://user:pass@localhost:5432/tango?sslmode=disable",
 			"AUTH_SECRET_KEY=" + testSecret,
 			"APP_SECRET_KEY=" + testSecret,
-			"AUTH_PRIVATE_KEY=" + testSecret,
-			"AUTH_PUBLIC_KEY=" + testSecret,
 		},
 	})
 	require.NoError(t, err)
@@ -144,7 +142,7 @@ func TestConfigGenerateNeverWritesALiteralSecret(t *testing.T) {
 
 	// Each secret must be a directive. A literal here would be committed by
 	// accident, because the file is meant to be readable.
-	for _, key := range []string{"app.secret_key", "auth.private_key", "auth.public_key", "auth.secret_key", "database.url"} {
+	for _, key := range []string{"app.secret_key", "auth.secret_key", "database.url"} {
 		assert.Contains(t, string(written), `"`+lastSegment(key)+`": "env:`+config.EnvName(key)+`"`)
 	}
 }
@@ -229,7 +227,6 @@ func TestConfigValidateReportsEveryProblem(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "server.port")
 	assert.Contains(t, err.Error(), "log.level")
-	assert.Contains(t, err.Error(), "auth")
 }
 
 func TestConfigValidateReportsAnUnresolvedVariable(t *testing.T) {
@@ -343,29 +340,23 @@ func TestConfigPrintMasksSecrets(t *testing.T) {
 	assert.Equal(t, "bot", printedValue(t, out, "mailer.smtp_username"))
 }
 
-func TestConfigPrintMasksTheJWTKeyPair(t *testing.T) {
-	// The JWK keys are the case the masking exists for: a deployment has several
-	// and they all look alike, so the ends are what tell them apart.
-	const (
-		privateKey = "eyJhbGciOiJFUzI1NiIsImtpZCI6ImFiYyJ9"
-		publicKey  = "eyJhbGciOiJFUzI1NiIsImtpZCI6Inh5eiJ9"
-	)
+func TestConfigPrintMasksTheAuthSecret(t *testing.T) {
+	// The auth secret is the case the masking exists for: it is the signing
+	// and sealing key material, so a print must never echo it.
+	const secret = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	useConfig(t, `{
-		"auth": {"private_key": "env:AUTH_PRIVATE_KEY", "public_key": "env:AUTH_PUBLIC_KEY"},
+		"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
 		"database": {"url": "env:DATABASE_URL"}
 	}`)
-	t.Setenv("AUTH_PRIVATE_KEY", privateKey)
-	t.Setenv("AUTH_PUBLIC_KEY", publicKey)
+	t.Setenv("AUTH_SECRET_KEY", secret)
 	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
 
-	maskedPrivate := printedValue(t, out, "auth.private_key")
-	assert.Equal(t, privateKey[:4]+"****"+privateKey[len(privateKey)-4:], maskedPrivate)
-	assert.NotContains(t, out, privateKey)
-	assert.NotEqual(t, maskedPrivate, printedValue(t, out, "auth.public_key"),
-		"two different keys must not mask to the same value")
+	masked := printedValue(t, out, "auth.secret_key")
+	assert.Equal(t, secret[:4]+"****"+secret[len(secret)-4:], masked)
+	assert.NotContains(t, out, secret)
 }
 
 func TestConfigPrintMasksAnEmptySecretAsEmpty(t *testing.T) {

@@ -30,7 +30,7 @@ pnpm dlx tiged riipandi/tango myapp-name
 6. Start the local Postgres: `docker compose -f docker/compose.yaml up -d pgsql`
 7. Set `DATABASE_URL` in `.env.local` (see `.env.example`)
 8. Run the database migrations: `task db:migrate`
-9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `tasks/database.yml`; wraps `tango initialize`)
+9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `tango initialize`)
 10. Start the development servers: `task dev`
 
 Vite serves the frontend on `:3000` and proxies `/api`, `/rpc`, `/.well-known`, `/metrics`, and `/static` to Go on `:3080`.
@@ -38,7 +38,7 @@ Go files are watched and rebuilt automatically.
 
 ## Available Tasks
 
-Run `task` to list every target. Most targets live in `tasks/`, one file per group; the root
+Run `task` to list every target. Most targets live in `scripts/task-*`, one file per group; the root
 `Taskfile.yml` declares the shared variables, includes them (flattened — `task db:migrate`, never
 `task database:db:migrate`), and keeps the `compose:*` targets itself.
 
