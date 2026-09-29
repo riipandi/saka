@@ -410,7 +410,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
-| GET, POST | `/oidc/end-session` | RP-initiated logout | **broken** — mounted and public, but every request answers `invalid_request`: the provider registers no `WithLogoutPolicies`, so the library refuses to open a logout session (E2E probe 2026-09-29). The planned behavior — `id_token_hint` verified, grants and tokens revoked — is not wired yet | `modules/federation/oidc/protocol.go` (`WithLogout` without policies) |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when `oidc.end_session_revokes_consent` is set), redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
 The protocol design notes below record implementation behavior for device flow,
@@ -486,12 +486,12 @@ one-time grant's consumption is atomic under concurrency (settled 2026-09-29):
 the token endpoint's save demands the stored grant still hold the document the
 request read, so of the requests racing on one authorization code or device
 code exactly one receives tokens — the losers answer `invalid_grant` (the
-code already redeemed or gone) and never reach issuance. **No token-type
-discriminator is minted today** (E2E probe 2026-09-29): the
-`tango:token_type` claim the end-session section once described is not
-written by any token path — it survives only as a reserved custom-claim
-key. Whether the ID token should carry it is an open design decision.
-Scopes are `openid`, `profile`, `email`, and
+code already redeemed or gone) and never reach issuance. No token-type
+discriminator claim is minted: the hint's identity rides the JOSE type
+member instead — access tokens carry RFC 9068's `at+jwt` and ID tokens
+carry none, and the end-session policy refuses a hint whose member reads
+`at+jwt`. `tango:token_type` survives only as a reserved custom-claim
+key. Scopes are `openid`, `profile`, `email`, and
 `groups` (not `offline_access`). Claims: `sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
@@ -509,14 +509,18 @@ skew allowance), and the hourly `protocol_cleanup` job reaps the rows
 past a one-hour grace in bounded batches — no `protocol` row outlives
 its expiry by more than the sweep's interval.
 
-**End-session.** Not implemented yet (see the endpoint table): the
-provider mounts the endpoint but registers no logout policy, so every
-request answers `invalid_request`. The behavior below is the *planned*
-contract, not the shipped one: `id_token_hint` verified (issuer,
-audience against `client_id`), the subject's grants and tokens for the
-client revoked, and a `post_logout_redirect_uri` not registered on the
-client ignored (never an open redirect). Wiring `WithLogoutPolicies` is
-the remaining work.
+**End-session.** `id_token_hint` is required — the provider holds no
+browser session, so a request without one names no subject and answers
+`invalid_request`. The hint is verified by the library (signature
+against the JWKS, issuer, audience against `client_id` when the request
+names both) and the policy refuses a hint whose JOSE type member is
+`at+jwt` (an access token). A `post_logout_redirect_uri` that is not
+registered on the client is refused with `invalid_request`, never
+ignored. Success revokes the account's grants and tokens for the client
+in one transaction — the authorized-client ledger dies with them when
+`oidc.end_session_revokes_consent` is set, survives otherwise — records
+`oidc_session_ended`, and redirects to the registered URI with `state`
+when one was given, to the SPA root otherwise.
 
 **Rate limits (guard's REST classification).** `/oidc/token`,
 `/oidc/device/authorize`, `/oidc/par` ride the credential bucket
