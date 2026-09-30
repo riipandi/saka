@@ -1,4 +1,5 @@
 import { defineConfig, type Project } from '@playwright/test'
+import { resolve } from 'node:path'
 
 // The passkey ladder E2E: a real Chromium against the debug build's devtool
 // simulation (/debug/passkey/*), the ceremonies answered by the virtual
@@ -12,9 +13,10 @@ import { defineConfig, type Project } from '@playwright/test'
 // The server the tests drive: the debug build is the one that carries the
 // /debug/passkey pages, and the base-url flag binding is where the RP
 // identity derives from.
+const serverBaseURL = 'http://localhost:3080'
 const serverCommand = [
   'go build -tags debug -o ./build/debug/tango ./cmd',
-  './build/debug/tango --env-file=.env.local serve --base-url=http://localhost:3080'
+  `./build/debug/tango --env-file=.env.local serve --base-url=${serverBaseURL}`
 ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one
@@ -28,26 +30,29 @@ const projects: Project[] = [
   { name: 'Safari', use: { browserName: 'webkit' as const } },
   {
     name: 'Mobile Chrome',
-    use: { browserName: 'chromium' as const, viewport: { width: 390, height: 844 } }
+    use: {
+      browserName: 'chromium' as const,
+      viewport: { width: 390, height: 844 }
+    }
   }
 ]
 
 export default defineConfig({
-  testDir: 'e2e-tests',
-  outputDir: 'e2e-tests/.output',
+  testDir: resolve('e2e-tests'),
+  outputDir: resolve('.output/e2e-tests'),
   timeout: 30_000,
   fullyParallel: false,
   workers: 1,
   reporter: process.env.GITHUB_ACTIONS === 'true' ? [['github-actions']] : [['list']],
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3080',
+    baseURL: process.env.E2E_BASE_URL || serverBaseURL,
     ignoreHTTPSErrors: true,
     trace: 'retain-on-failure'
   },
   projects: process.env.E2E_ALL_BROWSERS ? projects : chromiumOnly(projects),
   webServer: {
     command: serverCommand,
-    url: 'http://localhost:3080/api/healthz',
+    url: `${serverBaseURL}/api/healthz`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }
