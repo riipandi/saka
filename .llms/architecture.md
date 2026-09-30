@@ -750,6 +750,40 @@ fifteen-minute window, the INSERT's unique index makes the second
 presentation lose, and the sweep frees the id once its window passes.
 `interaction_sessions` remains a scaffold table with no writer.
 
+### modules/webhook
+
+The webhook area is tango-only: the outbound event surface Pocket ID never had. It is an area of
+its own rather than a feature of identity because a delivery endpoint is not an account fact —
+it is a destination the deployment streams its events to. Every procedure is administrative
+(`guard.Admin` on all ten, `ListEventTypes` included).
+
+The emission seam rides the audit recorder: `internal/audit`'s `Recorder` carries a sink, and
+this area's service is that sink, wired after construction (`recorder.WithSink(service)` inside
+the area's provider) so `internal/audit` never learns the package exists. `AuditRecorded` runs
+inside the savepoint the record rode — a rollback takes its deliveries with it, so a receiver is
+never told about a change that did not happen — and it never fails the caller: an emission
+failure costs the delivery, not the change, and the failure is logged.
+
+The event catalog (`events.go`) is the single source of the wire vocabulary. Each entry carries
+the dot name (`user.created`), the audit event it maps from, and a description; the catalog is
+also the emission filter (an unmapped audit event is never delivered) and the subscription
+boundary (`checkEvents` refuses names outside it). The names are curated by hand — the audit
+vocabulary's snake_case cannot say where the first dot belongs — and never rename once shipped;
+a mapping added later is a new subscription choice. `internal/audit/catalog.go` holds the audit
+vocabulary's own catalog (name + description beside the constants), and a source-level test in
+each package holds the two lists to one set: `internal/audit`'s test parses `audit.go`'s const
+block, `modules/webhook`'s test maps every `audit.Catalog()` entry.
+
+Delivery rows store the exact canonical body bytes; every attempt re-signs the stored bytes, so
+a signature survives retries. The signing secret is sealed `enc:` with the application cipher
+(`crypto.NewCipherFromHex(c.App.SecretKey)` — an `AUTH_SECRET_KEY` rotation does not touch it)
+and exists in plaintext in the create and rotate responses alone. The delivery engine is a queue
+task (`webhook_deliver`, 5 attempts × 30 s backoff, 30 s receiver deadline) whose processor lives
+in `internal/jobs` and resolves the service through the `WebhookRunner` seam — a container
+without the area answers `no delivery runner is wired`. Attempt retention is the recurring
+`webhook_prune` task (7 days, delivery summaries survive). Identifiers are TypeIDs on the wire —
+`whk_` endpoints, `whd_` deliveries, `wha_` attempts — while the columns stay UUIDs.
+
 ## Notice emails and their switches (settled 2026-09-27)
 
 The application sends two kinds of email, and only one of them is configurable. **Transactional**

@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_oX4wgtYtFP
+createdAt: 2026-09-30T01:59:38.604276
+updatedAt: 2026-09-30T02:11:59.169189
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_d23um6bp9P
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "whk_xxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+bodyType: application/json
+description: '[Tango] Replace an endpoint signing secret. The new plaintext is shown exactly once; deliveries after the rotation sign with it. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: Rotate Webhook Secret
+sortPriority: 4111.111111111111
+url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/RotateSecret
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

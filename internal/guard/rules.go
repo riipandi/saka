@@ -22,6 +22,8 @@ import (
 	settingsv1connect "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1/settingsv1connect"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
+	webhookv1 "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1"
+	webhookv1connect "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1/webhookv1connect"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -271,6 +273,21 @@ var ProcedureRules = map[string]Entry{
 	notificationv1connect.NotificationServiceUnreadCountProcedure:              {Rule: Authenticated},
 	notificationv1connect.NotificationServiceWatchNotificationsProcedure:       {Rule: Authenticated},
 
+	// The webhook surface is administrative all the way through: an
+	// endpoint receives the deployment's event stream, which is a
+	// deployment-wide decision, and the deliveries it received name other
+	// accounts' events too.
+	webhookv1connect.WebhookServiceListProcedure:              {Rule: Admin},
+	webhookv1connect.WebhookServiceCreateProcedure:            {Rule: Admin},
+	webhookv1connect.WebhookServiceGetProcedure:               {Rule: Admin},
+	webhookv1connect.WebhookServiceUpdateProcedure:            {Rule: Admin},
+	webhookv1connect.WebhookServiceDeleteProcedure:            {Rule: Admin},
+	webhookv1connect.WebhookServiceRotateSecretProcedure:      {Rule: Admin},
+	webhookv1connect.WebhookServiceTestProcedure:              {Rule: Admin},
+	webhookv1connect.WebhookServiceListDeliveriesProcedure:    {Rule: Admin},
+	webhookv1connect.WebhookServiceListAllDeliveriesProcedure: {Rule: Admin},
+	webhookv1connect.WebhookServiceListEventTypesProcedure:    {Rule: Admin},
+
 	// The application-configuration surface is the deployment's own settings.
 	// The test-email send is administrative: it proves the mailer from the
 	// settings screen, so it is not an account read, and there is no self
@@ -482,6 +499,7 @@ func ContractProcedures() []string {
 		federationv1.File_federation_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
+		webhookv1.File_webhook_proto,
 		settingsv1.File_settings_proto,
 		systemv1.File_system_proto,
 	}

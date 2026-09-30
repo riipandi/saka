@@ -147,20 +147,24 @@ proof — the audit record names it.
 
 ## Webhooks (tango-only)
 
-**Not implemented.** `modules/webhook` is a scaffold; no proto, no routes, no queue wiring. The
-contract below is the design the implementation will follow — do not call these procedures.
+The outbound event surface tango carries and Pocket ID does not: an administrator registers a
+destination and subscribes it to the event catalog. Every audit record is a candidate delivery,
+mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an endpoint that
+lists no events, or lists the `*` wildcard, receives every one of them. All procedures carry the
+admin guard.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.webhook.v1.WebhookService/List` | List webhook endpoints | planned — admin guard; `enabled` and `event` filters; secrets never present | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Create` | Create a webhook endpoint | planned — returns the signing secret exactly once | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Get` | Get a webhook endpoint | planned — no secret field | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Update` | Update a webhook endpoint | planned — partial update; absent fields keep values | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | planned — deliveries survive with `webhook_id` nulled | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | planned — returns the new plaintext exactly once; new deliveries sign with it | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Test` | Send a test delivery | planned — queues a `webhook.test` delivery | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | planned — newest first, paginated; latest attempt rides along | — |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | planned — `event` filter; redacted response metadata only | — |
+| POST | `/rpc/tango.webhook.v1.WebhookService/List` | List webhook endpoints | done — guard `Admin`; `enabled` and `event` filters; the `event` filter names a catalog event or the wildcard; secrets never present | `modules/webhook.TestEmissionMatchesSubscriptions`, `internal/guard` webhook rules |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Create` | Create a webhook endpoint | done — returns the signing secret exactly once; the secret is sealed `enc:` with the application cipher and a create without it is refused `failed_precondition`; subscription entries must be catalog names or `*` (`invalid_argument` otherwise) | `modules/webhook.TestCreateShowsTheSecretOnceAndRefusesADuplicateName`, `modules/webhook.TestCreateRejectsAnUnknownEvent` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Get` | Get a webhook endpoint | done — no secret field; exercised by the create/rotate suites' read-back | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Update` | Update a webhook endpoint | done — partial update; absent fields keep values; headers and event types replace wholesale when present | `modules/webhook.TestEmissionMatchesSubscriptions` (the disabled endpoint), `modules/webhook.TestCreateRejectsAnUnknownEvent` (event replacement) |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | done — deliveries survive with `webhook_id` nulled; a delivery whose endpoint is gone is marked failed, not retried | `modules/webhook.TestDeleteKeepsTheDeliveries` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | done — returns the new plaintext exactly once; new deliveries sign with it; the stored ciphertext is never answered again | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/Test` | Send a test delivery | done — queues a `webhook.test` delivery, subscription or not | `modules/webhook.TestTheTestDeliveryRidesItsOwnEvent` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | done — newest first, paginated; latest attempt rides along | `modules/webhook.TestRunDeliverySignsTheBodyAndRecordsTheAttempt` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | done — `event` filter names a catalog event or the wildcard; redacted response metadata only | `modules/webhook.TestEmissionMatchesSubscriptions` |
+| POST | `/rpc/tango.webhook.v1.WebhookService/ListEventTypes` | List webhook event types | done — guard `Admin`; serves the whole catalog with descriptions, in declaration order | E2E probe (2026-09-30): 77 entries over a freshly built binary |
 
 Delivery contract: HMAC-SHA256 over `t=<unix>,v1=<hex>` where the digest covers the signed
 timestamp concatenated with the exact canonical body bytes. Headers on every delivery:
@@ -168,11 +172,19 @@ timestamp concatenated with the exact canonical body bytes. Headers on every del
 name), `X-Webhook-Id` (endpoint id), `Content-Type: application/json`. The canonical body is the
 deterministic JSON encoding of the payload, capped at 1 MiB, stored once as immutable bytes and
 reused byte-for-byte by every retry — the signature therefore stays valid across retries. Custom
-registration headers cannot override the signature set. Subscriptions use event names or the
-`*` wildcard; an empty list receives every event. Retries run on the queue (5 attempts, 30 s
+registration headers cannot override the signature set. Subscriptions use catalog event names or
+the `*` wildcard; an empty list receives every event. Retries run on the queue (5 attempts, 30 s
 backoff, 30 s receiver deadline); non-2xx and transport failures are recorded per attempt and
 pruned after a week. Rotation affects new deliveries only and never returns the stored
 ciphertext.
+
+The event catalog (`modules/webhook/events.go`) maps every audit event onto one wire name — the
+body's `event` field, the `X-Webhook-Event` header's value, and the subscription entry. The names
+are curated, not derived: the audit vocabulary's snake_case cannot say where the first dot
+belongs (`one_time_access_sign_in` would split as `one_time.access_sign_in`). The first segment
+names the domain, the rest the happening in the past tense. An audit event without a mapping is
+never emitted; a mapping is a subscription choice, never a rename. `webhook.test` is the one
+entry no record causes.
 
 ---
 

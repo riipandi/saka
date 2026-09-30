@@ -26,6 +26,7 @@ import (
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/notification"
+	"github.com/riipandi/tango/modules/webhook"
 	"github.com/riipandi/tango/pkg/crypto"
 	"uuid"
 )
@@ -76,6 +77,34 @@ func (s lazyScimSyncer) SyncAll(ctx context.Context) error {
 		return nil
 	}
 	return service.SyncAll(ctx)
+}
+
+// lazyWebhookRunner resolves the webhook area's service at task-run time,
+// the way the SCIM passes resolve theirs: the delivery task's queue is
+// registered in this wiring, and the runner's provider builds over it, so
+// the two must not order each other around. A container without the webhook
+// area answers the failure here — the delivery task's queue is registered
+// regardless, and its attempts name the missing wiring.
+type lazyWebhookRunner struct {
+	injector do.Injector
+}
+
+// RunDelivery performs one delivery attempt for the delivery the task names.
+func (r lazyWebhookRunner) RunDelivery(ctx context.Context, deliveryID string) error {
+	service, err := do.Invoke[*webhook.Service](r.injector)
+	if err != nil {
+		return err
+	}
+	return service.RunDelivery(ctx, deliveryID)
+}
+
+// PruneAttempts deletes the attempt rows the retention window has aged out.
+func (r lazyWebhookRunner) PruneAttempts(ctx context.Context) (int64, error) {
+	service, err := do.Invoke[*webhook.Service](r.injector)
+	if err != nil {
+		return 0, err
+	}
+	return service.PruneAttempts(ctx)
 }
 
 func infrastructure(ctx context.Context) func(do.Injector) {
@@ -230,7 +259,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			// passes resolve the sync service the same lazy way: the
 			// federation area's provider builds it, and this wiring must
 			// not order the two around each other either.
-			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i}, lazyScimSyncer{i}, do.MustInvoke[*fetcher.Client](i), log)
+			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i}, lazyScimSyncer{i}, lazyWebhookRunner{i}, do.MustInvoke[*fetcher.Client](i), log)
 
 			// The upload's after-sync hook rides here rather than on the
 			// manager's provider: the hook enqueues through the client this

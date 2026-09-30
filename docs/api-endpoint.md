@@ -1,6 +1,6 @@
 # API Endpoints
 
-The surfaces the server answers, reconciled against the code on 2026-09-29. The agent-facing
+The surfaces the server answers, reconciled against the code on 2026-09-30. The agent-facing
 matrix with per-row status and test evidence is `.llms/endpoint-reference.md`; the code is the
 only record of what is served.
 
@@ -268,6 +268,29 @@ matches the local snapshot; it also runs hourly and, debounced, after account or
 | POST     | `/rpc/tango.federation.v1.ScimProviderService/Delete`         | ConnectRPC   | Remove the provisioning target (admin)     |
 | POST     | `/rpc/tango.federation.v1.ScimProviderService/Sync`           | ConnectRPC   | Run one provisioning pass now (admin; counts in the answer) |
 
+## Webhooks (tango-only)
+
+The outbound event surface: an administrator registers a destination — a URL, a method, optional
+custom headers — and subscribes it to the event catalog. Every audit record is a candidate
+delivery, mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an endpoint
+that lists no events, or lists the `*` wildcard, receives every one of them. Deliveries are
+HMAC-SHA256 signed (`t=<unix>,v1=<hex>` over timestamp + exact body bytes), retried five times at
+a thirty-second backoff, and the attempt rows carry redacted response metadata only. The signing
+secret is sealed at rest and shown exactly once.
+
+| Method   | Procedure / Endpoint                                          | Protocol     | Summary                                          |
+| -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------------ |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/List`                   | ConnectRPC   | List endpoints (admin)                           |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/Create`                 | ConnectRPC   | Register an endpoint (secret shown once) (admin) |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/Get`                    | ConnectRPC   | Read one endpoint (admin)                        |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/Update`                 | ConnectRPC   | Rewrite an endpoint (admin)                      |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/Delete`                 | ConnectRPC   | Remove an endpoint (admin)                       |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/RotateSecret`           | ConnectRPC   | Replace the signing secret (admin)               |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/Test`                   | ConnectRPC   | Queue a `webhook.test` delivery (admin)          |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries`         | ConnectRPC   | List one endpoint's deliveries (admin)           |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries`      | ConnectRPC   | List every delivery (admin)                      |
+| POST     | `/rpc/tango.webhook.v1.WebhookService/ListEventTypes`         | ConnectRPC   | The event catalog (admin)                        |
+
 ## Device Login
 
 The passkey-less pairing sign-in: a browser that cannot sign itself in creates a request, another
@@ -320,7 +343,6 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |
 | WebAuthn passkeys | `modules/identity/webauthn` (kept deliberately) | `/api/webauthn/{register,login}/{begin,finish}` + `UserService` passkey procedures |
-| Webhooks | `modules/webhook` | `WebhookService` |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
 | Initial admin setup | — | `tango initialize` + `tango admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |

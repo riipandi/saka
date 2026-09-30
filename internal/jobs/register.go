@@ -12,6 +12,7 @@ import (
 	"github.com/riipandi/tango/internal/scheduler"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/notification"
+	"github.com/riipandi/tango/modules/webhook"
 )
 
 // Register wires the task processors onto a client. It is pure wiring — no
@@ -30,7 +31,7 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, http *fetcher.Client, log *slog.Logger) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool)
 	}))
@@ -108,6 +109,20 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 	client.Register(queue.NewQueue[ScimSyncDebouncedTask](func(ctx context.Context, task ScimSyncDebouncedTask) error {
 		return scimSyncDebouncedProcessor(ctx, task, scimSyncer, log)
 	}))
+	// The webhook deliveries sign the stored body and send it through the
+	// shared fetch client: a failed attempt is the queue's retry, and the
+	// attempt rows carry the story. A container without the webhook area
+	// registers the queue anyway, and its attempts fail until the wiring
+	// lands — the emission that enqueued them never waits on it.
+	client.Register(queue.NewQueue[webhook.DeliverTask](func(ctx context.Context, task webhook.DeliverTask) error {
+		return webhookDeliverProcessor(ctx, task, webhookRunner)
+	}))
+	// The attempt retention runs on the runner beside the deliveries: the
+	// attempts are the runner's rows, and the sweep is their one deletion
+	// path.
+	client.Register(queue.NewQueue[WebhookPruneTask](func(ctx context.Context, task WebhookPruneTask) error {
+		return webhookPruneProcessor(ctx, task, webhookRunner, log)
+	}))
 	if scimSyncer != nil {
 		client.Register(queue.NewQueue[ScimSyncTask](func(ctx context.Context, task ScimSyncTask) error {
 			return (&scimSyncProcessor{syncer: scimSyncer, log: log}).Process(ctx, task)
@@ -166,6 +181,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	if err := s.seedOnce(ctx, ProtocolCleanupName,
 		protocolCleanupSeed(DefaultProtocolCleanupInterval),
 		DefaultProtocolCleanupInterval); err != nil {
+		return err
+	}
+	if err := s.seedOnce(ctx, WebhookPruneName,
+		webhookPruneSeed(DefaultWebhookPruneInterval),
+		DefaultWebhookPruneInterval); err != nil {
 		return err
 	}
 	if s.expiryEmail {

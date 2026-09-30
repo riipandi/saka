@@ -1,0 +1,34 @@
+type: folder
+model: folder
+id: fl_d23um6bp9P
+createdAt: 2026-09-30T01:59:08.458386
+updatedAt: 2026-09-30T02:11:37.043616
+workspaceId: wk_kBiMYTkhPP
+folderId: null
+authentication: {}
+authenticationType: null
+description: 'Tango-only outbound event surface: signed delivery endpoints, their deliveries, and the event catalog.'
+headers: []
+name: Webhooks
+sortPriority: 15703.703703703704
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingRequestMessageSize:
+  enabled: false
+  value: 67108864
+settingHttpVersion:
+  enabled: false
+  value: auto

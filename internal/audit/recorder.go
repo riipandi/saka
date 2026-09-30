@@ -72,6 +72,35 @@ type Entry struct {
 // for.
 type Recorder struct {
 	log *slog.Logger
+	// sink is the second side effect a record carries, wired after
+	// construction. It is optional — an absent one is every deployment that
+	// serves no webhook area — and its failure is the sink's to contain.
+	sink Sink
+}
+
+// Sink is the seam one more side effect of a record rides: the emission that
+// turns every record into a candidate webhook delivery. It receives the
+// query surface the record rode, so a sink that writes rows joins the same
+// transaction the change committed in — a rollback takes the emission with
+// it, the property the record itself relies on.
+//
+// The interface lives here rather than in the webhook package because the
+// recorder cannot know its consumers: a feature writes a record and moves
+// on, and who else reads the record is the wiring's business, not the
+// writer's.
+type Sink interface {
+	// AuditRecorded receives one written record, beside the query surface it
+	// rode. It must never fail the caller: an emission is a side effect of
+	// the change the caller asked for, not a condition of it.
+	AuditRecorded(ctx context.Context, db datastore.Querier, entry Entry)
+}
+
+// WithSink arms the recorder's second side effect. It is wired after
+// construction because the sink's own provider may resolve services the
+// recorder must not depend on to construct.
+func (r *Recorder) WithSink(sink Sink) *Recorder {
+	r.sink = sink
+	return r
 }
 
 // NewRecorder builds the recorder. A nil logger discards, which is the state
@@ -159,6 +188,14 @@ func (r *Recorder) Record(ctx context.Context, db datastore.Querier, entry Entry
 		// unrecorded, so it is what the line carries.
 		r.log.ErrorContext(ctx, "audit: record not written",
 			"event", entry.Event, "err", err)
+	}
+
+	// The record is written; the emission rides the same surface whether the
+	// row did or not — the happening is real either way, and the sink holds
+	// its own savepoint, so a failed emission cannot poison the caller's
+	// change.
+	if r.sink != nil {
+		r.sink.AuditRecorded(ctx, db, entry)
 	}
 }
 

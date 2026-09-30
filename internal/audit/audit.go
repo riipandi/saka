@@ -345,6 +345,28 @@ const (
 	// and a replacement pair is provisioned. The payload names the
 	// replacement's kid and algorithm plus how many rows were retired.
 	EventJwksInvalidated = "jwks_invalidated"
+
+	// EventWebhookCreated is a delivery endpoint registered. The signing
+	// secret is never in the record — it exists in the response and the
+	// sealed column.
+	EventWebhookCreated = "webhook_created"
+
+	// EventWebhookUpdated is an endpoint's fields rewritten.
+	EventWebhookUpdated = "webhook_updated"
+
+	// EventWebhookDeleted is an endpoint removed. Its deliveries survive
+	// with the endpoint's identifier nulled, so the history outlives the
+	// destination.
+	EventWebhookDeleted = "webhook_deleted"
+
+	// EventWebhookSecretRotated is an endpoint's signing secret replaced.
+	// The plaintext is never in the record: it exists in the response and
+	// the sealed column.
+	EventWebhookSecretRotated = "webhook_secret_rotated"
+
+	// EventWebhookTested is a test delivery queued to one endpoint — the
+	// queueing is the happening; the delivery rows carry the outcome.
+	EventWebhookTested = "webhook_tested"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

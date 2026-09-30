@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_oVkD99nMYj
+createdAt: 2026-09-30T01:59:38.694492
+updatedAt: 2026-09-30T02:12:16.637264
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_d23um6bp9P
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "webhook_id": "whk_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "page": 1,
+      "limit": 20
+    }
+bodyType: application/json
+description: '[Tango] List one page of an endpoint deliveries, newest first, each carrying its latest attempt when one exists. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: List Webhook Deliveries
+sortPriority: 4136.412132296906
+url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/ListDeliveries
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -61,7 +61,7 @@ func countJTIs(t *testing.T, pool *datastore.Postgres, jti string) int {
 // panics on the shared queue name.
 func registerProtocolQueues(t *testing.T, pool *datastore.Postgres, client *queue.Client) {
 	t.Helper()
-	Register(client, time.Hour, nil, nil, pool, "", false, false, nil, nil, nil, nil)
+	Register(client, time.Hour, nil, nil, pool, "", false, false, nil, nil, nil, nil, nil)
 }
 
 // runProtocolSweep adds one sweep task and waits for the successor the

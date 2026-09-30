@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/tango/modules/federation"
 	"github.com/riipandi/tango/modules/identity"
 	"github.com/riipandi/tango/modules/notification"
+	"github.com/riipandi/tango/modules/webhook"
 )
 
 // Area is one area the application serves, together with the services it owns.
@@ -62,6 +63,12 @@ func Areas() []Area {
 		// same reason the audit log does: its paths claim nothing the
 		// earlier areas claim.
 		{Name: notification.ModuleName, Package: notification.Package, Mount: notification.Mount},
+		// The webhook area streams the deployment's events to the
+		// destinations its administrator registered. Its emission rides the
+		// audit recorder's sink and its deliveries ride the queue, both
+		// wired inside the area; the surface it mounts is administrative
+		// and claims nothing the earlier areas claim.
+		{Name: webhook.ModuleName, Package: webhook.Package, Mount: webhook.Mount},
 		// The federation area serves the OIDC clients an operator
 		// administers and the protocol surfaces the relying parties speak.
 		// The protocol endpoints claim their own root paths, so the order
