@@ -42,9 +42,17 @@ Not ported, **by decision (2026-09-30)**: the upstream **APIs** entity and its
 client-grant/CIMD surface — tango is a general boilerplate, not an auth
 product, and the API-entity model has no tango counterpart. The Yaak
 collection keeps the 13 upstream requests as reference, marked `not planned`.
-Also not ported: user passkey CRUD, LDAP, and
-`/api/storage/sqlite-warning` (tango is Postgres-only). `/api/version/*` is
-planned (`tango.system.v1.VersionService`).
+Also not ported: LDAP and `/api/storage/sqlite-warning` (tango is
+Postgres-only). Passkey support **is** planned, positioned GitHub-style but
+with more flexibility (decisions 2026-09-30): password sign-in stays, and a
+passkey may also serve as a passwordless **first factor**; the email stays
+required so every account keeps its recovery path. One credential set serves
+passwordless sign-in, second-factor completion after a password, and
+step-up reauthentication. An assertion with user verification satisfies MFA
+fully — no second factor is demanded after a passkey sign-in. Enrollment and
+device limits come from the appconfig catalog (`mfa.max_enrollments`,
+`passkey.max_credentials`), enforced at enrollment only.
+`/api/version/*` is planned (`tango.system.v1.VersionService`).
 
 ## Operations
 
