@@ -164,8 +164,9 @@ CREATE TABLE IF NOT EXISTS public.auth_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_purpose ON public.auth_tokens (purpose);
+-- The token_hash's UNIQUE constraint carries the lookup index; the sweep
+-- reads the expiry.
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON public.auth_tokens USING btree (expires_at);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_token_hash ON public.auth_tokens USING HASH (token_hash);
 -- One live token per account and purpose — resend replaces. Reauthentication
 -- is excluded: several live step-up tokens per account are legitimate, the
 -- same rule user_mfa_pending follows, and consumption is single-use anyway.
@@ -280,7 +281,6 @@ DROP INDEX IF EXISTS idx_audit_logs_client_name;
 DROP INDEX IF EXISTS idx_device_login_requests_expires_at;
 DROP INDEX IF EXISTS idx_signup_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id_purpose;
-DROP INDEX IF EXISTS idx_auth_tokens_token_hash;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;

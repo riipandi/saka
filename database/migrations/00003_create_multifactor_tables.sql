@@ -31,12 +31,10 @@ CREATE TABLE IF NOT EXISTS public.webauthn_credentials (
 
 CREATE TRIGGER trg_webauthn_credentials_updated_at BEFORE UPDATE ON public.webauthn_credentials FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
 
--- NOTICE: Index for Bytea column is only optimal for the search for exact match, not LIKE or range.
+-- The credential_id's UNIQUE constraint carries the lookup index; the
+-- roll's reads filter by user_id (the limit's count and the settings
+-- page's list, at most max_credentials rows) and the sweeps read nothing.
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user_id ON public.webauthn_credentials USING btree (user_id);
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_credential_id ON public.webauthn_credentials (credential_id);
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_backup_eligible ON public.webauthn_credentials (backup_eligible) WHERE backup_eligible = TRUE;
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_last_used_at ON public.webauthn_credentials (last_used_at) WHERE last_used_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_created_at ON public.webauthn_credentials (created_at);
 
 -- --------------------------------------------------------
 -- Table: public.webauthn_sessions
@@ -61,10 +59,10 @@ CREATE TABLE IF NOT EXISTS public.webauthn_sessions (
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP)
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_user_id ON public.webauthn_sessions (user_id);
+-- The ceremonies are read by their handle alone; the sweep reads the
+-- expiry. No query filters by holder or kind — an authentication session
+-- names no account until its assertion resolves one.
 CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires_at ON public.webauthn_sessions USING btree (expires_at);
-CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_type ON public.webauthn_sessions (challenge_type);
-CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_user_type ON public.webauthn_sessions (user_id, challenge_type);
 
 -- --------------------------------------------------------
 -- Table: public.user_mfa_totp — TOTP MFA state: one row per enrolled
@@ -144,14 +142,7 @@ DROP TABLE IF EXISTS public.user_mfa_totp;
 
 DROP TRIGGER IF EXISTS trg_webauthn_credentials_updated_at ON public.webauthn_credentials;
 
-DROP INDEX IF EXISTS idx_webauthn_sessions_user_type;
-DROP INDEX IF EXISTS idx_webauthn_sessions_type;
 DROP INDEX IF EXISTS idx_webauthn_sessions_expires_at;
-DROP INDEX IF EXISTS idx_webauthn_sessions_user_id;
-DROP INDEX IF EXISTS idx_webauthn_credentials_created_at;
-DROP INDEX IF EXISTS idx_webauthn_credentials_last_used_at;
-DROP INDEX IF EXISTS idx_webauthn_credentials_backup_eligible;
-DROP INDEX IF EXISTS idx_webauthn_credentials_credential_id;
 DROP INDEX IF EXISTS idx_webauthn_credentials_user_id;
 
 DROP TABLE IF EXISTS public.webauthn_sessions;
