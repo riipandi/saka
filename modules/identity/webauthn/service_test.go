@@ -238,6 +238,91 @@ func TestEnrollmentRefusesAnUnreadableLimit(t *testing.T) {
 	assert.ErrorIs(t, err, ErrSettingUnreadable)
 }
 
+// ---- the administrative roll ----
+
+// accountWire answers the account's wire form, the way an admin request
+// carries it.
+func accountWire(t *testing.T, userID uuid.UUID) string {
+	t.Helper()
+	id, err := user.IDFromUUID(userID)
+	require.NoError(t, err)
+	return id.String()
+}
+
+func TestAdminSeesAnotherAccountsRoll(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+
+	enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "Admin eye")
+	enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "")
+
+	roll, err := service.AdminListCredentials(t.Context(), accountWire(t, userID))
+	require.NoError(t, err)
+	require.Len(t, roll, 2)
+	assert.Equal(t, "Admin eye", roll[0].Name)
+	// The unnamed enrollment answers the authenticator model's display name.
+	assert.NotEmpty(t, roll[1].Name)
+}
+
+func TestAdminRefusesAMalformedAccountID(t *testing.T) {
+	service, _, _ := webauthnTestService(t, defaultSettings())
+
+	// A wire form that does not parse names no account; a valid one that
+	// holds no credentials answers an empty roll, the same shape the
+	// holder's own list answers before the first enrollment.
+	_, err := service.AdminListCredentials(t.Context(), "not-a-user-id")
+	assert.ErrorIs(t, err, ErrAccountUnknown)
+}
+
+func TestAdminRenamesAnotherAccountsPasskey(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+	enrolled := enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "old name")
+
+	renamed, err := service.AdminRenameCredential(t.Context(), accountWire(t, userID), enrolled.ID, "operator rename")
+	require.NoError(t, err)
+	assert.Equal(t, "operator rename", renamed.Name)
+
+	// The holder's own view carries the rename too — one row, two doors.
+	roll, err := service.ListCredentials(t.Context(), userID)
+	require.NoError(t, err)
+	assert.Equal(t, "operator rename", roll[0].Name)
+}
+
+func TestAdminDeleteRemovesAndAudits(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+	first := enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "first")
+	second := enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "second")
+
+	require.NoError(t, service.AdminDeleteCredential(t.Context(), accountWire(t, userID), first.ID))
+
+	roll, err := service.ListCredentials(t.Context(), userID)
+	require.NoError(t, err)
+	require.Len(t, roll, 1)
+	assert.Equal(t, second.ID, roll[0].ID)
+}
+
+func TestAdminDeleteRefusesTheLastWayIn(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+	enrolled := enroll(t, service, userID, NewSoftAuthenticator(false, false, true), "only")
+
+	// The account holds the password row, so the removal is allowed — the
+	// password is the way back in. The stranding refusal is pinned here at
+	// the administrator's door too: the issuer's read joins the password
+	// table, so an account whose password row is gone answers not-found,
+	// and the administrator's key must not waive the recovery anchor.
+	_, err := service.pool.Exec(t.Context(), `DELETE FROM public.user_passwords WHERE user_id = $1`, userID)
+	require.NoError(t, err)
+	delete(issuer.accounts, userID) // the way the issuer sees it, the account's way in is gone
+	assert.ErrorIs(t, service.AdminDeleteCredential(t.Context(), accountWire(t, userID), enrolled.ID), ErrLastWayIn)
+}
+
 // ---- sign-in ----
 
 func TestSignInEndsInAWholeSession(t *testing.T) {

@@ -65,6 +65,7 @@ var (
 	ErrLastWayIn          = errors.New("webauthn: the removal would leave the account no way in")
 	ErrClonedCredential   = errors.New("webauthn: the credential shows signs of cloning")
 	ErrSettingUnreadable  = errors.New("webauthn: the passkey settings are unreadable")
+	ErrAccountUnknown     = errors.New("webauthn: the account is not found")
 )
 
 // SettingsReader is the settings surface the service reads its knobs

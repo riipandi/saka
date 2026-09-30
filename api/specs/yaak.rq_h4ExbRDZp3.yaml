@@ -1,0 +1,44 @@
+type: http_request
+model: http_request
+id: rq_h4ExbRDZp3
+createdAt: 2026-09-30T12:55:00.000000
+updatedAt: 2026-09-30T12:55:00.000000
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+['{', '  "user_id": "user_",', '  "credential_id": "psk_",', '  "name": "Operator rename"', '}']
+bodyType: application/json
+description: |-
+["Renames one of an account's passkeys. The same rules the holder's own rename holds; an account the user_id does not resolve answers not-found.", '', 'Guard: Permission user:*:update.']
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Admin rename passkey'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

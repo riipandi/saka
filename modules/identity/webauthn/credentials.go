@@ -47,6 +47,12 @@ func (s *Service) ListCredentials(ctx context.Context, userID uuid.UUID) ([]View
 // refusal an unknown identifier does, so the surface does not disclose
 // which accounts hold which credentials.
 func (s *Service) RenameCredential(ctx context.Context, userID uuid.UUID, credentialWire, name string) (View, error) {
+	return s.renameCredential(ctx, userID, credentialWire, name, audit.EventWebauthnCredentialRenamed)
+}
+
+// renameCredential is the rename both the holder's and the administrator's
+// surface run; the event says who it was.
+func (s *Service) renameCredential(ctx context.Context, userID uuid.UUID, credentialWire, name, event string) (View, error) {
 	id, err := typeidParseCredential(credentialWire)
 	if err != nil {
 		return View{}, ErrCredentialForeign
@@ -68,7 +74,7 @@ func (s *Service) RenameCredential(ctx context.Context, userID uuid.UUID, creden
 	row.Name = name
 
 	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:        audit.EventWebauthnCredentialRenamed,
+		Event:        event,
 		UserID:       userID.String(),
 		ResourceType: "webauthn_credential",
 		ResourceID:   row.ID.String(),
@@ -84,6 +90,12 @@ func (s *Service) RenameCredential(ctx context.Context, userID uuid.UUID, creden
 // would be stranded by the removal, and the refusal says so: the recovery
 // anchor is the plan's invariant, held here at the last door.
 func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, credentialWire string) error {
+	return s.deleteCredential(ctx, userID, credentialWire, audit.EventWebauthnCredentialRemoved)
+}
+
+// deleteCredential is the removal both the holder's and the administrator's
+// surface run; the event says who it was.
+func (s *Service) deleteCredential(ctx context.Context, userID uuid.UUID, credentialWire, event string) error {
 	id, err := typeidParseCredential(credentialWire)
 	if err != nil {
 		return ErrCredentialForeign
@@ -121,7 +133,7 @@ func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, creden
 	}
 
 	s.audit.Record(ctx, s.pool, audit.Entry{
-		Event:        audit.EventWebauthnCredentialRemoved,
+		Event:        event,
 		UserID:       userID.String(),
 		ResourceType: "webauthn_credential",
 		ResourceID:   row.ID.String(),

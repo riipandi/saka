@@ -109,6 +109,14 @@ const (
 	// EventWebauthnCredentialRenamed is a passkey's display name changed.
 	EventWebauthnCredentialRenamed = "webauthn_credential_renamed"
 
+	// EventWebauthnCredentialAdminRenamed is a passkey's display name
+	// changed by an administrator over a named account.
+	EventWebauthnCredentialAdminRenamed = "webauthn_credential_admin_renamed"
+
+	// EventWebauthnCredentialAdminRemoved is a passkey removed by an
+	// administrator over a named account.
+	EventWebauthnCredentialAdminRemoved = "webauthn_credential_admin_removed"
+
 	// EventWebauthnSignIn is a session opened by a passkey assertion with
 	// user verification — the whole proof in one step, no second factor
 	// owed.

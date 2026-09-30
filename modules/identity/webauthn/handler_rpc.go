@@ -204,6 +204,38 @@ func (h *rpcHandler) DeleteCredential(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(&authnv1.DeleteCredentialResponse{}), nil
 }
 
+// AdminListCredentials names one account's passkeys.
+func (h *rpcHandler) AdminListCredentials(ctx context.Context, req *connect.Request[authnv1.AdminListCredentialsRequest]) (*connect.Response[authnv1.ListCredentialsResponse], error) {
+	roll, err := h.service.AdminListCredentials(ctx, req.Msg.UserId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	views := make([]*authnv1.Credential, 0, len(roll))
+	for _, entry := range roll {
+		views = append(views, credentialView(entry))
+	}
+	return connect.NewResponse(&authnv1.ListCredentialsResponse{Credentials: views}), nil
+}
+
+// AdminUpdateCredential renames one of an account's passkeys.
+func (h *rpcHandler) AdminUpdateCredential(ctx context.Context, req *connect.Request[authnv1.AdminUpdateCredentialRequest]) (*connect.Response[authnv1.UpdateCredentialResponse], error) {
+	renamed, err := h.service.AdminRenameCredential(ctx, req.Msg.UserId, req.Msg.CredentialId, req.Msg.Name)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authnv1.UpdateCredentialResponse{
+		Credential: credentialView(renamed),
+	}), nil
+}
+
+// AdminDeleteCredential removes one of an account's passkeys.
+func (h *rpcHandler) AdminDeleteCredential(ctx context.Context, req *connect.Request[authnv1.AdminDeleteCredentialRequest]) (*connect.Response[authnv1.DeleteCredentialResponse], error) {
+	if err := h.service.AdminDeleteCredential(ctx, req.Msg.UserId, req.Msg.CredentialId); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authnv1.DeleteCredentialResponse{}), nil
+}
+
 // credentialView maps the service's view into the wire message.
 func credentialView(entry View) *authnv1.Credential {
 	view := &authnv1.Credential{
@@ -279,6 +311,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrCredentialForeign):
 		return connect.NewError(connect.CodeNotFound,
 			errors.New("the credential is not found"))
+	case errors.Is(err, ErrAccountUnknown):
+		return connect.NewError(connect.CodeNotFound,
+			errors.New("the account is not found"))
 	case errors.Is(err, ErrClonedCredential):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("the credential is refused; contact the operator"))

@@ -69,6 +69,20 @@ service WebAuthnService {
   // with its window. The password is checked against the caller's own
   // account; the assertion resolves an account that must be the caller's.
   rpc Reauthenticate(ReauthenticateRequest) returns (ReauthenticateResponse);
+
+  // AdminListCredentials names one account's passkeys — the roll the
+  // account's own ListCredentials answers, aimed by the request's user_id
+  // instead of the token's subject.
+  rpc AdminListCredentials(AdminListCredentialsRequest) returns (ListCredentialsResponse);
+
+  // AdminUpdateCredential renames one of an account's passkeys. The same
+  // rules the holder's own rename holds, over any account.
+  rpc AdminUpdateCredential(AdminUpdateCredentialRequest) returns (UpdateCredentialResponse);
+
+  // AdminDeleteCredential removes one of an account's passkeys. The
+  // stranding rule the holder's own delete holds — an account left with no
+  // way in at all is refused — holds here too.
+  rpc AdminDeleteCredential(AdminDeleteCredentialRequest) returns (DeleteCredentialResponse);
 }
 
 // ReauthenticateRequest carries the proof the caller re-proves with. One
@@ -270,3 +284,33 @@ message DeleteCredentialRequest {
 
 // DeleteCredentialResponse is empty: success is the answer.
 message DeleteCredentialResponse {}
+
+// AdminListCredentialsRequest names the account whose roll to read.
+message AdminListCredentialsRequest {
+  // user_id is the account's wire form (`user_…`).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// AdminUpdateCredentialRequest renames one passkey on a named account.
+message AdminUpdateCredentialRequest {
+  // user_id is the account's wire form (`user_…`).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential_id is the credential to rename (`psk_…`).
+  string credential_id = 2 [(buf.validate.field).string.min_len = 1];
+
+  // name is the new display name.
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// AdminDeleteCredentialRequest removes one passkey from a named account.
+message AdminDeleteCredentialRequest {
+  // user_id is the account's wire form (`user_…`).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential_id is the credential to remove (`psk_…`).
+  string credential_id = 2 [(buf.validate.field).string.min_len = 1];
+}
