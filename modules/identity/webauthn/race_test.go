@@ -180,11 +180,11 @@ func TestParallelRemovalsKeepAWayIn(t *testing.T) {
 	var wires []string
 	for _, name := range []string{"wand-one", "wand-two"} {
 		soft := NewSoftAuthenticator(false, false, true)
-		options, sessionID, err := service.BeginRegistration(t.Context(), userID)
-		require.NoError(t, err)
+		options, sessionID, beginErr := service.BeginRegistration(t.Context(), userID)
+		require.NoError(t, beginErr)
 		body := soft.Create(t, options, testOrigin)
-		enrolled, err := service.VerifyRegistration(t.Context(), userID, sessionID, body, name)
-		require.NoError(t, err)
+		enrolled, verifyErr := service.VerifyRegistration(t.Context(), userID, sessionID, body, name)
+		require.NoError(t, verifyErr)
 		wires = append(wires, enrolled.ID)
 	}
 
@@ -201,7 +201,7 @@ func TestParallelRemovalsKeepAWayIn(t *testing.T) {
 
 	removed := 0
 	for range 2 {
-		if err := <-results; err == nil {
+		if removalErr := <-results; removalErr == nil {
 			removed++
 		}
 	}

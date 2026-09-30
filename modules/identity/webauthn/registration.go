@@ -130,11 +130,11 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 	// count-then-insert window two loose statements would leave open.
 	var stored CredentialSchema
 	txErr := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if err := lockAccount(ctx, tx, userID); err != nil {
-			return err
+		if lockErr := lockAccount(ctx, tx, userID); lockErr != nil {
+			return lockErr
 		}
-		if err := s.enforceLimits(ctx, tx, userID); err != nil {
-			return err
+		if limitErr := s.enforceLimits(ctx, tx, userID); limitErr != nil {
+			return limitErr
 		}
 		row, storeErr := s.storeCredential(ctx, tx, userID, credential, name)
 		if storeErr != nil {
