@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
@@ -248,6 +249,21 @@ func (s *Service) limitInt(ctx context.Context, key string, fallback int) (int, 
 // appconfig package cannot sit below this one without a cycle the
 // settings-reader interface exists to avoid.
 var errUnknownSetting = errors.New("unknown setting")
+
+// lockAccount serializes the account's mutating ceremonies on one advisory
+// lock inside the caller's transaction: the enrollment limits and the
+// stranding check are count-then-write judgements, and two racers holding
+// the same account's lock read each other's committed state. The key is the
+// account's own — deployments serialize per holder, never globally.
+func lockAccount(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("pg_advisory_xact_lock(hashtextextended(" + sb.Var(userID.String()) + ", 0))")
+	query, args := sb.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("webauthn: account lock: %w", err)
+	}
+	return nil
+}
 
 // credentialUser is the adapter the engine sees: the account's identity as
 // the WebAuthn user handle (the UUID's bytes — stable, unique, and what the

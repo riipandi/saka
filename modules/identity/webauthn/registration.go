@@ -12,6 +12,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/datastore"
 	"go.jetify.com/typeid"
 )
 
@@ -123,14 +124,27 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 		return View{}, ErrSyncedPasskeyOff
 	}
 
-	limitErr := s.enforceLimits(ctx, userID)
-	if limitErr != nil {
-		return View{}, limitErr
-	}
-
-	stored, err := s.storeCredential(ctx, userID, credential, name)
-	if err != nil {
-		return View{}, err
+	// The limit judgement and the credential write share one transaction
+	// under the account's lock: two parallel enrollments read each other's
+	// committed state, so a limit of one lands one credential — the
+	// count-then-insert window two loose statements would leave open.
+	var stored CredentialSchema
+	txErr := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if err := lockAccount(ctx, tx, userID); err != nil {
+			return err
+		}
+		if err := s.enforceLimits(ctx, tx, userID); err != nil {
+			return err
+		}
+		row, storeErr := s.storeCredential(ctx, tx, userID, credential, name)
+		if storeErr != nil {
+			return storeErr
+		}
+		stored = row
+		return nil
+	})
+	if txErr != nil {
+		return View{}, txErr
 	}
 
 	wireID, err := IDFromUUID(stored.ID)
@@ -154,13 +168,14 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 // enforceLimits judges both enrollment ceilings: passkey.max_credentials
 // against the passkeys the account holds, mfa.max_enrollments against the
 // passkeys plus the TOTP devices together. An unreadable limit is the
-// fail-closed refusal the reader answered.
-func (s *Service) enforceLimits(ctx context.Context, userID uuid.UUID) error {
+// fail-closed refusal the reader answered. It runs inside the account's
+// lock — the count is only as strong as the serialization around it.
+func (s *Service) enforceLimits(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
 	maxCredentials, err := s.limitInt(ctx, SettingMaxCredentials, defaultMaxCredentials)
 	if err != nil {
 		return err
 	}
-	held, err := s.repo.CountCredentials(ctx, s.pool, userID)
+	held, err := s.repo.CountCredentials(ctx, db, userID)
 	if err != nil {
 		return err
 	}
@@ -175,7 +190,7 @@ func (s *Service) enforceLimits(ctx context.Context, userID uuid.UUID) error {
 	if maxEnrollments > held {
 		totp := 0
 		if s.totpEnrollments != nil {
-			totp, err = s.totpEnrollments.CountConfirmedTotp(ctx, s.pool, userID)
+			totp, err = s.totpEnrollments.CountConfirmedTotp(ctx, db, userID)
 			if err != nil {
 				return err
 			}
@@ -282,8 +297,9 @@ func classifyCeremonyError(err error) error {
 // storeCredential writes the verified attestation. The name falls back to
 // the catalog's authenticator name when the holder named none — the embedded
 // AAGUID manifest answers it — and to a plain word when the AAGUID is
-// unknown.
-func (s *Service) storeCredential(ctx context.Context, userID uuid.UUID, credential *gowebauthn.Credential, name string) (CredentialSchema, error) {
+// unknown. It runs on the caller's query surface: under the account's lock
+// the limit judgement and the insert are one transaction.
+func (s *Service) storeCredential(ctx context.Context, db datastore.Querier, userID uuid.UUID, credential *gowebauthn.Credential, name string) (CredentialSchema, error) {
 	if name == "" {
 		name = authenticatorName(credential.Authenticator.AAGUID)
 	}
@@ -311,7 +327,7 @@ func (s *Service) storeCredential(ctx context.Context, userID uuid.UUID, credent
 		AAGUID:          &aaguid,
 		CreatedAt:       s.now(),
 	}
-	if err := s.repo.CreateCredential(ctx, s.pool, row); err != nil {
+	if err := s.repo.CreateCredential(ctx, db, row); err != nil {
 		return CredentialSchema{}, err
 	}
 	return row, nil
