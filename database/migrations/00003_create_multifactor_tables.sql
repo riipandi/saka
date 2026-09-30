@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS public.webauthn_credentials (
     name TEXT NOT NULL,
     credential_id BYTEA NOT NULL,
     public_key BYTEA NOT NULL,
-    device_type TEXT NOT NULL,
+    -- The signature counter the authenticator reports. Persisted so a counter
+    -- regression between two assertions is visible: that regression is the
+    -- clone signal, and upstream's choice not to store it disables detection.
+    sign_count BIGINT NOT NULL DEFAULT 0,
     attestation_type TEXT NOT NULL,
     transport JSONB DEFAULT '[]'::jsonb,
     backup_eligible BOOLEAN NOT NULL DEFAULT FALSE,
@@ -31,11 +34,9 @@ CREATE TRIGGER trg_webauthn_credentials_updated_at BEFORE UPDATE ON public.webau
 -- NOTICE: Index for Bytea column is only optimal for the search for exact match, not LIKE or range.
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user_id ON public.webauthn_credentials USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_credential_id ON public.webauthn_credentials (credential_id);
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_device_type ON public.webauthn_credentials (device_type);
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_backup_eligible ON public.webauthn_credentials (backup_eligible) WHERE backup_eligible = TRUE;
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_last_used_at ON public.webauthn_credentials (last_used_at) WHERE last_used_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_created_at ON public.webauthn_credentials (created_at);
-CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user_device_type ON public.webauthn_credentials (user_id, device_type);
 
 -- --------------------------------------------------------
 -- Table: public.webauthn_sessions
@@ -46,6 +47,13 @@ CREATE TABLE IF NOT EXISTS public.webauthn_sessions (
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     challenge TEXT NOT NULL UNIQUE,
     challenge_type TEXT NOT NULL CHECK (challenge_type IN ('registration', 'authentication')),
+    -- A registration ceremony always names its account; an authentication
+    -- ceremony may not, because usernameless sign-in resolves the account
+    -- from the credential, not from the request.
+    CONSTRAINT chk_webauthn_sessions_type_user CHECK (
+        (challenge_type = 'registration' AND user_id IS NOT NULL)
+        OR challenge_type = 'authentication'
+    ),
     user_verification TEXT NOT NULL DEFAULT 'preferred' CHECK (user_verification IN ('required', 'preferred', 'discouraged')),
     credential_params JSONB NOT NULL DEFAULT '[]'::JSONB,
     extensions JSONB NOT NULL DEFAULT '{}', -- Authenticator extension data from ceremonies
@@ -140,11 +148,9 @@ DROP INDEX IF EXISTS idx_webauthn_sessions_user_type;
 DROP INDEX IF EXISTS idx_webauthn_sessions_type;
 DROP INDEX IF EXISTS idx_webauthn_sessions_expires_at;
 DROP INDEX IF EXISTS idx_webauthn_sessions_user_id;
-DROP INDEX IF EXISTS idx_webauthn_credentials_user_device_type;
 DROP INDEX IF EXISTS idx_webauthn_credentials_created_at;
 DROP INDEX IF EXISTS idx_webauthn_credentials_last_used_at;
 DROP INDEX IF EXISTS idx_webauthn_credentials_backup_eligible;
-DROP INDEX IF EXISTS idx_webauthn_credentials_device_type;
 DROP INDEX IF EXISTS idx_webauthn_credentials_credential_id;
 DROP INDEX IF EXISTS idx_webauthn_credentials_user_id;
 

@@ -166,7 +166,10 @@ CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens (user_i
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_purpose ON public.auth_tokens (purpose);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON public.auth_tokens USING btree (expires_at);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_token_hash ON public.auth_tokens USING HASH (token_hash);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_tokens_user_id_purpose ON public.auth_tokens USING btree (user_id, purpose);
+-- One live token per account and purpose — resend replaces. Reauthentication
+-- is excluded: several live step-up tokens per account are legitimate, the
+-- same rule user_mfa_pending follows, and consumption is single-use anyway.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_tokens_user_id_purpose ON public.auth_tokens USING btree (user_id, purpose) WHERE purpose <> 'reauthentication';
 
 -- --------------------------------------------------------
 -- Table: public.signup_tokens
