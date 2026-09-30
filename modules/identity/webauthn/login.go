@@ -104,6 +104,13 @@ func (s *Service) VerifyLogin(ctx context.Context, sessionWire, credentialJSON s
 	if account == nil || credential == nil {
 		return IssuedSession{}, fmt.Errorf("%w: the assertion resolved to no account", ErrAssertionInvalid)
 	}
+	if credential.Authenticator.CloneWarning {
+		// The counter went backwards: this credential exists twice, and
+		// one of the two holders is not the holder. The assertion records
+		// nothing — the stored counter stays where it was, so the clone
+		// stays detectable on the next attempt too.
+		return IssuedSession{}, ErrClonedCredential
+	}
 
 	stored, storedErr := s.repo.GetCredentialByCredentialID(ctx, s.pool, credential.ID)
 	if storedErr != nil {

@@ -279,6 +279,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrCredentialForeign):
 		return connect.NewError(connect.CodeNotFound,
 			errors.New("the credential is not found"))
+	case errors.Is(err, ErrClonedCredential):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("the credential is refused; contact the operator"))
 	case errors.Is(err, ErrLastWayIn):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("removing this credential would leave the account no way in"))

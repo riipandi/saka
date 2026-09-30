@@ -62,7 +62,8 @@ var (
 	ErrTooManyPasskeys    = errors.New("webauthn: the account holds the maximum number of passkeys")
 	ErrTooManyEnrollments = errors.New("webauthn: the account holds the maximum number of second factors")
 	ErrCredentialForeign  = errors.New("webauthn: the credential names another account")
-	ErrLastWayIn          = errors.New("webauthn: removing this credential would leave the account no way in")
+	ErrLastWayIn          = errors.New("webauthn: the removal would leave the account no way in")
+	ErrClonedCredential   = errors.New("webauthn: the credential shows signs of cloning")
 	ErrSettingUnreadable  = errors.New("webauthn: the passkey settings are unreadable")
 )
 
@@ -90,6 +91,9 @@ type TotpEnrollmentCounter interface {
 // multifactor feature the way the gate's wiring avoids the cycle.
 type issuer interface {
 	FindAccountByID(ctx context.Context, id uuid.UUID) (*signin.Account, error)
+	// VerifyPassword checks a password against the named account's stored
+	// hash — the re-proof the step-up surface runs.
+	VerifyPassword(ctx context.Context, id uuid.UUID, password string) (bool, error)
 	IssueSession(ctx context.Context, db datastore.Querier, account *signin.Account, provider, event string, params signin.SessionParams) (signin.Result, error)
 }
 

@@ -128,6 +128,9 @@ func (s *Service) verifyStepUpAssertion(ctx context.Context, sessionWire, creden
 	if account == nil || credential == nil {
 		return nil, fmt.Errorf("%w: the assertion resolved to no account", ErrAssertionInvalid)
 	}
+	if credential.Authenticator.CloneWarning {
+		return nil, ErrClonedCredential
+	}
 
 	stored, err := s.repo.GetCredentialByCredentialID(ctx, s.pool, credential.ID)
 	if err != nil {
