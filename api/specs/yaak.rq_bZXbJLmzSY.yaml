@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_bZXbJLmzSY
+createdAt: 2026-09-30T10:54:14.434875
+updatedAt: 2026-09-30T10:54:14.434875
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Names the caller's passkeys, oldest first — the shape a settings page renders. It never carries key material.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] List passkeys'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/ListCredentials
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

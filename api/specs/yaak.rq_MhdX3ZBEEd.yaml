@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_MhdX3ZBEEd
+createdAt: 2026-09-30T10:54:14.479196
+updatedAt: 2026-09-30T10:54:14.479196
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "credential_id": "psk_",
+      "name": "Office key"
+    }
+bodyType: application/json
+description: |-
+  Renames one of the caller's passkeys. A credential that names another account answers not-found — the surface does not disclose which accounts hold which credentials.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Rename passkey'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/UpdateCredential
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

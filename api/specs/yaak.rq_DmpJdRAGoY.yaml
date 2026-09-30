@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_DmpJdRAGoY
+createdAt: 2026-09-30T10:54:10.426859
+updatedAt: 2026-09-30T11:04:11.942497
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: none
+body:
+  text: |-
+    {
+      "session_id": "wcs_",
+      "credential": ""
+    }
+bodyType: application/json
+description: |-
+  Finishes the sign-in: the assertion is verified, the account resolves from the credential, and the token pair issues in one step — a passkey assertion with user verification is full authentication, so an MFA-enabled account answers tokens here, not a second challenge. The sign-in shape mirrors SignIn.
+
+  The assertion counts against the credential rate bucket.
+
+  Guard: Public.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Verify passkey sign-in'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/VerifyLogin
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

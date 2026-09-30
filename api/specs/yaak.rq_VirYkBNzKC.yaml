@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_VirYkBNzKC
+createdAt: 2026-09-30T10:54:05.906726
+updatedAt: 2026-09-30T10:54:05.906727
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Opens the enrollment ceremony on the caller's account and answers the PublicKeyCredentialCreationOptions JSON the browser hands to navigator.credentials.create, plus the ceremony handle the verify call echoes. Credentials enroll discoverable with the configured user-verification level.
+
+  The ceremony state rests server-side and dies at its expiry or its consumption; the handle names nothing else.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Begin passkey registration'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/BeginRegistration
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

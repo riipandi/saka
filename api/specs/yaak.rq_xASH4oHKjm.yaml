@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_xASH4oHKjm
+createdAt: 2026-09-30T10:54:10.381764
+updatedAt: 2026-09-30T11:04:08.875014
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: none
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Opens the sign-in ceremony without naming an account: the options carry an empty allowCredentials, so the browser offers every discoverable credential it holds for this origin and the account resolves from the credential the holder picks.
+
+  Guard: Public.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Begin passkey sign-in'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/BeginLogin
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto
