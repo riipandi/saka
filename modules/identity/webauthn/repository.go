@@ -171,9 +171,12 @@ func (r *Repository) RenameCredential(ctx context.Context, db datastore.Querier,
 
 // RecordAssertion is the bookkeeping one verified assertion produces: the
 // advanced signature counter, the backup state the authenticator now
-// reports, and the last-use stamp — one statement, so a concurrent assertion
-// on another replica cannot interleave a stale counter between the read and
-// the write.
+// reports, and the last-use stamp. The counter's update carries its own
+// guard — it moves only forward — so two assertions verifying against the
+// same stored count cannot commit a regression whichever commits last: the
+// backward writer is a no-op, and the clone signal stays intact. The other
+// columns are unconditional; the caller's transaction keeps them together
+// where one exists.
 func (r *Repository) RecordAssertion(ctx context.Context, db datastore.Querier, id uuid.UUID, signCount int64, backupState bool, usedAt time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(CredentialsTable)
@@ -182,9 +185,20 @@ func (r *Repository) RecordAssertion(ctx context.Context, db datastore.Querier, 
 		ub.Assign("backup_state", backupState),
 		ub.Assign("last_used_at", usedAt),
 	)
-	ub.Where(ub.Equal("id", id))
-
+	ub.Where(ub.Equal("id", id), ub.LessThan("sign_count", signCount))
 	query, args := ub.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("webauthn: record assertion: %w", err)
+	}
+
+	ub = sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(CredentialsTable)
+	ub.Set(
+		ub.Assign("backup_state", backupState),
+		ub.Assign("last_used_at", usedAt),
+	)
+	ub.Where(ub.Equal("id", id))
+	query, args = ub.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("webauthn: record assertion: %w", err)
 	}
@@ -305,12 +319,13 @@ const AuthTokensTable = "public.auth_tokens"
 
 // CreateReauthenticationToken writes one hashed step-up token. Several live
 // tokens per account are legitimate — the unique index excludes this
-// purpose — and consumption is the single-use UPDATE below.
-func (r *Repository) CreateReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
+// purpose — and consumption is the single-use UPDATE below. The clock is
+// the caller's: the service owns the time a test can pin.
+func (r *Repository) CreateReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, createdAt, expiresAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(AuthTokensTable)
 	ib.Cols("id", "user_id", "token_hash", "purpose", "created_at", "expires_at")
-	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication", time.Now(), expiresAt)
+	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication", createdAt, expiresAt)
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
