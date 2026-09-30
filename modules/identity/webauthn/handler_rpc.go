@@ -26,9 +26,6 @@ const ModuleName = "webauthn"
 // procedure, so its HTTP mount is empty by construction.
 type Module struct {
 	service *Service
-	// probe exposes the development probe page. The wiring sets it in the
-	// development mode alone.
-	probe bool
 }
 
 // NewModule builds the module over the webauthn service.
@@ -36,25 +33,12 @@ func NewModule(service *Service) *Module {
 	return &Module{service: service}
 }
 
-// WithProbe exposes the development probe page — the wiring's decision, the
-// development mode's gate.
-func (m *Module) WithProbe() *Module {
-	m.probe = true
-	return m
-}
-
 // Name reports the module in composition reports.
 func (m *Module) Name() string { return ModuleName }
 
-// Mount registers the endpoints on the HTTP router. The probe page is a
-// test instrument, not a product surface: it exists so a real browser can
-// walk the ceremonies against the release binary, and it never mounts
-// outside the development mode.
-func (m *Module) Mount(r chi.Router) {
-	if m.probe {
-		r.Get("/api/webauthn-probe", handleProbe)
-	}
-}
+// Mount registers the endpoints on the HTTP router. The feature serves
+// no plain HTTP route: a procedure is POST-only on the RPC surface.
+func (m *Module) Mount(r chi.Router) {}
 
 // MountRPC registers the procedures on the RPC router. The handler options
 // are the transport's — the shared snake_case codec and the panic boundary —

@@ -47,6 +47,10 @@ var restGuardRules = guard.RestRules
 // build, refused with a 404 envelope by a release one.
 const devtoolUIPath = "/debug/do"
 
+// webauthnProbePath is where the WebAuthn probe page mounts — the debug
+// build's browser instrument; a release build refuses the path.
+const webauthnProbePath = "/debug/webauthn-probe"
+
 var rpcRateLimitExclusions = []string{
 	healthCheckPath, // the same readiness a monitor watches over ConnectRPC
 }

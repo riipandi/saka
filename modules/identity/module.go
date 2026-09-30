@@ -106,10 +106,6 @@ type Deps struct {
 	// answers the raw token.
 	ExposeResetToken bool
 
-	// ExposeProbe mounts the webauthn development probe page. It is the
-	// development mode's gate and nothing else — no flag exists for it.
-	ExposeProbe bool
-
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
 
@@ -484,12 +480,9 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		// configuration's validation refuses the flag outside development,
 		// and the wiring repeats it so both layers hold.
 		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
-		// The probe page is the development mode's instrument alone: no
-		// flag, no configuration — a production run never mounts it.
-		ExposeProbe:   c.App.Mode == config.ModeDevelopment,
-		UserGroups:    do.MustInvoke[*usergroup.Service](i),
-		Authorization: do.MustInvoke[*authorization.Service](i),
-		DeviceLogin:   do.MustInvoke[*devicelogin.Service](i),
+		UserGroups:       do.MustInvoke[*usergroup.Service](i),
+		Authorization:    do.MustInvoke[*authorization.Service](i),
+		DeviceLogin:      do.MustInvoke[*devicelogin.Service](i),
 	}), nil
 }
 
@@ -542,11 +535,7 @@ func features(deps Deps) []kernel.Module {
 			deps.WebAuthn.WithTotpEnrollments(deps.Multifactor)
 			deps.Multifactor.WithPasskeyVerifier(deps.WebAuthn)
 		}
-		module := webauthn.NewModule(deps.WebAuthn)
-		if deps.ExposeProbe {
-			module = module.WithProbe()
-		}
-		modules = append(modules, module)
+		modules = append(modules, webauthn.NewModule(deps.WebAuthn))
 	}
 	if deps.PasswordRecovery != nil {
 		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery).

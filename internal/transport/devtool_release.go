@@ -20,6 +20,7 @@ func mountDevtool(r chi.Router, _ do.Injector) {
 	r.Get(devtoolUIPath+"/*", devtoolUnavailable)
 	r.Post("/debug/encode-id", devtoolUnavailable)
 	r.Post("/debug/decode-id", devtoolUnavailable)
+	r.Get(webauthnProbePath, devtoolUnavailable)
 }
 
 func devtoolUnavailable(w http.ResponseWriter, r *http.Request) {
