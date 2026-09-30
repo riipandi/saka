@@ -44,6 +44,11 @@ type Entry struct {
 	Field string
 	// Prototype is the request message Field belongs to.
 	Prototype proto.Message
+	// StepUp marks the procedures a consumed reauthentication proof guards.
+	// The rule carries the classification; the transport's enforcer consumes
+	// the proof before the procedure runs, so the requirement is judged once
+	// and every guarded procedure inherits it.
+	StepUp bool
 }
 
 // ProcedureRules is the rule every procedure on the RPC surface gets.
@@ -96,8 +101,8 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Session},
 	authnv1connect.MultifactorServiceListTotpEnrollmentsProcedure:     {Rule: Session},
 	authnv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
-	authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session},
-	authnv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session},
+	authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session, StepUp: true},
+	authnv1connect.MultifactorServiceDisableMfaProcedure:              {Rule: Session, StepUp: true},
 	// The step-up verification runs on the caller's own token — the code it
 	// spends proves the holder, the session only says whose set to look in.
 	// The administrative disable is the operator's door over a named
@@ -120,7 +125,10 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.WebAuthnServiceVerifyLoginProcedure:        {Rule: Public},
 	authnv1connect.WebAuthnServiceListCredentialsProcedure:    {Rule: Session},
 	authnv1connect.WebAuthnServiceUpdateCredentialProcedure:   {Rule: Session},
-	authnv1connect.WebAuthnServiceDeleteCredentialProcedure:   {Rule: Session},
+	authnv1connect.WebAuthnServiceDeleteCredentialProcedure:   {Rule: Session, StepUp: true},
+	// The re-proof runs on the caller's own session — it is the proof, not
+	// the guarded call, so it carries no token of its own.
+	authnv1connect.WebAuthnServiceReauthenticateProcedure: {Rule: Session},
 
 	// The password recovery surfaces split at the same line. The trigger and
 	// the spend are reached before any token exists — a caller who lost the
@@ -257,7 +265,7 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.SessionServiceSignOutProcedure:              {Rule: Session},
 	authnv1connect.SessionServiceGetSessionProcedure:           {Rule: Session},
 	authnv1connect.SessionServiceListSessionsProcedure:         {Rule: Session},
-	authnv1connect.SessionServiceRevokeSessionProcedure:        {Rule: Session},
+	authnv1connect.SessionServiceRevokeSessionProcedure:        {Rule: Session, StepUp: true},
 	authnv1connect.SessionServiceSignOutOtherSessionsProcedure: {Rule: Session},
 	authnv1connect.SessionServiceSignOutAllSessionsProcedure:   {Rule: Session},
 

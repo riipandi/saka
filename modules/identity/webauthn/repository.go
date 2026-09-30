@@ -294,3 +294,50 @@ func scanSession(scan func(dest ...any) error) (SessionSchema, error) {
 	row.ID = parsed
 	return row, nil
 }
+
+// ---- Step-up tokens ----
+
+// AuthTokensTable is the token table the step-up proofs rest in — the same
+// hashed rows the one-time codes and the reset tokens use, under their own
+// purpose. The schema belongs to the migrations; this constant is how this
+// package names it.
+const AuthTokensTable = "public.auth_tokens"
+
+// CreateReauthenticationToken writes one hashed step-up token. Several live
+// tokens per account are legitimate — the unique index excludes this
+// purpose — and consumption is the single-use UPDATE below.
+func (r *Repository) CreateReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(AuthTokensTable)
+	ib.Cols("id", "user_id", "token_hash", "purpose", "created_at", "expires_at")
+	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication", time.Now(), expiresAt)
+
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("webauthn: create reauthentication token: %w", err)
+	}
+	return nil
+}
+
+// ConsumeReauthenticationToken spends one step-up token: single use is the
+// DELETE's WHERE, which carries the token hash, the account the caller is,
+// the purpose, and the window — so a replayed, foreign, or expired token
+// deletes nothing and answers false. The audit record rides the caller's
+// transaction, not this write.
+func (r *Repository) ConsumeReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, now time.Time) (bool, error) {
+	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbt.DeleteFrom(AuthTokensTable)
+	dbt.Where(
+		dbt.Equal("token_hash", tokenHash),
+		dbt.Equal("user_id", userID),
+		dbt.Equal("purpose", "reauthentication"),
+		dbt.GreaterThan("expires_at", now),
+	)
+
+	query, args := dbt.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("webauthn: consume reauthentication token: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

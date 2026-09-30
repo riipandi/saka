@@ -25,6 +25,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/modules/identity/webauthn"
 	"go.jetify.com/typeid"
 
 	"github.com/riipandi/tango/pkg/crypto"
@@ -79,11 +80,20 @@ func newSessionRouter(t *testing.T, auth transport.Authenticator, pool *datastor
 	service := session.NewService(pool, issuer, users,
 		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 
+	// The step-up proofs are spent by the webauthn feature's consumer, built
+	// over the same pool; the settings reader is nil because the consumption
+	// reads no setting.
+	cfg.App.BaseURL = "http://localhost:3080"
+	reauth, err := webauthn.NewService(cfg, pool, webauthn.NewRepository(), issuer, nil,
+		audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+	require.NoError(t, err)
+
 	return transport.NewRouter(transport.Options{
-		Config:        cfg,
-		Checker:       health.NewChecker(),
-		Authenticator: auth,
-		Modules:       []kernel.Module{session.NewModule(service)},
+		Config:           cfg,
+		Checker:          health.NewChecker(),
+		Authenticator:    auth,
+		Modules:          []kernel.Module{session.NewModule(service)},
+		Reauthentication: reauth,
 	}), issuer
 }
 
@@ -292,13 +302,25 @@ func TestARevocationNamingNoSessionAnswersNotFound(t *testing.T) {
 
 	router, _ := newSessionRouter(t, sessionCallerAuthenticator(wireID(t, hermioneSessionOwner), current, false), pool)
 
+	// Each guarded call spends its own proof: the token is minted fresh per
+	// subtest, the way a client re-proves before every sensitive call.
+	proof := func(t *testing.T) map[string]string {
+		t.Helper()
+		_, err := pool.Exec(t.Context(), `
+			INSERT INTO public.auth_tokens (user_id, token_hash, purpose, created_at, expires_at)
+			VALUES ($1, $2, 'reauthentication', now(), now() + interval '5 minutes')`,
+			hermioneSessionOwner, crypto.HashHexToken("step-up-"+t.Name()))
+		require.NoError(t, err)
+		return map[string]string{"X-Tango-Reauthentication": "step-up-" + t.Name()}
+	}
+
 	for name, body := range map[string]string{
 		"unknown identifier": `{"id":"sess_00000000000000000000000000"}`,
 		"foreign identifier": `{"id":"sess_01a0da3e11117000800000000001"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, rpcRequest(t, authnv1connect.SessionServiceRevokeSessionProcedure, body))
+			router.ServeHTTP(rec, rpcRequestWithHeaders(t, authnv1connect.SessionServiceRevokeSessionProcedure, body, proof(t)))
 			assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 			assert.NotContains(t, rec.Body.String(), "internal", rec.Body.String())
 		})

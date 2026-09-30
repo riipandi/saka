@@ -53,6 +53,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(authnv1connect.WebAuthnServiceListCredentialsProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceUpdateCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceDeleteCredentialProcedure, connectHandler)
+	r.Handle(authnv1connect.WebAuthnServiceReauthenticateProcedure, connectHandler)
 }
 
 // rpcHandler is the transport mapping of the webauthn procedures. The
@@ -221,6 +222,32 @@ func credentialView(entry View) *authnv1.Credential {
 	return view
 }
 
+// Reauthenticate re-proves the caller and answers the single-use token the
+// next guarded call spends through its header.
+func (h *rpcHandler) Reauthenticate(ctx context.Context, req *connect.Request[authnv1.ReauthenticateRequest]) (*connect.Response[authnv1.ReauthenticateResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+
+	var password, sessionID, credential string
+	switch proof := req.Msg.Proof.(type) {
+	case *authnv1.ReauthenticateRequest_Password:
+		password = proof.Password
+	case *authnv1.ReauthenticateRequest_Passkey:
+		sessionID, credential = proof.Passkey.SessionId, proof.Passkey.Credential
+	}
+
+	token, expiresAt, err := h.service.Reauthenticate(ctx, userID, password, sessionID, credential)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authnv1.ReauthenticateResponse{
+		Token:     token,
+		ExpiresAt: timestamppb.New(expiresAt),
+	}), nil
+}
+
 // mapError translates the service's failures into the codes the Connect
 // protocol carries. The internal ones are collapsed to one answer whose text
 // names nothing a caller could aim at.
@@ -255,6 +282,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrLastWayIn):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("removing this credential would leave the account no way in"))
+	case errors.Is(err, ErrProofRefused):
+		return connect.NewError(connect.CodeUnauthenticated,
+			errors.New("the proof failed"))
 	case errors.Is(err, signin.ErrAccountDisabled):
 		return connect.NewError(connect.CodeUnauthenticated,
 			errors.New("the account is disabled"))

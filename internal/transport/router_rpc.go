@@ -9,7 +9,9 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"connectrpc.com/validate"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/riipandi/tango/internal/guard"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -126,7 +128,7 @@ func otelInterceptor() connect.Interceptor {
 // The read bound rides the same options, so a request body larger than
 // server.max_request_bytes is refused before any procedure — or the
 // authentication wrap in front of them — decodes it.
-func rpcHandlerOptions(maxRequestBytes int) []connect.HandlerOption {
+func rpcHandlerOptions(maxRequestBytes int, reauth guard.ReauthConsumer) []connect.HandlerOption {
 	return []connect.HandlerOption{
 		connect.WithCodec(rpcJSONCodec{name: rpcCodecJSON}),
 		connect.WithCodec(rpcJSONCodec{name: rpcCodecJSONCharsetUTF8}),
@@ -138,7 +140,7 @@ func rpcHandlerOptions(maxRequestBytes int) []connect.HandlerOption {
 		// procedure apart from an absent one. The rule is per-procedure and
 		// the request carries the procedure it calls, so this is an
 		// interceptor rather than a middleware.
-		connect.WithInterceptors(middleware.Guard()),
+		connect.WithInterceptors(middleware.Guard(reauth)),
 		// The declarative constraints in the contracts are enforced here,
 		// once: a message that fails its protovalidate options never reaches
 		// a handler, and the violations travel as typed error details.
@@ -159,10 +161,10 @@ func rpcHandlerOptions(maxRequestBytes int) []connect.HandlerOption {
 // exactly what the surface serves — the checker, the authenticator, and the
 // modules — so the RPC registration never reads how the router got its
 // dependencies.
-func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int) {
+func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int, reauth guard.ReauthConsumer) {
 	// The prefix is stripped because chi only shifts its own route context: a
 	// generated Connect handler matches its procedure path exactly.
-	r.Mount(RPCPath, http.StripPrefix(RPCPath, rpcRouter(checker, auth, modules, maxRequestBytes)))
+	r.Mount(RPCPath, http.StripPrefix(RPCPath, rpcRouter(checker, auth, modules, maxRequestBytes, reauth)))
 }
 
 // rpcRouter builds the Connect handler tree served below RPCPath.
@@ -177,7 +179,7 @@ func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules
 // (no procedure in this contract declares `idempotency_level =
 // NO_SIDE_EFFECTS`, which is what would make a GET legal), and the generated
 // handler is what refuses another method with `405` and `Allow: POST`.
-func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int) http.Handler {
+func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int, reauth guard.ReauthConsumer) http.Handler {
 	r := chi.NewRouter()
 
 	// The streaming procedures are lifted out of the request deadlines the
@@ -186,7 +188,7 @@ func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Mod
 	// renamed procedure breaks the build rather than losing its exemption.
 	r.Use(middleware.UnboundedFor(rpcStreamingProcedures...))
 
-	options := rpcHandlerOptions(maxRequestBytes)
+	options := rpcHandlerOptions(maxRequestBytes, reauth)
 	_, healthHandler := systemv1connect.NewHealthServiceHandler(
 		newRPCHealthService(checker),
 		options...,
@@ -238,7 +240,7 @@ func writeRPCError(writer *connect.ErrorWriter, w http.ResponseWriter, r *http.R
 // serialized under the shared codec, exactly like a refusal from a procedure
 // itself.
 func rpcRefuse(w http.ResponseWriter, r *http.Request, maxRequestBytes int) {
-	options := rpcHandlerOptions(maxRequestBytes)
+	options := rpcHandlerOptions(maxRequestBytes, nil)
 	writer := connect.NewErrorWriter(options...)
 	writeRPCError(writer, w, r, connect.CodeResourceExhausted, "rate limit exceeded")
 }

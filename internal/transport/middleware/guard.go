@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	"connectrpc.com/connect"
 
@@ -24,8 +25,14 @@ import (
 // interceptor answers for the whole surface instead of a path table the
 // router would have to repeat. It is registered on the handler options, so a
 // module's procedure is guarded exactly like the transport's own.
-func Guard() connect.Interceptor {
-	return guardInterceptor{}
+//
+// The step-up enforcer rides construction: a procedure the table marks as
+// Reauthenticated has its proof spent here, after the rule passes and before
+// the procedure runs. A nil enforcer fails closed — the guarded procedure
+// refuses rather than runs unproven — which is the state a bare test router
+// is in.
+func Guard(reauth guard.ReauthConsumer) connect.Interceptor {
+	return guardInterceptor{reauth: reauth}
 }
 
 // guardInterceptor carries the rule table over both procedure shapes. The
@@ -33,24 +40,28 @@ func Guard() connect.Interceptor {
 // identifier it names; the streaming half reads no message — a stream's
 // rules are the ones that need no target, and a self rule on a stream is a
 // table defect the guard's table test catches.
-type guardInterceptor struct{}
+type guardInterceptor struct {
+	// reauth spends the step-up proof a Reauthenticated procedure demands.
+	// Nil fails closed, at the check below rather than at a dereference.
+	reauth guard.ReauthConsumer
+}
 
-func (guardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+func (i guardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := enforce(ctx, req.Spec().Procedure, req.Any()); err != nil {
+		if err := i.enforce(ctx, req.Spec().Procedure, req.Any(), req.Header()); err != nil {
 			return nil, guardError(err)
 		}
 		return next(ctx, req)
 	}
 }
 
-func (guardInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+func (i guardInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return next
 }
 
-func (guardInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+func (i guardInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		if err := enforce(ctx, conn.Spec().Procedure, nil); err != nil {
+		if err := i.enforce(ctx, conn.Spec().Procedure, nil, conn.RequestHeader()); err != nil {
 			return guardError(err)
 		}
 		return next(ctx, conn)
@@ -58,11 +69,26 @@ func (guardInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) 
 }
 
 // enforce runs the rule one procedure gets, before the procedure runs, so a
-// refusal costs no service call and reaches no database.
-func enforce(ctx context.Context, procedure string, message any) error {
+// refusal costs no service call and reaches no database. A procedure the
+// table marks for step-up then has its proof spent — the one consumption
+// point, so the requirement is judged identically everywhere.
+func (i guardInterceptor) enforce(ctx context.Context, procedure string, message any, header http.Header) error {
 	rule := guard.RuleFor(procedure)
 	caller, _ := jwtutils.CallerFrom(ctx)
-	return rule(caller, guard.Target{Message: message})
+	if err := rule(caller, guard.Target{Message: message}); err != nil {
+		return err
+	}
+	if !guard.RequiresReauthentication(procedure) {
+		return nil
+	}
+	if i.reauth == nil {
+		return guard.ErrUnauthenticated
+	}
+	token := header.Get(guard.ReauthenticationHeader)
+	if token == "" {
+		return guard.ErrUnauthenticated
+	}
+	return i.reauth.ConsumeReauthentication(ctx, caller, token)
 }
 
 // guardError maps a rule's refusal onto the wire.

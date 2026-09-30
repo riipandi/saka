@@ -71,9 +71,9 @@ func (s *Service) VerifyLogin(ctx context.Context, sessionWire, credentialJSON s
 		return IssuedSession{}, ErrCeremonyInvalid
 	}
 
-	parsed, err := protocol.ParseCredentialRequestResponseBody(strings.NewReader(credentialJSON))
+	parsed, err := protocolParseAssertion(credentialJSON)
 	if err != nil {
-		return IssuedSession{}, fmt.Errorf("%w: %v", ErrAssertionInvalid, err)
+		return IssuedSession{}, err
 	}
 
 	sessionData, err := s.storedSessionData(row, nil)
@@ -82,7 +82,6 @@ func (s *Service) VerifyLogin(ctx context.Context, sessionWire, credentialJSON s
 	}
 
 	var account *signin.Account
-	var credential *gowebauthn.Credential
 	handler := func(_, userHandle []byte) (gowebauthn.User, error) {
 		if len(userHandle) != 16 {
 			return nil, fmt.Errorf("%w: the user handle is not an account identifier", ErrAssertionInvalid)
@@ -92,21 +91,13 @@ func (s *Service) VerifyLogin(ctx context.Context, sessionWire, credentialJSON s
 			return nil, lookupErr
 		}
 		account = found
-		rows, listErr := s.repo.ListCredentials(ctx, s.pool, found.ID)
+		creds, listErr := s.engineCredentials(ctx, found.ID)
 		if listErr != nil {
 			return nil, listErr
 		}
-		creds := make([]gowebauthn.Credential, 0, len(rows))
-		for _, row := range rows {
-			mapped, mapErr := toEngineCredential(row)
-			if mapErr != nil {
-				return nil, mapErr
-			}
-			creds = append(creds, mapped)
-		}
 		return &credentialUser{id: found.ID, name: found.Username, displayName: found.DisplayName, credentials: creds}, nil
 	}
-	credential, err = s.engine.ValidateDiscoverableLogin(handler, sessionData, parsed)
+	credential, err := s.engine.ValidateDiscoverableLogin(handler, sessionData, parsed)
 	if err != nil {
 		return IssuedSession{}, classifyCeremonyError(err)
 	}
@@ -129,7 +120,36 @@ func (s *Service) VerifyLogin(ctx context.Context, sessionWire, credentialJSON s
 		return issueErr
 	})
 	if txErr != nil {
-		return IssuedSession{}, err
+		return IssuedSession{}, txErr
 	}
 	return result, nil
+}
+
+// protocolParseAssertion reads the browser's assertion JSON into the parsed
+// form the engine verifies.
+func protocolParseAssertion(credentialJSON string) (*protocol.ParsedCredentialAssertionData, error) {
+	parsed, err := protocol.ParseCredentialRequestResponseBody(strings.NewReader(credentialJSON))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAssertionInvalid, err)
+	}
+	return parsed, nil
+}
+
+// engineCredentials maps the account's stored rows into the engine's
+// credential shapes — the form ValidateDiscoverableLogin compares an
+// assertion against, signature counter included.
+func (s *Service) engineCredentials(ctx context.Context, userID uuid.UUID) ([]gowebauthn.Credential, error) {
+	rows, err := s.repo.ListCredentials(ctx, s.pool, userID)
+	if err != nil {
+		return nil, err
+	}
+	creds := make([]gowebauthn.Credential, 0, len(rows))
+	for _, row := range rows {
+		mapped, mapErr := toEngineCredential(row)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		creds = append(creds, mapped)
+	}
+	return creds, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/samber/do/v2"
 
 	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/storage"
@@ -50,6 +51,10 @@ type Options struct {
 	// procedures run. A nil authenticator leaves the surface open, which is
 	// the state a test that reads only responses is in.
 	Authenticator Authenticator
+	// Reauthentication spends the step-up proof a Reauthenticated procedure
+	// demands. A nil enforcer fails closed: the guarded procedures refuse,
+	// which is the state a bare test router is in.
+	Reauthentication guard.ReauthConsumer
 	// Injector is the samber/do container the run composed. Only the debug
 	// build's devtool reads it; a release build ignores the field.
 	Injector do.Injector
@@ -156,7 +161,7 @@ func NewRouter(opts Options) chi.Router {
 				rpcRefuseWith(opts.Config.Server.MaxRequestBytes), opts.RateClassify, rpcRateLimitExclusions...))
 		}
 
-		mountRPC(throttled, opts.Checker, opts.Authenticator, opts.Modules, opts.Config.Server.MaxRequestBytes)
+		mountRPC(throttled, opts.Checker, opts.Authenticator, opts.Modules, opts.Config.Server.MaxRequestBytes, opts.Reauthentication)
 	})
 
 	// The devtool sits outside the throttled and bearer-guarded groups: a

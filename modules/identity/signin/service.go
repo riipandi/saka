@@ -410,6 +410,23 @@ func (s *Service) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, 
 	return s.repo.FindAccountByID(ctx, id)
 }
 
+// VerifyPassword checks a password against the account's stored hash — the
+// re-proof the step-up surface runs on the caller's own account. The answer
+// is a plain boolean: the caller already holds the account, so the refusal
+// says only that the proof failed, the way SignIn's pair does without
+// naming which half lied.
+func (s *Service) VerifyPassword(ctx context.Context, id uuid.UUID, password string) (bool, error) {
+	account, err := s.repo.FindAccountByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	match, verifyErr := s.hasher.Verify(password, account.PasswordHash)
+	if verifyErr != nil {
+		return false, fmt.Errorf("signin: verify password: %w", verifyErr)
+	}
+	return match, nil
+}
+
 // SessionLifetime picks the session lifetime the caller asked for: the short
 // window a shared machine forgets by the end of the day, the long one a
 // remembered device keeps. Both are configuration keys, so a deployment

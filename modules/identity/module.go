@@ -26,6 +26,7 @@ import (
 	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/mailer"
@@ -372,6 +373,13 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		settings := do.MustInvoke[*appconfig.Settings](i)
 		return webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, settings, recorder, log)
+	}),
+
+	// The step-up consumer is the webauthn service behind the interface the
+	// guard defines: the transport spends its proofs without learning the
+	// feature, and the registry resolves the seam rather than the feature.
+	do.Lazy(func(i do.Injector) (guard.ReauthConsumer, error) {
+		return do.MustInvoke[*webauthn.Service](i), nil
 	}),
 
 	// The password recovery service builds over the mailer; the queue and

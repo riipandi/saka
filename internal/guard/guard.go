@@ -15,6 +15,7 @@
 package guard
 
 import (
+	"context"
 	"errors"
 
 	"github.com/riipandi/tango/pkg/jwtutils"
@@ -174,6 +175,61 @@ func Admin(caller *jwtutils.Caller, _ Target) error {
 		return ErrAdminRequired
 	}
 	return nil
+}
+
+// Reauthenticated answers a caller whose session is augmented by a step-up
+// proof — a single-use reauthentication token minted moments ago by a
+// password check or a passkey assertion, and spent by exactly one guarded
+// call.
+//
+// The rule itself carries only the classification: an anonymous caller is
+// refused here, and the proof's consumption is the transport's job, because
+// a rule sees the claims and the message but never the database. The
+// interceptor consults RequiresReauthentication, reads the proof's header,
+// and spends the token atomically before the procedure runs — so the
+// requirement is judged once, in one place, and every procedure the table
+// marks inherits it.
+//
+// A machine credential is refused with the session shape: a key cannot
+// produce a proof only a present human can, and the surfaces this rule
+// guards — the account's own guards and grants — are exactly the ones a
+// stolen key must not reach.
+func Reauthenticated(caller *jwtutils.Caller, _ Target) error {
+	if caller == nil {
+		return ErrUnauthenticated
+	}
+	if caller.IsMachine() {
+		return ErrMachineCredential
+	}
+	if caller.SessionID == "" {
+		return ErrUnauthenticated
+	}
+	if caller.IsImpersonating() {
+		return ErrImpersonated
+	}
+	return nil
+}
+
+// ReauthenticationHeader carries the step-up proof a Reauthenticated
+// procedure demands. The token is single use: the guarded call that reads it
+// spends it, and a replay answers the same refusal an unknown token does.
+const ReauthenticationHeader = "X-Tango-Reauthentication"
+
+// ReauthConsumer spends a step-up proof. The guard defines the seam; the
+// feature that mints the tokens implements it, and the transport's guard
+// interceptor is built with the implementation the registry resolves. A nil
+// consumer fails closed: a guarded procedure refuses rather than runs
+// unproven.
+type ReauthConsumer interface {
+	ConsumeReauthentication(ctx context.Context, caller *jwtutils.Caller, token string) error
+}
+
+// RequiresReauthentication answers whether the procedure's table entry marks
+// it as step-up guarded — the question the interceptor asks after the rule
+// passes.
+func RequiresReauthentication(procedure string) bool {
+	entry, ok := ProcedureRules[procedure]
+	return ok && entry.StepUp
 }
 
 // Permission answers a caller whose effective grants satisfy the requirement:

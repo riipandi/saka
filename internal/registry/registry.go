@@ -129,7 +129,11 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		RateClassify:  classify,
 		Modules:       mounted,
 		Authenticator: do.MustInvoke[middleware.Authenticator](i),
-		Injector:      i,
+		// The step-up proofs are spent here, once per guarded call. The
+		// consumer is registered as the interface the guard defines — the
+		// registry never learns which feature mints the tokens.
+		Reauthentication: do.MustInvoke[guard.ReauthConsumer](i),
+		Injector:         i,
 	}), nil
 }
 

@@ -27,12 +27,22 @@ import (
 // /rpc, the unary JSON content type, and the protocol version header the
 // contract requires.
 func rpcRequest(t *testing.T, procedure, body string) *http.Request {
+	req := rpcRequestWithHeaders(t, procedure, body, nil)
+	return req
+}
+
+// rpcRequestWithHeaders builds a procedure request carrying extra headers —
+// the step-up proof's header is the one a Reauthenticated procedure reads.
+func rpcRequestWithHeaders(t *testing.T, procedure, body string, headers map[string]string) *http.Request {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodPost,
 		transport.RPCPath+procedure, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connect-Protocol-Version", "1")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 	return req
 }
 
