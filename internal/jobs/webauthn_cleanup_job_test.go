@@ -80,11 +80,14 @@ func TestTheTokenSweepReapsTheExpired(t *testing.T) {
 
 	pool := testutils.MigratedPostgres(t, "webauthn_token_cleanup_test")
 	repo := webauthn.NewRepository()
+	// The table's check refuses an already-expired insert, so aging is the
+	// sweep's clock: both rows go in live, and the sweep judges them with a
+	// now that has moved past the short one.
 	now := time.Now()
-	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "dead-hash", now.Add(-time.Hour), now.Add(-time.Minute)))
+	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "dead-hash", now, now.Add(time.Minute)))
 	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "live-hash", now, now.Add(time.Hour)))
 
-	swept, err := repo.DeleteExpiredTokens(t.Context(), pool, now)
+	swept, err := repo.DeleteExpiredTokens(t.Context(), pool, now.Add(2*time.Minute))
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), swept)
 
