@@ -10,16 +10,15 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "${[ userId ]}"
+      "user_id": "${[ userId ]}"
     }
 bodyType: application/json
 description: |-
-  Retrieve all WebAuthn credentials for a specific user
+  Names one account's passkeys, aimed by the request's user_id.
 
-  Mirror of Pocket ID `GET /api/users/{id}/webauthn-credentials`.
+  Pocket ID's mirror is `GET /api/users/{id}/webauthn-credentials`; the surface is tango's `WebAuthnService` — the roll the account's own ListCredentials answers, no key material.
 
-  Parameters:
-  - id (path, required): User ID
+  Guard: Permission user:*:read.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] List user passkeys (unimplemented)'
+name: '[Tango] List user passkeys (admin)'
 sortPriority: 23000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/ListWebAuthnCredentials
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials
 urlParameters:
 - enabled: true
   name: id

@@ -10,18 +10,16 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "${[ userId ]}",
-      "credential_id": "REPLACE_CREDENTIAL_ID"
+      "user_id": "${[ userId ]}",
+      "credential_id": "psk_"
     }
 bodyType: application/json
 description: |-
-  Delete a specific WebAuthn credential for a user
+  Removes one of an account's passkeys, aimed by the request's user_id.
 
-  Mirror of Pocket ID `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`.
+  Pocket ID's mirror is `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; the surface is tango's `WebAuthnService`, the same door the holder's own delete uses — the stranding refusal (an account left with no way in) holds here too.
 
-  Parameters:
-  - id (path, required): User ID
-  - credentialId (path, required): Credential ID
+  Guard: Permission user:*:delete.
 headers:
 - enabled: true
   name: Content-Type
@@ -32,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Delete user passkey (unimplemented)'
+name: '[Tango] Delete user passkey (admin)'
 sortPriority: 24000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/DeleteWebAuthnCredential
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential
 urlParameters:
 - enabled: true
   name: id

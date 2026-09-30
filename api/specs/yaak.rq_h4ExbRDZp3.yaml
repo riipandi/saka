@@ -4,7 +4,7 @@ id: rq_h4ExbRDZp3
 createdAt: 2026-09-30T12:55:00.000000
 updatedAt: 2026-09-30T12:55:00.000000
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_TMZFHpR4cU
+folderId: fl_xxFhnsiD2K
 authentication: {}
 authenticationType: null
 body:
@@ -23,7 +23,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Admin rename passkey'
+name: '[Tango] Rename user passkey (admin)'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential
 urlParameters: []
