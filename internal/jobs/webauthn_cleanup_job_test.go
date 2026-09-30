@@ -107,7 +107,7 @@ func tokenOwner(t *testing.T, pool *datastore.Postgres) uuid.UUID {
 	_, err := pool.Exec(t.Context(), `
 		INSERT INTO public.users (id, username, email, display_name, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, now(), now())`,
-		userID, "hermione_"+userID.String()[:8], "hermione@example.com", "Hermione Granger")
+		userID, "hermione_"+userID.String()[29:], "hermione@example.com", "Hermione Granger")
 	require.NoError(t, err)
 	return userID
 }
