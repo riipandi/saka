@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_oVkD99nMYj
 createdAt: 2026-09-30T01:59:38.694492
-updatedAt: 2026-09-30T02:12:16.637264
+updatedAt: 2026-09-30T02:17:45.927705
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_d23um6bp9P
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "webhook_id": "whk_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "webhook_id": "${[ response.body.path(request='rq_oTHPnZqWaG', behavior='smart', ttl='0', result='first', join=', ', path='$.webhooks[0].id') ]}",
       "page": 1,
       "limit": 20
     }

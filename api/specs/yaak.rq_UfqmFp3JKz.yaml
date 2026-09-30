@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_UfqmFp3JKz
 createdAt: 2026-09-30T01:59:38.648443
-updatedAt: 2026-09-30T02:12:02.716469
+updatedAt: 2026-09-30T02:15:29.610989
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_d23um6bp9P
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "whk_xxxxxxxxxxxxxxxxxxxxxxxx"
+      "id": "${[ response.body.path(request='rq_oTHPnZqWaG', behavior='smart', ttl='0', result='first', join=', ', path='$.webhooks[0].id') ]}"
     }
 bodyType: application/json
 description: '[Tango] Queue one webhook.test delivery to the endpoint, the way a receiver proves its side of the contract. Admin only.'

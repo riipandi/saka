@@ -2,11 +2,12 @@ type: folder
 model: folder
 id: fl_d23um6bp9P
 createdAt: 2026-09-30T01:59:08.458386
-updatedAt: 2026-09-30T02:11:37.043616
+updatedAt: 2026-09-30T02:14:23.657639
 workspaceId: wk_kBiMYTkhPP
 folderId: null
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 description: 'Tango-only outbound event surface: signed delivery endpoints, their deliveries, and the event catalog.'
 headers: []
 name: Webhooks

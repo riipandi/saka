@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_SsJXZhxDMa
 createdAt: 2026-09-30T01:59:38.409307
-updatedAt: 2026-09-30T02:11:55.788114
+updatedAt: 2026-09-30T02:17:08.142958
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_d23um6bp9P
 authentication: {}
@@ -10,9 +10,9 @@ authenticationType: null
 body:
   text: |-
     {
-      "name": "example-receiver",
+      "name": "${[ faker.internet.username() ]}",
       "description": "Where the events go",
-      "endpoint": "https://example.com/hook",
+      "endpoint": "https://webhooktest.net/webhook/01a09d0c-2abc-70ca-979b-fff00307bd4f",
       "method": "POST",
       "headers": {},
       "event_types": ["user.created"]
