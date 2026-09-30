@@ -83,7 +83,7 @@ const webauthnProbePage = `<!doctype html>
 <h2>Tango WebAuthn probe</h2>
 <p>Development instrument. The token is the access token a sign-in answers with.</p>
 <field><input id="token" size="80" placeholder="access token"></field>
-<field><input id="name" size="30" value="Probe key"></field>
+<field><input id="name" size="30" placeholder="probe key"></field>
 <button id="enroll">1. Enroll passkey</button>
 <button id="signin">2. Sign in passwordless</button>
 <button id="stepup">3. Step-up (passkey)</button>
