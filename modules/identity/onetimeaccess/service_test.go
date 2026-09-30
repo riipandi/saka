@@ -1,14 +1,20 @@
 package onetimeaccess
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"log/slog"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
@@ -17,6 +23,7 @@ import (
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
@@ -69,6 +76,72 @@ func testService(t *testing.T, pool *datastore.Postgres, adminEmail, publicEmail
 	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 }
 
+// testServiceWithMfa builds the service with the real second factor wired
+// behind the issuer's gate — the wiring the identity area performs — so a
+// test can prove the exchange asks the fork's question.
+func testServiceWithMfa(t *testing.T, pool *datastore.Postgres) (*Service, *multifactor.Service, *signin.Service) {
+	t.Helper()
+
+	cfg := testConfig()
+	cfg.Mailer.SMTPHost = "localhost"
+	mail, err := mailerService(cfg)
+	require.NoError(t, err)
+
+	client, err := queue.NewClient(queue.ClientConfig{
+		Store:        pool,
+		NumWorkers:   1,
+		ReleaseAfter: time.Hour,
+	})
+	require.NoError(t, err)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil, nil, nil)
+
+	cfg.Auth.SecretKey = testSecretHex
+	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
+		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+	mfa := multifactor.NewService(pool, testSealer(t), issuer,
+		audit.NewRecorder(slog.New(slog.DiscardHandler)), "Tango", nil)
+	issuer.WithMFAGate(mfa)
+	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil), mfa, issuer
+}
+
+// testSealer is the sealing a test runs: a real AES-256-GCM over a key the
+// test owns, so the round trip through the row is the production shape.
+func testSealer(t *testing.T) *testAESCipher {
+	t.Helper()
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+	block, err := aes.NewCipher(key)
+	require.NoError(t, err)
+	gcm, err := cipher.NewGCM(block)
+	require.NoError(t, err)
+	return &testAESCipher{gcm: gcm}
+}
+
+type testAESCipher struct{ gcm cipher.AEAD }
+
+func (c *testAESCipher) Encrypt(plaintext string) (string, error) {
+	nonce := make([]byte, c.gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	return "enc:" + hex.EncodeToString(c.gcm.Seal(nonce, nonce, []byte(plaintext), nil)), nil
+}
+
+func (c *testAESCipher) Decrypt(encoded string) (string, error) {
+	const prefix = "enc:"
+	raw, err := hex.DecodeString(encoded[len(prefix):])
+	if err != nil {
+		return "", err
+	}
+	nonce, body := raw[:c.gcm.NonceSize()], raw[c.gcm.NonceSize():]
+	plain, err := c.gcm.Open(nil, nonce, body, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
+}
+
 // mailerService builds the mailer the tests enqueue through: any SMTP host
 // makes it report configured, and no connection is dialed until a message is
 // submitted.
@@ -108,6 +181,14 @@ func wireOf(t *testing.T, raw string) string {
 	id, err := user.IDFromUUIDString(raw)
 	require.NoError(t, err)
 	return id.String()
+}
+
+// mustUUID parses a seeded row's identifier back into its UUID form.
+func mustUUID(t *testing.T, raw string) uuid.UUID {
+	t.Helper()
+	id, err := uuid.Parse(raw)
+	require.NoError(t, err)
+	return id
 }
 
 // countTokens reads how many code rows an account carries.
@@ -496,4 +577,55 @@ func readUserID(t *testing.T, pool *datastore.Postgres, email string) string {
 	var id string
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&id))
 	return id
+}
+
+// TestExchangeOnAnMfaAccountMintsTheBridgeNotASession pins the fork the
+// exchange runs: a code proves the mailbox, and an account keeping a
+// confirmed authenticator answers the pending bridge — not a session. The
+// bypass this test closes is the one an email link must never be: full
+// access without the second factor.
+func TestExchangeOnAnMfaAccountMintsTheBridgeNotASession(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, mfa, _ := testServiceWithMfa(t, pool)
+	userID := seedUser(t, pool, "hermione", "hermione@example.com")
+
+	// The account keeps a password: the enrollment's account read joins the
+	// password table, the way every issuer path does.
+	_, err := pool.Exec(t.Context(),
+		`INSERT INTO public.user_passwords (user_id, password_hash) VALUES ($1, $2)`,
+		userID, "$scrypt$test")
+	require.NoError(t, err)
+
+	// The confirmed authenticator the account keeps.
+	begun, err := mfa.BeginTotpEnrollment(t.Context(), mustUUID(t, userID), "Phone")
+	require.NoError(t, err)
+	now := time.Now()
+	code, err := totp.GenerateCode(begun.Secret, now)
+	require.NoError(t, err)
+	_, err = mfa.ConfirmTotpEnrollment(t.Context(), mustUUID(t, userID), begun.TotpID, code)
+	require.NoError(t, err)
+
+	// The exchange answers the bridge, and no token field travels.
+	token, _, err := service.CreateToken(t.Context(), wireOf(t, userID), 0)
+	require.NoError(t, err)
+	result, err := service.Exchange(t.Context(), token, "", audit.ClientInfo{})
+	require.NoError(t, err)
+	assert.True(t, result.MFARequired)
+	assert.Empty(t, result.AccessToken)
+	assert.Empty(t, result.RefreshToken)
+	assert.NotEmpty(t, result.MFAPendingToken)
+
+	// The bridge completes the sign-in: the same code the enrollment
+	// confirmed opens the session, exactly as the password path would.
+	next, err := totp.GenerateCode(begun.Secret, now.Add(31*time.Second))
+	if err != nil {
+		next, err = totp.GenerateCode(begun.Secret, now)
+		require.NoError(t, err)
+	}
+	completed, err := mfa.CompleteSignIn(t.Context(), result.MFAPendingToken, next, nil, signin.SessionParams{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, completed.AccessToken)
+	assert.Equal(t, "hermione", completed.User.Username)
 }

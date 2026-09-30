@@ -232,6 +232,25 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			return err
 		}
 
+		// The second factor's fork runs before any session is opened, the
+		// same question the password path asks: a code proves the mailbox,
+		// and an account keeping a confirmed factor answers the challenge
+		// before its session opens. The bridge mints inside this
+		// transaction, so a rollback returns the code — a retry starts
+		// clean.
+		pending, owed, forkErr := s.signin.Challenge(ctx, account.ID, false)
+		if forkErr != nil {
+			return forkErr
+		}
+		if owed {
+			result = signin.Result{
+				MFARequired:         true,
+				MFAPendingToken:     pending.Token,
+				MFAPendingExpiresAt: pending.ExpiresAt,
+			}
+			return nil
+		}
+
 		result, err = s.signin.IssueSession(ctx, tx, &signin.Account{
 			ID:          account.ID,
 			Username:    account.Username,

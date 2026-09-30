@@ -18,6 +18,7 @@ package tango.authn.v1;
 
 import "authn.proto";
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
 
@@ -122,6 +123,20 @@ message ExchangeOneTimeAccessTokenResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 8;
+
+  // mfa_required is true when the account keeps a confirmed authenticator:
+  // no tokens were issued, and the caller finishes the sign-in through
+  // MultifactorService.CompleteSignIn with the pending token — the same
+  // fork a password sign-in answers. Every token field above is empty in
+  // that case.
+  bool mfa_required = 10;
+
+  // mfa_pending_token is the short-lived bridge the exchange minted.
+  string mfa_pending_token = 11;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 12;
 }
 
 // RequestOneTimeAccessEmailAsAdminRequest names the account and the email

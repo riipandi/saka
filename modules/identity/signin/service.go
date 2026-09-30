@@ -427,6 +427,30 @@ func (s *Service) VerifyPassword(ctx context.Context, id uuid.UUID, password str
 	return match, nil
 }
 
+// Challenge mints the pending bridge an account keeping a confirmed
+// authenticator owes before its session opens. It is the fork SignIn's
+// password success runs, exposed so every path into a session asks the same
+// question: a one-time code is possession of the mailbox, and an account
+// that keeps a second factor answers the challenge, not the pair. ok is
+// false when nothing is owed and no bridge was minted.
+func (s *Service) Challenge(ctx context.Context, userID uuid.UUID, remember bool) (PendingSignIn, bool, error) {
+	if s.mfa == nil {
+		return PendingSignIn{}, false, nil
+	}
+	owed, err := s.mfa.KeepsConfirmedFactor(ctx, userID)
+	if err != nil {
+		return PendingSignIn{}, false, err
+	}
+	if !owed {
+		return PendingSignIn{}, false, nil
+	}
+	pending, err := s.mfa.GateSignIn(ctx, userID, remember)
+	if err != nil {
+		return PendingSignIn{}, false, err
+	}
+	return PendingSignIn{Token: pending.Token, ExpiresAt: pending.ExpiresAt}, true, nil
+}
+
 // SessionLifetime picks the session lifetime the caller asked for: the short
 // window a shared machine forgets by the end of the day, the long one a
 // remembered device keeps. Both are configuration keys, so a deployment

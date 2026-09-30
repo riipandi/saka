@@ -10,6 +10,7 @@ import (
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/pkg/responder"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
 	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
@@ -90,6 +91,13 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 	if err != nil {
 		return nil, mapError(err)
 	}
+	// The MFA fork changes the response's shape, not its envelope: the
+	// challenge answer carries no token fields, and the message names the
+	// next procedure rather than pretending a session opened.
+	message := "the one-time access code was exchanged for a session"
+	if result.MFARequired {
+		message = "the second factor is required to complete the sign-in"
+	}
 	return connect.NewResponse(&authnv1.ExchangeOneTimeAccessTokenResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
@@ -97,6 +105,14 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 		RefreshExpiresIn: result.RefreshExpiresIn,
 		RefreshToken:     result.RefreshToken,
 		SessionId:        result.SessionID,
+		MfaRequired:      result.MFARequired,
+		MfaPendingToken:  result.MFAPendingToken,
+		MfaPendingExpiresAt: func() *timestamppb.Timestamp {
+			if result.MFAPendingExpiresAt.IsZero() {
+				return nil
+			}
+			return timestamppb.New(result.MFAPendingExpiresAt)
+		}(),
 		User: &authnv1.AuthenticatedUser{
 			Id:          result.User.ID,
 			Username:    result.User.Username,
@@ -104,7 +120,7 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 			DisplayName: result.User.DisplayName,
 		},
 		Status:  responder.StatusSuccess,
-		Message: "the one-time access code was exchanged for a session",
+		Message: message,
 	}), nil
 }
 
