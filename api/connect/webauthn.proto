@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package tango.authn.v1;
+
+import "authn.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
+
+// WebAuthnService is the passkey surface: enrollment, usernameless sign-in,
+// and the credential roll an account manages.
+//
+// A passkey is one credential in three roles. It signs in without a password
+// (the assertion with user verification is the whole proof), it completes the
+// MFA bridge a password or a one-time code minted, and it proves the holder
+// for a step-up reauthentication. The sign-in here is discoverable on
+// purpose: BeginLogin takes no identifier and the account resolves from the
+// credential the browser presents.
+//
+// The ceremony documents travel as opaque JSON. The requests carry the
+// browser's PublicKeyCredential JSON verbatim and the responses carry the
+// server's options JSON verbatim; the SPA passes both through untouched, so
+// the wire never re-shapes what the browser produced.
+service WebAuthnService {
+  // BeginRegistration opens the enrollment ceremony: it answers the
+  // PublicKeyCredentialCreationOptions JSON the browser hands to
+  // navigator.credentials.create, plus the session handle the verify call
+  // echoes. The caller is the account the credentials enroll onto.
+  rpc BeginRegistration(BeginRegistrationRequest) returns (BeginRegistrationResponse);
+
+  // VerifyRegistration finishes the enrollment: the browser's attestation
+  // JSON is verified against the stored challenge, the credential's
+  // counters and backup flags are recorded, and the limits
+  // (passkey.max_credentials, mfa.max_enrollments) are judged at this
+  // moment — lowering a limit never unregisters an existing device. A
+  // synced-passkey attestation is refused when the deployment turned
+  // webauthn.allow_synced_passkeys off.
+  rpc VerifyRegistration(VerifyRegistrationRequest) returns (VerifyRegistrationResponse);
+
+  // BeginLogin opens the sign-in ceremony without naming an account: the
+  // answer carries an empty allowCredentials, so the browser offers every
+  // discoverable credential it holds for this origin.
+  rpc BeginLogin(BeginLoginRequest) returns (BeginLoginResponse);
+
+  // VerifyLogin finishes the sign-in: the assertion is verified, the account
+  // resolves from the credential, and the session issues in one step — a
+  // passkey assertion with user verification is full authentication, so an
+  // MFA-enabled account answers tokens here, not a second challenge.
+  rpc VerifyLogin(VerifyLoginRequest) returns (VerifyLoginResponse);
+
+  // ListCredentials names the caller's passkeys — the shape a settings page
+  // renders. It never carries key material.
+  rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse);
+
+  // UpdateCredential renames one of the caller's passkeys. The credential
+  // must be the caller's own; another account's answers not-found.
+  rpc UpdateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
+
+  // DeleteCredential removes one of the caller's passkeys. Deleting the
+  // last credential on an account that still holds a password is allowed;
+  // an account that would be left with no way in at all is refused.
+  rpc DeleteCredential(DeleteCredentialRequest) returns (DeleteCredentialResponse);
+}
+
+// BeginRegistrationRequest is empty: the account is the access token's
+// subject, the ceremony state rests server-side.
+message BeginRegistrationRequest {}
+
+// BeginRegistrationResponse carries the browser's create() argument and the
+// handle the verify call echoes.
+message BeginRegistrationResponse {
+  // options is the PublicKeyCredentialCreationOptions JSON, verbatim from
+  // the server's ceremony state — challenge, RP, user, parameters,
+  // timeouts.
+  string options = 1;
+
+  // session_id is the ceremony handle (`wcs_…`). It names nothing but the
+  // server-side row, which dies at its expiry or its consumption.
+  string session_id = 2;
+}
+
+// VerifyRegistrationRequest carries what the browser produced.
+message VerifyRegistrationRequest {
+  // session_id is the handle BeginRegistration answered.
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential is the PublicKeyCredential JSON the browser answered
+  // navigator.credentials.create with — id, rawId, type, response
+  // (attestationObject, clientDataJSON), passed through untouched.
+  string credential = 2 [(buf.validate.field).string.min_len = 1];
+
+  // name is the display name the holder gives the passkey. Empty names the
+  // authenticator model the AAGUID resolves to.
+  string name = 3 [(buf.validate.field).string.max_len = 64];
+}
+
+// VerifyRegistrationResponse answers the enrolled credential's view.
+message VerifyRegistrationResponse {
+  Credential credential = 1;
+}
+
+// BeginLoginRequest is empty: the sign-in is discoverable, the credential
+// names the account.
+message BeginLoginRequest {}
+
+// BeginLoginResponse carries the browser's get() argument and the handle.
+message BeginLoginResponse {
+  // options is the PublicKeyCredentialRequestOptions JSON — an empty
+  // allowCredentials and the ceremony timeout.
+  string options = 1;
+
+  // session_id is the ceremony handle (`wcs_…`).
+  string session_id = 2;
+}
+
+// VerifyLoginRequest carries what the browser produced for the sign-in.
+message VerifyLoginRequest {
+  // session_id is the handle BeginLogin answered.
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential is the PublicKeyCredential JSON the browser answered
+  // navigator.credentials.get with — the assertion, passed through
+  // untouched.
+  string credential = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// VerifyLoginResponse is the sign-in envelope: the same shape SignIn
+// answers, without the MFA fork — a passkey assertion with user
+// verification is full authentication, so the tokens always carry.
+message VerifyLoginResponse {
+  // access_token is the Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the refresh token's lifetime in seconds.
+  int32 refresh_expires_in = 4;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token.
+  string refresh_token = 5;
+
+  // session_id is the TypeID (`sess_…`) of the session row the refresh
+  // token is stored under.
+  string session_id = 6;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 7;
+}
+
+// Credential is the view of one enrolled passkey. It carries what a
+// settings page renders — no key material, no counter bookkeeping beyond
+// the display field.
+message Credential {
+  // id is the credential's identifier in its wire form, a TypeID
+  // (`psk_…`) encoded from the row's UUID.
+  string id = 1;
+
+  // name is the holder-chosen display name, or the authenticator model the
+  // AAGUID resolved to when the holder named nothing.
+  string name = 2;
+
+  // aaguid is the authenticator model identifier, empty when the
+  // attestation carried none.
+  string aaguid = 3;
+
+  // backup_eligible says the credential can live in a synced passkey
+  // provider.
+  bool backup_eligible = 4;
+
+  // backup_state says it currently does.
+  bool backup_state = 5;
+
+  // transports names the transports the authenticator reported — usb, nfc,
+  // ble, internal, hybrid.
+  repeated string transports = 6;
+
+  // sign_count is the signature counter at the last assertion, for the
+  // display that shows a credential is being used. Zero is legitimate: many
+  // authenticators never advance it.
+  int64 sign_count = 7;
+
+  // created_at is when the credential was enrolled.
+  google.protobuf.Timestamp created_at = 8;
+
+  // last_used_at is when the last assertion verified, unset for a
+  // credential that has never signed anything.
+  google.protobuf.Timestamp last_used_at = 9;
+}
+
+// ListCredentialsRequest is empty: the roll is the access token's subject's.
+message ListCredentialsRequest {}
+
+// ListCredentialsResponse answers the account's passkeys, oldest first.
+message ListCredentialsResponse {
+  repeated Credential credentials = 1;
+}
+
+// UpdateCredentialRequest renames one passkey.
+message UpdateCredentialRequest {
+  // credential_id is the credential to rename (`psk_…`).
+  string credential_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // name is the new display name.
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// UpdateCredentialResponse answers the renamed credential's view.
+message UpdateCredentialResponse {
+  Credential credential = 1;
+}
+
+// DeleteCredentialRequest removes one passkey.
+message DeleteCredentialRequest {
+  // credential_id is the credential to remove (`psk_…`).
+  string credential_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteCredentialResponse is empty: success is the answer.
+message DeleteCredentialResponse {}

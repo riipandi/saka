@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/identity/jwks"
 )
 
@@ -55,6 +56,10 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// shared cache; the driver that answers every read a miss stands in
 		// for the wiring the composition root guarantees.
 		do.Eager[cache.Cache](cache.Noop{}),
+		// The passkey ceremonies read their knobs through the settings
+		// feature; nil stands in for the wiring the composition root
+		// guarantees, and the reads fail closed rather than dereference it.
+		do.Eager[*appconfig.Settings](nil),
 	)
 	Package(i)
 
@@ -206,6 +211,10 @@ func TestTheAreaMountsWithoutEveryDependency(t *testing.T) {
 // is in.
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
-
-	return config.Default()
+	cfg := config.Default()
+	// The passkey engine derives its RP identity from the public origin at
+	// construction, and a default config carries no base URL; the test names
+	// the dev one.
+	cfg.App.BaseURL = "http://localhost:3080"
+	return cfg
 }

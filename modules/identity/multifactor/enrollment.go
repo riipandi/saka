@@ -15,6 +15,15 @@ import (
 
 // ---- Enrollment ----
 
+// CountConfirmedTotp answers how many confirmed authenticators the account
+// holds. It is the seam the passkey feature's shared enrollment ceiling
+// reads: mfa.max_enrollments counts TOTP devices and passkeys together, and
+// this is the TOTP half's door — exported so the wiring after construction
+// can hand the webauthn service the counter without an import the other way.
+func (s *Service) CountConfirmedTotp(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
+	return s.repo.CountConfirmedTotp(ctx, db, userID)
+}
+
 // BeginTotpEnrollmentResult is the enrollment's one-time answer: the
 // identifier, the Base32 secret, and the provisioning URI.
 type BeginTotpEnrollmentResult struct {
@@ -140,7 +149,7 @@ func (s *Service) ConfirmTotpEnrollment(ctx context.Context, userID uuid.UUID, t
 		return ConfirmTotpEnrollmentResult{}, ErrCodeInvalid
 	}
 
-	first, err := s.repo.CountConfirmedTotp(ctx, s.pool, userID)
+	first, err := s.CountConfirmedTotp(ctx, s.pool, userID)
 	if err != nil {
 		return ConfirmTotpEnrollmentResult{}, err
 	}

@@ -22,6 +22,11 @@ const ProviderOneTimeAccess = "one_time_access"
 // code or a recovery code opened the session through the MFA bridge.
 const ProviderTOTP = "totp"
 
+// ProviderWebauthn is the `provider` value a session row carries when a
+// passkey assertion with user verification opened the session whole — the
+// one credential in the role of the full first-and-second factor.
+const ProviderWebauthn = "webauthn"
+
 // KnownDeviceTable is the table remembering every browser fingerprint an
 // account has signed in from. A session row is a poor record of a device —
 // it expires and gets cleaned up — so the first-seen judgement needs a row

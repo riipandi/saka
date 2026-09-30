@@ -63,7 +63,9 @@ func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, user
 	ib.InsertInto(AuthTokenTable)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, PurposeEmailVerification, expiresAt, sentAt)
-	ib.SQL("ON CONFLICT (user_id, purpose) DO UPDATE SET " +
+	// The conflict target carries the partial index's predicate: the unique
+	// index excludes reauthentication, so a bare column list matches nothing.
+	ib.SQL("ON CONFLICT (user_id, purpose) WHERE purpose <> 'reauthentication' DO UPDATE SET " +
 		"token_hash = EXCLUDED.token_hash, " +
 		"expires_at = EXCLUDED.expires_at, " +
 		"last_sent_at = EXCLUDED.last_sent_at")
@@ -188,7 +190,9 @@ func (r *Repository) UpsertEmailChangeToken(ctx context.Context, db datastore.Qu
 	ib.InsertInto(AuthTokenTable)
 	ib.Cols("user_id", "token_hash", "purpose", "payload", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, PurposeEmailChange, payload, expiresAt, sentAt)
-	ib.SQL("ON CONFLICT (user_id, purpose) DO UPDATE SET " +
+	// The conflict target carries the partial index's predicate: the unique
+	// index excludes reauthentication, so a bare column list matches nothing.
+	ib.SQL("ON CONFLICT (user_id, purpose) WHERE purpose <> 'reauthentication' DO UPDATE SET " +
 		"token_hash = EXCLUDED.token_hash, " +
 		"payload = EXCLUDED.payload, " +
 		"expires_at = EXCLUDED.expires_at, " +

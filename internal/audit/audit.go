@@ -97,6 +97,33 @@ const (
 	// see inside a payload.
 	EventSessionRevoked = "session_revoked"
 
+	// EventWebauthnCredentialRegistered is a passkey enrolled onto an
+	// account. The record names the credential and the authenticator model;
+	// no key material is ever in the payload.
+	EventWebauthnCredentialRegistered = "webauthn_credential_registered"
+
+	// EventWebauthnCredentialRemoved is a passkey deleted — by its holder,
+	// through the surface that proves the session.
+	EventWebauthnCredentialRemoved = "webauthn_credential_removed"
+
+	// EventWebauthnCredentialRenamed is a passkey's display name changed.
+	EventWebauthnCredentialRenamed = "webauthn_credential_renamed"
+
+	// EventWebauthnSignIn is a session opened by a passkey assertion with
+	// user verification — the whole proof in one step, no second factor
+	// owed.
+	EventWebauthnSignIn = "webauthn_sign_in"
+
+	// EventWebauthnReauthenticationGranted is a step-up proof answered by a
+	// passkey assertion; the record names the token's window, never its
+	// value.
+	EventWebauthnReauthenticationGranted = "webauthn_reauthentication_granted"
+
+	// EventWebauthnReauthenticationConsumed is a step-up token spent by a
+	// guarded procedure. One token is one proof: the record is how a
+	// double-spend attempt shows up in the log.
+	EventWebauthnReauthenticationConsumed = "webauthn_reauthentication_consumed"
+
 	// EventAPIKeyCreated is a machine credential that did not exist now
 	// does. The raw key is never in the record: it exists in the response
 	// and the hash, so the payload names the key and its window only.

@@ -31,6 +31,7 @@ import (
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/devicelogin"
 	"github.com/riipandi/tango/modules/identity/authorization"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -43,6 +44,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/modules/identity/usergroup"
 	"github.com/riipandi/tango/modules/identity/verification"
+	"github.com/riipandi/tango/modules/identity/webauthn"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/jwtutils"
 )
@@ -82,6 +84,12 @@ type Deps struct {
 	// Multifactor is the second factor: TOTP authenticators and the recovery
 	// codes. Its sign-in fork is wired to the sign-in service at build time.
 	Multifactor *multifactor.Service
+
+	// WebAuthn is the passkey surface: enrollment, the usernameless sign-in,
+	// and the credential roll. Its ceremonies read their limits through the
+	// settings feature, and its TOTP-count seam is wired to the multifactor
+	// service at build time.
+	WebAuthn *webauthn.Service
 
 	// PasswordRecovery is the forgot-password flow: reset tokens, the
 	// emails that carry them, and the swap a spent token buys.
@@ -351,6 +359,21 @@ var Package = do.Package(
 		return service, nil
 	}),
 
+	// The webauthn service builds over the sign-in issuer — the assertion
+	// opens the session through it, so the session rules live in one place —
+	// and over the settings feature the ceremony knobs read through. The RP
+	// identity derives from app.base_url at construction; a configuration
+	// without a host fails the run here, before a listener opens.
+	do.Lazy(func(i do.Injector) (*webauthn.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		issuer := do.MustInvoke[*signin.Service](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		settings := do.MustInvoke[*appconfig.Settings](i)
+		return webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, settings, recorder, log)
+	}),
+
 	// The password recovery service builds over the mailer; the queue and
 	// the session lifecycle ride the post-construction seams, because
 	// internal/jobs cannot sit below the password package (the cycle runs
@@ -429,6 +452,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		Verification:  do.MustInvoke[*verification.Service](i),
 		OneTimeAccess: do.MustInvoke[*onetimeaccess.Service](i),
 		Multifactor:   do.MustInvoke[*multifactor.Service](i),
+		WebAuthn:      do.MustInvoke[*webauthn.Service](i),
 
 		PasswordRecovery: do.MustInvoke[*password.Service](i),
 
@@ -478,6 +502,15 @@ func features(deps Deps) []kernel.Module {
 	// skipped, and the wiring is the one place the feature is named.
 	if deps.Multifactor != nil {
 		modules = append(modules, multifactor.NewModule(deps.Multifactor))
+	}
+	// The passkey feature mounts beside it. The TOTP-count seam rides the
+	// post-construction wiring: mfa.max_enrollments counts both factors
+	// together, and the multifactor package must not sit below this one.
+	if deps.WebAuthn != nil {
+		if deps.Multifactor != nil {
+			deps.WebAuthn.WithTotpEnrollments(deps.Multifactor)
+		}
+		modules = append(modules, webauthn.NewModule(deps.WebAuthn))
 	}
 	if deps.PasswordRecovery != nil {
 		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery).

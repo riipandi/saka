@@ -46,6 +46,10 @@ var RateAuthProcedures = map[string]struct{}{
 	authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {},
 	authnv1connect.OneTimeAccessServiceRequestEmailProcedure:              {},
 	authnv1connect.MultifactorServiceCompleteSignInProcedure:              {},
+	// The passkey assertion is a credential attempt like the password: the
+	// verification is the guess, and the budget the bucket shares is what
+	// makes a drive against the credential space expensive.
+	authnv1connect.WebAuthnServiceVerifyLoginProcedure: {},
 	// The email senders an authenticated or administrative caller reaches:
 	// a compromised account or an impatient operator must not become a
 	// mailbomb, so they count against the same tight budget as the public
@@ -61,6 +65,12 @@ var RateAuthProcedures = map[string]struct{}{
 // tokens and answers before any credential of its own.
 var RateDefaultProcedures = map[string]struct{}{
 	authnv1connect.SessionServiceRefreshProcedure: {},
+	// The ceremony openers write a challenge row apiece: public work that
+	// is not a credential attempt, but whose spam fills a table, so they
+	// count against the default budget.
+	authnv1connect.WebAuthnServiceBeginLoginProcedure:         {},
+	authnv1connect.WebAuthnServiceBeginRegistrationProcedure:  {},
+	authnv1connect.WebAuthnServiceVerifyRegistrationProcedure: {},
 }
 
 // RateExemptProcedures names the public procedures the limiter never counts —

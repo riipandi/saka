@@ -107,6 +107,21 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.MultifactorServiceVerifyRecoveryCodeProcedure: {Rule: Session},
 	authnv1connect.MultifactorServiceAdminDisableMfaProcedure:    {Rule: Admin},
 
+	// The passkey surfaces split at the same line the multifactor ones do:
+	// the sign-in ceremony is reached before any token exists — the
+	// credential is the credential it judges — and the enrollment and the
+	// roll run on the caller's own token. `Session` names the management
+	// side: a machine credential has no browser to enroll a passkey on,
+	// and the refusal of an impersonated caller keeps an administrator
+	// from planting a credential on the account they are wearing.
+	authnv1connect.WebAuthnServiceBeginRegistrationProcedure:  {Rule: Session},
+	authnv1connect.WebAuthnServiceVerifyRegistrationProcedure: {Rule: Session},
+	authnv1connect.WebAuthnServiceBeginLoginProcedure:         {Rule: Public},
+	authnv1connect.WebAuthnServiceVerifyLoginProcedure:        {Rule: Public},
+	authnv1connect.WebAuthnServiceListCredentialsProcedure:    {Rule: Session},
+	authnv1connect.WebAuthnServiceUpdateCredentialProcedure:   {Rule: Session},
+	authnv1connect.WebAuthnServiceDeleteCredentialProcedure:   {Rule: Session},
+
 	// The password recovery surfaces split at the same line. The trigger and
 	// the spend are reached before any token exists — a caller who lost the
 	// password holds no credential, and the reset token is the credential
@@ -494,6 +509,7 @@ func ContractProcedures() []string {
 		auditlogv1.File_auditlog_proto,
 		authnv1.File_authn_proto,
 		authnv1.File_one_time_access_proto,
+		authnv1.File_webauthn_proto,
 		apikeyv1.File_api_key_proto,
 		authzv1.File_authz_proto,
 		federationv1.File_federation_proto,

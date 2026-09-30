@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_user_groups_users_user_group_id ON public.user_gr
 CREATE TABLE IF NOT EXISTS public.sessions (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CONSTRAINT chk_sessions_provider CHECK (provider IN ('password', 'one_time_access', 'totp', 'impersonation')),
+    provider TEXT NOT NULL CONSTRAINT chk_sessions_provider CHECK (provider IN ('password', 'one_time_access', 'totp', 'webauthn', 'impersonation')),
     token_hash TEXT NOT NULL UNIQUE,
     user_agent TEXT,
     device_fingerprint TEXT,
