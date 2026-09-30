@@ -779,16 +779,36 @@ message DeleteTotpEnrollmentResponse {
 // ---- Multifactor: the sign-in bridge ----
 
 // CompleteSignInRequest spends the pending bridge plus the second factor.
+// The factor is a TOTP or recovery code, or a passkey assertion over a
+// ceremony the sign-in begin answered — a credential with user verification
+// is a full second factor.
 message CompleteSignInRequest {
   // pending_token is the bridge SignIn minted on the password success.
   string pending_token = 1 [(buf.validate.field).string.min_len = 1];
 
-  // code is the second factor: the authenticator's six-digit value, or one
-  // of the account's recovery codes.
-  string code = 2 [
-    (buf.validate.field).string.min_len = 1,
-    (buf.validate.field).string.max_len = 64
-  ];
+  // second_factor is the proof the caller completes the challenge with.
+  oneof second_factor {
+    // code is the authenticator's six-digit value, or one of the account's
+    // recovery codes.
+    string code = 2 [
+      (buf.validate.field).string.min_len = 1,
+      (buf.validate.field).string.max_len = 64
+    ];
+
+    // passkey is the assertion path: the ceremony handle BeginLogin
+    // answered and the credential JSON the browser produced.
+    PasskeyFactor passkey = 3;
+  }
+}
+
+// PasskeyFactor is the passkey half of the sign-in challenge.
+message PasskeyFactor {
+  // session_id is the ceremony handle BeginLogin answered.
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential is the PublicKeyCredential JSON the browser answered
+  // navigator.credentials.get with, passed through untouched.
+  string credential = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // CompleteSignInResponse is the token pair — the shape SignIn answers with on

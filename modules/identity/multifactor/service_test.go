@@ -174,16 +174,16 @@ func TestCompleteSignInOpensTheSessionOncePerCode(t *testing.T) {
 	require.NoError(t, err)
 
 	// A wrong code refuses but keeps the bridge alive.
-	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrCodeInvalid)
 
-	result, err := service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), signin.SessionParams{})
+	result, err := service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), nil, signin.SessionParams{})
 	require.NoError(t, err)
 	assert.Equal(t, []uuid.UUID{userID}, issuer.opened)
 	assert.Equal(t, "sess_test", result.SessionID)
 
 	// The bridge died with its success: the same token answers nothing.
-	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrPendingInvalid)
 }
 
@@ -204,12 +204,12 @@ func TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn(t *testing.T) {
 	// earlier ones refuse as invalid codes, the budget's edge refuses as
 	// exhausted, and anything after answers nothing at all.
 	for range maxAttempts - 1 {
-		_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", signin.SessionParams{})
+		_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", nil, signin.SessionParams{})
 		assert.ErrorIs(t, err, ErrCodeInvalid)
 	}
-	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrPendingExhausted)
-	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrPendingInvalid)
 	assert.Empty(t, issuer.opened, "the exhausted bridge opens nothing")
 
@@ -217,13 +217,13 @@ func TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn(t *testing.T) {
 	// holds: the second attempt with the same code refuses.
 	recoveryOutcome, err := service.BeginSignIn(ctx, userID, false)
 	require.NoError(t, err)
-	result, err := service.CompleteSignIn(ctx, recoveryOutcome.PendingToken, confirmed.RecoveryCodes[0], signin.SessionParams{})
+	result, err := service.CompleteSignIn(ctx, recoveryOutcome.PendingToken, confirmed.RecoveryCodes[0], nil, signin.SessionParams{})
 	require.NoError(t, err)
 	assert.Equal(t, "sess_test", result.SessionID)
 
 	thirdOutcome, err := service.BeginSignIn(ctx, userID, false)
 	require.NoError(t, err)
-	_, err = service.CompleteSignIn(ctx, thirdOutcome.PendingToken, confirmed.RecoveryCodes[0], signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, thirdOutcome.PendingToken, confirmed.RecoveryCodes[0], nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrCodeInvalid)
 }
 
@@ -249,7 +249,7 @@ func TestRegenerateAndDisableRequireTheSecondFactor(t *testing.T) {
 	// The old set died with the regenerate.
 	oldOutcome, err := service.BeginSignIn(ctx, userID, false)
 	require.NoError(t, err)
-	_, err = service.CompleteSignIn(ctx, oldOutcome.PendingToken, confirmed.RecoveryCodes[0], signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, oldOutcome.PendingToken, confirmed.RecoveryCodes[0], nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrCodeInvalid)
 
 	// Disable with the fresh set, then the account is one factor again.
@@ -375,7 +375,7 @@ func TestVerifyRecoveryCodeSpendsOneCodeStandalone(t *testing.T) {
 
 	outcome, err := service.BeginSignIn(ctx, userID, false)
 	require.NoError(t, err)
-	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, confirmed.RecoveryCodes[0], signin.SessionParams{})
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, confirmed.RecoveryCodes[0], nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrCodeInvalid)
 
 	status, err = service.RecoveryCodesStatus(ctx, userID)

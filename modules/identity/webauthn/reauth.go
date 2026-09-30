@@ -139,8 +139,24 @@ func (s *Service) verifyStepUpAssertion(ctx context.Context, sessionWire, creden
 	return account, nil
 }
 
-// ConsumeReauthentication spends the proof a guarded call carries. It is
-// the guard's seam: the interceptor reads the header, this method deletes
+// VerifyBridgeAssertion verifies the assertion half of an MFA challenge: the
+// ceremony is consumed, the assertion checked, and the resolved account must
+// be the bridge's own — an assertion that proves another holder is not a
+// proof for this one. It is the multifactor feature's seam, defined there
+// and satisfied here; the assertion's bookkeeping commits as the real use
+// of the credential it was.
+func (s *Service) VerifyBridgeAssertion(ctx context.Context, userID uuid.UUID, sessionID, credentialJSON string) error {
+	account, err := s.verifyStepUpAssertion(ctx, sessionID, credentialJSON)
+	if err != nil {
+		return err
+	}
+	if account.ID != userID {
+		return ErrProofRefused
+	}
+	return nil
+}
+
+// ConsumeReauthentication spends the proof a guarded call carries. It is// the guard's seam: the interceptor reads the header, this method deletes
 // the hashed row in one statement, and a replay answers the same refusal an
 // unknown token does. The consumption is recorded, so a double-spend
 // attempt shows up in the log as the second refusal it was.

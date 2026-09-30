@@ -119,6 +119,9 @@ type Service struct {
 	issuerName string
 	now        func() time.Time
 	notices    noticeEnqueuer
+	// passkeys is the post-construction seam to the passkey feature's
+	// assertion verification. Nil keeps the code-only challenge.
+	passkeys PasskeyVerifier
 	// exposeSecrets carries the development aid the listing honors; the
 	// wiring passes it from the configuration's validated flag.
 	exposeSecrets bool

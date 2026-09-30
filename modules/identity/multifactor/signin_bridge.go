@@ -60,6 +60,33 @@ func (s *Service) BeginSignIn(ctx context.Context, userID uuid.UUID, remember bo
 // sign-in service's own Result, verbatim, so a client treats the two alike.
 type CompleteSignInResult = signin.Result
 
+// PasskeyAssertion is the passkey half of the challenge: the ceremony handle
+// and the browser's assertion JSON. The passkey feature verifies it; the
+// interface below keeps the multifactor package from importing it back.
+type PasskeyAssertion struct {
+	SessionID  string
+	Credential string
+}
+
+// PasskeyVerifier verifies the assertion half of the challenge. The webauthn
+// service satisfies it; the wiring rides the area's post-construction seam
+// the same way the issuer's gate does.
+type PasskeyVerifier interface {
+	// VerifyBridgeAssertion verifies the assertion against the bridge's
+	// account: the ceremony is consumed, the assertion checked, and an
+	// assertion that resolves to another account is a refusal.
+	VerifyBridgeAssertion(ctx context.Context, userID uuid.UUID, sessionID, credentialJSON string) error
+}
+
+// WithPasskeyVerifier wires the passkey half of the challenge after
+// construction. Nil keeps the code-only challenge — the state a wiring that
+// skipped the passkey feature is in, and a refusal at the call site rather
+// than a failed run.
+func (s *Service) WithPasskeyVerifier(verifier PasskeyVerifier) *Service {
+	s.passkeys = verifier
+	return s
+}
+
 // CompleteSignIn spends the bridge plus the second factor on the session.
 // The bridge dies whatever way the call ends: success consumes it, a wrong
 // code eats the failure budget, an expired bridge is swept on read.
@@ -68,7 +95,7 @@ type CompleteSignInResult = signin.Result
 // consumes nothing — a TOTP step a rollback returned, a recovery code a
 // rollback un-spent — and the bridge's delete carries the token hash, so two
 // completions racing on one bridge cannot both open a session.
-func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string, session signin.SessionParams) (CompleteSignInResult, error) {
+func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string, passkey *PasskeyAssertion, session signin.SessionParams) (CompleteSignInResult, error) {
 	now := s.now()
 
 	hash := crypto.HashHexToken(pendingToken)
@@ -95,7 +122,17 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 	var result CompleteSignInResult
 	var challengeErr error
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if _, verifyErr := s.verifyChallenge(ctx, tx, pending.UserID, code, now); verifyErr != nil {
+		if passkey != nil {
+			// The passkey half is verified beside the transaction, not
+			// inside it: the assertion's ceremony consumption and the
+			// credential's bookkeeping are their own writes, and a failed
+			// proof costs the bridge's budget below, exactly as a wrong
+			// code does.
+			if verifyErr := s.verifyPasskeyChallenge(ctx, pending.UserID, passkey); verifyErr != nil {
+				challengeErr = verifyErr
+				return verifyErr
+			}
+		} else if _, verifyErr := s.verifyChallenge(ctx, tx, pending.UserID, code, now); verifyErr != nil {
 			challengeErr = verifyErr
 			return verifyErr
 		}
@@ -138,6 +175,17 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 		return CompleteSignInResult{}, err
 	}
 	return result, nil
+}
+
+// verifyPasskeyChallenge runs the assertion half of the challenge. A nil
+// verifier is the wiring that skipped the passkey feature — the challenge
+// simply cannot be answered this way, which is the refusal the call site
+// answers rather than a failed run.
+func (s *Service) verifyPasskeyChallenge(ctx context.Context, userID uuid.UUID, passkey *PasskeyAssertion) error {
+	if s.passkeys == nil {
+		return ErrCodeInvalid
+	}
+	return s.passkeys.VerifyBridgeAssertion(ctx, userID, passkey.SessionID, passkey.Credential)
 }
 
 // verifyChallenge answers whether the code is the account's second factor: a

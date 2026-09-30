@@ -514,9 +514,13 @@ func features(deps Deps) []kernel.Module {
 	// The passkey feature mounts beside it. The TOTP-count seam rides the
 	// post-construction wiring: mfa.max_enrollments counts both factors
 	// together, and the multifactor package must not sit below this one.
+	// The challenge seam runs the other way for the same reason: the
+	// multifactor service verifies the passkey half of its bridge through
+	// the interface it defines, satisfied here.
 	if deps.WebAuthn != nil {
 		if deps.Multifactor != nil {
 			deps.WebAuthn.WithTotpEnrollments(deps.Multifactor)
+			deps.Multifactor.WithPasskeyVerifier(deps.WebAuthn)
 		}
 		modules = append(modules, webauthn.NewModule(deps.WebAuthn))
 	}

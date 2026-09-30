@@ -184,7 +184,16 @@ func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Requ
 func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[authnv1.CompleteSignInRequest]) (*connect.Response[authnv1.CompleteSignInResponse], error) {
 	client := audit.ClientFromContext(ctx)
 
-	result, err := h.service.CompleteSignIn(ctx, req.Msg.PendingToken, req.Msg.Code, signin.SessionParams{
+	var code string
+	var passkey *PasskeyAssertion
+	switch factor := req.Msg.SecondFactor.(type) {
+	case *authnv1.CompleteSignInRequest_Code:
+		code = factor.Code
+	case *authnv1.CompleteSignInRequest_Passkey:
+		passkey = &PasskeyAssertion{SessionID: factor.Passkey.SessionId, Credential: factor.Passkey.Credential}
+	}
+
+	result, err := h.service.CompleteSignIn(ctx, req.Msg.PendingToken, code, passkey, signin.SessionParams{
 		UserAgent:   client.UserAgent,
 		IPAddress:   client.IPAddress,
 		Fingerprint: client.Fingerprint,
