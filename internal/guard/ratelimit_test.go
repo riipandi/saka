@@ -59,6 +59,7 @@ func TestTheCredentialBucketCarriesTheAttemptSurface(t *testing.T) {
 		identityv1connect.SignupServiceSignupProcedure,
 		authnv1connect.OneTimeAccessServiceExchangeTokenProcedure,
 		authnv1connect.MultifactorServiceCompleteSignInProcedure,
+		authnv1connect.WebAuthnServiceReauthenticateProcedure,
 		authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure,
 		identityv1connect.EmailVerificationServiceSendEmailProcedure,
 	} {

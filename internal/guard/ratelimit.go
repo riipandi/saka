@@ -46,6 +46,11 @@ var RateAuthProcedures = map[string]struct{}{
 	authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {},
 	authnv1connect.OneTimeAccessServiceRequestEmailProcedure:              {},
 	authnv1connect.MultifactorServiceCompleteSignInProcedure:              {},
+	// The reauthentication door carries the same budget as the sign-in: its
+	// password half is a credential guess like any other, and the locked-in
+	// session changes the stakes, not the shape — the proof's budget is what
+	// makes a drive against the account's password expensive.
+	authnv1connect.WebAuthnServiceReauthenticateProcedure: {},
 	// The passkey assertion is a credential attempt like the password: the
 	// verification is the guess, and the budget the bucket shares is what
 	// makes a drive against the credential space expensive.
