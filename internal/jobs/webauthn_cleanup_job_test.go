@@ -82,10 +82,13 @@ func TestTheTokenSweepReapsTheExpired(t *testing.T) {
 	repo := webauthn.NewRepository()
 	// The table's check refuses an already-expired insert, so aging is the
 	// sweep's clock: both rows go in live, and the sweep judges them with a
-	// now that has moved past the short one.
+	// now that has moved past the short one. Each token rides its own user
+	// row — the FK the tokens carry.
 	now := time.Now()
-	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "dead-hash", now, now.Add(time.Minute)))
-	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "live-hash", now, now.Add(time.Hour)))
+	dead := tokenOwner(t, pool)
+	live := tokenOwner(t, pool)
+	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, dead, "dead-hash", now, now.Add(time.Minute)))
+	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, live, "live-hash", now, now.Add(time.Hour)))
 
 	swept, err := repo.DeleteExpiredTokens(t.Context(), pool, now.Add(2*time.Minute))
 	require.NoError(t, err)
@@ -94,4 +97,17 @@ func TestTheTokenSweepReapsTheExpired(t *testing.T) {
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(), "SELECT count(*) FROM public.auth_tokens").Scan(&count))
 	assert.Equal(t, 1, count, "the live token stays")
+}
+
+// tokenOwner seeds the user row a token's FK carries and answers its id.
+func tokenOwner(t *testing.T, pool *datastore.Postgres) uuid.UUID {
+	t.Helper()
+
+	userID := uuid.NewV7()
+	_, err := pool.Exec(t.Context(), `
+		INSERT INTO public.users (id, username, email, display_name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, now(), now())`,
+		userID, "hermione_"+userID.String()[:8], "hermione@example.com", "Hermione Granger")
+	require.NoError(t, err)
+	return userID
 }
