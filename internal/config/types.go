@@ -27,6 +27,7 @@ type Config struct {
 	RateLimit RateLimit `koanf:"rate_limit" json:"rate_limit"`
 	Server    Server    `koanf:"server" json:"server"`
 	Storage   Storage   `koanf:"storage" json:"storage"`
+	Webhook   Webhook   `koanf:"webhook" json:"webhook"`
 
 	// origin records which source last set each key, for conflict resolution.
 	// It is unexported so it never reaches JSON or a log line.
@@ -646,4 +647,16 @@ type S3 struct {
 	Region string `koanf:"region" json:"region"`
 	// SignedURLExpires is how long a presigned link stays valid.
 	SignedURLExpires time.Duration `koanf:"signed_url_expires" json:"signed_url_expires"`
+}
+
+// Webhook holds the outbound webhook delivery settings.
+type Webhook struct {
+	// AllowPrivateNetwork admits delivery endpoints whose host resolves to a
+	// loopback, private, or link-local address. The default refusal is the
+	// SSRF guard: an administrator-registered destination is trusted with
+	// the public internet, and reaching into the deployment's own network —
+	// a metadata service, the database, another container — is a capability
+	// a leaked admin credential should not carry by default. Enable it for
+	// deployments whose receivers genuinely live beside the server.
+	AllowPrivateNetwork bool `koanf:"allow_private_network" json:"allow_private_network"`
 }

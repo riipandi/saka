@@ -51,7 +51,9 @@ func TestWebhookPruneDeletesAgedOutAttemptsAndReschedules(t *testing.T) {
 	t.Cleanup(receiver.Close)
 	fetchClient, err := fetcher.New(config.Default(), log)
 	require.NoError(t, err)
-	service := webhook.NewService(pool, audit.NewRecorder(log), client, fetchClient, cipher, log)
+	// The receiver answers 500 and lives on loopback, so the private network
+	// is on: the retention test reaches it the way a delivery would.
+	service := webhook.NewService(pool, audit.NewRecorder(log), client, fetchClient, cipher, log, true)
 
 	// The prune processor is wired the way Register wires it, with the real
 	// service as the runner. The delivery queue is registered to a no-op:

@@ -184,13 +184,14 @@ message EventTypes {
 // keeps the stored set, and a present one — even empty — replaces it.
 message HeaderSet {
   // headers are the custom headers every delivery carries. Header names are
-  // token characters; the signature set cannot be named here.
+  // token characters, values are printable ASCII without a line break; the
+  // signature set cannot be named here.
   map<string, string> headers = 1 [(buf.validate.field).map = {
     keys: {
       string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
     }
     values: {
-      string: {max_len: 512}
+      string: {pattern: "^[ -~]*$", max_len: 512}
     }
   }];
 }
@@ -260,13 +261,14 @@ message CreateWebhookRequest {
   }];
 
   // headers are the custom headers every delivery carries. Header names are
-  // token characters; the signature set cannot be named here.
+  // token characters, values are printable ASCII without a line break; the
+  // signature set cannot be named here.
   map<string, string> headers = 5 [(buf.validate.field).map = {
     keys: {
       string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
     }
     values: {
-      string: {max_len: 512}
+      string: {pattern: "^[ -~]*$", max_len: 512}
     }
   }];
 

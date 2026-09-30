@@ -430,6 +430,12 @@ func Default() Config {
 				SignedURLExpires: time.Hour,
 			},
 		},
+		Webhook: Webhook{
+			// The private network stays out of reach by default: a
+			// deployment that hosts its own receivers turns this on, and
+			// every other destination is public internet.
+			AllowPrivateNetwork: false,
+		},
 	}
 }
 

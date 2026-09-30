@@ -107,6 +107,16 @@ func (r lazyWebhookRunner) PruneAttempts(ctx context.Context) (int64, error) {
 	return service.PruneAttempts(ctx)
 }
 
+// PruneDeliveries deletes the terminal delivery rows the retention window
+// has aged out; their attempts cascade with them.
+func (r lazyWebhookRunner) PruneDeliveries(ctx context.Context) (int64, error) {
+	service, err := do.Invoke[*webhook.Service](r.injector)
+	if err != nil {
+		return 0, err
+	}
+	return service.PruneDeliveries(ctx)
+}
+
 func infrastructure(ctx context.Context) func(do.Injector) {
 	return do.Package(
 		do.Lazy(func(i do.Injector) (*fetcher.Client, error) {

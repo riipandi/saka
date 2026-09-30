@@ -83,6 +83,9 @@ func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Serv
 		fetch,
 		testSecretKey(t),
 		slog.New(slog.DiscardHandler),
+		// The test receivers are loopback httptest servers; the private
+		// network is the state the delivery tests need.
+		true,
 	)
 }
 
@@ -464,4 +467,91 @@ func mustParse(t *testing.T, id string) uuid.UUID {
 	parsed, err := uuid.Parse(id)
 	require.NoError(t, err)
 	return parsed
+}
+
+// TestRunDeliveryRetriesAnInvisibleDelivery pins the wakeup race: a claim
+// that runs ahead of the commit that wrote the delivery row is the queue's
+// retry signal, not a quiet end — the row appears with the commit, and the
+// next attempt delivers it.
+func TestRunDeliveryRetriesAnInvisibleDelivery(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	err := service.RunDelivery(t.Context(), uuid.NewV7().String())
+	require.Error(t, err, "a delivery the reader cannot see is the retry signal")
+}
+
+// TestRunDeliveryRefusesAReplayAfterTerminalState pins the status guard: a
+// replayed task — a lost worker's reclaim, a dead-task replay — must not
+// re-send a delivery a receiver has already answered, and must not rewrite
+// the terminal state another attempt stamped.
+func TestRunDeliveryRefusesAReplayAfterTerminalState(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+
+	row := endpoint(t, service, r, "settled", "session.signed_in")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	arrivals := r.requests
+
+	// The delivery carries a terminal status now; a replayed task is the
+	// same quiet end, and the receiver sees nothing more.
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	assert.Equal(t, arrivals, r.requests, "a settled delivery is not sent again")
+}
+
+// TestRunDeliveryRefusesAPermanentAnswerWithoutARetry pins the retry
+// classification: a redirect and a 4xx are facts a receiver would repeat on
+// every try, so the delivery fails on the first answer and the queue's
+// budget is not spent.
+func TestRunDeliveryRefusesAPermanentAnswerWithoutARetry(t *testing.T) {
+	for name, status := range map[string]int{
+		"redirect":     http.StatusMovedPermanently,
+		"client error": http.StatusNotFound,
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := migratedPool(t)
+			r := newReceiver(t, status)
+			service := testService(t, pool, r.server)
+
+			row := endpoint(t, service, r, "refusing", "session.signed_in")
+			deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+			require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+			assert.Equal(t, 1, r.requests, "a permanent answer is not retried")
+
+			delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
+			require.NoError(t, err)
+			assert.Equal(t, StatusFailed, delivery.Status)
+		})
+	}
+}
+
+// TestRunDeliveryRefusesAPrivateDestination pins the SSRF stance: with the
+// private network switched off, a delivery whose host resolves into the
+// kept-out ranges is a failed delivery, not a spent retry budget — and with
+// the policy on, the same endpoint delivers.
+func TestRunDeliveryRefusesAPrivateDestination(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+	blocked := Service{pool: pool, repo: service.repo, audit: service.audit, queue: service.queue,
+		fetch: service.fetch, cipher: service.cipher, log: service.log, now: service.now}
+
+	row := endpoint(t, service, r, "loopback", "session.signed_in")
+	refusedID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+	require.NoError(t, blocked.RunDelivery(t.Context(), refusedID))
+	assert.Zero(t, r.requests, "the private destination is never reached")
+
+	delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, refusedID))
+	require.NoError(t, err)
+	assert.Equal(t, StatusFailed, delivery.Status, "a policy refusal is a fact, not a retry")
+
+	// The policy the deployment turned on delivers the same destination.
+	// A fresh emission rides a fresh delivery: a refusal is terminal.
+	allowedID := emitOne(t, service, row.ID, audit.EventSignIn)
+	require.NoError(t, service.RunDelivery(t.Context(), allowedID))
+	assert.Equal(t, 1, r.requests, "the private network is the operator's decision")
 }

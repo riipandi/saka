@@ -238,13 +238,15 @@ func (r *Repository) RotateSecret(ctx context.Context, db datastore.Querier, id 
 	return nil
 }
 
-// MatchEndpoints answers the enabled endpoints subscribed to one event: an
-// exact entry, the wildcard, or an empty subscription list. It runs inside
-// the transaction that caused the event, so a rollback takes its deliveries
-// with it.
-func (r *Repository) MatchEndpoints(ctx context.Context, db datastore.Querier, event string) ([]EndpointSchema, error) {
+// MatchEndpointIDs answers the identifiers of the enabled endpoints
+// subscribed to one event: an exact entry, the wildcard, or an empty
+// subscription list. It runs inside the transaction that caused the event,
+// so a rollback takes its deliveries with it. The identifiers are all the
+// emission needs — the runner re-reads the endpoint it delivers to — so the
+// sealed secrets never leave their rows for a fan-out that may deliver none.
+func (r *Repository) MatchEndpointIDs(ctx context.Context, db datastore.Querier, event string) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select(endpointColumns...)
+	sb.Select("id")
 	sb.From(EndpointTable)
 	sb.Where(sb.Equal("enabled", true), endpointSubscription(sb, event))
 
@@ -255,15 +257,15 @@ func (r *Repository) MatchEndpoints(ctx context.Context, db datastore.Querier, e
 	}
 	defer rows.Close()
 
-	endpoints := []EndpointSchema{}
+	ids := []uuid.UUID{}
 	for rows.Next() {
-		row, err := scanEndpoint(rows.Scan)
-		if err != nil {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
 			return nil, fmt.Errorf("webhook: match endpoints: %w", err)
 		}
-		endpoints = append(endpoints, row)
+		ids = append(ids, id)
 	}
-	return endpoints, rows.Err()
+	return ids, rows.Err()
 }
 
 // endpointSubscription is the subscription test one event runs against every
@@ -424,18 +426,23 @@ func (r *Repository) FailDelivery(ctx context.Context, db datastore.Querier, id 
 	return updateDelivery(ctx, db, id, StatusFailed, attemptNumber, nil)
 }
 
-// updateDelivery is the status write both outcomes share. A delivery that
-// already carries the status is rewritten the same way: the write is
-// idempotent, and a retry that races an earlier answer is the same outcome.
+// updateDelivery is the status write both outcomes share. The WHERE clause
+// names the pending state alone — single-use state lives in the UPDATE's
+// WHERE — so a replayed task that races an earlier answer rewrites nothing:
+// zero rows answered is the same success, not a failure.
 func updateDelivery(ctx context.Context, db datastore.Querier, id uuid.UUID, status string, attemptNumber int, deliveredAt *time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(DeliveryTable)
 	ub.Set(ub.Assign("status", status), ub.Assign("attempt_count", attemptNumber), ub.Assign("delivered_at", deliveredAt))
-	ub.Where(ub.Equal("id", id))
+	ub.Where(ub.Equal("id", id), ub.Equal("status", StatusPending))
 
 	query, args := ub.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
 		return fmt.Errorf("webhook: mark delivery %s: %w", status, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return datastore.ErrNoRows
 	}
 	return nil
 }
@@ -496,6 +503,23 @@ func (r *Repository) PruneAttempts(ctx context.Context, db datastore.Querier, be
 	tag, err := db.Exec(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("webhook: prune attempts: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+// PruneDeliveries deletes the terminal deliveries older than the retention
+// window; the attempts cascade with their delivery. Pending rows are never
+// candidates — the check rides the DELETE's WHERE, so a delivery that
+// reaches its terminal state during the sweep is simply not this run's row.
+func (r *Repository) PruneDeliveries(ctx context.Context, db datastore.Querier, before time.Time) (int64, error) {
+	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbt.DeleteFrom(DeliveryTable)
+	dbt.Where(dbt.LessThan("created_at", before), "status <> "+dbt.Var(StatusPending))
+
+	query, args := dbt.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("webhook: prune deliveries: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

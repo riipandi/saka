@@ -172,11 +172,20 @@ timestamp concatenated with the exact canonical body bytes. Headers on every del
 name), `X-Webhook-Id` (endpoint id), `Content-Type: application/json`. The canonical body is the
 deterministic JSON encoding of the payload, capped at 1 MiB, stored once as immutable bytes and
 reused byte-for-byte by every retry — the signature therefore stays valid across retries. Custom
-registration headers cannot override the signature set. Subscriptions use catalog event names or
-the `*` wildcard; an empty list receives every event. Retries run on the queue (5 attempts, 30 s
-backoff, 30 s receiver deadline); non-2xx and transport failures are recorded per attempt and
-pruned after a week. Rotation affects new deliveries only and never returns the stored
-ciphertext.
+registration headers cannot override the signature set, and their values are printable ASCII
+without a line break. Subscriptions use catalog event names or the `*` wildcard; an empty list
+receives every event.
+
+Deliveries are sent on the queue (5 attempts, 30 s backoff, 30 s receiver deadline) and never
+follow a redirect — a 3xx is the attempt's answer, so the signature headers never travel to a
+redirect target. A redirect, a 4xx other than 408 and 429, a disabled or deleted endpoint, or a
+host the destination policy refuses fails the delivery on its first answer; transport failures
+and 5xx spend the retry budget. The destination policy is `webhook.allow_private_network`
+(default `false`): a delivery whose host resolves to a loopback, private, link-local, or
+unspecified address is refused — the SSRF guard an operator lifts only when its receivers
+genuinely live beside the server. Retention runs on the recurring `webhook_prune` task: attempt
+rows age out at 7 days, terminal deliveries at 30 (a pending delivery is never a candidate).
+Rotation affects new deliveries only and never returns the stored ciphertext.
 
 The event catalog (`modules/webhook/events.go`) maps every audit event onto one wire name — the
 body's `event` field, the `X-Webhook-Event` header's value, and the subscription entry. The names

@@ -762,7 +762,12 @@ this area's service is that sink, wired after construction (`recorder.WithSink(s
 the area's provider) so `internal/audit` never learns the package exists. `AuditRecorded` runs
 inside the savepoint the record rode — a rollback takes its deliveries with it, so a receiver is
 never told about a change that did not happen — and it never fails the caller: an emission
-failure costs the delivery, not the change, and the failure is logged.
+failure costs the delivery, not the change, and the failure is logged. The tasks ride the
+caller's transaction (`TaskAddOp.Executor`), which commits after the sink returns, so the sink
+calls `queue.Client.Notify()` when it is done: the queue contract requires the notification from
+an executor-bound save, and the dispatcher can wake ahead of the outer commit. That wake-ahead
+is why `RunDelivery` answers a delivery row it cannot see with a retry instead of a quiet end —
+the row appears with the commit and the next attempt delivers it.
 
 The event catalog (`events.go`) is the single source of the wire vocabulary. Each entry carries
 the dot name (`user.created`), the audit event it maps from, and a description; the catalog is
@@ -780,9 +785,27 @@ a signature survives retries. The signing secret is sealed `enc:` with the appli
 and exists in plaintext in the create and rotate responses alone. The delivery engine is a queue
 task (`webhook_deliver`, 5 attempts × 30 s backoff, 30 s receiver deadline) whose processor lives
 in `internal/jobs` and resolves the service through the `WebhookRunner` seam — a container
-without the area answers `no delivery runner is wired`. Attempt retention is the recurring
-`webhook_prune` task (7 days, delivery summaries survive). Identifiers are TypeIDs on the wire —
-`whk_` endpoints, `whd_` deliveries, `wha_` attempts — while the columns stay UUIDs.
+without the area answers `no delivery runner is wired`. Retention is the recurring
+`webhook_prune` task: attempts age out at 7 days, terminal deliveries at 30 (their attempts
+cascade; a pending delivery is never a candidate). Identifiers are TypeIDs on the wire — `whk_`
+endpoints, `whd_` deliveries, `wha_` attempts — while the columns stay UUIDs.
+
+The runner's outcome rules: an attempt record and the delivery's status change ride one
+transaction, and the status write carries `WHERE status = 'pending'`, so a replayed task — a
+lost worker's reclaim, a dead-task replay — re-records the try but cannot re-send a delivery a
+receiver already answered. A delivery whose endpoint is gone, disabled, unsigned, or refused by
+the destination policy is marked failed on the spot; a redirect or a 4xx (but a 408 and a 429)
+is the same kind of fact and fails on the first answer, so the retry budget is spent only on
+failures a second try can save.
+
+The destination policy is the deployment's SSRF stance: `webhook.allow_private_network` (default
+`false`) refuses a delivery whose host resolves to a loopback, private, link-local, or
+unspecified address, judged per attempt from the resolver's answer. Deliveries never follow a
+redirect — `fetcher.Request.NoRedirect` marks the request, and the fetcher's redirect policy
+answers the 3xx as the response — so the signature headers never travel to a redirect target,
+and a public URL cannot lead the request into the deployment's own network by way of one. The
+residual risk the policy carries is the resolver answering differently between the check and
+the dial; closing that needs a dial-time policy, which is a fetcher transport change.
 
 ## Notice emails and their switches (settled 2026-09-27)
 

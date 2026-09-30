@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -106,13 +109,18 @@ type Service struct {
 	cipher *crypto.Cipher
 	log    *slog.Logger
 
+	// allowPrivateNetwork says whether a delivery may reach a loopback,
+	// private, or link-local address. The refusal is the deployment's SSRF
+	// stance, read from configuration rather than decided here.
+	allowPrivateNetwork bool
+
 	// now is the instant the service's decisions read. It is a field so a
 	// test can hold the clock still without waiting out a window.
 	now func() time.Time
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *audit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger, allowPrivateNetwork bool) *Service {
 	return &Service{
 		pool:   pool,
 		repo:   NewRepository(),
@@ -122,6 +130,10 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, client *queu
 		cipher: cipher,
 		log:    log,
 		now:    time.Now,
+		// The destination policy is a configuration decision, not a rule the
+		// surface owns: an operator who hosts receivers beside the server
+		// turns the private network on, and everyone else gets the refusal.
+		allowPrivateNetwork: allowPrivateNetwork,
 	}
 }
 
@@ -368,13 +380,13 @@ func (s *Service) RotateSecret(ctx context.Context, id uuid.UUID) (EndpointSchem
 // actually happen. The delivery rides the endpoint's subscription not at
 // all — a test goes where it is pointed.
 func (s *Service) Test(ctx context.Context, id uuid.UUID) error {
-	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		row, getErr := s.getEndpoint(ctx, tx, id)
 		if getErr != nil {
 			return getErr
 		}
 
-		body, bodyErr := json.Marshal(testBody{Event: EventTest, WebhookID: id.String(), OccurredAt: s.now().UTC().Format(time.RFC3339Nano)})
+		body, bodyErr := json.Marshal(testBody{Event: EventTest, WebhookID: FormatEndpointID(id), OccurredAt: s.now().UTC().Format(time.RFC3339Nano)})
 		if bodyErr != nil {
 			return fmt.Errorf("webhook: test body: %w", bodyErr)
 		}
@@ -402,6 +414,13 @@ func (s *Service) Test(ctx context.Context, id uuid.UUID) error {
 		})
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// The task rode the transaction, so the dispatcher could not observe its
+	// commit — this notification is the wakeup the queue contract requires.
+	s.queue.Notify()
+	return nil
 }
 
 // ListDeliveries answers one page of an endpoint's deliveries, newest first,
@@ -502,13 +521,13 @@ func (s *Service) AuditRecorded(ctx context.Context, db datastore.Querier, entry
 	}
 
 	err = datastore.WithSavepoint(ctx, db, func(ctx context.Context, tx datastore.Querier) error {
-		endpoints, matchErr := s.repo.MatchEndpoints(ctx, tx, event.Name)
+		ids, matchErr := s.repo.MatchEndpointIDs(ctx, tx, event.Name)
 		if matchErr != nil {
 			return matchErr
 		}
-		for _, endpoint := range endpoints {
+		for _, endpointID := range ids {
 			deliveryID, createErr := s.repo.CreateDelivery(ctx, tx, DeliverySchema{
-				WebhookID: &endpoint.ID,
+				WebhookID: &endpointID,
 				Event:     event.Name,
 				Body:      body,
 			})
@@ -525,7 +544,13 @@ func (s *Service) AuditRecorded(ctx context.Context, db datastore.Querier, entry
 		// The event is the one field that identifies which emission went
 		// nowhere, so it is what the line carries.
 		s.log.ErrorContext(ctx, "webhook: emissions not enqueued", "event", entry.Event, "err", err)
+		return
 	}
+	// The tasks rode the caller's transaction, which commits after this
+	// returns — the notification may wake a claim ahead of that commit, and
+	// RunDelivery answers an invisible row with a retry, which is what keeps
+	// this wakeup safe.
+	s.queue.Notify()
 }
 
 // RunDelivery performs one delivery attempt: it loads the delivery and its
@@ -543,16 +568,30 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 	}
 
 	delivery, getErr := s.repo.GetDelivery(ctx, s.pool, id)
+	// A missing delivery is a claim that ran ahead of the commit that wrote
+	// the row — the enqueue rode the caller's transaction, and the dispatcher
+	// can wake before that transaction commits. The task retries: the row
+	// appears with the commit, and the next attempt delivers it. Delivery
+	// rows are never deleted, so a delivery that stays missing means the
+	// transaction failed, and the queue's retry budget absorbs it.
 	if errors.Is(getErr, datastore.ErrNoRows) {
-		// The delivery is gone — a caller's retry of a deleted row. The
-		// queue's task ends, and there is nothing left to mark.
-		return nil
+		return fmt.Errorf("webhook: delivery %s is not visible yet", id)
 	}
 	if getErr != nil {
 		return getErr
 	}
 
-	endpoint := s.endpointFor(ctx, delivery)
+	// A delivery that already reached a terminal state must not be sent
+	// again: a replayed task — a lost worker's reclaim, a dead-task replay —
+	// re-signs and re-sends otherwise, and a receiver counts each arrival.
+	if delivery.Status != StatusPending {
+		return nil
+	}
+
+	endpoint, endpointErr := s.endpointFor(ctx, delivery)
+	if endpointErr != nil {
+		return endpointErr
+	}
 	if endpoint == nil {
 		return nil
 	}
@@ -568,6 +607,20 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 	secret, sealErr := s.cipher.Decrypt(*endpoint.SecretEnc)
 	if sealErr != nil {
 		return fmt.Errorf("webhook: unseal secret: %w", sealErr)
+	}
+
+	// The destination policy is decided here, at the only moment a receiver
+	// is actually reached: a refusal is a fact no retry saves, so a private
+	// destination ends the delivery the way a disabled endpoint does.
+	target := deref(endpoint.Endpoint)
+	if !s.allowPrivateNetwork {
+		if refuseErr := s.checkDestination(ctx, target); refuseErr != nil {
+			var refusal destinationRefusal
+			if errors.As(refuseErr, &refusal) {
+				return s.failQuietly(ctx, delivery, refusal.Error())
+			}
+			return fmt.Errorf("webhook: destination: %w", refuseErr)
+		}
 	}
 
 	attemptNumber := delivery.AttemptCount + 1
@@ -589,9 +642,14 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 
 	res, err := s.fetch.Do(ctx, fetcher.Request{
 		Method:  endpoint.Method,
-		URL:     deref(endpoint.Endpoint),
+		URL:     target,
 		Headers: headers,
 		Body:    delivery.Body,
+		// The signature set must not travel to a redirect target: a 3xx is
+		// the attempt's final answer, not a new destination. The refusal
+		// also keeps a public URL from leading the request into the
+		// deployment's own network by way of a redirect.
+		NoRedirect: true,
 	})
 	duration := int(time.Since(started).Milliseconds())
 
@@ -613,46 +671,121 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 			}
 		}
 	}
-	if attemptErr := s.repo.CreateAttempt(ctx, s.pool, attempt); attemptErr != nil {
-		return attemptErr
+	// The attempt record and the delivery's own summary change in one
+	// transaction: the count is the summary of the rows, and the two cannot
+	// drift apart across a crash. A terminal write that finds no pending row
+	// raced an earlier answer — the attempt row still commits, because the
+	// story of the wasted try is worth keeping, and the status stays as the
+	// earlier answer left it.
+	if writeErr := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if attemptErr := s.repo.CreateAttempt(ctx, tx, attempt); attemptErr != nil {
+			return attemptErr
+		}
+		var statusErr error
+		if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
+			statusErr = s.repo.CompleteDelivery(ctx, tx, delivery.ID, attemptNumber, s.now())
+		} else if permanentStatus(res) || attemptNumber >= maxAttempts {
+			statusErr = s.repo.FailDelivery(ctx, tx, delivery.ID, attemptNumber)
+		}
+		if errors.Is(statusErr, datastore.ErrNoRows) {
+			return nil
+		}
+		return statusErr
+	}); writeErr != nil {
+		return writeErr
+	}
+	// A permanent answer — a redirect the delivery must not follow, or a 4xx
+	// that is neither a timeout nor a throttle — is a fact no retry can
+	// save, so the delivery failed above and the task ends quietly.
+	// Everything else is the queue's retry signal, and the answer names what
+	// the attempt died of.
+	switch {
+	case err == nil && res.StatusCode >= 200 && res.StatusCode < 300:
+		return nil
+	case res != nil && permanentStatus(res):
+		return nil
+	case attemptNumber >= maxAttempts:
+		return nil
+	case err != nil:
+		return fmt.Errorf("webhook: deliver: %w", err)
+	default:
+		return fmt.Errorf("webhook: %s answered %d", deref(endpoint.Endpoint), res.StatusCode)
+	}
+}
+
+// permanentStatus reports whether an HTTP answer is a refusal the receiver
+// would repeat on every retry: a redirect, which a delivery must not follow
+// and a receiver should not send, and any 4xx but the two that name a delay.
+// A 408 and a 429 ask for another try; the rest ask for the sender to stop.
+func permanentStatus(res *fetcher.Response) bool {
+	return res != nil && res.StatusCode >= 300 && res.StatusCode < 500 &&
+		res.StatusCode != http.StatusRequestTimeout && res.StatusCode != http.StatusTooManyRequests
+}
+
+// destinationRefusal is a destination the delivery policy keeps out of reach.
+// It is a fact about the address, not a transient failure, so the caller
+// marks the delivery failed instead of spending the queue's retries on it.
+type destinationRefusal struct{ reason string }
+
+func (e destinationRefusal) Error() string { return e.reason }
+
+// checkDestination resolves the endpoint's host and refuses the address
+// ranges the private network holds — loopback, private, link-local,
+// unspecified. The resolution runs per attempt, so a hostname whose answer
+// changed between registration and delivery is judged as delivered, not as
+// registered; the residual risk is the resolver answering two addresses in
+// one attempt, which a dial-time policy would be needed to close.
+func (s *Service) checkDestination(ctx context.Context, rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" {
+		return destinationRefusal{"the endpoint URL does not name a host"}
 	}
 
-	if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
-		return s.repo.CompleteDelivery(ctx, s.pool, delivery.ID, attemptNumber, s.now())
+	addresses := []netip.Addr{}
+	if literal, literalErr := netip.ParseAddr(parsed.Hostname()); literalErr == nil {
+		addresses = append(addresses, literal)
+	} else {
+		resolved, lookupErr := net.DefaultResolver.LookupHost(ctx, parsed.Hostname())
+		if lookupErr != nil {
+			// A name the resolver cannot answer may answer next attempt.
+			return fmt.Errorf("the endpoint host could not be resolved: %w", lookupErr)
+		}
+		for _, address := range resolved {
+			if parsed, parseErr := netip.ParseAddr(address); parseErr == nil {
+				addresses = append(addresses, parsed)
+			}
+		}
 	}
-	if attemptNumber >= maxAttempts {
-		return s.repo.FailDelivery(ctx, s.pool, delivery.ID, attemptNumber)
+	for _, address := range addresses {
+		if address.IsLoopback() || address.IsPrivate() || address.IsLinkLocalUnicast() ||
+			address.IsLinkLocalMulticast() || address.IsUnspecified() {
+			return destinationRefusal{"the endpoint host is not reachable under the private-network policy"}
+		}
 	}
-	// The failure is the queue's retry signal, so the answer names what the
-	// attempt died of without discarding the attempt row's own record.
-	if err != nil {
-		return fmt.Errorf("webhook: deliver: %w", err)
-	}
-	return fmt.Errorf("webhook: %s answered %d", deref(endpoint.Endpoint), res.StatusCode)
+	return nil
 }
 
 // endpointFor reads the delivery's endpoint. A delivery whose endpoint row is
 // gone — deleted, or the identifier nulled by the delete — cannot be
 // delivered by any number of retries, so it is marked failed and the task
 // ends quietly.
-func (s *Service) endpointFor(ctx context.Context, delivery DeliverySchema) *EndpointSchema {
+func (s *Service) endpointFor(ctx context.Context, delivery DeliverySchema) (*EndpointSchema, error) {
 	if delivery.WebhookID == nil {
 		s.markUndeliverable(ctx, delivery, "the endpoint is gone")
-		return nil
+		return nil, nil
 	}
 	row, err := s.repo.GetEndpoint(ctx, s.pool, *delivery.WebhookID)
 	if errors.Is(err, datastore.ErrNoRows) {
 		s.markUndeliverable(ctx, delivery, "the endpoint is gone")
-		return nil
+		return nil, nil
 	}
 	if err != nil {
 		// A read that failed for a reason the next attempt might not repeat
-		// leaves the delivery pending: the queue's retry is the right
-		// answer, and the line keeps the failure visible.
-		s.log.ErrorContext(ctx, "webhook: endpoint not read", "delivery_id", delivery.ID, "err", err)
-		return nil
+		// is the queue's retry signal: the attempt stays unrecorded, the
+		// delivery stays pending, and the error keeps the failure visible.
+		return nil, fmt.Errorf("webhook: endpoint not read: %w", err)
 	}
-	return &row
+	return &row, nil
 }
 
 // markUndeliverable marks a delivery that no retry can save. The attempt row
@@ -668,8 +801,8 @@ func (s *Service) markUndeliverable(ctx context.Context, delivery DeliverySchema
 
 // failQuietly marks a delivery that no retry can save and answers nil, so
 // the queue's task ends instead of burning its attempts on a fact. The
-// attempt row is written first, because the reason the delivery died is the
-// one thing an operator will ask for.
+// attempt row and the terminal stamp change in one transaction, and a
+// terminal write that finds no pending row raced an earlier answer.
 func (s *Service) failQuietly(ctx context.Context, delivery DeliverySchema, reason string) error {
 	attemptNumber := delivery.AttemptCount + 1
 	cause := reason
@@ -678,10 +811,15 @@ func (s *Service) failQuietly(ctx context.Context, delivery DeliverySchema, reas
 		AttemptNumber: attemptNumber,
 		Error:         &cause,
 	}
-	if attemptErr := s.repo.CreateAttempt(ctx, s.pool, attempt); attemptErr != nil {
-		return attemptErr
-	}
-	return s.repo.FailDelivery(ctx, s.pool, delivery.ID, attemptNumber)
+	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if attemptErr := s.repo.CreateAttempt(ctx, tx, attempt); attemptErr != nil {
+			return attemptErr
+		}
+		if failErr := s.repo.FailDelivery(ctx, tx, delivery.ID, attemptNumber); failErr != nil && !errors.Is(failErr, datastore.ErrNoRows) {
+			return failErr
+		}
+		return nil
+	})
 }
 
 // PruneAttempts deletes the attempts older than the retention window. The
@@ -693,6 +831,17 @@ func (s *Service) PruneAttempts(ctx context.Context) (int64, error) {
 
 // attemptRetentionDays is how long an attempt row is kept.
 const attemptRetentionDays = 7
+
+// PruneDeliveries deletes the terminal deliveries older than the retention
+// window, attempts cascading with them. A pending delivery never leaves:
+// its story is still being written. The delivery rows carry up to the body
+// limit each, so an unpruned table grows without bound.
+func (s *Service) PruneDeliveries(ctx context.Context) (int64, error) {
+	return s.repo.PruneDeliveries(ctx, s.pool, s.now().AddDate(0, 0, -deliveryRetentionDays))
+}
+
+// deliveryRetentionDays is how long a terminal delivery row is kept.
+const deliveryRetentionDays = 30
 
 // mintSecret draws a signing secret and seals it. The plaintext exists in
 // the create and rotation responses alone; the row carries the sealed half.

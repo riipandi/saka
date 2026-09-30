@@ -20,6 +20,9 @@ type WebhookRunner interface {
 	// PruneAttempts deletes the attempt rows the retention window has aged
 	// out.
 	PruneAttempts(ctx context.Context) (int64, error)
+	// PruneDeliveries deletes the terminal delivery rows the retention
+	// window has aged out; their attempts cascade with them.
+	PruneDeliveries(ctx context.Context) (int64, error)
 }
 
 // webhookDeliverProcessor performs one delivery attempt. The attempt's
@@ -83,6 +86,14 @@ func webhookPruneProcessor(ctx context.Context, task WebhookPruneTask, runner We
 	}
 	if deleted > 0 {
 		log.InfoContext(ctx, "webhook: aged-out attempts deleted", "deleted", deleted)
+	}
+
+	deliveries, err := runner.PruneDeliveries(ctx)
+	if err != nil {
+		return err
+	}
+	if deliveries > 0 {
+		log.InfoContext(ctx, "webhook: aged-out deliveries deleted", "deleted", deliveries)
 	}
 
 	// The next run is queued before this one succeeds, so the schedule never

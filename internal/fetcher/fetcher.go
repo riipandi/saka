@@ -26,13 +26,18 @@ import (
 // Request is one outbound call. URL may be absolute, or relative to the
 // configured base URL. Query and Headers are added to that request only.
 // Body is encoded as JSON when it is a struct or a map; a string or a byte
-// slice is sent as-is.
+// slice is sent as-is. NoRedirect turns redirect following off — a signed
+// call whose signature headers must not travel to a redirect target, and a
+// caller that must not be led to a host the URL did not name.
 type Request struct {
 	Method  string
 	URL     string
 	Query   url.Values
 	Headers http.Header
 	Body    any
+	// NoRedirect answers a 3xx as the attempt's final answer instead of
+	// following it. Absent means the shared policy applies.
+	NoRedirect bool
 }
 
 // Response is the answer a call received. Body is present for an HTTP error
@@ -159,9 +164,26 @@ func (c *Client) newHostClient(host string) *resty.Client {
 		AddRetryConditions(retryable).
 		SetCircuitBreaker(breaker).
 		SetResponseBodyLimit(c.maxBody).
-		// A redirect to another host must not carry Authorization or Cookie.
-		SetRedirectPolicy(resty.RedirectHeaderStripSensitivePolicy(true))
+		// A redirect to another host must not carry Authorization or Cookie,
+		// and a request that marked itself no-redirect stops at its 3xx.
+		SetRedirectPolicy(redirectGate(), resty.RedirectHeaderStripSensitivePolicy(true))
 	return httpClient
+}
+
+// ctxKeyNoRedirect marks a request whose 3xx answers are final.
+type ctxKeyNoRedirect struct{}
+
+// redirectGate is the fetcher's own redirect policy: a request that carries
+// the no-redirect marker answers its 3xx as the response instead of
+// following it. The signature headers a signed call carries would otherwise
+// travel to whatever host the redirect names.
+func redirectGate() resty.RedirectPolicy {
+	return resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
+		if req.Context().Value(ctxKeyNoRedirect{}) == true {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	})
 }
 
 // headerUserAgent is the canonical header name, so a caller-supplied
@@ -238,6 +260,11 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	injectTrace(ctx, headers)
 
 	call := c.restyFor(host).R().SetContext(ctx).SetHeaderMultiValues(headers)
+	if req.NoRedirect {
+		// The gate rides the request's context: the redirect policy lives on
+		// the shared host client, so the request itself carries the choice.
+		call.SetContext(context.WithValue(ctx, ctxKeyNoRedirect{}, true))
+	}
 	if len(req.Query) > 0 {
 		call.SetQueryParamsFromValues(req.Query)
 	}
