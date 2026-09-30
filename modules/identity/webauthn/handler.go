@@ -11,11 +11,13 @@ func handleProbe(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(probePage))
 }
 
-// probePage is the development probe. Vanilla JS, no build step: the page
-// walks the ceremonies the server opens with the browser's own
-// navigator.credentials, and renders what the server answered. The
-// reconnecting base URL is the page's origin — the RPC surface sits behind
-// the same host the page came from.
+// probePage is the development probe. Vanilla JS, no build step: the
+// ceremony encoding rides @simplewebauthn/browser from unpkg — the UMD
+// bundle exposes SimpleWebAuthnBrowser.startRegistration/startAuthentication,
+// which take the server's options JSON verbatim and answer the response JSON
+// the verify procedures carry. The page walks the ceremonies with the
+// browser's own navigator.credentials and renders what the server answered;
+// the RPC surface sits behind the same host the page came from.
 const probePage = `<!doctype html>
 <html lang="en">
 <head>
@@ -39,7 +41,10 @@ const probePage = `<!doctype html>
 <button id="signin">2. Sign in passwordless</button>
 <button id="stepup">3. Step-up (passkey)</button>
 <div id="log"></div>
+<script src="https://unpkg.com/@simplewebauthn/browser@14.0.0/dist/bundle/index.umd.min.js"></script>
 <script>
+const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
+
 const log = (kind, message) => {
   const line = document.createElement('div');
   line.className = kind;
@@ -64,23 +69,14 @@ const ceremony = async (procedure, withToken) => {
   return { options: JSON.parse(answer.options).publicKey, sessionId: answer.session_id };
 };
 
-const b64url = (value) => btoa(String.fromCharCode(...new Uint8Array(value)))
-  .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-
 document.getElementById('enroll').onclick = async () => {
   try {
     const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginRegistration', true);
-    const credential = await navigator.credentials.create({ publicKey: options });
+    const credential = await startRegistration({ optionsJSON: options });
     const answer = await rpc('tango.authn.v1.WebAuthnService/VerifyRegistration', {
       session_id: sessionId,
       name: document.getElementById('name').value,
-      credential: {
-        id: credential.id, rawId: b64url(credential.rawId), type: credential.type,
-        response: {
-          clientDataJSON: b64url(credential.response.clientDataJSON),
-          attestationObject: b64url(credential.response.attestationObject),
-        },
-      },
+      credential,
     }, true);
     log('ok', 'enrolled: ' + answer.credential.id + ' — ' + answer.credential.name);
   } catch (error) { log('err', 'enroll: ' + error.message); }
@@ -89,18 +85,10 @@ document.getElementById('enroll').onclick = async () => {
 document.getElementById('signin').onclick = async () => {
   try {
     const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginLogin', false);
-    const assertion = await navigator.credentials.get({ publicKey: options });
+    const assertion = await startAuthentication({ optionsJSON: options });
     const answer = await rpc('tango.authn.v1.WebAuthnService/VerifyLogin', {
       session_id: sessionId,
-      credential: {
-        id: assertion.id, rawId: b64url(assertion.rawId), type: assertion.type,
-        response: {
-          authenticatorData: b64url(assertion.response.authenticatorData),
-          clientDataJSON: b64url(assertion.response.clientDataJSON),
-          signature: b64url(assertion.response.signature),
-          userHandle: b64url(assertion.response.userHandle),
-        },
-      },
+      credential: assertion,
     }, false);
     log('ok', 'signed in as ' + answer.user.username + ' — token in the field above');
     document.getElementById('token').value = answer.access_token;
@@ -110,20 +98,9 @@ document.getElementById('signin').onclick = async () => {
 document.getElementById('stepup').onclick = async () => {
   try {
     const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginLogin', false);
-    const assertion = await navigator.credentials.get({ publicKey: options });
+    const assertion = await startAuthentication({ optionsJSON: options });
     const answer = await rpc('tango.authn.v1.WebAuthnService/Reauthenticate', {
-      passkey: {
-        session_id: sessionId,
-        credential: {
-          id: assertion.id, rawId: b64url(assertion.rawId), type: assertion.type,
-          response: {
-            authenticatorData: b64url(assertion.response.authenticatorData),
-            clientDataJSON: b64url(assertion.response.clientDataJSON),
-            signature: b64url(assertion.response.signature),
-            userHandle: b64url(assertion.response.userHandle),
-          },
-        },
-      },
+      passkey: { session_id: sessionId, credential: assertion },
     }, true);
     log('ok', 'step-up proof expires at ' + answer.expires_at + ' — spend it on a guarded call');
   } catch (error) { log('err', 'step-up: ' + error.message); }
