@@ -19,7 +19,7 @@ description: |-
 
   Pocket ID's mirror is `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; the surface is tango's `WebAuthnService`, the same door the holder's own delete uses — the stranding refusal (an account left with no way in) holds here too.
 
-  Guard: Permission user:*:delete.
+  Guard: Admin.
 headers:
 - enabled: true
   name: Content-Type

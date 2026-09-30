@@ -12,7 +12,7 @@ body:
 ['{', '  "user_id": "user_",', '  "credential_id": "psk_",', '  "name": "Operator rename"', '}']
 bodyType: application/json
 description: |-
-["Renames one of an account's passkeys. The same rules the holder's own rename holds; an account the user_id does not resolve answers not-found.", '', 'Guard: Permission user:*:update.']
+["Renames one of an account's passkeys. The same rules the holder's own rename holds; an account the user_id does not resolve answers not-found.", '', 'Guard: Admin.']
 headers:
 - enabled: true
   name: Content-Type

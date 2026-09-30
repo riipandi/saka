@@ -18,7 +18,7 @@ description: |-
 
   Pocket ID's mirror is `GET /api/users/{id}/webauthn-credentials`; the surface is tango's `WebAuthnService` — the roll the account's own ListCredentials answers, no key material.
 
-  Guard: Permission user:*:read.
+  Guard: Admin.
 headers:
 - enabled: true
   name: Content-Type

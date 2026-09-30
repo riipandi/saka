@@ -126,11 +126,12 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.WebAuthnServiceListCredentialsProcedure:    {Rule: Session},
 	authnv1connect.WebAuthnServiceUpdateCredentialProcedure:   {Rule: Session},
 	authnv1connect.WebAuthnServiceDeleteCredentialProcedure:   {Rule: Session, StepUp: true},
-	// The administrative roll doors ride the permission catalog, the way
-	// every other over-a-named-account read and write does.
-	authnv1connect.WebAuthnServiceAdminListCredentialsProcedure:  {Rule: Permission("user:*:read")},
-	authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure: {Rule: Permission("user:*:update")},
-	authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure: {Rule: Permission("user:*:delete")},
+	// The administrative roll doors ride the same rule the other
+	// over-a-named-account doors do — the administrator role, the way the
+	// UserService's own CRUD does.
+	authnv1connect.WebAuthnServiceAdminListCredentialsProcedure:  {Rule: Admin},
+	authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure: {Rule: Admin},
+	authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure: {Rule: Admin},
 	// The re-proof runs on the caller's own session — it is the proof, not
 	// the guarded call, so it carries no token of its own.
 	authnv1connect.WebAuthnServiceReauthenticateProcedure: {Rule: Session},

@@ -522,8 +522,8 @@ The traps the ladder bought:
 
 Guard: `BeginLogin`/`VerifyLogin` are `Public`; the management side is `Session` (the
 impersonated caller refused, so an administrator cannot plant a credential on the account they
-are wearing); `DeleteCredential` carries `StepUp`; the administrative roll doors ride
-`user:*:read/update/delete`. Expired ceremony rows and spent proofs are swept hourly by the
+are wearing); `DeleteCredential` carries `StepUp`; the administrative roll doors ride `Admin`, the
+way the UserService's doors do. Expired ceremony rows and spent proofs are swept hourly by the
 `webauthn_cleanup` job.
 
 ### modules/apikey
