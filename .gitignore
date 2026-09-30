@@ -81,7 +81,6 @@ storybook-static/
 /web/output/
 /web/email/
 /web/storybook/
-app.*.json*
 
 # Miscellaneous
 pnpm-exec-summary.json
@@ -91,8 +90,10 @@ audit.json
 sbom-*
 
 # Generated files
+config.schema.json
 routeTree.gen.ts
 routes.gen.ts
+app.*.json*
 /codegen/
 *.gen.ts
 *.gen.go
