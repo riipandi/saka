@@ -88,7 +88,13 @@ func (i guardInterceptor) enforce(ctx context.Context, procedure string, message
 	if token == "" {
 		return guard.ErrUnauthenticated
 	}
-	return i.reauth.ConsumeReauthentication(ctx, caller, token)
+	// The consumer's own error text stays inside: a spent, foreign, and
+	// unknown proof answer the same unauthenticated refusal, the way the
+	// guard's other refusals do.
+	if err := i.reauth.ConsumeReauthentication(ctx, caller, token); err != nil {
+		return guard.ErrUnauthenticated
+	}
+	return nil
 }
 
 // guardError maps a rule's refusal onto the wire.
