@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_Tj7oWnSZEf
-createdAt: 2026-09-30T21:05:00.000000
-updatedAt: 2026-09-30T21:05:00.000000
+createdAt: 2026-09-30T21:05:00
+updatedAt: 2026-09-30T21:05:00
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_TMZFHpR4cU
 authentication: {}
@@ -37,6 +37,9 @@ settingSendCookies:
   enabled: false
   value: true
 settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
   enabled: false
   value: true
 settingFollowRedirects:
