@@ -14,6 +14,10 @@ tasks:
     desc: Run Go unit tests (pass packages or flags after `--`)
     cmd: gotestsum --format testname -- {{.CLI_ARGS | default "$(go list ./... | egrep -v '(/test|/codegen)$$')"}}
 
+  test:e2e:
+    desc: Run the Playwright passkey ladder (Chromium; needs the pgsql container)
+    cmd: pnpm e2e
+
   test:ui:
     desc: Run frontend unit tests
     cmd: pnpm exec vitest run {{.CLI_ARGS}}

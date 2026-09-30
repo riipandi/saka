@@ -1,6 +1,8 @@
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
+const excludedPath = ['node_modules', 'tests-e2e', 'e2e-tests']
+
 export default defineConfig({
   test: {
     reporters:
@@ -37,7 +39,7 @@ export default defineConfig({
           environment: 'node',
           env: loadEnv('test', process.cwd(), ''),
           include: ['./api/client/**/*.test.ts'],
-          exclude: ['node_modules', 'tests-e2e'],
+          exclude: excludedPath,
           globals: true
         }
       },
@@ -48,7 +50,7 @@ export default defineConfig({
           name: 'app',
           environment: 'happy-dom',
           include: ['./app/**/*.test.ts'],
-          exclude: ['node_modules', 'tests-e2e'],
+          exclude: excludedPath,
           globals: true
         }
       },
@@ -59,7 +61,7 @@ export default defineConfig({
           name: 'plugins',
           environment: 'node',
           include: ['./plugins/**/*.test.ts'],
-          exclude: ['node_modules', 'tests-e2e'],
+          exclude: excludedPath,
           globals: true
         }
       }

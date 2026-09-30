@@ -67,6 +67,9 @@ vitest.workspace.*
 # Disable this line in your real app
 /playwright/.cache/
 /playwright-report/
+/test-results/
+/e2e-tests/.auth/
+/e2e-tests/.output/
 /tests-results/
 /blob-report/
 .playwright/
