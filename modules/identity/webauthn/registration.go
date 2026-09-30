@@ -280,11 +280,12 @@ func classifyCeremonyError(err error) error {
 }
 
 // storeCredential writes the verified attestation. The name falls back to
-// the authenticator model's identifier — TODO(passkey): an AAGUID-to-vendor
-// table would read better than the bare identifier.
+// the catalog's authenticator name when the holder named none — the embedded
+// AAGUID manifest answers it — and to a plain word when the AAGUID is
+// unknown.
 func (s *Service) storeCredential(ctx context.Context, userID uuid.UUID, credential *gowebauthn.Credential, name string) (CredentialSchema, error) {
 	if name == "" {
-		name = "Passkey"
+		name = authenticatorName(credential.Authenticator.AAGUID)
 	}
 	aaguid := formatAAGUID(credential.Authenticator.AAGUID)
 	transports := make([]string, 0, len(credential.Transport))
