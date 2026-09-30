@@ -57,9 +57,15 @@ const (
 	enrollTTL = 15 * time.Minute
 
 	// maxEnrollments caps how many authenticators one account may hold,
-	// confirmed and pending together. It is a table-health bound, not a
-	// product limit: no user runs a dozen apps against one account.
+	// confirmed and pending together. It is the fallback the catalog-less
+	// wiring runs — a test, or a deployment that never wired the settings —
+	// and the value the catalog's default ships as.
 	maxEnrollments = 10
+
+	// maxSettingLimit is the ceiling the catalog's integer bounds keep: a
+	// value outside it is an unreadable limit, and the enrollment fails
+	// closed rather than trusting it.
+	maxSettingLimit = 50
 
 	// maxAttempts is how many wrong codes one pending bridge survives before
 	// the bridge dies. A fresh bridge costs a verified password, so guessing
@@ -87,6 +93,12 @@ var (
 
 	// ErrEnrollmentLimit is an account at its authenticator cap.
 	ErrEnrollmentLimit = errors.New("multifactor: the enrollment limit is reached")
+
+	// ErrLimitUnreadable is a ceiling the settings read could not answer or
+	// that answered out of bounds. The enrollment fails closed: the limit
+	// is what keeps one compromised enrollment spree from filling the
+	// table, so an unreadable limit is a refusal, not a wave-through.
+	ErrLimitUnreadable = errors.New("multifactor: the enrollment limit is unreadable")
 
 	// ErrEnrollmentExpired is an unconfirmed enrollment past its ceremony window.
 	ErrEnrollmentExpired = errors.New("multifactor: the enrollment has expired")
@@ -122,6 +134,9 @@ type Service struct {
 	// passkeys is the post-construction seam to the passkey feature's
 	// assertion verification. Nil keeps the code-only challenge.
 	passkeys PasskeyVerifier
+	// limits is the enrollment ceiling's runtime source, wired after
+	// construction. Nil keeps the constant.
+	limits settingsReader
 	// exposeSecrets carries the development aid the listing honors; the
 	// wiring passes it from the configuration's validated flag.
 	exposeSecrets bool
@@ -159,6 +174,41 @@ func NewService(pool *datastore.Postgres, cipher cryptoCipher, issuer signinIssu
 		log:        log,
 		now:        time.Now,
 	}
+}
+
+// settingsReader is the enrollment ceiling's runtime source: the catalog's
+// mfa.max_enrollments read fresh at every enrollment, so an operator's
+// change lands without a restart. *appconfig.Settings satisfies it; the
+// interface keeps the appconfig feature out of this one's import graph.
+type settingsReader interface {
+	GetInt64(ctx context.Context, key string) (int64, error)
+}
+
+// SettingMaxEnrollments is the catalog key the ceiling reads. The catalog
+// owns the name; this constant is how this package spells it.
+const SettingMaxEnrollments = "mfa.max_enrollments"
+
+// WithEnrollmentSettings wires the runtime ceiling after construction. Nil
+// keeps the constant — the state a test or a bare wiring is in.
+func (s *Service) WithEnrollmentSettings(reader settingsReader) *Service {
+	s.limits = reader
+	return s
+}
+
+// enrollmentLimit reads the ceiling. An unreadable or out-of-bounds value
+// fails closed: the enrollment is refused, not waved through.
+func (s *Service) enrollmentLimit(ctx context.Context) (int, error) {
+	if s.limits == nil {
+		return maxEnrollments, nil
+	}
+	value, err := s.limits.GetInt64(ctx, SettingMaxEnrollments)
+	if err != nil {
+		return 0, fmt.Errorf("multifactor: %w: %v", ErrLimitUnreadable, err)
+	}
+	if value < 1 || value > maxSettingLimit {
+		return 0, fmt.Errorf("multifactor: %w: %d", ErrLimitUnreadable, value)
+	}
+	return int(value), nil
 }
 
 // ---- The sign-in gate ----

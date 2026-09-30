@@ -310,6 +310,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrEnrollmentLimit):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("the enrollment limit is reached"))
+	case errors.Is(err, ErrLimitUnreadable):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("the enrollment limit is unreadable; contact the operator"))
 	case errors.Is(err, ErrEnrollmentExpired):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("the enrollment has expired; start again"))

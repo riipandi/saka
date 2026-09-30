@@ -346,6 +346,12 @@ var Package = do.Package(
 			cipher = built
 		}
 		service := multifactor.NewService(pool, cipher, issuer, recorder, "Tango", log)
+		// The enrollment ceiling reads the catalog at call time; a nil
+		// settings feature keeps the constant, the state a bare wiring is
+		// in.
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithEnrollmentSettings(settings)
+		}
 		issuer.WithMFAGate(service)
 		// The notification channel rides the post-construction seam like the
 		// gate does: internal/jobs cannot sit below the multifactor package
@@ -371,8 +377,14 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		settings := do.MustInvoke[*appconfig.Settings](i)
-		return webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, settings, recorder, log)
+		// A nil settings feature keeps the fail-closed reads — the state a
+		// bare wiring is in; the composition root always resolves the
+		// catalog.
+		var reader webauthn.SettingsReader
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			reader = settings
+		}
+		return webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, reader, recorder, log)
 	}),
 
 	// The step-up consumer is the webauthn service behind the interface the

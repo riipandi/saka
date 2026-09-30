@@ -44,7 +44,11 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 	if err != nil {
 		return BeginTotpEnrollmentResult{}, err
 	}
-	if len(count) >= maxEnrollments {
+	limit, limitErr := s.enrollmentLimit(ctx)
+	if limitErr != nil {
+		return BeginTotpEnrollmentResult{}, limitErr
+	}
+	if len(count) >= limit {
 		return BeginTotpEnrollmentResult{}, ErrEnrollmentLimit
 	}
 

@@ -82,6 +82,27 @@ const (
 	// issued for a grant carrying the offline_access scope lives for, in
 	// hours — the persistent-access answer the scope exists to name.
 	SettingOIDCOfflineRefreshTokenHours = "oidc.offline_refresh_token_hours"
+
+	// SettingWebauthnAllowSyncedPasskeys decides whether a credential that
+	// can live in a synced passkey provider — iCloud Keychain, a password
+	// manager — may enroll. Off, only device-bound credentials enroll; on,
+	// the deployment accepts the upstream default.
+	SettingWebauthnAllowSyncedPasskeys = "webauthn.allow_synced_passkeys"
+
+	// SettingWebauthnUserVerification is the user-verification level every
+	// ceremony demands: required, preferred, or discouraged. Only
+	// `required` makes an assertion satisfy an MFA bridge, so a lowered
+	// value narrows the ladder.
+	SettingWebauthnUserVerification = "webauthn.user_verification"
+
+	// SettingMFAMaxEnrollments caps the second factors one account may
+	// hold — TOTP devices and passkeys together. Enforcement is at
+	// enrollment only: lowering the limit never unregisters a device.
+	SettingMFAMaxEnrollments = "mfa.max_enrollments"
+
+	// SettingPasskeyMaxCredentials caps the passkeys one account may hold,
+	// counted separately from the TOTP devices.
+	SettingPasskeyMaxCredentials = "passkey.max_credentials"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -109,6 +130,28 @@ func Catalog() []SettingDef {
 			Key:         SettingOIDCOfflineRefreshTokenHours,
 			Default:     "720",
 			Description: "How many hours a refresh token lives for when its grant carries the offline_access scope — the persistent access the scope names. Zero means the token never expires.",
+		},
+		{
+			Key:         SettingWebauthnAllowSyncedPasskeys,
+			Default:     "true",
+			Description: "Whether a passkey that can live in a synced passkey provider (iCloud Keychain, a password manager) may enroll. Off, only device-bound credentials enroll.",
+		},
+		{
+			Key:         SettingWebauthnUserVerification,
+			Default:     "required",
+			Description: "The user-verification level every WebAuthn ceremony demands: required, preferred, or discouraged. Only required makes an assertion satisfy an MFA bridge, so a lowered value narrows the authentication ladder.",
+		},
+		{
+			Key:         SettingMFAMaxEnrollments,
+			Default:     "10",
+			Public:      true,
+			Description: "How many second factors one account may hold — TOTP devices and passkeys together. Enforcement is at enrollment only: lowering the limit never unregisters an existing device.",
+		},
+		{
+			Key:         SettingPasskeyMaxCredentials,
+			Default:     "10",
+			Public:      true,
+			Description: "How many passkeys one account may hold, counted separately from the TOTP devices. Enforcement is at enrollment only.",
 		},
 	}
 }
