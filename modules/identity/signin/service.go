@@ -410,6 +410,13 @@ func (s *Service) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, 
 	return s.repo.FindAccountByID(ctx, id)
 }
 
+// FindAccountByIDAny answers the account whether or not a password row rides
+// it — the read the passkey surfaces resolve accounts with, whose holders
+// sign in by credential alone.
+func (s *Service) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Account, error) {
+	return s.repo.FindAccountByIDAny(ctx, id)
+}
+
 // VerifyPassword checks a password against the account's stored hash — the
 // re-proof the step-up surface runs on the caller's own account. The answer
 // is a plain boolean: the caller already holds the account, so the refusal

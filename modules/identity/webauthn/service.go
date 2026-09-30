@@ -92,6 +92,11 @@ type TotpEnrollmentCounter interface {
 // multifactor feature the way the gate's wiring avoids the cycle.
 type issuer interface {
 	FindAccountByID(ctx context.Context, id uuid.UUID) (*signin.Account, error)
+	// FindAccountByIDAny answers the account whether or not a password row
+	// rides it — the passkey surfaces' resolution, whose holders sign in by
+	// credential alone. The stranding check keeps the inner-join read: its
+	// question is "is there a way back in", not "is there an account".
+	FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*signin.Account, error)
 	// VerifyPassword checks a password against the named account's stored
 	// hash — the re-proof the step-up surface runs.
 	VerifyPassword(ctx context.Context, id uuid.UUID, password string) (bool, error)

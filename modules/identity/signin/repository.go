@@ -112,6 +112,36 @@ func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Accoun
 	return &row, nil
 }
 
+// FindAccountByIDAny returns the account the identifier names whether or not
+// a password row rides it — the left join the passkey surfaces need, whose
+// accounts sign in by credential alone. The inner-join read above is the
+// one that answers "is there a way back in"; this one answers "is there an
+// account".
+func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(
+		"u.id", "u.username", "u.email", "u.display_name",
+		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
+	)
+	sb.From(user.UserTable + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, password.UserPasswordTable+" p ON p.user_id = u.id")
+	sb.Where(sb.Equal("u.id", id))
+
+	query, args := sb.Build()
+	var row Account
+	err := r.db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName,
+		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, datastore.ErrNoRows
+	}
+	if err != nil {
+		return nil, fmt.Errorf("signin: find account by id: %w", err)
+	}
+	return &row, nil
+}
+
 // CreateSession stores the refresh token's hashed row. The caller owns the
 // transaction, so the session row and the last-login touch commit together.
 // The typed session id leaves as its UUID: the column is a UUID, the `sess_`

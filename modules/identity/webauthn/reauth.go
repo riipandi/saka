@@ -110,7 +110,7 @@ func (s *Service) verifyStepUpAssertion(ctx context.Context, sessionWire, creden
 		if len(userHandle) != 16 {
 			return nil, fmt.Errorf("%w: the user handle is not an account identifier", ErrAssertionInvalid)
 		}
-		found, lookupErr := s.issuer.FindAccountByID(ctx, uuid.UUID(userHandle))
+		found, lookupErr := s.issuer.FindAccountByIDAny(ctx, uuid.UUID(userHandle))
 		if lookupErr != nil {
 			return nil, lookupErr
 		}

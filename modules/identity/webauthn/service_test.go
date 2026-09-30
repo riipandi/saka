@@ -32,6 +32,17 @@ type fakeIssuer struct {
 }
 
 func (f *fakeIssuer) FindAccountByID(_ context.Context, id uuid.UUID) (*signin.Account, error) {
+	return f.findAny(id)
+}
+
+// FindAccountByIDAny is the same map the inner-join read answers: the fake
+// cannot model the password join, so the stranding distinction lives in the
+// test that deletes the map entry.
+func (f *fakeIssuer) FindAccountByIDAny(_ context.Context, id uuid.UUID) (*signin.Account, error) {
+	return f.findAny(id)
+}
+
+func (f *fakeIssuer) findAny(id uuid.UUID) (*signin.Account, error) {
 	account, ok := f.accounts[id]
 	if !ok {
 		return nil, ErrNoRows

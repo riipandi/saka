@@ -45,7 +45,7 @@ func (s *Service) BeginRegistration(ctx context.Context, userID uuid.UUID) (stri
 		return "", "", err
 	}
 
-	account, err := s.issuer.FindAccountByID(ctx, userID)
+	account, err := s.issuer.FindAccountByIDAny(ctx, userID)
 	if err != nil {
 		return "", "", err
 	}
@@ -105,7 +105,7 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 	if err != nil {
 		return View{}, err
 	}
-	account, err := s.issuer.FindAccountByID(ctx, userID)
+	account, err := s.issuer.FindAccountByIDAny(ctx, userID)
 	if err != nil {
 		return View{}, err
 	}
