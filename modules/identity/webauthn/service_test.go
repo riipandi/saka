@@ -300,7 +300,7 @@ func TestAClonedCredentialIsRefused(t *testing.T) {
 
 	// The clone rewinds the counter: the same key, an assertion that claims
 	// less use than the row remembers.
-	soft.counter = 0
+	soft.RewindCounter()
 	options, sessionID, err = service.BeginLogin(t.Context())
 	require.NoError(t, err)
 	_, err = service.VerifyLogin(t.Context(), sessionID, soft.Get(t, options, testOrigin, userID[:]), signin.SessionParams{})
