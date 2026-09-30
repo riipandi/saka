@@ -320,6 +320,9 @@ func mapError(err error) error {
 	case errors.Is(err, ErrClonedCredential):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("the credential is refused; contact the operator"))
+	case errors.Is(err, ErrCredentialDuplicate):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("the credential is already enrolled"))
 	case errors.Is(err, ErrLastWayIn):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("removing this credential would leave the account no way in"))

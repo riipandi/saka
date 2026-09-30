@@ -56,17 +56,18 @@ const (
 // Errors the ceremonies and the management surface answer with. The handler
 // maps them to connect codes; the service only classifies.
 var (
-	ErrCeremonyInvalid    = errors.New("webauthn: ceremony session is unknown, spent, or expired")
-	ErrAssertionInvalid   = errors.New("webauthn: assertion or attestation failed verification")
-	ErrVerificationDue    = errors.New("webauthn: user verification is required for this ceremony")
-	ErrSyncedPasskeyOff   = errors.New("webauthn: synced passkeys are not allowed by this deployment")
-	ErrTooManyPasskeys    = errors.New("webauthn: the account holds the maximum number of passkeys")
-	ErrTooManyEnrollments = errors.New("webauthn: the account holds the maximum number of second factors")
-	ErrCredentialForeign  = errors.New("webauthn: the credential names another account")
-	ErrLastWayIn          = errors.New("webauthn: the removal would leave the account no way in")
-	ErrClonedCredential   = errors.New("webauthn: the credential shows signs of cloning")
-	ErrSettingUnreadable  = errors.New("webauthn: the passkey settings are unreadable")
-	ErrAccountUnknown     = errors.New("webauthn: the account is not found")
+	ErrCeremonyInvalid     = errors.New("webauthn: ceremony session is unknown, spent, or expired")
+	ErrAssertionInvalid    = errors.New("webauthn: assertion or attestation failed verification")
+	ErrVerificationDue     = errors.New("webauthn: user verification is required for this ceremony")
+	ErrSyncedPasskeyOff    = errors.New("webauthn: synced passkeys are not allowed by this deployment")
+	ErrTooManyPasskeys     = errors.New("webauthn: the account holds the maximum number of passkeys")
+	ErrTooManyEnrollments  = errors.New("webauthn: the account holds the maximum number of second factors")
+	ErrCredentialForeign   = errors.New("webauthn: the credential names another account")
+	ErrLastWayIn           = errors.New("webauthn: the removal would leave the account no way in")
+	ErrClonedCredential    = errors.New("webauthn: the credential shows signs of cloning")
+	ErrCredentialDuplicate = errors.New("webauthn: the credential is already enrolled")
+	ErrSettingUnreadable   = errors.New("webauthn: the passkey settings are unreadable")
+	ErrAccountUnknown      = errors.New("webauthn: the account is not found")
 )
 
 // SettingsReader is the settings surface the service reads its knobs

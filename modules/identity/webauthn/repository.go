@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/riipandi/tango/internal/datastore"
 )
 
@@ -54,7 +55,10 @@ func scanCredential(scan func(dest ...any) error) (CredentialSchema, error) {
 }
 
 // CreateCredential writes one enrolled passkey. The service fills the
-// identifier and every parsed attestation field.
+// identifier and every parsed attestation field. The credential_id's
+// uniqueness is the protocol's — one authenticator, one account — so a
+// duplicate insert is the duplicate-enrollment refusal, not an internal
+// failure.
 func (r *Repository) CreateCredential(ctx context.Context, db datastore.Querier, row CredentialSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(CredentialsTable)
@@ -65,6 +69,10 @@ func (r *Repository) CreateCredential(ctx context.Context, db datastore.Querier,
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrCredentialDuplicate
+		}
 		return fmt.Errorf("webauthn: create credential: %w", err)
 	}
 	return nil

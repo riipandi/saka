@@ -407,6 +407,28 @@ func TestAClonedCredentialIsRefused(t *testing.T) {
 	assert.Equal(t, int64(1), row[0].SignCount, "the refused assertion advanced nothing")
 }
 
+func TestADuplicateEnrollmentIsRefusedAsAPrecondition(t *testing.T) {
+	service, _, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	service.issuer = &passwordIssuer{accounts: map[uuid.UUID]*signin.Account{userID: account}}
+
+	soft := NewSoftAuthenticator(false, false, true)
+	options, sessionID, err := service.BeginRegistration(t.Context(), userID)
+	require.NoError(t, err)
+	first := soft.Create(t, options, testOrigin)
+	_, err = service.VerifyRegistration(t.Context(), userID, sessionID, first, "key")
+	require.NoError(t, err)
+
+	// The same authenticator walks a second ceremony: the key's identifier
+	// is the protocol's uniqueness, and the insert answers the duplicate
+	// refusal — not the internal failure a bare constraint violation was.
+	options, sessionID, err = service.BeginRegistration(t.Context(), userID)
+	require.NoError(t, err)
+	duplicate := soft.Create(t, options, testOrigin)
+	_, err = service.VerifyRegistration(t.Context(), userID, sessionID, duplicate, "key")
+	assert.ErrorIs(t, err, ErrCredentialDuplicate)
+}
+
 // ---- step-up ----
 
 func TestAStepUpProofSpendsOnce(t *testing.T) {
