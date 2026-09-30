@@ -348,7 +348,6 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |
-| WebAuthn passkeys | `modules/identity/webauthn` (kept deliberately) | `/api/webauthn/{register,login}/{begin,finish}` + `UserService` passkey procedures |
 | API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
 | Version metadata | — | `tango.system.v1.VersionService` |
 | Initial admin setup | — | `tango initialize` + `tango admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |

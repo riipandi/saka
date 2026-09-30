@@ -367,7 +367,7 @@ Timezone is a presentation preference, never a storage format: every instant the
 
 The account views carry the account's group memberships (`user_groups`, the full group view the group procedures answer with, ordered by display name): the shape the upstream user DTO sets, and the data a client renders beside the account — the group names are what a deployment's clients match a group-based claim against. The memberships read through a seam, `user.GroupDirectory`: the group feature's repository implements it, and the area wires it post-construction, because `usergroup` imports `user` and the import may not run the other way. The list fills its page in one batch read; a creation that names groups attaches them inside the account's own transaction, so an unknown group id rolls the whole creation back. The profile picture is the account's one file: the write is a REST route — a raw-body `PUT`, because a file upload is a browser's form job, not a protocol procedure — that stages the bytes into the storage engine, sniffed off their magic bytes, never a declared type, and syncs in the request, so the read that follows sees them; the reset is an RPC procedure (it carries no file) that deletes the file and clears the row. Both doors are the account owner's.
 
-The picture's key is `avatars/<account-id>.<ext>`: the extension comes from the sniffed bytes, so the object names what it holds wherever it is listed — a bucket browser, a presigned URL, the local deployment's file tree — with no lookup and no dependence on the file name the client sent. That makes the kind part of the identity: an upload of another kind lands under another key, so the replaced picture is deleted **before** the new one is stored. The other order is the one that cannot be repaired — the replaced file would keep its manifest row, and the row is exactly what the garbage collection keeps an object for, so the orphan would never be swept — while losing the race the first order can lose costs nothing visible: the row names the key it always named, and a picture whose object is missing already answers the bundled default, the state a reset produces. The key is recomposed on every update, so no path migration exists and none is needed. The read is the feature's other REST route, because an `<img>` tag fetches a URL rather than speaking the protocol: a stored picture streams with the content type the update recorded, an account without one answers the bundled default by redirect to `/images/default-avatar.png` — a frontend asset under `public/images/`, shipped in the compiled SPA — and the row naming a key the engine has lost lands on the same default rather than an error. The self-service profile edit (`/users/me`) and the group and passkey joins stay planned: they need the self-service shape and the usergroup/webauthn features respectively.
+The picture's key is `avatars/<account-id>.<ext>`: the extension comes from the sniffed bytes, so the object names what it holds wherever it is listed — a bucket browser, a presigned URL, the local deployment's file tree — with no lookup and no dependence on the file name the client sent. That makes the kind part of the identity: an upload of another kind lands under another key, so the replaced picture is deleted **before** the new one is stored. The other order is the one that cannot be repaired — the replaced file would keep its manifest row, and the row is exactly what the garbage collection keeps an object for, so the orphan would never be swept — while losing the race the first order can lose costs nothing visible: the row names the key it always named, and a picture whose object is missing already answers the bundled default, the state a reset produces. The key is recomposed on every update, so no path migration exists and none is needed. The read is the feature's other REST route, because an `<img>` tag fetches a URL rather than speaking the protocol: a stored picture streams with the content type the update recorded, an account without one answers the bundled default by redirect to `/images/default-avatar.png` — a frontend asset under `public/images/`, shipped in the compiled SPA — and the row naming a key the engine has lost lands on the same default rather than an error. The self-service profile edit (`/users/me`) and the group join stay planned: they need the self-service shape; the passkey procedures shipped as `tango.authn.v1.WebAuthnService` (see the endpoint reference).
 
 ### modules/identity/usergroup
 
@@ -476,6 +476,55 @@ The sign-in bridge is the state-handling core. A password success over an accoun
 Recovery codes are **one set per account, not per device** — ten codes, alphabet without `0/O/1/I`, SHA-256 hashed, single-use guaranteed by the UPDATE's `used_at IS NULL` clause (a race answers one winner). Every destructive procedure — regenerate, disable, the last authenticator's removal — demands the second-factor proof, because a stolen session alone must not switch the protection off. The proofs consume recovery codes but not TOTP steps: a proof that rotates under a double-clicked button is a support ticket.
 
 The sign-in fork runs through the `mfaGate` interface (`GateSignIn`, `KeepsConfirmedFactor`) that the multifactor service satisfies and the area's provider wires post-construction (`issuer.WithMFAGate(service)`) — the sign-in package cannot import multifactor back without a cycle, the same seam the ban's side effects use. Guard rules: `CompleteSignIn` is `Public` (the pending token is the credential), the rest are `Session`; the impersonated caller is refused everywhere, because an administrator must not enroll a factor onto the account they are wearing. The `enc:`-sealed secrets use the deployment's one cipher; a nil cipher (a consumer area without `app.secret_key`) is answered at the ceremony rather than failing a run that never touches the feature.
+
+### modules/identity/webauthn
+
+The passkey surface: `tango.authn.v1.WebAuthnService` — one credential in three roles (the
+passwordless first factor, the MFA bridge's second factor, the step-up proof), over
+`go-webauthn` v0.18.2 with the ceremonies as opaque JSON. The contract's `credential` field is
+a **string carrying the browser's `PublicKeyCredential` JSON verbatim** — `@simplewebauthn/browser`
+answers objects, so the client stringifies; the client passes the JSON through untouched in both
+directions.
+
+The traps the ladder bought:
+
+- **The signature counter is the clone alarm.** A rewound counter answers `failed_precondition`
+  silently ("contact the operator") — and a virtual authenticator re-seeded from captured
+  material asserts with counter 0, which IS a rewind against a row that already advanced. The
+  Playwright suite runs the whole ladder on one context so the counter advances naturally; an
+  E2E that re-seeds credentials between acts will watch the server refuse correct behavior.
+- **The discoverable sign-in resolves the account by the assertion's userHandle** — the raw 16
+  bytes of the account's UUID. `user.UUIDFromWire` is the conversion; `uuid.Parse` on the wire
+  form is the runtime 500.
+- **The account reads are two.** `FindAccountByID` inner-joins the password table (the question
+  "is there a way back in" — the stranding check's read); `FindAccountByIDAny` left-joins it
+  (the question "is there an account" — the enrollment, sign-in, and step-up resolutions). An
+  account that signs in by one-time code alone was invisible to the passkey surfaces until the
+  left join existed; the ladder's passwordless scenario is what pins it.
+- **The stranding refusal lives in the service, not the guard** — the contract cannot express
+  "the last credential of an account whose password row is gone", so every delete door
+  (holder's, administrator's) runs the same check: held ≤ 1 and the inner-join account read
+  answers not-found → `failed_precondition`.
+- **Each procedure registers at its own path** in the module's `MountRPC` — a handler added to
+  the generated service without an `r.Handle` line answers the router's `unimplemented` 501, and
+  no Go compile error names it. The area's forwarding test pins the claims.
+- **The step-up proof is interceptor-level.** `Reauthenticate` answers a hashed, single-use,
+  five-minute token; a procedure whose guard rule carries `StepUp: true` consumes the
+  `X-Tango-Reauthentication` header through the `guard.ReauthConsumer` interface the webauthn
+  feature implements. A nil consumer fails closed.
+- **The AAGUID catalog** ships embedded (`aaguid.json`, ~398 entries, names only, lazy
+  `sync.Once`); `get-aaguid.sh` re-trims it from the upstream combined payload. An unnamed
+  credential answers the model's name; a zero AAGUID answers "Passkey".
+- **The browser ladder is `tools/e2e-passkey`** (wire-level, the soft authenticator answering)
+  plus `e2e-tests/` on Playwright's virtual authenticator against the debug build's
+  `/debug/passkey/*` pages — a release binary refuses those paths with the 404 envelope and
+  carries none of the page.
+
+Guard: `BeginLogin`/`VerifyLogin` are `Public`; the management side is `Session` (the
+impersonated caller refused, so an administrator cannot plant a credential on the account they
+are wearing); `DeleteCredential` carries `StepUp`; the administrative roll doors ride
+`user:*:read/update/delete`. Expired ceremony rows and spent proofs are swept hourly by the
+`webauthn_cleanup` job.
 
 ### modules/apikey
 

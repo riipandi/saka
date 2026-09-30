@@ -700,11 +700,8 @@ customclaim feature owns them).
 | POST | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser` | Update current user | done — guard `Authenticated`; full replace of the signed-in account's own profile fields — the names, the locale, and the timezone (IANA, validated with `time.LoadLocation`, empty resets to `UTC`) | `modules/identity/user` (service tests) |
 | PUT | `/api/users/{id}/profile-picture` | Update user profile picture | done — REST raw-body upload; self-service Bearer (guard `Self("id")` on the path param); magic-byte sniff (PNG/JPEG/WebP), max 2 MiB; stored at `avatars/<id>.<ext>` with the extension the sniffed bytes earn, so a kind change moves the key and deletes the replaced picture first; staged then synced in-request | `modules/identity/user` (service + handler tests), `internal/guard` (rule) |
 | POST | `/rpc/tango.identity.v1.UserService/ResetProfilePicture` | Reset user profile picture | done — self-service Bearer (guard `Self("id")`); deletes the stored file and clears the row | `modules/identity/user` (service tests), `internal/guard` (rule), `internal/transport` (guard) |
-| POST | `/rpc/tango.identity.v1.UserService/ListWebAuthnCredentials` | List user passkeys | planned — needs the webauthn feature; not yet implemented | — |
-| POST | `/rpc/tango.identity.v1.UserService/UpdateWebAuthnCredential` | Rename user passkey | planned — needs the webauthn feature; not yet implemented | — |
 | POST | `/rpc/tango.authn.v1.SessionService/ImpersonateUser` | Impersonate a user (admin) | done — guard `Admin`; opens a **new** session on the target account with the delegation recorded (`sessions.impersonated_by`, the access token's `ActorID`); refuses another administrator, the caller themselves, and an unknown account; audit `impersonation_started`; a delegated caller is refused on self-service procedures by the guard | `modules/identity/session.TestImpersonateUserOpensADelegatedSession`, `modules/identity/session.TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown`, `internal/transport.TestTheGuardRefusesAnImpersonatedCallerOnASelfProcedure` |
 | POST | `/rpc/tango.authn.v1.SessionService/StopImpersonating` | Stop impersonating | done — guard `Authenticated` (callable while the delegation is active); ends the delegated session and reissues the actor's own token pair; audit `impersonation_stopped` | `modules/identity/session.TestStopImpersonatingEndsTheDelegationAndReissuesTheActor`, `modules/identity/session.TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign` |
-| POST | `/rpc/tango.identity.v1.UserService/DeleteWebAuthnCredential` | Delete user passkey | planned — needs the webauthn feature; not yet implemented | — |
 | POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — public; anti-enumeration: an unknown address answers the same success and a real device token; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress` |
 | POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — admin; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off; the code travels by email alone | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode` |
 | POST | `/rpc/tango.authn.v1.OneTimeAccessService/CreateToken` | Create one-time access token for user (admin) | done — admin; the six-character code is the short window’s form; only the hash is stored, so the response is the last the code exists | `modules/identity/onetimeaccess.TestCreateTokenIssuesACodeTheExchangeAccepts` |
@@ -718,19 +715,40 @@ customclaim feature owns them).
 
 ## WebAuthn
 
-**Not implemented.** Upstream Pocket ID is passkey-only; tango signs in with passwords and treats
-passkeys as a planned feature. The scaffold stays at `modules/identity/webauthn` (empty — kept
-deliberately as the landing place), and the `UserService` passkey procedures in the Users section
-above are planned rows for the same feature. No proto, no routes.
+Implemented in `modules/identity/webauthn` — the passkey surface: one credential in three roles
+(passwordless first factor, the MFA bridge's second factor, the step-up proof). The ceremonies
+travel as opaque JSON: the requests carry the browser's `PublicKeyCredential` JSON verbatim and
+the answers carry the server's options JSON verbatim, so the client never re-shapes what the
+browser produced. The `credential` field is a **string** carrying that JSON — not an object.
+Enrollment ceilings (`passkey.max_credentials`, `mfa.max_enrollments`) and the
+`webauthn.allow_synced_passkeys` toggle are catalog settings judged at the verify call, live.
+An account left with no way in at all refuses the removal — the recovery anchor is the
+invariant every delete door holds.
 
-Passkey ceremonies are a browser contract and stay HTTP.
+Guard: the ceremonies split at the token line — the sign-in side is `Public` (the credential is
+the credential it judges), the management side is `Session` (an impersonated caller is refused,
+so an administrator cannot plant a credential on the account they are wearing), and the
+administrative roll doors ride the permission catalog.
 
-| Method | Endpoint | Summary / Yaak Title | Status | Evidence |
-| ------ | -------- | -------------------- | ------ | -------- |
-| POST | `/api/webauthn/register/begin` | Begin passkey registration | planned — bare `publicKey` options plus an explicit ceremony id | — |
-| POST | `/api/webauthn/register/finish` | Finish passkey registration | planned | — |
-| POST | `/api/webauthn/login/begin` | Begin discoverable passkey login | planned — bare `publicKey` options plus an explicit ceremony id | — |
-| POST | `/api/webauthn/login/finish` | Finish discoverable passkey login | planned — fail closed on unknown ceremony sessions | — |
+| Method | Procedure | Summary / Yaak Title | Status | Evidence |
+| ------ | --------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/BeginRegistration` | Begin passkey registration | done — guard `Session`; answers the creation options JSON and the ceremony handle (`wcs_…`, one minute); the unverified enrollment row is the ceremony state | `modules/identity/webauthn` (service tests, soft authenticator) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/VerifyRegistration` | Verify passkey registration | done — guard `Session`; verifies the attestation against the stored challenge, records the counter and backup flags; the limits are judged here, an empty name falls back to the AAGUID's model name; a failed verification costs the ceremony | `modules/identity/webauthn.TestEnrollmentEndsInACredential`, `TestEnrollmentBeyondTheCredentialLimitIsRefused`, `TestEnrollmentRefusesASyncedPasskeyWhenTheToggleIsOff` |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/BeginLogin` | Begin passkey sign-in | done — public; empty `allowCredentials`, the discoverable sign-in: the account resolves from the credential the browser presents | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/VerifyLogin` | Verify passkey sign-in | done — public; the assertion with user verification is full authentication: the session issues in one step, no bridge, even on an MFA-enabled account; a rewound counter answers `failed_precondition` (the clone refusal, silent by design) | `modules/identity/webauthn.TestSignInEndsInAWholeSession`, `TestAClonedCredentialIsRefused` |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/ListCredentials` | List passkeys | done — guard `Session`; the caller's roll, oldest first, no key material | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/UpdateCredential` | Rename passkey | done — guard `Session`; another account's credential answers not-found, the same refusal an unknown id earns | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/DeleteCredential` | Delete passkey | done — guard `Session` + step-up (`X-Tango-Reauthentication`); deleting the last credential is allowed while the password row exists | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate` | Reauthenticate (step-up proof) | done — guard `Session`; proves the caller by password or passkey assertion and answers a single-use token (five minutes, hashed at rest); the guarded call spends it through the `X-Tango-Reauthentication` header; three wrong proofs do not apply — the proof is one grant, judged once | `modules/identity/webauthn.TestAStepUpProofSpendsOnce`, `internal/transport` (interceptor consumption) |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials` | Admin list passkeys | done — guard `Permission user:*:read`; the roll over a named account | `modules/identity/webauthn.TestAdminSeesAnotherAccountsRoll` |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential` | Admin rename passkey | done — guard `Permission user:*:update`; the holder's rules over any account; audit `webauthn_credential_admin_renamed` | `modules/identity/webauthn.TestAdminRenamesAnotherAccountsPasskey` |
+| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential` | Admin delete passkey | done — guard `Permission user:*:delete`; the stranding refusal holds here too; audit `webauthn_credential_admin_removed` | `modules/identity/webauthn.TestAdminDeleteRefusesTheLastWayIn` |
+
+Expired ceremony rows and the spent proof tokens are swept hourly by the `webauthn_cleanup` job
+(`internal/jobs`). The AAGUID catalog ships embedded (`aaguid.json`, names only) and names an
+unnamed credential's authenticator. The browser ladder runs on Playwright (`e2e-tests/`, the
+virtual authenticator) and the wire-level driver is `tools/e2e-passkey` — both drive the debug
+build's simulation pages at `/debug/passkey/*` (Utilities below).
 
 ## Version
 
