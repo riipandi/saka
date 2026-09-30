@@ -12,7 +12,7 @@ import type { APIRequestContext, Browser, BrowserContext, Page } from '@playwrig
 
 const identity = process.env.E2E_IDENTITY || 'admin'
 const password = process.env.E2E_PASSWORD || '@dmin123'
-const rpId = 'localhost'
+const rpId = process.env.E2E_RP_ID || 'localhost'
 
 let context: BrowserContext
 let page: Page

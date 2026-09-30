@@ -54,6 +54,9 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(authnv1connect.WebAuthnServiceUpdateCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceDeleteCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceReauthenticateProcedure, connectHandler)
+	r.Handle(authnv1connect.WebAuthnServiceAdminListCredentialsProcedure, connectHandler)
+	r.Handle(authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure, connectHandler)
+	r.Handle(authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure, connectHandler)
 }
 
 // rpcHandler is the transport mapping of the webauthn procedures. The

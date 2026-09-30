@@ -129,15 +129,22 @@ func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Acc
 
 	query, args := sb.Build()
 	var row Account
+	// The password hash is nullable here: the left join's whole point is the
+	// account whose password row is absent, and the empty string is the
+	// answer a verifier refuses.
+	var hash *string
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
+		&row.Disabled, &row.BannedAt, &row.BanExpires, &hash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, datastore.ErrNoRows
 	}
 	if err != nil {
 		return nil, fmt.Errorf("signin: find account by id: %w", err)
+	}
+	if hash != nil {
+		row.PasswordHash = *hash
 	}
 	return &row, nil
 }
