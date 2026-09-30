@@ -158,12 +158,14 @@ func TestSampleWritesTheOTELKeys(t *testing.T) {
 	// The collector address and the service identity are directives: a
 	// deployment is the one that knows where its collector listens and what the
 	// service is called there. The two enable switches stay in the file, so a
-	// checkout that ships nothing keeps shipping nothing.
+	// checkout that ships nothing keeps shipping nothing. otel.environment is
+	// neither: it is empty by default, and a deployment that wants the resource
+	// attribute fills the key in the file, so it is a literal empty string.
 	flat := sampleDoc(t)
 
 	assert.Equal(t, "env:OTEL_ENDPOINT", flat["otel.endpoint"])
 	assert.Equal(t, "env:OTEL_SERVICE_NAME", flat["otel.service_name"])
-	assert.Equal(t, "env:OTEL_ENVIRONMENT", flat["otel.environment"])
+	assert.Equal(t, "", flat["otel.environment"])
 	assert.Equal(t, "env:OTEL_TRACING_ENABLE", flat["otel.tracing.enable"])
 	assert.Equal(t, "env:OTEL_METRICS_ENABLE", flat["otel.metrics.enable"])
 }
@@ -466,4 +468,59 @@ func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
 	assert.Equal(t, "us-east-1", cfg.Storage.S3.Region)
 	assert.Equal(t, "s3admin", cfg.Storage.S3.AccessKey)
 	assert.Equal(t, "s3passw0rd", cfg.Storage.S3.SecretKey)
+}
+
+func TestEnvExampleCoversEveryDirectiveVariable(t *testing.T) {
+	// The dotenv example is the fill-in side of the sample file: every variable
+	// the sample's directives name appears exactly once, with a development
+	// value that resolves. The switches a checkout flips in the file (cache,
+	// kvstore enable/db, the origin list, the telemetry environment attribute)
+	// are deliberately absent.
+	raw, err := EnvExample()
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	values := make(map[string]string, len(lines))
+	for _, line := range lines {
+		name, value, ok := strings.Cut(line, "=")
+		require.True(t, ok, "every line is NAME=value: %q", line)
+		values[name] = value
+	}
+
+	expected := make(map[string]string, len(secretKeys)+len(envKeys))
+	for _, key := range secretKeys {
+		// envKeys names the variable when one does (kvstore.url is
+		// VALKEY_URL, not KVSTORE_URL); the rest derive their name.
+		name, named := envKeys[key]
+		if !named {
+			name = EnvName(key)
+		}
+		expected[name] = values[name]
+	}
+	for _, name := range envKeys {
+		expected[name] = values[name]
+	}
+	assert.Equal(t, expected, values,
+		"the example carries exactly the variables the sample names")
+
+	// The placeholders are not credentials, and the mailer/s3 secrets carry
+	// their development values so a fresh checkout runs against compose.
+	assert.Equal(t, "mailerpass1", values["MAILER_SMTP_PASSWORD"])
+	assert.Equal(t, "s3admin", values["STORAGE_S3_ACCESS_KEY"])
+	assert.Contains(t, values["OTEL_HEADERS"], "Basic ")
+	assert.Equal(t, "debug", values["LOG_LEVEL"])
+	assert.NotContains(t, values, "OTEL_ENVIRONMENT")
+	assert.NotContains(t, values, "CACHE_ENABLE")
+	assert.NotContains(t, values, "CORS_ALLOWED_ORIGINS")
+	assert.NotContains(t, values, "VALKEY_DB")
+	assert.NotContains(t, values, "VALKEY_ENABLE")
+}
+
+func TestEnvExampleIsDeterministic(t *testing.T) {
+	first, err := EnvExample()
+	require.NoError(t, err)
+	second, err := EnvExample()
+	require.NoError(t, err)
+
+	assert.Equal(t, string(first), string(second), "two runs must produce the same bytes")
 }

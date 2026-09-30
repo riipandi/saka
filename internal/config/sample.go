@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+	"maps"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,11 +43,6 @@ var secretKeys = []string{
 // replaces it.
 var omittedKeys = []string{
 	"fetcher.user_agent",
-	// auth.jwt_algorithm is empty in every deployment that configures one
-	// signing stack, because the answer is then derived: the key pair's own
-	// `alg`, or the HMAC secret's length. It is set only by a deployment that
-	// configures both stacks, so listing it would invite a choice that is
-	// already made.
 	"auth.jwt_algorithm",
 }
 
@@ -75,11 +73,20 @@ var omittedKeys = []string{
 // The transport list is a directive for a third reason: it is the one logging
 // key a deployment changes per environment, keeping the terminal locally and
 // shipping to a collector in production, and a comma-separated value is exactly
-// what an environment variable can carry (see listKeys).
+// what an environment variable can carry (see listKeys). The level travels with
+// it: locally debug, in production info, and a run that reads it from the file
+// alone cannot be turned up without an edit.
 //
 // A key may also appear in secretKeys, which runs first: secretKeys says the
 // value is a secret, and this map says what the variable is called. kvstore.url
 // is the case where the two disagree, being VALKEY_URL rather than KVSTORE_URL.
+//
+// Deliberately absent: cache.enable, kvstore.enable, and kvstore.db are plain
+// product switches a checkout flips in the file (all off/zero by default), and
+// server.cors.allowed_origins is a list of literal origins, not a credential.
+// otel.environment is not here either — the deployment environment a signal
+// reports is empty by default, and a deployment that wants the attribute fills
+// the key in the file directly.
 //
 // Validate reports a key here only when the variable leaves it unusable. An unset
 // APP_MODE falls back to development, an empty base_url is a valid value, an unset
@@ -92,10 +99,8 @@ var envKeys = map[string]string{
 	"app.assets_url":                   "PUBLIC_ASSETS_URL",
 	"app.base_url":                     "PUBLIC_BASE_URL",
 	"app.mode":                         "APP_MODE",
-	"cache.enable":                     "CACHE_ENABLE",
-	"kvstore.db":                       "VALKEY_DB",
-	"kvstore.enable":                   "VALKEY_ENABLE",
 	"kvstore.url":                      "VALKEY_URL",
+	"log.level":                        "LOG_LEVEL",
 	"log.transport":                    "LOG_TRANSPORT",
 	"mailer.smtp_allow_plaintext_auth": "MAILER_SMTP_ALLOW_PLAINTEXT_AUTH",
 	"mailer.smtp_host":                 "MAILER_SMTP_HOST",
@@ -103,16 +108,41 @@ var envKeys = map[string]string{
 	"mailer.smtp_secure":               "MAILER_SMTP_SECURE",
 	"mailer.smtp_username":             "MAILER_SMTP_USERNAME",
 	"otel.endpoint":                    "OTEL_ENDPOINT",
-	"otel.environment":                 "OTEL_ENVIRONMENT",
 	"otel.metrics.enable":              "OTEL_METRICS_ENABLE",
 	"otel.service_name":                "OTEL_SERVICE_NAME",
 	"otel.tracing.enable":              "OTEL_TRACING_ENABLE",
-	"server.cors.allowed_origins":      "CORS_ALLOWED_ORIGINS",
 	"server.host":                      "SERVER_HOST",
 	"server.port":                      "SERVER_PORT",
 	"storage.s3.bucket_name":           "STORAGE_S3_BUCKET_NAME",
 	"storage.s3.endpoint_url":          "STORAGE_S3_ENDPOINT_URL",
 	"storage.s3.region":                "STORAGE_S3_REGION",
+}
+
+// envExampleValues are the placeholder values the generated dotenv example
+// carries for the secrets whose built-in default is empty. A secret cannot
+// ship a real value, but an empty line teaches nothing: the placeholder names
+// what the operator is expected to put there, and nothing here is usable as a
+// credential. Every other variable renders its built-in default (otel.headers
+// gets the stack's own Basic credential for the compose OpenObserve, which is
+// what makes a fresh stack ship on the first run).
+var envExampleValues = map[string]string{
+	"app.base_url":                     "http://localhost:3080",
+	"app.secret_key":                   "__REPLACE_WITH_SECURE_ENCRYPTION_KEY__",
+	"auth.secret_key":                  "__REPLACE_WITH_SECRET_KEY_AUTHENTICATION__",
+	"database.url":                     "postgresql://postgres:securedb@localhost:5432/postgres?sslmode=disable",
+	"log.level":                        "debug",
+	"log.transport":                    "console,file,otlp",
+	"mailer.smtp_allow_plaintext_auth": "true",
+	"mailer.smtp_host":                 "localhost",
+	"mailer.smtp_password":             "mailerpass1",
+	"mailer.smtp_port":                 "1025",
+	"mailer.smtp_username":             "maileruser1",
+	"otel.headers":                     "Authorization=Basic YWRtaW5AZXhhbXBsZS5jb206QGRtaW4xMjM=",
+	"storage.s3.access_key":            "s3admin",
+	"storage.s3.bucket_name":           "devbucket",
+	"storage.s3.endpoint_url":          "http://localhost:9100",
+	"storage.s3.region":                "auto",
+	"storage.s3.secret_key":            "s3passw0rd",
 }
 
 // Sample renders the config file a fresh checkout starts from: every key with its
@@ -150,6 +180,74 @@ func Sample() ([]byte, error) {
 		return nil, fmt.Errorf("config: render sample: %w", err)
 	}
 	return append(out, '\n'), nil
+}
+
+// EnvExample renders the dotenv example the config:generate --env-example
+// flag writes: one NAME=value line per variable the sample's directives name —
+// the secrets in secretKeys plus every entry in envKeys — with the built-in
+// default as the value and the placeholders above for the empty secrets. The
+// output is sorted by variable name, so two runs produce the same bytes.
+func EnvExample() ([]byte, error) {
+	names := make(map[string]string, len(secretKeys)+len(envKeys))
+	for _, key := range secretKeys {
+		names[key] = EnvName(key)
+	}
+	maps.Copy(names, envKeys)
+
+	flat := DefaultsMap()
+	lines := make([]string, 0, len(names))
+	for key, name := range names {
+		value, ok := envExampleValues[key]
+		if !ok {
+			defaultValue, ok := flat[key]
+			if !ok {
+				return nil, fmt.Errorf("config: env example key %s is not part of Config", key)
+			}
+			value = renderScalar(defaultValue)
+		}
+		lines = append(lines, name+"="+value)
+	}
+	slices.Sort(lines)
+
+	return []byte(strings.Join(lines, "\n") + "\n"), nil
+}
+
+// renderScalar turns a default into the text a dotenv line carries. Booleans
+// stay true/false, numbers their decimal form, lists their comma-separated
+// form (the same shape listKeys splits back), and a header map is rendered in
+// the name=value,... form normalizeMaps splits — here the one entry the stack
+// itself needs.
+func renderScalar(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case time.Duration:
+		seconds := v.Seconds()
+		if seconds == float64(int64(seconds)) {
+			return strconv.FormatInt(int64(seconds), 10)
+		}
+		return strconv.FormatFloat(seconds, 'f', -1, 64)
+	case []string:
+		return strings.Join(v, ",")
+	case map[string]string:
+		entries := make([]string, 0, len(v))
+		for name, entry := range v {
+			entries = append(entries, name+"="+entry)
+		}
+		slices.Sort(entries)
+		return strings.Join(entries, ",")
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 // nest turns flat dotted keys back into the tree the file is written as. A
