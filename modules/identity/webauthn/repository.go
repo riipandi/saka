@@ -229,6 +229,23 @@ func (r *Repository) DeleteCredential(ctx context.Context, db datastore.Querier,
 	return tag.RowsAffected() > 0, nil
 }
 
+// DeleteExpiredTokens removes every token row past its expiry and answers
+// how many it reaped — the sweep the maintenance job calls. An expired token
+// is refused on read already; the sweep is what keeps the table from
+// keeping the refused rows forever, whatever purpose minted them.
+func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Querier, now time.Time) (int64, error) {
+	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbt.DeleteFrom(AuthTokensTable)
+	dbt.Where(dbt.LessThan("expires_at", now))
+
+	query, args := dbt.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("webauthn: delete expired tokens: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ---- Ceremony sessions ----
 
 // CreateSession writes one live ceremony row. The service fills the

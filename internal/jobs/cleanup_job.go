@@ -21,6 +21,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/modules/identity/multifactor"
+	"github.com/riipandi/tango/modules/identity/webauthn"
 )
 
 // CleanupName is the queue the maintenance job runs on.
@@ -86,6 +87,17 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 	if purged[0] > 0 || purged[1] > 0 {
 		slog.InfoContext(ctx, "queue: purged expired auth rows",
 			"unconfirmed_enrollments", purged[0], "pending_bridges", purged[1])
+	}
+
+	// The token rows the runtime refuses on read — the step-up proofs minted
+	// and never spent, the codes whose window closed — leave the table only
+	// through this sweep; every read already checks the expiry.
+	swept, err := webauthn.NewRepository().DeleteExpiredTokens(ctx, pool, time.Now())
+	if err != nil {
+		return err
+	}
+	if swept > 0 {
+		slog.InfoContext(ctx, "queue: purged expired auth tokens", "tokens", swept)
 	}
 
 	// The next run is queued before this one succeeds, so the schedule never

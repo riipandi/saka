@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/webauthn"
 	"github.com/riipandi/tango/pkg/testutils"
 )
 
@@ -69,4 +70,25 @@ func TestTheCeremonySweepReapsOnlyTheExpired(t *testing.T) {
 	deleted, err = deleteExpiredWebauthnSessions(t.Context(), pool, later)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), deleted, "the second sweep finds nothing left")
+}
+
+// TestTheTokenSweepReapsTheExpired pins the token half of the maintenance:
+// a step-up proof minted and never spent leaves the table through the
+// sweep, and a live token survives it.
+func TestTheTokenSweepReapsTheExpired(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := testutils.MigratedPostgres(t, "webauthn_token_cleanup_test")
+	repo := webauthn.NewRepository()
+	now := time.Now()
+	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "dead-hash", now.Add(-time.Hour), now.Add(-time.Minute)))
+	require.NoError(t, repo.CreateReauthenticationToken(t.Context(), pool, uuid.NewV7(), "live-hash", now, now.Add(time.Hour)))
+
+	swept, err := repo.DeleteExpiredTokens(t.Context(), pool, now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), swept)
+
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(), "SELECT count(*) FROM public.auth_tokens").Scan(&count))
+	assert.Equal(t, 1, count, "the live token stays")
 }
