@@ -152,10 +152,14 @@ var envExampleValues = map[string]string{
 //
 // Every key is written out rather than only the ones a user is likely to change,
 // so the file doubles as the list of what can be configured, except omittedKeys,
-// which keep the built-in default by being absent. The output is deterministic:
-// keys are sorted, so two runs produce the same bytes.
+// which keep the built-in default by being absent. The file opens with a
+// "$schema" key naming the schema beside it, so an editor picks up completion
+// and validation; the loader ignores the key, the way it ignores anything that
+// is not a config path. The output is deterministic: keys are sorted, so two
+// runs produce the same bytes.
 func Sample() ([]byte, error) {
 	flat := DefaultsMap()
+	flat["$schema"] = SchemaFileName
 	for _, key := range omittedKeys {
 		if _, ok := flat[key]; !ok {
 			return nil, fmt.Errorf("config: omitted key %s is not part of Config", key)

@@ -163,7 +163,10 @@ write somewhere else.
 
 With --env-example the command also writes .env.example, a dotenv example
 carrying the variables the config file's directives reference, each with its
-development default as the value.`,
+development default as the value.
+
+config.schema.json is written beside the config file every run: the file
+references it from its "$schema" key, so the pair travels together.`,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "output",
@@ -175,7 +178,7 @@ development default as the value.`,
 		},
 		&cli.BoolFlag{
 			Name:  "overwrite",
-			Usage: "Replace existing config and example env file",
+			Usage: "Replace existing config, schema, and example env file",
 		},
 	},
 	Action: runConfigGenerate,
@@ -191,9 +194,11 @@ const envExampleName = ".env.example"
 const configFileMode fs.FileMode = 0o644
 
 // runConfigGenerate writes the sample config and reports where it landed.
-// With --env-example it writes .env.example beside it; the same
-// --overwrite guard covers both, so a run that would clobber either is told
-// to say so rather than silently replacing a file the user edited.
+// The schema is written beside it every run — the file references it from its
+// "$schema" key, so a config without its schema loses editor completion — and
+// with --env-example the dotenv example joins them. The same --overwrite guard
+// covers all three, so a run that would clobber any is told to say so rather
+// than silently replacing a file the user edited.
 func runConfigGenerate(_ context.Context, cmd *cli.Command) error {
 	p := printext.NewPalette(cmd.Root().Writer)
 
@@ -207,9 +212,15 @@ func runConfigGenerate(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	dir := filepath.Dir(path)
+	schemaPath := filepath.Join(dir, config.SchemaFileName)
+	if err := mayWriteConfig(schemaPath, overwrite); err != nil {
+		return err
+	}
+
 	envPath := ""
 	if cmd.Bool("env-example") {
-		envPath = filepath.Join(filepath.Dir(path), envExampleName)
+		envPath = filepath.Join(dir, envExampleName)
 		if err := mayWriteConfig(envPath, overwrite); err != nil {
 			return err
 		}
@@ -219,8 +230,15 @@ func runConfigGenerate(_ context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	schema, err := config.SchemaDoc()
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(path, sample, configFileMode); err != nil {
 		return fmt.Errorf("config: write %s: %w", path, err)
+	}
+	if err := os.WriteFile(schemaPath, schema, configFileMode); err != nil {
+		return fmt.Errorf("config: write %s: %w", schemaPath, err)
 	}
 
 	if envPath != "" {
@@ -231,9 +249,9 @@ func runConfigGenerate(_ context.Context, cmd *cli.Command) error {
 		if err := os.WriteFile(envPath, example, configFileMode); err != nil {
 			return fmt.Errorf("config: write %s: %w", envPath, err)
 		}
-		return printConfigWrittenWithEnv(p, path, envPath)
+		return printConfigWritten(p, path, schemaPath, envPath)
 	}
-	return printConfigWritten(p, path)
+	return printConfigWritten(p, path, schemaPath)
 }
 
 // mayWriteConfig refuses to replace an existing file unless --overwrite was
@@ -253,32 +271,23 @@ func mayWriteConfig(path string, overwrite bool) error {
 	}
 }
 
-// printConfigWritten reports the file and the step that follows it, as the same
-// labelled block every other command prints.
+// printConfigWritten reports the files and the step that follows them, as the
+// same labelled block every other command prints. The schema is always the
+// second line: it is written every run, beside the config it describes.
 //
 // The key count and the size are left out: a generated file always carries every
 // key, so both numbers are the same on every run and say nothing about this one.
-func printConfigWritten(p printext.Palette, path string) error {
-	if err := printFields(p, []field{{"written", path}}); err != nil {
+func printConfigWritten(p printext.Palette, path, schemaPath string, more ...string) error {
+	written := append([]string{path, schemaPath}, more...)
+	fields := make([]field, 0, len(written))
+	for _, w := range written {
+		fields = append(fields, field{"written", w})
+	}
+	if err := printFields(p, fields); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(p.Writer(), "next step: run %s, then set %s\n",
 		p.Dim("key:generate --env-file=.env.local"), p.Dim(config.EnvName("database.url"))); err != nil {
-		return err
-	}
-	return printStatusLine(p, "config file ready")
-}
-
-// printConfigWrittenWithEnv is the variant for a run that also wrote the
-// dotenv example: the env file is reported on its own line, and the next step
-// names copying it rather than generating keys, because the example already
-// carries the placeholders to fill.
-func printConfigWrittenWithEnv(p printext.Palette, path, envPath string) error {
-	if err := printFields(p, []field{{"written", path}, {"written", envPath}}); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(p.Writer(), "next step: run %s, then copy %s to .env.local\n",
-		p.Dim("key:generate"), p.Dim(envPath)); err != nil {
 		return err
 	}
 	return printStatusLine(p, "config file ready")

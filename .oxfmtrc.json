@@ -42,7 +42,6 @@
         "**/*.tmpl",
         "/codegen/**",
         "/public/**",
-        "!/public/config.schema.json",
         "/storage/**",
         "/temp/**"
     ]

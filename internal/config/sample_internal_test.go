@@ -95,9 +95,12 @@ func TestSampleCoversEveryKey(t *testing.T) {
 	// A generated file is also the list of what can be configured, so it must
 	// carry every key the struct defines except the ones omittedKeys hides.
 	// An omitted key keeps its built-in default when the file leaves it out.
+	// The "$schema" key is not a config key: it names the schema beside the
+	// file so an editor picks up completion, and the loader skips it.
 	flat := sampleDoc(t)
 
-	require.Len(t, flat, len(Keys())-len(omittedKeys))
+	require.Len(t, flat, len(Keys())-len(omittedKeys)+1)
+	assert.Equal(t, SchemaFileName, flat["$schema"])
 	for _, key := range Keys() {
 		if slices.Contains(omittedKeys, key) {
 			assert.NotContains(t, flat, key)

@@ -19,6 +19,12 @@ const DefaultConfigFile = "app.config.json"
 // overridden by an explicit --config-file flag.
 const FileEnv = "CONFIG_FILE"
 
+// SchemaFileName is the JSON Schema the generated file references from its
+// "$schema" key. The name is relative, so the pair travels together: the
+// schema lives beside the file it describes, in public/ for the repository
+// and beside app.config.json wherever the file is generated.
+const SchemaFileName = "config.schema.json"
+
 // ErrNoConfigFile reports a config file that does not exist.
 var ErrNoConfigFile = errors.New("config: config file not found")
 
