@@ -46,6 +46,9 @@ var catalog = []Event{
 	{Source: audit.EventMfaSignIn, Name: "session.mfa_signed_in", Description: "A session was completed by a second factor."},
 	{Source: audit.EventImpersonationStarted, Name: "session.impersonation_started", Description: "A delegated session was opened by an administrator."},
 	{Source: audit.EventImpersonationStopped, Name: "session.impersonation_stopped", Description: "A delegated session was ended by the administrator riding in it."},
+	{Source: audit.EventWebauthnSignIn, Name: "session.passkey_signed_in", Description: "A session was opened by a passkey assertion with user verification."},
+	{Source: audit.EventWebauthnReauthenticationGranted, Name: "session.reauthentication_granted", Description: "A step-up proof was answered by a passkey assertion."},
+	{Source: audit.EventWebauthnReauthenticationConsumed, Name: "session.reauthentication_consumed", Description: "A step-up token was spent by a guarded procedure."},
 
 	{Source: audit.EventAccountCreated, Name: "user.created", Description: "An account that did not exist now does."},
 	{Source: audit.EventAccountUpdated, Name: "user.updated", Description: "An account's fields were rewritten."},
@@ -69,6 +72,12 @@ var catalog = []Event{
 	{Source: audit.EventGroupDeleted, Name: "group.deleted", Description: "A user group was removed."},
 	{Source: audit.EventGroupMembersUpdated, Name: "group.members_updated", Description: "A user group's member set was replaced."},
 	{Source: audit.EventGroupAllowedClientsUpdated, Name: "group.allowed_clients_updated", Description: "A user group's client allowlist was replaced."},
+
+	{Source: audit.EventWebauthnCredentialRegistered, Name: "passkey.enrolled", Description: "A passkey was enrolled onto an account."},
+	{Source: audit.EventWebauthnCredentialRemoved, Name: "passkey.removed", Description: "A passkey was removed from an account."},
+	{Source: audit.EventWebauthnCredentialRenamed, Name: "passkey.renamed", Description: "A passkey's display name was changed."},
+	{Source: audit.EventWebauthnCredentialAdminRenamed, Name: "passkey.admin_renamed", Description: "A passkey's display name was changed by an administrator."},
+	{Source: audit.EventWebauthnCredentialAdminRemoved, Name: "passkey.admin_removed", Description: "A passkey was removed by an administrator."},
 
 	{Source: audit.EventAPIKeyCreated, Name: "api_key.created", Description: "A machine credential was created."},
 	{Source: audit.EventAPIKeyRenewed, Name: "api_key.renewed", Description: "An expired key's secret and window were replaced."},
