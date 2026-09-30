@@ -1,11 +1,45 @@
 # Pocket ID API Reference
 
 Upstream contract for the surfaces tango ports. Extracted from
-<https://pocket-id.org/swagger.yaml> (swagger 2.0, Pocket ID API v1.0).
+<https://pocket-id.org/swagger.yaml> (swagger 2.0, Pocket ID API v1.0) and
+reconciled against the upstream release **v2.16.0** (2026-09-20; local clone at
+`~/Developer/github.com/pocket-id/pocket-id`). The operation list matched the
+release exactly; the shape deltas this reconciliation found are recorded in
+`.llms/handover-20260930_1337.md` and the per-area notes below.
 
 This file is a reference only. tango serves ConnectRPC below `/rpc` for these
 operations and keeps a small HTTP/REST surface for protocol endpoints; see
 `docs/api-endpoint.md` for what tango actually mounts.
+
+## Parity deltas (reconciled 2026-09-30, upstream v2.16.0)
+
+The operation lists matched exactly. The shape deltas below are what a caller
+porting from upstream will meet; each is a deliberate tango shape or a gap the
+backlog owns, not a drift to fix silently.
+
+- User views carry no `is_admin` (the role/permission system replaced it) and
+  no `ldapId` (tango has no LDAP). `email` is required; upstream made it
+  nullable in v2. Custom claims travel through `CustomClaimService` rather
+  than riding the user views.
+- `UserGroupDetail` answers members but not `allowedOidcClients`; the Set
+  procedure's response carries the roll. Upstream's group view embeds both.
+- Signup tokens answer `raw_token` at create and never again; upstream's
+  token list echoes the raw value. Tango's sign-up mints a password
+  credential with the request; upstream's sign-up has no credential in it.
+- One-time access is identifier-based for the administrative half
+  (`id` + `ttl_seconds`), not upstream's email + duration.
+- Device-login inspect answers `user_agent` where upstream answers device and
+  geo (country, city); the exchange/decide shapes match.
+- API keys, audit logs, OIDC clients (backchannel logout included), SCIM
+  service providers, and application configuration are supersets of the
+  upstream shapes; nothing upstream carries is missing from them.
+
+Not ported (the Yaak collection holds placeholder requests under
+`tango.admin.v1.ApiService/*` and the WebAuthn procedures): the upstream
+**APIs** entity and its client-grant/CIMD surface — tango's authorization
+model covers permissions with roles instead — user passkey CRUD, LDAP, and
+`/api/storage/sqlite-warning` (tango is Postgres-only). `/api/version/*` is
+planned (`tango.system.v1.VersionService`).
 
 ## Operations
 
