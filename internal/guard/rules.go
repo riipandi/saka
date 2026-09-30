@@ -424,6 +424,12 @@ var RestRules = []RestEntry{
 	{Method: http.MethodGet, Pattern: "/.well-known/oauth-authorization-server", Rule: Public},
 	{Method: http.MethodGet, Pattern: "/api/users/{id}/profile-picture.png", Rule: Public},
 
+	// The development probe page is the webauthn feature's test instrument,
+	// mounted in the development mode alone. It carries no data of its own —
+	// the token the caller pastes is the credential — so the page itself is
+	// public where it exists.
+	{Method: http.MethodGet, Pattern: "/api/webauthn-probe", Rule: Public},
+
 	// The `/me` writes come before the `/{id}` write: the table is matched
 	// in order, and a `{id}` pattern checked first would swallow `me` and
 	// compare the word against a subject — the refusal a real identifier

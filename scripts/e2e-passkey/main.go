@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -31,6 +32,7 @@ const rpcPath = "/rpc/"
 
 func main() {
 	baseURL := flag.String("base-url", "http://localhost:3080", "the server's base URL")
+	insecure := flag.Bool("insecure", false, "skip the TLS verification - the self-signed development proxy")
 	flag.Parse()
 
 	identity := os.Getenv("E2E_IDENTITY")
@@ -40,6 +42,9 @@ func main() {
 	}
 
 	client := &rpcClient{base: strings.TrimSuffix(*baseURL, "/"), http: &http.Client{}}
+	if *insecure {
+		client.http.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // the self-signed development proxy
+	}
 
 	// 1. Password sign-in answers the token pair the enrollment runs on.
 	signIn := client.mustRPC("tango.authn.v1.AuthService/SignIn", map[string]any{

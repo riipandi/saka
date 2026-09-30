@@ -106,6 +106,10 @@ type Deps struct {
 	// answers the raw token.
 	ExposeResetToken bool
 
+	// ExposeProbe mounts the webauthn development probe page. It is the
+	// development mode's gate and nothing else — no flag exists for it.
+	ExposeProbe bool
+
 	// UserGroups administers the groups accounts belong to.
 	UserGroups *usergroup.Service
 
@@ -480,9 +484,12 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		// configuration's validation refuses the flag outside development,
 		// and the wiring repeats it so both layers hold.
 		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
-		UserGroups:       do.MustInvoke[*usergroup.Service](i),
-		Authorization:    do.MustInvoke[*authorization.Service](i),
-		DeviceLogin:      do.MustInvoke[*devicelogin.Service](i),
+		// The probe page is the development mode's instrument alone: no
+		// flag, no configuration — a production run never mounts it.
+		ExposeProbe:   c.App.Mode == config.ModeDevelopment,
+		UserGroups:    do.MustInvoke[*usergroup.Service](i),
+		Authorization: do.MustInvoke[*authorization.Service](i),
+		DeviceLogin:   do.MustInvoke[*devicelogin.Service](i),
 	}), nil
 }
 
@@ -528,13 +535,18 @@ func features(deps Deps) []kernel.Module {
 	// together, and the multifactor package must not sit below this one.
 	// The challenge seam runs the other way for the same reason: the
 	// multifactor service verifies the passkey half of its bridge through
-	// the interface it defines, satisfied here.
+	// the interface it defines, satisfied here. The probe page rides the
+	// development mode's gate the TOTP aid keeps.
 	if deps.WebAuthn != nil {
 		if deps.Multifactor != nil {
 			deps.WebAuthn.WithTotpEnrollments(deps.Multifactor)
 			deps.Multifactor.WithPasskeyVerifier(deps.WebAuthn)
 		}
-		modules = append(modules, webauthn.NewModule(deps.WebAuthn))
+		module := webauthn.NewModule(deps.WebAuthn)
+		if deps.ExposeProbe {
+			module = module.WithProbe()
+		}
+		modules = append(modules, module)
 	}
 	if deps.PasswordRecovery != nil {
 		modules = append(modules, password.NewRecoveryModule(deps.PasswordRecovery).
