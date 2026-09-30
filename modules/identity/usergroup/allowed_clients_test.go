@@ -59,6 +59,36 @@ func TestSetAllowedOidcClientsReplacesTheRollAndRefusesAnUnknownClient(t *testin
 	assert.ErrorIs(t, err, ErrGroupNotFound)
 }
 
+// TestGroupDetailCarriesTheClientRoll pins the parity read: the group's
+// detail view answers the allowlist the Set procedure wrote, ordered by
+// name — the same roll the Set response carries, read back where upstream
+// answers it.
+func TestGroupDetailCarriesTheClientRoll(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	group, err := service.CreateUserGroup(t.Context(), CreateParams{Name: "ravenclaw", DisplayName: "Ravenclaw"})
+	require.NoError(t, err)
+	portal := seedOidcClient(t, pool, "hogwarts-portal", "Hogwarts Portal")
+	library := seedOidcClient(t, pool, "hogwarts-library", "Hogwarts Library")
+	_, _, err = service.SetAllowedOidcClients(t.Context(), FormatID(IDToUUID(group.ID)), []string{portal, library})
+	require.NoError(t, err)
+
+	detail, err := service.GetGroup(t.Context(), FormatID(IDToUUID(group.ID)))
+	require.NoError(t, err)
+	require.Len(t, detail.AllowedClients, 2)
+	assert.Equal(t, "Hogwarts Library", detail.AllowedClients[0].Name)
+	assert.Equal(t, "Hogwarts Portal", detail.AllowedClients[1].Name)
+
+	// The roll the detail answers is the junction's: an emptied allowlist
+	// reads back as none.
+	_, _, err = service.SetAllowedOidcClients(t.Context(), FormatID(IDToUUID(group.ID)), nil)
+	require.NoError(t, err)
+	detail, err = service.GetGroup(t.Context(), FormatID(IDToUUID(group.ID)))
+	require.NoError(t, err)
+	assert.Empty(t, detail.AllowedClients)
+}
+
 // seedOidcClient inserts an OIDC client row directly and answers its
 // identifier — the allowlist's join target, another feature's table the
 // test seeds the same way the junction's foreign keys expect.

@@ -18,11 +18,15 @@ porting from upstream will meet; each is a deliberate tango shape or a gap the
 backlog owns, not a drift to fix silently.
 
 - User views carry no `is_admin` (the role/permission system replaced it) and
-  no `ldapId` (tango has no LDAP). `email` is required; upstream made it
-  nullable in v2. Custom claims travel through `CustomClaimService` rather
-  than riding the user views.
-- `UserGroupDetail` answers members but not `allowedOidcClients`; the Set
-  procedure's response carries the roll. Upstream's group view embeds both.
+  no `ldapId` (tango has no LDAP). `email` stays required **by decision
+  (2026-09-30)**: tango signs in with passwords first, so the address is the
+  recovery and notification channel every account must have — the nullable
+  email upstream v2 carries is a passkey-first consequence tango does not
+  share. Custom claims travel through `CustomClaimService` rather than
+  riding the user views.
+- `UserGroupDetail` answers members and `allowed_oidc_clients` — the
+  allowlist roll the Set procedure wrote, read back where upstream's group
+  view embeds it (fixed 2026-09-30).
 - Signup tokens answer `raw_token` at create and never again; upstream's
   token list echoes the raw value. Tango's sign-up mints a password
   credential with the request; upstream's sign-up has no credential in it.
@@ -34,10 +38,11 @@ backlog owns, not a drift to fix silently.
   service providers, and application configuration are supersets of the
   upstream shapes; nothing upstream carries is missing from them.
 
-Not ported (the Yaak collection holds placeholder requests under
-`tango.admin.v1.ApiService/*` and the WebAuthn procedures): the upstream
-**APIs** entity and its client-grant/CIMD surface — tango's authorization
-model covers permissions with roles instead — user passkey CRUD, LDAP, and
+Not ported, **by decision (2026-09-30)**: the upstream **APIs** entity and its
+client-grant/CIMD surface — tango is a general boilerplate, not an auth
+product, and the API-entity model has no tango counterpart. The Yaak
+collection keeps the 13 upstream requests as reference, marked `not planned`.
+Also not ported: user passkey CRUD, LDAP, and
 `/api/storage/sqlite-warning` (tango is Postgres-only). `/api/version/*` is
 planned (`tango.system.v1.VersionService`).
 

@@ -254,13 +254,18 @@ func wireDetail(view GroupDetailView) *identityv1.UserGroupDetail {
 	for _, member := range view.Members {
 		members = append(members, user.WireView(user.ViewSchema(member)))
 	}
+	clients := make([]*identityv1.AllowedOidcClientRef, 0, len(view.AllowedClients))
+	for _, client := range view.AllowedClients {
+		clients = append(clients, &identityv1.AllowedOidcClientRef{Id: client.ID, Name: client.Name})
+	}
 	detail := &identityv1.UserGroupDetail{
-		Id:          view.ID.String(),
-		Name:        view.Name,
-		DisplayName: view.DisplayName,
-		Users:       members,
-		UserCount:   int32Of(view.UserCount),
-		CreatedAt:   view.CreatedAt.Format(time.RFC3339),
+		Id:                 view.ID.String(),
+		Name:               view.Name,
+		DisplayName:        view.DisplayName,
+		Users:              members,
+		UserCount:          int32Of(view.UserCount),
+		CreatedAt:          view.CreatedAt.Format(time.RFC3339),
+		AllowedOidcClients: clients,
 	}
 	if view.UpdatedAt != nil {
 		detail.UpdatedAt = new(view.UpdatedAt.Format(time.RFC3339))

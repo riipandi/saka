@@ -914,6 +914,12 @@ message UserGroupDetail {
   // updated_at is the last field-changing write, RFC 3339, absent when the
   // row was never updated.
   optional string updated_at = 7;
+
+  // allowed_oidc_clients are the clients the group's allowlist names — the
+  // accounts in the group may only reach these clients when the client is
+  // restricted — ordered by the client's name. Upstream answers the same
+  // roll inside its group detail view.
+  repeated AllowedOidcClientRef allowed_oidc_clients = 8;
 }
 
 // ListUserGroupsRequest carries the page, the filter, and the sort the list
@@ -1108,7 +1114,7 @@ message SetGroupAllowedOidcClientsRequest {
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.max_items = 100,
     (buf.validate.field).repeated.items.string = {
-      min_len: 1,
+      min_len: 1
       max_len: 64
     }
   ];

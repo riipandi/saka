@@ -67,11 +67,12 @@ type GroupView struct {
 }
 
 // GroupDetailView is the group as the detail procedures answer it: the row,
-// the member count, and the members.
+// the member count, the members, and the client allowlist the group names.
 type GroupDetailView struct {
 	GroupSchema
-	UserCount int
-	Members   []user.UserSchema
+	UserCount      int
+	Members        []user.UserSchema
+	AllowedClients []ClientRef
 }
 
 // CreateParams carries the fields a group is made of.
@@ -394,10 +395,15 @@ func (s *Service) readDetail(ctx context.Context, db datastore.Querier, groupID 
 	if err != nil {
 		return GroupDetailView{}, err
 	}
+	clients, err := s.repo.ListAllowedClients(ctx, db, IDToUUID(groupID))
+	if err != nil {
+		return GroupDetailView{}, err
+	}
 	return GroupDetailView{
-		GroupSchema: row,
-		UserCount:   len(members),
-		Members:     members,
+		GroupSchema:    row,
+		UserCount:      len(members),
+		Members:        members,
+		AllowedClients: clients,
 	}, nil
 }
 
