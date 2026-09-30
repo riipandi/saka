@@ -1,11 +1,5 @@
-import {
-  test,
-  expect,
-  type APIRequestContext,
-  type Browser,
-  type BrowserContext,
-  type Page
-} from '@playwright/test'
+import { test, expect } from '@playwright/test'
+import type { APIRequestContext, Browser, BrowserContext, Page } from '@playwright/test'
 
 // The passkey ladder: enroll, passwordless sign-in, and the step-up proof —
 // driven through the devtool's simulation pages (/debug/passkey/*) with the
@@ -16,7 +10,7 @@ import {
 // counter and earn the clone refusal, which is the server working as
 // intended.
 
-const identity = 'admin'
+const identity = process.env.E2E_IDENTITY || 'admin'
 const password = process.env.E2E_PASSWORD || '@dmin123'
 const rpId = 'localhost'
 
