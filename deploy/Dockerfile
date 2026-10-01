@@ -119,8 +119,11 @@ FROM gcr.io/distroless/cc-debian13:${DISTROLESS_TAG} AS runner
 
 # Environment variable with default values
 ARG APP_MODE=production
-ARG APP_LOG_LEVEL=info
-ARG APP_LOG_TRANSPORT=console
+ARG LOG_LEVEL=info
+ARG LOG_TRANSPORT=console
+ARG SERVER_HOST=0.0.0.0
+ARG SERVER_PORT=3000
+ARG TZ=UTC
 
 # Copy the build output files and some necessary system utilities from previous stage.
 # To enhance security, consider avoiding the copying of sysutils.
@@ -130,7 +133,6 @@ COPY --from=pruner --chown=nonroot:nonroot /srv /srv
 # Define the host and port to listen on.
 # Prevent load certs from system (/etc/ssl/certs/ca-certificates.crt)
 ENV PATH="/usr/bin:/usr/local/bin:/nodejs/bin:$PATH"
-ARG SERVER_HOST=0.0.0.0 SERVER_PORT=3000 TZ=UTC
 ENV SERVER_HOST=$SERVER_HOST SERVER_PORT=$SERVER_PORT
 ENV TZ=$TZ SSL_CERT_FILE= SSL_CERT_DIR=
 ENV TINI_SUBREAPER=true
