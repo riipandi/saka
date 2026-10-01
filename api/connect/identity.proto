@@ -561,7 +561,8 @@ message ListUsersRequest {
       "first_name",
       "last_name",
       "display_name",
-      "created_at"
+      "created_at",
+      "last_login_at"
     ]
   }];
 

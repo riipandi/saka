@@ -97,6 +97,8 @@ var userSortColumns = map[string]string{
 	"last_name":    "lower(last_name)",
 	"display_name": "lower(display_name)",
 	"created_at":   "created_at",
+	// The sign-in stamps the column; the partial btree index answers the sort.
+	"last_login_at": "last_login_at",
 }
 
 // ListUsers answers one page of the accounts, ordered as the caller asked
