@@ -273,7 +273,7 @@ probe (`task mailer:smoke`).
 
 Tango-only surface — Pocket ID has no generic settings CRUD. The catalog in
 code declares every item (key, default, sealed, public, description);
-`public.settings` in `00005_create_platform_tables.sql` stores the overrides
+`public.settings` in `00008_create_settings_table.sql` stores the overrides
 alone. No delete surface exists by design: an item is removed by resetting
 it, and a key not in the catalog is refused everywhere.
 
