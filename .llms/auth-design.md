@@ -7,10 +7,10 @@ Keep this document as simple as possible!
 ### Email
 
 - [ ] **Sign-up with email**: Allow users to sign up with their email address (default: true)
-- [ ] **Require email address**: Users must provide an email address to sign up and must maintain one on their account at all times (default: true)
+- [x] **Require email address**: Users must provide an email address to sign up and must maintain one on their account at all times (default: true)
 - [ ] **Verify at sign-up**: Require users to verify their email addresses before they can sign-up (default: true)
   - Email verification code: Verify by entering a one-time passcode sent to the email address
-- [ ] **Sign-in with email**: Allow users to sign in with their email address (default: true)
+- [x] **Sign-in with email**: Allow users to sign in with their email address (default: true)
   - Email verification code: Users can sign-in with an email verification code
 
 ### Phone (deferred)
@@ -20,13 +20,13 @@ Keep this document as simple as possible!
 
 ### Username
 
-- [ ] **Sign-up with username**: Allow users to add a username during sign-up (default: false)
+- [x] **Sign-up with username**: Allow users to add a username during sign-up (default: false)
 - [ ] **Require username**: Users must create a username for their account (default: false)
-- [ ] **Sign-in with username**: Allow users to sign in with their username (default: false)
+- [x] **Sign-in with username**: Allow users to sign in with their username (default: false)
 
 ### Password
 
-- [ ] **Sign-up with password**: Require users to sign up with a password (default: true)
+- [x] **Sign-up with password**: Require users to sign up with a password (default: true)
 - [ ] **Add password to account**: Allow users to add a password to their account (default: true) - related to Device Trust
 
 #### Password requirements
@@ -42,17 +42,17 @@ Keep this document as simple as possible!
 
 ### Passkeys & Biometrics
 
-- [ ] **Sign-in with passkey**: Allow users to sign in with a passkey (default: false)
-- [ ] **Add passkey to account**: Allow users to add a passkey to their account (default: false)
+- [x] **Sign-in with passkey**: Allow users to sign in with a passkey (default: false)
+- [x] **Add passkey to account**: Allow users to add a passkey to their account (default: false)
 - [ ] **Sign-in with mobile biometrics**: Allow users to sign in with Face ID, Touch ID, or device biometrics (default: false)
   - Note: Only applies to iOS and Android apps using the Native API
 
 ### User Model
 
-- [ ] **First and last name**: Users have the ability to set their first and last name (default: true)
-- [ ] **Require first and last name**: Users must provide both first and last name at sign-up (default: true)
+- [x] **First and last name**: Users have the ability to set their first and last name (default: true)
+- [x] **Require first and last name**: Users must provide both first and last name at sign-up (default: true)
 - [ ] **Allow users to delete their account**: Can override on a per-user basis in the user profile. (default: false)
-- [ ] **Allow users to change their email address** (default: true)
+- [x] **Allow users to change their email address** (default: true)
 - [ ] **Allow users to change their username** (default: true)
 
 ---
@@ -70,8 +70,8 @@ Keep this document as simple as possible!
 ### MFA strategies
 
 - [ ] **SMS verification code**: Send the user a one-time verification code via SMS (default: false)
-- [ ] **Authenticator application**: Allow users to add an authenticator application to retrieve a TOTP code from a service such as Google Authenticator (default: false)
-- [ ] **Backup codes**: Generate a list of unique codes a user can save and use once (default: false)
+- [x] **Authenticator application**: Allow users to add an authenticator application to retrieve a TOTP code from a service such as Google Authenticator (default: false)
+- [x] **Backup codes**: Generate a list of unique codes a user can save and use once (default: false)
 
 > Authenticator application must be enabled to generate backup codes
 
