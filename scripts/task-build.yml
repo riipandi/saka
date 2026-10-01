@@ -6,12 +6,12 @@ tasks:
   build:
     desc: Build frontend + Go binaries (debug and release in one pass)
     deps: [rpc:generate]
-    cmds:
-      - pnpm exec vite build
-      # The embed is compile-time: the binaries must be built after (and only
-      # after) the manifest and assets above exist, or they serve a stale SPA.
-      - go build -tags debug -o build/debug/{{.APP_NAME}} ./cmd
-      - go build -tags release -trimpath -o build/release/{{.APP_NAME}} ./cmd
+    # The Vite build is the single source of the binary flags: plugin-golang
+    # compiles the SPA, then embeds it into both binaries with the version
+    # stamps, tags, and strip flags declared in vite.config.ts. Do not add a
+    # raw `go build` here — it would overwrite those binaries with a build
+    # that lost the flags.
+    cmd: pnpm exec vite build
 
   start:
     desc: Run the release binary
