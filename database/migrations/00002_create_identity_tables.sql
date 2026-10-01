@@ -7,7 +7,7 @@
 
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    username CITEXT NOT NULL UNIQUE,
+    username CITEXT UNIQUE,
     email TEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     first_name VARCHAR(100),
     last_name VARCHAR(100),

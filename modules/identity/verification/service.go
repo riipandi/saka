@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
@@ -154,6 +155,49 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 		UserID: account.ID.String(),
 		Payload: map[string]string{
 			"email": account.Email,
+		},
+	})
+	return nil
+}
+
+// IssueForSignup draws the single-use verification code for an account a
+// sign-up has just created and writes its row inside the sign-up's own
+// transaction, so the account and its outstanding code commit together. The
+// raw value is answered once; only the caller's hash is stored.
+func (s *Service) IssueForSignup(ctx context.Context, tx datastore.Querier, userID uuid.UUID, email, displayName string) (string, error) {
+	rawToken, err := crypto.NewHexToken()
+	if err != nil {
+		return "", fmt.Errorf("verification: token: %w", err)
+	}
+	now := s.now()
+	if err := s.repo.UpsertToken(ctx, tx, userID, crypto.HashHexToken(rawToken), now.Add(tokenTTL), now); err != nil {
+		return "", fmt.Errorf("verification: issue for signup: %w", err)
+	}
+	return rawToken, nil
+}
+
+// DeliverForSignup enqueues the verification message for a code whose row
+// committed, then records the send. The message is not the sign-up's
+// business: the caller delivered what it could and logs what it could not.
+func (s *Service) DeliverForSignup(ctx context.Context, userID uuid.UUID, email, displayName, rawToken string) error {
+	if !s.mail.Configured() {
+		return ErrMailUnavailable
+	}
+	if _, err := s.queue.Add(jobs.EmailVerificationTask{
+		UserID:      userID.String(),
+		Email:       email,
+		DisplayName: displayName,
+		Token:       rawToken,
+	}).Save(); err != nil {
+		return fmt.Errorf("verification: enqueue: %w", err)
+	}
+	s.audit.Record(ctx, s.pool, audit.Entry{
+		Event:  audit.EventEmailVerificationSent,
+		Status: audit.StatusSuccess,
+		UserID: userID.String(),
+		Payload: map[string]string{
+			"email":  email,
+			"source": "signup",
 		},
 	})
 	return nil

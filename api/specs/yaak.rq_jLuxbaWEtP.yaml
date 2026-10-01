@@ -20,15 +20,15 @@ body:
     }
 bodyType: application/json
 description: |-
-  Create an account from a valid signup token. The names are mandatory; the display name is composed from them.
+  Create an account. The access mode decides the token: invite mode requires a valid signup token (chained from CreateSignupToken), open mode ignores it. The identity toggles decide whether username is required, and whether the account leaves with an email-verification code outstanding (sign-in refuses `failed_precondition` until the code confirms the address).
 
   Ported from Pocket ID `POST /api/signup` as the `tango.identity.v1.SignupService/Signup` procedure.
 
   Parameters:
-  - username (body, required): Account handle
+  - username (body, optional): Account handle; required when auth.require_username is on
   - email (body, required): Account address
   - password (body, required): Primary credential
-  - token (body, required): Raw signup token
+  - token (body, optional): Raw signup token; required only in the invite access mode
   - first_name (body, required): Given name
   - last_name (body, required): Family name
 headers:

@@ -84,7 +84,7 @@ func (h *rpcHandler) Signup(ctx context.Context, req *connect.Request[identityv1
 		User: user.WireView(account),
 
 		Status:  responder.StatusSuccess,
-		Message: "the account was created from the signup token",
+		Message: "the account was created",
 	}), nil
 }
 
@@ -194,6 +194,12 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("signup token is invalid or expired"))
 	case errors.Is(err, ErrAccountExists):
 		return connect.NewError(connect.CodeAlreadyExists, errors.New("account already exists"))
+	case errors.Is(err, ErrSignupNotAllowed):
+		return connect.NewError(connect.CodeNotFound, errors.New("sign-up is not available"))
+	case errors.Is(err, ErrUsernameRequired):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is required"))
+	case errors.Is(err, ErrUsernameInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is invalid"))
 	case errors.Is(err, ErrTokenNotFound):
 		return connect.NewError(connect.CodeNotFound, errors.New("signup token not found"))
 	case isPasswordPolicy(err):

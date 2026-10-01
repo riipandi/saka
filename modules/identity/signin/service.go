@@ -39,6 +39,12 @@ var (
 	// ErrAccountBanned is an account inside its ban window. The reason is
 	// not attached: it is operator-facing material, not a wire detail.
 	ErrAccountBanned = errors.New("signin: account is banned")
+
+	// ErrEmailUnverified is the account whose email address no verification
+	// code has confirmed yet. It is its own answer — distinct from the
+	// invalid-credentials one — so the client can route the account to the
+	// verification screen without a second probe.
+	ErrEmailUnverified = errors.New("signin: email address is not verified")
 )
 
 // TokenType is the authorization scheme the access token is presented under.
@@ -188,6 +194,16 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	}
 	if !match {
 		return Result{}, ErrInvalidCredentials
+	}
+
+	// The verification gate runs before the second factor's fork: an
+	// account whose address no code has confirmed yet owes the code, not a
+	// bridge, and answers the distinct refusal the client routes to the
+	// verification screen. The single-use email-code sign-in is a
+	// confirmation of its own — the code went to the address — so the fork
+	// below keeps its own path.
+	if account.EmailVerifiedAt == nil {
+		return Result{}, ErrEmailUnverified
 	}
 
 	// The second factor's fork runs before any session is opened: an account

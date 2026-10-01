@@ -127,10 +127,11 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row u
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(user.UserTable)
-	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name")
+	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name", "email_verified_at")
 	// The name columns are nullable and an absent name is NULL, not the
-	// empty string the struct's zero value carries.
-	ib.Values(row.ID, row.Username, row.Email, nullIfEmpty(row.FirstName), nullIfEmpty(row.LastName), row.DisplayName)
+	// empty string the struct's zero value carries; the username is the
+	// same when the toggles made it optional.
+	ib.Values(row.ID, nullIfEmpty(row.Username), row.Email, nullIfEmpty(row.FirstName), nullIfEmpty(row.LastName), row.DisplayName, row.EmailVerifiedAt)
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {

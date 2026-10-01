@@ -172,15 +172,20 @@ func applyDefaultUser(
 		return nil, nil, err
 	}
 
+	// Seeded accounts ship verified: the sign-in gate the verification
+	// setting arms refuses an unverified address, and a bootstrap account
+	// the operator cannot receive mail for must not be locked out by it.
+	now := time.Now().UTC()
 	row := user.UserSchema{
-		ID:          uuid.NewV7(),
-		Username:    DefaultUser.Username,
-		Email:       DefaultUser.Email,
-		FirstName:   DefaultUser.FirstName,
-		LastName:    DefaultUser.LastName,
-		DisplayName: DefaultUser.DisplayName(),
-		Timezone:    user.DefaultTimezone,
-		CreatedAt:   time.Now().UTC(),
+		ID:              uuid.NewV7(),
+		Username:        DefaultUser.Username,
+		Email:           DefaultUser.Email,
+		FirstName:       DefaultUser.FirstName,
+		LastName:        DefaultUser.LastName,
+		DisplayName:     DefaultUser.DisplayName(),
+		Timezone:        user.DefaultTimezone,
+		CreatedAt:       time.Now().UTC(),
+		EmailVerifiedAt: &now,
 	}
 
 	inserted, err := insertUser(ctx, q, row)
@@ -278,6 +283,9 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 		DisplayName: s.credentials.DisplayName(),
 		Timezone:    user.DefaultTimezone,
 		CreatedAt:   now,
+		// Scenario accounts ship verified, like the default one: they exist
+		// to exercise the ban states, not the verification gate.
+		EmailVerifiedAt: &now,
 	}
 	if s.bannedAt {
 		// The start instant sits a day back, so the two expiry scenarios

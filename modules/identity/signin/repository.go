@@ -38,14 +38,15 @@ func (r *Repository) WithQuerier(db datastore.Querier) *Repository {
 // Account is the sign-in's view of a user row and its password. The hash
 // leaves this package only into the verifier, never into a response.
 type Account struct {
-	ID           uuid.UUID
-	Username     string
-	Email        string
-	DisplayName  string
-	Disabled     bool
-	BannedAt     *time.Time
-	BanExpires   *time.Time
-	PasswordHash string
+	ID              uuid.UUID
+	Username        string
+	Email           string
+	DisplayName     string
+	Disabled        bool
+	BannedAt        *time.Time
+	BanExpires      *time.Time
+	PasswordHash    string
+	EmailVerifiedAt *time.Time
 }
 
 // FindAccountByIdentity returns the account whose username or email matches
@@ -59,6 +60,7 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	sb.Select(
 		"u.id", "u.username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
+		"u.email_verified_at",
 	)
 	sb.From(user.UserTable + " u")
 	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
@@ -74,6 +76,7 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
 		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
+		&row.EmailVerifiedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, datastore.ErrNoRows

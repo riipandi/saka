@@ -60,6 +60,10 @@ type accountFixture struct {
 	disabled     bool
 	bannedAt     *time.Time
 	banExpires   *time.Time
+	// unverified leaves the verification column unstamped — the state the
+	// sign-up's verification gate leaves an account in. The default fixture
+	// is verified: these tests exercise the sign-in, not the gate.
+	unverified bool
 }
 
 // createAccount writes a user and its password straight into the tables, the
@@ -78,8 +82,12 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	id := uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto("public.users")
-	ib.Cols("id", "username", "email", "display_name", "disabled", "banned_at", "ban_expires")
-	ib.Values(id, fixture.username, fixture.email, "Hogwarts Student", fixture.disabled, fixture.bannedAt, fixture.banExpires)
+	ib.Cols("id", "username", "email", "display_name", "disabled", "banned_at", "ban_expires", "email_verified_at")
+	var verifiedAt any = time.Now().UTC()
+	if fixture.unverified {
+		verifiedAt = nil
+	}
+	ib.Values(id, fixture.username, fixture.email, "Hogwarts Student", fixture.disabled, fixture.bannedAt, fixture.banExpires, verifiedAt)
 	query, args := ib.Build()
 	_, err = pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"strings"
 	"time"
 	"uuid"
 
@@ -33,6 +35,19 @@ var (
 
 	// ErrGroupNotFound is a token issue naming a group that does not exist.
 	ErrGroupNotFound = errors.New("signup: user group not found")
+
+	// ErrSignupNotAllowed is an open-mode sign-up the allowlist refuses.
+	// The answer is shaped so it names nothing about the account the
+	// address may already hold.
+	ErrSignupNotAllowed = errors.New("signup: not allowed")
+
+	// ErrUsernameRequired is a sign-up the require-username toggle refuses
+	// for carrying no username.
+	ErrUsernameRequired = errors.New("signup: username is required")
+
+	// ErrUsernameInvalid is a username that carries the shape the column's
+	// check enforces — the pattern applies only when the field is present.
+	ErrUsernameInvalid = errors.New("signup: username is invalid")
 )
 
 // Service creates an account from a signup token.
@@ -45,6 +60,171 @@ type Service struct {
 	hasher *crypto.PasswordHasher
 	log    *slog.Logger
 	now    func() time.Time
+	// settings reads the access mode, the identity toggles, the allowlist,
+	// and the verification gate at call time. Nil runs the bare-wiring
+	// policy — invite mode (the historical token-required path), toggles
+	// off, the account created verified — the state a test or an unwired
+	// deployment is in; the composition root always wires the catalog.
+	settings settingsReader
+	// verifier issues the email-verification code inside the sign-up's
+	// transaction and delivers the message after it commits. Nil keeps the
+	// account unverified with no code — the state a bare wiring is in.
+	verifier VerificationIssuer
+}
+
+// settingsReader is the sign-up policy's runtime source: the access mode,
+// the allowlist, the identity toggles, and the verification gate read fresh
+// at every sign-up, so an operator's change lands without a restart.
+// *appconfig.Settings satisfies it; the interface keeps the appconfig
+// feature out of this one's import graph.
+type settingsReader interface {
+	GetString(ctx context.Context, key string) (string, error)
+	GetBool(ctx context.Context, key string) (bool, error)
+}
+
+// The catalog keys the sign-up reads. The catalog owns the names; these
+// constants are how this package spells them.
+const (
+	SettingAccessMode             = "access.mode"
+	SettingAccessAllowlistEnabled = "access.allowlist_enabled"
+	SettingAccessAllowlist        = "access.allowlist"
+	SettingSignupUsernameEnabled  = "auth.signup_username_enabled"
+	SettingRequireUsername        = "auth.require_username"
+	SettingVerifyEmailAtSignup    = "auth.verify_email_at_signup"
+)
+
+// VerificationIssuer is the email-verification seam: the code's row belongs
+// in the sign-up's transaction, the message leaves once it commits.
+type VerificationIssuer interface {
+	// IssueForSignup draws the single-use code, writes its hash for the
+	// account inside the caller's transaction, and answers the raw value.
+	IssueForSignup(ctx context.Context, tx datastore.Querier, userID uuid.UUID, email, displayName string) (string, error)
+	// DeliverForSignup enqueues the message for a code whose row committed.
+	DeliverForSignup(ctx context.Context, userID uuid.UUID, email, displayName, rawToken string) error
+}
+
+// WithSignupSettings wires the runtime policy after construction. Nil keeps
+// the catalog defaults — the state a test or a bare wiring is in.
+func (s *Service) WithSignupSettings(reader settingsReader) *Service {
+	s.settings = reader
+	return s
+}
+
+// WithVerification wires the code issuer. Nil keeps the account unverified
+// with no code sent.
+func (s *Service) WithVerification(issuer VerificationIssuer) *Service {
+	s.verifier = issuer
+	return s
+}
+
+// signupPolicy is the setting slice one sign-up reads, resolved once at the
+// call's start so the branches see one world.
+type signupPolicy struct {
+	inviteMode bool
+	// stampVerified is the verification gate's other side: off, the account
+	// leaves with the column stamped — it may sign in at once; on, the
+	// column stays empty and the outstanding code owns the gate.
+	stampVerified   bool
+	allowlistOn     bool
+	allowlist       []string
+	usernameOn      bool
+	requireUsername bool
+	verifyEmail     bool
+}
+
+// policy reads the catalog. The bare wiring answers the historical policy —
+// invite mode, account created verified — and an unreadable key keeps its
+// catalog default, so a settings row that cannot answer never rewrites the
+// mode silently.
+func (s *Service) policy(ctx context.Context) signupPolicy {
+	p := signupPolicy{inviteMode: true, stampVerified: true}
+	if s.settings == nil {
+		return p
+	}
+	if mode, err := s.settings.GetString(ctx, SettingAccessMode); err != nil {
+		s.log.WarnContext(ctx, "signup: access.mode unreadable; using the default", "error", err)
+	} else {
+		p.inviteMode = mode == "invite"
+	}
+	if on, err := s.settings.GetBool(ctx, SettingAccessAllowlistEnabled); err != nil {
+		s.log.WarnContext(ctx, "signup: access.allowlist_enabled unreadable; using the default", "error", err)
+	} else {
+		p.allowlistOn = on
+	}
+	if p.allowlistOn {
+		if list, err := s.settings.GetString(ctx, SettingAccessAllowlist); err != nil {
+			s.log.WarnContext(ctx, "signup: access.allowlist unreadable; treating as empty", "error", err)
+		} else {
+			p.allowlist = splitAllowlist(list)
+		}
+	}
+	if on, err := s.settings.GetBool(ctx, SettingSignupUsernameEnabled); err != nil {
+		s.log.WarnContext(ctx, "signup: auth.signup_username_enabled unreadable; using the default", "error", err)
+	} else {
+		p.usernameOn = on
+	}
+	if on, err := s.settings.GetBool(ctx, SettingRequireUsername); err != nil {
+		s.log.WarnContext(ctx, "signup: auth.require_username unreadable; using the default", "error", err)
+	} else {
+		p.requireUsername = on
+	}
+	if on, err := s.settings.GetBool(ctx, SettingVerifyEmailAtSignup); err != nil {
+		s.log.WarnContext(ctx, "signup: auth.verify_email_at_signup unreadable; using the default", "error", err)
+	} else {
+		p.verifyEmail = on
+		p.stampVerified = !on
+	}
+	return p
+}
+
+// splitAllowlist parses the allowlist value: comma- or newline-separated
+// entries, trimmed, lowercased for the case-insensitive match. An `@domain`
+// entry accepts every address at that domain.
+func splitAllowlist(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n' || r == ';'
+	})
+	entries := make([]string, 0, len(fields))
+	for _, field := range fields {
+		entry := strings.ToLower(strings.TrimSpace(field))
+		if entry != "" {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
+// allowlisted matches the address against the entries: an `@domain` entry
+// accepts every address at that domain, an address entry matches exactly,
+// both case-insensitively.
+func allowlisted(address string, entries []string) bool {
+	address = strings.ToLower(address)
+	for _, entry := range entries {
+		if strings.HasPrefix(entry, "@") {
+			if strings.HasSuffix(address, entry) {
+				return true
+			}
+			continue
+		}
+		if address == entry {
+			return true
+		}
+	}
+	return false
+}
+
+// usernamePattern mirrors the column's check: 3-32 ASCII letters, digits,
+// and underscores.
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{3,32}$`)
+
+// stampVerifiedAt answers the instant the verification column carries: nil
+// while the gate arms — the outstanding code owns it — the creation instant
+// when the account may sign in at once.
+func (p signupPolicy) stampVerifiedAt(at time.Time) *time.Time {
+	if p.verifyEmail {
+		return nil
+	}
+	return &at
 }
 
 // NewService builds the service. The database writes run in one transaction
@@ -72,43 +252,83 @@ type Params struct {
 	Token     string
 	FirstName string
 	LastName  string
-} // Signup consumes the token and creates the account. The request's shape is
-// the contract's business — `SignupRequest` carries the constraints the
-// transport's validate interceptor enforces before this runs.
-//
-// Email verification is a later procedure: the account is created unverified,
-// which is the column's default and needs no code here yet. The password is
-// hashed and stored with the account, so the account can sign in immediately.
+}
+
+// Signup creates the account. The settings own the shape: the access mode
+// decides whether a token is consumed, the identity toggles decide whether
+// a username is required, the verification gate decides whether the account
+// leaves with a code outstanding. The refusals run cheapest-first — the
+// policy, the allowlist, then the token row, and only then the KDF — and
+// one transaction commits the account, its credential, the token's use, and
+// the verification code together.
 func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, error) {
 	if policyErr := password.Validate(params.Password); policyErr != nil {
 		return user.UserView{}, policyErr
 	}
-	// The token is looked up before the password is hashed: a public
-	// endpoint answers a junk token with a cheap refusal, not a KDF run.
-	tokenHash := crypto.HashHexToken(params.Token)
+
+	p := s.policy(ctx)
+
+	// The username is optional by the toggles; present, it carries the
+	// column's pattern; absent, it is refused only when the require-username
+	// toggle says so — and that toggle only means anything while the
+	// username identity itself is on.
+	username := strings.TrimSpace(params.Username)
+	if username != "" {
+		if !usernamePattern.MatchString(username) {
+			return user.UserView{}, ErrUsernameInvalid
+		}
+	} else if p.requireUsername && p.usernameOn {
+		return user.UserView{}, ErrUsernameRequired
+	}
+
+	// The allowlist is an open-mode filter, checked before anything touches
+	// the database: a refused address earns a cheap, account-blind refusal.
+	if !p.inviteMode && p.allowlistOn && !allowlisted(params.Email, p.allowlist) {
+		return user.UserView{}, ErrSignupNotAllowed
+	}
 
 	name := displayName(params.FirstName, params.LastName)
+	if name == "" {
+		// The display name rejects an empty string; an account carrying no
+		// names and no username falls back to the address's local part.
+		name = params.Email
+		if at := strings.IndexByte(params.Email, '@'); at > 0 {
+			name = params.Email[:at]
+		}
+	}
 
 	var created user.UserView
+	var pendingVerification *pendingCode
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		token, findErr := s.repo.FindSignupTokenByHash(ctx, tx, tokenHash)
-		if errors.Is(findErr, datastore.ErrNoRows) {
-			return ErrInvalidToken
-		}
-		if findErr != nil {
-			return findErr
-		}
-		if token.ExpiresAt.Before(s.now()) || token.UsageCount >= token.UsageLimit {
-			return ErrInvalidToken
+		var groupIDs []uuid.UUID
+		var tokenID uuid.UUID
+		if p.inviteMode {
+			// The token is looked up before the password is hashed: a public
+			// endpoint answers a junk token with a cheap refusal, not a KDF
+			// run. The open mode skips the lookup entirely.
+			token, findErr := s.repo.FindSignupTokenByHash(ctx, tx, crypto.HashHexToken(params.Token))
+			if errors.Is(findErr, datastore.ErrNoRows) {
+				return ErrInvalidToken
+			}
+			if findErr != nil {
+				return findErr
+			}
+			if token.ExpiresAt.Before(s.now()) || token.UsageCount >= token.UsageLimit {
+				return ErrInvalidToken
+			}
+			tokenID = token.ID
+			groupIDs = token.GroupIDs
 		}
 
+		verifiedAt := p.stampVerifiedAt(s.now())
 		userID, createErr := s.repo.CreateUser(ctx, tx, user.UserSchema{
-			Username:    params.Username,
-			Email:       params.Email,
-			FirstName:   params.FirstName,
-			LastName:    params.LastName,
-			DisplayName: name,
-			Timezone:    user.DefaultTimezone,
+			Username:        username,
+			Email:           params.Email,
+			FirstName:       params.FirstName,
+			LastName:        params.LastName,
+			DisplayName:     name,
+			Timezone:        user.DefaultTimezone,
+			EmailVerifiedAt: verifiedAt,
 		})
 		if errUniqueViolation(createErr) {
 			return ErrAccountExists
@@ -131,16 +351,37 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			return fmt.Errorf("signup: create password: %w", passErr)
 		}
 
-		if consumeErr := s.repo.ConsumeSignupToken(ctx, tx, token.ID, s.now()); consumeErr != nil {
-			return consumeErr
+		if p.inviteMode {
+			if consumeErr := s.repo.ConsumeSignupToken(ctx, tx, tokenID, s.now()); consumeErr != nil {
+				return consumeErr
+			}
+
+			// The token's groups take the account in. A group deleted after
+			// the token was issued joins fewer accounts rather than failing
+			// the sign-up.
+			if len(groupIDs) > 0 {
+				if joinErr := s.repo.AddUserToGroups(ctx, tx, userID, groupIDs); joinErr != nil {
+					return joinErr
+				}
+			}
 		}
 
-		// The token's groups take the account in. A group deleted after
-		// the token was issued joins fewer accounts rather than failing
-		// the sign-up.
-		if len(token.GroupIDs) > 0 {
-			if joinErr := s.repo.AddUserToGroups(ctx, tx, userID, token.GroupIDs); joinErr != nil {
-				return joinErr
+		// The verification gate leaves the account unverified — the column's
+		// default — with the code's row inside this same transaction, so the
+		// account and its outstanding code commit together. The message
+		// leaves after the commit: a task queue is durable on its own, and
+		// the record of a message the transaction rolled back would
+		// understate what happened.
+		if p.verifyEmail && s.verifier != nil {
+			raw, issueErr := s.verifier.IssueForSignup(ctx, tx, userID, params.Email, name)
+			if issueErr != nil {
+				return issueErr
+			}
+			pendingVerification = &pendingCode{
+				UserID:      userID,
+				Email:       params.Email,
+				DisplayName: name,
+				RawToken:    raw,
 			}
 		}
 
@@ -171,7 +412,24 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 	if err != nil {
 		return user.UserView{}, err
 	}
+	if pendingVerification != nil {
+		if deliverErr := s.verifier.DeliverForSignup(ctx, pendingVerification.UserID, pendingVerification.Email, pendingVerification.DisplayName, pendingVerification.RawToken); deliverErr != nil {
+			// The account exists and its code is stored; a delivery
+			// failure is a message problem, not a sign-up failure. The
+			// account re-requests the code through the resend procedure.
+			s.log.ErrorContext(ctx, "signup: verification delivery failed", "error", deliverErr)
+		}
+	}
 	return created, nil
+}
+
+// pendingCode carries the verification a sign-up issued, from the
+// transaction that stored it to the delivery that follows the commit.
+type pendingCode struct {
+	UserID      uuid.UUID
+	Email       string
+	DisplayName string
+	RawToken    string
 }
 
 // displayName composes the name the UI shows from the optional given and

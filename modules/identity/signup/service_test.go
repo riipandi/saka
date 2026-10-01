@@ -1,6 +1,7 @@
 package signup
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/modules/identity/usergroup"
+	"github.com/riipandi/tango/modules/identity/verification"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
@@ -96,19 +98,21 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 	assert.Equal(t, "Hermione Granger", user.DisplayName)
 
 	// The answer is the canonical account view: the names, the creation
-	// instant the database stamped, and the unverified state.
+	// instant the database stamped. The bare wiring carries no verification
+	// gate, so the account signs in at once — the stamped column is the
+	// proof.
 	assert.Equal(t, "hermione", user.Username)
 	assert.Equal(t, "hermione@example.com", user.Email)
 	require.NotNil(t, user.FirstName)
 	assert.Equal(t, "Hermione", *user.FirstName)
 	require.NotNil(t, user.LastName)
 	assert.Equal(t, "Granger", *user.LastName)
-	assert.False(t, user.EmailVerified)
+	assert.True(t, user.EmailVerified)
 	assert.False(t, user.Disabled)
 	assert.False(t, user.CreatedAt.IsZero())
 
-	// The account row carries the composed display name and stays
-	// unverified: email verification is a later procedure.
+	// The account row carries the composed display name and the stamp the
+	// no-gate policy writes beside it.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email", "display_name", "email_verified_at")
 	sb.From("public.users")
@@ -118,7 +122,7 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 	var verifiedAt *time.Time
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&email, &displayName, &verifiedAt))
 	assert.Equal(t, "hermione@example.com", email)
-	assert.Nil(t, verifiedAt)
+	assert.NotNil(t, verifiedAt)
 
 	// The credential is stored as the hash the verifier accepts, never in
 	// the clear.
@@ -135,7 +139,8 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 
 	assert.Equal(t, int32(1), tokenUsageCount(t, pool, "elder-wand"))
 
-	// The password the caller chose signs in immediately.
+	// The password the caller chose signs in immediately: the bare wiring
+	// arms no gate.
 	signinService := signin.NewService(testConfig(), pool, signin.NewRepository(pool), jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
 	result, err := signinService.SignIn(t.Context(), signin.Params{
 		Identity: "hermione",
@@ -279,12 +284,272 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 	}{
 		{ErrInvalidToken, connect.CodePermissionDenied},
 		{ErrAccountExists, connect.CodeAlreadyExists},
+		{ErrSignupNotAllowed, connect.CodeNotFound},
+		{ErrUsernameRequired, connect.CodeInvalidArgument},
+		{ErrUsernameInvalid, connect.CodeInvalidArgument},
 		{ErrTokenNotFound, connect.CodeNotFound},
 	}
 	for _, tc := range cases {
 		assert.Equal(t, tc.code, connect.CodeOf(mapError(tc.err)), "%v", tc.err)
 	}
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(mapError(errors.New("boom"))))
+}
+
+// signupSettings is the test's view of the catalog: the keys the sign-up
+// reads, answered from a map.
+type signupSettings map[string]string
+
+func (s signupSettings) GetString(_ context.Context, key string) (string, error) {
+	if value, ok := s[key]; ok {
+		return value, nil
+	}
+	return "", errors.New("unreadable setting")
+}
+
+func (s signupSettings) GetBool(_ context.Context, key string) (bool, error) {
+	value, ok := s[key]
+	if !ok {
+		return false, errors.New("unreadable setting")
+	}
+	return value == "true", nil
+}
+
+// recordingVerifier is the seam's test double: it stores the code's row the
+// way the real feature does and remembers the raw values for the round trip.
+type recordingVerifier struct {
+	repo      verificationRepository
+	issued    []string
+	delivered []string
+}
+
+// verificationRepository is the slice of the verification feature's
+// repository the double borrows — the same row shape, one dependency less.
+type verificationRepository interface {
+	UpsertToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error
+}
+
+func (v *recordingVerifier) IssueForSignup(ctx context.Context, tx datastore.Querier, userID uuid.UUID, _ string, _ string) (string, error) {
+	raw := "verhecy-" + uuid.NewV7().String()[:12]
+	if err := v.repo.UpsertToken(ctx, tx, userID, crypto.HashHexToken(raw), time.Now().Add(time.Hour), time.Now()); err != nil {
+		return "", err
+	}
+	v.issued = append(v.issued, raw)
+	return raw, nil
+}
+
+func (v *recordingVerifier) DeliverForSignup(_ context.Context, _ uuid.UUID, _, _, rawToken string) error {
+	v.delivered = append(v.delivered, rawToken)
+	return nil
+}
+
+// openMode is the settings the open, no-toggles sign-up reads.
+var openMode = signupSettings{
+	"access.mode": "open",
+}
+
+func TestOpenModeSignsUpWithoutAToken(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool).WithSignupSettings(openMode)
+
+	account, err := service.Signup(t.Context(), Params{
+		Username: "ron",
+		Email:    "ron@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ron", account.Username)
+	assert.True(t, account.EmailVerified, "the no-gate policy stamps the account verified")
+}
+
+func TestOpenModeIssuesTheVerificationCode(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	verifier := &recordingVerifier{repo: verification.NewRepository()}
+	service := testService(t, pool).
+		WithSignupSettings(signupSettings{
+			"access.mode":                 "open",
+			"auth.verify_email_at_signup": "true",
+		}).
+		WithVerification(verifier)
+
+	account, err := service.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+
+	// The code was issued in the sign-up's transaction and delivered after
+	// the commit.
+	require.Len(t, verifier.issued, 1)
+	require.Len(t, verifier.delivered, 1)
+
+	// The gate's other side: the column rests empty while the code is
+	// outstanding.
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("email_verified_at")
+	sb.From("public.users")
+	sb.Where(sb.Equal("id", rowID(t, account.ID)))
+	query, args := sb.Build()
+	var verifiedAt *time.Time
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&verifiedAt))
+	assert.Nil(t, verifiedAt)
+}
+
+func TestInviteModeRefusesAnUnknownTokenCheaply(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool).WithSignupSettings(signupSettings{"access.mode": "invite"})
+
+	// No token at all is the same refusal as an unknown one, and neither
+	// creates anything.
+	for _, token := range []string{"", "philosophers-stone"} {
+		_, err := service.Signup(t.Context(), Params{
+			Username: "sophie",
+			Email:    "sophie@example.com",
+			Password: "expecto-patronum",
+			Token:    token,
+		})
+		assert.ErrorIs(t, err, ErrInvalidToken)
+	}
+	assert.Equal(t, 0, userCount(t, pool))
+}
+
+func TestInviteModeStillSignsUpWithAValidToken(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool).WithSignupSettings(signupSettings{"access.mode": "invite"})
+	insertToken(t, pool, "chamber-of-secrets", 1, 0)
+
+	account, err := service.Signup(t.Context(), Params{
+		Username: "neville",
+		Email:    "neville@example.com",
+		Password: "expecto-patronum",
+		Token:    "chamber-of-secrets",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "neville", account.Username)
+	assert.Equal(t, int32(1), tokenUsageCount(t, pool, "chamber-of-secrets"))
+	_ = account
+}
+
+func TestTheAllowlistFiltersOpenSignups(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool).WithSignupSettings(signupSettings{
+		"access.mode":              "open",
+		"access.allowlist_enabled": "true",
+		"access.allowlist":         "sophie@example.com, @hogwarts.example",
+	})
+
+	// An unlisted address earns the account-blind refusal.
+	_, err := service.Signup(t.Context(), Params{
+		Username: "robert",
+		Email:    "robert.langdon@elsewhere.example",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, ErrSignupNotAllowed)
+
+	// A listed address and a domain match both pass.
+	for _, attempt := range []Params{
+		{Username: "sophie", Email: "SOPHIE@example.com", Password: "expecto-patronum"},
+		{Username: "vittoria", Email: "vittoria@hogwarts.example", Password: "expecto-patronum"},
+	} {
+		_, err := service.Signup(t.Context(), attempt)
+		require.NoError(t, err, "%s", attempt.Email)
+	}
+}
+
+func TestTheTogglesDecideTheUsername(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	// The username identity off: the field may be absent.
+	optional := testService(t, pool).WithSignupSettings(signupSettings{"access.mode": "open"})
+	account, err := optional.Signup(t.Context(), Params{
+		Email:    "sophie@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, account.Username)
+
+	// The username identity on with the require toggle: absence is refused.
+	required := testService(t, pool).WithSignupSettings(signupSettings{
+		"access.mode":                  "open",
+		"auth.signup_username_enabled": "true",
+		"auth.require_username":        "true",
+	})
+	_, err = required.Signup(t.Context(), Params{
+		Email:    "robert@example.com",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, ErrUsernameRequired)
+
+	// Present but ill-shaped: the column's pattern, enforced in the service.
+	_, err = required.Signup(t.Context(), Params{
+		Username: "no spaces",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, ErrUsernameInvalid)
+
+	// Present and well-shaped under the same toggles: accepted.
+	_, err = required.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 2, userCount(t, pool))
+}
+
+func TestSignInRefusesAnUnverifiedAccountUntilTheCodeConfirms(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	verifier := &recordingVerifier{repo: verification.NewRepository()}
+	service := testService(t, pool).
+		WithSignupSettings(signupSettings{
+			"access.mode":                 "open",
+			"auth.verify_email_at_signup": "true",
+		}).
+		WithVerification(verifier)
+
+	_, err := service.Signup(t.Context(), Params{
+		Username: "sophie",
+		Email:    "sophie@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+	require.Len(t, verifier.issued, 1)
+
+	// The gate: the password is right, the address is not confirmed yet,
+	// and the answer is the distinct refusal — not the credentials' one.
+	signinService := signin.NewService(testConfig(), pool, signin.NewRepository(pool), jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
+	_, err = signinService.SignIn(t.Context(), signin.Params{
+		Identity: "sophie@example.com",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, signin.ErrEmailUnverified)
+
+	// The code confirming the address is the gate's release: the
+	// verification feature stamps the column; here the effect is applied
+	// directly, the consumption logic being that feature's own suite.
+	_, err = pool.Exec(t.Context(), `UPDATE public.users SET email_verified_at = now() WHERE username = 'sophie'`)
+	require.NoError(t, err)
+
+	result, err := signinService.SignIn(t.Context(), signin.Params{
+		Identity: "sophie@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.AccessToken)
 }
 
 func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {

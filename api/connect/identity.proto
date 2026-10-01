@@ -21,13 +21,18 @@ option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/identity/v
 
 // SignupService creates accounts and administers the tokens sign-up requires.
 service SignupService {
-  // Signup creates an account from a valid signup token.
+  // Signup creates an account. In the invite mode a valid signup token is
+  // required; in the open mode the account is created without one, filtered
+  // by the allowlist when that is on. Whether the account must verify its
+  // email before signing in is a setting, so the answer's contract is
+  // mode-independent.
   //
-  // The token is a raw value an operator issued once and is stored server-side
-  // only as a hash, so a database leak cannot replay it. A token that is
-  // unknown, expired, or spent answers the same failure, so the endpoint does
-  // not disclose which half was wrong. The username is case-insensitive and
-  // the email is matched exactly, the way their unique indexes are.
+  // The invite token is a raw value an operator issued once and is stored
+  // server-side only as a hash, so a database leak cannot replay it. A token
+  // that is unknown, expired, or spent answers the same failure, so the
+  // endpoint does not disclose which half was wrong. The username is
+  // case-insensitive and the email is matched exactly, the way their unique
+  // indexes are.
   rpc Signup(SignupRequest) returns (SignupResponse);
 
   // CreateSignupToken issues the signup token an account is created under.
@@ -284,24 +289,29 @@ message ConfirmEmailChangeResponse {
   string message = 2;
 }
 
-// SignupRequest carries the account fields and the signup token. The
-// constraints below mirror what the users table enforces, so a bad field is
-// refused with its name before the database is reached.
+// SignupRequest carries the account fields and, for the invite mode, the
+// signup token. Which fields the request must carry is the settings' call —
+// the access mode decides the token, the identity toggles decide the
+// username — so the transport enforces the shapes and the service owns the
+// conditionals.
 message SignupRequest {
   // username is the account's handle: 3-32 characters of ASCII letters,
-  // digits, and underscores, matched case-insensitively.
-  string username = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_]{3,32}$"];
+  // digits, and underscores, matched case-insensitively. Optional by the
+  // identity toggles; presence and the pattern are the service's check.
+  string username = 1;
 
   // email is the account's address, matched exactly.
   string email = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"];
 
   // password is the account's primary credential, in clear text. The field
   // travels only over TLS and is never logged. The transport's floor keeps a
-  // degenerate answer cheap; the strength rule itself is the service's.
+  // degenerate answer cheap; the policy rule itself is the service's.
   string password = 3 [(buf.validate.field).string.min_len = 8];
 
-  // token is the raw signup token the account is created under.
-  string token = 4 [(buf.validate.field).string.min_len = 1];
+  // token is the raw signup token the account is created under. Required
+  // only in the invite mode; the access mode is a setting the service reads,
+  // so the field carries no constraint here.
+  string token = 4;
 
   // first_name is the given name the account displays.
   string first_name = 5 [

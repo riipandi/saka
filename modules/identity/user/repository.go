@@ -31,12 +31,14 @@ var UserColumns = []string{
 }
 
 // ScanSchema reads one row into the schema. The nullable columns scan through
-// pointers, so an absent name part or ban reads as nil, not as a zero value.
+// pointers, so an absent name part, ban, or username — the column went
+// nullable when the username became optional — reads as nil, not as a zero
+// value.
 func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	var row UserSchema
-	var firstName, lastName, locale, banReason, picturePath *string
+	var username, firstName, lastName, locale, banReason, picturePath *string
 	err := scan(
-		&row.ID, &row.Username, &row.Email, &firstName, &lastName,
+		&row.ID, &username, &row.Email, &firstName, &lastName,
 		&row.DisplayName, &locale, &row.Timezone, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
@@ -44,6 +46,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	if err != nil {
 		return UserSchema{}, err
 	}
+	row.Username = deref(username)
 	row.FirstName = deref(firstName)
 	row.LastName = deref(lastName)
 	row.Locale = deref(locale)
@@ -163,7 +166,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
 		"locale", "disabled", "email_verified_at")
 	ib.Values(
-		row.ID, row.Username, row.Email,
+		row.ID, nullIfEmpty(row.Username), row.Email,
 		nullIfEmpty(row.FirstName), nullIfEmpty(row.LastName), row.DisplayName,
 		nullIfEmpty(row.Locale), row.Disabled, row.EmailVerifiedAt,
 	)

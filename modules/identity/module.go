@@ -281,7 +281,19 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return signup.NewService(pool, recorder, log), nil
+		service := signup.NewService(pool, recorder, log)
+		// The sign-up policy reads the catalog at call time; a nil settings
+		// feature runs the bare-wiring policy — open mode, no toggles, no
+		// gate. The verification code rides the post-construction seam like
+		// the settings do: the code's row belongs to the sign-up's
+		// transaction, the message to the queue after it commits.
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithSignupSettings(settings)
+		}
+		if verifier := do.MustInvoke[*verification.Service](i); verifier != nil {
+			service.WithVerification(verifier)
+		}
+		return service, nil
 	}),
 
 	do.Lazy(func(i do.Injector) (*user.Service, error) {
