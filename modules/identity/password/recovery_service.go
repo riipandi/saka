@@ -133,6 +133,24 @@ type Service struct {
 	baseURL string
 	log     *slog.Logger
 	now     func() time.Time
+	// policy is the credential check's runtime source. Nil keeps the
+	// static policy.
+	policy *Validator
+}
+
+// WithPasswordPolicy wires the settings-driven validator. Nil keeps the
+// static policy — the state a test or a bare wiring is in.
+func (s *Service) WithPasswordPolicy(policy *Validator) *Service {
+	s.policy = policy
+	return s
+}
+
+// validatePassword runs the credential through the wired policy.
+func (s *Service) validatePassword(ctx context.Context, clearText string) error {
+	if s.policy != nil {
+		return s.policy.Validate(ctx, clearText)
+	}
+	return Validate(clearText)
 }
 
 // hasherFunc is the credential hashing the service owes. It is the same
@@ -299,7 +317,7 @@ func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 // records the reset — all in one transaction, so a rollback returns the
 // token and the old password.
 func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string, terminateSessions bool) error {
-	if err := Validate(newPassword); err != nil {
+	if err := s.validatePassword(ctx, newPassword); err != nil {
 		return err
 	}
 

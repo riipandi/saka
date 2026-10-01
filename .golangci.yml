@@ -52,6 +52,11 @@ linters:
         # server URL — neither carries request input — through the one
         # trustedHead helper; every page-named value stays escaped.
         - G203
+        # G401/G505 (sha1) are the Pwned Passwords range API's contract: the
+        # k-anonymity query is the SHA-1 of the password, five hex characters
+        # of it on the wire. The primitive is the protocol, not a chosen cipher.
+        - G401
+        - G505
     funlen:
       lines: 120
       statements: 50

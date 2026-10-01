@@ -28,6 +28,7 @@ import (
 // secret to one without the other fails.
 var secretKeys = []string{
 	"app.secret_key",
+	"auth.hibp_api_key",
 	"auth.secret_key",
 	"database.url",
 	"kvstore.url",
@@ -99,6 +100,7 @@ var envKeys = map[string]string{
 	"app.assets_url":                   "PUBLIC_ASSETS_URL",
 	"app.base_url":                     "PUBLIC_BASE_URL",
 	"app.mode":                         "APP_MODE",
+	"auth.hibp_api_key":                "HIBP_API_KEY",
 	"kvstore.url":                      "VALKEY_URL",
 	"log.level":                        "LOG_LEVEL",
 	"log.transport":                    "LOG_TRANSPORT",
@@ -128,6 +130,7 @@ var envKeys = map[string]string{
 var envExampleValues = map[string]string{
 	"app.base_url":                     "http://localhost:3080",
 	"app.secret_key":                   "__REPLACE_WITH_SECURE_ENCRYPTION_KEY__",
+	"auth.hibp_api_key":                "",
 	"auth.secret_key":                  "__REPLACE_WITH_SECRET_KEY_AUTHENTICATION__",
 	"database.url":                     "postgresql://postgres:securedb@localhost:5432/postgres?sslmode=disable",
 	"log.level":                        "debug",

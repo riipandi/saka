@@ -66,6 +66,7 @@ var catalog = []Event{
 	{Source: audit.EventEmailChanged, Name: "user.email_changed", Description: "A pending address change was confirmed."},
 	{Source: audit.EventPasswordResetEmailSent, Name: "user.password_reset_email_sent", Description: "A password reset message was submitted for delivery."},
 	{Source: audit.EventPasswordReset, Name: "user.password_reset", Description: "A credential was replaced through a reset token."},
+	{Source: audit.EventSigninBreachedPassword, Name: "user.signin_breached_password", Description: "A session opened on a credential the breach corpus knows — flagged for a forced change, not refused."},
 
 	{Source: audit.EventGroupCreated, Name: "group.created", Description: "A user group that did not exist now does."},
 	{Source: audit.EventGroupUpdated, Name: "group.updated", Description: "A user group's fields were rewritten."},

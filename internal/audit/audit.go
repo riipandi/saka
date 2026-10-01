@@ -252,6 +252,13 @@ const (
 	// the live sessions, so a reader sees the blast radius.
 	EventPasswordReset = "password_reset"
 
+	// EventSigninBreachedPassword is a session that opened on a credential
+	// the breach corpus knows — the flag-and-force-change answer, not a
+	// refusal: a rejection here is an oracle and locks a breached account
+	// out of the recovery it needs. The record lands after the session's
+	// own, carrying no credential material.
+	EventSigninBreachedPassword = "signin_breached_password"
+
 	// EventTestEmailSent is the deployment's own smoke message submitted —
 	// the administrator's proof that the mailer is configured and
 	// reachable. The payload names the address it went to, which the

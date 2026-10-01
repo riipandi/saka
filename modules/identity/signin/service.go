@@ -18,6 +18,7 @@ import (
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
@@ -74,6 +75,10 @@ type Service struct {
 	// settings reads the session bound the database owns. Nil keeps the
 	// catalog default — the state a bare wiring is in.
 	settings sessionSettings
+
+	// policy is the breach check's runtime source. Nil arms no flag — the
+	// state a bare wiring is in.
+	policy *password.Validator
 
 	// notices is the new-device notification channel. Nil until wired; a
 	// service without one skips the mail, never the sign-in.
@@ -230,6 +235,11 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 
 	// The account's state is the issuer's check: a disabled or banned account
 	// is refused there, so every way of opening a session refuses the same.
+	// The breach corpus's flag rides beside it: a credential the corpus
+	// knows opens the session and the record tells the operator the
+	// credential must be rotated — a refusal here would be the oracle the
+	// recovery path cannot afford, and the corpus is fail-open anyway.
+	flagged := s.policy != nil && s.policy.FlagsSignIn(ctx, params.Password)
 	var result Result
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		var issueErr error
@@ -243,6 +253,17 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	})
 	if err != nil {
 		return Result{}, err
+	}
+	if flagged {
+		s.log.WarnContext(ctx, "signin: a breached password opened the session")
+		s.audit.Record(ctx, s.pool, audit.Entry{
+			Event:  audit.EventSigninBreachedPassword,
+			Status: audit.StatusSuccess,
+			UserID: account.ID.String(),
+			Payload: map[string]string{
+				"provider": ProviderPassword,
+			},
+		})
 	}
 	return result, nil
 }
@@ -511,6 +532,13 @@ const (
 // the catalog default — the state a test or a bare wiring is in.
 func (s *Service) WithSessionSettings(reader sessionSettings) *Service {
 	s.settings = reader
+	return s
+}
+
+// WithPasswordPolicy wires the breach check's runtime source. Nil arms no
+// flag — the state a test or a bare wiring is in.
+func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
+	s.policy = policy
 	return s
 }
 

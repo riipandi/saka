@@ -77,6 +77,7 @@ func (c Config) withSecrets(render secretRenderer) Config {
 	out := c
 	out.App.SecretKey = render(c.App.SecretKey)
 	out.Auth.SecretKey = render(c.Auth.SecretKey)
+	out.Auth.HIBPAPIKey = render(c.Auth.HIBPAPIKey)
 	out.Database.URL = RedactDSN(c.Database.URL)
 	out.KVStore.URL = RedactKVURL(c.KVStore.URL)
 	out.Mailer.SMTPPassword = render(c.Mailer.SMTPPassword)

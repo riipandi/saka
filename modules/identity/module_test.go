@@ -18,6 +18,7 @@ import (
 	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/internal/queue"
@@ -60,6 +61,11 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// feature; nil stands in for the wiring the composition root
 		// guarantees, and the reads fail closed rather than dereference it.
 		do.Eager[*appconfig.Settings](nil),
+		// The credential policy's breach corpus rides the shared outbound
+		// client; nil stands in for the wiring the composition root
+		// guarantees, and the checker answers unavailable — the optional
+		// feature's off state — rather than dialling anything.
+		do.Eager[*fetcher.Client](nil),
 	)
 	Package(i)
 

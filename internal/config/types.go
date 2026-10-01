@@ -90,6 +90,12 @@ type Auth struct {
 	// the remembered lifetime, inactivity, reauthentication — are not here:
 	// they are settings the database owns.
 	AccessTTL time.Duration `koanf:"access_ttl" json:"access_ttl"`
+	// HIBPAPIKey is the Have I Been Pwned account key. The password checks
+	// never need it — the range API's k-anonymity is unauthenticated — so
+	// the key only becomes load-bearing when a deployment calls the
+	// account-level endpoints itself. An empty value is the optional
+	// feature's off state.
+	HIBPAPIKey string `koanf:"hibp_api_key" json:"hibp_api_key"`
 	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
 	// default, the way the upstream feature ships: a mailer that reaches
 	// account holders on a schedule is a decision, not a default. It lives

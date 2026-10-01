@@ -26,6 +26,7 @@ import (
 	"github.com/riipandi/tango/internal/cache"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/jobs"
 	"github.com/riipandi/tango/internal/kernel"
@@ -249,6 +250,9 @@ var Package = do.Package(
 		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
 			service.WithSessionSettings(settings)
 		}
+		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
+			service.WithPasswordPolicy(policy)
+		}
 		return service, nil
 	}),
 
@@ -277,6 +281,22 @@ var Package = do.Package(
 		return service, nil
 	}),
 
+	// The credential policy is one provider: the catalog reads and the
+	// breach corpus ride together, so every consumer — sign-up, the
+	// administrator's create, the recovery flows, the sign-in flag — sees
+	// the same rules. The corpus rides the shared outbound client (its
+	// circuit breaker is the dead-upstream answer), and the checker is the
+	// optional feature: an unfetched client or an absent key leaves the
+	// corpus off, the policy's other rules unmoved.
+	do.Lazy(func(i do.Injector) (*password.Validator, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		settings := do.MustInvoke[*appconfig.Settings](i)
+		fetch := do.MustInvoke[*fetcher.Client](i)
+		checker := password.NewBreachChecker(fetch, c.Auth.HIBPAPIKey, c.Fetcher.UserAgent)
+		return password.NewValidator(settings, checker, log), nil
+	}),
+
 	do.Lazy(func(i do.Injector) (*signup.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
@@ -293,6 +313,9 @@ var Package = do.Package(
 		if verifier := do.MustInvoke[*verification.Service](i); verifier != nil {
 			service.WithVerification(verifier)
 		}
+		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
+			service.WithPasswordPolicy(policy)
+		}
 		return service, nil
 	}),
 
@@ -301,7 +324,11 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		return user.NewService(pool, recorder, log, pictures), nil
+		service := user.NewService(pool, recorder, log, pictures)
+		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
+			service.WithPasswordPolicy(policy)
+		}
+		return service, nil
 	}),
 
 	// The verification service builds over the mailer and the queue the
@@ -425,10 +452,14 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
 		sessions := do.MustInvoke[*session.Service](i)
-		return password.NewService(pool, mail, recorder, c.App.BaseURL, log).
+		service := password.NewService(pool, mail, recorder, c.App.BaseURL, log).
 			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log, c.Mailer.Notifications.PasswordChangedNoticeEnabled)).
 			WithSessionEnder(sessions).
-			WithUUIDDecoder(user.UUIDFromWire), nil
+			WithUUIDDecoder(user.UUIDFromWire)
+		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
+			service.WithPasswordPolicy(policy)
+		}
+		return service, nil
 	}),
 
 	do.Lazy(func(i do.Injector) (*usergroup.Service, error) {

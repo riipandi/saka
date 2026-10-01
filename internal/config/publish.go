@@ -72,6 +72,7 @@ type PublishedAuth struct {
 	JWTAlgorithm       string   `json:"jwt_algorithm,omitzero"`
 	Issuer             string   `json:"issuer,omitzero"`
 	AccessTTL          Duration `json:"access_ttl,omitzero"`
+	HIBPAPIKey         string   `json:"hibp_api_key,omitzero"`
 	ExpiryEmailEnabled bool     `json:"expiry_email_enabled,omitzero"`
 	SessionDriver      string   `json:"session_driver,omitzero"`
 
@@ -356,6 +357,7 @@ func (c Config) Published(full bool) Published {
 	public.Auth.ExpiryEmailEnabled = c.Auth.ExpiryEmailEnabled
 	public.Auth.SessionDriver = c.Auth.SessionDriver
 	public.Auth.SecretKey = sealed.Auth.SecretKey
+	public.Auth.HIBPAPIKey = sealed.Auth.HIBPAPIKey
 	public.Cache = PublishedCache{
 		Enable:    c.Cache.Enable,
 		Driver:    c.Cache.Driver,

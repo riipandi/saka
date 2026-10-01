@@ -70,6 +70,9 @@ type Service struct {
 	// transaction and delivers the message after it commits. Nil keeps the
 	// account unverified with no code — the state a bare wiring is in.
 	verifier VerificationIssuer
+	// policy is the credential check's runtime source. Nil keeps the
+	// static policy.
+	policy *password.Validator
 }
 
 // settingsReader is the sign-up policy's runtime source: the access mode,
@@ -136,7 +139,7 @@ type signupPolicy struct {
 // invite mode, account created verified — and an unreadable key keeps its
 // catalog default, so a settings row that cannot answer never rewrites the
 // mode silently.
-func (s *Service) policy(ctx context.Context) signupPolicy {
+func (s *Service) policyOf(ctx context.Context) signupPolicy {
 	p := signupPolicy{inviteMode: true, stampVerified: true}
 	if s.settings == nil {
 		return p
@@ -254,6 +257,21 @@ type Params struct {
 	LastName  string
 }
 
+// WithPasswordPolicy wires the settings-driven validator. Nil keeps the
+// static policy — the state a test or a bare wiring is in.
+func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
+	s.policy = policy
+	return s
+}
+
+// validatePassword runs the credential through the wired policy.
+func (s *Service) validatePassword(ctx context.Context, clearText string) error {
+	if s.policy != nil {
+		return s.policy.Validate(ctx, clearText)
+	}
+	return password.Validate(clearText)
+}
+
 // Signup creates the account. The settings own the shape: the access mode
 // decides whether a token is consumed, the identity toggles decide whether
 // a username is required, the verification gate decides whether the account
@@ -262,11 +280,11 @@ type Params struct {
 // one transaction commits the account, its credential, the token's use, and
 // the verification code together.
 func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, error) {
-	if policyErr := password.Validate(params.Password); policyErr != nil {
-		return user.UserView{}, policyErr
+	if validateErr := s.validatePassword(ctx, params.Password); validateErr != nil {
+		return user.UserView{}, validateErr
 	}
 
-	p := s.policy(ctx)
+	p := s.policyOf(ctx)
 
 	// The username is optional by the toggles; present, it carries the
 	// column's pattern; absent, it is refused only when the require-username

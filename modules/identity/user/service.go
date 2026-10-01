@@ -72,6 +72,10 @@ type Service struct {
 	// absent — a ban still writes, only without a message.
 	notify banNotifier
 
+	// policy is the credential check's runtime source. Nil keeps the
+	// static policy.
+	policy *password.Validator
+
 	// groups reads and opens the memberships the account views carry. It
 	// is nil where the group feature is not wired — the views then answer
 	// without the field filled, which is the smaller feature rather than a
@@ -180,6 +184,21 @@ func (s *Service) WithBanSideEffects(sessions sessionEnder, notify banNotifier) 
 	return s
 }
 
+// WithPasswordPolicy wires the settings-driven validator. Nil keeps the
+// static policy — the state a test or a bare wiring is in.
+func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
+	s.policy = policy
+	return s
+}
+
+// validatePassword runs the credential through the wired policy.
+func (s *Service) validatePassword(ctx context.Context, clearText string) error {
+	if s.policy != nil {
+		return s.policy.Validate(ctx, clearText)
+	}
+	return password.Validate(clearText)
+}
+
 // CreateParams carries one administrator-created account.
 type CreateParams struct {
 	Username      string
@@ -284,8 +303,8 @@ type UserView struct {
 func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView, error) {
 	passwordHash := ""
 	if params.Password != "" {
-		if policyErr := password.Validate(params.Password); policyErr != nil {
-			return UserView{}, policyErr
+		if validateErr := s.validatePassword(ctx, params.Password); validateErr != nil {
+			return UserView{}, validateErr
 		}
 		hash, err := s.hasher.Hash(params.Password)
 		if err != nil {
