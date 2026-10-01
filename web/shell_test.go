@@ -9,7 +9,7 @@ import (
 )
 
 func TestTheShellRendersThePageAndTheFragment(t *testing.T) {
-	html, err := renderShell(Page{
+	html, err := RenderPage(Page{
 		Entry:       "app/main.tsx",
 		Title:       "Sign in — Tango",
 		Description: "Sign in to your account",
@@ -27,13 +27,13 @@ func TestTheShellRendersThePageAndTheFragment(t *testing.T) {
 }
 
 func TestAIndexablePageDropsTheRobotsRefusal(t *testing.T) {
-	html, err := renderShell(Page{Title: "Landing", Description: "d", Noindex: false}, "")
+	html, err := RenderPage(Page{Title: "Landing", Description: "d", Noindex: false}, "")
 	require.NoError(t, err)
 	assert.NotContains(t, string(html), `name="robots"`)
 }
 
 func TestTheShellEscapesTheMeta(t *testing.T) {
-	html, err := renderShell(Page{Title: `Evil " onload="x`, Description: "d"}, "")
+	html, err := RenderPage(Page{Title: `Evil " onload="x`, Description: "d"}, "")
 	require.NoError(t, err)
 	assert.Contains(t, string(html), "<title>Evil &#34; onload=&#34;x</title>",
 		"html/template escapes the values the page carries")

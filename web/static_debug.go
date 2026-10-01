@@ -3,6 +3,7 @@
 package web
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,6 +41,12 @@ func SetupStatic(r chi.Router) {
 	})
 }
 
+// OutputFS answers nothing in a debug build: the output it would carry is
+// resolved through the dev server, not embedded. A page served under its
+// own route in development builds its fragment against the dev server
+// directly, the way serveShell does.
+func OutputFS() fs.FS { return nil }
+
 // serveShell renders the debug shell: one dev fragment per page, resolved
 // against the dev server without touching a build manifest. The JSON
 // surfaces a fragment must never answer are refused with the envelope
@@ -60,7 +67,7 @@ func serveShell(w http.ResponseWriter, r *http.Request) {
 		responder.Fail(w, r, http.StatusInternalServerError, "the dev fragment did not resolve: "+err.Error())
 		return
 	}
-	html, err := renderShell(DefaultPage, tags.Tags)
+	html, err := RenderPage(DefaultPage, tags.Tags)
 	if err != nil {
 		responder.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
 		return

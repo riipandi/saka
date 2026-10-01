@@ -18,6 +18,14 @@ import (
 //go:embed all:output
 var webFS embed.FS
 
+// OutputFS answers the embedded build output — the manifest a second
+// page's fragment resolves against, and the hashed assets the surface
+// serves. The release build is the only one that carries it.
+func OutputFS() fs.FS {
+	artifact, _ := fs.Sub(webFS, "output")
+	return artifact
+}
+
 // The entry fragment resolves once: the manifest is embedded, so its
 // answer is fixed at build time. A release binary whose output carries no
 // manifest is a build-order error — Vite must run before Go — and the
@@ -110,7 +118,7 @@ func spaHandler() http.HandlerFunc {
 			responder.Fail(w, r, http.StatusInternalServerError, "vite: the build manifest did not resolve: "+err.Error())
 			return
 		}
-		html, err := renderShell(DefaultPage, tags)
+		html, err := RenderPage(DefaultPage, tags)
 		if err != nil {
 			responder.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
 			return

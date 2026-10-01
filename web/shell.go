@@ -37,8 +37,11 @@ var DefaultPage = Page{
 	Noindex:     true,
 }
 
-// renderShell executes the document for one page with one Vite fragment.
-func renderShell(page Page, tags template.HTML) (template.HTML, error) {
+// RenderPage executes the document for one page with one Vite fragment —
+// the page's meta, the tags handed in, and the loader. It is what
+// SetupStatic drives per request, and what a caller serving a page under
+// its own route uses.
+func RenderPage(page Page, tags template.HTML) (template.HTML, error) {
 	var buf bytes.Buffer
 	tmpl, err := template.New("shell").Parse(shellTmpl)
 	if err != nil {
