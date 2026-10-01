@@ -112,7 +112,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) (*Serv
 	require.NoError(t, err)
 
 	enqueuer := &countingEnqueuer{}
-	service := NewService(pool, mailer.NewService(mail, templates), nil, "http://localhost:3000", nil).
+	service := NewService(pool, mailer.NewService(mail, templates), nil, "http://localhost:3080", nil).
 		WithEnqueuer(enqueuer)
 	return service, enqueuer
 }

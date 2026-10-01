@@ -94,7 +94,7 @@ const DefaultStorageWatchDebounce = 2 * time.Second
 // server the SPA is served from in development. Production names its own
 // origin through the configuration, so a browser has to prove where the call
 // comes from rather than being trusted by default.
-var DefaultCORSOrigins = []string{"http://localhost:3000"}
+var DefaultCORSOrigins = []string{"http://localhost:3080"}
 
 // DefaultCORSMethods is the method list the dual surface needs: the GET and
 // POST the Connect protocol answers with, plus the PUT, PATCH, and DELETE the

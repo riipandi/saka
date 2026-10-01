@@ -763,7 +763,7 @@ func TestValidationRejectsWildcardWithCredentials(t *testing.T) {
 func TestValidationRejectsAnOriginThatIsNotOne(t *testing.T) {
 	// A path is not part of an origin, so it can never match what a browser
 	// sends; accepting it would silently close the policy.
-	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["http://localhost:3000/app"]}}`)
+	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["http://localhost:3080/app"]}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "server.cors.allowed_origins")
 }

@@ -43,7 +43,7 @@ include:
 #         GO_VERSION: ${GO_VERSION:-1.27.1}
 #     # platform: linux/amd64
 #     hostname: tango
-#     expose: ["3000"]
+#     expose: ["3080"]
 #     volumes: ["./storage:/srv/storage:rw"]
 #     env_file: "./.env.local"
 #     environment:

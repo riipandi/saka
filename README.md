@@ -33,8 +33,9 @@ pnpm dlx tiged riipandi/tango myapp-name
 9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `tango initialize`)
 10. Start the development servers: `task dev`
 
-Vite serves the frontend on `:3000` and proxies `/api`, `/rpc`, `/.well-known`, `/metrics`, and `/static` to Go on `:3080`.
-Go files are watched and rebuilt automatically.
+The browser opens **:3080** only — the Go server renders the document, its shell points
+at the same origin, and the debug build proxies the Vite compiler (modules, assets, the
+HMR socket) behind it. Go files are watched and rebuilt automatically.
 
 ## Available Tasks
 

@@ -69,7 +69,7 @@ func testService(t *testing.T, pool *datastore.Postgres, adminEmail, publicEmail
 		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil, nil, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3080", false, true, nil, nil, nil, nil, nil)
 
 	issuer := signin.NewService(testConfig(), pool, signin.NewRepository(pool),
 		jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
@@ -93,7 +93,7 @@ func testServiceWithMfa(t *testing.T, pool *datastore.Postgres) (*Service, *mult
 		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil, nil, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3080", false, true, nil, nil, nil, nil, nil)
 
 	cfg.Auth.SecretKey = testSecretHex
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
