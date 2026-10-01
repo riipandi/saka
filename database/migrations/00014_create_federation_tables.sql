@@ -68,6 +68,9 @@ CREATE TABLE IF NOT EXISTS public.custom_claims (
 CREATE INDEX IF NOT EXISTS idx_custom_claims_user_id ON public.custom_claims USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_custom_claims_user_group_id ON public.custom_claims USING btree (user_group_id);
 
+CREATE TRIGGER trg_custom_claims_deleted_record AFTER DELETE ON public.custom_claims FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
+CREATE TRIGGER trg_oidc_clients_deleted_record AFTER DELETE ON public.oidc_clients FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
+
 -- --------------------------------------------------------
 -- Table: public.user_authorized_oidc_clients (junction table)
 -- --------------------------------------------------------
@@ -180,6 +183,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_scim_providers_client ON public.scim_servi
 -- +goose StatementBegin
 
 DROP TRIGGER IF EXISTS trg_jwks_updated_at ON public.jwks;
+DROP TRIGGER IF EXISTS trg_custom_claims_deleted_record ON public.custom_claims;
+DROP TRIGGER IF EXISTS trg_oidc_clients_deleted_record ON public.oidc_clients;
 
 DROP INDEX IF EXISTS idx_scim_providers_client;
 DROP INDEX IF EXISTS idx_oauth2_jtis_expires_at;

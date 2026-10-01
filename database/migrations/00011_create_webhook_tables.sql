@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.webhook_endpoints (
 ) USING heap;
 
 CREATE TRIGGER trg_webhook_endpoints_updated_at BEFORE UPDATE ON public.webhook_endpoints FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
+CREATE TRIGGER trg_webhook_endpoints_deleted_record AFTER DELETE ON public.webhook_endpoints FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
 
 -- (name needs no index: the UNIQUE constraint carries every lookup)
 CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_enabled ON public.webhook_endpoints (enabled);
@@ -97,6 +98,7 @@ DROP INDEX IF EXISTS idx_webhook_deliveries_webhook_id;
 DROP TABLE IF EXISTS public.webhook_deliveries;
 
 DROP TRIGGER IF EXISTS trg_webhook_endpoints_updated_at ON public.webhook_endpoints;
+DROP TRIGGER IF EXISTS trg_webhook_endpoints_deleted_record ON public.webhook_endpoints;
 
 DROP INDEX IF EXISTS idx_webhook_endpoints_event_types;
 DROP INDEX IF EXISTS idx_webhook_endpoints_created_at;

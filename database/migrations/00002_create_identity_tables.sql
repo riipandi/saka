@@ -253,12 +253,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs USING 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON public.audit_logs USING btree (event);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs USING btree (user_id);
 
+-- The archive triggers rest here, after every table they name exists.
+CREATE TRIGGER trg_user_groups_deleted_record AFTER DELETE ON public.user_groups FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
+CREATE TRIGGER trg_signup_tokens_deleted_record AFTER DELETE ON public.signup_tokens FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
+
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 
 DROP TRIGGER IF EXISTS trg_users_deleted_record ON public.users;
+DROP TRIGGER IF EXISTS trg_user_groups_deleted_record ON public.user_groups;
+DROP TRIGGER IF EXISTS trg_signup_tokens_deleted_record ON public.signup_tokens;
 DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
 DROP TRIGGER IF EXISTS trg_user_passwords_updated_at ON public.user_passwords;
 DROP TRIGGER IF EXISTS trg_user_groups_updated_at ON public.user_groups;
