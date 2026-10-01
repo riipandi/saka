@@ -309,17 +309,28 @@ func countDead(ctx context.Context, q datastore.Querier, queue string) (int64, e
 	return count, err
 }
 
-// listPending answers one page of the pending table, newest first, with the
-// total the filter admits. A claimed row is a running task; the page carries
-// the claim so the caller tells the two states apart.
-func listPending(ctx context.Context, q datastore.Querier, queue string, offset, limit int) ([]*taskRow, int64, error) {
+// pendingSortColumns is the whitelist a pending page's sort key resolves
+// through; the map is the schema of the ORDER BY, one entry per column the
+// wire may name. The tie-break keeps pagination stable: two rows created in
+// the same instant still page without repeating or dropping.
+var pendingSortColumns = map[string]string{
+	"created_at": "created_at",
+	"priority":   "priority",
+	"attempts":   "attempts",
+	"wait_until": "wait_until",
+}
+
+// listPending answers one page of the pending table, with the total the
+// filter admits. A claimed row is a running task; the page carries the
+// claim so the caller tells the two states apart.
+func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string, ascending bool, offset, limit int) ([]*taskRow, int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "task", "attempts", "priority", "wait_until", "claimed_at", "created_at", "last_executed_at")
 	sb.From(tasksTable)
 	if queue != "" {
 		sb.Where(sb.Equal("queue", queue))
 	}
-	sb.OrderBy("created_at DESC", "id ASC")
+	sb.OrderBy(datastore.ListOrder(pendingSortColumns, sortBy, "created_at", ascending), "id ASC")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()
@@ -356,10 +367,18 @@ func listPending(ctx context.Context, q datastore.Querier, queue string, offset,
 	return tasks, total, nil
 }
 
+// deadSortColumns is the whitelist a dead page's sort key resolves through,
+// the same contract the pending page keeps.
+var deadSortColumns = map[string]string{
+	"created_at":       "created_at",
+	"attempts":         "attempts",
+	"last_executed_at": "last_executed_at",
+}
+
 // listDead answers one page of the archive's failures — the rows a replay
-// could bring back — oldest first, with the total the filter admits. The
-// payload stays in the database: the page is a listing, not an inspection.
-func listDead(ctx context.Context, q datastore.Querier, queue string, offset, limit int, at time.Time) ([]*completedRow, int64, error) {
+// could bring back — with the total the filter admits. The payload stays in
+// the database: the page is a listing, not an inspection.
+func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, ascending bool, offset, limit int, at time.Time) ([]*completedRow, int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "attempts", "error", "expires_at", "last_executed_at", "created_at")
 	sb.From(completedTable)
@@ -370,7 +389,7 @@ func listDead(ctx context.Context, q datastore.Querier, queue string, offset, li
 	if queue != "" {
 		sb.Where(sb.Equal("queue", queue))
 	}
-	sb.OrderBy("created_at ASC", "id ASC")
+	sb.OrderBy(datastore.ListOrder(deadSortColumns, sortBy, "created_at", ascending), "id ASC")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()

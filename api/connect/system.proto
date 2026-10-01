@@ -8,6 +8,7 @@ syntax = "proto3";
 package tango.system.v1;
 
 import "buf/validate/validate.proto";
+import "common.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/system/v1;systemv1";
@@ -125,13 +126,51 @@ service QueueService {
   rpc FlushCompletedTasks(FlushCompletedTasksRequest) returns (FlushCompletedTasksResponse);
 }
 
-// ListQueuesRequest is empty: the queue set is the process's own registry.
-message ListQueuesRequest {}
+// ListQueuesRequest pages and filters the registered queues, the way the
+// account list does. The queue set is the process's own registry; the counts
+// make every row's worth.
+message ListQueuesRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
 
-// ListQueuesResponse carries one entry per registered queue, in name order.
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // search narrows the page to the queues whose name contains the term,
+  // case-insensitively. Absent means every queue.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the key the page orders by. Absent, the name orders the
+  // page ascending.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "pending",
+      "dead"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListQueuesResponse is the page of queue summaries and its pagination
+// block.
 message ListQueuesResponse {
-  // queues is the summary list.
+  // queues is the page.
   repeated QueueSummary queues = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
 }
 
 // QueueSummary is one queue's configuration and live counts.
@@ -162,28 +201,50 @@ message QueueSummary {
 
 // ListTasksRequest filters and pages the pending table. An absent queue
 // name answers every queue's rows.
+// ListTasksRequest pages and filters the pending table. An absent queue
+// name answers every queue's rows.
 message ListTasksRequest {
-  // queue narrows the page to one queue's rows.
-  optional string queue = 1;
+  // page is the one-based page number.
+  optional int32 page = 1;
 
   // limit is the page size.
-  optional int32 limit = 2 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
+  optional int32 limit = 2;
+
+  // queue narrows the page to one queue's rows.
+  optional string queue = 3;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "priority",
+      "attempts",
+      "wait_until"
+    ]
   }];
 
-  // offset is the number of rows the page starts after.
-  optional int32 offset = 3 [(buf.validate.field).int32 = {gte: 0}];
+  // sort_order flips the direction; absent means descending — the newest
+  // task first, the way the list answers by default.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
-// ListTasksResponse answers one page of the pending table, newest first,
-// with the total the pagination metadata needs.
+// ListTasksResponse is the page of pending tasks and its pagination block.
 message ListTasksResponse {
   // tasks is the page.
   repeated PendingTask tasks = 1;
 
-  // total is the number of rows the filter admits in full.
-  int64 total = 2;
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
 }
 
 // PendingTask is one row of the pending table: a task waiting for a worker,
@@ -222,8 +283,9 @@ message PendingTask {
 
 // GetTaskRequest names one task.
 message GetTaskRequest {
-  // id is the task's identifier.
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  // id is the task's identifier in its wire form, a TypeID (`que_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 // GetTaskResponse is one task's full view: its state, and the payload as
@@ -262,30 +324,50 @@ message GetTaskResponse {
   optional google.protobuf.Timestamp last_executed_at = 9;
 }
 
-// ListDeadTasksRequest filters and pages the archive's failures. An absent
+// ListDeadTasksRequest pages and filters the archive's failures. An absent
 // queue name answers every queue's dead.
 message ListDeadTasksRequest {
-  // queue narrows the page to one queue's dead.
-  optional string queue = 1;
+  // page is the one-based page number.
+  optional int32 page = 1;
 
   // limit is the page size.
-  optional int32 limit = 2 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
+  optional int32 limit = 2;
+
+  // queue narrows the page to one queue's dead.
+  optional string queue = 3;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, oldest first — the replay reads the pile in the order
+  // it piled up.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "attempts",
+      "last_executed_at"
+    ]
   }];
 
-  // offset is the number of rows the page starts after.
-  optional int32 offset = 3 [(buf.validate.field).int32 = {gte: 0}];
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
 }
 
-// ListDeadTasksResponse answers one page of the archive's failures, oldest
-// first, with the total the pagination metadata needs.
+// ListDeadTasksResponse is the page of archived failures and its pagination
+// block.
 message ListDeadTasksResponse {
   // tasks is the page.
   repeated DeadTask tasks = 1;
 
-  // total is the number of rows the filter admits in full.
-  int64 total = 2;
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
 }
 
 // DeadTask is one archived failure: a task that exhausted its attempts and
@@ -316,8 +398,9 @@ message DeadTask {
 
 // CancelTaskRequest names the waiting task to remove.
 message CancelTaskRequest {
-  // id is the task's identifier.
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  // id is the task's identifier in its wire form, a TypeID (`que_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 // CancelTaskResponse is empty: a cancelled task answers success; a claimed
@@ -376,43 +459,79 @@ service SchedulerService {
   rpc RunNow(RunSchedulerJobNowRequest) returns (RunSchedulerJobNowResponse);
 }
 
-// ListSchedulerJobsRequest is empty: the job set is the process's own
-// registry.
-message ListSchedulerJobsRequest {}
+// ListSchedulerJobsRequest pages and filters the scheduler's state rows.
+message ListSchedulerJobsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
 
-// ListSchedulerJobsResponse carries one entry per registered job, in name
-// order.
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // search narrows the page to the jobs whose name or whose cron spec
+  // contains the term, case-insensitively. Absent means every job.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the name orders
+  // the page ascending.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "next_due",
+      "updated_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListSchedulerJobsResponse is the page of scheduler jobs and its
+// pagination block.
 message ListSchedulerJobsResponse {
-  // jobs is the entry list.
+  // jobs is the page.
   repeated SchedulerJob jobs = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
 }
 
 // SchedulerJob is one registered job's durable state.
 message SchedulerJob {
-  // name is the job's registered name.
-  string name = 1;
+  // id is the job's identifier in its wire form, a TypeID (`scd_…`)
+  // encoded from the state row's UUID — the UUID never leaves the server.
+  string id = 1;
+
+  // name is the job's registered name: its display and its unique key.
+  string name = 2;
 
   // spec is the cron expression the job fires on.
-  string spec = 2;
+  string spec = 3;
 
   // next_due is when the claim cursor says the job fires next.
-  google.protobuf.Timestamp next_due = 3;
+  google.protobuf.Timestamp next_due = 4;
 
   // last_fired is when the job last won a claim, absent when it never
   // fired.
-  optional google.protobuf.Timestamp last_fired = 4;
+  optional google.protobuf.Timestamp last_fired = 5;
 
   // updated_at is when the state row last moved.
-  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 // RunSchedulerJobNowRequest names the job to run now.
 message RunSchedulerJobNowRequest {
-  // name is the job's registered name.
-  string name = 1 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 128
-  }];
+  // id is the job's identifier in its wire form, a TypeID (`scd_…`)
+  // encoded from the state row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 // RunSchedulerJobNowResponse is empty: an enqueued tick answers success; an

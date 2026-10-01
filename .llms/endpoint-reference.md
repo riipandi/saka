@@ -402,19 +402,26 @@ and `tango.system.v1.SchedulerService` in `system.proto`; every procedure is
 `Admin` in `internal/guard/rules.go`. The engine facts come from
 `internal/queue` (`Queues`, `Tasks`, `Detail`, `DeadTasks`) and
 `internal/scheduler` (`Jobs`, `RunNow`); the transport maps the wire only.
+The four list procedures page like the account list: `page` (one-based) and
+`limit` normalize through `responder.NormalizePage`, `sort_by`/`sort_order`
+resolve through a whitelist the store owns, and the answer carries
+`tango.common.v1.ListMetadata` plus `status`. Ids leave as TypeIDs — tasks
+`que_…`, jobs `scd_…`, both encoded from the row's UUID — the same wire form
+`user_…` takes, and a malformed id is refused as the not-found a malformed
+account id is.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.QueueService/ListQueues` | List task queues with live counts (queue) | done — per-queue config + pending/dead counts, name order | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed`, `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
-| POST | `/rpc/tango.system.v1.QueueService/ListTasks` | List pending tasks (queue) | done — pending-table page, newest first, queue filter, total; no payload | `internal/queue.TestInspectFiltersByQueueName` |
-| POST | `/rpc/tango.system.v1.QueueService/GetTask` | Get task detail with payload (queue) | done — state across both tables + decoded payload; unknown id `not_found` | `internal/queue.TestInspectAnswersAnArchivedTask`, `internal/queue.TestInspectReportsAnUnknownTaskAsAbsent` |
-| POST | `/rpc/tango.system.v1.QueueService/ListDeadTasks` | List failed tasks in the archive (queue) | done — replayable failures, oldest first, queue filter | `internal/queue.TestInspectAnswersAnArchivedTask` |
-| POST | `/rpc/tango.system.v1.QueueService/CancelTask` | Cancel a waiting task (queue) | done — unclaimed removes; claimed `failed_precondition`; unknown `not_found` | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed` |
+| POST | `/rpc/tango.system.v1.QueueService/ListQueues` | List task queues with live counts (queue) | done — per-queue config + pending/dead counts; `page`/`limit`, `search` on the name, `sort_by` in name/pending/dead | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed`, `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/tango.system.v1.QueueService/ListTasks` | List pending tasks (queue) | done — pending-table page, queue filter, `sort_by` in created_at/priority/attempts/wait_until (absent: newest first); no payload; ids are `que_…` | `internal/queue.TestInspectFiltersByQueueName` |
+| POST | `/rpc/tango.system.v1.QueueService/GetTask` | Get task detail with payload (queue) | done — `que_…` id; state across both tables + decoded payload; unknown or malformed id `not_found` | `internal/queue.TestInspectAnswersAnArchivedTask`, `internal/queue.TestInspectReportsAnUnknownTaskAsAbsent` |
+| POST | `/rpc/tango.system.v1.QueueService/ListDeadTasks` | List failed tasks in the archive (queue) | done — replayable failures, queue filter, `sort_by` in created_at/attempts/last_executed_at (absent: oldest first) | `internal/queue.TestInspectAnswersAnArchivedTask` |
+| POST | `/rpc/tango.system.v1.QueueService/CancelTask` | Cancel a waiting task (queue) | done — `que_…` id; unclaimed removes; claimed `failed_precondition`; unknown or malformed `not_found` | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed` |
 | POST | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks` | Replay failed tasks (queue) | done — re-enqueues under fresh identities, answers the count | `internal/queue.TestReplayDeadRequeuesTheDeadTasks` |
 | POST | `/rpc/tango.system.v1.QueueService/FlushPendingTasks` | Flush all waiting tasks (queue) | done — every unclaimed row | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
 | POST | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks` | Flush the completed archive (queue) | done — retention notwithstanding | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
-| POST | `/rpc/tango.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: spec, next_due, last_fired; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
-| POST | `/rpc/tango.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — enqueues without advancing next_due; unknown name `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
+| POST | `/rpc/tango.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: `scd_…` id, spec, next_due, last_fired; `page`/`limit`, `search` on name/spec, `sort_by` in name/next_due/updated_at; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
+| POST | `/rpc/tango.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — `scd_…` id parameter; enqueues without advancing next_due; unknown or malformed id `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
 
 ## OIDC
 

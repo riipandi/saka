@@ -45,14 +45,16 @@ CREATE INDEX IF NOT EXISTS idx_queue_tasks_completed_expires ON public.queue_tas
 -- --------------------------------------------------------
 -- Table: public.scheduler_jobs
 --
--- The scheduler's durable state, one row per registered job. The row is the
+-- The scheduler's durable state, one row per registered job. The id is the
+-- wire identity (`scd_…`); the name stays the registry's key. The row is the
 -- claim: a fire locks it FOR UPDATE, and only the process that moves
 -- next_due forward enqueues the task — so every replica may fire the cron
 -- time, exactly one of them wins the tick.
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.scheduler_jobs (
-    name TEXT NOT NULL PRIMARY KEY,
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    name TEXT NOT NULL UNIQUE,
     spec TEXT NOT NULL,
     next_due TIMESTAMPTZ NOT NULL,
     last_fired TIMESTAMPTZ,

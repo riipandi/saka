@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "name": "example-job"
+      "id": "scd_01m3wn191de3aby4bytbmqehc1"
     }
 bodyType: application/json
 description: |-

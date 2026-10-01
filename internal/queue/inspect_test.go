@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,21 +31,34 @@ func TestInspectReadsWhatTheDispatcherHasNotClaimed(t *testing.T) {
 	id, err := uuid.Parse(ids[0])
 	require.NoError(t, err)
 
-	queues, err := client.Queues(ctx)
+	queues, pagination, err := client.Queues(ctx, "", "", true, 1, 25)
 	require.NoError(t, err)
 	require.Len(t, queues, 1)
 	require.Equal(t, "inspect-queue", queues[0].Name)
 	require.EqualValues(t, 3, queues[0].MaxAttempts)
 	require.EqualValues(t, 1, queues[0].Pending)
 	require.EqualValues(t, 0, queues[0].Dead)
+	require.NotNil(t, pagination.TotalItems)
+	require.EqualValues(t, 1, *pagination.TotalItems)
 
-	tasks, total, err := client.Tasks(ctx, "", 0, 10)
+	tasks, pagination, err := client.Tasks(ctx, "", "", false, 1, 25)
 	require.NoError(t, err)
-	require.EqualValues(t, 1, total)
+	require.NotNil(t, pagination.TotalItems)
+	require.EqualValues(t, 1, *pagination.TotalItems)
 	require.Len(t, tasks, 1)
 	require.Equal(t, id, tasks[0].ID)
+	require.True(t, strings.HasPrefix(FormatID(tasks[0].ID), "que_"))
 	require.False(t, tasks[0].Claimed)
 	require.Equal(t, TaskStatusPending, statusOf(tasks[0].Claimed))
+
+	// The search narrows the queue summaries the way the account list's
+	// search narrows the accounts.
+	_, pagination, err = client.Queues(ctx, "inspect", "", true, 1, 25)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, *pagination.TotalItems)
+	_, pagination, err = client.Queues(ctx, "no-such-queue", "", true, 1, 25)
+	require.NoError(t, err)
+	require.Zero(t, *pagination.TotalItems)
 
 	detail, exists, err := client.Detail(ctx, id)
 	require.NoError(t, err)
@@ -57,9 +71,10 @@ func TestInspectReadsWhatTheDispatcherHasNotClaimed(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, cancelled)
 
-	_, total, err = client.Tasks(ctx, "", 0, 10)
+	_, pagination, err = client.Tasks(ctx, "", "", false, 1, 25)
 	require.NoError(t, err)
-	require.Zero(t, total)
+	require.NotNil(t, pagination.TotalItems)
+	require.Zero(t, *pagination.TotalItems)
 }
 
 // TestInspectFiltersByQueueName proves the queue filter: another queue's
@@ -73,13 +88,13 @@ func TestInspectFiltersByQueueName(t *testing.T) {
 	_, err := client.Add(inspectTask{}).Ctx(ctx).Save()
 	require.NoError(t, err)
 
-	_, total, err := client.Tasks(ctx, "inspect-queue", 0, 10)
+	_, pagination, err := client.Tasks(ctx, "inspect-queue", "", false, 1, 25)
 	require.NoError(t, err)
-	require.EqualValues(t, 1, total)
+	require.EqualValues(t, 1, *pagination.TotalItems)
 
-	_, total, err = client.Tasks(ctx, "another-queue", 0, 10)
+	_, pagination, err = client.Tasks(ctx, "another-queue", "", false, 1, 25)
 	require.NoError(t, err)
-	require.Zero(t, total)
+	require.Zero(t, *pagination.TotalItems)
 }
 
 // TestInspectAnswersAnArchivedTask proves the archive half of the detail: a
@@ -104,9 +119,9 @@ func TestInspectAnswersAnArchivedTask(t *testing.T) {
 	}
 	require.NoError(t, insertCompleted(ctx, client.store, archived))
 
-	dead, total, err := client.DeadTasks(ctx, "", 0, 10)
+	dead, pagination, err := client.DeadTasks(ctx, "", "", true, 1, 25)
 	require.NoError(t, err)
-	require.EqualValues(t, 1, total)
+	require.EqualValues(t, 1, *pagination.TotalItems)
 	require.Len(t, dead, 1)
 	require.Equal(t, archived.ID, dead[0].ID)
 	require.Equal(t, 3, dead[0].Attempts)
@@ -118,10 +133,11 @@ func TestInspectAnswersAnArchivedTask(t *testing.T) {
 	require.Equal(t, `{"reason":"Horcrux"}`, string(detail.Payload))
 	require.Equal(t, "Expecto failed", *detail.Error)
 
-	queues, err := client.Queues(ctx)
+	queues, pagination, err := client.Queues(ctx, "", "", true, 1, 25)
 	require.NoError(t, err)
 	require.Len(t, queues, 1)
 	require.EqualValues(t, 1, queues[0].Dead)
+	require.EqualValues(t, 1, *pagination.TotalItems)
 }
 
 // TestInspectReportsAnUnknownTaskAsAbsent proves the not-found answer: an id

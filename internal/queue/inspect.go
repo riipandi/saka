@@ -8,8 +8,13 @@ package queue
 
 import (
 	"context"
+	"fmt"
+	"sort"
+	"strings"
 	"time"
 	"uuid"
+
+	"github.com/riipandi/tango/pkg/responder"
 )
 
 // QueueView is one registered queue's configuration and live counts.
@@ -98,19 +103,25 @@ type TaskDetail struct {
 	LastExecutedAt time.Time
 }
 
-// Queues answers every registered queue's configuration and live counts, in
-// name order.
-func (c *Client) Queues(ctx context.Context) ([]QueueView, error) {
+// Queues answers one page of the registered queues — the count on every
+// queue the search admits, ordered by the key the caller named and paged
+// the way the account list pages.
+func (c *Client) Queues(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]QueueView, responder.Pagination, error) {
+	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+
 	configs := c.queues.all()
 	views := make([]QueueView, 0, len(configs))
 	for _, cfg := range configs {
+		if search != "" && !strings.Contains(strings.ToLower(cfg.Name), strings.ToLower(search)) {
+			continue
+		}
 		pending, err := countPending(ctx, c.store, cfg.Name)
 		if err != nil {
-			return nil, err
+			return nil, responder.Pagination{}, err
 		}
 		dead, err := countDead(ctx, c.store, cfg.Name)
 		if err != nil {
-			return nil, err
+			return nil, responder.Pagination{}, err
 		}
 		views = append(views, QueueView{
 			Name:        cfg.Name,
@@ -121,15 +132,63 @@ func (c *Client) Queues(ctx context.Context) ([]QueueView, error) {
 			Dead:        dead,
 		})
 	}
-	return views, nil
+	sortQueueViews(views, sortBy, ascending)
+
+	total := len(views)
+	start, end := pageBounds(page, limit, total)
+	views = views[start:end]
+	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
-// Tasks answers one page of the pending table, newest first, with the total
-// the filter admits. An empty queue name answers every queue's rows.
-func (c *Client) Tasks(ctx context.Context, queue string, offset, limit int) ([]TaskView, int64, error) {
-	rows, total, err := listPending(ctx, c.store, queue, offset, limit)
+// queueSortKeys is the whitelist a queue page's sort key resolves through.
+// The rows live in memory, so the sort happens here; the counts make every
+// key worth sorting by.
+var queueSortKeys = map[string]func(QueueView) string{
+	"name":    func(v QueueView) string { return v.Name },
+	"pending": func(v QueueView) string { return fmt.Sprintf("%020d", v.Pending) },
+	"dead":    func(v QueueView) string { return fmt.Sprintf("%020d", v.Dead) },
+}
+
+// sortQueueViews orders the summaries by the named key, unknown keys
+// falling back to the name; a numeric key padded as text keeps one
+// comparison for strings and numbers alike.
+func sortQueueViews(views []QueueView, sortBy string, ascending bool) {
+	key, ok := queueSortKeys[sortBy]
+	if !ok {
+		key = queueSortKeys["name"]
+	}
+	sort.SliceStable(views, func(i, j int) bool {
+		a, b := key(views[i]), key(views[j])
+		if ascending {
+			return a < b
+		}
+		return a > b
+	})
+}
+
+// pageBounds clips a page window to the rows that exist. A page past the
+// end answers an empty window rather than an error — the pagination block
+// already tells the caller the total.
+func pageBounds(page, limit, total int) (int, int) {
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return start, end
+}
+
+// Tasks answers one page of the pending table, with the pagination block the
+// list responses carry. An empty queue name answers every queue's rows.
+func (c *Client) Tasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]TaskView, responder.Pagination, error) {
+	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+
+	rows, total, err := listPending(ctx, c.store, queue, sortBy, ascending, responder.Offset(page, limit), limit)
 	if err != nil {
-		return nil, 0, err
+		return nil, responder.Pagination{}, err
 	}
 	views := make([]TaskView, 0, len(rows))
 	for _, t := range rows {
@@ -145,16 +204,18 @@ func (c *Client) Tasks(ctx context.Context, queue string, offset, limit int) ([]
 			LastExecutedAt: t.LastExecutedAt,
 		})
 	}
-	return views, total, nil
+	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, int(total)), nil
 }
 
-// DeadTasks answers one page of the archive's failures, oldest first, with
-// the total the filter admits. An empty queue name answers every queue's
+// DeadTasks answers one page of the archive's failures, with the pagination
+// block the list responses carry. An empty queue name answers every queue's
 // dead.
-func (c *Client) DeadTasks(ctx context.Context, queue string, offset, limit int) ([]DeadView, int64, error) {
-	rows, total, err := listDead(ctx, c.store, queue, offset, limit, now())
+func (c *Client) DeadTasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]DeadView, responder.Pagination, error) {
+	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+
+	rows, total, err := listDead(ctx, c.store, queue, sortBy, ascending, responder.Offset(page, limit), limit, now())
 	if err != nil {
-		return nil, 0, err
+		return nil, responder.Pagination{}, err
 	}
 	views := make([]DeadView, 0, len(rows))
 	for _, d := range rows {
@@ -168,7 +229,7 @@ func (c *Client) DeadTasks(ctx context.Context, queue string, offset, limit int)
 			CreatedAt:      d.CreatedAt,
 		})
 	}
-	return views, total, nil
+	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, int(total)), nil
 }
 
 // Detail answers one task's full view across the two tables. The payload is

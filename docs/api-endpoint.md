@@ -233,7 +233,7 @@ The configuration's source is the JSON file resolved at startup; there is no wri
 
 ## Queue & Scheduler administration
 
-The engines' own operational surface — an operations console reads and acts on them over RPC. Every procedure is `Admin` (`internal/guard/rules.go`); the frontend integration is deferred.
+The engines' own operational surface — an operations console reads and acts on them over RPC. Every procedure is `Admin` (`internal/guard/rules.go`); the frontend integration is deferred. The four lists page with `page`/`limit` and answer `ListMetadata` + `status`; ids are TypeIDs — tasks `que_…`, scheduler jobs `scd_…`.
 
 | Method   | Procedure / Endpoint                                            | Protocol     | Summary                                             |
 | -------- | --------------------------------------------------------------- | ------------ | --------------------------------------------------- |

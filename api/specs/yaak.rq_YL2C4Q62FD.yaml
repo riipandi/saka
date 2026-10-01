@@ -8,7 +8,13 @@ folderId: fl_znKwvJhRQz
 authentication: {}
 authenticationType: null
 body:
-  text: '{}'
+  text: |-
+    {
+      "page": 1,
+      "limit": 20,
+      "sort_by": "name",
+      "sort_order": "asc"
+    }
 bodyType: application/json
 description: |-
   Scheduler surface — one entry per registered job: cron spec, next_due cursor, last_fired. Empty until a feature schedules a cron job.

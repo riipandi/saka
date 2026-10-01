@@ -10,7 +10,10 @@ authenticationType: null
 body:
   text: |-
     {
-      "limit": 20
+      "page": 1,
+      "limit": 20,
+      "sort_by": "created_at",
+      "sort_order": "desc"
     }
 bodyType: application/json
 description: |-

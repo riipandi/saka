@@ -8,10 +8,16 @@ folderId: fl_znKwvJhRQz
 authentication: {}
 authenticationType: null
 body:
-  text: '{}'
+  text: |-
+    {
+      "page": 1,
+      "limit": 10,
+      "sort_by": "name",
+      "sort_order": "asc"
+    }
 bodyType: application/json
 description: |-
-  Queue surface — one summary per registered queue: configuration and live pending/dead counts.
+  Queue surface — one summary per registered queue: configuration and live pending/dead counts (page/limit, search, sort).
 
   Admin only. tango built-in; no Pocket ID counterpart.
 headers:

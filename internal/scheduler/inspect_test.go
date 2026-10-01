@@ -1,8 +1,10 @@
 package scheduler
 
 import (
+	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,8 +19,8 @@ func (inspectTask) Config() queue.QueueConfig {
 }
 
 // TestJobsAnswersTheSeededStateRows proves the read surface: a seeded job
-// lists with its spec and cursor, in name order, and the state row is the
-// source — not the in-memory registry.
+// lists with its wire id, its spec, and its cursor, in name order, and the
+// state row is the source — not the in-memory registry.
 func TestJobsAnswersTheSeededStateRows(t *testing.T) {
 	pool := migratedPool(t)
 	client := newInspectClient(t, pool)
@@ -26,13 +28,18 @@ func TestJobsAnswersTheSeededStateRows(t *testing.T) {
 
 	require.NoError(t, s.seed(t.Context(), &s.jobs[0]))
 
-	jobs, err := s.Jobs(t.Context())
+	jobs, pagination, err := s.Jobs(t.Context(), "", "", true, 1, 25)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	require.Equal(t, "hermione-cron", jobs[0].Name)
 	require.Equal(t, "@every 1h", jobs[0].Spec)
 	require.False(t, jobs[0].NextDue.IsZero())
 	require.Nil(t, jobs[0].LastFired)
+	require.NotNil(t, pagination.TotalItems)
+	require.EqualValues(t, 1, *pagination.TotalItems)
+
+	// The id renders as the `scd_` TypeID the wire carries.
+	require.True(t, strings.HasPrefix(FormatID(jobs[0].ID), "scd_"))
 }
 
 // TestRunNowEnqueuesWithoutAdvancingTheSchedule proves the trigger: a job run
@@ -44,30 +51,31 @@ func TestRunNowEnqueuesWithoutAdvancingTheSchedule(t *testing.T) {
 	s := newScheduler(t, pool, client, Job{Name: "ron-cron", Spec: "@every 1h", Task: inspectTask{}})
 
 	require.NoError(t, s.seed(t.Context(), &s.jobs[0]))
-	jobs, err := s.Jobs(t.Context())
+	jobs, _, err := s.Jobs(t.Context(), "", "", true, 1, 25)
 	require.NoError(t, err)
 	dueBefore := jobs[0].NextDue
 
-	require.NoError(t, s.RunNow(t.Context(), "ron-cron"))
+	require.NoError(t, s.RunNow(t.Context(), FormatID(jobs[0].ID)))
 
 	pending, err := client.Pending(t.Context(), "inspect-schedule")
 	require.NoError(t, err)
 	require.EqualValues(t, 1, pending)
 
-	jobs, err = s.Jobs(t.Context())
+	jobs, _, err = s.Jobs(t.Context(), "", "", true, 1, 25)
 	require.NoError(t, err)
 	require.Equal(t, dueBefore, jobs[0].NextDue)
 }
 
-// TestRunNowRefusesAnUnknownJob proves the not-found answer: a name the
-// process never registered is a caller's mistake, not an enqueue.
+// TestRunNowRefusesAnUnknownJob proves the not-found answer: an id the
+// state table does not name — malformed or merely absent — is a caller's
+// mistake, not an enqueue.
 func TestRunNowRefusesAnUnknownJob(t *testing.T) {
 	pool := migratedPool(t)
 	client := newInspectClient(t, pool)
 	s := newScheduler(t, pool, client, Job{Name: "draco-cron", Spec: "@every 1h", Task: inspectTask{}})
 
-	err := s.RunNow(t.Context(), "no-such-job")
-	require.ErrorIs(t, err, ErrJobUnknown)
+	require.ErrorIs(t, s.RunNow(t.Context(), "not-a-typeid"), ErrJobUnknown)
+	require.ErrorIs(t, s.RunNow(t.Context(), FormatID(uuid.NewV7())), ErrJobUnknown)
 }
 
 // newInspectClient builds a queue client over the shared pool without
