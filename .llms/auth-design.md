@@ -135,9 +135,11 @@ Keep this document as simple as possible!
 
 - [ ] **Invitation**: Send an invitation email to new users to join your application.
 - [ ] **Verification code**: Send a verification code for authentication or account confirmation.
-- [ ] **Email link - Sign in**: Send a magic link to allow users to sign in. (require magic link)
-- [ ] **Email link - Sign up**: Send a magic link for users to sign up and create an account. (require magic link)
-- [ ] **Email link - Verify email**: Send a magic link for users to verify their email address. (require magic link)
+
+> **Notice**: No magic links and no verification links — ever. Every email-based flow
+> (sign-up verification, sign-in, email change, invitation) delivers a **single-use
+> code** only. The former "Email link - Sign in / Sign up / Verify email" items are
+> removed from this design; do not plan, implement, or re-add link-based channels.
 
 #### Security
 
