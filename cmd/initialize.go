@@ -196,7 +196,6 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 			// bootstraps, so it ships verified like every seeder account.
 			EmailVerifiedAt: &now,
 			DisplayName:     "Administrator",
-			Timezone:        user.DefaultTimezone,
 		})
 		var pgErr *pgconn.PgError
 		if errors.As(createErr, &pgErr) && pgErr.Code == "23505" {

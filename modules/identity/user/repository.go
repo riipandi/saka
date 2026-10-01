@@ -26,7 +26,7 @@ func NewRepository() *Repository {
 // userColumns are the columns the account procedures read, in scan order.
 var UserColumns = []string{
 	"id", "username", "email", "first_name", "last_name", "display_name",
-	"locale", "timezone", "disabled", "email_verified_at", "created_at",
+	"metadata", "disabled", "email_verified_at", "created_at",
 	"banned_at", "ban_expires", "ban_reason", "avatar_url",
 	"self_delete_override",
 }
@@ -37,10 +37,10 @@ var UserColumns = []string{
 // value.
 func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	var row UserSchema
-	var username, firstName, lastName, locale, banReason, picturePath *string
+	var username, firstName, lastName, banReason, picturePath *string
 	err := scan(
 		&row.ID, &username, &row.Email, &firstName, &lastName,
-		&row.DisplayName, &locale, &row.Timezone, &row.Disabled,
+		&row.DisplayName, &row.Metadata, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
 		&row.SelfDeleteOverride,
@@ -51,7 +51,6 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	row.Username = deref(username)
 	row.FirstName = deref(firstName)
 	row.LastName = deref(lastName)
-	row.Locale = deref(locale)
 	row.BanReason = banReason
 	row.AvatarURL = picturePath
 	return row, nil
@@ -168,11 +167,11 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(UserTable)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
-		"locale", "disabled", "email_verified_at")
+		"metadata", "disabled", "email_verified_at")
 	ib.Values(
 		row.ID, nullIfEmpty(row.Username), row.Email,
 		nullIfEmpty(row.FirstName), nullIfEmpty(row.LastName), row.DisplayName,
-		nullIfEmpty(row.Locale), row.Disabled, row.EmailVerifiedAt,
+		nullJSON(row.Metadata), row.Disabled, row.EmailVerifiedAt,
 	)
 
 	query, args := ib.Build()
@@ -195,8 +194,7 @@ func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row U
 		ub.Assign("first_name", nullIfEmpty(row.FirstName)),
 		ub.Assign("last_name", nullIfEmpty(row.LastName)),
 		ub.Assign("display_name", row.DisplayName),
-		ub.Assign("locale", nullIfEmpty(row.Locale)),
-		ub.Assign("timezone", row.Timezone),
+		ub.Assign("metadata", nullJSON(row.Metadata)),
 		ub.Assign("disabled", row.Disabled),
 		ub.Assign("banned_at", row.BannedAt),
 		ub.Assign("ban_expires", row.BanExpires),
@@ -246,6 +244,16 @@ func (r *Repository) CreatePassword(ctx context.Context, db datastore.Querier, u
 // stores.
 func nullIfEmpty(value string) any {
 	if value == "" {
+		return nil
+	}
+	return value
+}
+
+// nullJSON turns an absent document into the SQL NULL its column stores; a
+// document that carries no keys is still a document — the state "the account
+// answered every preference", distinct from "no document was ever written".
+func nullJSON(value []byte) any {
+	if len(value) == 0 {
 		return nil
 	}
 	return value

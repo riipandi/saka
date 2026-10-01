@@ -13,10 +13,12 @@ CREATE TABLE IF NOT EXISTS public.users (
     last_name VARCHAR(100),
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),
     avatar_url TEXT, -- Storage key of the uploaded avatar; NULL = bundled default picture
-    locale TEXT,
-    timezone TEXT NOT NULL DEFAULT 'UTC', -- IANA zone for timestamp presentation; UTC = the server default
     disabled BOOLEAN NOT NULL DEFAULT FALSE,
-    metadata JSONB DEFAULT NULL, -- Metadata can contain user-specific information
+    -- The account's preference document (locale, timezone, and whatever a
+    -- later preference adds); NULL means every preference is absent, and an
+    -- absent key answers its default. The readers and writers live in the
+    -- user module's metadata helpers — no query filters on the document.
+    metadata JSONB DEFAULT NULL,
     email_verified_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT NULL,
@@ -30,8 +32,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     -- the global gate is on.
     self_delete_override BOOLEAN DEFAULT NULL,
     -- Username only allows alphanumeric characters and underscores, must be between 3 and 32 characters long
-    CONSTRAINT chk_username_format CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_]{3,32}$'),
-    CONSTRAINT chk_users_timezone CHECK (char_length(timezone) <= 64)
+    CONSTRAINT chk_username_format CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_]{3,32}$')
 ) USING heap;
 
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();

@@ -345,7 +345,6 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			FirstName:       params.FirstName,
 			LastName:        params.LastName,
 			DisplayName:     name,
-			Timezone:        user.DefaultTimezone,
 			EmailVerifiedAt: verifiedAt,
 		})
 		if errUniqueViolation(createErr) {

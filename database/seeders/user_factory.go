@@ -183,7 +183,6 @@ func applyDefaultUser(
 		FirstName:       DefaultUser.FirstName,
 		LastName:        DefaultUser.LastName,
 		DisplayName:     DefaultUser.DisplayName(),
-		Timezone:        user.DefaultTimezone,
 		CreatedAt:       time.Now().UTC(),
 		EmailVerifiedAt: &now,
 	}
@@ -281,7 +280,6 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 		FirstName:   s.credentials.FirstName,
 		LastName:    s.credentials.LastName,
 		DisplayName: s.credentials.DisplayName(),
-		Timezone:    user.DefaultTimezone,
 		CreatedAt:   now,
 		// Scenario accounts ship verified, like the default one: they exist
 		// to exercise the ban states, not the verification gate.

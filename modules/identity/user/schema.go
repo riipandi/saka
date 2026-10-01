@@ -17,14 +17,18 @@ const UserTable = "public.users"
 // a default without touching this struct. The db tags are the column names the
 // query builder uses.
 type UserSchema struct {
-	ID                 uuid.UUID  `db:"id"`
-	Username           string     `db:"username"`
-	Email              string     `db:"email"`
-	FirstName          string     `db:"first_name"`
-	LastName           string     `db:"last_name"`
-	DisplayName        string     `db:"display_name"`
-	Locale             string     `db:"locale"`
-	Timezone           string     `db:"timezone"`
+	ID          uuid.UUID `db:"id"`
+	Username    string    `db:"username"`
+	Email       string    `db:"email"`
+	FirstName   string    `db:"first_name"`
+	LastName    string    `db:"last_name"`
+	DisplayName string    `db:"display_name"`
+	// Metadata is the account's preference document — the locale and the
+	// timezone live here as JSON keys, not as columns, so a new preference
+	// is a code change and not a migration. The readers and the writers go
+	// through the metadata helpers in the service; nothing touches the raw
+	// bytes elsewhere.
+	Metadata           []byte     `db:"metadata"`
 	Disabled           bool       `db:"disabled"`
 	EmailVerifiedAt    *time.Time `db:"email_verified_at"`
 	CreatedAt          time.Time  `db:"created_at"`
