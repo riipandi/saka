@@ -1,9 +1,12 @@
 import * as fs from 'node:fs'
+import { createRequire } from 'node:module'
 import * as path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { ReactElement, ReactNode } from 'react'
 import { render } from 'react-email'
 import type { Plugin } from 'vite'
+import { loadCache, planRebuild, pruneOutputs, saveCache, sha256 } from './email-cache.ts'
+import type { TemplateCacheEntry } from './email-cache.ts'
 
 type EmailTemplate = ((props: unknown) => ReactNode) & { TemplateProps?: unknown }
 
@@ -71,6 +74,29 @@ function logError(msg: string) {
   console.error(`${PREFIX} ${C.red}${msg}${C.reset}`)
 }
 
+/**
+ * The rendered bytes depend on the template source and the stack that
+ * renders it. A dependency bump — a patch that changes a render detail —
+ * must obsolete every entry, not silently keep stale output; hashing the
+ * resolved versions of the packages the render rides is the honest
+ * fingerprint. A package that does not resolve contributes its name only,
+ * which downgrades precision, never correctness.
+ */
+function toolchainDigest(): string {
+  const require = createRequire(import.meta.url)
+  const parts = ['react-email', 'react', 'tsx'].map((name) => {
+    try {
+      const pkg = JSON.parse(require.resolve(`${name}/package.json`) as unknown as string) as {
+        version?: string
+      }
+      return `${name}@${pkg.version ?? 'unknown'}`
+    } catch {
+      return `${name}@unresolved`
+    }
+  })
+  return sha256(parts.join('|'))
+}
+
 function getFirstExport(module: Record<string, unknown>): unknown {
   const keys = Object.keys(module)
   if (keys.length === 0) return undefined
@@ -94,7 +120,7 @@ async function buildTemplateFile(
   templateName: string,
   outputDir: string,
   isPlainText: boolean
-) {
+): Promise<void> {
   const element = Component(templateProps) as ReactElement
 
   // `plainText` is a discriminated union, so it must be a literal, not a boolean.
@@ -123,21 +149,22 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
   // vite was started from, which is not vite's root when the SPA sits in a
   // subdirectory.
   const projectRoot = process.cwd()
+  const toolchain = toolchainDigest()
   let command: 'serve' | 'build' = 'serve'
   let timer: ReturnType<typeof setTimeout> | null = null
   let isBuilding = false
   let hasPendingChanges = false
   let disposed = false
 
-  // Template file names awaiting a dev rebuild; empty means "compile everything".
-  const pending = new Set<string>()
-
-  // Compiles one template into its _html and _text pair. Returns the template
-  // name on success, null on failure (already logged).
+  // Compiles one template into its _html and _text pair and records the
+  // pair in the cache. Returns the entry on success, null on failure
+  // (already logged); a failed template writes no entry, so the next run
+  // owes it again.
   async function buildOne(
     absTemplates: string,
     absOutput: string,
-    file: string
+    file: string,
+    cache: Record<string, TemplateCacheEntry>
   ): Promise<string | null> {
     const templateName = file.replace('.tsx', '')
     const start = Date.now()
@@ -157,6 +184,12 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
       await buildTemplateFile(Component, Component.TemplateProps, templateName, absOutput, false) // HTML
       await buildTemplateFile(Component, Component.TemplateProps, templateName, absOutput, true) // Text
 
+      cache[file] = {
+        hash: sha256(fs.readFileSync(path.join(absTemplates, file))),
+        outputs: [`${templateName}_html.tmpl`, `${templateName}_text.tmpl`],
+        builtAt: Date.now()
+      }
+
       log(`  ${C.green}✓ ${templateName}${C.reset} in ${formatDuration(Date.now() - start)}`)
       return templateName
     } catch (error) {
@@ -166,7 +199,11 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
     }
   }
 
-  async function buildAll(): Promise<boolean> {
+  // The one pass every path shares — dev start, watch reconcile, and
+  // `vite build`. A template compiles again only when its source changed,
+  // the toolchain changed, or its output vanished; everything the cache
+  // vouches for is left alone, so the Go embed sees no churn.
+  async function reconcile(): Promise<boolean> {
     const absTemplates = path.resolve(projectRoot, opts.templateDir)
     const absOutput = path.resolve(projectRoot, opts.outputDir)
 
@@ -177,17 +214,34 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
 
     fs.mkdirSync(absOutput, { recursive: true })
 
+    const cache = loadCache(absOutput)
+    cache.toolchain = toolchain
+    const files = fs.readdirSync(absTemplates).filter((file) => file.endsWith('.tsx'))
+    const plan = planRebuild(cache, files, absTemplates, absOutput, toolchain)
+
+    if (plan.removed.length > 0) {
+      pruneOutputs(absOutput, plan.removed)
+    }
+
+    const nothingToDo = plan.stale.length === 0 && plan.removed.length === 0
+    if (nothingToDo) {
+      log(`  ${C.green}✓ ${plan.cached.length} template(s) current${C.reset}`)
+      return true
+    }
+
     log('building email templates...')
     logInfo('templates', displayPath(absTemplates))
     logInfo('output', displayPath(absOutput))
+    if (plan.cached.length > 0) {
+      logInfo('cached', `${plan.cached.length}/${files.length}`)
+    }
 
     const startedAt = Date.now()
-    const files = fs.readdirSync(absTemplates).filter((file) => file.endsWith('.tsx'))
     let built = 0
     let failed = 0
 
-    for (const file of files) {
-      const name = await buildOne(absTemplates, absOutput, file)
+    for (const file of plan.stale) {
+      const name = await buildOne(absTemplates, absOutput, file, cache.templates)
       if (name === null) {
         failed++
       } else {
@@ -195,46 +249,14 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
       }
     }
 
-    const duration = formatDuration(Date.now() - startedAt)
-
-    if (built > 0) {
+    if (built > 0 || plan.removed.length > 0) {
       log(
-        `${C.green}built ${built}/${files.length} templates → ${displayPath(absOutput)} in ${duration}${C.reset}\n`
+        `${C.green}built ${built}/${plan.stale.length} template(s) → ${displayPath(absOutput)} in ${formatDuration(Date.now() - startedAt)}${C.reset}\n`
       )
-    } else if (files.length === 0) {
-      log(`no templates found in ${displayPath(absTemplates)}`)
     }
 
+    saveCache(absOutput, cache)
     return failed === 0
-  }
-
-  // A dev rebuild touches only the templates that changed; the untouched
-  // compiled pairs keep their files, so the Go embed sees no churn.
-  async function rebuildChanged(): Promise<boolean> {
-    const absTemplates = path.resolve(projectRoot, opts.templateDir)
-    const absOutput = path.resolve(projectRoot, opts.outputDir)
-    const files = [...pending]
-    pending.clear()
-
-    const startedAt = Date.now()
-    let built = 0
-    let ok = true
-
-    for (const file of files) {
-      const name = await buildOne(absTemplates, absOutput, file)
-      if (name === null) {
-        ok = false
-      } else {
-        built++
-      }
-    }
-
-    if (built > 0) {
-      log(
-        `${C.green}rebuilt ${built}/${files.length} template(s) in ${formatDuration(Date.now() - startedAt)}${C.reset}`
-      )
-    }
-    return ok
   }
 
   async function rebuild() {
@@ -244,7 +266,7 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
     }
 
     isBuilding = true
-    const ok = pending.size === 0 ? await buildAll() : await rebuildChanged()
+    const ok = await reconcile()
     isBuilding = false
 
     if (!ok) return
@@ -255,8 +277,7 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
     }
   }
 
-  function schedule(file?: string) {
-    if (file) pending.add(path.basename(file))
+  function schedule() {
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null
@@ -291,20 +312,18 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
       server.watcher.add(path.resolve(projectRoot, opts.templateDir))
       log(`watching ${displayPath(path.resolve(projectRoot, opts.templateDir))} for changes...`)
 
+      // A change or an addition marks its template for the next pass; the
+      // reconcile reads the sources fresh, so the debounce needs no names.
       const onFile = (file: string) => {
         if (disposed || !shouldWatch(file)) return
-        schedule(file)
+        schedule()
       }
 
       server.watcher.on('change', onFile)
       server.watcher.on('add', onFile)
-      // A removed template cannot be rebuilt alone; a full pass reconciles the
-      // compiled pairs with what is on disk.
-      server.watcher.on('unlink', (file: string) => {
-        if (disposed || !shouldWatch(file)) return
-        pending.clear()
-        schedule()
-      })
+      // A removed template cannot be rebuilt; the reconcile prunes the
+      // compiled pairs the lock still names.
+      server.watcher.on('unlink', onFile)
 
       server.httpServer?.once('close', cleanup)
     },
@@ -320,7 +339,7 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
           return
         }
 
-        const ok = await buildAll()
+        const ok = await reconcile()
         if (!ok) {
           logError('email template build failed, aborting go binary build')
           process.exitCode = 1
