@@ -212,7 +212,7 @@ stream; `system` notices target accounts and carry neither a topic nor a global 
 
 ## Settings
 
-Tango-only. The catalog in code declares every item; `public.settings` stores the overrides
+Tango-only. The catalog in code declares every item; `public.app_settings` stores the overrides
 alone. A sealed item seals its value (AES-256-GCM); a public item never rests sealed.
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |

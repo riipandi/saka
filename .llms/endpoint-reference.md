@@ -120,8 +120,8 @@ a path), and the frontend forwards the code to the exchange. Audit events: `one_
 ## MFA TOTP (tango-only)
 
 Upstream Pocket ID has no TOTP; this surface is tango-only and follows the database contract in
-`.llms/porting-plan/database.md` (`user_mfa_totp`, `user_mfa_recovery_codes`,
-`user_mfa_pending`).
+`.llms/porting-plan/database.md` — the tables now carry the names `mfa_totp`, `mfa_recovery_codes`,
+and `mfa_pending` (migration `00004_create_multifactor_tables.sql`).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
@@ -273,7 +273,7 @@ probe (`task mailer:smoke`).
 
 Tango-only surface — Pocket ID has no generic settings CRUD. The catalog in
 code declares every item (key, default, sealed, public, description);
-`public.settings` in `00008_create_settings_table.sql` stores the overrides
+`public.app_settings` in `00006_create_settings_table.sql` stores the overrides
 alone. No delete surface exists by design: an item is removed by resetting
 it, and a key not in the catalog is refused everywhere.
 
@@ -692,7 +692,7 @@ customclaim feature owns them).
 | POST | `/rpc/tango.identity.v1.SignupService/ListSignupTokens` | List signup tokens | done — admin Bearer; paginated; sorted by `created_at`, `expires_at`, `usage_count`, or `usage_limit` (absent: newest first); each token answers the groups its sign-ups join | `modules/identity/signup` (service tests) |
 | POST | `/rpc/tango.identity.v1.SignupService/CreateSignupToken` | Create signup token | done — admin Bearer; raw token shown once; optional `user_group_ids` links the groups every account signed up under the token joins, checked to exist at issue time | `modules/identity/signup.TestSignupJoinsTheGroupsTheTokenCarried` |
 | POST | `/rpc/tango.identity.v1.SignupService/DeleteSignupToken` | Delete signup token | done — admin Bearer | `modules/identity/signup` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/ListUsers` | List users | done — admin Bearer; paginated; optional search over username/email/display_name; sorted by `username`, `email`, `first_name`, `last_name`, `display_name`, or `created_at` (absent: newest first); every account view carries its group memberships | `modules/identity/user` (service tests) |
+| POST | `/rpc/tango.identity.v1.UserService/ListUsers` | List users | done — admin Bearer; paginated; optional search over username/email/display_name; sorted by `username`, `email`, `first_name`, `last_name`, `display_name`, `created_at`, or `last_login_at` (absent: newest first); every account view carries its group memberships and its `metadata` document (the typed locale + timezone block) | `modules/identity/user` (service tests) |
 | POST | `/rpc/tango.identity.v1.UserService/GetUser` | Get user by ID | done — admin Bearer; the view carries the group memberships | `modules/identity/user` (service tests) |
 | POST | `/rpc/tango.identity.v1.UserService/CreateUser` | Create user | done — admin Bearer; mandatory names; optional password (absent = no credential); optional `user_group_ids` joins the groups at creation — an unknown id rolls the whole creation back, and the answer carries the memberships | `modules/identity/user` (service tests) |
 | POST | `/rpc/tango.identity.v1.UserService/UpdateUser` | Update user | done — admin Bearer; full replace; mandatory names; ban fields as a unit; `timezone` reset to `UTC` when empty and refused when it names no zone the tz database carries | `modules/identity/user` (service tests) |
