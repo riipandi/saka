@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_ZgDfuBYV9u
+createdAt: 2026-10-01T18:57:43.100376
+updatedAt: 2026-10-01T19:07:48.407579
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "01999999-9999-7000-8000-000000000000"
+    }
+bodyType: application/json
+description: |-
+  Queue surface — removes one unclaimed task. A claimed task answers failed_precondition, an unknown one not_found.
+
+  Admin only. tango built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Cancel a waiting task (queue)'
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/CancelTask
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

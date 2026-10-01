@@ -38,7 +38,8 @@ configuration's; a public procedure missing from the tables fails a test rather 
 past uncounted.
 
 The contracts frozen so far are `tango.common.v1` (`common.proto`: the shared response metadata
-block) and `tango.system.v1` (`system.proto`: `HealthService`). The transport rules — snake_case
+block) and `tango.system.v1` (`system.proto`: `HealthService`, `AppConfigService`, `QueueService`,
+`SchedulerService`). The transport rules — snake_case
 field naming on both surfaces, and an unknown `/rpc` path answering the Connect error document —
 are pinned by `internal/transport/handler_rpc_test.go`.
 
@@ -392,6 +393,28 @@ the approval. Audit events: `device_login_approved`,
 | GET | `/healthz` | Responds to healthchecks | REST — liveness, dependencies untouched | `internal/transport.TestAPIHealthzReportsTheChecker` |
 | GET | `/api/healthz` | Readiness document | REST — per-dependency results | `internal/transport.TestAPIHealthzReportsTheChecker` |
 | POST | `/rpc/tango.system.v1.HealthService/Check` | Readiness over ConnectRPC | done — the same checker and the same result as `/api/healthz`; fails with `unavailable` naming the checks that are down | `internal/transport.TestRPCCheckAnswersTheReadinessDocument`, `internal/transport.TestRPCUnhealthyAnswersUnavailable` |
+
+## Queue & Scheduler (tango-only)
+
+The engines' own operational surface — an operations console reads and acts
+on them over RPC; the frontend integration is deferred. `tango.system.v1.QueueService`
+and `tango.system.v1.SchedulerService` in `system.proto`; every procedure is
+`Admin` in `internal/guard/rules.go`. The engine facts come from
+`internal/queue` (`Queues`, `Tasks`, `Detail`, `DeadTasks`) and
+`internal/scheduler` (`Jobs`, `RunNow`); the transport maps the wire only.
+
+| Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
+| ------ | -------------------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.system.v1.QueueService/ListQueues` | List task queues with live counts (queue) | done — per-queue config + pending/dead counts, name order | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed`, `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/tango.system.v1.QueueService/ListTasks` | List pending tasks (queue) | done — pending-table page, newest first, queue filter, total; no payload | `internal/queue.TestInspectFiltersByQueueName` |
+| POST | `/rpc/tango.system.v1.QueueService/GetTask` | Get task detail with payload (queue) | done — state across both tables + decoded payload; unknown id `not_found` | `internal/queue.TestInspectAnswersAnArchivedTask`, `internal/queue.TestInspectReportsAnUnknownTaskAsAbsent` |
+| POST | `/rpc/tango.system.v1.QueueService/ListDeadTasks` | List failed tasks in the archive (queue) | done — replayable failures, oldest first, queue filter | `internal/queue.TestInspectAnswersAnArchivedTask` |
+| POST | `/rpc/tango.system.v1.QueueService/CancelTask` | Cancel a waiting task (queue) | done — unclaimed removes; claimed `failed_precondition`; unknown `not_found` | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed` |
+| POST | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks` | Replay failed tasks (queue) | done — re-enqueues under fresh identities, answers the count | `internal/queue.TestReplayDeadRequeuesTheDeadTasks` |
+| POST | `/rpc/tango.system.v1.QueueService/FlushPendingTasks` | Flush all waiting tasks (queue) | done — every unclaimed row | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks` | Flush the completed archive (queue) | done — retention notwithstanding | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/tango.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: spec, next_due, last_fired; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
+| POST | `/rpc/tango.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — enqueues without advancing next_due; unknown name `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
 
 ## OIDC
 
@@ -758,7 +781,7 @@ build's simulation pages at `/debug/passkey/*` (Utilities below).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.VersionService/Current` | Get current deployed version | planned — no proto yet; `system.proto` holds only `HealthService` | — |
+| POST | `/rpc/tango.system.v1.VersionService/Current` | Get current deployed version | planned — no proto yet; `system.proto` carries the health, configuration, queue, and scheduler services | — |
 | POST | `/rpc/tango.system.v1.VersionService/Latest` | Get latest available version | planned — anonymous; falls back to the deployed build when the feed never answered | — |
 
 ## Utilities

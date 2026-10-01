@@ -133,7 +133,12 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		// consumer is registered as the interface the guard defines — the
 		// registry never learns which feature mints the tokens.
 		Reauthentication: do.MustInvoke[guard.ReauthConsumer](i),
-		Injector:         i,
+		// The engines' own operational surface reads them the same way: the
+		// queue procedures answer from the client, the scheduler ones from
+		// its state rows.
+		QueueClient: do.MustInvoke[*queue.Client](i),
+		Scheduler:   do.MustInvoke[*scheduler.Scheduler](i),
+		Injector:    i,
 	}), nil
 }
 

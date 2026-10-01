@@ -329,6 +329,21 @@ var ProcedureRules = map[string]Entry{
 	// `GET /api/configuration` in RestRules — not a procedure here.
 	systemv1connect.AppConfigServiceTestEmailProcedure: {Rule: Admin},
 
+	// The queue and scheduler are the engines' own operational surface: an
+	// operations console reads the pending rows, the archive, and the cron
+	// state, and acts on them. Everything administrative by default, and
+	// named here so the intent survives a default that changes.
+	systemv1connect.QueueServiceListQueuesProcedure:          {Rule: Admin},
+	systemv1connect.QueueServiceListTasksProcedure:           {Rule: Admin},
+	systemv1connect.QueueServiceGetTaskProcedure:             {Rule: Admin},
+	systemv1connect.QueueServiceListDeadTasksProcedure:       {Rule: Admin},
+	systemv1connect.QueueServiceCancelTaskProcedure:          {Rule: Admin},
+	systemv1connect.QueueServiceReplayDeadTasksProcedure:     {Rule: Admin},
+	systemv1connect.QueueServiceFlushPendingTasksProcedure:   {Rule: Admin},
+	systemv1connect.QueueServiceFlushCompletedTasksProcedure: {Rule: Admin},
+	systemv1connect.SchedulerServiceListJobsProcedure:        {Rule: Admin},
+	systemv1connect.SchedulerServiceRunNowProcedure:          {Rule: Admin},
+
 	// The settings surface is the database-backed, product-flow settings.
 	// ListPublic is the one public read: it publishes only the catalog items
 	// flagged public, and a public item never rests sealed — the catalog

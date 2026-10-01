@@ -11,6 +11,8 @@ import (
 	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/tango/internal/scheduler"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/internal/transport/middleware"
 	"github.com/riipandi/tango/internal/transport/static"
@@ -55,6 +57,14 @@ type Options struct {
 	// demands. A nil enforcer fails closed: the guarded procedures refuse,
 	// which is the state a bare test router is in.
 	Reauthentication guard.ReauthConsumer
+	// QueueClient is the embedded task queue the administrative surface
+	// reads and acts on. A nil client mounts the queue procedures but every
+	// one answers `unavailable` — the state a test that never touches the
+	// engine is in.
+	QueueClient *queue.Client
+	// Scheduler is the durable cron scheduler the administrative surface
+	// reads and triggers. A nil scheduler answers the same way.
+	Scheduler *scheduler.Scheduler
 	// Injector is the samber/do container the run composed. Only the debug
 	// build's devtool reads it; a release build ignores the field.
 	Injector do.Injector
@@ -161,7 +171,7 @@ func NewRouter(opts Options) chi.Router {
 				rpcRefuseWith(opts.Config.Server.MaxRequestBytes), opts.RateClassify, rpcRateLimitExclusions...))
 		}
 
-		mountRPC(throttled, opts.Checker, opts.Authenticator, opts.Modules, opts.Config.Server.MaxRequestBytes, opts.Reauthentication)
+		mountRPC(throttled, opts)
 	})
 
 	// The devtool sits outside the throttled and bearer-guarded groups: a

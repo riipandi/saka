@@ -231,6 +231,23 @@ alone. A sealed item seals its value (AES-256-GCM); a public item never rests se
 
 The configuration's source is the JSON file resolved at startup; there is no write surface.
 
+## Queue & Scheduler administration
+
+The engines' own operational surface — an operations console reads and acts on them over RPC. Every procedure is `Admin` (`internal/guard/rules.go`); the frontend integration is deferred.
+
+| Method   | Procedure / Endpoint                                            | Protocol     | Summary                                             |
+| -------- | --------------------------------------------------------------- | ------------ | --------------------------------------------------- |
+| POST     | `/rpc/tango.system.v1.QueueService/ListQueues`                  | ConnectRPC   | Per-queue summary: config + live pending/dead counts (admin) |
+| POST     | `/rpc/tango.system.v1.QueueService/ListTasks`                   | ConnectRPC   | One page of the pending table, newest first (admin) |
+| POST     | `/rpc/tango.system.v1.QueueService/GetTask`                     | ConnectRPC   | One task's state + decoded payload (admin)          |
+| POST     | `/rpc/tango.system.v1.QueueService/ListDeadTasks`               | ConnectRPC   | One page of the failed archive (admin)              |
+| POST     | `/rpc/tango.system.v1.QueueService/CancelTask`                  | ConnectRPC   | Remove one unclaimed task; claimed answers `failed_precondition` (admin) |
+| POST     | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks`             | ConnectRPC   | Re-enqueue the dead tasks; answers how many went (admin) |
+| POST     | `/rpc/tango.system.v1.QueueService/FlushPendingTasks`           | ConnectRPC   | Remove every unclaimed task (admin)                 |
+| POST     | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks`         | ConnectRPC   | Remove every archive record (admin)                 |
+| POST     | `/rpc/tango.system.v1.SchedulerService/ListJobs`                | ConnectRPC   | Cron state rows: spec, next_due, last_fired (admin) |
+| POST     | `/rpc/tango.system.v1.SchedulerService/RunNow`                  | ConnectRPC   | Enqueue a job's task now, schedule untouched (admin)|
+
 ## OIDC Federation
 
 The provider surface: client management and consent over ConnectRPC, the protocol itself as REST

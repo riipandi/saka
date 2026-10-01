@@ -309,6 +309,155 @@ func countDead(ctx context.Context, q datastore.Querier, queue string) (int64, e
 	return count, err
 }
 
+// listPending answers one page of the pending table, newest first, with the
+// total the filter admits. A claimed row is a running task; the page carries
+// the claim so the caller tells the two states apart.
+func listPending(ctx context.Context, q datastore.Querier, queue string, offset, limit int) ([]*taskRow, int64, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "queue", "task", "attempts", "priority", "wait_until", "claimed_at", "created_at", "last_executed_at")
+	sb.From(tasksTable)
+	if queue != "" {
+		sb.Where(sb.Equal("queue", queue))
+	}
+	sb.OrderBy("created_at DESC", "id ASC")
+	sb.Limit(limit).Offset(offset)
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var tasks []*taskRow
+	for rows.Next() {
+		t := &taskRow{}
+		if err := rows.Scan(&t.ID, &t.Queue, &t.Payload, &t.Attempts, &t.Priority,
+			&t.WaitUntil, &t.ClaimedAt, &t.CreatedAt, &t.LastExecutedAt); err != nil {
+			return nil, 0, err
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	cb.Select("count(*)")
+	cb.From(tasksTable)
+	if queue != "" {
+		cb.Where(cb.Equal("queue", queue))
+	}
+	query, args = cb.Build()
+	var total int64
+	if err := q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	return tasks, total, nil
+}
+
+// listDead answers one page of the archive's failures — the rows a replay
+// could bring back — oldest first, with the total the filter admits. The
+// payload stays in the database: the page is a listing, not an inspection.
+func listDead(ctx context.Context, q datastore.Querier, queue string, offset, limit int, at time.Time) ([]*completedRow, int64, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "queue", "attempts", "error", "expires_at", "last_executed_at", "created_at")
+	sb.From(completedTable)
+	sb.Where(
+		sb.Equal("succeeded", false),
+		sb.Or(sb.IsNull("expires_at"), sb.GT("expires_at", at)),
+	)
+	if queue != "" {
+		sb.Where(sb.Equal("queue", queue))
+	}
+	sb.OrderBy("created_at ASC", "id ASC")
+	sb.Limit(limit).Offset(offset)
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var dead []*completedRow
+	for rows.Next() {
+		c := &completedRow{}
+		if err := rows.Scan(&c.ID, &c.Queue, &c.Attempts, &c.Error, &c.ExpiresAt,
+			&c.LastExecutedAt, &c.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		dead = append(dead, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	cb.Select("count(*)")
+	cb.From(completedTable)
+	cb.Where(
+		cb.Equal("succeeded", false),
+		cb.Or(cb.IsNull("expires_at"), cb.GT("expires_at", at)),
+	)
+	if queue != "" {
+		cb.Where(cb.Equal("queue", queue))
+	}
+	query, args = cb.Build()
+	var total int64
+	if err := q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	return dead, total, nil
+}
+
+// taskDetail reads one task's full row: the pending row when it still is
+// one, else the archived row. exists is false when neither table names the
+// id.
+func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending *taskRow, completed *completedRow, exists bool, err error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "queue", "task", "attempts", "priority", "wait_until", "claimed_at", "created_at", "last_executed_at")
+	sb.From(tasksTable)
+	sb.Where(sb.Equal("id", id))
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t := &taskRow{}
+		if scanErr := rows.Scan(&t.ID, &t.Queue, &t.Payload, &t.Attempts, &t.Priority,
+			&t.WaitUntil, &t.ClaimedAt, &t.CreatedAt, &t.LastExecutedAt); scanErr != nil {
+			return nil, nil, false, scanErr
+		}
+		return t, nil, true, rows.Err()
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, nil, false, rowsErr
+	}
+
+	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	cb.Select("id", "queue", "task", "attempts", "succeeded", "last_duration_micro", "error", "expires_at", "created_at", "last_executed_at")
+	cb.From(completedTable)
+	cb.Where(cb.Equal("id", id))
+
+	query, args = cb.Build()
+	completed = &completedRow{}
+	err = q.QueryRow(ctx, query, args...).Scan(
+		&completed.ID, &completed.Queue, &completed.Payload, &completed.Attempts,
+		&completed.Succeeded, &completed.LastDuration, &completed.Error,
+		&completed.ExpiresAt, &completed.CreatedAt, &completed.LastExecutedAt)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return nil, nil, false, nil
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return nil, completed, true, nil
+}
+
 // deleteCompletedByIDs removes archived tasks by their IDs. The replay owns
 // a transaction, so a dead task never stays archived while its re-queued
 // form is already pending. One statement per ID: the dead pile is small, and

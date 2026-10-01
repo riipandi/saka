@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_9H3Z5UXnRN
+createdAt: 2026-10-01T18:57:43.047039
+updatedAt: 2026-10-01T19:07:44.359009
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "limit": 20
+    }
+bodyType: application/json
+description: |-
+  Queue surface — one page of the archive's failures, the replay's raw material.
+
+  Admin only. tango built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] List failed tasks in the archive (queue)'
+sortPriority: 333.3333333333333
+url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/ListDeadTasks
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

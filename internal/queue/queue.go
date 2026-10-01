@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 )
@@ -128,4 +129,22 @@ func (q *queues) get(name string) (Queue, bool) {
 	defer q.RUnlock()
 	queue, ok := q.registry[name]
 	return queue, ok
+}
+
+// all answers every registered queue's configuration, in name order. The
+// inspection surface reads it; the registry never mutates during a run —
+// Register is a startup call — so the lock only guards a concurrent build.
+func (q *queues) all() []*QueueConfig {
+	q.RLock()
+	defer q.RUnlock()
+	names := make([]string, 0, len(q.registry))
+	for name := range q.registry {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	configs := make([]*QueueConfig, 0, len(names))
+	for _, name := range names {
+		configs = append(configs, q.registry[name].Config())
+	}
+	return configs
 }

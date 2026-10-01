@@ -17,7 +17,6 @@ import (
 
 	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
 	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
-	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
 	"github.com/riipandi/tango/internal/transport/middleware"
 )
@@ -157,14 +156,13 @@ func rpcHandlerOptions(maxRequestBytes int, reauth guard.ReauthConsumer) []conne
 	}
 }
 
-// mountRPC registers the ConnectRPC surface on the router. It receives
-// exactly what the surface serves — the checker, the authenticator, and the
-// modules — so the RPC registration never reads how the router got its
-// dependencies.
-func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int, reauth guard.ReauthConsumer) {
+// mountRPC registers the ConnectRPC surface on the router. It receives the
+// whole Options value, so the RPC registration never reads how the router
+// got its dependencies.
+func mountRPC(r chi.Router, opts Options) {
 	// The prefix is stripped because chi only shifts its own route context: a
 	// generated Connect handler matches its procedure path exactly.
-	r.Mount(RPCPath, http.StripPrefix(RPCPath, rpcRouter(checker, auth, modules, maxRequestBytes, reauth)))
+	r.Mount(RPCPath, http.StripPrefix(RPCPath, rpcRouter(opts)))
 }
 
 // rpcRouter builds the Connect handler tree served below RPCPath.
@@ -179,7 +177,13 @@ func mountRPC(r chi.Router, checker *health.Checker, auth Authenticator, modules
 // (no procedure in this contract declares `idempotency_level =
 // NO_SIDE_EFFECTS`, which is what would make a GET legal), and the generated
 // handler is what refuses another method with `405` and `Allow: POST`.
-func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Module, maxRequestBytes int, reauth guard.ReauthConsumer) http.Handler {
+func rpcRouter(opts Options) http.Handler {
+	checker := opts.Checker
+	auth := opts.Authenticator
+	modules := opts.Modules
+	maxRequestBytes := opts.Config.Server.MaxRequestBytes
+	reauth := opts.Reauthentication
+
 	r := chi.NewRouter()
 
 	// The streaming procedures are lifted out of the request deadlines the
@@ -194,6 +198,30 @@ func rpcRouter(checker *health.Checker, auth Authenticator, modules []kernel.Mod
 		options...,
 	)
 	r.Handle(systemv1connect.HealthServiceCheckProcedure, healthHandler)
+
+	// The engines' own administrative surface: the queue's tables and the
+	// scheduler's state rows an operations console reads and acts on. The
+	// guard names every procedure administrative, so an anonymous miss is a
+	// 404 before the handler ever runs.
+	_, queueHandler := systemv1connect.NewQueueServiceHandler(
+		newRPCQueueService(opts.QueueClient),
+		options...,
+	)
+	r.Handle(systemv1connect.QueueServiceListQueuesProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceListTasksProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceGetTaskProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceListDeadTasksProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceCancelTaskProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceReplayDeadTasksProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceFlushPendingTasksProcedure, queueHandler)
+	r.Handle(systemv1connect.QueueServiceFlushCompletedTasksProcedure, queueHandler)
+
+	_, schedulerHandler := systemv1connect.NewSchedulerServiceHandler(
+		newRPCSchedulerService(opts.Scheduler),
+		options...,
+	)
+	r.Handle(systemv1connect.SchedulerServiceListJobsProcedure, schedulerHandler)
+	r.Handle(systemv1connect.SchedulerServiceRunNowProcedure, schedulerHandler)
 
 	// A module's procedures mount beside the transport's own, on the same
 	// router, so they share the codec and the not-found boundary.

@@ -8,6 +8,7 @@ syntax = "proto3";
 package tango.system.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/system/v1;systemv1";
 
@@ -75,6 +76,348 @@ message TestEmailResponse {
   // message is the human-readable sentence describing what the call did.
   string message = 2;
 }
+
+// QueueService is the administrative surface over the embedded task queue.
+// It answers the same facts the queue's own tables hold — the pending rows
+// the dispatcher claims, and the archive a finished task lands in — and the
+// control actions an operations screen performs: cancel a waiting task,
+// replay the dead pile, or flush a table. Every procedure is administrative;
+// the guard refuses a caller without the administrator role.
+service QueueService {
+  // ListQueues reports one summary per registered queue: the configuration
+  // it was registered with, and the live row counts pending and dead. A
+  // queue no task ever named still answers, its counts at zero.
+  rpc ListQueues(ListQueuesRequest) returns (ListQueuesResponse);
+
+  // ListTasks answers one page of the pending table — the tasks waiting for
+  // a worker, running, or past their wait — newest first. The rows carry no
+  // payload; GetTask inspects one task's content.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+
+  // GetTask reports one task's state across the two tables, and the decoded
+  // payload when the task is not yet archived past its retention. A task
+  // neither table names answers not_found.
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+
+  // ListDeadTasks answers one page of the archive's failures: the tasks
+  // that exhausted their attempts and kept their payload, not yet expired
+  // under their queue's retention. They are the replay's raw material.
+  rpc ListDeadTasks(ListDeadTasksRequest) returns (ListDeadTasksResponse);
+
+  // CancelTask removes one unclaimed task from the pending table. A claimed
+  // task is in flight — its worker may already be halfway through it — and
+  // answers `failed_precondition` rather than pretending it was stopped.
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
+  // ReplayDeadTasks re-enqueues the dead tasks a queue's archive still
+  // carries, each under a fresh identity with a fresh attempt budget, and
+  // reports how many went back. A dead task whose queue did not retain its
+  // payload cannot come back; it stays for the cleanup to expire.
+  rpc ReplayDeadTasks(ReplayDeadTasksRequest) returns (ReplayDeadTasksResponse);
+
+  // FlushPendingTasks removes every unclaimed task and reports how many
+  // went. Claimed tasks are in flight, so they finish their lifecycle
+  // instead of vanishing under a worker.
+  rpc FlushPendingTasks(FlushPendingTasksRequest) returns (FlushPendingTasksResponse);
+
+  // FlushCompletedTasks removes every completed record, retention
+  // notwithstanding, and reports how many went.
+  rpc FlushCompletedTasks(FlushCompletedTasksRequest) returns (FlushCompletedTasksResponse);
+}
+
+// ListQueuesRequest is empty: the queue set is the process's own registry.
+message ListQueuesRequest {}
+
+// ListQueuesResponse carries one entry per registered queue, in name order.
+message ListQueuesResponse {
+  // queues is the summary list.
+  repeated QueueSummary queues = 1;
+}
+
+// QueueSummary is one queue's configuration and live counts.
+message QueueSummary {
+  // name is the queue's registered name.
+  string name = 1;
+
+  // max_attempts is the attempt budget a task of this queue runs under.
+  int32 max_attempts = 2;
+
+  // timeout_ms is the per-execution context deadline, 0 when none.
+  int64 timeout_ms = 3;
+
+  // retention_seconds is how long completed tasks stay archived, absent
+  // when the queue does not retain them.
+  optional int64 retention_seconds = 4;
+
+  // retention_only_failed is true when the queue archives only its
+  // failures.
+  bool retention_only_failed = 5;
+
+  // pending is the number of unclaimed tasks in the queue.
+  int64 pending = 6;
+
+  // dead is the number of failed tasks the archive holds.
+  int64 dead = 7;
+}
+
+// ListTasksRequest filters and pages the pending table. An absent queue
+// name answers every queue's rows.
+message ListTasksRequest {
+  // queue narrows the page to one queue's rows.
+  optional string queue = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+
+  // offset is the number of rows the page starts after.
+  optional int32 offset = 3 [(buf.validate.field).int32 = {gte: 0}];
+}
+
+// ListTasksResponse answers one page of the pending table, newest first,
+// with the total the pagination metadata needs.
+message ListTasksResponse {
+  // tasks is the page.
+  repeated PendingTask tasks = 1;
+
+  // total is the number of rows the filter admits in full.
+  int64 total = 2;
+}
+
+// PendingTask is one row of the pending table: a task waiting for a worker,
+// running, or past its wait.
+message PendingTask {
+  // id is the task's identifier.
+  string id = 1;
+
+  // queue is the queue the task belongs to.
+  string queue = 2;
+
+  // attempts is the number of times the task has been claimed.
+  int32 attempts = 3;
+
+  // priority is the claim order weight; a higher number is claimed first.
+  int32 priority = 4;
+
+  // status is the task's state: `pending`, or `running` while a worker
+  // holds the claim.
+  string status = 5;
+
+  // wait_until is when the task becomes claimable, absent when it already
+  // is.
+  optional google.protobuf.Timestamp wait_until = 6;
+
+  // claimed_at is when the running task was claimed, absent when waiting.
+  optional google.protobuf.Timestamp claimed_at = 7;
+
+  // created_at is when the task was enqueued.
+  google.protobuf.Timestamp created_at = 8;
+
+  // last_executed_at is when the last claim was released, absent on a task
+  // no attempt has touched.
+  optional google.protobuf.Timestamp last_executed_at = 9;
+}
+
+// GetTaskRequest names one task.
+message GetTaskRequest {
+  // id is the task's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetTaskResponse is one task's full view: its state, and the payload as
+// the queue stored it — the stored bytes a sealing deployment wrote are
+// opened, so the body is always the task's own JSON.
+message GetTaskResponse {
+  // id is the task's identifier.
+  string id = 1;
+
+  // queue is the queue the task belongs to, absent when the task is not
+  // in the pending table.
+  optional string queue = 2;
+
+  // status is the task's state: `pending`, `running`, `success`, or
+  // `failure`.
+  string status = 3;
+
+  // attempts is the number of times the task has been claimed.
+  optional int32 attempts = 4;
+
+  // payload is the task's own JSON document, absent when the archive no
+  // longer holds it.
+  optional bytes payload = 5;
+
+  // error is the failure message of the last attempt, present on a failed
+  // task.
+  optional string error = 6;
+
+  // last_duration_ms is how long the last execution took.
+  optional double last_duration_ms = 7;
+
+  // created_at is when the task was enqueued.
+  optional google.protobuf.Timestamp created_at = 8;
+
+  // last_executed_at is when the last attempt ran.
+  optional google.protobuf.Timestamp last_executed_at = 9;
+}
+
+// ListDeadTasksRequest filters and pages the archive's failures. An absent
+// queue name answers every queue's dead.
+message ListDeadTasksRequest {
+  // queue narrows the page to one queue's dead.
+  optional string queue = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+
+  // offset is the number of rows the page starts after.
+  optional int32 offset = 3 [(buf.validate.field).int32 = {gte: 0}];
+}
+
+// ListDeadTasksResponse answers one page of the archive's failures, oldest
+// first, with the total the pagination metadata needs.
+message ListDeadTasksResponse {
+  // tasks is the page.
+  repeated DeadTask tasks = 1;
+
+  // total is the number of rows the filter admits in full.
+  int64 total = 2;
+}
+
+// DeadTask is one archived failure: a task that exhausted its attempts and
+// kept its payload for the replay.
+message DeadTask {
+  // id is the archived record's identifier — not the task's original one.
+  string id = 1;
+
+  // queue is the queue the task belonged to.
+  string queue = 2;
+
+  // attempts is the attempt budget the task exhausted.
+  int32 attempts = 3;
+
+  // error is the failure message of the last attempt.
+  optional string error = 4;
+
+  // expires_at is when the archive retires the record, absent when the
+  // queue retains it forever.
+  optional google.protobuf.Timestamp expires_at = 5;
+
+  // last_executed_at is when the last attempt ran.
+  google.protobuf.Timestamp last_executed_at = 6;
+
+  // created_at is when the task was originally enqueued.
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// CancelTaskRequest names the waiting task to remove.
+message CancelTaskRequest {
+  // id is the task's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CancelTaskResponse is empty: a cancelled task answers success; a claimed
+// one fails with `failed_precondition`, an unknown one with `not_found`.
+message CancelTaskResponse {}
+
+// ReplayDeadTasksRequest names the queue whose dead pile returns, or every
+// queue when absent.
+message ReplayDeadTasksRequest {
+  // queue narrows the replay to one queue's dead.
+  optional string queue = 1;
+}
+
+// ReplayDeadTasksResponse reports how many dead tasks went back to the
+// pending table.
+message ReplayDeadTasksResponse {
+  // replayed is the number of tasks re-enqueued.
+  int64 replayed = 1;
+}
+
+// FlushPendingTasksRequest is empty: the flush removes every unclaimed
+// task the pending table holds.
+message FlushPendingTasksRequest {}
+
+// FlushPendingTasksResponse reports how many waiting tasks went.
+message FlushPendingTasksResponse {
+  // flushed is the number of tasks removed.
+  int64 flushed = 1;
+}
+
+// FlushCompletedTasksRequest is empty: the flush removes every archived
+// record, retention notwithstanding.
+message FlushCompletedTasksRequest {}
+
+// FlushCompletedTasksResponse reports how many archived records went.
+message FlushCompletedTasksResponse {
+  // flushed is the number of records removed.
+  int64 flushed = 1;
+}
+
+// SchedulerService is the administrative surface over the durable cron
+// scheduler. Its state is the scheduler_jobs table — one row per registered
+// job, `next_due` the claim cursor — and its one control action re-enqueues
+// a job's task on demand, without touching the schedule. Every procedure is
+// administrative; the guard refuses a caller without the administrator
+// role.
+service SchedulerService {
+  // ListJobs reports one entry per registered job, in name order: the cron
+  // spec it fires on, when the claim cursor says it is next due, and when
+  // it last fired.
+  rpc ListJobs(ListSchedulerJobsRequest) returns (ListSchedulerJobsResponse);
+
+  // RunNow enqueues a job's task immediately, without advancing the job's
+  // schedule: the next tick fires on time. A job the process never
+  // registered answers not_found.
+  rpc RunNow(RunSchedulerJobNowRequest) returns (RunSchedulerJobNowResponse);
+}
+
+// ListSchedulerJobsRequest is empty: the job set is the process's own
+// registry.
+message ListSchedulerJobsRequest {}
+
+// ListSchedulerJobsResponse carries one entry per registered job, in name
+// order.
+message ListSchedulerJobsResponse {
+  // jobs is the entry list.
+  repeated SchedulerJob jobs = 1;
+}
+
+// SchedulerJob is one registered job's durable state.
+message SchedulerJob {
+  // name is the job's registered name.
+  string name = 1;
+
+  // spec is the cron expression the job fires on.
+  string spec = 2;
+
+  // next_due is when the claim cursor says the job fires next.
+  google.protobuf.Timestamp next_due = 3;
+
+  // last_fired is when the job last won a claim, absent when it never
+  // fired.
+  optional google.protobuf.Timestamp last_fired = 4;
+
+  // updated_at is when the state row last moved.
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+// RunSchedulerJobNowRequest names the job to run now.
+message RunSchedulerJobNowRequest {
+  // name is the job's registered name.
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+}
+
+// RunSchedulerJobNowResponse is empty: an enqueued tick answers success; an
+// unknown job answers not_found.
+message RunSchedulerJobNowResponse {}
 
 // CheckDetail is the outcome of one dependency check.
 message CheckDetail {
