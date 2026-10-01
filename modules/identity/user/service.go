@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json/v2"
-
 	"uuid"
 
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
@@ -315,13 +313,9 @@ type ProfileParams struct {
 // API answers in that zone.
 const DefaultTimezone = "UTC"
 
-// The metadata document's keys. The document is the account's preference
-// store; a key the document omits answers its default, and a document the
-// column does not hold answers every default.
-const (
-	metadataLocaleKey   = "locale"
-	metadataTimezoneKey = "timezone"
-)
+// The metadata document's read and write paths are the UserMetadata type's
+// own: the views parse the stored document through it, the writes rest one
+// through it, and no call site marshals the JSON itself.
 
 // normalizeTimezone validates a presented timezone preference. An empty value
 // is the default — clearing the field means UTC, not an unparseable zone —
@@ -341,53 +335,6 @@ func normalizeTimezone(value string) (string, error) {
 		return "", ErrTimezoneInvalid
 	}
 	return value, nil
-}
-
-// metadataTimezone reads the document's timezone, the default answering an
-// absent document, an absent key, or a malformed one — a corrupt document
-// must not take an account's presentation down with it.
-func metadataTimezone(raw []byte) string {
-	var doc map[string]any
-	if json.Unmarshal(raw, &doc) != nil {
-		return DefaultTimezone
-	}
-	if zone, ok := doc[metadataTimezoneKey].(string); ok && zone != "" {
-		return zone
-	}
-	return DefaultTimezone
-}
-
-// metadataLocale reads the document's locale, nil answering an absent
-// document or key — an absent locale is a real state, not the empty string.
-func metadataLocale(raw []byte) *string {
-	var doc map[string]any
-	if json.Unmarshal(raw, &doc) != nil {
-		return nil
-	}
-	if locale, ok := doc[metadataLocaleKey].(string); ok && locale != "" {
-		return &locale
-	}
-	return nil
-}
-
-// metadataFromPrefs builds the document a create or update writes. The
-// timezone always rests (normalizeTimezone has answered the default
-// already); an empty locale rests no key, which is how a cleared locale
-// reads.
-func metadataFromPrefs(locale, timezone string) []byte {
-	doc := map[string]any{
-		metadataTimezoneKey: timezone,
-	}
-	if locale != "" {
-		doc[metadataLocaleKey] = locale
-	}
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		// A two-string document cannot fail to marshal; a failure is a
-		// programming error, and an empty document answers every default.
-		return nil
-	}
-	return raw
 }
 
 // UserView is an account as the procedures answer it: the fields a client
@@ -448,7 +395,7 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 			FirstName:       params.FirstName,
 			LastName:        params.LastName,
 			DisplayName:     displayName,
-			Metadata:        metadataFromPrefs(params.Locale, DefaultTimezone),
+			Metadata:        UserMetadata{Locale: params.Locale, Timezone: DefaultTimezone}.Raw(),
 			Disabled:        params.Disabled,
 			EmailVerifiedAt: emailVerifiedAt,
 			CreatedAt:       s.now(),
@@ -592,7 +539,7 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		FirstName:   params.FirstName,
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
-		Metadata:    metadataFromPrefs(params.Locale, timezone),
+		Metadata:    UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw(),
 		Disabled:    existing.Disabled,
 		// The immutable columns and the ban state ride through untouched:
 		// this update owns the profile, nothing else.
@@ -747,7 +694,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		FirstName:   params.FirstName,
 		LastName:    params.LastName,
 		DisplayName: params.DisplayName,
-		Metadata:    metadataFromPrefs(params.Locale, timezone),
+		Metadata:    UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw(),
 		Disabled:    params.Disabled,
 		// The creation instant is immutable; the update statement leaves the
 		// column alone, and the answer carries the value as it stood.
@@ -834,12 +781,16 @@ func WireView(user UserView) *identityv1.User {
 		DisplayName:   user.DisplayName,
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
-		Locale:        user.Locale,
-		Timezone:      user.Timezone,
 		Disabled:      user.Disabled,
 		EmailVerified: user.EmailVerified,
 		CreatedAt:     user.CreatedAt.Format(rfc3339),
 		BanReason:     user.BanReason,
+		// The document is the read-side view of the stored preferences; a
+		// client that wants the locale or the timezone reads it here.
+		Metadata: &identityv1.UserMetadata{
+			Locale:   user.Locale,
+			Timezone: user.Timezone,
+		},
 	}
 	if user.BannedAt != nil {
 		view.BannedAt = new(user.BannedAt.Format(rfc3339))
@@ -919,6 +870,7 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 // form: a TypeID the responses and the URLs carry, so the row's UUID stays
 // inside the server.
 func view(row UserSchema) UserView {
+	metadata := ParseUserMetadata(row.Metadata)
 	return UserView{
 		ID:            FormatID(row.ID),
 		Username:      row.Username,
@@ -926,8 +878,8 @@ func view(row UserSchema) UserView {
 		DisplayName:   row.DisplayName,
 		FirstName:     optional(row.FirstName),
 		LastName:      optional(row.LastName),
-		Locale:        metadataLocale(row.Metadata),
-		Timezone:      metadataTimezone(row.Metadata),
+		Locale:        optional(metadata.Locale),
+		Timezone:      metadata.TimezoneOrDefault(),
 		Disabled:      row.Disabled,
 		EmailVerified: row.EmailVerifiedAt != nil,
 		CreatedAt:     row.CreatedAt,

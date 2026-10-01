@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json/v2"
 	"fmt"
 	"time"
 
@@ -37,6 +38,62 @@ type UserSchema struct {
 	BanReason          *string    `db:"ban_reason"`
 	AvatarURL          *string    `db:"avatar_url"`
 	SelfDeleteOverride *bool      `db:"self_delete_override"`
+}
+
+// UserMetadata is the account's preference document — the typed shape of
+// the JSONB `users.metadata` column. The document is closed: locale and
+// timezone are the whole contract, so an engineer reads the keys here and
+// nowhere else. The zero document answers every default; a malformed or
+// absent stored document parses to it rather than failing the account read.
+//
+// Raw is the write side: an empty document marshals no keys, and the
+// column answers NULL when no key rests. A future preference joins this
+// struct — a code change and a read of this comment, never a migration.
+type UserMetadata struct {
+	// Locale is the preferred locale tag, empty meaning unset.
+	Locale string `json:"locale,omitzero"`
+	// Timezone is the IANA zone the frontend formats instants against.
+	// Storage writes it always (normalizeTimezone answered the default);
+	// reads answer DefaultTimezone when it is absent.
+	Timezone string `json:"timezone,omitzero"`
+}
+
+// ParseUserMetadata reads the stored document. The zero document answers a
+// nil, empty, or malformed one — a corrupt document degrades the account's
+// presentation to the defaults instead of failing the read.
+func ParseUserMetadata(raw []byte) UserMetadata {
+	if len(raw) == 0 {
+		return UserMetadata{}
+	}
+	var doc UserMetadata
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return UserMetadata{}
+	}
+	return doc
+}
+
+// Raw marshals the document for storage. A document that carries no key
+// rests no bytes — the column stores NULL, the state "every preference is
+// absent" — and a two-string document cannot fail to marshal, so an error
+// answers no bytes rather than a panic.
+func (m UserMetadata) Raw() []byte {
+	if m.Locale == "" && m.Timezone == "" {
+		return nil
+	}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
+// TimezoneOrDefault answers the document's timezone, DefaultTimezone when
+// the document omits one.
+func (m UserMetadata) TimezoneOrDefault() string {
+	if m.Timezone == "" {
+		return DefaultTimezone
+	}
+	return m.Timezone
 }
 
 // UserIDPrefix is the TypeID prefix of an account's identifier. The id

@@ -374,14 +374,6 @@ message User {
   // last_name is the optional family name.
   optional string last_name = 6;
 
-  // locale is the optional preferred locale tag.
-  optional string locale = 7;
-
-  // timezone is the IANA zone the client formats UTC timestamps against;
-  // "UTC" is the default. The server never localizes: every instant it
-  // answers is UTC, and this field is the presentation hint alone.
-  string timezone = 15;
-
   // disabled says whether sign-ins are refused.
   bool disabled = 9;
 
@@ -402,12 +394,32 @@ message User {
   // ban_reason is the note the banning administrator wrote.
   optional string ban_reason = 14;
 
+  // metadata is the account's preference document — the locale and the
+  // timezone an account sets about itself, read as one typed block. The
+  // requests keep their flat fields; this is the stored shape's view.
+  UserMetadata metadata = 15;
+
   // user_groups are the groups the account belongs to, ordered by the
   // group's display name — the same view ListUserGroups answers with, so
   // a client rendering an account never needs a second roundtrip to name
   // its memberships. The group names are what a deployment's clients
   // match a group-based claim against.
   repeated UserGroup user_groups = 16;
+}
+
+// UserMetadata is the account's preference document, the typed view of the
+// JSONB `users.metadata` column. The document is closed: these keys are the
+// whole contract, and a key a client invents is not carried. Absent fields
+// answer the defaults — an absent timezone is UTC, an absent locale is
+// unset — and the server never localizes: every instant it answers is UTC,
+// the timezone is the presentation hint alone.
+message UserMetadata {
+  // locale is the optional preferred locale tag.
+  optional string locale = 1;
+
+  // timezone is the IANA zone the client formats UTC timestamps against;
+  // "UTC" is the default.
+  string timezone = 2;
 }
 
 // SignupToken is the issued token's view. It carries the counters an operator
