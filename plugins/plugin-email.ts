@@ -225,7 +225,7 @@ export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): P
 
     const nothingToDo = plan.stale.length === 0 && plan.removed.length === 0
     if (nothingToDo) {
-      log(`  ${C.green}✓ ${plan.cached.length} template(s) current${C.reset}`)
+      log(`  ${C.green}✓ ${plan.cached.length} template(s) current${C.reset}\n`)
       return true
     }
 
