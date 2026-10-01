@@ -44,7 +44,7 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
 
 | Command             | Description                                            |
 | ------------------- | ------------------------------------------------------ |
-| `task dev`          | Vite dev server (:3000) + Go API server (:3080)        |
+| `task dev`          | One origin (:3080) — Go serves the document; Vite compiles + HMR behind it; the binary rebuilt from `build/debug` on every Go change |
 | `task run`          | Run the CLI directly (debug build)                     |
 | `task build`        | Build the frontend and both Go binaries                |
 | `task start`        | Run the production binary                              |

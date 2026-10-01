@@ -11,7 +11,7 @@ tasks:
   start:
     desc: Run the release binary
     cmds:
-      - pnpm exec kill-port 3000 3080
+      - pnpm exec kill-port 3080
       - ./build/release/{{.APP_NAME}} --env-file=.env.local serve {{.CLI_ARGS}}
 
   release:
