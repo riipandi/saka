@@ -17,21 +17,22 @@ const UserTable = "public.users"
 // a default without touching this struct. The db tags are the column names the
 // query builder uses.
 type UserSchema struct {
-	ID              uuid.UUID  `db:"id"`
-	Username        string     `db:"username"`
-	Email           string     `db:"email"`
-	FirstName       string     `db:"first_name"`
-	LastName        string     `db:"last_name"`
-	DisplayName     string     `db:"display_name"`
-	Locale          string     `db:"locale"`
-	Timezone        string     `db:"timezone"`
-	Disabled        bool       `db:"disabled"`
-	EmailVerifiedAt *time.Time `db:"email_verified_at"`
-	CreatedAt       time.Time  `db:"created_at"`
-	BannedAt        *time.Time `db:"banned_at"`
-	BanExpires      *time.Time `db:"ban_expires"`
-	BanReason       *string    `db:"ban_reason"`
-	AvatarURL       *string    `db:"avatar_url"`
+	ID                 uuid.UUID  `db:"id"`
+	Username           string     `db:"username"`
+	Email              string     `db:"email"`
+	FirstName          string     `db:"first_name"`
+	LastName           string     `db:"last_name"`
+	DisplayName        string     `db:"display_name"`
+	Locale             string     `db:"locale"`
+	Timezone           string     `db:"timezone"`
+	Disabled           bool       `db:"disabled"`
+	EmailVerifiedAt    *time.Time `db:"email_verified_at"`
+	CreatedAt          time.Time  `db:"created_at"`
+	BannedAt           *time.Time `db:"banned_at"`
+	BanExpires         *time.Time `db:"ban_expires"`
+	BanReason          *string    `db:"ban_reason"`
+	AvatarURL          *string    `db:"avatar_url"`
+	SelfDeleteOverride *bool      `db:"self_delete_override"`
 }
 
 // UserIDPrefix is the TypeID prefix of an account's identifier. The id

@@ -28,6 +28,7 @@ var UserColumns = []string{
 	"id", "username", "email", "first_name", "last_name", "display_name",
 	"locale", "timezone", "disabled", "email_verified_at", "created_at",
 	"banned_at", "ban_expires", "ban_reason", "avatar_url",
+	"self_delete_override",
 }
 
 // ScanSchema reads one row into the schema. The nullable columns scan through
@@ -42,6 +43,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 		&row.DisplayName, &locale, &row.Timezone, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
+		&row.SelfDeleteOverride,
 	)
 	if err != nil {
 		return UserSchema{}, err

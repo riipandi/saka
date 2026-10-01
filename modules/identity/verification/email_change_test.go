@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,8 +19,20 @@ import (
 func emailChangeService(t *testing.T, pool *datastore.Postgres, noticesEnabled bool) *Service {
 	t.Helper()
 	service := testService(t, pool, true)
-	return service.WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(service.queue, nil, noticesEnabled))
+	return service.
+		WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(service.queue, nil, noticesEnabled)).
+		// The tests exercise the flow, not the gate: the toggle's on state
+		// is what an operator serving the feature runs.
+		WithEmailChangeGate(stubGate{on: true})
 }
+
+// stubGate is the change toggle's test double: the on state answers for the
+// catalog the gate reads.
+type stubGate struct {
+	on bool
+}
+
+func (g stubGate) GetBool(context.Context, string) (bool, error) { return g.on, nil }
 
 func pendingCount(t *testing.T, service *Service, name string) int64 {
 	t.Helper()

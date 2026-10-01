@@ -1017,3 +1017,149 @@ func TestUnbanUserLiftsTheBanAsAUnitAndAnswersTheQuiet(t *testing.T) {
 	assert.Nil(t, again.User.BannedAt)
 	assert.Equal(t, 2, notifier.unbanned)
 }
+
+// stubUserSettings answers the self-service gates' catalog keys.
+type stubUserSettings map[string]bool
+
+func (s stubUserSettings) GetBool(_ context.Context, key string) (bool, error) {
+	value, ok := s[key]
+	if !ok {
+		return false, errors.New("unreadable setting")
+	}
+	return value, nil
+}
+
+func TestUpdateCurrentUserChangesTheUsernameBehindTheToggle(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	ctx := t.Context()
+
+	created, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:  "robert_langdon",
+		Email:     "robert.langdon@digital.fortress",
+		FirstName: "Robert",
+		LastName:  "Langdon",
+	})
+	require.NoError(t, err)
+
+	// The toggle off: a present username is the not-found-shaped refusal,
+	// and the row keeps its handle.
+	gated := testService(t, pool).WithSettings(stubUserSettings{
+		SettingChangeUsernameEnabled: false,
+	})
+	_, err = gated.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert_langdon_ii",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	// The toggle on: the change lands, the pattern holds, and the record
+	// names the rename.
+	open := testService(t, pool).WithSettings(stubUserSettings{
+		SettingChangeUsernameEnabled: true,
+	})
+	_, err = open.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert langdon",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	assert.ErrorIs(t, err, ErrUsernameInvalid)
+
+	renamed, err := open.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert_langdon_ii",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "robert_langdon_ii", renamed.Username)
+
+	// A taken handle is the column's unique index: the same refusal the
+	// duplicate sign-up earns.
+	other, err := open.CreateUser(ctx, CreateParams{
+		Username:  "sophie_neveu",
+		Email:     "sophie.neveu@digital.fortress",
+		FirstName: "Sophie",
+		LastName:  "Neveu",
+	})
+	require.NoError(t, err)
+	_, err = open.UpdateCurrentUser(ctx, other.ID, ProfileParams{
+		Username:    "ROBERT_LANGDON_II",
+		FirstName:   "Sophie",
+		LastName:    "Neveu",
+		DisplayName: "Sophie Neveu",
+	})
+	assert.ErrorIs(t, err, ErrAccountExists)
+}
+
+func TestDeleteMyAccountFollowsTheGateAndTheOverride(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	ctx := t.Context()
+
+	// The gate off and no override: the refusal is not-found-shaped, and
+	// the account keeps its row.
+	created, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:  "vittoria_vetra",
+		Email:     "vittoria.vetra@inferno.falls",
+		FirstName: "Vittoria",
+		LastName:  "Vetra",
+		Password:  "Expecto-Patronum-9",
+	})
+	require.NoError(t, err)
+
+	gated := testService(t, pool).WithSettings(stubUserSettings{
+		SettingSelfDeleteEnabled: false,
+	})
+	assert.ErrorIs(t, gated.DeleteMyAccount(ctx, created.ID), ErrUserNotFound)
+
+	// The gate on: the row is really gone — the soft-delete trigger holds
+	// its capture — and the dependent rows die by their own table rules.
+	open := testService(t, pool).WithSettings(stubUserSettings{
+		SettingSelfDeleteEnabled: true,
+	})
+	require.NoError(t, open.DeleteMyAccount(ctx, created.ID))
+
+	var accounts int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM public.users WHERE id = $1`, IDToUUID(mustID(t, created.ID))).Scan(&accounts))
+	assert.Equal(t, 0, accounts)
+
+	var captures int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM public.deleted_records WHERE source_table = 'users' AND object_id = $1`,
+		IDToUUID(mustID(t, created.ID))).Scan(&captures))
+	assert.Equal(t, 1, captures, "the archive names the account the delete removed")
+
+	var credentials int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM public.user_passwords WHERE user_id = $1`,
+		IDToUUID(mustID(t, created.ID))).Scan(&credentials))
+	assert.Equal(t, 0, credentials)
+
+	// The gate on but the account's override false: refused. The override
+	// true under the gate off: admitted — the column answers for itself.
+	overrideDenied, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:    "sophie_neveu",
+		Email:       "sophie.neveu@inferno.falls",
+		DisplayName: "Sophie Neveu",
+	})
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `UPDATE public.users SET self_delete_override = FALSE WHERE id = $1`, IDToUUID(mustID(t, overrideDenied.ID)))
+	require.NoError(t, err)
+	assert.ErrorIs(t, open.DeleteMyAccount(ctx, overrideDenied.ID), ErrUserNotFound)
+
+	overrideAllowed, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:    "hermione_granger",
+		Email:       "hermione.granger@hogwarts.edu",
+		DisplayName: "Hermione Granger",
+	})
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `UPDATE public.users SET self_delete_override = TRUE WHERE id = $1`, IDToUUID(mustID(t, overrideAllowed.ID)))
+	require.NoError(t, err)
+	assert.NoError(t, gated.DeleteMyAccount(ctx, overrideAllowed.ID))
+}

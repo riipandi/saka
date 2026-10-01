@@ -30,6 +30,12 @@ const (
 	// EventAccountUpdated is an account's fields rewritten.
 	EventAccountUpdated = "account_updated"
 
+	// EventUsernameChanged is an account's handle replaced — its own
+	// happening beside the profile update that carried it, because the
+	// readers the unique index serves want the rename named. The payload
+	// keeps the old handle; the row carries the new one.
+	EventUsernameChanged = "username_changed"
+
 	// EventAccountDeleted is an account removed.
 	EventAccountDeleted = "account_deleted"
 

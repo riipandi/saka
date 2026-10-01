@@ -208,6 +208,7 @@ var ProcedureRules = map[string]Entry{
 	// another account is not the door to that account's own profile.
 	identityv1connect.UserServiceGetCurrentUserProcedure:    {Rule: Authenticated},
 	identityv1connect.UserServiceUpdateCurrentUserProcedure: {Rule: Authenticated},
+	identityv1connect.UserServiceDeleteMyAccountProcedure:   {Rule: Authenticated},
 
 	// Administrative, declared explicitly rather than left to the default so
 	// the table reads as the complete policy of the surface. Upstream guards

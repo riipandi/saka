@@ -21,6 +21,7 @@ var catalog = []Event{
 	{EventSignIn, "A credential was verified and a session was opened."},
 	{EventAccountCreated, "An account that did not exist now does."},
 	{EventAccountUpdated, "An account's fields were rewritten."},
+	{EventUsernameChanged, "An account's handle was replaced."},
 	{EventAccountDeleted, "An account was removed."},
 	{EventEmailVerificationSent, "A verification message was submitted for delivery."},
 	{EventEmailVerified, "An email address was proven to its account."},

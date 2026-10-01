@@ -100,10 +100,20 @@ service UserService {
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
 
   // UpdateCurrentUser replaces the signed-in account's own profile fields:
-  // the names the account displays and its locale. The credential, the
-  // username, the address, and the role are not the caller's to rewrite
-  // here — the administrative surface owns them.
+  // the names the account displays, its locale, and — where the change
+  // toggle admits it — the username. The credential, the address, and the
+  // role are not the caller's to rewrite here — the administrative surface
+  // owns them.
   rpc UpdateCurrentUser(UpdateCurrentUserRequest) returns (UpdateCurrentUserResponse);
+
+  // DeleteMyAccount removes the signed-in account itself. The global
+  // self-delete setting arms the door and the account's override column
+  // answers for it; a caller the gate refuses answers the not-found code,
+  // the same shape an unknown account earns, so the surface says nothing
+  // about what the setting holds. The removal is the administrator delete's
+  // own: the row is archived by the database trigger, the live sessions
+  // die with their foreign keys, and the record names the account.
+  rpc DeleteMyAccount(DeleteMyAccountRequest) returns (DeleteMyAccountResponse);
 
   // BanUser applies a ban to the named account: the start instant is now,
   // the reason is required, and the expiry is optional — absent, the ban
@@ -860,6 +870,24 @@ message UpdateCurrentUserRequest {
   // against. Empty resets it to "UTC"; a non-empty value must name a zone
   // the tz database knows — the server refuses an unknown name.
   string timezone = 5 [(buf.validate.field).string.max_len = 64];
+
+  // username is the account's handle, changeable while the change toggle
+  // admits it: 3-32 characters of ASCII letters, digits, and underscores,
+  // matched case-insensitively. Absent, the field keeps the current
+  // username; presence and the pattern are the service's check.
+  string username = 6;
+}
+
+// DeleteMyAccountRequest carries nothing: the target is the token's subject,
+// never something the request names.
+message DeleteMyAccountRequest {
+}
+
+// DeleteMyAccountResponse answers the removal the caller asked for.
+message DeleteMyAccountResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
 }
 
 // UpdateCurrentUserResponse is the account as the update left it.

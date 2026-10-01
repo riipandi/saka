@@ -328,6 +328,9 @@ var Package = do.Package(
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
 		}
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithSettings(settings)
+		}
 		return service, nil
 	}),
 
@@ -341,11 +344,17 @@ var Package = do.Package(
 		mail := do.MustInvoke[*mailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
+		settings := do.MustInvoke[*appconfig.Settings](i)
 		// The change notices ride the deployment's cost decision; the
-		// confirm-link message the request itself sends is transactional
-		// and enqueues directly.
-		return verification.NewService(pool, mail, client, recorder, c.App.BaseURL, log).
-			WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(client, log, c.Mailer.Notifications.EmailChangeNoticeEnabled)), nil
+		// confirm message the request itself sends is transactional and
+		// enqueues directly. The change toggle reads the catalog at call
+		// time; a nil settings feature keeps the gate closed.
+		service := verification.NewService(pool, mail, client, recorder, c.App.BaseURL, log).
+			WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(client, log, c.Mailer.Notifications.EmailChangeNoticeEnabled))
+		if settings != nil {
+			service.WithEmailChangeGate(settings)
+		}
+		return service, nil
 	}),
 
 	// The one-time access service builds over the sign-in issuer — the

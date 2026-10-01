@@ -54,6 +54,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(identityv1connect.UserServiceResetProfilePictureProcedure, handler)
 	r.Handle(identityv1connect.UserServiceGetCurrentUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceUpdateCurrentUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceDeleteMyAccountProcedure, handler)
 	r.Handle(identityv1connect.UserServiceBanUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceUnbanUserProcedure, handler)
 }
@@ -266,6 +267,7 @@ func (h *rpcHandler) UpdateCurrentUser(ctx context.Context, req *connect.Request
 	}
 	body := req.Msg
 	user, err := h.service.UpdateCurrentUser(ctx, caller.UserID, ProfileParams{
+		Username:    body.Username,
 		FirstName:   body.FirstName,
 		LastName:    body.LastName,
 		DisplayName: body.DisplayName,
@@ -279,6 +281,27 @@ func (h *rpcHandler) UpdateCurrentUser(ctx context.Context, req *connect.Request
 		User:    WireView(user),
 		Status:  responder.StatusSuccess,
 		Message: "the current user was updated",
+	}), nil
+}
+
+// DeleteMyAccount removes the signed-in account itself. The request carries
+// no identifier on purpose — the caller is the account — and a delegated
+// caller is refused at the boundary: the impersonating administrator is not
+// the account, and the account's own removal is not a delegate's choice.
+func (h *rpcHandler) DeleteMyAccount(ctx context.Context, req *connect.Request[identityv1.DeleteMyAccountRequest]) (*connect.Response[identityv1.DeleteMyAccountResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
+	}
+	if err := h.service.DeleteMyAccount(ctx, caller.UserID); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.DeleteMyAccountResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the account was deleted",
 	}), nil
 }
 
@@ -324,6 +347,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("the ban expiry is in the past"))
 	case errors.Is(err, ErrTimezoneInvalid):
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown timezone"))
+	case errors.Is(err, ErrUsernameInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is invalid"))
 	case errors.Is(err, ErrGroupUnknown):
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown user group"))
 	case errors.Is(err, ErrPicturesUnavailable):

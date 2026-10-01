@@ -52,6 +52,7 @@ var catalog = []Event{
 
 	{Source: audit.EventAccountCreated, Name: "user.created", Description: "An account that did not exist now does."},
 	{Source: audit.EventAccountUpdated, Name: "user.updated", Description: "An account's fields were rewritten."},
+	{Source: audit.EventUsernameChanged, Name: "user.username_changed", Description: "An account's handle was replaced."},
 	{Source: audit.EventAccountDeleted, Name: "user.deleted", Description: "An account was removed."},
 	{Source: audit.EventUserBanned, Name: "user.banned", Description: "An account's access was withdrawn for a stated term."},
 	{Source: audit.EventUserUnbanned, Name: "user.unbanned", Description: "An account's ban was lifted."},

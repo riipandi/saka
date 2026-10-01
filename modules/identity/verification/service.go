@@ -48,6 +48,11 @@ var (
 	// reach here, so the answer names the collision instead of pretending
 	// the request will one day succeed.
 	ErrEmailTaken = errors.New("verification: the address is already in use")
+
+	// ErrEmailChangeDisabled is a change flow the toggle turned off. It is
+	// the not-found-shaped answer: the surface says nothing about the
+	// setting that closed it.
+	ErrEmailChangeDisabled = errors.New("verification: email change is not available")
 )
 
 // tokenTTL is how long a verification link works. The template copy states
@@ -75,6 +80,9 @@ type Service struct {
 	// changes is the notice channel the email-change flow feeds. Nil until
 	// wired; a service without one skips the two notices, never the flow.
 	changes changeNoticeEnqueuer
+	// settings is the change toggle's runtime source. Nil keeps the gate
+	// closed.
+	settings emailChangeSettings
 }
 
 // NewService builds the service. The mailer and the queue are the
@@ -269,6 +277,38 @@ func (s *Service) WithEmailChangeNotifier(notices changeNoticeEnqueuer) *Service
 	return s
 }
 
+// emailChangeSettings is the change toggle's runtime source: the gate reads
+// fresh at every request and confirmation, so an operator's change lands
+// without a restart. *appconfig.Settings satisfies it; the interface keeps
+// the appconfig feature out of this one's import graph.
+type emailChangeSettings interface {
+	GetBool(ctx context.Context, key string) (bool, error)
+}
+
+// SettingChangeEmailEnabled is the catalog key the change gate reads. The
+// catalog owns the name; this constant is how this package spells it.
+const SettingChangeEmailEnabled = "users.change_email_enabled"
+
+// WithEmailChangeGate wires the change toggle. Nil keeps the gate closed —
+// the state a test or a bare wiring is in, answering not-found.
+func (s *Service) WithEmailChangeGate(settings emailChangeSettings) *Service {
+	s.settings = settings
+	return s
+}
+
+// emailChangeOpen answers the gate. An unreadable setting refuses: a gate
+// that cannot answer is a gate closed.
+func (s *Service) emailChangeOpen(ctx context.Context) bool {
+	if s.settings == nil {
+		return false
+	}
+	on, err := s.settings.GetBool(ctx, SettingChangeEmailEnabled)
+	if err != nil {
+		return false
+	}
+	return on
+}
+
 // RequestEmailChange writes the pending change for the signed-in account and
 // enqueues its token to the address the change moves to. The link is the
 // flow's whole credential: it is generated here, shown once in the message,
@@ -282,6 +322,12 @@ func (s *Service) WithEmailChangeNotifier(notices changeNoticeEnqueuer) *Service
 // old address rides the deployment's cost decision; the token message is the
 // flow itself and always goes.
 func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail string) error {
+	// The toggle is the cheapest check, so it runs before anything touches
+	// the database: a flow turned off answers not-found — the same shape an
+	// unknown account earns, and the surface says nothing about the setting.
+	if !s.emailChangeOpen(ctx) {
+		return ErrEmailChangeDisabled
+	}
 	account, err := s.repo.FindUserByUsername(ctx, s.pool, username)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrUserNotFound
@@ -367,6 +413,11 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 // a caller: the frontend the message links to forwards the value, and the
 // flow works in a browser that holds no session.
 func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error {
+	// The gate answers the confirmation too: a toggle turned off between
+	// the request and the code ends the flow, not just the requests for it.
+	if !s.emailChangeOpen(ctx) {
+		return ErrEmailChangeDisabled
+	}
 	hash := crypto.HashHexToken(rawToken)
 	var confirmed EmailChangeNotice
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {

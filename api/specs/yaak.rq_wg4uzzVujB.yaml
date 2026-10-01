@@ -12,6 +12,7 @@ authenticationType: bearer
 body:
   text: |-
     {
+      "username": "ada_lovelace",
       "first_name": "Ada",
       "last_name": "Lovelace",
       "display_name": "Ada Lovelace",
@@ -19,9 +20,14 @@ body:
     }
 bodyType: application/json
 description: |-
-  Update the currently authenticated user's information — the display surface only: the names and the locale. The username, the email, and the role are the administrative surface's (`UserService/UpdateUser`). Ported from Pocket ID `PUT /api/users/me` as the `tango.identity.v1.UserService/UpdateCurrentUser` procedure.
+  Update the currently authenticated user's information: the display surface, and the username while the change toggle admits it (absent keeps the current handle; a taken one answers already-exists). The email and the role are the administrative surface's (`UserService/UpdateUser`). Ported from Pocket ID `PUT /api/users/me` as the `tango.identity.v1.UserService/UpdateCurrentUser` procedure.
 
-  Parameters: none
+  Parameters:
+  - username (body, optional): New handle; required shape enforced in the service
+  - first_name (body, required): Given name
+  - last_name (body, required): Family name
+  - display_name (body, required): Display name
+  - locale (body, optional): Locale tag
 headers:
 - enabled: true
   name: Content-Type

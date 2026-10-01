@@ -135,6 +135,8 @@ func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrUserNotFound):
 		return connect.NewError(connect.CodeNotFound, errors.New("account not found"))
+	case errors.Is(err, ErrEmailChangeDisabled):
+		return connect.NewError(connect.CodeNotFound, errors.New("email change is not available"))
 	case errors.Is(err, ErrAlreadyVerified):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("email already verified"))
 	case errors.Is(err, ErrMailUnavailable):

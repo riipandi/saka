@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS public.users (
     banned_at TIMESTAMPTZ DEFAULT NULL,
     ban_expires TIMESTAMPTZ DEFAULT NULL,
     ban_reason TEXT DEFAULT NULL,
+    -- The self-delete override is the per-account answer the global setting
+    -- defers to: NULL follows `users.self_delete_enabled`, TRUE admits the
+    -- account even when the global gate is off, FALSE refuses it even when
+    -- the global gate is on.
+    self_delete_override BOOLEAN DEFAULT NULL,
     -- Username only allows alphanumeric characters and underscores, must be between 3 and 32 characters long
     CONSTRAINT chk_username_format CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_]{3,32}$'),
     CONSTRAINT chk_users_timezone CHECK (char_length(timezone) <= 64)

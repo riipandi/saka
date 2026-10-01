@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,6 +40,10 @@ var (
 	// tz database carries. The proto constraint bounds its length; only
 	// this check can tell a well-formed name from a real zone.
 	ErrTimezoneInvalid = errors.New("user: unknown timezone")
+
+	// ErrUsernameInvalid is a username that carries the shape the column's
+	// check enforces — the pattern applies only when the field is present.
+	ErrUsernameInvalid = errors.New("user: username is invalid")
 )
 
 // ResourceUser is the resource type an audit record names when the account
@@ -75,6 +80,12 @@ type Service struct {
 	// policy is the credential check's runtime source. Nil keeps the
 	// static policy.
 	policy *password.Validator
+
+	// settings reads the self-service gates — the username change and the
+	// self-delete — at call time. Nil keeps every gate closed: the
+	// bare-wiring state answers not-found, the same shape an unknown
+	// account earns.
+	settings settingsReader
 
 	// groups reads and opens the memberships the account views carry. It
 	// is nil where the group feature is not wired — the views then answer
@@ -199,6 +210,51 @@ func (s *Service) validatePassword(ctx context.Context, clearText string) error 
 	return password.Validate(clearText)
 }
 
+// settingsReader is the self-service gates' runtime source: the toggles read
+// fresh at every call, so an operator's change lands without a restart.
+// *appconfig.Settings satisfies it; the interface keeps the appconfig
+// feature out of this one's import graph.
+type settingsReader interface {
+	GetBool(ctx context.Context, key string) (bool, error)
+}
+
+// The catalog keys the self-service gates read. The catalog owns the names;
+// these constants are how this package spells them.
+const (
+	SettingChangeUsernameEnabled = "users.change_username_enabled"
+	SettingSelfDeleteEnabled     = "users.self_delete_enabled"
+	SettingChangeEmailEnabled    = "users.change_email_enabled"
+)
+
+// WithSettings wires the self-service gates. Nil keeps every gate closed —
+// the state a test or a bare wiring is in.
+func (s *Service) WithSettings(reader settingsReader) *Service {
+	s.settings = reader
+	return s
+}
+
+// gateOpen answers the self-service gate: the global setting when the
+// account carries no override, the override's answer otherwise. An
+// unreadable setting refuses — a gate that cannot answer is a gate closed.
+func (s *Service) gateOpen(ctx context.Context, key string, override *bool) bool {
+	if override != nil {
+		return *override
+	}
+	if s.settings == nil {
+		return false
+	}
+	on, err := s.settings.GetBool(ctx, key)
+	if err != nil {
+		return false
+	}
+	return on
+}
+
+// usernamePattern mirrors the column's check: 3-32 ASCII letters, digits,
+// and underscores. The username is optional by the toggles; present, it
+// carries the pattern.
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{3,32}$`)
+
 // CreateParams carries one administrator-created account.
 type CreateParams struct {
 	Username      string
@@ -233,10 +289,13 @@ type UpdateParams struct {
 }
 
 // ProfileParams carries the fields a signed-in account may change about
-// itself: the display surface only. The narrow shape is the self-service
-// boundary — a caller cannot smuggle a role or an address through a
-// request the administrative surface does not own.
+// itself: the display surface, and the username where the change toggle
+// admits it. The narrow shape is the self-service boundary — a caller
+// cannot smuggle a role or an address through a request the administrative
+// surface does not own. An empty username keeps the current one; the
+// username is optional by the toggles, so there is no "clear" here.
 type ProfileParams struct {
+	Username    string
 	FirstName   string
 	LastName    string
 	DisplayName string
@@ -449,6 +508,22 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		return UserView{}, err
 	}
 
+	// The username is the gated field: absent keeps the current one, and a
+	// present value goes through the toggle, the pattern, and the column's
+	// unique index — in that order, so a refused change is a cheap refusal.
+	username := existing.Username
+	usernameChanged := false
+	if params.Username != "" && !strings.EqualFold(params.Username, existing.Username) {
+		if !s.gateOpen(ctx, SettingChangeUsernameEnabled, nil) {
+			return UserView{}, ErrUserNotFound
+		}
+		if !usernamePattern.MatchString(params.Username) {
+			return UserView{}, ErrUsernameInvalid
+		}
+		username = params.Username
+		usernameChanged = true
+	}
+
 	timezone, tzErr := normalizeTimezone(params.Timezone)
 	if tzErr != nil {
 		return UserView{}, tzErr
@@ -456,7 +531,7 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 
 	row := UserSchema{
 		ID:          userID,
-		Username:    existing.Username,
+		Username:    username,
 		Email:       existing.Email,
 		FirstName:   params.FirstName,
 		LastName:    params.LastName,
@@ -484,6 +559,21 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		if !updated {
 			return ErrUserNotFound
 		}
+		// A username change is its own happening: the profile update's
+		// record says the row moved, this one says the handle did — the
+		// old name is the payload, the new one the row.
+		if usernameChanged {
+			s.audit.Record(ctx, tx, audit.Entry{
+				Event:  audit.EventUsernameChanged,
+				Status: audit.StatusSuccess,
+				UserID: userID.String(),
+				Payload: map[string]string{
+					"username":     username,
+					"old_username": existing.Username,
+					"source":       "self",
+				},
+			})
+		}
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventAccountUpdated,
 			Status: audit.StatusSuccess,
@@ -503,6 +593,54 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		return UserView{}, err
 	}
 	return filled, nil
+}
+
+// DeleteMyAccount removes the signed-in account itself. The gate is the
+// global setting with the account's override answering for it — and a gate
+// that refuses, or a subject that names no account, earns the same
+// not-found-shaped answer: the surface says nothing about what the setting
+// holds. The removal is the administrator delete's own mechanics — a real
+// DELETE the database's soft-delete trigger archives, the dependent rows
+// resolved by their own table rules — recorded inside the same transaction,
+// naming the account in resource_type and resource_id because the row is
+// gone by the time the record is written.
+func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
+	userID, err := parseWire(subject)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	row, err := s.repo.GetUser(ctx, s.pool, userID)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return ErrUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !s.gateOpen(ctx, SettingSelfDeleteEnabled, row.SelfDeleteOverride) {
+		return ErrUserNotFound
+	}
+
+	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		deleted, deleteErr := s.repo.DeleteUser(ctx, tx, userID)
+		if deleteErr != nil {
+			return deleteErr
+		}
+		if !deleted {
+			return ErrUserNotFound
+		}
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:        audit.EventAccountDeleted,
+			Status:       audit.StatusSuccess,
+			ResourceType: ResourceUser,
+			ResourceID:   userID.String(),
+			Payload: map[string]string{
+				"username": row.Username,
+				"email":    row.Email,
+				"source":   "self",
+			},
+		})
+		return nil
+	})
 }
 
 // ListUsers answers one page of the accounts, newest first, optionally
