@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { defineConfig, type ProxyOptions } from 'vite'
+import { defineConfig } from 'vite'
 import { comlink } from 'vite-plugin-comlink'
 import pkg from './package.json' with { type: 'json' }
 import email from './plugins/plugin-email.ts'
@@ -13,7 +13,6 @@ const BUILD_HASH = process.env.BUILD_HASH || 'dev'
 
 // Must match the module path in go.mod.
 const goModule = 'github.com/riipandi/tango'
-const targetHost = 'http://127.0.0.1:3080'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
 const goVersionLdflags = [
@@ -21,19 +20,6 @@ const goVersionLdflags = [
   `-X ${goModule}/internal/config.BuildHash=${BUILD_HASH}`,
   `-X ${goModule}/internal/config.BuildDate=${BUILD_DATE}`
 ]
-
-// Same-origin proxy to the demo auth backend. Required for the HttpOnly
-// cookie session: cookies default to SameSite=Lax, which is not sent on
-// cross-site fetches, and this keeps them first-party.
-const viteProxy: Record<string, string | ProxyOptions> = {
-  '/.well-known': { target: targetHost, changeOrigin: true },
-  '/api': { target: targetHost, changeOrigin: true },
-  '/rpc': { target: targetHost, changeOrigin: true },
-  '/metrics': { target: targetHost, changeOrigin: true },
-  '/static': { target: targetHost, changeOrigin: true },
-  '/oidc': { target: targetHost, changeOrigin: true },
-  '/debug': { target: targetHost, changeOrigin: true }
-}
 
 /**
  * Plugin Comlink owns worker construction and must register first: only
@@ -44,6 +30,18 @@ const viteProxy: Record<string, string | ProxyOptions> = {
  *
  * With plugin Go, the SPA bundle and the email templates are compiled
  * once and embedded into both binaries.
+ *
+ * Backend integration (the Vite guide's): the Go binary owns the HTML
+ * document — web/shell.go renders it — so there is no index.html here and
+ * no dev proxy either. In development the browser opens the Go port
+ * (3080); the shell's fragment points the assets at this dev server, and
+ * the API calls stay same-origin against Go, which keeps the session
+ * cookie first-party. In production the shell resolves every tag from the
+ * build manifest, one entry per page.
+ *
+ * The root is the repository so the manifest keys name the source paths
+ * the Go side knows: app/main.tsx is the application document, and a
+ * second page adds its own key to the input map (see web.Page).
  */
 export default defineConfig({
   plugins: [
@@ -76,8 +74,8 @@ export default defineConfig({
     })
   ],
   resolve: { tsconfigPaths: true },
+  root: resolve('.'),
   publicDir: resolve('public'),
-  root: resolve('web'),
   build: {
     manifest: true,
     emptyOutDir: true,
@@ -85,7 +83,7 @@ export default defineConfig({
     outDir: resolve('web/output'),
     reportCompressedSize: false,
     rolldownOptions: {
-      input: { app: resolve('web/index.html') }
+      input: { app: resolve('app/main.tsx') }
     }
   },
   worker: { plugins: () => [comlink()] },
@@ -94,8 +92,6 @@ export default defineConfig({
     : {
         port: 3000,
         strictPort: true,
-        cors: { origin: '*' },
-        proxy: viteProxy
-      },
-  preview: { proxy: viteProxy }
+        cors: { origin: '*' }
+      }
 })

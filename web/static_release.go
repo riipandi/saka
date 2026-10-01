@@ -4,10 +4,12 @@ package web
 
 import (
 	"embed"
+	"html/template"
 	"io/fs"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/riipandi/tango/pkg/responder"
@@ -16,6 +18,39 @@ import (
 //go:embed all:output
 var webFS embed.FS
 
+// The entry fragment resolves once: the manifest is embedded, so its
+// answer is fixed at build time. A release binary whose output carries no
+// manifest is a build-order error — Vite must run before Go — and the
+// surface answers the envelope's failure rather than a half-shell.
+var (
+	fragmentOnce sync.Once
+	fragmentTags template.HTML
+	fragmentErr  error
+)
+
+func resolveFragment() (template.HTML, error) {
+	fragmentOnce.Do(func() {
+		webArtifact, subErr := fs.Sub(webFS, "output")
+		if subErr != nil {
+			fragmentErr = subErr
+			return
+		}
+		f, err := ViteHTMLFragment(ViteConfig{
+			FS:        webArtifact,
+			ViteEntry: DefaultPage.Entry,
+		})
+		if err != nil {
+			fragmentErr = err
+			return
+		}
+		fragmentTags = f.Tags
+	})
+	return fragmentTags, fragmentErr
+}
+
+// SetupStatic mounts the SPA surface: the built assets from the embedded
+// output, and the Go-rendered shell for every path the routes above left
+// unclaimed.
 func SetupStatic(r chi.Router) {
 	// The SPA answers only reads. A write method that names no claimed route
 	// falls through to the not-found handler — chi cannot tell "no such
@@ -70,6 +105,17 @@ func spaHandler() http.HandlerFunc {
 			}
 		}
 
-		http.ServeFileFS(w, r, webArtifact, "index.html")
+		tags, err := resolveFragment()
+		if err != nil {
+			responder.Fail(w, r, http.StatusInternalServerError, "vite: the build manifest did not resolve: "+err.Error())
+			return
+		}
+		html, err := renderShell(DefaultPage, tags)
+		if err != nil {
+			responder.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(html))
 	}
 }

@@ -47,6 +47,11 @@ linters:
         - G101
         - G102
         - G107
+        # G203 (template.HTML) is the Vite integration's contract: the shell
+        # embeds the fragment built from the build manifest and the dev
+        # server URL — neither carries request input — through the one
+        # trustedHead helper; every page-named value stays escaped.
+        - G203
     funlen:
       lines: 120
       statements: 50

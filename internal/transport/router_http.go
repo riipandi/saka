@@ -177,6 +177,9 @@ func NewRouter(opts Options) chi.Router {
 	// with index.html.
 	static.Mount(r, static.NewLocal(static.Dir(opts.Config.Storage.LocalPath)))
 
+	// The SPA mounts last and renders the Go shell; the debug build points
+	// its fragment at the Vite dev server, the release build resolves its
+	// tags from the embedded manifest.
 	web.SetupStatic(r)
 	return r
 }
