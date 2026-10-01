@@ -63,9 +63,11 @@ type Service struct {
 	log       *slog.Logger
 	issuer    string
 	accessTTL time.Duration
-	shortTTL  time.Duration
-	longTTL   time.Duration
 	now       func() time.Time
+
+	// settings reads the session bound the database owns. Nil keeps the
+	// catalog default — the state a bare wiring is in.
+	settings sessionSettings
 
 	// notices is the new-device notification channel. Nil until wired; a
 	// service without one skips the mail, never the sign-in.
@@ -113,8 +115,6 @@ func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, k
 		log:       log,
 		issuer:    cfg.Auth.Issuer,
 		accessTTL: cfg.Auth.AccessTTL,
-		shortTTL:  cfg.Auth.RefreshShortTTL,
-		longTTL:   cfg.Auth.RefreshLongTTL,
 		now:       time.Now,
 	}
 }
@@ -287,7 +287,7 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		IPAddress:         addrPtr(params.IPAddress),
 		Remember:          params.Remember,
 		CreatedAt:         now,
-		ExpiresAt:         now.Add(s.SessionLifetime(params.Remember)),
+		ExpiresAt:         now.Add(s.sessionLifetime(ctx)),
 	}
 	repo := s.repo.WithQuerier(db)
 	if createErr := repo.CreateSession(ctx, sessionRow); createErr != nil {
@@ -343,7 +343,7 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		AccessToken:      access,
 		TokenType:        TokenType,
 		AccessExpiresIn:  int32(s.accessTTL.Seconds()),
-		RefreshExpiresIn: int32(s.SessionLifetime(params.Remember).Seconds()),
+		RefreshExpiresIn: int32(s.sessionLifetime(ctx).Seconds()),
 		RefreshToken:     refresh.Plain,
 		SessionID:        sessionID.String(),
 		User: User{
@@ -458,16 +458,64 @@ func (s *Service) Challenge(ctx context.Context, userID uuid.UUID, remember bool
 	return PendingSignIn{Token: pending.Token, ExpiresAt: pending.ExpiresAt}, true, nil
 }
 
-// SessionLifetime picks the session lifetime the caller asked for: the short
-// window a shared machine forgets by the end of the day, the long one a
-// remembered device keeps. Both are configuration keys, so a deployment
-// decides the two windows. It is exported because the refresh renewal writes
-// the same column the opening does, and the two must agree.
-func (s *Service) SessionLifetime(remember bool) time.Duration {
-	if remember {
-		return s.longTTL
+// SessionLifetime picks the session lifetime: the remembered and the
+// non-remembered path share one bound, `session.max_lifetime` — the
+// remembered ceiling a deployment sets on every session the store may hold.
+// The read rides the request context, so an operator's change lands at the
+// next mint; an unreadable or out-of-bounds value falls back to the catalog
+// default rather than refusing the sign-in, and the remember flag is kept on
+// the signature because the store's column still records the caller's
+// choice.
+func (s *Service) SessionLifetime(ctx context.Context, remember bool) time.Duration {
+	return s.sessionLifetime(ctx)
+}
+
+// sessionSettings reads the session bound at mint time.
+// *appconfig.Settings satisfies it; the interface keeps the appconfig
+// feature out of this one's import graph.
+type sessionSettings interface {
+	GetInt64(ctx context.Context, key string) (int64, error)
+}
+
+// SettingSessionMaxLifetime is the catalog key the session bound reads. The
+// catalog owns the name; this constant is how this package spells it.
+const SettingSessionMaxLifetime = "session.max_lifetime"
+
+// The catalog's default for the bound, mirrored so a nil settings feature or
+// an unreadable read still mints a session the deployment set out with.
+const sessionMaxLifetimeDefault = 604800 * time.Second
+
+// The spec's bounds for the remembered session: five minutes to ten years.
+const (
+	sessionLifetimeFloor = 5 * 60 * time.Second
+	sessionLifetimeCeil  = 10 * 365 * 24 * time.Hour
+)
+
+// WithSessionSettings wires the runtime bound after construction. Nil keeps
+// the catalog default — the state a test or a bare wiring is in.
+func (s *Service) WithSessionSettings(reader sessionSettings) *Service {
+	s.settings = reader
+	return s
+}
+
+// sessionLifetime reads the bound fresh at every mint. An unreadable or
+// out-of-bounds value falls back to the catalog default: a setting the
+// database cannot answer must not end every sign-in.
+func (s *Service) sessionLifetime(ctx context.Context) time.Duration {
+	if s.settings == nil {
+		return sessionMaxLifetimeDefault
 	}
-	return s.shortTTL
+	seconds, err := s.settings.GetInt64(ctx, SettingSessionMaxLifetime)
+	if err != nil {
+		s.log.Warn("signin: session.max_lifetime unreadable; using the default", slog.Any("error", err))
+		return sessionMaxLifetimeDefault
+	}
+	lifetime := time.Duration(seconds) * time.Second
+	if lifetime < sessionLifetimeFloor || lifetime > sessionLifetimeCeil {
+		s.log.Warn("signin: session.max_lifetime out of bounds; using the default", slog.Int64("seconds", seconds))
+		return sessionMaxLifetimeDefault
+	}
+	return lifetime
 }
 
 // SignAccessToken mints the stateless token for an account the caller has

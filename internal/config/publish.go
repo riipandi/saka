@@ -72,8 +72,6 @@ type PublishedAuth struct {
 	JWTAlgorithm       string   `json:"jwt_algorithm,omitzero"`
 	Issuer             string   `json:"issuer,omitzero"`
 	AccessTTL          Duration `json:"access_ttl,omitzero"`
-	RefreshShortTTL    Duration `json:"refresh_short_ttl,omitzero"`
-	RefreshLongTTL     Duration `json:"refresh_long_ttl,omitzero"`
 	ExpiryEmailEnabled bool     `json:"expiry_email_enabled,omitzero"`
 	SessionDriver      string   `json:"session_driver,omitzero"`
 
@@ -355,8 +353,6 @@ func (c Config) Published(full bool) Published {
 	public.Auth.JWTAlgorithm = c.Auth.JWTAlgorithm
 	public.Auth.Issuer = c.Auth.Issuer
 	public.Auth.AccessTTL = seconds(c.Auth.AccessTTL)
-	public.Auth.RefreshShortTTL = seconds(c.Auth.RefreshShortTTL)
-	public.Auth.RefreshLongTTL = seconds(c.Auth.RefreshLongTTL)
 	public.Auth.ExpiryEmailEnabled = c.Auth.ExpiryEmailEnabled
 	public.Auth.SessionDriver = c.Auth.SessionDriver
 	public.Auth.SecretKey = sealed.Auth.SecretKey

@@ -51,8 +51,9 @@ type Issuer interface {
 	// assembled, for the session identifier the token carries in `sid`.
 	SignSessionToken(ctx context.Context, subject string, claims jwtutils.AccessClaims, sessionID SessionID, at time.Time) (string, error)
 	// SessionLifetime is the window a session's renewal writes, by the
-	// remember flag the opening recorded.
-	SessionLifetime(remember bool) time.Duration
+	// caller's remembered choice; the remembered and the non-remembered
+	// path share the bound the settings own.
+	SessionLifetime(ctx context.Context, remember bool) time.Duration
 	// AccessTokenTTL is the lifetime the access token is signed with, so a
 	// renewal answers the same expires_in the sign-in does.
 	AccessTokenTTL() time.Duration
@@ -483,7 +484,7 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		// renewal that handed a delegated session a fresh full lifetime would
 		// let it outlive the administration that opened it. A delegation
 		// whose window has passed renews no further.
-		lifetime = s.issuer.SessionLifetime(locked.Remember)
+		lifetime = s.issuer.SessionLifetime(ctx, locked.Remember)
 		expiresAt = now.Add(lifetime)
 		if locked.Provider == ImpersonationProvider {
 			hardEnd := locked.CreatedAt.Add(ImpersonationTTL)

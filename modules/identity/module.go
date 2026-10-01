@@ -242,8 +242,14 @@ var Package = do.Package(
 		keys := do.MustInvoke[*jwks.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
-		return signin.NewService(*c, pool, signin.NewRepository(pool), keys, recorder, log).
-			WithDeviceNotifier(jobs.NewDeviceNotifier(client, log, c.Mailer.Notifications.NewDeviceNoticeEnabled)), nil
+		service := signin.NewService(*c, pool, signin.NewRepository(pool), keys, recorder, log).
+			WithDeviceNotifier(jobs.NewDeviceNotifier(client, log, c.Mailer.Notifications.NewDeviceNoticeEnabled))
+		// The session bound reads the catalog at mint time; a nil settings
+		// feature keeps the catalog default, the state a bare wiring is in.
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithSessionSettings(settings)
+		}
+		return service, nil
 	}),
 
 	// The session lifecycle builds over the sign-in issuer through the

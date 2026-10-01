@@ -1,6 +1,7 @@
 package signin
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -115,7 +116,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	assert.Equal(t, "hermione@example.com", result.User.Email)
 	assert.NotEmpty(t, result.RefreshToken)
 	assert.Equal(t, int32(testConfig().Auth.AccessTTL.Seconds()), result.AccessExpiresIn)
-	assert.Equal(t, int32(testConfig().Auth.RefreshShortTTL.Seconds()), result.RefreshExpiresIn)
+	assert.Equal(t, int32((7 * 24 * time.Hour).Seconds()), result.RefreshExpiresIn)
 
 	// The session identifier is the typed id, and the refresh token is
 	// stored under its hash alone.
@@ -294,19 +295,18 @@ func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
 	assert.Nil(t, ip)
 }
 
-// TestRememberSelectsTheConfiguredLifetime pins the two windows to the
-// configuration keys, not to constants: a deployment that changes
-// auth.refresh_short_ttl and auth.refresh_long_ttl changes what remember
-// means, and the flag alone decides between them.
+// TestRememberSelectsTheConfiguredLifetime pins the session bound to the
+// settings catalog, not to constants: the remembered and the non-remembered
+// path share session.max_lifetime, so either sign-in writes the same window
+// and the flag only records the caller's choice on the row.
 func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 
 	cfg := testConfig()
-	cfg.Auth.RefreshShortTTL = 1 * time.Hour
-	cfg.Auth.RefreshLongTTL = 48 * time.Hour
 	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
+	service.WithSessionSettings(stubSettingReader{seconds: int64((2 * time.Hour).Seconds())})
 
 	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
 
@@ -331,15 +331,32 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 			require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&remember, &createdAt, &expiresAt))
 
 			lifetime := expiresAt.Sub(createdAt)
-			if params.Remember {
-				assert.True(t, remember)
-				assert.Equal(t, 48*time.Hour, lifetime)
-				return
-			}
-			assert.False(t, remember)
-			assert.Equal(t, time.Hour, lifetime)
+			assert.Equal(t, params.Remember, remember)
+			assert.Equal(t, 2*time.Hour, lifetime)
 		})
 	}
+}
+
+// stubSettingReader answers one key with one value: the mint's view of the
+// catalog in a test.
+type stubSettingReader struct {
+	seconds int64
+}
+
+func (s stubSettingReader) GetInt64(context.Context, string) (int64, error) {
+	return s.seconds, nil
+}
+
+func TestSessionLifetimeFallsBackWhenUnreadable(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	cfg := testConfig()
+	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
+	service.WithSessionSettings(stubSettingReader{seconds: 0}) // out of bounds
+
+	assert.Equal(t, sessionMaxLifetimeDefault, service.sessionLifetime(t.Context()))
+	assert.Equal(t, sessionMaxLifetimeDefault, service.SessionLifetime(t.Context(), true))
 }
 
 func TestMapErrorCarriesTheConnectCodes(t *testing.T) {

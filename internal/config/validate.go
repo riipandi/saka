@@ -507,12 +507,6 @@ func checkAuth(c *Config, check func(ok bool, format string, args ...any)) {
 	}
 	check(c.Auth.Issuer != "", "auth.issuer: must not be empty")
 	check(c.Auth.AccessTTL > 0, "auth.access_ttl: must be positive")
-	check(c.Auth.RefreshShortTTL > 0, "auth.refresh_short_ttl: must be positive")
-	check(c.Auth.RefreshLongTTL > 0, "auth.refresh_long_ttl: must be positive")
-	check(c.Auth.RefreshShortTTL >= c.Auth.AccessTTL,
-		"auth.refresh_short_ttl: must not be shorter than auth.access_ttl")
-	check(c.Auth.RefreshLongTTL >= c.Auth.RefreshShortTTL,
-		"auth.refresh_long_ttl: must not be shorter than auth.refresh_short_ttl")
 }
 
 // String renders the configuration with every secret redacted, so an accidental

@@ -103,6 +103,107 @@ const (
 	// SettingPasskeyMaxCredentials caps the passkeys one account may hold,
 	// counted separately from the TOTP devices.
 	SettingPasskeyMaxCredentials = "passkey.max_credentials"
+
+	// SettingAccessMode picks the sign-up path: open, anyone may create an
+	// account; invite, a valid invitation token is required.
+	SettingAccessMode = "access.mode"
+
+	// SettingAccessAllowlistEnabled turns the address allowlist on for
+	// open-mode sign-ups; the list itself is dead while this is off.
+	SettingAccessAllowlistEnabled = "access.allowlist_enabled"
+
+	// SettingAccessAllowlist holds the accepted addresses or @domain
+	// entries, comma- or newline-separated. Read only when the toggle is
+	// on.
+	SettingAccessAllowlist = "access.allowlist"
+
+	// SettingAuthSignupEmailEnabled gates the email identity at sign-up.
+	SettingAuthSignupEmailEnabled = "auth.signup_email_enabled"
+
+	// SettingAuthRequireEmail forces an email identity on every account.
+	SettingAuthRequireEmail = "auth.require_email"
+
+	// SettingAuthVerifyEmailAtSignup puts a new open-mode account in the
+	// unverified state: a single-use code is issued and sign-in refuses
+	// the account until the code confirms the address.
+	SettingAuthVerifyEmailAtSignup = "auth.verify_email_at_signup"
+
+	// SettingAuthSigninEmailEnabled gates the email identity at sign-in.
+	SettingAuthSigninEmailEnabled = "auth.signin_email_enabled"
+
+	// SettingAuthSigninEmailCodeEnabled gates the single-use email-code
+	// sign-in — the only email sign-in channel; no link-based one exists.
+	SettingAuthSigninEmailCodeEnabled = "auth.signin_email_code_enabled"
+
+	// SettingAuthSignupUsernameEnabled gates the username identity at
+	// sign-up; off, the username field is optional.
+	SettingAuthSignupUsernameEnabled = "auth.signup_username_enabled"
+
+	// SettingAuthRequireUsername forces a username on every account; only
+	// meaningful when the username identity itself is enabled.
+	SettingAuthRequireUsername = "auth.require_username"
+
+	// SettingAuthSignupPasswordEnabled gates the password identity at
+	// sign-up.
+	SettingAuthSignupPasswordEnabled = "auth.signup_password_enabled"
+
+	// SettingPasswordMinLength is the shortest password accepted, in
+	// characters.
+	SettingPasswordMinLength = "password.min_length"
+
+	// SettingPasswordRejectCompromised gates the breached-password check:
+	// on, a password appearing in the breach corpus is refused at sign-up
+	// and password change, and flagged at sign-in.
+	SettingPasswordRejectCompromised = "password.reject_compromised"
+
+	// SettingPasswordMinStrength is the strength floor a new password must
+	// clear: off or normal. Sign-in never runs the strength meter.
+	SettingPasswordMinStrength = "password.min_strength"
+
+	// SettingPasswordRuleLowercase requires at least one lowercase letter
+	// in a new password.
+	SettingPasswordRuleLowercase = "password.rule_lowercase"
+
+	// SettingPasswordRuleUppercase requires at least one uppercase letter
+	// in a new password.
+	SettingPasswordRuleUppercase = "password.rule_uppercase"
+
+	// SettingPasswordRuleNumber requires at least one digit in a new
+	// password.
+	SettingPasswordRuleNumber = "password.rule_number"
+
+	// SettingPasswordRuleSpecial requires at least one special character in
+	// a new password.
+	SettingPasswordRuleSpecial = "password.rule_special"
+
+	// SettingMFARequired is the global second-factor gate: on, sign-in and
+	// sign-up route an account with zero confirmed factors to enrollment
+	// instead of minting a token.
+	SettingMFARequired = "mfa.required"
+
+	// SettingSessionMaxLifetime bounds a remembered session, in seconds.
+	// The refresh paths — remembered or not — never outlive it.
+	SettingSessionMaxLifetime = "session.max_lifetime"
+
+	// SettingSessionInactivityTimeout expires a session whose last activity
+	// rests older than this many seconds; the session is refused and
+	// rotated out on the next use.
+	SettingSessionInactivityTimeout = "session.inactivity_timeout"
+
+	// SettingSessionReverificationWindow is how long a completed
+	// reauthentication proof counts, in seconds, before a sensitive
+	// procedure demands a fresh one.
+	SettingSessionReverificationWindow = "session.reverification_window"
+
+	// SettingUsersSelfDeleteEnabled lets an account delete itself; the
+	// per-account override column can turn the decision either way.
+	SettingUsersSelfDeleteEnabled = "users.self_delete_enabled"
+
+	// SettingUsersChangeEmailEnabled gates the account email change flow.
+	SettingUsersChangeEmailEnabled = "users.change_email_enabled"
+
+	// SettingUsersChangeUsernameEnabled gates the username change flow.
+	SettingUsersChangeUsernameEnabled = "users.change_username_enabled"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -152,6 +253,138 @@ func Catalog() []SettingDef {
 			Default:     "10",
 			Public:      true,
 			Description: "How many passkeys one account may hold, counted separately from the TOTP devices. Enforcement is at enrollment only.",
+		},
+		{
+			Key:         SettingAccessMode,
+			Default:     "open",
+			Public:      true,
+			Description: "The sign-up path: open, anyone may create an account (filtered by the allowlist when it is on); invite, a valid invitation token is required.",
+		},
+		{
+			Key:         SettingAccessAllowlistEnabled,
+			Default:     "false",
+			Description: "Whether open-mode sign-ups are filtered by the address allowlist. Off, the list is dead text.",
+		},
+		{
+			Key:         SettingAccessAllowlist,
+			Default:     "",
+			Description: "The accepted sign-up addresses or @domain entries, comma- or newline-separated. Read only when access.allowlist_enabled is on.",
+		},
+		{
+			Key:         SettingAuthSignupEmailEnabled,
+			Default:     "true",
+			Public:      true,
+			Description: "Whether an email identity may be claimed at sign-up.",
+		},
+		{
+			Key:         SettingAuthRequireEmail,
+			Default:     "true",
+			Description: "Whether every account must carry an email identity.",
+		},
+		{
+			Key:         SettingAuthVerifyEmailAtSignup,
+			Default:     "true",
+			Description: "Whether a new account starts unverified: a single-use code is issued at sign-up and sign-in refuses the account until the code confirms the address.",
+		},
+		{
+			Key:         SettingAuthSigninEmailEnabled,
+			Default:     "true",
+			Public:      true,
+			Description: "Whether an email identity may sign in.",
+		},
+		{
+			Key:         SettingAuthSigninEmailCodeEnabled,
+			Default:     "true",
+			Public:      true,
+			Description: "Whether the single-use email-code sign-in is offered — the only email sign-in channel; there is no link-based one.",
+		},
+		{
+			Key:         SettingAuthSignupUsernameEnabled,
+			Default:     "false",
+			Public:      true,
+			Description: "Whether a username identity may be claimed at sign-up. Off, the username field is optional.",
+		},
+		{
+			Key:         SettingAuthRequireUsername,
+			Default:     "false",
+			Public:      true,
+			Description: "Whether every account must carry a username. Only meaningful when the username identity is enabled.",
+		},
+		{
+			Key:         SettingAuthSignupPasswordEnabled,
+			Default:     "true",
+			Public:      true,
+			Description: "Whether a password identity may be claimed at sign-up.",
+		},
+		{
+			Key:         SettingPasswordMinLength,
+			Default:     "8",
+			Description: "The shortest password accepted, in characters.",
+		},
+		{
+			Key:         SettingPasswordRejectCompromised,
+			Default:     "true",
+			Description: "Whether a password that appears in the breach corpus is refused at sign-up and password change, and flagged at sign-in.",
+		},
+		{
+			Key:         SettingPasswordMinStrength,
+			Default:     "normal",
+			Description: "The strength floor a new password must clear: off or normal. Sign-in never runs the strength meter; the compromised check covers that path.",
+		},
+		{
+			Key:         SettingPasswordRuleLowercase,
+			Default:     "false",
+			Description: "Whether a new password must carry at least one lowercase letter.",
+		},
+		{
+			Key:         SettingPasswordRuleUppercase,
+			Default:     "false",
+			Description: "Whether a new password must carry at least one uppercase letter.",
+		},
+		{
+			Key:         SettingPasswordRuleNumber,
+			Default:     "false",
+			Description: "Whether a new password must carry at least one digit.",
+		},
+		{
+			Key:         SettingPasswordRuleSpecial,
+			Default:     "false",
+			Description: "Whether a new password must carry at least one special character.",
+		},
+		{
+			Key:         SettingMFARequired,
+			Default:     "false",
+			Description: "The global second-factor gate: on, sign-in and sign-up route an account with zero confirmed factors to enrollment instead of minting a token.",
+		},
+		{
+			Key:         SettingSessionMaxLifetime,
+			Default:     "604800",
+			Description: "The longest a remembered session lives, in seconds (168 hours). The refresh paths — remembered or not — never outlive it. Bounds at the reader: 5 minutes to 10 years.",
+		},
+		{
+			Key:         SettingSessionInactivityTimeout,
+			Default:     "21600",
+			Description: "How long a session may rest idle, in seconds (6 hours); an older session is refused and rotated out on the next use. Bounds at the reader: 5 minutes to 1 year.",
+		},
+		{
+			Key:         SettingSessionReverificationWindow,
+			Default:     "1800",
+			Description: "How long a completed reauthentication proof counts, in seconds (30 minutes), before a sensitive procedure demands a fresh one.",
+		},
+		{
+			Key:         SettingUsersSelfDeleteEnabled,
+			Default:     "false",
+			Description: "Whether an account may delete itself; the per-account override column turns the decision either way.",
+		},
+		{
+			Key:         SettingUsersChangeEmailEnabled,
+			Default:     "true",
+			Description: "Whether the account email change flow is offered.",
+		},
+		{
+			Key:         SettingUsersChangeUsernameEnabled,
+			Default:     "true",
+			Description: "Whether the username change flow is offered.",
 		},
 	}
 }

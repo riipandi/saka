@@ -40,7 +40,7 @@ func (f *fakeIssuer) SignSessionToken(_ context.Context, subject string, _ jwtut
 	return "fake-token-for-" + subject, nil
 }
 
-func (f *fakeIssuer) SessionLifetime(bool) time.Duration { return f.lifetime }
+func (f *fakeIssuer) SessionLifetime(_ context.Context, _ bool) time.Duration { return f.lifetime }
 
 func (f *fakeIssuer) AccessTokenTTL() time.Duration { return 15 * time.Minute }
 

@@ -86,13 +86,10 @@ type Auth struct {
 	JWTAlgorithm string `koanf:"jwt_algorithm" json:"jwt_algorithm"`
 	// Issuer is the iss claim placed in every token.
 	Issuer string `koanf:"issuer" json:"issuer"`
-	// AccessTTL is the lifetime of an access token.
+	// AccessTTL is the lifetime of an access token. The session bounds —
+	// the remembered lifetime, inactivity, reauthentication — are not here:
+	// they are settings the database owns.
 	AccessTTL time.Duration `koanf:"access_ttl" json:"access_ttl"`
-	// RefreshShortTTL is the lifetime of a refresh token the caller did not
-	// ask to remember: a shared-machine window that ends the same day.
-	RefreshShortTTL time.Duration `koanf:"refresh_short_ttl" json:"refresh_short_ttl"`
-	// RefreshLongTTL is the lifetime of a remembered refresh token.
-	RefreshLongTTL time.Duration `koanf:"refresh_long_ttl" json:"refresh_long_ttl"`
 	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
 	// default, the way the upstream feature ships: a mailer that reaches
 	// account holders on a schedule is a decision, not a default. It lives

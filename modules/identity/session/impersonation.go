@@ -261,7 +261,7 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 			IPAddress:         addrPtr(client.IPAddress),
 			Remember:          false,
 			CreatedAt:         now,
-			ExpiresAt:         now.Add(s.issuer.SessionLifetime(false)),
+			ExpiresAt:         now.Add(s.issuer.SessionLifetime(ctx, false)),
 		}); createErr != nil {
 			return createErr
 		}
@@ -302,7 +302,7 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 		AccessToken:      access,
 		TokenType:        jwtutils.BearerScheme,
 		AccessExpiresIn:  int32(s.issuer.AccessTokenTTL().Seconds()),
-		RefreshExpiresIn: int32(s.issuer.SessionLifetime(false).Seconds()),
+		RefreshExpiresIn: int32(s.issuer.SessionLifetime(ctx, false).Seconds()),
 		RefreshToken:     refresh.Plain,
 		SessionID:        newID.String(),
 		User:             view,

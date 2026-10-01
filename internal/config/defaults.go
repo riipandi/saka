@@ -254,11 +254,9 @@ func Default() Config {
 			AuditRetentionDays: 90,
 		},
 		Auth: Auth{
-			Issuer:          "tango",
-			AccessTTL:       15 * time.Minute,
-			RefreshShortTTL: 12 * time.Hour,
-			RefreshLongTTL:  14 * 24 * time.Hour,
-			SessionDriver:   SessionDB,
+			Issuer:        "tango",
+			AccessTTL:     15 * time.Minute,
+			SessionDriver: SessionDB,
 			// The API key's expiry reminder is off by default, the way the
 			// upstream feature ships: a mailer that reaches account holders
 			// on a schedule is a decision, not a default.

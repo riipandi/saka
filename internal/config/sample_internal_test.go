@@ -126,8 +126,6 @@ func TestSampleWritesDurationsAsSeconds(t *testing.T) {
 	flat := sampleDoc(t)
 
 	assert.Equal(t, float64(900), flat["auth.access_ttl"])
-	assert.Equal(t, float64(43200), flat["auth.refresh_short_ttl"])
-	assert.Equal(t, float64(1209600), flat["auth.refresh_long_ttl"])
 	assert.Equal(t, float64(3600), flat["database.max_conn_lifetime"])
 }
 

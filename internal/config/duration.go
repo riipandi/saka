@@ -18,8 +18,6 @@ import (
 // so adding a duration field fails until it is listed here.
 var durationKeys = []string{
 	"auth.access_ttl",
-	"auth.refresh_long_ttl",
-	"auth.refresh_short_ttl",
 	"cache.ttl",
 	"database.connect_retry_interval",
 	"database.connect_timeout",
