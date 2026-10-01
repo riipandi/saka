@@ -345,14 +345,22 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 	}
 }
 
-// stubSettingReader answers one key with one value: the mint's view of the
-// catalog in a test.
+// stubSettingReader answers the duration keys with one value and the
+// boolean keys with one flag: the mint's view of the catalog in a test.
 type stubSettingReader struct {
-	seconds int64
+	seconds     int64
+	mfaRequired bool
 }
 
 func (s stubSettingReader) GetInt64(context.Context, string) (int64, error) {
 	return s.seconds, nil
+}
+
+func (s stubSettingReader) GetBool(_ context.Context, key string) (bool, error) {
+	if key == SettingMFARequired {
+		return s.mfaRequired, nil
+	}
+	return false, nil
 }
 
 func TestSessionLifetimeFallsBackWhenUnreadable(t *testing.T) {

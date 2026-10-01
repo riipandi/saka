@@ -73,9 +73,62 @@ type Service struct {
 	audit  *audit.Recorder
 	log    *slog.Logger
 
+	// settings reads the inactivity bound the database owns. Nil keeps the
+	// catalog default — the state a bare wiring is in.
+	settings settingsReader
+
 	// now is the instant the service's decisions read. It is a field so a
 	// test can hold the clock still.
 	now func() time.Time
+}
+
+// settingsReader reads one bound at renewal time. *appconfig.Settings
+// satisfies it; the interface keeps the appconfig feature out of this one's
+// import graph.
+type settingsReader interface {
+	GetInt64(ctx context.Context, key string) (int64, error)
+}
+
+// SettingSessionInactivityTimeout is the catalog key the inactivity bound
+// reads. The catalog owns the name; this constant is how this package
+// spells it.
+const SettingSessionInactivityTimeout = "session.inactivity_timeout"
+
+// The catalog's default for the bound, mirrored so a nil settings feature or
+// an unreadable read still judges inactivity the deployment set out with.
+const inactivityTimeoutDefault = 21600 * time.Second
+
+// The spec's bounds for the bound: five minutes to one year.
+const (
+	inactivityFloor = 5 * 60 * time.Second
+	inactivityCeil  = 365 * 24 * time.Hour
+)
+
+// WithSettings wires the inactivity bound after construction. Nil keeps the
+// catalog default — the state a test or a bare wiring is in.
+func (s *Service) WithSettings(reader settingsReader) *Service {
+	s.settings = reader
+	return s
+}
+
+// inactivityTimeout reads the bound fresh at every renewal. An unreadable or
+// out-of-bounds value falls back to the catalog default: a setting the
+// database cannot answer must not end every session.
+func (s *Service) inactivityTimeout(ctx context.Context) time.Duration {
+	if s.settings == nil {
+		return inactivityTimeoutDefault
+	}
+	seconds, err := s.settings.GetInt64(ctx, SettingSessionInactivityTimeout)
+	if err != nil {
+		s.log.Warn("session: session.inactivity_timeout unreadable; using the default", slog.Any("error", err))
+		return inactivityTimeoutDefault
+	}
+	timeout := time.Duration(seconds) * time.Second
+	if timeout < inactivityFloor || timeout > inactivityCeil {
+		s.log.Warn("session: session.inactivity_timeout out of bounds; using the default", slog.Int64("seconds", seconds))
+		return inactivityTimeoutDefault
+	}
+	return timeout
 }
 
 // NewService builds the service over the shared pool.
@@ -163,6 +216,15 @@ func (s *Service) SignOut(ctx context.Context, callerSession string, callerID st
 		return SignedOut{}, err
 	}
 	return outcome, nil
+}
+
+// lastActivity is the instant the session last moved: the last renewal, or
+// the opening when it never renewed. The inactivity gate judges it.
+func (row SessionSchema) lastActivity() time.Time {
+	if row.RefreshedAt != nil {
+		return *row.RefreshedAt
+	}
+	return row.CreatedAt
 }
 
 // GetSession answers the session the access token names and the account it
@@ -453,6 +515,19 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 			return readErr
 		}
 		if account.Disabled || bannedAt(account, now) {
+			return ErrSessionEnded
+		}
+
+		// The inactivity gate: a session whose last activity — the last
+		// renewal, or the opening when it never renewed — rests older than
+		// `session.inactivity_timeout` is refused and revoked on the spot.
+		// The revocation commits, so a stolen refresh token cannot wait out
+		// the gate and replay later; the access tokens die on their own
+		// short TTL, which is the blast radius the timeout does not bound.
+		if last := locked.lastActivity(); now.Sub(last) > s.inactivityTimeout(ctx) {
+			if _, revokeErr := s.repo.Revoke(ctx, tx, locked.ID, nil, now); revokeErr != nil {
+				return revokeErr
+			}
 			return ErrSessionEnded
 		}
 

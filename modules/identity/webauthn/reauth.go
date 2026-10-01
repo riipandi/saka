@@ -63,7 +63,7 @@ func (s *Service) Reauthenticate(ctx context.Context, userID uuid.UUID, password
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("webauthn: reauthentication token: %w", err)
 	}
-	expires := s.now().Add(reauthTTL)
+	expires := s.now().Add(s.reverificationWindow(ctx))
 	if err := s.repo.CreateReauthenticationToken(ctx, s.pool, resolved, crypto.HashHexToken(token), s.now(), expires); err != nil {
 		return "", time.Time{}, err
 	}

@@ -27,6 +27,22 @@ type SignInOutcome struct {
 // sign-in service, after its credential check and its account-state check —
 // the disabled and banned refusals happened before this ran.
 func (s *Service) BeginSignIn(ctx context.Context, userID uuid.UUID, remember bool) (SignInOutcome, error) {
+	return s.beginBridge(ctx, userID, remember, PurposeVerify)
+}
+
+// BeginEnrollment writes the bridge the `mfa.required` gate mints: the
+// password is proven, the account keeps no confirmed factor, and the
+// enrollment endpoints are what the bridge admits. The caller is the sign-in
+// service, at the same point its per-account fork would have minted a
+// challenge — no token is issued until a factor is confirmed.
+func (s *Service) BeginEnrollment(ctx context.Context, userID uuid.UUID, remember bool) (SignInOutcome, error) {
+	return s.beginBridge(ctx, userID, remember, PurposeEnroll)
+}
+
+// beginBridge writes one bridge row of the named purpose. The write runs
+// outside a transaction on purpose — the bridge is worthless without the
+// password success that minted it, and that success carries no row.
+func (s *Service) beginBridge(ctx context.Context, userID uuid.UUID, remember bool, purpose string) (SignInOutcome, error) {
 	now := s.now()
 
 	token, err := crypto.RandomHexToken(32)
@@ -41,6 +57,7 @@ func (s *Service) BeginSignIn(ctx context.Context, userID uuid.UUID, remember bo
 		UserID:    userID,
 		TokenHash: hash,
 		Remember:  remember,
+		Purpose:   purpose,
 		ExpiresAt: expires,
 		CreatedAt: now,
 	}

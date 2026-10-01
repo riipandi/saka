@@ -298,8 +298,8 @@ func (r *Repository) DeleteAllRecoveryForUser(ctx context.Context, db datastore.
 func (r *Repository) CreatePending(ctx context.Context, db datastore.Querier, row PendingSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(PendingTable)
-	ib.Cols("id", "user_id", "token_hash", "remember", "expires_at", "created_at")
-	ib.Values(row.ID, row.UserID, row.TokenHash, row.Remember, row.ExpiresAt, row.CreatedAt)
+	ib.Cols("id", "user_id", "token_hash", "remember", "purpose", "expires_at", "created_at")
+	ib.Values(row.ID, row.UserID, row.TokenHash, row.Remember, row.Purpose, row.ExpiresAt, row.CreatedAt)
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
@@ -309,7 +309,7 @@ func (r *Repository) CreatePending(ctx context.Context, db datastore.Querier, ro
 }
 
 // pendingColumns is the select list one bridge row answers.
-var pendingColumns = []string{"id", "user_id", "token_hash", "remember", "expires_at", "created_at", "wrong_attempts"}
+var pendingColumns = []string{"id", "user_id", "token_hash", "remember", "purpose", "expires_at", "created_at", "wrong_attempts"}
 
 // FindLivePending reads the bridge a presented pending token resolves to.
 // The WHERE clause is the gate: hash match and unexpired — a spent, expired,
@@ -324,7 +324,7 @@ func (r *Repository) FindLivePending(ctx context.Context, db datastore.Querier, 
 	var row PendingSchema
 	var rawID string
 	scan := func(dest ...any) error { return db.QueryRow(ctx, query, args...).Scan(dest...) }
-	if err := scan(&rawID, &row.UserID, &row.TokenHash, &row.Remember, &row.ExpiresAt, &row.CreatedAt, &row.WrongAttempts); err != nil {
+	if err := scan(&rawID, &row.UserID, &row.TokenHash, &row.Remember, &row.Purpose, &row.ExpiresAt, &row.CreatedAt, &row.WrongAttempts); err != nil {
 		if errors.Is(err, datastore.ErrNoRows) {
 			return PendingSchema{}, datastore.ErrNoRows
 		}

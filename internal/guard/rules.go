@@ -90,15 +90,19 @@ var ProcedureRules = map[string]Entry{
 	// The multifactor surfaces split at the same line the one-time access
 	// codes do. CompleteSignIn is reached with the pending token the
 	// password check minted — the caller holds no access token yet, and the
-	// pending token is the credential the procedure judges. The enrollment,
+	// pending token is the credential the procedure judges. The enrollment
+	// pair answers two callers the tables cannot tell apart: the session
+	// holder and the account the `mfa.required` gate routed here, whose
+	// enrollment bridge stands in for the access token it does not hold
+	// yet — so they are `Public` and the handler carries the rule. The
 	// listing, regeneration, and switch-off run on the caller's own token,
 	// so `Session` names them: a machine credential has no second factor to
 	// manage, and the refusal of an impersonated caller keeps an
 	// administrator from enrolling a factor onto the account they are
 	// wearing — the delegation must end before the account's guard changes.
 	authnv1connect.MultifactorServiceCompleteSignInProcedure:          {Rule: Public},
-	authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:     {Rule: Session},
-	authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Session},
+	authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:     {Rule: Public},
+	authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure:   {Rule: Public},
 	authnv1connect.MultifactorServiceListTotpEnrollmentsProcedure:     {Rule: Session},
 	authnv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure:    {Rule: Session},
 	authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure: {Rule: Session, StepUp: true},

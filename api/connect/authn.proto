@@ -325,6 +325,13 @@ message SignInResponse {
   // challenge screen renders.
   google.protobuf.Timestamp mfa_pending_expires_at = 12;
 
+  // mfa_enrollment_required marks the `mfa.required` fork: the account kept
+  // no confirmed factor, so the pending token admits the enrollment
+  // endpoints (BeginTotpEnrollment / ConfirmTotpEnrollment with the token
+  // in `pending_token`) instead of CompleteSignIn — no tokens were issued,
+  // and the sign-in completes through CompleteSignIn after the confirm.
+  bool mfa_enrollment_required = 13;
+
   // access_token is the Bearer JWT. It is short-lived and stateless: the
   // caller sends it in the Authorization header and the server verifies it
   // against the published key set without a round trip.
@@ -675,6 +682,12 @@ message BeginTotpEnrollmentRequest {
     (buf.validate.field).string.min_len = 1,
     (buf.validate.field).string.max_len = 100
   ];
+
+  // pending_token admits a caller the `mfa.required` gate routed to
+  // enrollment: the bridge the password check minted stands in for the
+  // access token the caller does not hold yet. A caller presenting a token
+  // omits the field.
+  optional string pending_token = 2;
 }
 
 // BeginTotpEnrollmentResponse answers the secret the authenticator imports.
@@ -706,6 +719,11 @@ message ConfirmTotpEnrollmentRequest {
 
   // code is the six-digit value the authenticator renders right now.
   string code = 2 [(buf.validate.field).string.pattern = "^[0-9]{6,8}$"];
+
+  // pending_token is the bridge the enrollment began with, presented again
+  // by the caller the `mfa.required` gate routed here. A caller presenting
+  // a token omits the field.
+  optional string pending_token = 3;
 }
 
 // ConfirmTotpEnrollmentResponse answers the recovery set in the clear once —

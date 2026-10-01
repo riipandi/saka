@@ -25,13 +25,49 @@ import (
 
 // Ceremony session and step-up token windows. The ceremony window is how
 // long a challenge may sit unanswered — a browser prompts within seconds;
-// a minute is generous. The reauthentication window mirrors the pending
-// MFA bridge: a proof a holder confirmed seconds ago is spent within
-// minutes or not at all.
+// a minute is generous. The reauthentication window is the
+// `session.reverification_window` setting, read at grant time: a proof a
+// holder confirmed seconds ago is spent within the window or not at all.
 const (
 	ceremonyTTL = time.Minute
-	reauthTTL   = 5 * time.Minute
 )
+
+// SettingReverificationWindow is the catalog key the step-up window reads.
+// The catalog owns the name; this constant is how this package spells it.
+const SettingReverificationWindow = "session.reverification_window"
+
+// The catalog's default for the window, mirrored so a nil settings feature
+// or an unreadable read still grants a proof the deployment set out with.
+const reverificationWindowDefault = 30 * time.Minute
+
+// The reader's bounds for the window: one minute to twenty-four hours. A
+// window past a day stops being reauthentication; one below a minute is
+// not a window.
+const (
+	reverificationFloor = time.Minute
+	reverificationCeil  = 24 * time.Hour
+)
+
+// reverificationWindow reads the window fresh at every grant, so an
+// operator's change lands at the next proof. An unreadable or out-of-bounds
+// value falls back to the catalog default: a setting the database cannot
+// answer must not end every step-up.
+func (s *Service) reverificationWindow(ctx context.Context) time.Duration {
+	if s.settings == nil {
+		return reverificationWindowDefault
+	}
+	seconds, err := s.settings.GetInt64(ctx, SettingReverificationWindow)
+	if err != nil {
+		s.log.Warn("webauthn: session.reverification_window unreadable; using the default", slog.Any("error", err))
+		return reverificationWindowDefault
+	}
+	window := time.Duration(seconds) * time.Second
+	if window < reverificationFloor || window > reverificationCeil {
+		s.log.Warn("webauthn: session.reverification_window out of bounds; using the default", slog.Int64("seconds", seconds))
+		return reverificationWindowDefault
+	}
+	return window
+}
 
 // Setting keys the service reads through the settings reader. The catalog
 // owns the defaults; these names are the contract between the two.

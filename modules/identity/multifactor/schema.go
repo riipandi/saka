@@ -81,6 +81,10 @@ type PendingSchema struct {
 	UserID    uuid.UUID `db:"user_id"`
 	TokenHash string    `db:"token_hash"`
 	Remember  bool      `db:"remember"`
+	// Purpose names what the bridge admits its holder to: `verify` is the
+	// second-factor challenge, `enroll` the enrollment a zero-factor
+	// account is routed to while `mfa.required` stands.
+	Purpose   string    `db:"purpose"`
 	ExpiresAt time.Time `db:"expires_at"`
 	CreatedAt time.Time `db:"created_at"`
 	// WrongAttempts is the wrong-code budget the bridge has spent. The count
@@ -88,3 +92,11 @@ type PendingSchema struct {
 	// and so the budget survives a process restart inside the bridge's life.
 	WrongAttempts int `db:"wrong_attempts"`
 }
+
+// Bridge purposes. The catalog of what a bridge admits: a verify bridge is
+// spent by the second-factor challenge; an enroll bridge reaches the
+// enrollment endpoints and dies with the sign-in it belongs to.
+const (
+	PurposeVerify = "verify"
+	PurposeEnroll = "enroll"
+)

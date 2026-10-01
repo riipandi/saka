@@ -72,6 +72,10 @@ type rpcHandler struct {
 	service *Service
 }
 
+// errUnauthenticated is the answer a caller neither the session nor a live
+// enrollment bridge names. The text names nothing a caller could aim at.
+var errUnauthenticated = errors.New("authentication is required")
+
 // newRPCHandler builds the handler over the service.
 func newRPCHandler(service *Service) authnv1connect.MultifactorServiceHandler {
 	return &rpcHandler{service: service}
@@ -94,12 +98,34 @@ func callerID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
+// enrollmentCaller resolves the account an enrollment procedure runs for.
+// The guard names the procedures Public and this resolver carries the rule
+// the contract cannot express: a caller holding an access token runs on the
+// session, and a caller the `mfa.required` gate routed here runs on the
+// enrollment bridge — the token stands in for the access token the caller
+// does not hold yet. Presenting both, neither, or an unusable bridge is the
+// same unauthenticated answer.
+func (h *rpcHandler) enrollmentCaller(ctx context.Context, pendingToken string) (uuid.UUID, error) {
+	if pendingToken != "" {
+		userID, err := h.service.ResolveEnrollmentBridge(ctx, pendingToken)
+		if err != nil {
+			return uuid.UUID{}, errUnauthenticated
+		}
+		return userID, nil
+	}
+	userID, err := callerID(ctx)
+	if err != nil {
+		return uuid.UUID{}, errUnauthenticated
+	}
+	return userID, nil
+}
+
 // BeginTotpEnrollment writes an unconfirmed authenticator and answers its
 // secret once.
 func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.BeginTotpEnrollmentRequest]) (*connect.Response[authnv1.BeginTotpEnrollmentResponse], error) {
-	userID, err := callerID(ctx)
+	userID, err := h.enrollmentCaller(ctx, req.Msg.GetPendingToken())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated)
 	}
 
 	result, err := h.service.BeginTotpEnrollment(ctx, userID, req.Msg.Name)
@@ -118,9 +144,9 @@ func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Reque
 // ConfirmTotpEnrollment activates the enrollment and answers the recovery
 // set once.
 func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.ConfirmTotpEnrollmentRequest]) (*connect.Response[authnv1.ConfirmTotpEnrollmentResponse], error) {
-	userID, err := callerID(ctx)
+	userID, err := h.enrollmentCaller(ctx, req.Msg.GetPendingToken())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated)
 	}
 
 	result, err := h.service.ConfirmTotpEnrollment(ctx, userID, req.Msg.TotpId, req.Msg.Code)

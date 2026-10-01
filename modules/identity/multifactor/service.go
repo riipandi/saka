@@ -226,6 +226,18 @@ func (s *Service) GateSignIn(ctx context.Context, userID uuid.UUID, remember boo
 	return signin.PendingSignIn{Token: outcome.PendingToken, ExpiresAt: outcome.ExpiresAt}, nil
 }
 
+// GateEnrollment mints the bridge the `mfa.required` gate hands over: the
+// password is proven and the account keeps no confirmed factor, so the
+// pending state routes to enrollment instead of a challenge. The bridge
+// admits the enrollment endpoints; the tokens wait for the confirm.
+func (s *Service) GateEnrollment(ctx context.Context, userID uuid.UUID, remember bool) (signin.PendingSignIn, error) {
+	outcome, err := s.BeginEnrollment(ctx, userID, remember)
+	if err != nil {
+		return signin.PendingSignIn{}, err
+	}
+	return signin.PendingSignIn{Token: outcome.PendingToken, ExpiresAt: outcome.ExpiresAt}, nil
+}
+
 // KeepsConfirmedFactor answers whether the account holds a confirmed
 // authenticator — the question the sign-in's fork runs on.
 func (s *Service) KeepsConfirmedFactor(ctx context.Context, userID uuid.UUID) (bool, error) {
@@ -234,6 +246,28 @@ func (s *Service) KeepsConfirmedFactor(ctx context.Context, userID uuid.UUID) (b
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// ResolveEnrollmentBridge resolves the account an enrollment bridge names.
+// The caller is the enrollment handler: a bridge holder carries no access
+// token, so the account comes from the bridge instead of the JWT. Only an
+// enroll-purpose bridge reaches the enrollment endpoints — a verify bridge
+// is spent by the challenge, and a verify holder enrolls through the session
+// the completed sign-in opened. The bridge survives the resolution: it is
+// spent by CompleteSignIn, after the confirm, not before.
+func (s *Service) ResolveEnrollmentBridge(ctx context.Context, pendingToken string) (uuid.UUID, error) {
+	hash := crypto.HashHexToken(pendingToken)
+	pending, err := s.repo.FindLivePending(ctx, s.pool, hash, s.now())
+	if errors.Is(err, datastore.ErrNoRows) {
+		return uuid.UUID{}, ErrPendingInvalid
+	}
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	if pending.Purpose != PurposeEnroll {
+		return uuid.UUID{}, ErrPendingInvalid
+	}
+	return pending.UserID, nil
 }
 
 // ---- internals ----

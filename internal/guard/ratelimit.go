@@ -46,6 +46,12 @@ var RateAuthProcedures = map[string]struct{}{
 	authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure:         {},
 	authnv1connect.OneTimeAccessServiceRequestEmailProcedure:              {},
 	authnv1connect.MultifactorServiceCompleteSignInProcedure:              {},
+	// The enrollment pair is public only because the `mfa.required` bridge
+	// admits a caller no token names: the bridge is the credential the
+	// procedures judge, so a drive against it shares the credential
+	// budget's stakes.
+	authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure:   {},
+	authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure: {},
 	// The reauthentication door carries the same budget as the sign-in: its
 	// password half is a credential guess like any other, and the locked-in
 	// session changes the stakes, not the shape — the proof's budget is what

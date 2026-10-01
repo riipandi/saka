@@ -119,6 +119,11 @@ CREATE TABLE IF NOT EXISTS public.user_mfa_pending (
     user_id UUID NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
     token_hash TEXT NOT NULL UNIQUE,
     remember BOOLEAN NOT NULL DEFAULT false,
+    -- What the bridge admits its holder to: `verify` is the second-factor
+    -- challenge a confirmed account completes, `enroll` is the enrollment a
+    -- zero-factor account is routed to while `mfa.required` stands — the
+    -- bridge proves the password, the enrollment endpoints judge it.
+    purpose TEXT NOT NULL DEFAULT 'verify' CONSTRAINT chk_user_mfa_pending_purpose CHECK (purpose IN ('verify', 'enroll')),
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- The wrong-code budget the bridge has spent. The count rides the row so

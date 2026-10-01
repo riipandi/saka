@@ -84,22 +84,27 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 		return nil, mapError(err)
 	}
 
-	// The MFA fork changes the response's shape, not its envelope: the
-	// challenge answer carries no token fields, and the message names the
-	// next procedure rather than pretending a session opened.
+	// The MFA forks change the response's shape, not its envelope: the
+	// challenge and the enrollment answers carry no token fields, and the
+	// message names the next procedure rather than pretending a session
+	// opened.
 	message := "the token pair was issued"
-	if result.MFARequired {
+	switch {
+	case result.MFAEnrollmentRequired:
+		message = "a second factor must be enrolled before the sign-in completes"
+	case result.MFARequired:
 		message = "the second factor is required to complete the sign-in"
 	}
 	return connect.NewResponse(&authnv1.SignInResponse{
-		AccessToken:      result.AccessToken,
-		TokenType:        result.TokenType,
-		AccessExpiresIn:  result.AccessExpiresIn,
-		RefreshExpiresIn: result.RefreshExpiresIn,
-		RefreshToken:     result.RefreshToken,
-		SessionId:        result.SessionID,
-		MfaRequired:      result.MFARequired,
-		MfaPendingToken:  result.MFAPendingToken,
+		AccessToken:           result.AccessToken,
+		TokenType:             result.TokenType,
+		AccessExpiresIn:       result.AccessExpiresIn,
+		RefreshExpiresIn:      result.RefreshExpiresIn,
+		RefreshToken:          result.RefreshToken,
+		SessionId:             result.SessionID,
+		MfaRequired:           result.MFARequired,
+		MfaEnrollmentRequired: result.MFAEnrollmentRequired,
+		MfaPendingToken:       result.MFAPendingToken,
 		MfaPendingExpiresAt: func() *timestamppb.Timestamp {
 			if result.MFAPendingExpiresAt.IsZero() {
 				return nil

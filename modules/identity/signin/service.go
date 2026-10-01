@@ -97,6 +97,10 @@ type mfaGate interface {
 	// GateSignIn answers the challenge a verified password hands over: the
 	// pending token, its expiry, and whether a challenge is owed at all.
 	GateSignIn(ctx context.Context, userID uuid.UUID, remember bool) (PendingSignIn, error)
+	// GateEnrollment mints the bridge the `mfa.required` gate hands over:
+	// the password is proven, the account keeps no confirmed factor, and
+	// the enrollment endpoints are what the bridge admits.
+	GateEnrollment(ctx context.Context, userID uuid.UUID, remember bool) (PendingSignIn, error)
 	// KeepsConfirmedFactor answers whether the account holds a confirmed
 	// authenticator — the question the sign-in's fork runs on.
 	KeepsConfirmedFactor(ctx context.Context, userID uuid.UUID) (bool, error)
@@ -166,6 +170,12 @@ type Result struct {
 	// authenticator and the token fields are empty — the caller completes
 	// the sign-in through the second factor with the pending token.
 	MFARequired bool
+	// MFAEnrollmentRequired marks the `mfa.required` fork: the account
+	// kept no confirmed factor, so the pending token admits the
+	// enrollment endpoints instead of the challenge — no token until a
+	// factor is confirmed, and the sign-in completes through the same
+	// CompleteSignIn afterward.
+	MFAEnrollmentRequired bool
 	// MFAPendingToken is the bridge the password check minted.
 	MFAPendingToken string
 	// MFAPendingExpiresAt is when the bridge dies.
@@ -213,8 +223,11 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 
 	// The second factor's fork runs before any session is opened: an account
 	// keeping a confirmed authenticator answers the pending bridge instead of
-	// the pair, and the tokens wait for the code. The fork is silent in the
-	// response otherwise — a one-factor account sees nothing of it.
+	// the pair, and the tokens wait for the code. An account keeping none
+	// while `mfa.required` stands answers the enrollment bridge — the same
+	// no-token shape, routed to enrollment instead of a challenge. The fork
+	// is silent in the response otherwise — a one-factor account sees
+	// nothing of it.
 	if s.mfa != nil {
 		owed, owedErr := s.mfa.KeepsConfirmedFactor(ctx, account.ID)
 		if owedErr != nil {
@@ -229,6 +242,18 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 				MFARequired:         true,
 				MFAPendingToken:     pending.Token,
 				MFAPendingExpiresAt: pending.ExpiresAt,
+			}, nil
+		}
+		if s.mfaRequired(ctx) {
+			pending, gateErr := s.mfa.GateEnrollment(ctx, account.ID, params.Remember)
+			if gateErr != nil {
+				return Result{}, gateErr
+			}
+			return Result{
+				MFARequired:           true,
+				MFAEnrollmentRequired: true,
+				MFAPendingToken:       pending.Token,
+				MFAPendingExpiresAt:   pending.ExpiresAt,
 			}, nil
 		}
 	}
@@ -507,16 +532,21 @@ func (s *Service) SessionLifetime(ctx context.Context, remember bool) time.Durat
 	return s.sessionLifetime(ctx)
 }
 
-// sessionSettings reads the session bound at mint time.
-// *appconfig.Settings satisfies it; the interface keeps the appconfig
-// feature out of this one's import graph.
+// sessionSettings reads the session bound and the second-factor gate at
+// mint time. *appconfig.Settings satisfies it; the interface keeps the
+// appconfig feature out of this one's import graph.
 type sessionSettings interface {
 	GetInt64(ctx context.Context, key string) (int64, error)
+	GetBool(ctx context.Context, key string) (bool, error)
 }
 
 // SettingSessionMaxLifetime is the catalog key the session bound reads. The
 // catalog owns the name; this constant is how this package spells it.
 const SettingSessionMaxLifetime = "session.max_lifetime"
+
+// SettingMFARequired is the catalog key the global second-factor gate reads.
+// The catalog owns the name; this constant is how this package spells it.
+const SettingMFARequired = "mfa.required"
 
 // The catalog's default for the bound, mirrored so a nil settings feature or
 // an unreadable read still mints a session the deployment set out with.
@@ -560,6 +590,21 @@ func (s *Service) sessionLifetime(ctx context.Context) time.Duration {
 		return sessionMaxLifetimeDefault
 	}
 	return lifetime
+}
+
+// mfaRequired reads the global second-factor gate. An unreadable value
+// answers the catalog default — the gate ships off, and a setting the
+// database cannot answer must not end every sign-in.
+func (s *Service) mfaRequired(ctx context.Context) bool {
+	if s.settings == nil {
+		return false
+	}
+	required, err := s.settings.GetBool(ctx, SettingMFARequired)
+	if err != nil {
+		s.log.Warn("signin: mfa.required unreadable; the gate is off", slog.Any("error", err))
+		return false
+	}
+	return required
 }
 
 // SignAccessToken mints the stateless token for an account the caller has

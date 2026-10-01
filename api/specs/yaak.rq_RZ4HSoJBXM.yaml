@@ -19,6 +19,8 @@ description: |-
 
   The account's **first** confirmation also writes its recovery set; the response carries the 10 recovery codes **in the clear exactly once** — their hashed rows are all that survive the call. Later enrollments answer no codes.
 
+  Guard: the handler carries the rule the tables cannot express — a session caller runs on its own token, and a caller the `mfa.required` gate routed here presents the enrollment bridge in the optional `pending_token` field.
+
   A wrong code answers `unauthenticated` and the ceremony stays open until its expiry.
 headers:
 - enabled: true

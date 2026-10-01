@@ -18,7 +18,7 @@ description: |-
 
   The secret is stored sealed (`enc:`) and never leaves the server again — later reads answer metadata only. The enrollment dies if not confirmed within 15 minutes. Accounts hold at most 10 authenticators (confirmed and pending together); multiple devices per account are the point.
 
-  Guard: Session (an impersonated caller is refused — an administrator must not enroll a factor onto the account they are wearing).
+  Guard: the handler carries the rule the tables cannot express — a session caller runs on its own token, and a caller the `mfa.required` gate routed here presents the enrollment bridge in the optional `pending_token` field. An impersonated caller is refused (an administrator must not enroll a factor onto the account they are wearing).
 headers:
 - enabled: true
   name: Content-Type

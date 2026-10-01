@@ -483,3 +483,55 @@ func TestAWrongPasswordIsNotAProof(t *testing.T) {
 	_, _, err := service.Reauthenticate(t.Context(), userID, "marauder", "", "")
 	assert.ErrorIs(t, err, ErrProofRefused)
 }
+
+// The step-up window is the `session.reverification_window` setting read at
+// grant time: the token's expiry sits exactly one window out, a proof spent
+// inside it answers, and the same proof presented after the window has
+// passed is dead on arrival — no fresh grant in between.
+func TestAStepUpProofLivesInTheReverificationWindow(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, map[string]string{
+		SettingAllowSyncedPasskeys:  "true",
+		SettingUserVerification:     UserVerificationRequired,
+		SettingMaxCredentials:       "10",
+		SettingMaxEnrollments:       "10",
+		SettingReverificationWindow: "120", // two minutes
+	})
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+
+	soft := NewSoftAuthenticator(false, false, true)
+	enroll(t, service, userID, soft, "key")
+
+	// The window the setting names, not the constant the service used to
+	// carry: the grant's expiry sits exactly two minutes out. The clock is
+	// held still so the two reads share one instant.
+	at := time.Now()
+	service.now = func() time.Time { return at }
+	token, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, 2*time.Minute, expiresAt.Sub(at))
+
+	// Inside the window the proof spends.
+	require.NoError(t, service.ConsumeReauthentication(t.Context(), stepUpCaller(t, userID), token))
+
+	// Past the window a fresh grant is dead on arrival: the proof was
+	// confirmed at grant time, and no consumption may outlive the window.
+	token, _, err = service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	require.NoError(t, err)
+	service.now = func() time.Time { return at.Add(3 * time.Minute) }
+	assert.ErrorIs(t, service.ConsumeReauthentication(t.Context(), stepUpCaller(t, userID), token), ErrProofRefused)
+}
+
+// A deployment whose settings feature cannot answer the window grants the
+// catalog default — thirty minutes — rather than refusing every proof.
+func TestTheReverificationWindowFallsBackToTheDefault(t *testing.T) {
+	service, issuer, _ := webauthnTestService(t, defaultSettings())
+	userID, account := seedAccount(t, service.pool, "hermione")
+	issuer.accounts[userID] = account
+
+	at := time.Now()
+	service.now = func() time.Time { return at }
+	_, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, reverificationWindowDefault, expiresAt.Sub(at))
+}

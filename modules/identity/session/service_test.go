@@ -482,6 +482,45 @@ func TestRefreshRotatesTheTokenAndKeepsTheSession(t *testing.T) {
 // The delegation's window is a hard bound: a renewal rotates the secret but
 // hands the row no lifetime beyond the hour the impersonation opened, and
 // once the window has passed the delegation renews no further.
+// The inactivity gate: a session whose last activity rests older than
+// `session.inactivity_timeout` is refused and revoked on the spot — the row
+// is stamped, so the stolen credential the caller holds cannot wait out the
+// gate and replay later. A session inside the window renews as before.
+func TestAnIdleSessionIsRefusedAndRotatedOut(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, now := testService(t, pool)
+	userID := seedAccount(t, pool, "hermione")
+	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	service.WithSettings(stubBound{seconds: int64(time.Hour.Seconds())})
+
+	// Inside the window the renewal answers.
+	jump(t, now, 30*time.Minute)
+	_, err := service.Refresh(t.Context(), token)
+	require.NoError(t, err)
+
+	// Past the window — the last renewal is the jump above, so the clock
+	// moves two hours past it — the same token is refused, and the row is
+	// revoked rather than left resting.
+	jump(t, now, 2*time.Hour)
+	_, err = service.Refresh(t.Context(), token)
+	assert.ErrorIs(t, err, ErrSessionEnded)
+	row, err := service.repo.GetSession(t.Context(), pool, sid)
+	require.NoError(t, err)
+	assert.NotNil(t, row.RevokedAt, "an idle session is rotated out, not left resting")
+}
+
+// stubBound answers the duration keys with one value: the renewal's view of
+// the catalog in a test.
+type stubBound struct {
+	seconds int64
+}
+
+func (s stubBound) GetInt64(context.Context, string) (int64, error) {
+	return s.seconds, nil
+}
+
 func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 

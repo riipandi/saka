@@ -267,6 +267,12 @@ var Package = do.Package(
 		users := do.MustInvoke[*user.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		service := session.NewService(pool, issuer, users, recorder, log)
+		// The inactivity bound reads the catalog at renewal time; a nil
+		// settings feature keeps the catalog default, the state a bare
+		// wiring is in.
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithSettings(settings)
+		}
 		// The ban's side effects are wired here rather than in the user
 		// provider: the session lifecycle and the queue exist by the time
 		// this builds, and the user service must not depend on either to
