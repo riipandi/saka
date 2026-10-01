@@ -23,7 +23,7 @@ headers:
 method: POST
 name: List Permissions
 sortPriority: 666.6666666666666
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/ListPermissions
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/ListPermissions
 urlParameters: []
 settingSendCookies:
   enabled: false

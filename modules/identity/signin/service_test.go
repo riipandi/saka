@@ -64,6 +64,10 @@ type accountFixture struct {
 	// sign-up's verification gate leaves an account in. The default fixture
 	// is verified: these tests exercise the sign-in, not the gate.
 	unverified bool
+	// noUsername leaves the username column NULL — the state the open-mode
+	// sign-up leaves an account in when the address is all it has. The
+	// identity the sign-in judges is the email alone.
+	noUsername bool
 }
 
 // createAccount writes a user and its password straight into the tables, the
@@ -87,7 +91,11 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	if fixture.unverified {
 		verifiedAt = nil
 	}
-	ib.Values(id, fixture.username, fixture.email, "Hogwarts Student", fixture.disabled, fixture.bannedAt, fixture.banExpires, verifiedAt)
+	var usernameValue any = fixture.username
+	if fixture.noUsername {
+		usernameValue = nil
+	}
+	ib.Values(id, usernameValue, fixture.email, "Hogwarts Student", fixture.disabled, fixture.bannedAt, fixture.banExpires, verifiedAt)
 	query, args := ib.Build()
 	_, err = pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
@@ -100,6 +108,38 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	_, err = pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
 	return id
+}
+
+// The username-less account signs in by its email alone: the open-mode
+// sign-up leaves the column NULL, and the scan that read it as a string
+// once turned every such sign-in into a 500 — the regression this pins.
+func TestASignInWithoutAUsernameOpensTheSession(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	const password = "expecto-patronum"
+	userID := createAccount(t, pool, "", "nameless@example.com", password,
+		func(f *accountFixture) { f.noUsername = true })
+
+	result, err := service.SignIn(ctx, Params{
+		Identity:  "nameless@example.com",
+		Password:  password,
+		UserAgent: "signin_test/1",
+		IPAddress: "192.0.2.30",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.User.Username)
+	assert.NotEmpty(t, result.AccessToken)
+	assert.NotEmpty(t, result.RefreshToken)
+
+	// The bridge's completion reads the same row by identifier — the same
+	// NULL rides every account read, not just the identity lookup.
+	again, err := service.repo.FindAccountByID(ctx, userID)
+	require.NoError(t, err)
+	assert.Empty(t, again.Username)
 }
 
 func TestSignInIssuesTheTokenPair(t *testing.T) {

@@ -41,7 +41,7 @@ type Account struct {
 func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name",
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires",
 		"p.password_hash IS NOT NULL",
 	)
@@ -69,7 +69,7 @@ func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, userID uuid.UUID) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name",
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires",
 		"p.password_hash IS NOT NULL",
 	)

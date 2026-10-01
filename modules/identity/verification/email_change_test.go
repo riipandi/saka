@@ -59,22 +59,22 @@ func TestRequestEmailChangeBindsTheTokenToTheNewAddress(t *testing.T) {
 
 	pool := migratedPool(t)
 	service := emailChangeService(t, pool, true)
-	userID := seedUser(t, pool, "rlangdon", "langdon@example.com", false)
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
 
-	require.NoError(t, service.RequestEmailChange(t.Context(), "rlangdon", "langdon@new.example.com"))
+	require.NoError(t, service.RequestEmailChange(t.Context(), userID, "langdon@new.example.com"))
 
-	// The confirm-link message and the pending notice both travel, and the
+	// The confirm-code message and the pending notice both travel, and the
 	// row binds the pending address: the confirmation will move the account
-	// to the address the request named, never one a replayed link picks.
-	assert.Equal(t, int64(1), pendingCount(t, service, jobs.EmailChangeRequestEmailName), "the confirm link is queued to the new address")
+	// to the address the request named.
+	assert.Equal(t, int64(1), pendingCount(t, service, jobs.EmailChangeRequestEmailName), "the confirm code is queued to the new address")
 	assert.Equal(t, int64(1), pendingCount(t, service, jobs.EmailChangeNoticeName), "the old address hears about the request")
 
-	row := pendingChangeToken(t, pool, userID)
+	row := pendingChangeToken(t, pool, userID.String())
 	assert.Equal(t, "langdon@new.example.com", row.Payload)
 
 	// A second request inside the cooldown refuses, whatever address it
 	// names.
-	err := service.RequestEmailChange(t.Context(), "rlangdon", "langdon@other.example.com")
+	err := service.RequestEmailChange(t.Context(), userID, "langdon@other.example.com")
 	assert.ErrorIs(t, err, ErrResendTooSoon)
 }
 
@@ -83,13 +83,13 @@ func TestRequestEmailChangeRefusesTakenAndSameAddresses(t *testing.T) {
 
 	pool := migratedPool(t)
 	service := emailChangeService(t, pool, true)
-	seedUser(t, pool, "rlangdon", "langdon@example.com", false)
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
 	seedUser(t, pool, "sneveu", "neveu@example.com", false)
 
-	err := service.RequestEmailChange(t.Context(), "rlangdon", "langdon@example.com")
+	err := service.RequestEmailChange(t.Context(), userID, "langdon@example.com")
 	assert.ErrorIs(t, err, ErrSameEmail, "the current address is nothing to change")
 
-	err = service.RequestEmailChange(t.Context(), "rlangdon", "neveu@example.com")
+	err = service.RequestEmailChange(t.Context(), userID, "neveu@example.com")
 	assert.ErrorIs(t, err, ErrEmailTaken, "another account's address is refused at the request")
 
 	// Neither refusal left a pending row behind.

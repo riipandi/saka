@@ -58,7 +58,7 @@ type Account struct {
 func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string) (*Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name",
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
 		"u.email_verified_at",
 	)
@@ -93,7 +93,7 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name",
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
 	)
 	sb.From(user.UserTable + " u")
@@ -123,7 +123,7 @@ func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Accoun
 func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
-		"u.id", "u.username", "u.email", "u.display_name",
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
 	)
 	sb.From(user.UserTable + " u")

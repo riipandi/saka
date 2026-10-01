@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -186,11 +187,16 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		repo := user.NewRepository()
+		now := time.Now().UTC()
 		id, createErr := repo.CreateUser(ctx, tx, user.UserSchema{
-			Username:    username,
-			Email:       email,
-			DisplayName: "Administrator",
-			Timezone:    user.DefaultTimezone,
+			Username: username,
+			Email:    email,
+			// The first administrator's address is operator-set, never
+			// mail-verified; the account must open the deployment it
+			// bootstraps, so it ships verified like every seeder account.
+			EmailVerifiedAt: &now,
+			DisplayName:     "Administrator",
+			Timezone:        user.DefaultTimezone,
 		})
 		var pgErr *pgconn.PgError
 		if errors.As(createErr, &pgErr) && pgErr.Code == "23505" {

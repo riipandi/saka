@@ -55,6 +55,26 @@ less, twelve above — and stored as SHA-256 hashes. The email paths are gated b
 | POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
 | POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
 
+## Passkeys (WebAuthn)
+
+The passwordless surface: registration and ceremony sign-in ride the WebAuthn protocol; the
+administrative rows manage credentials over a named account. Step-up reauthentication mints a
+single-use token that lives `session.reverification_window` (default 30 minutes).
+
+| Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
+| -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/ListCredentials`                       | ConnectRPC   | List the account's passkeys                 |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/UpdateCredential`                      | ConnectRPC   | Rename a passkey                            |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/BeginLogin`                            | ConnectRPC   | Open a ceremony sign-in challenge           |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/VerifyLogin`                           | ConnectRPC   | Verify the assertion and open the session   |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password or passkey)         |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential`                 | ConnectRPC   | Rename a user's passkey (admin)             |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |
+
 ## MFA TOTP
 
 Tango-only; upstream Pocket ID has no TOTP. A confirmed enrollment turns a successful password
@@ -132,6 +152,7 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 | POST     | `/rpc/tango.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin)                              |
 | POST     | `/rpc/tango.identity.v1.UserService/UnbanUser`                               | ConnectRPC   | Unban a user (admin)                            |
 | POST     | `/rpc/tango.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
+| POST     | `/rpc/tango.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (self-service; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
 | PUT      | `/api/users/me/profile-picture`                                              | HTTP/REST    | Update own profile picture (raw-body upload)    |
 | DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
 | PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
@@ -168,7 +189,7 @@ membership update is a replace: the request names the whole member set.
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                          |
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/VerifyEmail`                | ConnectRPC   | Verify email (token is the credential)           |
-| POST     | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm link to the new address) |
+| POST     | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
 | POST     | `/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
 
 ## Notifications

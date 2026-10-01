@@ -26,7 +26,7 @@ headers:
 method: POST
 name: List User Roles
 sortPriority: 7000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/ListUserRoles
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/ListUserRoles
 urlParameters: []
 settingSendCookies:
   enabled: false

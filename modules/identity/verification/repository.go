@@ -32,29 +32,6 @@ type Account struct {
 	EmailVerifiedAt *time.Time
 }
 
-// FindUserByUsername reads the account a signed-in caller's claims name. The
-// username column is CITEXT, so the match is the case-insensitive one its
-// unique index applies — the same match that signed the claim.
-func (r *Repository) FindUserByUsername(ctx context.Context, db datastore.Querier, username string) (Account, error) {
-	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id", "username", "email", "display_name", "email_verified_at")
-	sb.From("public.users")
-	sb.Where(sb.Equal("username", username))
-
-	query, args := sb.Build()
-	var row Account
-	err := db.QueryRow(ctx, query, args...).Scan(
-		&row.ID, &row.Username, &row.Email, &row.DisplayName, &row.EmailVerifiedAt,
-	)
-	if errors.Is(err, datastore.ErrNoRows) {
-		return Account{}, datastore.ErrNoRows
-	}
-	if err != nil {
-		return Account{}, fmt.Errorf("verification: find user: %w", err)
-	}
-	return row, nil
-}
-
 // UpsertToken writes the verification token and answers nothing: the account
 // carries at most one row per purpose, so a re-request replaces the hash,
 // moves the window, and stamps the send time over the row it conflicts with.

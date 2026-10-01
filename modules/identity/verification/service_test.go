@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
@@ -107,16 +108,16 @@ func TestSendEmailRefusesTheStatesItCannotServe(t *testing.T) {
 
 	// An unknown account, a verified account, and an unconfigured mailer
 	// each refuse with their own failure.
-	err = service.SendEmail(t.Context(), "nobody")
+	err = service.SendEmail(t.Context(), uuid.NewV7())
 	assert.ErrorIs(t, err, ErrUserNotFound)
 
-	seedUser(t, pool, "verified", "patronus@example.com", true)
-	err = service.SendEmail(t.Context(), "verified")
+	verified := uuid.MustParse(seedUser(t, pool, "verified", "patronus@example.com", true))
+	err = service.SendEmail(t.Context(), verified)
 	assert.ErrorIs(t, err, ErrAlreadyVerified)
 
 	unconfigured := testService(t, pool, false)
-	seedUser(t, pool, "hermione", "hermione@example.com", false)
-	err = unconfigured.SendEmail(t.Context(), "hermione")
+	hermione := uuid.MustParse(seedUser(t, pool, "hermione", "hermione@example.com", false))
+	err = unconfigured.SendEmail(t.Context(), hermione)
 	assert.ErrorIs(t, err, ErrMailUnavailable)
 }
 
@@ -125,9 +126,9 @@ func TestSendEmailIssuesOneTokenPerAccount(t *testing.T) {
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true)
-	seedUser(t, pool, "hermione", "hermione@example.com", false)
+	hermione := uuid.MustParse(seedUser(t, pool, "hermione", "hermione@example.com", false))
 
-	require.NoError(t, service.SendEmail(t.Context(), "hermione"))
+	require.NoError(t, service.SendEmail(t.Context(), hermione))
 
 	// The table carries one row per account and purpose, and the queue
 	// carries the message that will deliver it.
@@ -138,11 +139,11 @@ func TestSendEmailIssuesOneTokenPerAccount(t *testing.T) {
 	// A re-request inside the cooldown refuses. Past the window the same
 	// request replaces the token: the row the first hash named no longer
 	// exists, and the queue carries one more message, not a second row.
-	err = service.SendEmail(t.Context(), "hermione")
+	err = service.SendEmail(t.Context(), hermione)
 	assert.ErrorIs(t, err, ErrResendTooSoon)
 
 	service.now = func() time.Time { return time.Now().Add(2 * time.Minute) }
-	require.NoError(t, service.SendEmail(t.Context(), "hermione"))
+	require.NoError(t, service.SendEmail(t.Context(), hermione))
 
 	pending, err = service.queue.Pending(t.Context(), jobs.EmailVerificationName)
 	require.NoError(t, err)
@@ -213,7 +214,6 @@ func TestTheFlowEndToEnd(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
-	seedUser(t, pool, "hermione", "hermione@example.com", false)
 
 	mailpit := testutils.StartMailpit(t.Context(), t)
 
@@ -238,7 +238,8 @@ func TestTheFlowEndToEnd(t *testing.T) {
 	t.Cleanup(func() { client.Shutdown(context.Background()) })
 
 	service := NewService(pool, mail, client, nil, "http://localhost:3080", nil)
-	require.NoError(t, service.SendEmail(t.Context(), "hermione"))
+	hermione := uuid.MustParse(seedUser(t, pool, "hermione", "hermione@example.com", false))
+	require.NoError(t, service.SendEmail(t.Context(), hermione))
 
 	code := waitForCode(t, mailpit)
 	require.NotEmpty(t, code)

@@ -26,7 +26,7 @@ func NewRepository() *Repository { return &Repository{} }
 
 // accountColumns are the columns the account reads name, in scan order.
 var accountColumns = []string{
-	"id", "username", "email", "display_name",
+	"id", "coalesce(username, '') AS username", "email", "display_name",
 	"disabled", "banned_at", "ban_expires",
 }
 

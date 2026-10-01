@@ -3,6 +3,8 @@ package verification
 import (
 	"context"
 	"errors"
+	"uuid"
+
 	"github.com/riipandi/tango/pkg/responder"
 
 	"connectrpc.com/connect"
@@ -10,6 +12,7 @@ import (
 
 	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
 	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
+	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/jwtutils"
 )
 
@@ -61,17 +64,16 @@ func newRPCHandler(service *Service) identityv1connect.EmailVerificationServiceH
 	return &rpcHandler{service: service}
 }
 
-// SendEmail mails the verification link to the signed-in account's address.
+// SendEmail mails the verification code to the signed-in account's address.
 // The procedure is the signed-in user's own door, not an administrative one:
 // any authenticated caller may ask for their own message, and the claims —
 // not the request — name the account.
 func (h *rpcHandler) SendEmail(ctx context.Context, req *connect.Request[identityv1.SendVerificationEmailRequest]) (*connect.Response[identityv1.SendVerificationEmailResponse], error) {
-	caller, ok := jwtutils.CallerFrom(ctx)
-	if !ok {
+	if _, ok := jwtutils.CallerFrom(ctx); !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
-	if err := h.service.SendEmail(ctx, caller.Username); err != nil {
+	if err := h.service.SendEmail(ctx, callerIDOf(ctx)); err != nil {
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.SendVerificationEmailResponse{
@@ -82,7 +84,7 @@ func (h *rpcHandler) SendEmail(ctx context.Context, req *connect.Request[identit
 
 // VerifyEmail marks the token's account as verified. The procedure is
 // public: the token is the credential, and the caller carries none — the
-// message linked here from a browser that may hold no session.
+// message typed in from a screen that may hold no session.
 func (h *rpcHandler) VerifyEmail(ctx context.Context, req *connect.Request[identityv1.VerifyEmailRequest]) (*connect.Response[identityv1.VerifyEmailResponse], error) {
 	if err := h.service.VerifyEmail(ctx, req.Msg.Token); err != nil {
 		return nil, mapError(err)
@@ -93,28 +95,40 @@ func (h *rpcHandler) VerifyEmail(ctx context.Context, req *connect.Request[ident
 	}), nil
 }
 
+// callerIDOf reads the account the access token names — the wire-form
+// TypeID the claims carry, converted the user package's one way. The guard
+// has already admitted the caller, so an absent identity is the internal
+// state a wiring bug produces.
+func callerIDOf(ctx context.Context) uuid.UUID {
+	caller, _ := jwtutils.CallerFrom(ctx)
+	id, err := user.UUIDFromWire(caller.UserID)
+	if err != nil {
+		return uuid.UUID{}
+	}
+	return id
+}
+
 // RequestEmailChange writes the signed-in account's pending change and mails
 // its token to the address the change moves to. The procedure is the
 // signed-in user's own door: the claims — not the request — name the
 // account, so a caller can only ever start a change for their own address.
 func (h *rpcHandler) RequestEmailChange(ctx context.Context, req *connect.Request[identityv1.RequestEmailChangeRequest]) (*connect.Response[identityv1.RequestEmailChangeResponse], error) {
-	caller, ok := jwtutils.CallerFrom(ctx)
-	if !ok {
+	if _, ok := jwtutils.CallerFrom(ctx); !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
-	if err := h.service.RequestEmailChange(ctx, caller.Username, req.Msg.NewEmail); err != nil {
+	if err := h.service.RequestEmailChange(ctx, callerIDOf(ctx), req.Msg.NewEmail); err != nil {
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.RequestEmailChangeResponse{
 		Status:  responder.StatusSuccess,
-		Message: "the change was requested; the confirm link was sent to the new address",
+		Message: "the change was requested; the confirm code was sent to the new address",
 	}), nil
 }
 
 // ConfirmEmailChange consumes the pending token and moves the account to the
 // address it binds. The procedure is public: the token is the credential,
-// and the caller carries none — the message linked here from a browser that
+// and the caller carries none — the message typed in from a screen that
 // may hold no session.
 func (h *rpcHandler) ConfirmEmailChange(ctx context.Context, req *connect.Request[identityv1.ConfirmEmailChangeRequest]) (*connect.Response[identityv1.ConfirmEmailChangeResponse], error) {
 	if err := h.service.ConfirmEmailChange(ctx, req.Msg.Token); err != nil {

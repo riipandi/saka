@@ -28,7 +28,7 @@ headers:
 method: POST
 name: Create Role
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/CreateRole
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/CreateRole
 urlParameters: []
 settingSendCookies:
   enabled: false

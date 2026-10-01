@@ -118,12 +118,12 @@ func NewService(pool *datastore.Postgres, mail *mailer.Service, client *queue.Cl
 }
 
 // SendEmail issues a verification token for the signed-in account and
-// enqueues the message. The account is looked up from the username the
+// enqueues the message. The account is looked up from the identifier the
 // claims carry — the address on record is the one the message goes to,
 // never one the request could name — so a changed address is honored at
 // the next request without touching the signed token.
-func (s *Service) SendEmail(ctx context.Context, username string) error {
-	account, err := s.repo.FindUserByUsername(ctx, s.pool, username)
+func (s *Service) SendEmail(ctx context.Context, userID uuid.UUID) error {
+	account, err := s.repo.FindUserByID(ctx, s.pool, userID)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrUserNotFound
 	}
@@ -323,25 +323,25 @@ func (s *Service) emailChangeOpen(ctx context.Context) bool {
 }
 
 // RequestEmailChange writes the pending change for the signed-in account and
-// enqueues its token to the address the change moves to. The link is the
+// enqueues its token to the address the change moves to. The code is the
 // flow's whole credential: it is generated here, shown once in the message,
 // and stored only as a hash, so a database leak cannot move an address. The
 // token row binds the payload — the pending address — so the confirmation
-// moves the account to the address the requester named, never one a stolen
-// link could pick.
+// moves the account to the address the requester named, never one a replayed
+// code could pick.
 //
 // The request is silent about the mail: acceptance says the token was issued
 // and the task enqueued, not that a message was delivered. The notice to the
 // old address rides the deployment's cost decision; the token message is the
 // flow itself and always goes.
-func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail string) error {
+func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newEmail string) error {
 	// The toggle is the cheapest check, so it runs before anything touches
 	// the database: a flow turned off answers not-found — the same shape an
 	// unknown account earns, and the surface says nothing about the setting.
 	if !s.emailChangeOpen(ctx) {
 		return ErrEmailChangeDisabled
 	}
-	account, err := s.repo.FindUserByUsername(ctx, s.pool, username)
+	account, err := s.repo.FindUserByID(ctx, s.pool, userID)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrUserNotFound
 	}

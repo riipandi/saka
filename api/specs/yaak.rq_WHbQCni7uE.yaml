@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_WHbQCni7uE
 createdAt: 2026-09-27T11:44:29.442916
-updatedAt: 2026-09-27T11:47:23.136110
+updatedAt: 2026-10-01T15:24:34.881806
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_MbztvSdMtC
 authentication: {}
@@ -11,7 +11,7 @@ body:
   text: |-
     {
       "page": 1,
-      "limit": 25
+      "limit": 10
     }
 bodyType: application/json
 description: '[Tango] Answer one page of the roles, newest first unless the caller sorts otherwise (sort_by: name, slug, created_at). search narrows by name or slug. Administrative: requires the admin role.'
@@ -27,7 +27,7 @@ headers:
 method: POST
 name: List Roles
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthorizationService/ListRoles
+url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/ListRoles
 urlParameters: []
 settingSendCookies:
   enabled: false
