@@ -35,7 +35,7 @@ func TestSettingsSeederFillsTheCatalog(t *testing.T) {
 	require.Len(t, results, 1)
 
 	assert.Equal(t, expectedSettings, results[0].Created)
-	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.settings`))
+	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.app_settings`))
 
 	// The value each row rests at is the catalog's own, not a seed-time
 	// invention: the two sources must not drift.
@@ -62,7 +62,7 @@ func TestSettingsSeederIsIdempotent(t *testing.T) {
 
 	assert.Empty(t, results[0].Created)
 	assert.Equal(t, expectedSettings, results[0].Skipped)
-	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.settings`))
+	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.app_settings`))
 }
 
 // TestSettingsSeedsWithTheRest pins the seam the commands use: All carries
@@ -74,7 +74,7 @@ func TestSettingsSeedsWithTheRest(t *testing.T) {
 	results := runSeeders(t, pool, false)
 
 	assert.Equal(t, seeders.SettingsSeederName, results[len(results)-1].Name)
-	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.settings`))
+	assert.Equal(t, len(expectedSettings), countRows(t, pool, `SELECT count(*) FROM public.app_settings`))
 }
 
 // TestSettingsSeederDryRunReportsWithoutWriting pins the dry run: the report
@@ -87,7 +87,7 @@ func TestSettingsSeederDryRunReportsWithoutWriting(t *testing.T) {
 	require.Len(t, results, 1)
 
 	assert.Equal(t, expectedSettings, results[0].Created)
-	assert.Zero(t, countRows(t, pool, `SELECT count(*) FROM public.settings`))
+	assert.Zero(t, countRows(t, pool, `SELECT count(*) FROM public.app_settings`))
 
 	// Once the rows rest, the same dry run reports them as skipped.
 	_, err = seeders.Run(t.Context(), pool, false, seeders.Settings())
@@ -105,6 +105,6 @@ func settingValue(t *testing.T, pool *datastore.Postgres, key string) string {
 
 	var value string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT value FROM public.settings WHERE key = $1`, key).Scan(&value))
+		`SELECT value FROM public.app_settings WHERE key = $1`, key).Scan(&value))
 	return value
 }

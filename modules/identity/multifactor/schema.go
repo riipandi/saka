@@ -11,14 +11,14 @@ import (
 // TotpTable is the table holding one row per enrolled TOTP authenticator. The
 // migrations own the schema; this constant is how Go code names it, so a table
 // rename touches one line.
-const TotpTable = "public.user_mfa_totp"
+const TotpTable = "public.mfa_totp"
 
 // RecoveryTable is the table holding the hashed single-use recovery codes.
-const RecoveryTable = "public.user_mfa_recovery_codes"
+const RecoveryTable = "public.mfa_recovery_codes"
 
 // PendingTable is the table holding the short-lived bridges a successful
 // password check writes between the first factor and the full session.
-const PendingTable = "public.user_mfa_pending"
+const PendingTable = "public.mfa_pending"
 
 // TotpPrefix is the TypeID prefix of an enrolled authenticator's identifier.
 // The id leaves the server in API responses, so a support ticket can tell

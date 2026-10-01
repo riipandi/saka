@@ -92,7 +92,7 @@ func TestASealedValueRestsEncryptedAndReadsOpened(t *testing.T) {
 
 	// The catalog carries no sealed item today; the seal path is driven by
 	// declaring one here, the way a feature would by adding its entry.
-	if _, err := pool.Exec(t.Context(), `DELETE FROM public.settings`); err != nil {
+	if _, err := pool.Exec(t.Context(), `DELETE FROM public.app_settings`); err != nil {
 		require.NoError(t, err)
 	}
 	sealed := SettingDef{Key: "smtp.relay", Default: "", Sealed: true}
@@ -102,7 +102,7 @@ func TestASealedValueRestsEncryptedAndReadsOpened(t *testing.T) {
 
 	var resting string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT value FROM public.settings WHERE key = $1`, "smtp.relay").Scan(&resting))
+		`SELECT value FROM public.app_settings WHERE key = $1`, "smtp.relay").Scan(&resting))
 	assert.True(t, isSealed(resting),
 		"a sealed item must rest encrypted, not in the clear")
 
@@ -131,7 +131,7 @@ func TestGetOnASealedRowWithoutACipherFails(t *testing.T) {
 	sealed, err := cipher.Encrypt("s3cret")
 	require.NoError(t, err)
 	_, err = pool.Exec(t.Context(),
-		`INSERT INTO public.settings (key, value) VALUES ($1, $2)`, "orphan.key", sealed)
+		`INSERT INTO public.app_settings (key, value) VALUES ($1, $2)`, "orphan.key", sealed)
 	require.NoError(t, err)
 
 	settings.byKey["orphan.key"] = SettingDef{Key: "orphan.key", Default: "", Sealed: true}
@@ -151,7 +151,7 @@ func TestASealedWriteWithoutACipherRefuses(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.settings`).Scan(&count))
+		`SELECT count(*) FROM public.app_settings`).Scan(&count))
 	assert.Zero(t, count, "a refused write must not leave a row")
 }
 
@@ -182,7 +182,7 @@ func TestResetRestoresTheCatalogDefault(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.settings`).Scan(&count))
+		`SELECT count(*) FROM public.app_settings`).Scan(&count))
 	assert.Zero(t, count, "a reset removes the override, it does not write the default")
 
 	// The second reset is the item already at its default: unchanged, and
@@ -190,7 +190,7 @@ func TestResetRestoresTheCatalogDefault(t *testing.T) {
 	_, err = settings.ResetFor(t.Context(), "", SettingOIDCEndSessionRevokesConsent)
 	require.NoError(t, err)
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.settings`).Scan(&count))
+		`SELECT count(*) FROM public.app_settings`).Scan(&count))
 	assert.Zero(t, count)
 }
 

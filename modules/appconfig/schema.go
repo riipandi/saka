@@ -4,7 +4,7 @@ import "time"
 
 // SettingTable is the settings table. The migrations own the schema; this
 // constant is how Go code names it, so a table rename touches one line.
-const SettingTable = "public.settings"
+const SettingTable = "public.app_settings"
 
 // SettingSchema is one row of SettingTable — one override. The catalog in
 // code owns the item's default and flags, so the row carries the key and

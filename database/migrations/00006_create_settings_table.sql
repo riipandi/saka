@@ -2,7 +2,7 @@
 -- +goose StatementBegin
 
 -- --------------------------------------------------------
--- Table: public.settings — database-backed overrides for the
+-- Table: public.app_settings — database-backed overrides for the
 -- application settings the product flows read, as distinct from
 -- the system configuration (the JSON file, served read-only by
 -- the configuration endpoint). The catalog in code declares every
@@ -13,15 +13,15 @@
 -- maintained by the trigger on every update after.
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.settings (
+CREATE TABLE IF NOT EXISTS public.app_settings (
     key TEXT NOT NULL PRIMARY KEY CHECK (char_length(key) BETWEEN 1 AND 350),
     value TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) USING heap;
 
-CREATE TRIGGER trg_settings_updated_at
-    BEFORE UPDATE ON public.settings
+CREATE TRIGGER trg_app_settings_updated_at
+    BEFORE UPDATE ON public.app_settings
     FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
 
 -- +goose StatementEnd
@@ -29,7 +29,7 @@ CREATE TRIGGER trg_settings_updated_at
 -- +goose Down
 -- +goose StatementBegin
 
-DROP TRIGGER IF EXISTS trg_settings_updated_at ON public.settings;
-DROP TABLE IF EXISTS public.settings;
+DROP TRIGGER IF EXISTS trg_app_settings_updated_at ON public.app_settings;
+DROP TABLE IF EXISTS public.app_settings;
 
 -- +goose StatementEnd
