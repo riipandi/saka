@@ -101,46 +101,7 @@ const shellTmpl = `<!doctype html>
     {{ .ViteTags }}
 
     <!-- Static SPA loader; React clears #root on mount. -->
-    <style>
-      html {
-        color-scheme: light dark;
-      }
-      .s-loader {
-        position: fixed;
-        inset: 0;
-        display: grid;
-        place-content: center;
-      }
-      .s-loader-mark {
-        width: 2.25rem;
-        height: auto;
-        fill: oklch(0.55 0.24 262.67);
-      }
-      .s-dot {
-        animation: s-pulse 1s ease-in-out infinite;
-      }
-      .s-dot-2 {
-        animation-delay: 150ms;
-      }
-      .s-dot-3 {
-        animation-delay: 300ms;
-      }
-      @keyframes s-pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.25;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .s-dot {
-          animation: none;
-          opacity: 0.7;
-        }
-      }
-    </style>
+    <style>html{color-scheme:light dark}.s-loader{position:fixed;inset:0;display:grid;place-content:center}.s-loader-mark{width:2.25rem;height:auto;fill:oklch(0.55 0.24 262.67)}.s-dot{animation:s-pulse 1s ease-in-out infinite}.s-dot-2{animation-delay:150ms}.s-dot-3{animation-delay:300ms}@keyframes s-pulse{0%,100%{opacity:1}50%{opacity:0.25}}@media (prefers-reduced-motion:reduce){.s-dot{animation:none;opacity:0.7}}</style>
   </head>
   <body>
     <div id="root" class="isolate">
