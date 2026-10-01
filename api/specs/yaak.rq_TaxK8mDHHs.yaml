@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_TaxK8mDHHs
 createdAt: 2026-10-01T18:57:42.982632
-updatedAt: 2026-10-01T19:07:46.690647
+updatedAt: 2026-10-01T21:41:05.785910
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_znKwvJhRQz
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "id": "que_01m3wn191de3aby4bytbmqehc1"
+      "id": "${[ response.body.path(request='rq_BMKxG5DHHf', behavior='smart', ttl='0', result='first', join=', ', path='$.tasks[0].id') ]}"
     }
 bodyType: application/json
 description: |-

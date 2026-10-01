@@ -405,7 +405,11 @@ and `tango.system.v1.SchedulerService` in `system.proto`; every procedure is
 The four list procedures page like the account list: `page` (one-based) and
 `limit` normalize through `responder.NormalizePage`, `sort_by`/`sort_order`
 resolve through a whitelist the store owns, and the answer carries
-`tango.common.v1.ListMetadata` plus `status`. Ids leave as TypeIDs — tasks
+`tango.common.v1.ListMetadata` with the `status` and `message` words every
+response of this surface carries. `status` is always the call's outcome;
+`state` names the task's own condition (`pending`, `running`, `success`,
+`failure`) — the mutation responses add their counts to the message ("flushed
+6 waiting tasks"). Ids leave as TypeIDs — tasks
 `que_…`, jobs `scd_…`, both encoded from the row's UUID — the same wire form
 `user_…` takes, and a malformed id is refused as the not-found a malformed
 account id is.

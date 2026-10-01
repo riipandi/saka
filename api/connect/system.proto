@@ -171,6 +171,9 @@ message ListQueuesResponse {
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
   string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
 // QueueSummary is one queue's configuration and live counts.
@@ -245,6 +248,9 @@ message ListTasksResponse {
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
   string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
 // PendingTask is one row of the pending table: a task waiting for a worker,
@@ -262,9 +268,9 @@ message PendingTask {
   // priority is the claim order weight; a higher number is claimed first.
   int32 priority = 4;
 
-  // status is the task's state: `pending`, or `running` while a worker
-  // holds the claim.
-  string status = 5;
+  // state is the task's own state: `pending`, or `running` while a worker
+  // holds the claim. The response-level `status` is the call's outcome.
+  string state = 5;
 
   // wait_until is when the task becomes claimable, absent when it already
   // is.
@@ -299,9 +305,9 @@ message GetTaskResponse {
   // in the pending table.
   optional string queue = 2;
 
-  // status is the task's state: `pending`, `running`, `success`, or
-  // `failure`.
-  string status = 3;
+  // state is the task's own state: `pending`, `running`, `success`, or
+  // `failure`. The response-level `status` is the call's outcome.
+  string state = 3;
 
   // attempts is the number of times the task has been claimed.
   optional int32 attempts = 4;
@@ -322,6 +328,13 @@ message GetTaskResponse {
 
   // last_executed_at is when the last attempt ran.
   optional google.protobuf.Timestamp last_executed_at = 9;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 10;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 11;
 }
 
 // ListDeadTasksRequest pages and filters the archive's failures. An absent
@@ -368,6 +381,9 @@ message ListDeadTasksResponse {
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
   string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
 // DeadTask is one archived failure: a task that exhausted its attempts and
@@ -403,9 +419,17 @@ message CancelTaskRequest {
   string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-// CancelTaskResponse is empty: a cancelled task answers success; a claimed
-// one fails with `failed_precondition`, an unknown one with `not_found`.
-message CancelTaskResponse {}
+// CancelTaskResponse is the outcome of the cancel: a cancelled task answers
+// success; a claimed one fails with `failed_precondition`, an unknown one
+// with `not_found`.
+message CancelTaskResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
 
 // ReplayDeadTasksRequest names the queue whose dead pile returns, or every
 // queue when absent.
@@ -419,6 +443,13 @@ message ReplayDeadTasksRequest {
 message ReplayDeadTasksResponse {
   // replayed is the number of tasks re-enqueued.
   int64 replayed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
 // FlushPendingTasksRequest is empty: the flush removes every unclaimed
@@ -429,6 +460,13 @@ message FlushPendingTasksRequest {}
 message FlushPendingTasksResponse {
   // flushed is the number of tasks removed.
   int64 flushed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
 // FlushCompletedTasksRequest is empty: the flush removes every archived
@@ -439,6 +477,13 @@ message FlushCompletedTasksRequest {}
 message FlushCompletedTasksResponse {
   // flushed is the number of records removed.
   int64 flushed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
 // SchedulerService is the administrative surface over the durable cron
@@ -502,6 +547,9 @@ message ListSchedulerJobsResponse {
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
   string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
 // SchedulerJob is one registered job's durable state.
@@ -534,9 +582,16 @@ message RunSchedulerJobNowRequest {
   string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-// RunSchedulerJobNowResponse is empty: an enqueued tick answers success; an
-// unknown job answers not_found.
-message RunSchedulerJobNowResponse {}
+// RunSchedulerJobNowResponse is the outcome of the run-now: an enqueued
+// tick answers success; an unknown job answers not_found.
+message RunSchedulerJobNowResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
 
 // CheckDetail is the outcome of one dependency check.
 message CheckDetail {

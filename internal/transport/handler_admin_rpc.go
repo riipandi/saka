@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -62,6 +63,7 @@ func (s *rpcQueueService) ListQueues(ctx context.Context, req *connect.Request[s
 		Queues:   queues,
 		Metadata: listMetadata(pagination),
 		Status:   "success",
+		Message:  "the queues were listed",
 	}), nil
 }
 
@@ -86,7 +88,7 @@ func (s *rpcQueueService) ListTasks(ctx context.Context, req *connect.Request[sy
 			Queue:     v.Queue,
 			Attempts:  boundedInt32(v.Attempts),
 			Priority:  boundedInt32(v.Priority),
-			Status:    statusWordFor(statusOfClaim(v.Claimed)),
+			State:     statusWordFor(statusOfClaim(v.Claimed)),
 			CreatedAt: timestampOf(v.CreatedAt),
 		}
 		task.WaitUntil = timestampPtrOf(v.WaitUntil)
@@ -98,6 +100,7 @@ func (s *rpcQueueService) ListTasks(ctx context.Context, req *connect.Request[sy
 		Tasks:    tasks,
 		Metadata: listMetadata(pagination),
 		Status:   "success",
+		Message:  "the tasks were listed",
 	}), nil
 }
 
@@ -122,7 +125,9 @@ func (s *rpcQueueService) GetTask(ctx context.Context, req *connect.Request[syst
 
 	response := &systemv1.GetTaskResponse{
 		Id:      queue.FormatID(id),
-		Status:  statusWordFor(detail.Status),
+		State:   statusWordFor(detail.Status),
+		Status:  "success",
+		Message: "the task was fetched",
 		Payload: detail.Payload,
 		Error:   detail.Error,
 	}
@@ -175,6 +180,7 @@ func (s *rpcQueueService) ListDeadTasks(ctx context.Context, req *connect.Reques
 		Tasks:    tasks,
 		Metadata: listMetadata(pagination),
 		Status:   "success",
+		Message:  "the dead tasks were listed",
 	}), nil
 }
 
@@ -197,7 +203,10 @@ func (s *rpcQueueService) CancelTask(ctx context.Context, req *connect.Request[s
 	if !cancelled {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("queue: the task is claimed and can no longer be cancelled"))
 	}
-	return connect.NewResponse(&systemv1.CancelTaskResponse{}), nil
+	return connect.NewResponse(&systemv1.CancelTaskResponse{
+		Status:  "success",
+		Message: "the task was cancelled",
+	}), nil
 }
 
 // ReplayDeadTasks re-enqueues the dead tasks one queue — or every queue —
@@ -213,7 +222,11 @@ func (s *rpcQueueService) ReplayDeadTasks(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&systemv1.ReplayDeadTasksResponse{Replayed: replayed}), nil
+	return connect.NewResponse(&systemv1.ReplayDeadTasksResponse{
+		Replayed: replayed,
+		Status:   "success",
+		Message:  fmt.Sprintf("replayed %d dead %s", replayed, pluralNoun(replayed, "task")),
+	}), nil
 }
 
 // FlushPendingTasks removes every unclaimed task.
@@ -225,7 +238,11 @@ func (s *rpcQueueService) FlushPendingTasks(ctx context.Context, _ *connect.Requ
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&systemv1.FlushPendingTasksResponse{Flushed: flushed}), nil
+	return connect.NewResponse(&systemv1.FlushPendingTasksResponse{
+		Flushed: flushed,
+		Status:  "success",
+		Message: fmt.Sprintf("flushed %d waiting %s", flushed, pluralNoun(flushed, "task")),
+	}), nil
 }
 
 // FlushCompletedTasks removes every archived record, retention
@@ -238,7 +255,11 @@ func (s *rpcQueueService) FlushCompletedTasks(ctx context.Context, _ *connect.Re
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&systemv1.FlushCompletedTasksResponse{Flushed: flushed}), nil
+	return connect.NewResponse(&systemv1.FlushCompletedTasksResponse{
+		Flushed: flushed,
+		Status:  "success",
+		Message: fmt.Sprintf("flushed %d completed %s", flushed, pluralNoun(flushed, "record")),
+	}), nil
 }
 
 // engine refuses a handler the composition built without its client: the
@@ -291,6 +312,7 @@ func (s *rpcSchedulerService) ListJobs(ctx context.Context, req *connect.Request
 		Jobs:     jobs,
 		Metadata: listMetadata(pagination),
 		Status:   "success",
+		Message:  "the scheduler jobs were listed",
 	}), nil
 }
 
@@ -307,7 +329,10 @@ func (s *rpcSchedulerService) RunNow(ctx context.Context, req *connect.Request[s
 	case err != nil:
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&systemv1.RunSchedulerJobNowResponse{}), nil
+	return connect.NewResponse(&systemv1.RunSchedulerJobNowResponse{
+		Status:  "success",
+		Message: "the job's task was enqueued now",
+	}), nil
 }
 
 func (s *rpcSchedulerService) engine() error {
@@ -315,6 +340,15 @@ func (s *rpcSchedulerService) engine() error {
 		return connect.NewError(connect.CodeUnavailable, errors.New("scheduler unavailable"))
 	}
 	return nil
+}
+
+// pluralNoun picks the singular or plural ending for a counted message:
+// the count rides in the sentence, and one is not many.
+func pluralNoun(n int64, noun string) string {
+	if n == 1 {
+		return noun
+	}
+	return noun + "s"
 }
 
 // sortAscending resolves the wire's sort_order against each list's own
