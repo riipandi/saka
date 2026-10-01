@@ -215,13 +215,20 @@ func (s *Service) List(ctx context.Context, search, sortBy string, ascending boo
 	}
 
 	views := make([]ClientView, 0, len(rows))
+	clientIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		clientIDs = append(clientIDs, row.ID)
+	}
+	// The restrictions resolve in one read: the page carries every client's
+	// groups, and a per-row read here would pay the junction join once per
+	// client on the page.
+	byClient, groupErr := s.repo.GroupsOfClients(ctx, s.pool, clientIDs)
+	if groupErr != nil {
+		return nil, responder.Pagination{}, groupErr
+	}
 	for _, row := range rows {
 		view := row.view(s.now())
-		groups, groupErr := s.repo.ListAllowedGroups(ctx, s.pool, row.ID)
-		if groupErr != nil {
-			return nil, responder.Pagination{}, groupErr
-		}
-		view.AllowedGroups = groups
+		view.AllowedGroups = byClient[row.ID]
 		view.LogoURL = s.logoURL(view)
 		views = append(views, view)
 	}

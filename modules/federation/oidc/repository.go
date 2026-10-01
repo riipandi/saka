@@ -431,12 +431,35 @@ func (r *Repository) SetAllowedGroups(ctx context.Context, db datastore.Querier,
 // display name. The junction is this feature's table; the group columns it
 // joins are read beside it, the way the account view reads its memberships.
 func (r *Repository) ListAllowedGroups(ctx context.Context, db datastore.Querier, clientID string) ([]GroupRef, error) {
+	byClient, err := r.GroupsOfClients(ctx, db, []string{clientID})
+	if err != nil {
+		return nil, err
+	}
+	// A client with no restriction answered an empty roll before the batch
+	// existed, and the map's miss answers nil — the caller reads a roll.
+	if groups := byClient[clientID]; groups != nil {
+		return groups, nil
+	}
+	return []GroupRef{}, nil
+}
+
+// GroupsOfClients answers the allowed groups of every named client in one
+// read, grouped by the client id in wire form, each slice ordered by the
+// group's display name. The client list page is the caller that pays for the
+// batch: its one answer carries every client's restriction, and a per-row
+// read there would pay the junction join once per client on the page.
+func (r *Repository) GroupsOfClients(ctx context.Context, db datastore.Querier, clientIDs []string) (map[string][]GroupRef, error) {
+	grouped := make(map[string][]GroupRef, len(clientIDs))
+	if len(clientIDs) == 0 {
+		return grouped, nil
+	}
+
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("g.id", "g.name", "g.display_name")
+	sb.Select("j.oidc_client_id", "g.id", "g.name", "g.display_name")
 	sb.From(AllowedGroupsTable + " j")
 	sb.JoinWithOption(sqlbuilder.InnerJoin, "public.user_groups g", "g.id = j.user_group_id")
-	sb.Where(sb.Equal("j.oidc_client_id", clientID))
-	sb.OrderBy("lower(g.display_name)", "g.id")
+	sb.Where(sb.In("j.oidc_client_id", sqlbuilder.List(clientIDs)))
+	sb.OrderBy("j.oidc_client_id", "lower(g.display_name)", "g.id")
 
 	query, args := sb.Build()
 	rows, err := db.Query(ctx, query, args...)
@@ -445,21 +468,20 @@ func (r *Repository) ListAllowedGroups(ctx context.Context, db datastore.Querier
 	}
 	defer rows.Close()
 
-	groups := []GroupRef{}
 	for rows.Next() {
-		var rawID, name, displayName string
-		if err := rows.Scan(&rawID, &name, &displayName); err != nil {
+		var clientID, rawID, name, displayName string
+		if err := rows.Scan(&clientID, &rawID, &name, &displayName); err != nil {
 			return nil, fmt.Errorf("oidc: list allowed groups: %w", err)
 		}
 		id, err := uuid.Parse(rawID)
 		if err != nil {
 			return nil, fmt.Errorf("oidc: list allowed groups: %w", err)
 		}
-		groups = append(groups, GroupRef{
+		grouped[clientID] = append(grouped[clientID], GroupRef{
 			ID:          wireGroupID(id),
 			Name:        name,
 			DisplayName: displayName,
 		})
 	}
-	return groups, rows.Err()
+	return grouped, rows.Err()
 }
