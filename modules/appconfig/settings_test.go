@@ -306,7 +306,7 @@ func TestTheTableKeepsTheOverrideShapeOnly(t *testing.T) {
 
 	rows, err := pool.Query(t.Context(), `
 		SELECT column_name FROM information_schema.columns
-		WHERE table_schema = 'public' AND table_name = 'settings'
+		WHERE table_schema = 'public' AND table_name = 'app_settings'
 		ORDER BY ordinal_position`)
 	require.NoError(t, err)
 	defer rows.Close()
