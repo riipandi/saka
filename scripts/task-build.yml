@@ -6,7 +6,12 @@ tasks:
   build:
     desc: Build frontend + Go binaries (debug and release in one pass)
     deps: [rpc:generate]
-    cmd: pnpm exec vite build
+    cmds:
+      - pnpm exec vite build
+      # The embed is compile-time: the binaries must be built after (and only
+      # after) the manifest and assets above exist, or they serve a stale SPA.
+      - go build -tags debug -o build/debug/{{.APP_NAME}} ./cmd
+      - go build -tags release -trimpath -o build/release/{{.APP_NAME}} ./cmd
 
   start:
     desc: Run the release binary
