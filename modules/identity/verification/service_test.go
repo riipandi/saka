@@ -240,11 +240,10 @@ func TestTheFlowEndToEnd(t *testing.T) {
 	service := NewService(pool, mail, client, nil, "http://localhost:3080", nil)
 	require.NoError(t, service.SendEmail(t.Context(), "hermione"))
 
-	link := waitForLink(t, mailpit)
-	token := link[strings.Index(link, "token=")+len("token="):]
-	require.NotEmpty(t, token)
+	code := waitForCode(t, mailpit)
+	require.NotEmpty(t, code)
 
-	require.NoError(t, service.VerifyEmail(t.Context(), token))
+	require.NoError(t, service.VerifyEmail(t.Context(), code))
 
 	var verifiedAt *time.Time
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -258,7 +257,9 @@ func TestTheFlowEndToEnd(t *testing.T) {
 
 // waitForLink polls Mailpit until the verification message arrives and
 // answers the link its body carries.
-func waitForLink(t *testing.T, mailpit *testutils.Mailpit) string {
+// waitForCode reads the verification code the Mailpit message carries — the
+// text form the rendered template puts the code in, not a link.
+func waitForCode(t *testing.T, mailpit *testutils.Mailpit) string {
 	t.Helper()
 
 	deadline := time.Now().Add(30 * time.Second)
@@ -283,8 +284,10 @@ func waitForLink(t *testing.T, mailpit *testutils.Mailpit) string {
 				continue
 			}
 			body := readMessageBody(t, mailpit, message.ID)
-			if match := regexp.MustCompile(`https?://[^"'\s]+token=[^"'\s]+`).FindString(body); match != "" {
-				return match
+			// The code sits alone in its own element — the only 12-character
+			// run the template renders as one node.
+			if match := regexp.MustCompile(`>[a-km-zA-KM-NP-Z2-9]{12}<`).FindString(body); match != "" {
+				return match[1 : len(match)-1]
 			}
 		}
 		time.Sleep(200 * time.Millisecond)

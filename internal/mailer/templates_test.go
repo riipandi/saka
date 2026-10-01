@@ -62,13 +62,13 @@ func fixtures() map[string]mailer.View {
 		}},
 		mailer.TemplateEmailChangeRequest: {Data: mailer.EmailChangeRequestData{
 			Name: "Andi", OldEmail: "flamel@example.com", NewEmail: "neville@example.com",
-			ConfirmLink: "https://app.example.com/confirm?token=abc",
+			ConfirmCode: "chamber-secrets",
 		}},
 		mailer.TemplateEmailChangeSuccess: {Data: mailer.EmailChangeSuccessData{
 			Name: "Andi", NewEmail: "neville@example.com",
 		}},
 		mailer.TemplateEmailVerification: {Data: mailer.EmailVerificationData{
-			UserFullName: "Andi Pratama", VerificationLink: "https://app.example.com/verify?code=abc",
+			UserFullName: "Andi Pratama", VerificationCode: "expecto-patronum",
 		}},
 		mailer.TemplateLoginNewDevice: {Data: mailer.LoginNewDeviceData{
 			City: "Jakarta", Country: "Indonesia", IPAddress: "203.0.113.7",
@@ -78,12 +78,11 @@ func fixtures() map[string]mailer.View {
 			Name: "Neveu", Reason: "Lost authenticator device, verified over support",
 		}},
 		mailer.TemplateOneTimeAccess: {Data: mailer.OneTimeAccessData{
-			Code: "123456", LoginLink: "https://app.example.com/signin?method=code",
-			LoginLinkWithCode: "https://app.example.com/signin?code=123456",
-			ExpirationString:  "5 minutes",
+			Code:             "GRYFFINDOR",
+			ExpirationString: "5 minutes",
 		}},
 		mailer.TemplatePasswordReset: {Data: mailer.PasswordResetData{
-			Email: "neveu@example.com", ResetLink: "https://app.example.com/reset?token=abc",
+			Email: "neveu@example.com", ResetCode: "expecto-patronum",
 		}},
 		mailer.TemplatePasswordChangedNotice: {Data: mailer.PasswordChangedNoticeData{
 			Name: "Neveu", Email: "neveu@example.com",
@@ -119,9 +118,9 @@ func TestRenderedBodiesCarryTheIdentityAndTheData(t *testing.T) {
 
 	assert.Contains(t, body.HTML, "https://cdn.example.com/logo.svg")
 	assert.Contains(t, body.HTML, "Tango")
-	assert.Contains(t, body.HTML, "https://app.example.com/reset?token=abc")
+	assert.Contains(t, body.HTML, "expecto-patronum")
 	assert.Contains(t, body.Text, "Tango")
-	assert.Contains(t, body.Text, "https://app.example.com/reset?token=abc")
+	assert.Contains(t, body.Text, "expecto-patronum")
 }
 
 func TestHTMLBodyEscapesUntrustedValues(t *testing.T) {
@@ -134,7 +133,7 @@ func TestHTMLBodyEscapesUntrustedValues(t *testing.T) {
 	body, err := templates.Render(mailer.TemplateEmailVerification, mailer.View{
 		Data: mailer.EmailVerificationData{
 			UserFullName:     `<script>alert(1)</script>`,
-			VerificationLink: "https://app.example.com/verify?code=abc",
+			VerificationCode: "expecto-patronum",
 		},
 	})
 	require.NoError(t, err)

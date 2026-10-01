@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { Hr, CodeInline, Row, Column } from 'react-email'
-import { Alert, Button, CardFooter, CardHeader, Text } from '../components'
+import { Alert, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
@@ -8,7 +8,7 @@ interface EmailChangeRequestData {
   name: string
   oldEmail: string
   newEmail: string
-  confirmLink: string
+  confirmCode: string
 }
 
 interface EmailChangeRequestProps {
@@ -47,22 +47,21 @@ export const EmailChangeRequest = ({ logoURL, appName, data }: EmailChangeReques
 
       <Hr style={{ marginTop: '20px' }} />
 
-      <Text>Please click the link below to confirm this change:</Text>
-
-      <Button href={data.confirmLink}>Confirm Email Change</Button>
-
-      <Text style={{ marginTop: '24px', marginBottom: '8px' }}>
-        Or copy and paste this link into your browser:
+      <Text>
+        Use the code below to confirm this change. Type it on the change screen — the code works
+        once.
       </Text>
 
-      <CodeInline style={{ color: '#5b667e', fontSize: '14px', wordBreak: 'break-all' }}>
-        {data.confirmLink}
-      </CodeInline>
+      <Text style={{ textAlign: 'center' }}>
+        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>
+          {data.confirmCode}
+        </CodeInline>
+      </Text>
 
       <Hr style={{ marginTop: '20px' }} />
 
       <Alert variant='warning' style={{ marginTop: '20px' }}>
-        <strong>Important:</strong> This link will expire in 24 hours. If you did not request this
+        <strong>Important:</strong> This code will expire in 24 hours. If you did not request this
         change, please ignore this email.
       </Alert>
 
@@ -82,7 +81,7 @@ EmailChangeRequest.TemplateProps = {
     name: '{{.Data.Name}}',
     oldEmail: '{{.Data.OldEmail}}',
     newEmail: '{{.Data.NewEmail}}',
-    confirmLink: '{{.Data.ConfirmLink}}'
+    confirmCode: '{{.Data.ConfirmCode}}'
   }
 }
 
@@ -92,7 +91,7 @@ EmailChangeRequest.PreviewProps = {
     name: 'John Doe',
     oldEmail: 'current@example.com',
     newEmail: 'new@example.com',
-    confirmLink: 'https://example.com/confirm-email-change?token=abc123'
+    confirmCode: 'CHAMBER-SECRETS'
   }
 }
 

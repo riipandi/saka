@@ -55,9 +55,22 @@ var (
 	ErrEmailChangeDisabled = errors.New("verification: email change is not available")
 )
 
-// tokenTTL is how long a verification link works. The template copy states
+// tokenTTL is how long a verification code works. The template copy states
 // it, so changing one means changing the other.
 const tokenTTL = time.Hour
+
+// verificationCodeLength is the code's length: the unambiguous alphabet at
+// twelve characters — long enough that a typed guess is hopeless, short
+// enough that a human types it. The short/long window rule the one-time
+// access code keeps does not apply: these codes are the long form wherever
+// they are issued.
+const verificationCodeLength = 12
+
+// newVerificationCode draws the single-use code the message carries and the
+// hash answers.
+func newVerificationCode() (string, error) {
+	return crypto.RandomString(verificationCodeLength, crypto.AlphabetUnambiguous)
+}
 
 // resendCooldown is how long the last send keeps a new one out. The window
 // is what stops a caller from turning the procedure into a mailbomb; the
@@ -133,7 +146,7 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 		}
 	}
 
-	rawToken, err := crypto.NewHexToken()
+	rawToken, err := newVerificationCode()
 	if err != nil {
 		return fmt.Errorf("verification: token: %w", err)
 	}
@@ -173,7 +186,7 @@ func (s *Service) SendEmail(ctx context.Context, username string) error {
 // transaction, so the account and its outstanding code commit together. The
 // raw value is answered once; only the caller's hash is stored.
 func (s *Service) IssueForSignup(ctx context.Context, tx datastore.Querier, userID uuid.UUID, email, displayName string) (string, error) {
-	rawToken, err := crypto.NewHexToken()
+	rawToken, err := newVerificationCode()
 	if err != nil {
 		return "", fmt.Errorf("verification: token: %w", err)
 	}
@@ -355,7 +368,7 @@ func (s *Service) RequestEmailChange(ctx context.Context, username, newEmail str
 		}
 	}
 
-	rawToken, err := crypto.NewHexToken()
+	rawToken, err := newVerificationCode()
 	if err != nil {
 		return fmt.Errorf("verification: change token: %w", err)
 	}

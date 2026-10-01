@@ -31,7 +31,8 @@ type EmailVerificationTask struct {
 	// DisplayName is the name the template greets.
 	DisplayName string `json:"display_name"`
 
-	// Token is the raw verification token the link carries.
+	// Token is the raw verification code the message carries. It is a
+	// single-use code the account types back — there is no link to click.
 	Token string `json:"token"`
 }
 
@@ -48,15 +49,10 @@ func (t EmailVerificationTask) Config() queue.QueueConfig {
 	}
 }
 
-// emailVerificationLinkPath is the frontend route the verification message
-// links to. The frontend reads the token from the query and forwards it to
-// the VerifyEmail procedure.
-const emailVerificationLinkPath = "/verify-email?token="
-
 // emailVerificationProcessor renders the template and submits one message.
 func emailVerificationProcessor(ctx context.Context, task EmailVerificationTask, mail *mailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
-		return errors.New("email_verification: task carries no address or token")
+		return errors.New("email_verification: task carries no address or code")
 	}
 	err := mail.Send(ctx, mailer.Request{
 		To:       []string{task.Email},
@@ -66,7 +62,7 @@ func emailVerificationProcessor(ctx context.Context, task EmailVerificationTask,
 			Email: task.Email,
 			Data: mailer.EmailVerificationData{
 				UserFullName:     task.DisplayName,
-				VerificationLink: baseURL + emailVerificationLinkPath + task.Token,
+				VerificationCode: task.Token,
 			},
 		},
 	})

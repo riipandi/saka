@@ -331,7 +331,7 @@ func TestExchangeRefusesADeviceTokenThatDoesNotMatch(t *testing.T) {
 	service := testService(t, pool, false, true)
 	seedUser(t, pool, "hermione", "hermione@example.com")
 
-	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err)
 	code := pendingOneTimeAccessTask(t, pool, service.queue).Token
 
@@ -358,11 +358,11 @@ func TestRequestEmailAnswersTheSameForAnUnknownAddress(t *testing.T) {
 	service := testService(t, pool, false, true)
 	userID := seedUser(t, pool, "hermione", "hermione@example.com")
 
-	known, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	known, err := service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err)
 	assert.Len(t, known, deviceTokenLength)
 
-	unknown, err := service.RequestEmail(t.Context(), "nobody@example.com", "")
+	unknown, err := service.RequestEmail(t.Context(), "nobody@example.com")
 	require.NoError(t, err, "an unknown address answers success, or the response is the enumeration")
 	assert.Len(t, unknown, deviceTokenLength, "the answer carries a real device token either way")
 
@@ -378,7 +378,7 @@ func TestRequestEmailPairsTheCodeWithADeviceToken(t *testing.T) {
 	service := testService(t, pool, false, true)
 	seedUser(t, pool, "hermione", "hermione@example.com")
 
-	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com", "/dashboard")
+	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err)
 
 	// The code the task carries is the only place it exists; the queue's
@@ -406,17 +406,17 @@ func TestRequestEmailRefusesADisabledPath(t *testing.T) {
 	publicOnly := testService(t, pool, false, true)
 	userID := seedUser(t, pool, "hermione", "hermione@example.com")
 
-	_, err := off.RequestEmail(t.Context(), "hermione@example.com", "")
+	_, err := off.RequestEmail(t.Context(), "hermione@example.com")
 	assert.ErrorIs(t, err, ErrFeatureDisabled)
 	err = off.RequestEmailAsAdmin(t.Context(), wireOf(t, userID), 0)
 	assert.ErrorIs(t, err, ErrFeatureDisabled)
 
 	err = adminOnly.RequestEmailAsAdmin(t.Context(), wireOf(t, userID), 0)
 	assert.NoError(t, err, "the administrative path is open when its switch is")
-	_, err = adminOnly.RequestEmail(t.Context(), "hermione@example.com", "")
+	_, err = adminOnly.RequestEmail(t.Context(), "hermione@example.com")
 	assert.ErrorIs(t, err, ErrFeatureDisabled, "the public path is closed while the administrative one is open")
 
-	_, err = publicOnly.RequestEmail(t.Context(), "hermione@example.com", "")
+	_, err = publicOnly.RequestEmail(t.Context(), "hermione@example.com")
 	assert.NoError(t, err)
 	err = publicOnly.RequestEmailAsAdmin(t.Context(), wireOf(t, userID), 0)
 	assert.ErrorIs(t, err, ErrFeatureDisabled)
@@ -515,12 +515,12 @@ func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
 	service := testService(t, pool, false, true)
 	seedUser(t, pool, "hermione", "hermione@example.com")
 
-	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	deviceToken, err := service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err)
 	code := pendingOneTimeAccessTask(t, pool, service.queue).Token
 
 	// The retry inside the window is the network's answer arriving twice.
-	held, err := service.RequestEmail(t.Context(), "hermione@example.com", "")
+	held, err := service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err, "a held send answers the same success a first one does")
 	assert.Len(t, held, deviceTokenLength)
 	assert.Equal(t, int64(1), pendingEmails(t, service.queue), "the held request enqueues nothing")
@@ -535,7 +535,7 @@ func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
 	// Past the window the send re-issues: the cooldown is a hold, not a
 	// lifetime mute.
 	service.now = func() time.Time { return time.Now().Add(2 * resendCooldown) }
-	_, err = service.RequestEmail(t.Context(), "hermione@example.com", "")
+	_, err = service.RequestEmail(t.Context(), "hermione@example.com")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), pendingEmails(t, service.queue))
 }

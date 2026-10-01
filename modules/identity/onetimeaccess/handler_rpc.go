@@ -139,7 +139,7 @@ func (h *rpcHandler) RequestEmailAsAdmin(ctx context.Context, req *connect.Reque
 // RequestEmail sends a code to the address the caller names.
 func (h *rpcHandler) RequestEmail(ctx context.Context, req *connect.Request[authnv1.RequestOneTimeAccessEmailRequest]) (*connect.Response[authnv1.RequestOneTimeAccessEmailResponse], error) {
 	body := req.Msg
-	deviceToken, err := h.service.RequestEmail(ctx, body.Email, body.GetRedirectPath())
+	deviceToken, err := h.service.RequestEmail(ctx, body.Email)
 	if err != nil {
 		return nil, mapError(err)
 	}

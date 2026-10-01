@@ -1,13 +1,11 @@
-import { Hr } from 'react-email'
-import { Link, Button, CardFooter, CardHeader, Text } from '../components'
+import { Hr, CodeInline } from 'react-email'
+import { CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
 interface OneTimeAccessData {
   name: string
   code: string
-  loginLink: string
-  buttonCodeLink: string
   expirationString: string
 }
 
@@ -24,17 +22,11 @@ export const OneTimeAccessEmail = ({ logoURL, appName, data }: OneTimeAccessEmai
       <Hr style={{ marginTop: '16px' }} />
 
       <Text style={{ marginTop: '18px' }}>
-        Click the button below to sign in to {appName} with a login code.
+        Enter this one-time code on the sign-in screen to sign in to {appName}. The code works once.
       </Text>
 
-      <Button href={data.buttonCodeLink}>Sign In</Button>
-
-      <Text style={{ marginTop: '20px' }}>
-        Or visit: <Link href={data.loginLink}>{data.loginLink}</Link>
-      </Text>
-
-      <Text>
-        then enter the one-time code: <strong>{data.code}</strong>
+      <Text style={{ textAlign: 'center' }}>
+        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.code}</CodeInline>
       </Text>
 
       <Hr style={{ marginTop: '24px' }} />
@@ -59,8 +51,6 @@ OneTimeAccessEmail.TemplateProps = {
   ...sharedTemplateProps,
   data: {
     code: '{{.Data.Code}}',
-    loginLink: '{{.Data.LoginLink}}',
-    buttonCodeLink: '{{.Data.LoginLinkWithCode}}',
     expirationString: '{{.Data.ExpirationString}}'
   }
 }
@@ -68,9 +58,7 @@ OneTimeAccessEmail.TemplateProps = {
 OneTimeAccessEmail.PreviewProps = {
   ...sharedPreviewProps,
   data: {
-    code: '123456',
-    loginLink: 'https://example.com/signin?method=onetimecode',
-    buttonCodeLink: 'https://example.com/login?code=123456',
+    code: 'GRYFFINDOR',
     expirationString: '15 minutes'
   }
 }

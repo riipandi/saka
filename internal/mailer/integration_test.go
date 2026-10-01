@@ -75,7 +75,7 @@ func TestSendDeliversATemplatedMessage(t *testing.T) {
 		Template: mailer.TemplatePasswordReset,
 		View: mailer.View{Data: mailer.PasswordResetData{
 			Email:     recipient,
-			ResetLink: "https://app.tango.test/reset?token=probe",
+			ResetCode: "expecto-patronum",
 		}},
 	}))
 
@@ -86,7 +86,7 @@ func TestSendDeliversATemplatedMessage(t *testing.T) {
 	// The HTML rendering is what the recipient sees, so the link has to arrive
 	// intact and the identity has to be there.
 	detail := fetchMessage(t, server, message.ID)
-	assert.Contains(t, detail.HTML, "https://app.tango.test/reset?token=probe")
+	assert.Contains(t, detail.HTML, "expecto-patronum")
 	assert.Contains(t, detail.HTML, "Tango")
 	assert.NotContains(t, detail.HTML, "{{")
 }

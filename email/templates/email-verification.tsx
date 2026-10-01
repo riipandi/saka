@@ -1,11 +1,11 @@
-import { Hr } from 'react-email'
-import { Button, CardFooter, CardHeader, Text } from '../components'
+import { Hr, CodeInline } from 'react-email'
+import { CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
 interface EmailVerificationData {
   userFullName: string
-  verificationLink: string
+  verificationCode: string
 }
 
 interface EmailVerificationProps {
@@ -21,12 +21,19 @@ export const EmailVerification = ({ logoURL, appName, data }: EmailVerificationP
       <Hr style={{ marginTop: '16px' }} />
       <Text style={{ marginTop: '18px' }}>Hello {data.userFullName},</Text>
 
-      <Text>Click the button below to verify your email address for {appName}.</Text>
+      <Text>
+        Use the code below to verify your email address for {appName}. Type it on the verification
+        screen — the code works once.
+      </Text>
 
-      <Button href={data.verificationLink}>Verify Email</Button>
+      <Text style={{ textAlign: 'center' }}>
+        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>
+          {data.verificationCode}
+        </CodeInline>
+      </Text>
 
       <Text style={{ marginTop: '24px' }}>
-        <strong>Important:</strong> This link will expire in 1 hour.
+        <strong>Important:</strong> This code will expire in 1 hour.
       </Text>
 
       <Text>If you did not create account, please ignore this email.</Text>
@@ -45,7 +52,7 @@ EmailVerification.TemplateProps = {
   ...sharedTemplateProps,
   data: {
     userFullName: '{{.Data.UserFullName}}',
-    verificationLink: '{{.Data.VerificationLink}}'
+    verificationCode: '{{.Data.VerificationCode}}'
   }
 }
 
@@ -53,7 +60,7 @@ EmailVerification.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     userFullName: 'John Doe',
-    verificationLink: 'https://localhost:3000/user/verify-email?code=abcdefg12345'
+    verificationCode: 'GRYFFINDOR-EXPECTO'
   }
 }
 

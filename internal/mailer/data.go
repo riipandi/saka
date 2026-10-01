@@ -58,7 +58,7 @@ type (
 		Name        string
 		OldEmail    string
 		NewEmail    string
-		ConfirmLink string
+		ConfirmCode string
 	}
 	// EmailChangeSuccessData renders TemplateEmailChangeSuccess.
 	EmailChangeSuccessData struct {
@@ -68,7 +68,7 @@ type (
 	// EmailVerificationData renders TemplateEmailVerification.
 	EmailVerificationData struct {
 		UserFullName     string
-		VerificationLink string
+		VerificationCode string
 	}
 	// LoginNewDeviceData renders TemplateLoginNewDevice. DateTime is formatted by
 	// the template, so it is the one value that stays a time.
@@ -79,17 +79,16 @@ type (
 		Device    string
 		DateTime  time.Time
 	}
-	// OneTimeAccessData renders TemplateOneTimeAccess.
+	// OneTimeAccessData renders TemplateOneTimeAccess. The code is the
+	// message's whole credential — there is no link to click.
 	OneTimeAccessData struct {
-		Code              string
-		LoginLink         string
-		LoginLinkWithCode string
-		ExpirationString  string
+		Code             string
+		ExpirationString string
 	}
 	// PasswordResetData renders TemplatePasswordReset.
 	PasswordResetData struct {
 		Email     string
-		ResetLink string
+		ResetCode string
 	}
 	// PasswordChangedNoticeData renders TemplatePasswordChangedNotice —
 	// the "your password was changed" receipt a completed reset sends.

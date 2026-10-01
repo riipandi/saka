@@ -293,7 +293,7 @@ func (s *Service) RequestEmailAsAdmin(ctx context.Context, userID string, ttlSec
 	} else if inside {
 		return ErrResendTooSoon
 	}
-	return s.issueEmailCode(ctx, account, "", ttlOr(ttlSeconds), nil)
+	return s.issueEmailCode(ctx, account, ttlOr(ttlSeconds), nil)
 }
 
 // RequestEmail sends a code to the address the caller names, from the sign-in
@@ -303,7 +303,7 @@ func (s *Service) RequestEmailAsAdmin(ctx context.Context, userID string, ttlSec
 // code simply has nowhere to go — so the procedure cannot tell a caller which
 // addresses exist. The device token the answer carries is real either way,
 // because the shape of the answer is the only thing the caller reads.
-func (s *Service) RequestEmail(ctx context.Context, email, redirectPath string) (string, error) {
+func (s *Service) RequestEmail(ctx context.Context, email string) (string, error) {
 	if !s.emailAsUnauthenticatedEnabled {
 		return "", ErrFeatureDisabled
 	}
@@ -332,7 +332,7 @@ func (s *Service) RequestEmail(ctx context.Context, email, redirectPath string) 
 	} else if inside {
 		return deviceToken, nil
 	}
-	if err := s.issueEmailCode(ctx, account, redirectPath, defaultTTL, &deviceToken); err != nil {
+	if err := s.issueEmailCode(ctx, account, defaultTTL, &deviceToken); err != nil {
 		return "", err
 	}
 	return deviceToken, nil
@@ -360,7 +360,7 @@ func (s *Service) resendOnCooldown(ctx context.Context, userID uuid.UUID) (bool,
 // hands the message to the queue. The retry schedule the task carries is
 // tighter than the verification email's, because a code that outlives its own
 // delivery is not a convenience, it is a hole.
-func (s *Service) issueEmailCode(ctx context.Context, account Account, redirectPath string, ttl time.Duration, deviceToken *string) error {
+func (s *Service) issueEmailCode(ctx context.Context, account Account, ttl time.Duration, deviceToken *string) error {
 	if !s.mail.Configured() {
 		return ErrMailUnavailable
 	}
@@ -377,12 +377,11 @@ func (s *Service) issueEmailCode(ctx context.Context, account Account, redirectP
 		return err
 	}
 	if _, err := s.queue.Add(jobs.OneTimeAccessEmailTask{
-		UserID:       account.ID.String(),
-		Email:        account.Email,
-		DisplayName:  account.DisplayName,
-		Token:        code,
-		RedirectPath: redirectPath,
-		TTLSeconds:   int64(ttl.Seconds()),
+		UserID:      account.ID.String(),
+		Email:       account.Email,
+		DisplayName: account.DisplayName,
+		Token:       code,
+		TTLSeconds:  int64(ttl.Seconds()),
 	}).Save(); err != nil {
 		return fmt.Errorf("onetimeaccess: enqueue: %w", err)
 	}

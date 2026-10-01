@@ -40,15 +40,10 @@ func (t PasswordResetEmailTask) Config() queue.QueueConfig {
 	}
 }
 
-// passwordResetLinkPath is the frontend route the reset message links to.
-// The frontend reads the token from the query and forwards it to the
-// ResetPassword procedure.
-const passwordResetLinkPath = "/reset-password?token="
-
 // passwordResetProcessor renders the template and submits one message.
 func passwordResetProcessor(ctx context.Context, task PasswordResetEmailTask, mail *mailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
-		return errors.New("password_reset_email: task carries no address or token")
+		return errors.New("password_reset_email: task carries no address or code")
 	}
 	err := mail.Send(ctx, mailer.Request{
 		To:       []string{task.Email},
@@ -58,7 +53,7 @@ func passwordResetProcessor(ctx context.Context, task PasswordResetEmailTask, ma
 			Email: task.Email,
 			Data: mailer.PasswordResetData{
 				Email:     task.Email,
-				ResetLink: baseURL + passwordResetLinkPath + task.Token,
+				ResetCode: task.Token,
 			},
 		},
 	})

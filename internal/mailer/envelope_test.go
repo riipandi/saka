@@ -398,7 +398,7 @@ func TestTemplatedBodyIsStreamedNotBuffered(t *testing.T) {
 		Subject: "Reset your password",
 	}, TemplatePasswordReset, View{Data: PasswordResetData{
 		Email:     "neveu@example.com",
-		ResetLink: "https://app.example.com/reset?token=abc",
+		ResetCode: "expecto-patronum",
 	}})
 	require.NoError(t, err)
 
@@ -409,7 +409,7 @@ func TestTemplatedBodyIsStreamedNotBuffered(t *testing.T) {
 
 	// Both renderings are present, and the HTML one carries the link.
 	decoded := decodeQuotedPrintable(t, msg.body)
-	assert.Contains(t, decoded, "https://app.example.com/reset?token=abc")
+	assert.Contains(t, decoded, "expecto-patronum")
 	assert.Contains(t, decoded, "<!DOCTYPE html")
 	_ = params
 }
@@ -421,7 +421,7 @@ func TestRenderToMatchesRender(t *testing.T) {
 	require.NoError(t, err)
 	view := View{Data: PasswordResetData{
 		Email:     "neveu@example.com",
-		ResetLink: "https://app.example.com/reset?token=abc",
+		ResetCode: "expecto-patronum",
 	}}
 
 	buffered, err := templates.Render(TemplatePasswordReset, view)

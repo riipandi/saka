@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/riipandi/tango/internal/mailer"
@@ -40,12 +38,6 @@ type OneTimeAccessEmailTask struct {
 	// Token is the raw code the message carries.
 	Token string `json:"token"`
 
-	// RedirectPath is where the frontend sends the holder after the exchange
-	// succeeds. It is appended to the link only when it is a path: a value
-	// that points elsewhere would turn the message's button into a redirect
-	// the requester chose.
-	RedirectPath string `json:"redirect_path"`
-
 	// TTLSeconds is the window the copy states, so the message and the code
 	// agree on how long it works.
 	TTLSeconds int64 `json:"ttl_seconds"`
@@ -64,22 +56,10 @@ func (t OneTimeAccessEmailTask) Config() queue.QueueConfig {
 	}
 }
 
-// oneTimeAccessLinkPath is the frontend route the message links to. The
-// frontend reads the code from the query and forwards it to the exchange
-// procedure, which is why the route is a query parameter rather than a path
-// segment: the same shape the verification link takes.
-const oneTimeAccessLinkPath = "/login-code"
-
 // oneTimeAccessProcessor renders the template and submits one message.
 func oneTimeAccessProcessor(ctx context.Context, task OneTimeAccessEmailTask, mail *mailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
-		return errors.New("one_time_access_email: task carries no address or token")
-	}
-
-	link := baseURL + oneTimeAccessLinkPath
-	linkWithCode := link + "?code=" + url.QueryEscape(task.Token)
-	if strings.HasPrefix(task.RedirectPath, "/") {
-		linkWithCode += "&redirect=" + url.QueryEscape(task.RedirectPath)
+		return errors.New("one_time_access_email: task carries no address or code")
 	}
 
 	err := mail.Send(ctx, mailer.Request{
@@ -89,10 +69,8 @@ func oneTimeAccessProcessor(ctx context.Context, task OneTimeAccessEmailTask, ma
 		View: mailer.View{
 			Email: task.Email,
 			Data: mailer.OneTimeAccessData{
-				Code:              task.Token,
-				LoginLink:         link,
-				LoginLinkWithCode: linkWithCode,
-				ExpirationString:  expirationString(time.Duration(task.TTLSeconds) * time.Second),
+				Code:             task.Token,
+				ExpirationString: expirationString(time.Duration(task.TTLSeconds) * time.Second),
 			},
 		},
 	})

@@ -1,11 +1,11 @@
-import { Hr } from 'react-email'
-import { Alert, Button, CardFooter, CardHeader, Text } from '../components'
+import { Hr, CodeInline } from 'react-email'
+import { Alert, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
 interface PasswordResetData {
   email: string
-  resetLink: string
+  resetCode: string
 }
 
 interface PasswordResetProps {
@@ -25,18 +25,17 @@ export const PasswordReset = ({ logoURL, appName, data }: PasswordResetProps) =>
         You requested to reset your password for <strong>{data.email}</strong>.
       </Text>
 
-      <Text>Click the link below to reset your password:</Text>
-
-      <Button href={data.resetLink}>Reset Password</Button>
-
-      <Text style={{ color: '#5b667e', marginBottom: '1px' }}>
-        Or copy and paste this link into your browser:
+      <Text>
+        Use the code below to reset your password. Type it on the reset screen — the code works
+        once.
       </Text>
 
-      <Text style={{ color: '#5b667e', wordBreak: 'break-all' }}>{data.resetLink}</Text>
+      <Text style={{ textAlign: 'center' }}>
+        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.resetCode}</CodeInline>
+      </Text>
 
       <Alert variant='warning' style={{ marginTop: '20px' }}>
-        <strong>Important:</strong> This link will expire in 1 hour. If you did not request this
+        <strong>Important:</strong> This code will expire in 1 hour. If you did not request this
         change, please ignore this email.
       </Alert>
 
@@ -54,7 +53,7 @@ PasswordReset.TemplateProps = {
   ...sharedTemplateProps,
   data: {
     email: '{{.Data.Email}}',
-    resetLink: '{{.Data.ResetLink}}'
+    resetCode: '{{.Data.ResetCode}}'
   }
 }
 
@@ -62,7 +61,7 @@ PasswordReset.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     email: 'user@example.com',
-    resetLink: 'https://example.com/reset-password?token=abc123'
+    resetCode: 'EXPECTO-PATRONUM'
   }
 }
 

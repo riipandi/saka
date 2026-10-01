@@ -10,18 +10,16 @@ authenticationType: null
 body:
   text: |-
     {
-      "email": "${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=', ', path='$.user.email') ]}",
-      "redirect_path": "/dashboard"
+      "email": "${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=', ', path='$.user.email') ]}"
     }
 bodyType: application/json
 description: |-
-  Send a one-time access code to the address the caller names, from the sign-in page. An address no account holds answers the same success, so the procedure cannot enumerate addresses. The response carries the device token the exchange demands back. Refused while `auth.one_time_access_email_as_unauthenticated_enabled` is off.
+  Send a one-time access code to the address the caller names, from the sign-in page. An address no account holds answers the same success, so the procedure cannot enumerate addresses. The code is typed on the sign-in screen — there is no link to click. The response carries the device token the exchange demands back. Refused while `auth.one_time_access_email_as_unauthenticated_enabled` is off.
 
   Mirror of Pocket ID `POST /api/one-time-access-email`, ported as the RPC procedure `tango.authn.v1.OneTimeAccessService/RequestEmail`.
 
   Body:
   - email: the address the code should go to
-  - redirect_path: optional; where the frontend sends the holder after the exchange
 headers:
 - enabled: true
   name: Content-Type

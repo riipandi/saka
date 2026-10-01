@@ -174,9 +174,7 @@ message RequestOneTimeAccessEmailRequest {
     email: true
   }];
 
-  // redirect_path is where the frontend sends the holder after the exchange
-  // succeeds. A value that does not begin with a slash is ignored.
-  optional string redirect_path = 2 [(buf.validate.field).string.max_len = 256];
+  reserved 2; // formerly redirect_path: the login code is typed, never linked
 }
 
 // RequestOneTimeAccessEmailResponse carries the device token the exchange

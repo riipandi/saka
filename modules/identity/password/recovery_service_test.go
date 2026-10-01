@@ -153,7 +153,9 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 
 	// The token is URL-safe hex: 64 lowercase hexadecimal characters, no
 	// dashes, no symbols.
-	assert.Regexp(t, `^[0-9a-f]{64}$`, raw)
+	// The reset credential is the single-use code the message carries: the
+	// unambiguous alphabet at twelve characters — typed, never linked.
+	assert.Regexp(t, `^[a-km-zA-KM-NP-Z2-9]{12}$`, raw)
 
 	// The row carries the hash, not the value the email took away.
 	var stored string

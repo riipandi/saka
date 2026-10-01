@@ -56,9 +56,14 @@ var (
 	ErrSamePassword = errors.New("password: the new password matches the current one")
 )
 
-// tokenTTL is how long a reset link works. The template copy states it, so
+// tokenTTL is how long a reset code works. The template copy states it, so
 // changing one means changing the other.
 const tokenTTL = time.Hour
+
+// resetCodeLength is the reset code's length: the unambiguous alphabet at
+// twelve characters — the form the verification code keeps, long enough
+// that a typed guess is hopeless, short enough that a human types it.
+const resetCodeLength = 12
 
 // resendCooldown is how long the last send keeps a new one out. The window
 // is what stops a caller from turning the trigger into a mailbomb; the token
@@ -284,7 +289,10 @@ func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 		return "", ErrMailUnavailable
 	}
 
-	raw, err := crypto.NewHexToken()
+	// The reset credential is a single-use code — typed on the reset
+	// screen, never linked. The unambiguous alphabet at twelve characters
+	// is the same form the verification code keeps.
+	raw, err := crypto.RandomString(resetCodeLength, crypto.AlphabetUnambiguous)
 	if err != nil {
 		return "", fmt.Errorf("password: mint token: %w", err)
 	}

@@ -16,18 +16,11 @@ const EmailChangeRequestEmailName = "email_change_request"
 // notices run on.
 const EmailChangeNoticeName = "email_change_notice"
 
-// emailChangeLinkPath is the frontend route the confirm message links to.
-// The frontend reads the token from the query and forwards it to the
-// ConfirmEmailChange procedure.
-const emailChangeLinkPath = "/change-email?token="
-
-// EmailChangeRequestEmailTask renders the confirm-link template and submits
-// one message to the address the change moves to. The token inside is the
-// flow's whole credential, so the task travels only after the token row
-// committed.
+// EmailChangeRequestEmailTask carries the addresses and the code; the
+// processors below render the request and the notices.
 type EmailChangeRequestEmailTask struct {
 	// Email is the address the message goes to — the new address, the one
-	// proving control of which is the point of the link.
+	// proving control of which is the point of the code.
 	Email string `json:"email"`
 
 	// DisplayName is the name the template greets.
@@ -38,14 +31,15 @@ type EmailChangeRequestEmailTask struct {
 	OldEmail string `json:"old_email"`
 	NewEmail string `json:"new_email"`
 
-	// Token is the raw change token, in clear text: the message is the only
-	// copy, the database keeps the hash.
+	// Token is the raw change code, in clear text: the message is the only
+	// copy, the database keeps the hash. It is a single-use code the account
+	// types back — there is no link to click.
 	Token string `json:"token"`
 }
 
-// Config returns the queue the confirm-link messages run on. The attempts
+// Config returns the queue the confirm-code messages run on. The attempts
 // stay generous for the same reason the other transactional emails keep
-// them: an SMTP outage is the ordinary retry, and a change whose link never
+// them: an SMTP outage is the ordinary retry, and a change whose code never
 // arrives is a change that never completes.
 func (t EmailChangeRequestEmailTask) Config() queue.QueueConfig {
 	return queue.QueueConfig{
@@ -59,7 +53,7 @@ func (t EmailChangeRequestEmailTask) Config() queue.QueueConfig {
 // emailChangeRequestProcessor renders the template and submits one message.
 func emailChangeRequestProcessor(ctx context.Context, task EmailChangeRequestEmailTask, mail *mailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
-		return errors.New("email_change_request: task carries no address or token")
+		return errors.New("email_change_request: task carries no address or code")
 	}
 	return mail.Send(ctx, mailer.Request{
 		To:       []string{task.Email},
@@ -71,7 +65,7 @@ func emailChangeRequestProcessor(ctx context.Context, task EmailChangeRequestEma
 				Name:        task.DisplayName,
 				OldEmail:    task.OldEmail,
 				NewEmail:    task.NewEmail,
-				ConfirmLink: baseURL + emailChangeLinkPath + task.Token,
+				ConfirmCode: task.Token,
 			},
 		},
 	})
