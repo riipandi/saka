@@ -139,7 +139,7 @@ $$ LANGUAGE plpgsql STABLE;
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.deleted_records (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    object_id UUID NOT NULL, -- ID for the object (PK)
+    object_id TEXT NOT NULL, -- ID for the object (PK); text because a client-id is named, not generated
     source_table VARCHAR(200) NOT NULL,
     data JSONB NOT NULL DEFAULT '{}'::jsonb,
     deleted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -1131,7 +1131,7 @@ func TestDeleteMyAccountFollowsTheGateAndTheOverride(t *testing.T) {
 
 	var captures int
 	require.NoError(t, pool.QueryRow(ctx,
-		`SELECT count(*) FROM public.deleted_records WHERE source_table = 'users' AND object_id = $1`,
+		`SELECT count(*) FROM public.deleted_records WHERE source_table = 'users' AND object_id = $1::text`,
 		IDToUUID(mustID(t, created.ID))).Scan(&captures))
 	assert.Equal(t, 1, captures, "the archive names the account the delete removed")
 
