@@ -4,7 +4,7 @@ version: "3"
 
 tasks:
   dev:
-    desc: Dev loop — SPA on :3000 and :3080, HMR for assets, the Go binary rebuilt from build/debug on every Go change
+    desc: Dev loop on one origin (:3080) — Vite compiles + HMR behind the Go proxy, the binary rebuilt from build/debug on every Go change
     deps: [rpc:generate]
     cmd: pnpm exec vite dev {{.CLI_ARGS}}
 

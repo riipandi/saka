@@ -2,7 +2,6 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { comlink } from 'vite-plugin-comlink'
 import pkg from './package.json' with { type: 'json' }
-import devshell from './plugins/plugin-devshell.ts'
 import email from './plugins/plugin-email.ts'
 import golang from './plugins/plugin-golang.ts'
 
@@ -22,21 +21,6 @@ const goVersionLdflags = [
   `-X ${goModule}/internal/config.BuildDate=${BUILD_DATE}`
 ]
 
-// Same-origin proxy to the Go server, dev-only: the session cookie is
-// HttpOnly and SameSite=Lax, so the API must ride the origin the document
-// was served from. The document itself comes from Go through the devshell
-// plugin — Vite owns the modules and HMR, Go owns the HTML.
-const targetHost = 'http://127.0.0.1:3080'
-const viteProxy: Record<string, string> = {
-  '/.well-known': targetHost,
-  '/api': targetHost,
-  '/rpc': targetHost,
-  '/metrics': targetHost,
-  '/static': targetHost,
-  '/oidc': targetHost,
-  '/debug': targetHost
-}
-
 /**
  * Plugin Comlink owns worker construction and must register first: only
  * plugins that transform ComlinkWorker call sites may precede it.
@@ -49,11 +33,11 @@ const viteProxy: Record<string, string> = {
  *
  * Backend integration (the Vite guide's): the Go binary owns the HTML
  * document — web/shell.go renders it — so there is no index.html here.
- * In development both origins display the same application: the Go port
- * (:3080) renders the document natively and points its fragment here, and
- * this port (:3000) forwards document navigations to Go through the
- * devshell plugin while keeping the modules and HMR. In production the
- * shell resolves every tag from the build manifest, one entry per page.
+ * The dev server is the compiler behind the Go port, not an origin of its
+ * own: the browser talks to :3080 only, the shell's fragment carries
+ * same-origin paths, and the debug build proxies the module graph and the
+ * HMR socket to this server. In production the shell resolves every tag
+ * from the build manifest, one entry per page.
  *
  * The root is the repository so the manifest keys name the source paths
  * the Go side knows: app/main.tsx is the application document, and a
@@ -62,7 +46,6 @@ const viteProxy: Record<string, string> = {
 export default defineConfig({
   plugins: [
     comlink(),
-    devshell(),
     email({
       templateDir: resolve('email/templates'),
       outputDir: resolve('web/email')
@@ -104,13 +87,7 @@ export default defineConfig({
     }
   },
   worker: { plugins: () => [comlink()] },
-  server: isStorybook
-    ? undefined
-    : {
-        port: 3000,
-        strictPort: true,
-        // The Go page loads modules cross-origin in development.
-        cors: { origin: '*' },
-        proxy: viteProxy
-      }
+  // The compiler's port: bound to the loopback, proxied by the Go
+  // debug build, and never opened by a developer or a deployment.
+  server: isStorybook ? undefined : { port: 5173, host: '127.0.0.1', strictPort: true }
 })

@@ -29,9 +29,8 @@ type ViteConfig struct {
 	// manifest for its single entry point and fails when there are many.
 	ViteEntry string
 
-	// ViteURL is the dev server the fragment points at in development
-	// mode. It defaults to http://localhost:5173 and is unused in
-	// production.
+	// ViteURL is the dev server origin the fragment's same-origin paths
+	// ride. It is unused in production mode.
 	ViteURL string
 
 	// ViteManifest is the manifest path relative to FS. It defaults to

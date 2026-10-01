@@ -47,7 +47,7 @@ flowchart TB
     end
 
     subgraph Debug build
-        V[Vite dev server :3000]
+        V[Vite dev server :5173, loopback only]
     end
 
     subgraph Release build
@@ -57,16 +57,17 @@ flowchart TB
 
     B --> R
     R -->|unclaimed GET| S
-    S --> SH
+    S -->|navigation: Accept text/html| SH
     SH -->|one fragment per entry| F
-    F -->|IsDev| V
+    F -->|IsDev: same-origin paths| V
     F -->|release| M
+    S -->|module, asset, HMR socket| V
     S -->|/assets/... file hit| A
 ```
 
 | Build    | Fragment source                      | Assets served from          |
 | -------- | ------------------------------------ | --------------------------- |
-| `debug`  | the dev-server constant (:3000)      | the Vite dev server         |
+| `debug`  | same-origin paths (the proxy answers)| the Go port, via the proxy  |
 | `release`| the embedded build manifest          | the embedded `web/output`   |
 
 ## Requirements
@@ -94,11 +95,11 @@ templates, then rebuilds both Go targets (debug and release) with the new output
 task dev
 ```
 
-The `golang` plugin builds `build/debug/tango`, starts it, and rebuilds it on every Go
-change; Vite keeps the modules and the HMR. Both origins show the application —
-**:3000** (document forwarded to Go, assets and HMR local) and **:3080** (document
-native, assets from :3000) — and the API calls ride whichever origin served the page
-through the dev proxies, so the session cookie stays first-party.
+One command, one origin. The `golang` plugin builds `build/debug/tango`, starts it, and
+rebuilds it on every Go change — that is the Go hot reload; Vite keeps the module
+transform and the HMR, but the browser never sees it: **:3080** is the only origin, the
+shell's fragment carries same-origin paths, and the debug build proxies the compiler's
+traffic (modules, assets, the HMR socket) to the loopback dev server.
 
 ### 2. Add a Page
 
@@ -164,7 +165,7 @@ it. An entry the manifest does not name is an error, never a silent empty tag.
 | `FS`              | The Vite build output; read only in release for the manifest                |
 | `IsDev`           | Point the fragment at the dev server instead of the built assets            |
 | `ViteEntry`       | The source path the manifest names (`app/main.tsx`); empty asks for the manifest's single entry |
-| `ViteURL`         | The dev server URL (dev mode; `SetupStatic` passes the constant)            |
+| `ViteURL`         | The origin the same-origin paths ride (dev mode; empty means this origin)   |
 | `ViteManifest`    | The manifest path relative to `FS` (default `.vite/manifest.json`)          |
 | `ViteTemplate`    | The scaffolding whose dev preamble is injected (`ViteReact` or `ViteNone`)  |
 | `AssetsURLPrefix` | The prefix the built asset paths ride, for a deployment that keeps artifacts off the document origin |
@@ -206,8 +207,9 @@ go test -race ./web/
 | Ported, not imported                       | The engine is ~600 lines, MIT, and touches presentation the repo owns; no drift, no dependency    |
 | No `index.html`                            | One owner for the document; the meta a crawler reads is served by Go, not duplicated in a static file |
 | One fragment per entry                     | A second page must not ship the first page's assets; the manifest keys are the contract           |
-| Dev URL is a constant, not config          | Only a debug build reads it, and a deployment never serves one; config would be a second place to look for a development-only fact |
-| Same-origin API in development             | The session cookie stays first-party without a proxy hop or a CORS-with-credentials dance          |
+| Dev server is a constant, not config       | Only a debug build reads it, and a deployment never serves one; config would be a second place to look for a development-only fact |
+| One origin: the compiler sits behind Go    | The cookie context, the proxies, and the document have exactly one owner; a second port was two sources of truth |
+| Navigation vs everything else              | A navigation's Accept names text/html and a module's never does — one header splits the shell from the compiler's traffic, and the HMR socket rides the same rule |
 | `html/template` for the document           | Every page-named value is escaped; the one trusted input (`trustedHead`) is manifest-built, never request data |
 | Fragment resolved once, lazily             | The embedded manifest cannot change mid-run; a resolution error answers the envelope's 500        |
 | Serving stays with `SetupStatic`           | Upstream's handler was not ported: the router already owns mounts, boundaries, and exclusions     |

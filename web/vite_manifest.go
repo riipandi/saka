@@ -4,7 +4,6 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 )
 
@@ -56,9 +55,9 @@ func (m ViteManifest) chunkFor(name string) *ViteChunk {
 }
 
 // viteReactPreamble returns the script tag that enables React Fast
-// Refresh against the dev server.
+// Refresh against the dev server; an empty server is the same-origin path.
 func viteReactPreamble(server string) string {
-	refresh, _ := url.JoinPath(server, "/@react-refresh")
+	refresh := strings.TrimSuffix(server, "/") + "/@react-refresh"
 	return fmt.Sprintf(`<script type="module">
   import RefreshRuntime from '%s'
   RefreshRuntime.injectIntoGlobalHook(window)

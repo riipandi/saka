@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"net/url"
+	"strings"
 )
 
 // ViteFragment holds the head tags the shell embeds for one entry point.
@@ -15,22 +15,20 @@ type ViteFragment struct {
 }
 
 // ViteHTMLFragment resolves the head tags for one entry point out of the
-// configuration. In development it names the dev server's client and
-// module graph; in production it resolves the entry through the build
-// manifest to its hashed module, stylesheets, and preload links.
+// configuration. In development it names the dev server's client and the
+// entry module by same-origin paths — the browser never learns another
+// port, because the Go surface in front proxies the dev server. In
+// production it resolves the entry through the build manifest to its
+// hashed module, stylesheets, and preload links.
 func ViteHTMLFragment(config ViteConfig) (*ViteFragment, error) {
-	pd := &vitePageData{
-		IsDev:     config.IsDev,
-		ViteEntry: config.ViteEntry,
-		ViteURL:   config.ViteURL,
-	}
+	pd := &vitePageData{}
 
 	if config.IsDev {
-		if pd.ViteURL == "" {
-			pd.ViteURL = "http://localhost:5173"
-		}
+		base := strings.TrimSuffix(config.ViteURL, "/")
+		pd.ClientURL = base + "/@vite/client"
+		pd.EntryURL = base + "/" + strings.TrimPrefix(config.ViteEntry, "/")
 		if config.ViteTemplate.RequiresPreamble() {
-			pd.ReactPreamble = trustedHead(config.ViteTemplate.Preamble(pd.ViteURL))
+			pd.ReactPreamble = trustedHead(viteReactPreamble(base))
 		}
 	} else {
 		if config.FS == nil {
@@ -50,13 +48,13 @@ func ViteHTMLFragment(config ViteConfig) (*ViteFragment, error) {
 			return nil, fmt.Errorf("vite: parse manifest: %w", err)
 		}
 		var chunk *ViteChunk
-		if pd.ViteEntry == "" {
+		if config.ViteEntry == "" {
 			chunk = m.entryPoint()
 		} else {
-			chunk = m.chunkFor(pd.ViteEntry)
+			chunk = m.chunkFor(config.ViteEntry)
 		}
 		if chunk == nil {
-			return nil, fmt.Errorf("vite: unable to find chunk for entry point %q", pd.ViteEntry)
+			return nil, fmt.Errorf("vite: unable to find chunk for entry point %q", config.ViteEntry)
 		}
 
 		pd.StyleSheets = trustedHead(m.generateCSS(chunk.Src, config.AssetsURLPrefix))
@@ -65,9 +63,7 @@ func ViteHTMLFragment(config ViteConfig) (*ViteFragment, error) {
 	}
 
 	var buf bytes.Buffer
-	tmpl, err := template.New("vite").Funcs(template.FuncMap{
-		"urljoin": url.JoinPath,
-	}).Parse(viteHeadTmpl)
+	tmpl, err := template.New("vite").Parse(viteHeadTmpl)
 	if err != nil {
 		return nil, fmt.Errorf("vite: parse template: %w", err)
 	}
@@ -79,7 +75,7 @@ func ViteHTMLFragment(config ViteConfig) (*ViteFragment, error) {
 
 // trustedHead marks fragment bytes as HTML for the shell's template. The
 // fragment is assembled from the build manifest and the documented dev
-// server URL — neither carries request input — and it is the only place
+// server paths — neither carries request input — and it is the only place
 // the shell receives unescaped markup; every value a page names goes
 // through html/template's escaping.
 func trustedHead[T []byte | string](raw T) template.HTML {
@@ -89,34 +85,32 @@ func trustedHead[T []byte | string](raw T) template.HTML {
 // vitePageData feeds the fragment template. Its fields are exported
 // because html/template refuses unexported ones.
 type vitePageData struct {
-	IsDev          bool
-	ViteEntry      string
-	ViteURL        string
+	ClientURL      string
+	EntryURL       string
 	ReactPreamble  template.HTML
 	StyleSheets    template.HTML
 	Modules        template.HTML
 	PreloadModules template.HTML
 }
 
-// viteHeadTmpl renders the head tags. In development the entry is named by its
-// source path under the dev server root; in production the manifest has
-// already resolved every path.
+// viteHeadTmpl renders the head tags. In development the paths are
+// same-origin; the Go surface proxies whatever they name. In production
+// the manifest has already resolved every path.
 const viteHeadTmpl = `
-{{- if .IsDev }}
+{{- if .ClientURL }}
 	{{- if .ReactPreamble }}
 	{{ .ReactPreamble }}
 	{{- end }}
-	<script type="module" src="{{ urljoin .ViteURL "/@vite/client" }}"></script>
-	<script type="module" src="{{ urljoin .ViteURL .ViteEntry }}"></script>
-{{- else }}
-	{{- if .StyleSheets }}
+	<script type="module" src="{{ .ClientURL }}"></script>
+	<script type="module" src="{{ .EntryURL }}"></script>
+{{- end }}
+{{- if .StyleSheets }}
 	{{ .StyleSheets }}
-	{{- end }}
-	{{- if .Modules }}
+{{- end }}
+{{- if .Modules }}
 	{{ .Modules }}
-	{{- end }}
-	{{- if .PreloadModules }}
+{{- end }}
+{{- if .PreloadModules }}
 	{{ .PreloadModules }}
-	{{- end }}
 {{- end }}
 `

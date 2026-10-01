@@ -55,7 +55,21 @@ func TestTheMultiPageBuildOwnePerEntryFragments(t *testing.T) {
 	assert.NotEqual(t, app.Tags, landing.Tags, "two entries resolve to two fragments")
 }
 
-func TestTheDevFragmentPointsAtTheDevServer(t *testing.T) {
+func TestTheDevFragmentIsSameOrigin(t *testing.T) {
+	f, err := ViteHTMLFragment(ViteConfig{
+		IsDev: true, ViteEntry: "app/main.tsx", ViteTemplate: ViteReact,
+	})
+	require.NoError(t, err)
+
+	tags := string(f.Tags)
+	assert.Contains(t, tags, "import RefreshRuntime from '/@react-refresh'",
+		"the React preamble rides the dev fragment")
+	assert.Contains(t, tags, `<script type="module" src="/@vite/client">`)
+	assert.Contains(t, tags, `<script type="module" src="/app/main.tsx">`)
+	assert.NotContains(t, tags, "http://", "the browser never learns another port — the Go surface proxies the compiler")
+}
+
+func TestTheDevFragmentKeepsAnExplicitBase(t *testing.T) {
 	f, err := ViteHTMLFragment(ViteConfig{
 		IsDev: true, ViteURL: "http://localhost:5173",
 		ViteEntry: "app/main.tsx", ViteTemplate: ViteReact,
@@ -63,16 +77,13 @@ func TestTheDevFragmentPointsAtTheDevServer(t *testing.T) {
 	require.NoError(t, err)
 
 	tags := string(f.Tags)
-	assert.Contains(t, tags, "import RefreshRuntime from 'http://localhost:5173/@react-refresh'",
-		"the React preamble rides the dev fragment")
-	assert.Contains(t, tags, `<script type="module" src="http://localhost:5173/@vite/client">`)
+	assert.Contains(t, tags, "import RefreshRuntime from 'http://localhost:5173/@react-refresh'")
 	assert.Contains(t, tags, `<script type="module" src="http://localhost:5173/app/main.tsx">`)
 }
 
 func TestTheVanillaDevFragmentSkipsThePreamble(t *testing.T) {
 	f, err := ViteHTMLFragment(ViteConfig{
-		IsDev: true, ViteURL: "http://localhost:5173",
-		ViteEntry: "app/main.tsx", ViteTemplate: ViteNone,
+		IsDev: true, ViteEntry: "app/main.tsx", ViteTemplate: ViteNone,
 	})
 	require.NoError(t, err)
 	assert.NotContains(t, string(f.Tags), "RefreshRuntime")
