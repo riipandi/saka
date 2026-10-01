@@ -143,7 +143,7 @@ func mapRecoveryError(err error) error {
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("a reset email was sent less than a minute ago"))
 	case errors.Is(err, ErrSamePassword):
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("the new password must differ from the current one"))
-	case errors.Is(err, ErrWeakPassword):
+	case errors.Is(err, ErrWeakPassword), errors.Is(err, ErrBreachedPassword):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("password reset failed"))

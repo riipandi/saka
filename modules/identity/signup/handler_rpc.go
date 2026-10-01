@@ -213,5 +213,5 @@ func mapError(err error) error {
 // refusal. The rule lives in the password package, so the check does too —
 // the handler maps the answer without learning the policy's rules.
 func isPasswordPolicy(err error) bool {
-	return errors.Is(err, password.ErrWeakPassword)
+	return errors.Is(err, password.ErrWeakPassword) || errors.Is(err, password.ErrBreachedPassword)
 }

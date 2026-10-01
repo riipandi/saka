@@ -88,7 +88,10 @@ func TestDeploymentKeysThatAreNotSecrets(t *testing.T) {
 	}
 	slices.Sort(both)
 
-	assert.Equal(t, []string{"kvstore.url"}, both)
+	// auth.hibp_api_key pins HIBP_API_KEY: the variable the breach-corpus
+	// key is known by outside this file, not the section-prefixed name the
+	// derivation would write.
+	assert.Equal(t, []string{"auth.hibp_api_key", "kvstore.url"}, both)
 }
 
 func TestSampleCoversEveryKey(t *testing.T) {
