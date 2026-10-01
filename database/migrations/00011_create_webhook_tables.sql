@@ -34,7 +34,6 @@ CREATE TRIGGER trg_webhook_endpoints_updated_at BEFORE UPDATE ON public.webhook_
 -- (name needs no index: the UNIQUE constraint carries every lookup)
 CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_enabled ON public.webhook_endpoints (enabled);
 CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_created_at ON public.webhook_endpoints (created_at);
-CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_updated_at ON public.webhook_endpoints (updated_at) WHERE updated_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_event_types ON public.webhook_endpoints USING GIN (event_types);
 
 -- --------------------------------------------------------
@@ -74,7 +73,6 @@ CREATE TABLE IF NOT EXISTS public.webhook_delivery_attempts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_webhook_delivery_attempts_delivery ON public.webhook_delivery_attempts (delivery_id, attempt_number);
 -- The attempt number is single-use state per delivery: a lost worker's reclaim
 -- must not write a second row for the number an earlier worker already recorded.
 -- The unique index is the storage of that rule.
@@ -90,7 +88,6 @@ CREATE INDEX IF NOT EXISTS idx_webhook_delivery_attempts_created_at ON public.we
 
 DROP INDEX IF EXISTS idx_webhook_delivery_attempts_created_at;
 DROP INDEX IF EXISTS uq_webhook_delivery_attempts_number;
-DROP INDEX IF EXISTS idx_webhook_delivery_attempts_delivery;
 DROP TABLE IF EXISTS public.webhook_delivery_attempts;
 
 DROP INDEX IF EXISTS idx_webhook_deliveries_created_at_desc;
@@ -102,7 +99,6 @@ DROP TABLE IF EXISTS public.webhook_deliveries;
 DROP TRIGGER IF EXISTS trg_webhook_endpoints_updated_at ON public.webhook_endpoints;
 
 DROP INDEX IF EXISTS idx_webhook_endpoints_event_types;
-DROP INDEX IF EXISTS idx_webhook_endpoints_updated_at;
 DROP INDEX IF EXISTS idx_webhook_endpoints_created_at;
 DROP INDEX IF EXISTS idx_webhook_endpoints_enabled;
 

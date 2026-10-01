@@ -40,12 +40,7 @@ CREATE TRIGGER trg_users_deleted_record AFTER DELETE ON public.users FOR EACH RO
 
 CREATE INDEX IF NOT EXISTS idx_users_display_name ON public.users USING gin (display_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING GIN (username gin_trgm_ops) WHERE username IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_users_banned_at ON public.users (banned_at) WHERE banned_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_users_ban_expires ON public.users (ban_expires) WHERE ban_expires IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_users_banned_expires ON public.users (banned_at, ban_expires) WHERE banned_at IS NOT NULL AND ban_expires IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_users_updated_at ON public.users (updated_at) WHERE updated_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_users_metadata_gin ON public.users USING GIN (metadata);
 CREATE INDEX IF NOT EXISTS idx_users_last_login_at ON public.users (last_login_at) WHERE last_login_at IS NOT NULL;
 
 -- --------------------------------------------------------
@@ -62,7 +57,6 @@ CREATE TABLE IF NOT EXISTS public.user_passwords (
 
 CREATE TRIGGER trg_user_passwords_updated_at BEFORE UPDATE ON public.user_passwords FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
 
-CREATE INDEX IF NOT EXISTS idx_user_passwords_user_id ON public.user_passwords (user_id);
 CREATE INDEX IF NOT EXISTS idx_user_passwords_created_at ON public.user_passwords (created_at);
 CREATE INDEX IF NOT EXISTS idx_user_passwords_updated_at ON public.user_passwords (updated_at) WHERE updated_at IS NOT NULL;
 
@@ -118,7 +112,6 @@ CREATE TABLE IF NOT EXISTS public.sessions (
 ) USING heap;
 
 -- (user_id needs no single-column index: idx_sessions_user_id_expires_at leads with it)
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions (expires_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_rotated_token_hash ON public.sessions (rotated_token_hash) WHERE rotated_token_hash IS NOT NULL;
 
 -- The table remembering every browser fingerprint an account has signed in
@@ -136,8 +129,6 @@ CREATE TABLE IF NOT EXISTS public.known_devices (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON public.sessions USING btree (user_id, expires_at);
 -- (ip_address needs no index: no query filters sessions by it)
-CREATE INDEX IF NOT EXISTS idx_sessions_device_fingerprint ON public.sessions (device_fingerprint);
-CREATE INDEX IF NOT EXISTS idx_sessions_impersonated_by ON public.sessions (impersonated_by) WHERE impersonated_by IS NOT NULL;
 
 -- --------------------------------------------------------
 -- Table: public.auth_tokens — one-time access, email verification,
@@ -192,7 +183,6 @@ CREATE TABLE IF NOT EXISTS public.signup_tokens (
     expires_at TIMESTAMPTZ NOT NULL
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_signup_tokens_expires_at ON public.signup_tokens USING btree (expires_at);
 
 -- --------------------------------------------------------
 -- Table: public.signup_tokens_user_groups (junction table)
@@ -229,7 +219,6 @@ CREATE TABLE IF NOT EXISTS public.device_login_requests (
     CONSTRAINT chk_device_login_requests_expiry CHECK (expires_at > created_at)
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_device_login_requests_expires_at ON public.device_login_requests (expires_at);
 
 -- --------------------------------------------------------
 -- Table: public.audit_logs — track user actions and system events
@@ -260,12 +249,8 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_client_name ON public.audit_logs USING btree (((payload ->> 'client_name'::text)));
-CREATE INDEX IF NOT EXISTS idx_audit_logs_country ON public.audit_logs USING btree (country);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs USING btree (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON public.audit_logs USING btree (event);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_agent ON public.audit_logs USING btree (user_agent);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_device_fingerprint ON public.audit_logs (device_fingerprint) WHERE device_fingerprint IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs USING btree (user_id);
 
 -- +goose StatementEnd
@@ -279,35 +264,20 @@ DROP TRIGGER IF EXISTS trg_user_passwords_updated_at ON public.user_passwords;
 DROP TRIGGER IF EXISTS trg_user_groups_updated_at ON public.user_groups;
 
 DROP INDEX IF EXISTS idx_audit_logs_user_id;
-DROP INDEX IF EXISTS idx_audit_logs_user_agent;
-DROP INDEX IF EXISTS idx_audit_logs_device_fingerprint;
 DROP INDEX IF EXISTS idx_audit_logs_event;
-DROP INDEX IF EXISTS idx_audit_logs_country;
 DROP INDEX IF EXISTS idx_audit_logs_created_at;
-DROP INDEX IF EXISTS idx_audit_logs_client_name;
-DROP INDEX IF EXISTS idx_device_login_requests_expires_at;
-DROP INDEX IF EXISTS idx_signup_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;
-DROP INDEX IF EXISTS idx_sessions_impersonated_by;
-DROP INDEX IF EXISTS idx_sessions_device_fingerprint;
 DROP INDEX IF EXISTS idx_sessions_user_id_expires_at;
-DROP INDEX IF EXISTS idx_sessions_expires_at;
 DROP INDEX IF EXISTS idx_user_groups_users_user_group_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_id;
 DROP INDEX IF EXISTS idx_users_last_login_at;
-DROP INDEX IF EXISTS idx_users_metadata_gin;
-DROP INDEX IF EXISTS idx_users_updated_at;
 DROP INDEX IF EXISTS idx_users_created_at;
-DROP INDEX IF EXISTS idx_users_banned_expires;
-DROP INDEX IF EXISTS idx_users_ban_expires;
-DROP INDEX IF EXISTS idx_users_banned_at;
 DROP INDEX IF EXISTS idx_users_username;
 DROP INDEX IF EXISTS idx_users_display_name;
 DROP INDEX IF EXISTS idx_user_passwords_updated_at;
 DROP INDEX IF EXISTS idx_user_passwords_created_at;
-DROP INDEX IF EXISTS idx_user_passwords_user_id;
 
 DROP TABLE IF EXISTS public.audit_logs;
 DROP TABLE IF EXISTS public.device_login_requests;

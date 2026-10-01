@@ -28,7 +28,6 @@ CREATE TRIGGER trg_api_keys_updated_at BEFORE UPDATE ON public.api_keys FOR EACH
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON public.api_keys USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_expires_at ON public.api_keys (expires_at) WHERE expires_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id_expires_at ON public.api_keys USING btree (user_id, expires_at);
-CREATE INDEX IF NOT EXISTS idx_api_keys_revoked_at ON public.api_keys (revoked_at) WHERE revoked_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_api_keys_last_used_at ON public.api_keys (last_used_at) WHERE last_used_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_api_keys_created_at ON public.api_keys (created_at);
 
@@ -43,7 +42,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_name_user_id ON public.api_keys U
 DROP INDEX IF EXISTS idx_api_keys_name_user_id;
 DROP INDEX IF EXISTS idx_api_keys_created_at;
 DROP INDEX IF EXISTS idx_api_keys_last_used_at;
-DROP INDEX IF EXISTS idx_api_keys_revoked_at;
 DROP INDEX IF EXISTS idx_api_keys_user_id_expires_at;
 DROP INDEX IF EXISTS idx_api_keys_expires_at;
 DROP INDEX IF EXISTS idx_api_keys_user_id;

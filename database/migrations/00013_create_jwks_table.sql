@@ -46,11 +46,8 @@ CREATE TABLE IF NOT EXISTS public.jwks (
 
 CREATE TRIGGER trg_jwks_updated_at BEFORE UPDATE ON public.jwks FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
 
-CREATE INDEX IF NOT EXISTS idx_jwks_active ON public.jwks(is_active);
-CREATE INDEX IF NOT EXISTS idx_jwks_algorithm ON public.jwks(algorithm);
-CREATE INDEX IF NOT EXISTS idx_jwks_use_for ON public.jwks(use_for);
 CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON public.jwks(expires_at);
-CREATE INDEX IF NOT EXISTS idx_jwks_active_algorithm_use_for ON public.jwks(is_active, algorithm, use_for);
+CREATE INDEX IF NOT EXISTS idx_jwks_active_algorithm_use_for ON public.jwks(is_active, use_for, algorithm);
 
 -- +goose StatementEnd
 
@@ -59,9 +56,6 @@ CREATE INDEX IF NOT EXISTS idx_jwks_active_algorithm_use_for ON public.jwks(is_a
 
 DROP INDEX IF EXISTS idx_jwks_active_algorithm_use_for;
 DROP INDEX IF EXISTS idx_jwks_expires_at;
-DROP INDEX IF EXISTS idx_jwks_use_for;
-DROP INDEX IF EXISTS idx_jwks_algorithm;
-DROP INDEX IF EXISTS idx_jwks_active;
 
 DROP TRIGGER IF EXISTS trg_jwks_updated_at ON public.jwks;
 DROP TABLE IF EXISTS public.jwks;

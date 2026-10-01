@@ -30,7 +30,6 @@ CREATE TRIGGER trg_rate_limits_updated_at BEFORE UPDATE ON public.rate_limits FO
 
 -- Indexes for `public.rate_limits`
 -- (the key needs no index: the primary key carries every lookup)
-CREATE INDEX IF NOT EXISTS idx_rate_limits_window_start ON public.rate_limits (window_start);
 
 -- --------------------------------------------------------
 -- Rate limit check function, returns JSON with rate limit information
@@ -132,7 +131,6 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_rate_limits_updated_at ON public.rate_limits;
 
-DROP INDEX IF EXISTS idx_rate_limits_window_start;
 
 DROP TABLE IF EXISTS public.rate_limits;
 

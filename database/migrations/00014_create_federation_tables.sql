@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS public.oidc_clients (
     skip_consent BOOLEAN NOT NULL DEFAULT FALSE,
     is_group_restricted BOOLEAN NOT NULL DEFAULT FALSE,
     client_type TEXT NOT NULL DEFAULT 'standard', -- 'standard' or 'cimd' (Client-ID Metadata Document)
-    metadata_url TEXT, -- CIMD: the metadata document URL a client materializes from
     metadata_expires_at TIMESTAMPTZ, -- CIMD document refresh deadline
     metadata_grant_types JSONB, -- Grant types allowed by the CIMD document
     logo_path TEXT, -- Blob path; NULL = no logo
@@ -122,7 +121,6 @@ CREATE TABLE IF NOT EXISTS public.oauth2_sessions (
     kind TEXT NOT NULL,
     key TEXT NOT NULL,
     request_id TEXT NOT NULL,
-    access_token_signature TEXT NOT NULL DEFAULT '',
     active BOOLEAN NOT NULL DEFAULT TRUE,
     request_data JSONB NOT NULL,
     -- A logout session may name no client: an RP-initiated logout
