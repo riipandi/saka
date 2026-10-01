@@ -11,13 +11,14 @@ import (
 )
 
 // viteDevURL is where the debug build's shell points the browser for its
-// assets: the Vite dev server `pnpm dev` runs. It is a development-only
-// constant, not configuration — a deployment never serves a debug binary,
-// and the release build resolves every tag from its embedded manifest.
-// The server must be running for the page's assets to load; the API calls
-// it makes stay same-origin against the Go port, which is what keeps the
-// session cookie first-party.
-const viteDevURL = "http://localhost:5173"
+// assets: the Vite dev server task dev runs on :3000. It is a
+// development-only constant, not configuration — a deployment never
+// serves a debug binary, and the release build resolves every tag from
+// its embedded manifest. The document is reachable from both origins of
+// the dev loop — this port renders it, and the devshell plugin forwards
+// the :3000 navigations here — while the API calls ride whichever origin
+// the document was served from through the dev proxies.
+const viteDevURL = "http://localhost:3000"
 
 // SetupStatic mounts the SPA surface for a debug build: every unclaimed
 // GET renders the Go shell, whose fragment points at the Vite dev server.

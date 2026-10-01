@@ -18,9 +18,9 @@ the application entry, and every path the routes above it did not claim renders 
   crawler reads is served, not fetched around
 - **Manifest-driven tags** — the release build resolves every script, stylesheet, and
   modulepreload link from `.vite/manifest.json` embedded with the binary
-- **Dev-server mode** — the debug build points the shell at the Vite dev server; the API
-  calls stay same-origin against the Go port, which keeps the session cookie first-party
-  with no dev proxy
+- **Both dev origins render the document** — the Go port (:3080) natively, the Vite port
+  (:3000) through the devshell plugin's navigation forward; the API proxies ride whichever
+  origin served the page, keeping the session cookie first-party
 - **Multi-page by contract** — one entry point owns one fragment (`Page` + the input map in
   `vite.config.ts`); a second page carries its own module, styles, and preloads, never
   another page's
@@ -47,7 +47,7 @@ flowchart TB
     end
 
     subgraph Debug build
-        V[Vite dev server :5173]
+        V[Vite dev server :3000]
     end
 
     subgraph Release build
@@ -66,7 +66,7 @@ flowchart TB
 
 | Build    | Fragment source                      | Assets served from          |
 | -------- | ------------------------------------ | --------------------------- |
-| `debug`  | the dev-server constant              | the Vite dev server         |
+| `debug`  | the dev-server constant (:3000)      | the Vite dev server         |
 | `release`| the embedded build manifest          | the embedded `web/output`   |
 
 ## Requirements
@@ -91,12 +91,14 @@ templates, then rebuilds both Go targets (debug and release) with the new output
 ### 1. Develop
 
 ```bash
-pnpm exec vite dev            # the asset server, :5173
-go run ./cmd --env-file=.env.local serve   # the document + API, :3080
+task dev
 ```
 
-Open **:3080** — the Go shell renders, its fragment loads the modules from :5173, and
-every fetch the application makes is same-origin against Go.
+The `golang` plugin builds `build/debug/tango`, starts it, and rebuilds it on every Go
+change; Vite keeps the modules and the HMR. Both origins show the application —
+**:3000** (document forwarded to Go, assets and HMR local) and **:3080** (document
+native, assets from :3000) — and the API calls ride whichever origin served the page
+through the dev proxies, so the session cookie stays first-party.
 
 ### 2. Add a Page
 
@@ -162,7 +164,7 @@ it. An entry the manifest does not name is an error, never a silent empty tag.
 | `FS`              | The Vite build output; read only in release for the manifest                |
 | `IsDev`           | Point the fragment at the dev server instead of the built assets            |
 | `ViteEntry`       | The source path the manifest names (`app/main.tsx`); empty asks for the manifest's single entry |
-| `ViteURL`         | The dev server URL (dev mode; defaults to the package constant's value)     |
+| `ViteURL`         | The dev server URL (dev mode; `SetupStatic` passes the constant)            |
 | `ViteManifest`    | The manifest path relative to `FS` (default `.vite/manifest.json`)          |
 | `ViteTemplate`    | The scaffolding whose dev preamble is injected (`ViteReact` or `ViteNone`)  |
 | `AssetsURLPrefix` | The prefix the built asset paths ride, for a deployment that keeps artifacts off the document origin |
