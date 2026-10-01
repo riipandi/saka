@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     rotated_token_hash TEXT DEFAULT NULL
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.sessions (user_id);
+-- (user_id needs no single-column index: idx_sessions_user_id_expires_at leads with it)
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions (expires_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_rotated_token_hash ON public.sessions (rotated_token_hash) WHERE rotated_token_hash IS NOT NULL;
 
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS public.known_devices (
 ) USING heap;
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON public.sessions USING btree (user_id, expires_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_ip_address ON public.sessions (ip_address) WHERE ip_address IS NOT NULL;
+-- (ip_address needs no index: no query filters sessions by it)
 CREATE INDEX IF NOT EXISTS idx_sessions_device_fingerprint ON public.sessions (device_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_sessions_impersonated_by ON public.sessions (impersonated_by) WHERE impersonated_by IS NOT NULL;
 
@@ -167,14 +167,15 @@ CREATE TABLE IF NOT EXISTS public.auth_tokens (
     )
 ) USING heap;
 
+-- (purpose needs no index: every lookup pairs it with token_hash — UNIQUE —
+-- or with user_id through idx_auth_tokens_user_id_purpose)
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens (user_id);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_purpose ON public.auth_tokens (purpose);
 -- The token_hash's UNIQUE constraint carries the lookup index; the sweep
 -- reads the expiry.
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON public.auth_tokens USING btree (expires_at);
 -- One live token per account and purpose — resend replaces. Reauthentication
 -- is excluded: several live step-up tokens per account are legitimate, the
--- same rule user_mfa_pending follows, and consumption is single-use anyway.
+-- same rule mfa_pending follows, and consumption is single-use anyway.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_tokens_user_id_purpose ON public.auth_tokens USING btree (user_id, purpose) WHERE purpose <> 'reauthentication';
 
 -- --------------------------------------------------------
@@ -287,14 +288,11 @@ DROP INDEX IF EXISTS idx_device_login_requests_expires_at;
 DROP INDEX IF EXISTS idx_signup_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
-DROP INDEX IF EXISTS idx_auth_tokens_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;
 DROP INDEX IF EXISTS idx_sessions_impersonated_by;
 DROP INDEX IF EXISTS idx_sessions_device_fingerprint;
-DROP INDEX IF EXISTS idx_sessions_ip_address;
 DROP INDEX IF EXISTS idx_sessions_user_id_expires_at;
 DROP INDEX IF EXISTS idx_sessions_expires_at;
-DROP INDEX IF EXISTS idx_sessions_user_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_group_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_id;
 DROP INDEX IF EXISTS idx_users_last_login_at;

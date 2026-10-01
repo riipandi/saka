@@ -70,28 +70,6 @@ CREATE INDEX IF NOT EXISTS idx_custom_claims_user_id ON public.custom_claims USI
 CREATE INDEX IF NOT EXISTS idx_custom_claims_user_group_id ON public.custom_claims USING btree (user_group_id);
 
 -- --------------------------------------------------------
--- Table: public.oidc_authorization_codes
--- --------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS public.oidc_authorization_codes (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    code TEXT NOT NULL UNIQUE,
-    scope TEXT NOT NULL,
-    nonce TEXT,
-    code_challenge TEXT,
-    code_challenge_method_sha256 BOOLEAN,
-    authentication_method TEXT NOT NULL DEFAULT '',
-    user_id UUID NOT NULL,
-    client_id TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMPTZ NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    FOREIGN KEY (client_id) REFERENCES public.oidc_clients(id) ON DELETE CASCADE
-) USING heap;
-
-CREATE INDEX IF NOT EXISTS idx_oidc_authorization_codes_expires_at ON public.oidc_authorization_codes USING btree (expires_at);
-
--- --------------------------------------------------------
 -- Table: public.user_authorized_oidc_clients (junction table)
 -- --------------------------------------------------------
 
@@ -134,35 +112,6 @@ CREATE TABLE IF NOT EXISTS public.user_groups_allowed_oidc_clients (
 
 CREATE INDEX IF NOT EXISTS idx_user_groups_allowed_oidc_clients_client_id
     ON public.user_groups_allowed_oidc_clients USING btree (oidc_client_id);
-
--- --------------------------------------------------------
--- Table: public.oidc_device_codes — OAuth 2.0 Device Flow (RFC 8628).
--- Device and user codes are stored as SHA-256 hashes; status drives
--- the token poll (pending → approved/denied → consumed). PAR (RFC
--- 9126) lives in oauth2_sessions with kind 'par'.
--- --------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS public.oidc_device_codes (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    device_code_hash TEXT NOT NULL UNIQUE,
-    user_code_hash TEXT NOT NULL UNIQUE,
-    scope TEXT NOT NULL,
-    resource TEXT,
-    nonce TEXT,
-    client_id TEXT NOT NULL,
-    user_id UUID,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'consumed')),
-    last_polled_at TIMESTAMPTZ DEFAULT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMPTZ NOT NULL,
-    approved_at TIMESTAMPTZ DEFAULT NULL,
-    FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    FOREIGN KEY (client_id) REFERENCES public.oidc_clients(id) ON DELETE CASCADE,
-    CONSTRAINT chk_oidc_device_codes_expiry CHECK (expires_at > created_at)
-) USING heap;
-
-CREATE INDEX IF NOT EXISTS idx_oidc_device_codes_expires_at ON public.oidc_device_codes (expires_at);
-CREATE INDEX IF NOT EXISTS idx_oidc_device_codes_status ON public.oidc_device_codes (status);
 
 -- --------------------------------------------------------
 -- Table: public.oauth2_sessions (Fosite-style OAuth 2.0 storage)
@@ -240,9 +189,6 @@ DROP INDEX IF EXISTS idx_oauth2_sessions_client_subject;
 DROP INDEX IF EXISTS idx_oauth2_sessions_expires_at;
 DROP INDEX IF EXISTS idx_oauth2_sessions_kind_request;
 DROP INDEX IF EXISTS idx_oauth2_sessions_kind_key;
-DROP INDEX IF EXISTS idx_oidc_device_codes_status;
-DROP INDEX IF EXISTS idx_oidc_device_codes_expires_at;
-DROP INDEX IF EXISTS idx_oidc_authorization_codes_expires_at;
 DROP INDEX IF EXISTS idx_user_authorized_oidc_clients_last_used_at;
 DROP INDEX IF EXISTS idx_user_groups_allowed_oidc_clients_client_id;
 DROP INDEX IF EXISTS idx_custom_claims_user_group_id;
@@ -251,11 +197,9 @@ DROP INDEX IF EXISTS idx_custom_claims_user_id;
 DROP TABLE IF EXISTS public.scim_service_providers;
 DROP TABLE IF EXISTS public.oauth2_jtis;
 DROP TABLE IF EXISTS public.oauth2_sessions;
-DROP TABLE IF EXISTS public.oidc_device_codes;
 DROP TABLE IF EXISTS public.user_groups_allowed_oidc_clients;
 DROP TABLE IF EXISTS public.oidc_clients_allowed_user_groups;
 DROP TABLE IF EXISTS public.user_authorized_oidc_clients;
-DROP TABLE IF EXISTS public.oidc_authorization_codes;
 DROP TABLE IF EXISTS public.custom_claims;
 DROP TABLE IF EXISTS public.oidc_clients;
 
