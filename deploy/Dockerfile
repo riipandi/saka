@@ -94,8 +94,8 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     go build -tags "release,noasm,nounsafe" -trimpath -buildvcs=false \
     -ldflags "-w -s \
       -X github.com/riipandi/tango/internal/config.AppVersion=${BUILD_VERSION:-dev} \
-      -X ${goModule}/internal/config.BuildHash=${BUILD_HASH} \
-      -X ${goModule}/internal/config.BuildDate=${BUILD_DATE}" \
+      -X github.com/riipandi/tango/internal/config.BuildHash=${BUILD_HASH} \
+      -X github.com/riipandi/tango/internal/config.BuildDate=${BUILD_DATE}" \
     -o build/release/$(jq -r '.name' package.json) ./cmd \
     && strip build/release/$(jq -r '.name' package.json) \
     && chmod +x build/release/$(jq -r '.name' package.json)
