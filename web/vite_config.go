@@ -34,7 +34,7 @@ type ViteConfig struct {
 	ViteURL string
 
 	// ViteManifest is the manifest path relative to FS. It defaults to
-	// ".vite/manifest.json".
+	// "assets.json", the derived copy the build writes for the embed.
 	ViteManifest string
 
 	// ViteTemplate names the frontend scaffolding whose dev preamble the

@@ -35,7 +35,7 @@ func ViteHTMLFragment(config ViteConfig) (*ViteFragment, error) {
 			return nil, fmt.Errorf("vite: the build output FS is required outside development")
 		}
 		if config.ViteManifest == "" {
-			config.ViteManifest = ".vite/manifest.json"
+			config.ViteManifest = "assets.json"
 		}
 		mf, err := config.FS.Open(config.ViteManifest)
 		if err != nil {

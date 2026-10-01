@@ -86,9 +86,19 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
 
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     NODE_ENV=production pnpm exec tsc -b --noEmit \
-    && NODE_ENV=production pnpm exec vite build \
-    && strip /srv/build/release/$(jq -r '.name' package.json) \
-    && chmod +x /srv/build/release/$(jq -r '.name' package.json)
+    && NODE_ENV=production pnpm exec vite build
+
+# The embed is compile-time: the SPA bundle and the derived assets.json the
+# Vite build wrote above must exist before the Go binary compiles.
+RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
+    go build -tags "release,noasm,nounsafe" -trimpath -buildvcs=false \
+    -ldflags "-w -s \
+      -X github.com/riipandi/tango/internal/config.AppVersion=${BUILD_VERSION:-dev} \
+      -X ${goModule}/internal/config.BuildHash=${BUILD_HASH} \
+      -X ${goModule}/internal/config.BuildDate=${BUILD_DATE}" \
+    -o build/release/$(jq -r '.name' package.json) ./cmd \
+    && strip build/release/$(jq -r '.name' package.json) \
+    && chmod +x build/release/$(jq -r '.name' package.json)
 
 # ------------------------------------------------------------------------------
 # Cleanup the builder stage and create necessary directories.
@@ -129,8 +139,10 @@ WORKDIR /srv
 USER nonroot:nonroot
 EXPOSE $SERVER_PORT/tcp
 
-# Define volumes for persistent storage and configuration.
-VOLUME /srv/storage /srv/app.config.json
+# Define volumes for persistent storage. The config file is generated into
+# the image; a deployment that overrides it bind-mounts a file, which a
+# VOLUME cannot shadow.
+VOLUME /srv/storage
 
 # Healthcheck to monitor application status
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD /srv/tango hc

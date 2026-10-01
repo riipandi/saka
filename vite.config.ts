@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { comlink } from 'vite-plugin-comlink'
@@ -43,9 +44,30 @@ const goVersionLdflags = [
  * the Go side knows: app/main.tsx is the application document, and a
  * second page adds its own key to the input map (see web.Page).
  */
+/**
+ * The manifest lives under `.vite/`, a dot directory go:embed silently
+ * skips — deliberate: the Vite-internal manifest never ships in the
+ * binary. The Go fragment instead reads this derived copy, written next
+ * to the assets after every build, so every pipeline that compiles the
+ * frontend (task build, goreleaser, Docker, CI) feeds the embed from one
+ * source.
+ */
+function manifestForEmbed() {
+  return {
+    name: 'manifest-for-embed',
+    closeBundle() {
+      const out = resolve('web/output')
+      const internal = resolve(out, '.vite/manifest.json')
+      if (!existsSync(internal)) return
+      writeFileSync(resolve(out, 'assets.json'), readFileSync(internal))
+    }
+  }
+}
+
 export default defineConfig({
   plugins: [
     comlink(),
+    manifestForEmbed(),
     email({
       templateDir: resolve('email/templates'),
       outputDir: resolve('web/email')

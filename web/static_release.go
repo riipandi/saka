@@ -15,12 +15,14 @@ import (
 	"github.com/riipandi/tango/pkg/responder"
 )
 
-//go:embed all:output
+//go:embed output
 var webFS embed.FS
 
-// OutputFS answers the embedded build output — the manifest a second
-// page's fragment resolves against, and the hashed assets the surface
-// serves. The release build is the only one that carries it.
+// OutputFS answers the embedded build output — the derived manifest the
+// fragment resolves against, and the hashed assets the surface serves.
+// The release build is the only one that carries it. Vite's own
+// `.vite/manifest.json` stays out: a dot directory is below the embed
+// pattern's floor.
 func OutputFS() fs.FS {
 	artifact, _ := fs.Sub(webFS, "output")
 	return artifact

@@ -13,7 +13,7 @@ import (
 // they import — the shape a multi-page build produces.
 func manifestFS() fstest.MapFS {
 	return fstest.MapFS{
-		".vite/manifest.json": &fstest.MapFile{Data: []byte(`{
+		"assets.json": &fstest.MapFile{Data: []byte(`{
 			"app/main.tsx": {
 				"file": "assets/app-Bq7k.css.e0f.js", "name": "app", "src": "app/main.tsx",
 				"isEntry": true, "css": ["assets/app-Bq7k.css"], "imports": ["shared/chunk.tsx"]

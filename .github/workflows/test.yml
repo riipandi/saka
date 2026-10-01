@@ -140,8 +140,12 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Mirrors `task build` (Taskfile.yml).
+      # Mirrors `task build` (Taskfile.yml): the frontend bundle and the
+      # derived assets.json land first, then both binaries embed them.
       - name: Build application binaries
-        run: pnpm exec vite build
+        run: |
+          pnpm exec vite build
+          go build -tags "debug,noasm,nounsafe" -trimpath -o build/debug/tango ./cmd
+          go build -tags "release,noasm,nounsafe" -trimpath -o build/release/tango ./cmd
         env:
           NODE_ENV: production

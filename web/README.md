@@ -17,10 +17,10 @@ the application entry, and every path the routes above it did not claim renders 
 - **Go-owned document** — `web/shell.go` renders the whole HTML document; the head a
   crawler reads is served, not fetched around
 - **Manifest-driven tags** — the release build resolves every script, stylesheet, and
-  modulepreload link from `.vite/manifest.json` embedded with the binary
-- **Both dev origins render the document** — the Go port (:3080) natively, the Vite port
-  (:3000) through the devshell plugin's navigation forward; the API proxies ride whichever
-  origin served the page, keeping the session cookie first-party
+  modulepreload link from a derived `assets.json` embedded with the binary; Vite's own
+  `.vite/manifest.json` stays out of the embed (a dot directory sits below go:embed's floor)
+- **Single-origin** — the browser talks to the Go port (:3080) only; the debug build
+  proxies the Vite compiler (modules, assets, the HMR socket) behind it
 - **Multi-page by contract** — one entry point owns one fragment (`Page` + the input map in
   `vite.config.ts`); a second page carries its own module, styles, and preloads, never
   another page's
@@ -51,7 +51,7 @@ flowchart TB
     end
 
     subgraph Release build
-        M[(embedded .vite/manifest.json)]
+        M[(embedded assets.json)]
         A[(embedded hashed assets)]
     end
 
@@ -166,7 +166,7 @@ it. An entry the manifest does not name is an error, never a silent empty tag.
 | `IsDev`           | Point the fragment at the dev server instead of the built assets            |
 | `ViteEntry`       | The source path the manifest names (`app/main.tsx`); empty asks for the manifest's single entry |
 | `ViteURL`         | The origin the same-origin paths ride (dev mode; empty means this origin)   |
-| `ViteManifest`    | The manifest path relative to `FS` (default `.vite/manifest.json`)          |
+| `ViteManifest`    | The manifest path relative to `FS` (default `assets.json`)                  |
 | `ViteTemplate`    | The scaffolding whose dev preamble is injected (`ViteReact` or `ViteNone`)  |
 | `AssetsURLPrefix` | The prefix the built asset paths ride, for a deployment that keeps artifacts off the document origin |
 
