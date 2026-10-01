@@ -20,6 +20,7 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/tango/modules/devicelogin"
 	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/webauthn"
 )
@@ -57,7 +58,15 @@ func (t CleanupTask) Config() queue.QueueConfig {
 // itself: the unconfirmed TOTP enrollments whose ceremony never completed,
 // and the sign-in bridges past their life — rows the runtime refuses on
 // read, but which hold sealed secrets until someone deletes them.
-func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Postgres) error {
+// SignupTokenSweeper is the delete the signup repository owns — the sweep's
+// purge of tokens past their expiry. It crosses as an interface because the
+// signup feature's own tests reach this package through the verification
+// dependency, and the direct import would cycle in a test build.
+type SignupTokenSweeper interface {
+	DeleteExpiredTokens(ctx context.Context, db datastore.Querier, now time.Time) (int, error)
+}
+
+func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Postgres, signupSweeper SignupTokenSweeper) error {
 	client := queue.FromContext(ctx)
 	if client == nil {
 		return errors.New("cleanup: queue client missing from context")
@@ -90,14 +99,33 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 	}
 
 	// The token rows the runtime refuses on read — the step-up proofs minted
-	// and never spent, the codes whose window closed — leave the table only
-	// through this sweep; every read already checks the expiry.
+	// and never spent, the codes whose window closed, the signup tokens and
+	// device-login requests past their expiry — leave the table only through
+	// this sweep; every read already checks the expiry.
 	swept, err := webauthn.NewRepository().DeleteExpiredTokens(ctx, pool, time.Now())
 	if err != nil {
 		return err
 	}
 	if swept > 0 {
 		slog.InfoContext(ctx, "queue: purged expired auth tokens", "tokens", swept)
+	}
+
+	if signupSweeper != nil {
+		signupSwept, sweepErr := signupSweeper.DeleteExpiredTokens(ctx, pool, time.Now())
+		if sweepErr != nil {
+			return sweepErr
+		}
+		if signupSwept > 0 {
+			slog.InfoContext(ctx, "queue: purged expired signup tokens", "tokens", signupSwept)
+		}
+	}
+
+	deviceSwept, err := devicelogin.NewRepository(pool).DeleteExpiredTokens(ctx, time.Now())
+	if err != nil {
+		return err
+	}
+	if deviceSwept > 0 {
+		slog.InfoContext(ctx, "queue: purged expired device-login requests", "requests", deviceSwept)
 	}
 
 	// The next run is queued before this one succeeds, so the schedule never

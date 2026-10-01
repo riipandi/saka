@@ -31,9 +31,9 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, signupSweeper SignupTokenSweeper, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
-		return cleanupProcessor(ctx, task, pool)
+		return cleanupProcessor(ctx, task, pool, signupSweeper)
 	}))
 	// The audit retention runs on the pool rather than through a service: it
 	// deletes rows nothing reads back, so it needs no feature to own it.

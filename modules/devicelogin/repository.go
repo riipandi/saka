@@ -3,6 +3,7 @@ package devicelogin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -124,6 +125,22 @@ func (r *Repository) ByID(ctx context.Context, id string) (Request, error) {
 	sb.Where(sb.Equal("id", id), sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()
 	return scanRequest(r.pool.QueryRow(ctx, query, args...))
+}
+
+// DeleteExpiredTokens purges device-login requests past their expiry — the
+// sweep's delete. Every read filters on a live expiry, so an expired row is
+// unreachable before this sweep removes it.
+func (r *Repository) DeleteExpiredTokens(ctx context.Context, now time.Time) (int, error) {
+	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbb.DeleteFrom(requestTable)
+	dbb.Where(dbb.LT("expires_at", now))
+
+	query, args := dbb.Build()
+	tag, err := r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("devicelogin: purge expired requests: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }
 
 // Decide stamps the approval or the denial. The WHERE holds `pending`:

@@ -29,6 +29,22 @@ func NewRepository() *Repository {
 // FindSignupTokenByHash reads the token a raw value hashes to, with the
 // groups its sign-ups join. The raw value is never stored: only the caller's
 // hash reaches this query.
+// DeleteExpiredTokens purges signup tokens past their expiry — the sweep's
+// delete. Reads refuse an expired token without removing it, so only this
+// sweep retires the dead rows.
+func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Querier, now time.Time) (int, error) {
+	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbb.DeleteFrom(SignupTokenTable)
+	dbb.Where(dbb.LT("expires_at", now))
+
+	query, args := dbb.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("signup: purge expired tokens: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 func (r *Repository) FindSignupTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (*SignupToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "usage_limit", "usage_count", "created_at", "expires_at")
