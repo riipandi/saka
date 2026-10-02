@@ -28,21 +28,30 @@ x-common: &common
 #   Client ID: test-client
 #   Client Secret: test-secret
 #   Redirect URI: http://localhost:3000/callback
+#
+# This image ships no Google provider preset, so the SSO simulation
+# runs the `custom` preset: default endpoint paths and standard
+# claims (sub, email, email_verified, name). Point a Tango `custom`
+# connection at https://localhost:3220 and let discovery fill the
+# endpoints.
 #####################################################################
 
 services:
-  ngauth-google:
+  ngauth-custom:
     <<: *common
     image: docker.io/ngauth/server:${NGAUTH_VERSION:-latest}
     platform: linux/amd64
-    hostname: ngauth-google
+    hostname: ngauth-custom
     ports: ["3220:3000"]
     volumes:
-      - "../.storage/ngauth_google_data:/app/data:rw"
+      - "../.storage/ngauth_custom_data:/app/data:rw"
       - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
     environment:
-      NGAUTH_PRESET: google
+      NGAUTH_PRESET: custom
       NGAUTH_ACCESS_TOKEN_TTL: 7200
+      NGAUTH_SUPPORT_PKCE: "true"
+      NGAUTH_SCOPE_CLAIM_NAME: scope
+      NGAUTH_SCOPE_FORMAT: string
       # https://localhost:3220/.well-known/openid-configuration
       NGAUTH_ISSUER: https://localhost:3220
       NGAUTH_DATA: /app/data
@@ -67,10 +76,10 @@ services:
       OIDC_DO_USER_INFO: false
       OIDC_TLS_VERIFY: true
     depends_on:
-      ngauth-google: { condition: service_healthy }
+      ngauth-custom: { condition: service_healthy }
 
 volumes:
-  ngauth_google_data:
+  ngauth_custom_data:
 
 networks:
   intranet:
