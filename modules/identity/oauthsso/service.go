@@ -391,7 +391,7 @@ func (s *Service) record(ctx context.Context, tx datastore.Querier, event string
 	for key, value := range payload {
 		out[key] = value
 	}
-	out["connection_id"] = FormatConnectionID(conn.ID)
+	out["connection_id"] = FormatID(conn.ID)
 	s.audit.Record(ctx, tx, audit.Entry{
 		Event:        event,
 		Trigger:      audit.TriggerUser,

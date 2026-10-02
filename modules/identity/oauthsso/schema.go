@@ -13,6 +13,7 @@
 package oauthsso
 
 import (
+	"fmt"
 	"time"
 
 	"uuid"
@@ -86,32 +87,62 @@ func (LinkedAccountIDPrefix) Prefix() string { return "olink" }
 // LinkedAccountID is the typed identifier of one row of linkedAccountTable.
 type LinkedAccountID = typeid.TypeID[LinkedAccountIDPrefix]
 
-// FormatConnectionID renders the connection's wire form. The rows the
-// database holds always carry a valid UUID, so the render cannot fail; an
-// invalid one answers the empty string, which no consumer should mistake
-// for an id.
-func FormatConnectionID(raw uuid.UUID) string {
-	id, err := typeid.FromUUID[ConnectionID](raw.String())
+// IDFromUUID wraps the connection row's UUID into the wire form. It is
+// the one direction every response takes.
+func IDFromUUID(raw uuid.UUID) (ConnectionID, error) {
+	return typeid.FromUUID[ConnectionID](raw.String())
+}
+
+// FormatID renders the wire form of a connection row's UUID. Rows read
+// from the database always carry a valid UUID, so the render cannot fail;
+// an invalid one answers the empty string, which no consumer should
+// mistake for an id.
+func FormatID(raw uuid.UUID) string {
+	id, err := IDFromUUID(raw)
 	if err != nil {
 		return ""
 	}
 	return id.String()
 }
 
-// ParseConnectionID reads the connection's wire form back. It is the
-// boundary a request crosses: an identifier that arrives without the
-// prefix names no connection, the not-found the caller refuses.
-func ParseConnectionID(wire string) (uuid.UUID, error) {
+// ParseID reads the connection's wire form back. It is the boundary a
+// request crosses: an identifier that arrives without the prefix names no
+// connection, the not-found the caller refuses.
+func ParseID(wire string) (ConnectionID, error) {
 	parsed, err := typeid.Parse[ConnectionID](wire)
+	if err != nil {
+		return ConnectionID{}, fmt.Errorf("oauthsso: %w", err)
+	}
+	return parsed, nil
+}
+
+// IDToUUID unwraps the wire form into the UUID the column stores. The
+// typed id carries the bytes itself, so nothing re-parses text to get
+// there.
+func IDToUUID(id ConnectionID) uuid.UUID {
+	return uuid.UUID(id.UUIDBytes())
+}
+
+// UUIDFromWire is the request boundary in one step: the wire form a
+// request carries in, the key the rows carry out.
+func UUIDFromWire(wire string) (uuid.UUID, error) {
+	id, err := ParseID(wire)
 	if err != nil {
 		return uuid.Nil(), err
 	}
-	return uuid.UUID(parsed.UUIDBytes()), nil
+	return IDToUUID(id), nil
 }
 
-// FormatLinkedAccountID renders the linked account's wire form.
+// LinkedAccountIDFromUUID wraps a linked account row's UUID into the wire
+// form.
+func LinkedAccountIDFromUUID(raw uuid.UUID) (LinkedAccountID, error) {
+	return typeid.FromUUID[LinkedAccountID](raw.String())
+}
+
+// FormatLinkedAccountID renders the wire form of a linked account row's
+// UUID.
 func FormatLinkedAccountID(raw uuid.UUID) string {
-	id, err := typeid.FromUUID[LinkedAccountID](raw.String())
+	id, err := LinkedAccountIDFromUUID(raw)
 	if err != nil {
 		return ""
 	}
@@ -122,7 +153,7 @@ func FormatLinkedAccountID(raw uuid.UUID) string {
 func ParseLinkedAccountID(wire string) (uuid.UUID, error) {
 	parsed, err := typeid.Parse[LinkedAccountID](wire)
 	if err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("oauthsso: %w", err)
 	}
 	return uuid.UUID(parsed.UUIDBytes()), nil
 }

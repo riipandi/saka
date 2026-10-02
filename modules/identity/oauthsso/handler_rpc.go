@@ -56,10 +56,11 @@ func (h *rpcHandler) ListConnections(ctx context.Context, req *connect.Request[a
 // GetConnection answers one connection by its identifier, secrets never
 // included.
 func (h *rpcHandler) GetConnection(ctx context.Context, req *connect.Request[authnv1.GetOAuthConnectionRequest]) (*connect.Response[authnv1.GetOAuthConnectionResponse], error) {
-	id, err := ParseConnectionID(req.Msg.Id)
+	wireID, err := ParseID(req.Msg.Id)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
 	}
+	id := IDToUUID(wireID)
 
 	conn, err := h.service.Get(ctx, id)
 	switch {
@@ -103,10 +104,11 @@ func (h *rpcHandler) CreateConnection(ctx context.Context, req *connect.Request[
 
 // UpdateConnection rewrites one connection's editable fields.
 func (h *rpcHandler) UpdateConnection(ctx context.Context, req *connect.Request[authnv1.UpdateOAuthConnectionRequest]) (*connect.Response[authnv1.UpdateOAuthConnectionResponse], error) {
-	id, err := ParseConnectionID(req.Msg.Id)
+	wireID, err := ParseID(req.Msg.Id)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
 	}
+	id := IDToUUID(wireID)
 
 	conn, err := h.service.Update(ctx, id, updateOf(req.Msg))
 	switch {
@@ -135,10 +137,11 @@ func (h *rpcHandler) UpdateConnection(ctx context.Context, req *connect.Request[
 
 // DeleteConnection removes one connection and everything that rode it.
 func (h *rpcHandler) DeleteConnection(ctx context.Context, req *connect.Request[authnv1.DeleteOAuthConnectionRequest]) (*connect.Response[authnv1.DeleteOAuthConnectionResponse], error) {
-	id, err := ParseConnectionID(req.Msg.Id)
+	wireID, err := ParseID(req.Msg.Id)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
 	}
+	id := IDToUUID(wireID)
 
 	err = h.service.Delete(ctx, id)
 	switch {
@@ -246,7 +249,7 @@ func wireMapping(msg *authnv1.OAuthAttributeMapping) AttributeMapping {
 // it sealed, and no answer ever carries it at all.
 func wireConnection(conn Connection) *authnv1.OAuthConnection {
 	out := &authnv1.OAuthConnection{
-		Id:           FormatConnectionID(conn.ID),
+		Id:           FormatID(conn.ID),
 		Kind:         string(conn.Kind),
 		Provider:     conn.Provider,
 		DisplayName:  conn.DisplayName,
