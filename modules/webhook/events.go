@@ -139,6 +139,15 @@ var catalog = []Event{
 	{Source: audit.EventWebhookDeleted, Name: "webhook.endpoint_deleted", Description: "A webhook endpoint was removed."},
 	{Source: audit.EventWebhookSecretRotated, Name: "webhook.secret_rotated", Description: "A webhook endpoint's signing secret was replaced."},
 	{Source: audit.EventWebhookTested, Name: "webhook.tested", Description: "A test delivery was queued to one webhook endpoint."},
+
+	{Source: audit.EventQueueTaskCancelled, Name: "queue.task_cancelled", Description: "A queued task was cancelled by an administrator."},
+	{Source: audit.EventQueueDeadReplayed, Name: "queue.dead_replayed", Description: "A queue's dead-letter tasks were replayed by an administrator."},
+	{Source: audit.EventQueuePendingFlushed, Name: "queue.pending_flushed", Description: "A queue's pending tasks were flushed by an administrator."},
+	{Source: audit.EventQueueCompletedFlushed, Name: "queue.completed_flushed", Description: "A queue's finished tasks were flushed by an administrator."},
+	{Source: audit.EventSchedulerJobRunNow, Name: "scheduler.job_run_now", Description: "A scheduled job was run on demand by an administrator."},
+
+	{Source: audit.EventPasswordAdded, Name: "user.password_added", Description: "An account's first password credential was set by its holder."},
+	{Source: audit.EventWebauthnReauthenticationCodeSent, Name: "session.reauthentication_code_sent", Description: "A reverification code was handed to the mail queue."},
 	{Name: EventTest, Description: "A test delivery was sent, at the operator's command — no record caused it."},
 }
 
