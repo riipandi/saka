@@ -15,7 +15,7 @@ x-common: &common
 
 include:
   - ./compose-dev.yaml
-  # - ./compose-mock.yaml
+  - ./compose-mock.yaml
   - ./compose-sre.yaml
 
 #####################################################################
