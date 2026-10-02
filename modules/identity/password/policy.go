@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -252,20 +253,39 @@ type BreachChecker struct {
 	apiKey string
 	// userAgent is the deployment's product token, the acceptable-use rule.
 	userAgent string
+	// rangeURL is the corpus endpoint. The production value is the const;
+	// the field exists so a test can answer from its own server.
+	rangeURL string
+	// budget bounds one corpus call. A dead upstream must cost the caller
+	// seconds, not a sign-up-length stall: the deadline trips, the caller
+	// fails open, and the breaker takes over the fast-failing after that.
+	budget time.Duration
 }
 
 // The range API's endpoint. The range path is the SHA-1 prefix; the body
 // answers the suffixed counts.
 const breachRangeURL = "https://api.pwnedpasswords.com/range/"
 
+// breachCheckBudget is the default one-call deadline. The range API answers
+// in well under a second when it is healthy; anything longer reads as an
+// outage, and the caller's fail-open is cheaper than the wait.
+const breachCheckBudget = 5 * time.Second
+
 // NewBreachChecker builds the corpus checker over the shared outbound
 // client. A nil fetcher is the optional feature's off state — the checker
-// answers unavailable without dialling anything.
+// answers unavailable without dialling anything. The account key is not a
+// switch: the range API is unauthenticated, so an empty key only means the
+// header stays off the wire.
 func NewBreachChecker(fetch *fetcher.Client, apiKey, userAgent string) *BreachChecker {
 	if fetch == nil {
 		return &BreachChecker{}
 	}
-	checker := &BreachChecker{fetch: fetch, apiKey: apiKey}
+	checker := &BreachChecker{
+		fetch:    fetch,
+		apiKey:   apiKey,
+		rangeURL: breachRangeURL,
+		budget:   breachCheckBudget,
+	}
 	if userAgent != "" {
 		checker.userAgent = userAgent
 	}
@@ -274,7 +294,9 @@ func NewBreachChecker(fetch *fetcher.Client, apiKey, userAgent string) *BreachCh
 
 // Count answers how many times the corpus has seen the credential. A checker
 // with no client is the off state: the error says "unavailable", never
-// "breached", and the caller fails open.
+// "breached", and the caller fails open. The call rides the checker's
+// budget, not the caller's patience: retries and backoff live under this
+// deadline, so the worst an unreachable corpus costs is the budget itself.
 func (b *BreachChecker) Count(ctx context.Context, clearText string) (int32, error) {
 	if b == nil || b.fetch == nil {
 		return 0, errors.New("password: no breach checker is configured")
@@ -292,9 +314,12 @@ func (b *BreachChecker) Count(ctx context.Context, clearText string) (int32, err
 		headers.Set("HIBP-Account-Key", b.apiKey)
 	}
 
-	res, err := b.fetch.Do(ctx, fetcher.Request{
+	callCtx, cancel := context.WithTimeout(ctx, b.budget)
+	defer cancel()
+
+	res, err := b.fetch.Do(callCtx, fetcher.Request{
 		Method:  http.MethodGet,
-		URL:     breachRangeURL + prefix,
+		URL:     b.rangeURL + prefix,
 		Headers: headers,
 	})
 	if err != nil {

@@ -291,9 +291,10 @@ var Package = do.Package(
 	// breach corpus ride together, so every consumer — sign-up, the
 	// administrator's create, the recovery flows, the sign-in flag — sees
 	// the same rules. The corpus rides the shared outbound client (its
-	// circuit breaker is the dead-upstream answer), and the checker is the
-	// optional feature: an unfetched client or an absent key leaves the
-	// corpus off, the policy's other rules unmoved.
+	// circuit breaker is the dead-upstream answer). The range API is
+	// unauthenticated, so the account key only becomes a request header
+	// when a deployment sets one; the feature's own switch is the
+	// `password.reject_compromised` setting.
 	do.Lazy(func(i do.Injector) (*password.Validator, error) {
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)

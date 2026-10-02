@@ -93,8 +93,9 @@ type Auth struct {
 	// HIBPAPIKey is the Have I Been Pwned account key. The password checks
 	// never need it — the range API's k-anonymity is unauthenticated — so
 	// the key only becomes load-bearing when a deployment calls the
-	// account-level endpoints itself. An empty value is the optional
-	// feature's off state.
+	// account-level endpoints itself. An empty value does not turn the
+	// corpus check off: the check rides `password.reject_compromised` and
+	// answers without the header.
 	HIBPAPIKey string `koanf:"hibp_api_key" json:"hibp_api_key"`
 	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
 	// default, the way the upstream feature ships: a mailer that reaches
