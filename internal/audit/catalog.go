@@ -72,6 +72,7 @@ var catalog = []Event{
 	{EventUserUnbanned, "An account's ban was lifted."},
 	{EventPasswordResetEmailSent, "A password reset message was submitted for delivery."},
 	{EventPasswordReset, "A credential was replaced through a reset token."},
+	{EventPasswordAdded, "An account's first password credential was set by its holder."},
 	{EventSigninBreachedPassword, "A session opened on a credential the breach corpus knows — flagged for a forced change, not refused."},
 	{EventTestEmailSent, "The deployment's smoke message was submitted for delivery."},
 	{EventSettingUpdated, "A database-backed setting override was written."},

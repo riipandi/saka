@@ -73,6 +73,12 @@ type Service struct {
 	// same question for the mail side.
 	sessions sessionEnder
 
+	// passwords is the credential side's seam the add-password procedure
+	// rides: the hash, the policy, and the notice are the password
+	// feature's writes. Nil until the area wires it; a nil seam answers
+	// the refusal the unwired surface always earned.
+	passwords passwordSetter
+
 	// notify queues the ban notifications. It is nil where the queue is
 	// absent — a ban still writes, only without a message.
 	notify banNotifier
@@ -597,6 +603,22 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	return filled, nil
 }
 
+// passwordSetter is the credential side's seam: the add-password procedure
+// is the credential feature's write — the hash, the policy judgment, the
+// receipt — mounted on the account surface the caller speaks to. The
+// password package satisfies it; a direct import back would cycle.
+type passwordSetter interface {
+	AddPassword(ctx context.Context, userID uuid.UUID, clearText string) error
+}
+
+// WithPasswordSetter wires the credential side's seam. Called after
+// construction, the way the ban's side effects are: the password feature is
+// built beside this one.
+func (s *Service) WithPasswordSetter(setter passwordSetter) *Service {
+	s.passwords = setter
+	return s
+}
+
 // DeleteMyAccount removes the signed-in account itself. The gate is the
 // global setting with the account's override answering for it — and a gate
 // that refuses, or a subject that names no account, earns the same
@@ -643,6 +665,25 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 		})
 		return nil
 	})
+}
+
+// ErrCredentialUnwired is the add-password procedure's state a bare wiring
+// is in: no credential side is mounted, so the write has nowhere to go.
+var ErrCredentialUnwired = errors.New("user: the credential side is not wired")
+
+// AddPassword sets the signed-in account's first credential. The proof is
+// the step-up header the guard consumed; the write is the credential
+// feature's — the policy, the hash, the receipt — through the seam the area
+// wired.
+func (s *Service) AddPassword(ctx context.Context, subject, clearText string) error {
+	if s.passwords == nil {
+		return ErrCredentialUnwired
+	}
+	userID, err := parseWire(subject)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	return s.passwords.AddPassword(ctx, userID, clearText)
 }
 
 // ListUsers answers one page of the accounts, newest first, optionally

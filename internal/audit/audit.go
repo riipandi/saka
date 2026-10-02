@@ -263,6 +263,11 @@ const (
 	// the live sessions, so a reader sees the blast radius.
 	EventPasswordReset = "password_reset"
 
+	// EventPasswordAdded is an account's first credential set through the
+	// self-service flow — the proof rode the step-up header, and the
+	// record commits in the transaction that inserts the hash.
+	EventPasswordAdded = "password_added"
+
 	// EventSigninBreachedPassword is a session that opened on a credential
 	// the breach corpus knows — the flag-and-force-change answer, not a
 	// refusal: a rejection here is an oracle and locks a breached account

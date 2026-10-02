@@ -55,6 +55,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(identityv1connect.UserServiceGetCurrentUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceUpdateCurrentUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceDeleteMyAccountProcedure, handler)
+	r.Handle(identityv1connect.UserServiceAddPasswordProcedure, handler)
 	r.Handle(identityv1connect.UserServiceBanUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceUnbanUserProcedure, handler)
 }
@@ -300,8 +301,28 @@ func (h *rpcHandler) DeleteMyAccount(ctx context.Context, req *connect.Request[i
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.DeleteMyAccountResponse{
+		Status: responder.StatusSuccess, Message: "the account was deleted",
+	}), nil
+}
+
+// AddPassword sets the caller's first password credential. The proof rode
+// the X-Tango-Reauthentication header the guard consumed; the impersonating
+// administrator is refused at the boundary — the account's credential is
+// not a delegate's choice.
+func (h *rpcHandler) AddPassword(ctx context.Context, req *connect.Request[identityv1.AddPasswordRequest]) (*connect.Response[identityv1.AddPasswordResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
+	}
+	if err := h.service.AddPassword(ctx, caller.UserID, req.Msg.NewPassword); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.AddPasswordResponse{
 		Status:  responder.StatusSuccess,
-		Message: "the account was deleted",
+		Message: "the password was added",
 	}), nil
 }
 
@@ -353,6 +374,10 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown user group"))
 	case errors.Is(err, ErrPicturesUnavailable):
 		return connect.NewError(connect.CodeUnavailable, errors.New("picture storage is not available"))
+	case errors.Is(err, password.ErrPasswordSet):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account already holds a password"))
+	case errors.Is(err, ErrCredentialUnwired):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the credential side is not available"))
 	case isPasswordPolicy(err):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:

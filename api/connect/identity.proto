@@ -115,6 +115,15 @@ service UserService {
   // die with their foreign keys, and the record names the account.
   rpc DeleteMyAccount(DeleteMyAccountRequest) returns (DeleteMyAccountResponse);
 
+  // AddPassword sets the signed-in account's first password credential —
+  // the self-service an account created without one holds. The proof is
+  // the step-up token the guard consumes from the X-Tango-Reauthentication
+  // header; an account that already holds a password is refused, because
+  // changing one is a different procedure with its own proof. The password
+  // must meet the account's policy; the strength floor is the frontend's
+  // to show, the backend judges the length and the character rules.
+  rpc AddPassword(AddPasswordRequest) returns (AddPasswordResponse);
+
   // BanUser applies a ban to the named account: the start instant is now,
   // the reason is required, and the expiry is optional — absent, the ban
   // never lifts by itself. Every live session the account holds is ended in
@@ -898,6 +907,21 @@ message DeleteMyAccountRequest {
 
 // DeleteMyAccountResponse answers the removal the caller asked for.
 message DeleteMyAccountResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
+}
+
+// AddPasswordRequest carries the new credential only: the proof rode the
+// header, and the account is the token's subject.
+message AddPasswordRequest {
+  // new_password is the clear-text credential, judged by the account's
+  // policy at the service — the proto's floor stays at one character so
+  // the settings own the real bound.
+  string new_password = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message AddPasswordResponse {
   // status and message are the shared envelope's fields.
   string status = 1;
   string message = 2;

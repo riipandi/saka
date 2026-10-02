@@ -427,6 +427,72 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 	})
 }
 
+// ErrPasswordSet is the refusal for a first-credential set on an account
+// that already holds one: the change flow is a different procedure, and the
+// add must not become an overwrite that skips the current-password proof.
+var ErrPasswordSet = errors.New("password: the account already holds a password")
+
+// AddPassword sets an account's first credential — the self-service an
+// account created without a password holds. The proof is the step-up token
+// the guard consumed before this ran; the write carries the same policy the
+// sign-up and the reset judge (min length, the char rules, the breach
+// corpus), and the record commits in the hash's transaction. The notice
+// rides the same best-effort enqueue the reset's receipt keeps.
+func (s *Service) AddPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
+	if err := s.validatePassword(ctx, newPassword); err != nil {
+		return err
+	}
+
+	// The precondition reads before the KDF runs: an account that already
+	// holds a credential learns the refusal cheaply.
+	current, err := s.repo.FindPasswordHash(ctx, s.pool, userID)
+	if err != nil {
+		return err
+	}
+	if current != "" {
+		return ErrPasswordSet
+	}
+
+	account, err := s.repo.FindUserByID(ctx, s.pool, userID)
+	if err != nil {
+		return err
+	}
+	if account.Disabled || bannedNow(account, s.now()) {
+		return ErrAccountForbidden
+	}
+
+	hash, err := s.hasher(newPassword)
+	if err != nil {
+		return fmt.Errorf("password: hash: %w", err)
+	}
+
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if setErr := s.repo.SetPasswordHash(ctx, tx, userID, hash); setErr != nil {
+			return setErr
+		}
+		// The hash and the record commit together: a credential that reads
+		// as added has a record saying so.
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventPasswordAdded,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+		})
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// The receipt goes out after the commit — a notice about an add that
+	// rolled back would be a lie. The enqueue is best-effort, the way the
+	// reset's receipt is.
+	return s.enqueuer.EnqueuePasswordChangedNotice(ctx, ChangedNotice{
+		UserID:      userID.String(),
+		Email:       account.Email,
+		DisplayName: account.DisplayName,
+	})
+}
+
 // revokeInTx ends the live sessions inside the caller's transaction. A nil
 // ender (tests) skips the coupling; the count stays zero.
 func (s *Service) revokeInTx(ctx context.Context, tx datastore.Querier, userID uuid.UUID) (int, error) {
