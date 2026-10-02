@@ -338,13 +338,6 @@ var Package = do.Package(
 		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
 			service.WithSettings(settings)
 		}
-		// The add-password procedure's write side is the credential
-		// feature's, wired behind the seam — the hash, the policy, and the
-		// receipt are not this package's to own. A nil seam answers the
-		// unavailable refusal.
-		if passwords := do.MustInvoke[*password.Service](i); passwords != nil {
-			service.WithPasswordSetter(passwords)
-		}
 		return service, nil
 	}),
 
@@ -493,6 +486,14 @@ var Package = do.Package(
 			WithUUIDDecoder(user.UUIDFromWire)
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
+		}
+		// The add-password procedure's write side is this service's, wired
+		// behind the account surface's seam here rather than in the user
+		// provider: the user service must not depend on the credential one
+		// to construct — session builds over user, and password over
+		// session, so wiring it here is what keeps the graph a line.
+		if users := do.MustInvoke[*user.Service](i); users != nil {
+			users.WithPasswordSetter(service)
 		}
 		return service, nil
 	}),

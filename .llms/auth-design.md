@@ -13,11 +13,6 @@ Keep this document as simple as possible!
 - [x] **Sign-in with email**: Allow users to sign in with their email address (default: true)
   - Email verification code: Users can sign-in with an email verification code
 
-### Phone (deferred)
-
-- [ ] **Sign-up with phone**: Allow users to sign up with a phone number (default: false)
-- [ ] **Sign-in with phone**: Allow users to sign in with a phone number (default: false)
-
 ### Username
 
 - [x] **Sign-up with username**: Allow users to add a username during sign-up (default: false)
@@ -55,6 +50,11 @@ Keep this document as simple as possible!
 - [x] **Allow users to change their email address** (default: true)
 - [x] **Allow users to change their username** (default: true)
 
+### Phone (deferred)
+
+- [ ] **Sign-up with phone**: Allow users to sign up with a phone number (default: false)
+- [ ] **Sign-in with phone**: Allow users to sign in with a phone number (default: false)
+
 ---
 
 ## SSO Connections
@@ -70,6 +70,7 @@ Keep this document as simple as possible!
 ### MFA strategies
 
 - [ ] **SMS verification code**: Send the user a one-time verification code via SMS (default: false)
+- [ ] **WhatsApp verification code**: Send the user a one-time verification code via WhatsApp (default: false)
 - [x] **Authenticator application**: Allow users to add an authenticator application to retrieve a TOTP code from a service such as Google Authenticator (default: false)
 - [x] **Backup codes**: Generate a list of unique codes a user can save and use once (default: false)
 
