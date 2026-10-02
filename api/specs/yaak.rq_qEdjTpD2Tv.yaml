@@ -2,11 +2,11 @@ type: http_request
 model: http_request
 id: rq_qEdjTpD2Tv
 createdAt: 2026-10-02T20:13:16.187442
-updatedAt: 2026-10-02T20:13:16.187442
+updatedAt: 2026-10-02T23:46:01.691740
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_TofiUEyN5c
 authentication: {}
-authenticationType: null
+authenticationType: none
 body:
   bodyType: application/json
   text: |-
