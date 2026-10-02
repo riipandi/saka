@@ -100,6 +100,12 @@ const (
 	// enrollment only: lowering the limit never unregisters a device.
 	SettingMFAMaxEnrollments = "mfa.max_enrollments"
 
+	// SettingOAuthSsoAccountLinkingEnabled decides whether an OAuth
+	// sign-in links the provider identity into the account its verified
+	// email names. Off, a provider identity only ever signs in through a
+	// row it was bound by before; the linking is never automatic.
+	SettingOAuthSsoAccountLinkingEnabled = "oauthsso.account_linking_enabled"
+
 	// SettingPasskeyMaxCredentials caps the passkeys one account may hold,
 	// counted separately from the TOTP devices.
 	SettingPasskeyMaxCredentials = "passkey.max_credentials"
@@ -263,6 +269,11 @@ func Catalog() []SettingDef {
 			Default:     "10",
 			Public:      true,
 			Description: "How many second factors one account may hold — TOTP devices and passkeys together. Enforcement is at enrollment only: lowering the limit never unregisters an existing device.",
+		},
+		{
+			Key:         SettingOAuthSsoAccountLinkingEnabled,
+			Default:     "true",
+			Description: "Whether an OAuth sign-in links the provider identity into the account its verified email names. Off, a provider identity only ever signs in through a link it was bound by before.",
 		},
 		{
 			Key:         SettingPasskeyMaxCredentials,

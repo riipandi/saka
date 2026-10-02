@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_hwFNj8V27S
+createdAt: 2026-10-02T20:13:25.615370
+updatedAt: 2026-10-02T20:13:25.615370
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication:
+  bearer:
+    token: ${[ accessToken ]}
+  type: bearer
+authenticationType: null
+body:
+  bodyType: application/json
+  text: '{}'
+bodyType: null
+description: 'The operator''s view over every configured connection, builtin and custom, in slug order. Secrets are never answered. Guard: admin.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] List OAuth connections'
+sortPriority: 913.3333333333331
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/ListConnections
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

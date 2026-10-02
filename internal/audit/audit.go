@@ -455,6 +455,40 @@ const (
 	// EventSchedulerJobRunNow is a job's task enqueued on demand, without
 	// advancing the job's schedule. The record names the job's wire identity.
 	EventSchedulerJobRunNow = "scheduler_job_run_now"
+
+	// EventOauthSsoConnectionCreated is a provider connection that did not
+	// exist now does. The payload names the provider slug; the client
+	// secret never rides a record.
+	EventOauthSsoConnectionCreated = "oauthsso_connection_created"
+
+	// EventOauthSsoConnectionUpdated is a connection's fields rewritten.
+	// The payload names the slug; a secret replacement changes no record —
+	// the row's own updated_at tells that story.
+	EventOauthSsoConnectionUpdated = "oauthsso_connection_updated"
+
+	// EventOauthSsoConnectionDeleted is a connection removed. The payload
+	// names the slug and the reader cannot reconstruct the row.
+	EventOauthSsoConnectionDeleted = "oauthsso_connection_deleted"
+
+	// EventOauthSsoSignIn is a session opened by a provider identity that
+	// was bound before — the linked account resolved and the second
+	// factor, when the account keeps one, answered.
+	EventOauthSsoSignIn = "oauthsso_sign_in"
+
+	// EventOauthSsoAccountCreated is an account the OAuth flow provisioned
+	// — the provider's verified email named an account that did not exist,
+	// and the access mode allowed the creation.
+	EventOauthSsoAccountCreated = "oauthsso_account_created"
+
+	// EventOauthSsoAccountLinked is a provider identity bound into an
+	// account it did not ride before, on the strength of the verified
+	// email or the spent code.
+	EventOauthSsoAccountLinked = "oauthsso_account_linked"
+
+	// EventOauthSsoAccountUnlinked is a provider identity removed from an
+	// account — by its holder or by an administrator. The payload names
+	// the connection and the provider account id.
+	EventOauthSsoAccountUnlinked = "oauthsso_account_unlinked"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

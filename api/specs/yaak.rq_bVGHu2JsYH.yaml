@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_bVGHu2JsYH
+createdAt: 2026-10-02T20:13:25.807804
+updatedAt: 2026-10-02T20:13:25.807804
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication:
+  bearer:
+    token: ${[ accessToken ]}
+  type: bearer
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "id": "oconn_"
+    }
+bodyType: null
+description: 'Removes a connection and, through the foreign keys, the linked accounts and the live flows that rode it. Guard: admin.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Delete OAuth connection'
+sortPriority: 917.7777777777778
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

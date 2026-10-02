@@ -1,0 +1,57 @@
+type: http_request
+model: http_request
+id: rq_i2RohLBcqR
+createdAt: 2026-10-02T20:13:25.706650
+updatedAt: 2026-10-02T20:13:25.706650
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication:
+  bearer:
+    token: ${[ accessToken ]}
+  type: bearer
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "kind": "custom",
+      "provider": "hogwarts-sso",
+      "display_name": "Hogwarts SSO",
+      "discovery_url": "https://sso.hogwarts.example/.well-known/openid-configuration",
+      "client_id": "",
+      "client_secret": ""
+    }
+bodyType: null
+description: 'Registers a connection. A custom kind carries its discovery URL or all four manual endpoints — the discovery document is fetched and validated before the row is written; a builtin kind carries neither. The client secret is stored sealed and never answered back. Guard: admin.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] Create OAuth connection'
+sortPriority: 915.5555555555557
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/CreateConnection
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

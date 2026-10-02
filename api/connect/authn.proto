@@ -1010,3 +1010,428 @@ message DecideDeviceLoginResponse {
   // message is the human-readable sentence describing what the call did.
   string message = 2;
 }
+
+// OAuthSSOService is the sign-in-with-a-provider surface: the builtin
+// Google and GitHub connections and the operator-configured custom OIDC
+// ones. The service is tango-only — upstream Pocket ID never signed an
+// account in through an external identity provider.
+//
+// The flow is a browser round trip: BeginSignIn answers the provider's
+// authorize URL the browser navigates to, the provider returns the browser
+// to the callback route (a REST surface beside the procedures, declared in
+// the guard's route table), and the resolution there either opens the
+// session or pauses the flow in a stage the client finishes here — the
+// email code, or the names the provider did not supply. The flow token is
+// the credential a paused stage is finished with; the caller that holds no
+// access token yet is exactly the caller these procedures serve.
+//
+// An account keeps several linked connections, and the linking rule is the
+// verified email: a provider-verified address links into the account that
+// holds it, an unverified one must prove itself with an email code first.
+service OAuthSSOService {
+  // BeginSignIn opens the authorization-code flow for the named connection:
+  // it writes the flow row — state, nonce, PKCE verifier — and answers the
+  // authorize URL the browser is sent to. An unknown or disabled connection
+  // answers not_found, the same answer an error elsewhere carries, so the
+  // endpoint is not a connection enumerator.
+  rpc BeginSignIn(BeginOAuthSignInRequest) returns (BeginOAuthSignInResponse);
+
+  // ContinueSignIn completes a flow the callback paused in a stage that
+  // needed more from the caller — the given and family names the provider
+  // did not supply, or nothing else when the stage only waited for this
+  // call. The flow token is the whole credential: the caller carries no
+  // access token, the same way the second-factor and email-verification
+  // completes are judged. The answer is the token pair, or the MFA bridge
+  // when the account keeps a confirmed second factor — the same shape the
+  // password sign-in pauses with.
+  rpc ContinueSignIn(ContinueOAuthSignInRequest) returns (CompleteSignInResponse);
+
+  // ListConnections is the operator's view over every configured
+  // connection, builtin and custom. Secrets are never answered.
+  rpc ListConnections(ListOAuthConnectionsRequest) returns (ListOAuthConnectionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetConnection reads one connection by its identifier. Secrets are
+  // never answered.
+  rpc GetConnection(GetOAuthConnectionRequest) returns (GetOAuthConnectionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateConnection registers a connection. A custom connection carries
+  // its discovery URL or its manual endpoints; the discovery document is
+  // fetched and validated before the row is written. Builtin kinds take
+  // only their credentials — the endpoints are the code's own.
+  rpc CreateConnection(CreateOAuthConnectionRequest) returns (CreateOAuthConnectionResponse);
+
+  // UpdateConnection rewrites a connection's editable fields. The client
+  // secret is replaced only when the request carries a new one; an empty
+  // field keeps the stored secret.
+  rpc UpdateConnection(UpdateOAuthConnectionRequest) returns (UpdateOAuthConnectionResponse);
+
+  // DeleteConnection removes a connection and, through the foreign keys,
+  // the linked accounts and the live flows that rode it.
+  rpc DeleteConnection(DeleteOAuthConnectionRequest) returns (DeleteOAuthConnectionResponse);
+
+  // ListLinkedConnections answers the calling account's own linked
+  // connections: which providers it holds, under which connection, since
+  // when. The account is the claims' subject; the request names nothing.
+  rpc ListLinkedConnections(ListLinkedConnectionsRequest) returns (ListLinkedConnectionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UnlinkConnection removes one of the calling account's linked
+  // connections. Unlinking the last credential of an account that keeps
+  // no password and no passkey is refused until a password is set — an
+  // account with no way back in cannot be created by its holder's hand.
+  rpc UnlinkConnection(UnlinkConnectionRequest) returns (UnlinkConnectionResponse);
+}
+
+// ---- OAuth SSO: the flow ----
+
+// BeginOAuthSignInRequest names the connection the sign-in runs over.
+message BeginOAuthSignInRequest {
+  // connection is the connection's provider slug: `google`, `github`, or
+  // a custom connection's own slug.
+  string connection = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// BeginOAuthSignInResponse is the provider's authorize URL. The browser
+// navigates to it; the flow row it was minted for rests server-side.
+message BeginOAuthSignInResponse {
+  // authorize_url is the absolute URL the browser is redirected to.
+  string authorize_url = 1;
+
+  // status is the outcome word the client checks — success; a failure
+  // never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ContinueOAuthSignInRequest finishes a paused flow: the names the provider
+// did not supply. An account whose only pause was the names stage answers
+// immediately; the flow token is the credential the stage is judged by.
+message ContinueOAuthSignInRequest {
+  // flow_token is the handle the paused flow answers — the value the
+  // callback redirected the browser back with.
+  string flow_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // given_name is the account's given name, collected by the client.
+  string given_name = 2 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 128
+  }];
+
+  // family_name is the account's family name, collected by the client.
+  string family_name = 3 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 128
+  }];
+}
+
+// ---- OAuth SSO: the connection administration ----
+
+// OAuthConnection is one configured provider connection. The secret is
+// never carried — the responses read the row without it.
+message OAuthConnection {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1;
+
+  // kind is `builtin` (the endpoints are the code's own) or `custom`.
+  string kind = 2;
+
+  // provider is the connection's slug: `google`, `github`, or a custom
+  // connection's own word. One connection per slug.
+  string provider = 3;
+
+  // display_name is the name the sign-in page renders.
+  string display_name = 4;
+
+  // enabled connections accept new sign-ins; a disabled one answers
+  // not_found at BeginSignIn while keeping its linked accounts intact.
+  bool enabled = 5;
+
+  // discovery_url is the custom connection's OIDC discovery document —
+  // set when the endpoints are discovered, empty when they are manual.
+  string discovery_url = 6;
+
+  // endpoints are the custom connection's manual endpoints, empty for a
+  // builtin connection and for a discovered custom one.
+  OAuthEndpoints endpoints = 7;
+
+  // client_id is the credential the provider issued, public by protocol.
+  string client_id = 8;
+
+  // scopes are the space-separated scopes the authorize request asks for.
+  string scopes = 9;
+
+  // attribute_mapping is the custom connection's claim mapping — which
+  // userinfo or id_token claim answers the account's email and names.
+  OAuthAttributeMapping attribute_mapping = 10;
+
+  // created_at is when the connection was registered.
+  google.protobuf.Timestamp created_at = 11;
+
+  // updated_at is when the connection was last rewritten.
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// OAuthEndpoints are the manual endpoints a custom connection carries when
+// it does not ride a discovery document.
+message OAuthEndpoints {
+  // authorization is the provider's authorization endpoint.
+  string authorization = 1;
+
+  // token is the provider's token endpoint.
+  string token = 2;
+
+  // userinfo is the provider's userinfo endpoint, when the claims come
+  // from the userinfo response rather than the id_token.
+  string userinfo = 3;
+
+  // jwks is the provider's key set, the document the id_token is
+  // verified against.
+  string jwks = 4;
+}
+
+// OAuthAttributeMapping names which provider claims answer the account's
+// fields on a custom connection. Every field is optional — an unset field
+// keeps the default claim name.
+message OAuthAttributeMapping {
+  // email is the claim the account's address is read from. The default is
+  // `email`.
+  string email = 1;
+
+  // given_name is the claim the account's given name is read from. The
+  // default is `given_name`.
+  string given_name = 2;
+
+  // family_name is the claim the account's family name is read from. The
+  // default is `family_name`.
+  string family_name = 3;
+}
+
+// ListOAuthConnectionsRequest is empty: the listing answers every
+// connection, the way the operator's screens read them.
+message ListOAuthConnectionsRequest {}
+
+// ListOAuthConnectionsResponse carries the connections in slug order.
+message ListOAuthConnectionsResponse {
+  // connections are the configured connections, secrets never included.
+  repeated OAuthConnection connections = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// GetOAuthConnectionRequest names the connection by its identifier.
+message GetOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetOAuthConnectionResponse is the connection, secrets never included.
+message GetOAuthConnectionResponse {
+  // connection is the named connection.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateOAuthConnectionRequest registers a connection. A custom kind must
+// carry its discovery URL or all four manual endpoints; a builtin kind
+// must carry neither. The client secret is stored sealed.
+message CreateOAuthConnectionRequest {
+  // kind is `builtin` or `custom`.
+  string kind = 1 [(buf.validate.field).string = {
+    in: [
+      "builtin",
+      "custom"
+    ]
+  }];
+
+  // provider is the connection's slug: the builtin word for a builtin
+  // kind, the custom connection's own word otherwise.
+  string provider = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+
+  // display_name is the name the sign-in page renders.
+  string display_name = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 128
+  ];
+
+  // discovery_url is the custom connection's OIDC discovery document.
+  // Empty when the endpoints are manual, and always empty for a builtin
+  // kind.
+  string discovery_url = 4;
+
+  // endpoints are the manual endpoints, carried when the discovery URL
+  // is empty and the kind is custom.
+  OAuthEndpoints endpoints = 5;
+
+  // client_id is the credential the provider issued.
+  string client_id = 6 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 256
+  ];
+
+  // client_secret is the credential's other half, stored sealed. It is
+  // never answered back by any read.
+  string client_secret = 7 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 512
+  ];
+
+  // scopes are the space-separated scopes the authorize request asks
+  // for; empty keeps the connection's default set.
+  string scopes = 8;
+
+  // attribute_mapping is the custom connection's claim mapping.
+  OAuthAttributeMapping attribute_mapping = 9;
+
+  // enabled registers the connection live; the default is false.
+  optional bool enabled = 10;
+}
+
+// CreateOAuthConnectionResponse is the stored connection, secrets never
+// included.
+message CreateOAuthConnectionResponse {
+  // connection is the connection as the row now holds it.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateOAuthConnectionRequest rewrites a connection's editable fields.
+// Every field is optional; an unset field keeps the stored value, and a
+// new client secret is carried only when the stored one is being replaced.
+message UpdateOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // display_name is the name the sign-in page renders.
+  optional string display_name = 2;
+
+  // discovery_url is the custom connection's OIDC discovery document;
+  // clearing it without manual endpoints refuses the update.
+  optional string discovery_url = 3;
+
+  // endpoints are the manual endpoints.
+  OAuthEndpoints endpoints = 4;
+
+  // client_id is the credential the provider issued.
+  optional string client_id = 5;
+
+  // client_secret replaces the stored one when set; it is never answered
+  // back by any read.
+  optional string client_secret = 6;
+
+  // scopes are the space-separated scopes the authorize request asks for.
+  optional string scopes = 7;
+
+  // attribute_mapping is the custom connection's claim mapping.
+  OAuthAttributeMapping attribute_mapping = 8;
+
+  // enabled turns the connection's sign-ins on or off.
+  optional bool enabled = 9;
+}
+
+// UpdateOAuthConnectionResponse is the connection as the row now holds it,
+// secrets never included.
+message UpdateOAuthConnectionResponse {
+  // connection is the rewritten connection.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteOAuthConnectionRequest names the connection to remove.
+message DeleteOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteOAuthConnectionResponse is empty of facts: the protocol carries
+// the success.
+message DeleteOAuthConnectionResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ---- OAuth SSO: the linked accounts ----
+
+// ListLinkedConnectionsRequest is empty: the account is the claims'
+// subject, and the answer is its own ledger.
+message ListLinkedConnectionsRequest {}
+
+// ListLinkedConnectionsResponse is the calling account's linked
+// connections, oldest first.
+message ListLinkedConnectionsResponse {
+  // linked_accounts are the providers the account holds.
+  repeated OAuthLinkedAccount linked_accounts = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// OAuthLinkedAccount is one provider identity bound to an account.
+message OAuthLinkedAccount {
+  // id is the linked account's TypeID (`olink_…`).
+  string id = 1;
+
+  // connection_id is the connection the identity rode, `oconn_…`.
+  string connection_id = 2;
+
+  // provider is the connection's slug.
+  string provider = 3;
+
+  // email is the address the provider answered — the verified one when
+  // the linking rule accepted it.
+  string email = 4;
+
+  // created_at is when the identity was bound.
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// UnlinkConnectionRequest names the linked account to remove.
+message UnlinkConnectionRequest {
+  // linked_account_id is the linked account's TypeID (`olink_…`), and it
+  // must be the caller's own — the account is the claims' subject.
+  string linked_account_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// UnlinkConnectionResponse is empty of facts: the protocol carries the
+// success.
+message UnlinkConnectionResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}

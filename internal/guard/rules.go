@@ -164,6 +164,25 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.DeviceApprovalServiceInspectProcedure: {Rule: Session},
 	authnv1connect.DeviceApprovalServiceDecideProcedure:  {Rule: Session},
 
+	// The OAuth sign-in surface splits at the same line the passkey one
+	// does: the flow's begin and continue are reached before any token
+	// exists — the flow token is the credential the continue judges, the
+	// way the pending bridge is the credential the second factor is — and
+	// the linked-account ledger is the caller's own. The connection CRUD
+	// is the operator's power over who may sign the deployment's accounts
+	// in from outside, the way the OIDC client surface beside it is.
+	// Unlinking is the sensitive write: the step-up proof names the
+	// holder, the way the second-factor disable does.
+	authnv1connect.OAuthSSOServiceBeginSignInProcedure:           {Rule: Public},
+	authnv1connect.OAuthSSOServiceContinueSignInProcedure:        {Rule: Public},
+	authnv1connect.OAuthSSOServiceListConnectionsProcedure:       {Rule: Admin},
+	authnv1connect.OAuthSSOServiceGetConnectionProcedure:         {Rule: Admin},
+	authnv1connect.OAuthSSOServiceCreateConnectionProcedure:      {Rule: Admin},
+	authnv1connect.OAuthSSOServiceUpdateConnectionProcedure:      {Rule: Admin},
+	authnv1connect.OAuthSSOServiceDeleteConnectionProcedure:      {Rule: Admin},
+	authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure: {Rule: Session},
+	authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure:      {Rule: Session, StepUp: true},
+
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and
 	// the access token a renewal is fixing may already be expired, so the

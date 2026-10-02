@@ -64,6 +64,10 @@ var RateAuthProcedures = map[string]struct{}{
 	// verification is the guess, and the budget the bucket shares is what
 	// makes a drive against the credential space expensive.
 	authnv1connect.WebAuthnServiceVerifyLoginProcedure: {},
+	// The OAuth continue is a credential spend like the second factor's
+	// complete: the flow token is the single-use credential the procedure
+	// judges, and its success mints the token pair.
+	authnv1connect.OAuthSSOServiceContinueSignInProcedure: {},
 	// The email senders an authenticated or administrative caller reaches:
 	// a compromised account or an impatient operator must not become a
 	// mailbomb, so they count against the same tight budget as the public
@@ -85,6 +89,9 @@ var RateDefaultProcedures = map[string]struct{}{
 	authnv1connect.WebAuthnServiceBeginLoginProcedure:         {},
 	authnv1connect.WebAuthnServiceBeginRegistrationProcedure:  {},
 	authnv1connect.WebAuthnServiceVerifyRegistrationProcedure: {},
+	// The OAuth begin writes a flow row apiece, the same table-filling
+	// shape the ceremony openers above carry.
+	authnv1connect.OAuthSSOServiceBeginSignInProcedure: {},
 }
 
 // RateExemptProcedures names the public procedures the limiter never counts —

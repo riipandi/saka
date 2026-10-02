@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_4kueFjsqJ2
+createdAt: 2026-10-02T20:13:25.855338
+updatedAt: 2026-10-02T20:13:25.855338
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication:
+  bearer:
+    token: ${[ accessToken ]}
+  type: bearer
+authenticationType: null
+body:
+  bodyType: application/json
+  text: '{}'
+bodyType: null
+description: 'Answers the calling account''s own linked connections: which providers it holds, under which connection, since when. Guard: session.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Tango] List linked OAuth connections'
+sortPriority: 918.8888888888888
+url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

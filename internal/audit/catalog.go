@@ -113,6 +113,13 @@ var catalog = []Event{
 	{EventQueuePendingFlushed, "Every unclaimed task was removed from the queue."},
 	{EventQueueCompletedFlushed, "Every archived task record was removed."},
 	{EventSchedulerJobRunNow, "A scheduled job's task was enqueued immediately, without advancing its schedule."},
+	{EventOauthSsoConnectionCreated, "An OAuth provider connection was registered."},
+	{EventOauthSsoConnectionUpdated, "An OAuth provider connection's fields were rewritten."},
+	{EventOauthSsoConnectionDeleted, "An OAuth provider connection was removed."},
+	{EventOauthSsoSignIn, "A session opened through a linked OAuth provider identity."},
+	{EventOauthSsoAccountCreated, "An account was provisioned by an OAuth sign-in."},
+	{EventOauthSsoAccountLinked, "An OAuth provider identity was bound into an account."},
+	{EventOauthSsoAccountUnlinked, "An OAuth provider identity was removed from an account."},
 }
 
 // eventIndex is the catalog keyed by name, built once from the slice so a
