@@ -163,6 +163,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the new address is the current one"))
 	case errors.Is(err, ErrEmailTaken):
 		return connect.NewError(connect.CodeAlreadyExists, errors.New("the address is already in use"))
+	case errors.Is(err, ErrSubaddressBlocked):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the address cannot be used"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("email verification failed"))
 	}

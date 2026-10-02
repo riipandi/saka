@@ -158,6 +158,37 @@ func (r *Repository) DeleteEntry(ctx context.Context, db datastore.Querier, id u
 	return tag.RowsAffected() > 0, nil
 }
 
+// EmailsAtDomain answers the lowercased addresses the accounts hold at one
+// domain. The collision scan compares bases in Go — the folding is the
+// helper's, not SQL's — and the call rate is operator-facing, so the domain
+// scan's bound is the deployment's own account count, not the internet's.
+func (r *Repository) EmailsAtDomain(ctx context.Context, db datastore.Querier, domain string) ([]string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("lower(email)")
+	sb.From("public.users")
+	sb.Where(sb.Like("lower(email)", "%@"+domain))
+
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("blocklist: emails at domain: %w", err)
+	}
+	defer rows.Close()
+
+	emails := []string{}
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, fmt.Errorf("blocklist: emails at domain: %w", err)
+		}
+		emails = append(emails, email)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("blocklist: emails at domain: %w", err)
+	}
+	return emails, nil
+}
+
 // Patterns answers every stored pattern. The gate reads the whole list: the
 // blocklist is an administrator's hand-curated set, small by construction,
 // and the match is in Go where the subaddress base lives.

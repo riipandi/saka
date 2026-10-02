@@ -177,3 +177,43 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 	}
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(mapError(errors.New("boom"))))
 }
+
+// TestCollisionTakenPinsTheScan pins the collision scan over the real rows:
+// the exact duplicate is not a collision (the caller's taken-answer owns
+// it), a base another account holds is, and the fold compares Gmail's dots.
+func TestCollisionTakenPinsTheScan(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := context.Background()
+
+	insertAccount(t, pool, "jsmith", "jsmith@gmail.com")
+
+	// The same mailbox, folded differently: a collision.
+	taken, err := service.CollisionTaken(ctx, "j.smith+tag@gmail.com")
+	require.NoError(t, err)
+	assert.True(t, taken)
+
+	// The exact candidate is not a collision — the taken-answer owns it.
+	taken, err = service.CollisionTaken(ctx, "jsmith@gmail.com")
+	require.NoError(t, err)
+	assert.False(t, taken)
+
+	// A different mailbox at the same domain is not one.
+	taken, err = service.CollisionTaken(ctx, "sneveu@gmail.com")
+	require.NoError(t, err)
+	assert.False(t, taken)
+}
+
+// insertAccount creates the account row the collision scan reads.
+func insertAccount(t *testing.T, pool *datastore.Postgres, username, email string) {
+	t.Helper()
+	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	sb.InsertInto("public.users")
+	sb.Cols("id", "username", "email", "display_name")
+	sb.Values(uuid.NewV7(), username, email, username)
+
+	query, args := sb.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+}

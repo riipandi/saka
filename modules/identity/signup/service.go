@@ -92,13 +92,14 @@ type settingsReader interface {
 // The catalog keys the sign-up reads. The catalog owns the names; these
 // constants are how this package spells them.
 const (
-	SettingAccessMode             = "access.mode"
-	SettingAccessAllowlistEnabled = "access.allowlist_enabled"
-	SettingAccessAllowlist        = "access.allowlist"
-	SettingAccessBlocklistEnabled = "access.blocklist_enabled"
-	SettingSignupUsernameEnabled  = "auth.signup_username_enabled"
-	SettingRequireUsername        = "auth.require_username"
-	SettingVerifyEmailAtSignup    = "auth.verify_email_at_signup"
+	SettingAccessMode              = "access.mode"
+	SettingAccessAllowlistEnabled  = "access.allowlist_enabled"
+	SettingAccessAllowlist         = "access.allowlist"
+	SettingAccessBlocklistEnabled  = "access.blocklist_enabled"
+	SettingAccessBlockSubaddresses = "access.block_email_subaddresses"
+	SettingSignupUsernameEnabled   = "auth.signup_username_enabled"
+	SettingRequireUsername         = "auth.require_username"
+	SettingVerifyEmailAtSignup     = "auth.verify_email_at_signup"
 )
 
 // VerificationIssuer is the email-verification seam: the code's row belongs
@@ -132,13 +133,14 @@ type signupPolicy struct {
 	// stampVerified is the verification gate's other side: off, the account
 	// leaves with the column stamped — it may sign in at once; on, the
 	// column stays empty and the outstanding code owns the gate.
-	stampVerified   bool
-	allowlistOn     bool
-	allowlist       []string
-	blocklistOn     bool
-	usernameOn      bool
-	requireUsername bool
-	verifyEmail     bool
+	stampVerified     bool
+	allowlistOn       bool
+	allowlist         []string
+	blocklistOn       bool
+	blockSubaddresses bool
+	usernameOn        bool
+	requireUsername   bool
+	verifyEmail       bool
 }
 
 // policy reads the catalog. The bare wiring answers the historical policy —
@@ -171,6 +173,11 @@ func (s *Service) policyOf(ctx context.Context) signupPolicy {
 		s.log.WarnContext(ctx, "signup: access.blocklist_enabled unreadable; using the default", "error", err)
 	} else {
 		p.blocklistOn = on
+	}
+	if on, err := s.settings.GetBool(ctx, SettingAccessBlockSubaddresses); err != nil {
+		s.log.WarnContext(ctx, "signup: access.block_email_subaddresses unreadable; using the default", "error", err)
+	} else {
+		p.blockSubaddresses = on
 	}
 	if on, err := s.settings.GetBool(ctx, SettingSignupUsernameEnabled); err != nil {
 		s.log.WarnContext(ctx, "signup: auth.signup_username_enabled unreadable; using the default", "error", err)
@@ -275,12 +282,15 @@ func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
 	return s
 }
 
-// BlocklistChecker is the blocklist seam: the one question the sign-up gate
-// asks of the feature that owns the entries. The interface is this package's
-// — the consuming side defines it — and the identity area satisfies it with
-// the blocklist service after construction.
+// BlocklistChecker is the blocklist seam: the two questions the sign-up
+// gates ask of the feature that owns the entries and the address shapes —
+// whether the blocklist names the address, and whether its base is one an
+// account already holds. The interface is this package's — the consuming
+// side defines it — and the identity area satisfies it with the blocklist
+// service after construction.
 type BlocklistChecker interface {
 	Blocked(ctx context.Context, address string) (bool, error)
+	CollisionTaken(ctx context.Context, address string) (bool, error)
 }
 
 // WithBlocklist wires the blocked-identifier gate. Nil keeps the gate open.
@@ -296,6 +306,15 @@ func (s *Service) blocklistBlocked(ctx context.Context, address string) (bool, e
 		return false, nil
 	}
 	return s.blocklist.Blocked(ctx, address)
+}
+
+// subaddressCollision asks the wired gate's other question. An unwired gate
+// never blocks, the same state its tests build.
+func (s *Service) subaddressCollision(ctx context.Context, address string) (bool, error) {
+	if s.blocklist == nil {
+		return false, nil
+	}
+	return s.blocklist.CollisionTaken(ctx, address)
 }
 
 // validatePassword runs the credential through the wired policy.
@@ -350,6 +369,19 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			if blockedErr != nil {
 				s.log.WarnContext(ctx, "signup: the blocklist is unreadable; letting the sign-up pass", "error", blockedErr)
 			} else if blocked {
+				return user.UserView{}, ErrSignupNotAllowed
+			}
+		}
+		// The subaddress blocker is a different rule with a different
+		// shape: an address whose base an account already holds is
+		// refused — the first sign-up for a base passes, so the mass
+		// creation the feature targets is what it stops — and its
+		// collision scan fails open like the lists do.
+		if !accepted && p.blockSubaddresses {
+			collides, collisionErr := s.subaddressCollision(ctx, params.Email)
+			if collisionErr != nil {
+				s.log.WarnContext(ctx, "signup: the subaddress collision scan failed; letting the sign-up pass", "error", collisionErr)
+			} else if collides {
 				return user.UserView{}, ErrSignupNotAllowed
 			}
 		}

@@ -5,10 +5,13 @@ import (
 	"strings"
 )
 
-// The Yahoo-owned mail domains whose subaddress separators include the
-// hyphen. The set is exact — a domain that merely begins with a `yahoo`
-// label, such as `yahoo.dev` or a tenant subdomain on a hosting provider,
-// is not Yahoo and reads the generic separators.
+// genericSeparators are the subaddress separators every provider reads.
+const genericSeparators = "+=#"
+
+// yahooDomains maps the exact domains whose subaddress separators include
+// the hyphen. A domain that merely begins with a `yahoo` label — `yahoo.dev`
+// or a tenant subdomain on a hosting provider — is not Yahoo and reads the
+// generic separators.
 var yahooDomains = map[string]bool{
 	"yahoo.com":      true,
 	"ymail.com":      true,
@@ -20,8 +23,13 @@ var yahooDomains = map[string]bool{
 	"yahoo.com.br":   true,
 }
 
-// genericSeparators are the subaddress separators every provider reads.
-const genericSeparators = "+=#"
+// gmailDomains maps the domains whose local part folds its dots. Folding is
+// the block-email-subaddresses feature's match — the blocklist's carry-over
+// keeps the dots, so the two answers live in different bases.
+var gmailDomains = map[string]bool{
+	"gmail.com":      true,
+	"googlemail.com": true,
+}
 
 // patternShape is the grammar an entry parses to: one email address, or one
 // `@domain` entry. It mirrors the column's check constraint — the database
@@ -73,6 +81,28 @@ func SubaddressBase(address string) string {
 	}
 	if cut := strings.IndexAny(local, separators); cut >= 0 {
 		local = local[:cut]
+	}
+	return local + "@" + domain
+}
+
+// CollisionBase returns the form the block-email-subaddresses feature
+// compares: the address with its subaddress removed — the same cut
+// SubaddressBase makes — and, at a Gmail domain, the local part's dots
+// folded away. Two addresses with one collision base are one mailbox.
+func CollisionBase(address string) string {
+	local, domain, ok := splitAddress(address)
+	if !ok {
+		return address
+	}
+	separators := genericSeparators
+	if yahooDomains[domain] {
+		separators += "-"
+	}
+	if cut := strings.IndexAny(local, separators); cut >= 0 {
+		local = local[:cut]
+	}
+	if gmailDomains[domain] {
+		local = strings.ReplaceAll(local, ".", "")
 	}
 	return local + "@" + domain
 }

@@ -49,6 +49,13 @@ var (
 	// the request will one day succeed.
 	ErrEmailTaken = errors.New("verification: the address is already in use")
 
+	// ErrSubaddressBlocked is a request whose new address's base another
+	// account already holds, while access.block_email_subaddresses is on.
+	// The answer is the failed-precondition the change flow's own
+	// constraints carry, and it names nothing about the account whose
+	// base collided.
+	ErrSubaddressBlocked = errors.New("verification: the address cannot be used")
+
 	// ErrEmailChangeDisabled is a change flow the toggle turned off. It is
 	// the not-found-shaped answer: the surface says nothing about the
 	// setting that closed it.
@@ -96,6 +103,11 @@ type Service struct {
 	// settings is the change toggle's runtime source. Nil keeps the gate
 	// closed.
 	settings emailChangeSettings
+	// subaddresses is the block-email-subaddresses seam the area wires
+	// after construction. Nil leaves the guard out — the state a test or a
+	// bare wiring is in — and the toggle decides whether the wired guard
+	// reads.
+	subaddresses SubaddressGuard
 }
 
 // NewService builds the service. The mailer and the queue are the
@@ -302,6 +314,41 @@ type emailChangeSettings interface {
 // catalog owns the name; this constant is how this package spells it.
 const SettingChangeEmailEnabled = "users.change_email_enabled"
 
+// SettingAccessBlockSubaddresses is the catalog key the subaddress guard
+// reads. The catalog owns the name; this constant is how this package
+// spells it.
+const SettingAccessBlockSubaddresses = "access.block_email_subaddresses"
+
+// SubaddressGuard is the block-email-subaddresses seam: the one question
+// the change flow asks before it spends a token on a base another account
+// holds. The interface is this package's — the consuming side defines it —
+// and the identity area satisfies it with the blocklist service after
+// construction.
+type SubaddressGuard interface {
+	CollisionTaken(ctx context.Context, address string) (bool, error)
+}
+
+// WithSubaddressGuard wires the subaddress collision guard. Nil leaves the
+// guard out.
+func (s *Service) WithSubaddressGuard(guard SubaddressGuard) *Service {
+	s.subaddresses = guard
+	return s
+}
+
+// subaddressesBlocked answers the guard's toggle. An unreadable setting
+// leaves the guard out — the lists fail open, and this rule rides with
+// them; a broken read must never hold an account's own change hostage.
+func (s *Service) subaddressesBlocked(ctx context.Context) bool {
+	if s.settings == nil || s.subaddresses == nil {
+		return false
+	}
+	on, err := s.settings.GetBool(ctx, SettingAccessBlockSubaddresses)
+	if err != nil {
+		return false
+	}
+	return on
+}
+
 // WithEmailChangeGate wires the change toggle. Nil keeps the gate closed —
 // the state a test or a bare wiring is in, answering not-found.
 func (s *Service) WithEmailChangeGate(settings emailChangeSettings) *Service {
@@ -358,6 +405,19 @@ func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newE
 		return ErrEmailTaken
 	} else if !errors.Is(findErr, datastore.ErrNoRows) {
 		return findErr
+	}
+	// The subaddress blocker is the change flow's other refusal: the new
+	// address's base is one an account already holds. It fails open with
+	// the lists, and its answer says nothing about the other account —
+	// the caller proved its own account to reach here, but the refusal
+	// still does not confirm whose base it collided with.
+	if s.subaddressesBlocked(ctx) {
+		taken, guardErr := s.subaddresses.CollisionTaken(ctx, newEmail)
+		if guardErr != nil {
+			s.log.WarnContext(ctx, "verification: the subaddress collision scan failed; letting the change pass", "error", guardErr)
+		} else if taken {
+			return ErrSubaddressBlocked
+		}
 	}
 
 	// The resend cooldown reads the send time the pending row stamps, the

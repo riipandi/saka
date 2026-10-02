@@ -729,6 +729,13 @@ func (f *fakeBlocklist) Blocked(_ context.Context, address string) (bool, error)
 	return blocklist.Matches(address, f.patterns), nil
 }
 
+func (f *fakeBlocklist) CollisionTaken(_ context.Context, _ string) (bool, error) {
+	if f.failing {
+		return false, errors.New("the blocklist is unreadable")
+	}
+	return false, nil
+}
+
 // openMode is the catalog the open-mode tests read: no invite token, no
 // allowlist, and the blocklist toggle as the test set it.
 func openSignup(blocklistOn bool) signupSettings {

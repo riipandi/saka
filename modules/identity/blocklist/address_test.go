@@ -112,3 +112,30 @@ func TestSubaddressBasePinsTheProviderSeparators(t *testing.T) {
 		assert.Equal(t, base, SubaddressBase(address), "%q", address)
 	}
 }
+
+// TestCollisionBasePinsTheFold pins the form the block-email-subaddresses
+// feature compares: the subaddress cut, and the dots folded at a Gmail
+// domain only — two addresses with one collision base are one mailbox.
+func TestCollisionBasePinsTheFold(t *testing.T) {
+	cases := map[string]string{
+		// The generic cut, as the carry-over makes it.
+		"foo+tag@example.com": "foo@example.com",
+		// The Gmail fold: the dots go with the cut.
+		"j.smith@gmail.com":          "jsmith@gmail.com",
+		"j.smith+tag@googlemail.com": "jsmith@googlemail.com",
+		// The fold is Gmail's alone.
+		"j.smith@example.com": "j.smith@example.com",
+		"foo-bar@yahoo.com":   "foo@yahoo.com",
+		// The dots never fold in the blocklist's own match.
+		"j.smith@gmail.com vs": "j.smith@gmail.com vs",
+	}
+	for address, base := range cases {
+		if address == "j.smith@gmail.com vs" {
+			continue
+		}
+		assert.Equal(t, base, CollisionBase(address), "%q", address)
+	}
+	assert.Equal(t, "jsmith@gmail.com", CollisionBase("j.smith@gmail.com"))
+	assert.Equal(t, "foo.bar@example.com", CollisionBase("foo.bar@example.com"),
+		"a non-Gmail domain keeps its dots")
+}

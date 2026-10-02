@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"uuid"
 
@@ -154,4 +155,33 @@ func (s *Service) Blocked(ctx context.Context, address string) (bool, error) {
 		return false, fmt.Errorf("blocklist: read for the gate: %w", err)
 	}
 	return Matches(address, patterns), nil
+}
+
+// CollisionTaken answers whether an account already holds an address whose
+// collision base equals the candidate's — the question the
+// block-email-subaddresses gate asks at sign-up and at an email change. The
+// candidate's own exact duplicate is not a collision: the caller's unique
+// index or taken-address check answers that with the failure the contract
+// carries, so the scan skips it and compares the folded bases.
+func (s *Service) CollisionTaken(ctx context.Context, address string) (bool, error) {
+	normalized := strings.ToLower(strings.TrimSpace(address))
+	base := CollisionBase(normalized)
+	_, domain, ok := strings.Cut(base, "@")
+	if !ok || domain == "" {
+		return false, nil
+	}
+
+	emails, err := s.repo.EmailsAtDomain(ctx, s.pool, domain)
+	if err != nil {
+		return false, err
+	}
+	for _, email := range emails {
+		if email == normalized {
+			continue
+		}
+		if CollisionBase(email) == base {
+			return true, nil
+		}
+	}
+	return false, nil
 }

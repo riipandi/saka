@@ -616,6 +616,9 @@ func features(deps Deps) []kernel.Module {
 		if deps.Signup != nil {
 			deps.Signup.WithBlocklist(deps.Blocklist)
 		}
+		if deps.Verification != nil {
+			deps.Verification.WithSubaddressGuard(deps.Blocklist)
+		}
 		modules = append(modules, blocklist.NewModule(deps.Blocklist))
 	}
 	if deps.OneTimeAccess != nil {

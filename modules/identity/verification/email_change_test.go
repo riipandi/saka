@@ -2,6 +2,7 @@ package verification
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/jobs"
+	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/testutils"
 )
@@ -245,4 +247,98 @@ func TestConfirmEmailChangeRefusesAnExpiredToken(t *testing.T) {
 
 	err := service.ConfirmEmailChange(t.Context(), raw)
 	assert.ErrorIs(t, err, ErrInvalidToken)
+}
+
+// fakeSubaddresses is the collision guard's test double: it answers from a
+// base list the way the real service does, and its read can fail on demand.
+type fakeSubaddresses struct {
+	bases   []string
+	failing bool
+}
+
+func (f *fakeSubaddresses) CollisionTaken(_ context.Context, address string) (bool, error) {
+	if f.failing {
+		return false, errors.New("the collision scan failed")
+	}
+	base := blocklist.CollisionBase(address)
+	for _, held := range f.bases {
+		if held == base {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// TestRequestEmailChangeRefusesACollidingBase pins the subaddress guard:
+// with the toggle on, a change toward an address whose base another account
+// holds is refused with the generic failure — the answer names nothing
+// about the account whose base collided — and no token row is left behind.
+func TestRequestEmailChangeRefusesACollidingBase(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := emailChangeService(t, pool, true)
+	service.WithEmailChangeGate(stubGate{on: true})
+	service.WithSubaddressGuard(&fakeSubaddresses{bases: []string{"neveu@example.com"}})
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
+
+	err := service.RequestEmailChange(t.Context(), userID, "neveu+tag@example.com")
+	assert.ErrorIs(t, err, ErrSubaddressBlocked)
+
+	// No pending row: the refusal spent nothing.
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT count(*) FROM public.auth_tokens WHERE purpose = $1", PurposeEmailChange).Scan(&count))
+	assert.Zero(t, count)
+}
+
+// TestRequestEmailChangeSubaddressToggleAndFailure pins the guard's off
+// state: with the toggle off, a colliding base passes — the confirm's own
+// taken-check still answers.
+func TestRequestEmailChangeSubaddressToggleAndFailure(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	inner := testService(t, pool, true)
+	service := inner.
+		WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(inner.queue, nil, true)).
+		WithEmailChangeGate(toggleGate{changeEmail: true, blockSubaddresses: false}).
+		WithSubaddressGuard(&fakeSubaddresses{bases: []string{"neveu@example.com"}})
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
+	seedUser(t, pool, "sneveu", "neveu@example.com", false)
+
+	require.NoError(t, service.RequestEmailChange(t.Context(), userID, "sneveu+tag@example.com"),
+		"the toggle off, the wired guard is not asked")
+}
+
+// TestRequestEmailChangeToleratesAFailingScan pins the fail-open stance on
+// the change flow: a scan that cannot answer refuses nothing.
+func TestRequestEmailChangeToleratesAFailingScan(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := emailChangeService(t, pool, true)
+	service.WithEmailChangeGate(stubGate{on: true})
+	service.WithSubaddressGuard(&fakeSubaddresses{failing: true})
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
+
+	require.NoError(t, service.RequestEmailChange(t.Context(), userID, "vetra@new.example.com"))
+}
+
+// toggleGate is the keyed gate double: each catalog key answers its own
+// state, so a test can arm the change flow and leave the subaddress guard's
+// toggle off.
+type toggleGate struct {
+	changeEmail       bool
+	blockSubaddresses bool
+}
+
+func (g toggleGate) GetBool(_ context.Context, key string) (bool, error) {
+	switch key {
+	case SettingChangeEmailEnabled:
+		return g.changeEmail, nil
+	case SettingAccessBlockSubaddresses:
+		return g.blockSubaddresses, nil
+	}
+	return false, errors.New("unreadable setting")
 }
