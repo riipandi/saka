@@ -8,7 +8,7 @@ re-litigated. Read the section for the package you are changing.
 
 ### migrations/ (`database/migrations/`)
 
-Goose SQL migrations, the single source of schema truth (14 files, `00001`–`00014`, grouped by topic — identity, authorization, multifactor, webauthn, settings, rate limits, scheduler, filestore, notification, webhook, api keys, jwks, with the federation surface last). Never embed DDL or create tables at runtime. Editing an applied migration does not re-run it — roll back with `migrate:down` and re-apply. `app_migration` also carries goose's `tstamp` (when a version was recorded), which `migrate:status` reads, so run times need no separate audit table.
+Goose SQL migrations, the single source of schema truth (15 files, `00001`–`00015`, grouped by topic — identity, authorization, multifactor, webauthn, settings, rate limits, scheduler, filestore, notification, webhook, api keys, jwks, blocklist, with the federation surface last). Never embed DDL or create tables at runtime. Editing an applied migration does not re-run it — roll back with `migrate:down` and re-apply. `app_migration` also carries goose's `tstamp` (when a version was recorded), which `migrate:status` reads, so run times need no separate audit table.
 
 ### migrator.go
 
@@ -268,6 +268,45 @@ The area also owns the wiring of its own services, which is what makes it compos
 
 **Route claims are policed between modules.** `chi`'s registration is last-wins (`node.setEndpoint` overwrites unconditionally), which is why `kernel.Mount` reads each module's routes back from a scratch router and fails the run when two modules claim the same method/pattern pair — see the kernel section above. Within one module's own registration, last-wins holds and is the module's own defect. `kernel.Mount`'s doc and `internal/kernel`'s tests pin the detection.
 
+### modules/identity/blocklist
+
+The access-restriction feature: the blocklist CRUD and the pure address logic
+both gate readers share. `public.blocklist_entries` (migration `00015`) holds
+one email address or one `@domain` entry per row — the grammar is the column's
+CHECK constraint read twice, `ValidatePattern` in Go mirroring it so a refusal
+is `invalid_argument` before the write, never the database's error. The match
+(`Matches`) is exact, `@domain` **equality** (a subdomain is a different
+domain, unlike the allowlist's suffix reading), and the subaddress carry-over:
+a blocked exact address also blocks its `+`/`=`/`#`/Yahoo-hyphen variants. The
+provider table (`yahooDomains` on exact domains only, `gmailDomains`) and the
+folds live in `address.go` as pure functions — `SubaddressBase` (the
+blocklist's cut, dots kept) and `CollisionBase` (the subaddress blocker's cut,
+Gmail dots folded) are two different answers to "one mailbox?" and both are
+imported by the features that ask.
+
+The admin CRUD is `tango.identity.v1.BlocklistService` (`Admin` in the guard
+table), idempotent on add: the insert is `ON CONFLICT (pattern) DO NOTHING`
+returning whether it fired, the audit event `blocklist_entry_added` /
+`blocklist_entry_removed` writing only on a state change, inside the caller's
+transaction.
+
+**The gates ride seams, not imports.** Signup defines `BlocklistChecker`
+(`Blocked`, `CollisionTaken`) and signin defines `BlocklistChecker`
+(`Blocked`) — consuming-side interfaces, satisfied with
+`signup.WithBlocklist` / `signin.WithBlocklist` in the area's `Package`. The
+verification feature defines `SubaddressGuard` (`CollisionTaken`) for the
+email-change check. The decisions the gates share: the allowlist wins over
+the blocklist at both surfaces; every settings or list read that fails lets
+the request pass (fail-open, warn log) — the lists are an anti-abuse control,
+not an availability one, and a broken read must not lock accounts out. The
+sign-up refusal is the generic `not_found` "sign-up is not available"; the
+sign-in refusal (`ErrSigninRestricted`, read inside `IssueSession`'s state
+switch behind `access.blocklist_applies_to_signins`) is `permission_denied`
+"sign-in is not permitted" and answers only a proven credential — a wrong
+password still answers `invalid credentials`. The subaddress blocker refuses
+an email change with `failed_precondition` without naming the collided
+account.
+
 ### modules/identity/jwks
 
 The published key set, at `GET /.well-known/jwks.json`. The database is the one signing authority: `public.jwks` (migration `00013`) holds every asymmetric key pair, its private half sealed `enc:` with the auth secret (derived from `AUTH_SECRET_KEY`, not the application secret). Each row carries `seal_fp`, the fingerprint of the key that sealed it. When the process's fingerprint no longer matches a row's — an `AUTH_SECRET_KEY` rotation — the signing read retires the stale rows in place and provisions a replacement pair (the `Sealer` seam, audit event `jwks_invalidated`), so the rotation recovers on the next sign-in; tokens minted under the retired key fail verification until they expire. Rotating the application secret leaves the signing keys untouched. `tango initialize` provisions the first pair in the seed transaction (the `JWKSKeyPairSeeder`, audit event `jwks_provisioned`); `jwks:generate` stages a further pair for rotation; both seal with the auth cipher and record its fingerprint. The environment carries no key-pair material. `Service` implements `jwtutils.KeyProvider`, so the endpoint that publishes the set and the code that verifies a token read one source — a key that is not published is not accepted, and a key that is published is accepted with no second list to keep in step.
@@ -351,7 +390,11 @@ names the session it ended so an operator can pair it with the sign-in line.
 
 The sign-up feature: `tango.identity.v1.SignupService/Signup`, the contract in `api/connect/identity.proto` (the identity package, unlike sign-in's `tango.authn.v1` — authentication is its own package, account creation is identity's). RPC only: there is no REST route and none is planned for it. The account carries its primary credential from the first call — the password is required and hashed with the shared `crypto.PasswordHasher` — so the account can sign in immediately; it is created unverified, and email verification is a later procedure (`public.auth_tokens` with purpose `email_verification` already exists for it).
 
-Signup is not open: the request must carry a raw signup token, stored server-side only as its SHA-256 hash in `public.signup_tokens`. An unknown, expired, and spent token answer one failure (`permission_denied`), so the endpoint does not disclose which half was wrong; the spend is a conditional `usage_count` bump inside the transaction that also writes the user and the password, so a single-use token cannot create two accounts under a race and a refused duplicate spends nothing. The username grammar and the email check the users table enforces live in the contract — `SignupRequest` carries them as protovalidate constraints the transport's validate interceptor enforces before any handler runs, answering `invalid_argument` with typed violation details — and the names are mandatory on the same terms, so a duplicate answers `already_exists` and a malformed field never reaches the database. The answer is the canonical account view the account procedures share — `user.UserView` read back from the row the transaction wrote, mapped to the wire once in `user.WireView` — so sign-up describes the account exactly the way the administration CRUD does: the names, the creation instant the database stamped, and the unverified state. The service carries no shape checks of its own; `pkg/validate`'s ozzo vocabulary stays the REST body seam.
+Signup serves the mode the catalog names: `access.mode` reads `open` or
+`invite` fresh per request — open, anyone may create an account (the
+allowlist and the blocklist gate it; see the blocklist section), invite, the
+request must carry a raw signup token, stored server-side only as its SHA-256
+hash in `public.signup_tokens`. An unknown, expired, and spent token answer one failure (`permission_denied`), so the endpoint does not disclose which half was wrong; the spend is a conditional `usage_count` bump inside the transaction that also writes the user and the password, so a single-use token cannot create two accounts under a race and a refused duplicate spends nothing. The username grammar and the email check the users table enforces live in the contract — `SignupRequest` carries them as protovalidate constraints the transport's validate interceptor enforces before any handler runs, answering `invalid_argument` with typed violation details — and the names are mandatory on the same terms, so a duplicate answers `already_exists` and a malformed field never reaches the database. The answer is the canonical account view the account procedures share — `user.UserView` read back from the row the transaction wrote, mapped to the wire once in `user.WireView` — so sign-up describes the account exactly the way the administration CRUD does: the names, the creation instant the database stamped, and the unverified state. The service carries no shape checks of its own; `pkg/validate`'s ozzo vocabulary stays the REST body seam.
 
 The signup-token administration is the feature's second half, and the first consumer of the Bearer seam: `CreateSignupToken` draws the raw value (256 bits of base64url, the refresh token's shape), shows it once in the answer, and stores the hash with the requested window and budget — `ttl_seconds` between one hour and thirty days, a `usage_limit` that defaults to the single invitation and caps at a thousand, both validated through the same ozzo vocabulary. `ListSignupTokens` answers the counters and window through the shared `ListMetadata` block, never the raw values; `DeleteSignupToken` revokes an issued token, answering `not_found` for an id that names nothing. The three procedures are administrative: the transport-wide bearer middleware authenticated the caller, and the handler reads `jwtutils.AccessClaims` out of the context and refuses a non-admin with `permission_denied` — authorization lives at the feature because only it knows which procedures are administrative, while authentication is the transport's uniform default. The raw token's lifetime is request-driven, not configuration: an invitation's window is the operator's decision per issue.
 

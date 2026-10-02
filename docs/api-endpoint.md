@@ -160,6 +160,26 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 | PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
 | GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture (public)               |
 
+## Blocklist (tango-only)
+
+Admin CRUD over the identifiers no open-mode sign-up may claim while
+`access.blocklist_enabled` is on. An entry is one email address or one
+`@domain` entry (the domain exact — a subdomain is a different domain); no
+wildcards. A blocked exact address carries over to its subaddressed variants.
+The refusal is the generic `not_found` "sign-up is not available"; the
+allowlist wins over the blocklist. `access.blocklist_applies_to_signins`
+extends the lists to sign-ins — the refusal is `permission_denied` "sign-in is
+not permitted", and a wrong password still answers `invalid credentials`.
+`access.block_email_subaddresses` blocks an address whose base (subaddress
+separators cut, Gmail dots folded) an existing account already holds, at
+sign-up and when an email change names the new address (`failed_precondition`).
+
+| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
+| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
+| POST     | `/rpc/tango.identity.v1.BlocklistService/ListBlocklistEntries`               | ConnectRPC   | List blocklist entries, newest first (admin)    |
+| POST     | `/rpc/tango.identity.v1.BlocklistService/AddBlocklistEntry`                  | ConnectRPC   | Add one entry (admin; idempotent — a repeat answers the stored row) |
+| POST     | `/rpc/tango.identity.v1.BlocklistService/RemoveBlocklistEntry`               | ConnectRPC   | Remove one entry by ID (admin)                  |
+
 ## Sign-up and Signup Tokens
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
