@@ -15,10 +15,10 @@ import (
 // Alphabet sets a feature draws its codes from. AlphabetAlphanumeric covers
 // machine credentials that only a client presents; AlphabetUnambiguous drops
 // the glyphs a human misreads (0/O, 1/l/I) because its holders type the value
-// from a phone reading an email.
+// from a phone reading an email — the digits 0 and 1 go with the letters.
 const (
 	AlphabetAlphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	AlphabetUnambiguous  = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
+	AlphabetUnambiguous  = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
 )
 
 // hexTokenEntropy is the randomness of one hex token: 256 bits, so the hash

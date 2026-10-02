@@ -27,7 +27,7 @@ Keep this document as simple as possible!
 ### Password
 
 - [x] **Sign-up with password**: Require users to sign up with a password (default: true)
-- [ ] **Add password to account**: Allow users to add a password to their account (default: true) - related to Device Trust
+- [x] **Add password to account**: Allow users to add a password to their account (default: true) - related to Device Trust
 
 #### Password requirements
 

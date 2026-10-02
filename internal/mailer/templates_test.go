@@ -38,6 +38,7 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 		mailer.TemplateOneTimeAccess,
 		mailer.TemplatePasswordChangedNotice,
 		mailer.TemplatePasswordReset,
+		mailer.TemplateReauthenticationCode,
 		mailer.TemplateTestEmail,
 		mailer.TemplateUserBanned,
 		mailer.TemplateUserUnbanned,
