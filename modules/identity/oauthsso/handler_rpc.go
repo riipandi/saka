@@ -7,9 +7,12 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"uuid"
 
 	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
 	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
 
@@ -22,6 +25,21 @@ type rpcHandler struct {
 
 func newRPCHandler(service *Service) *rpcHandler {
 	return &rpcHandler{service: service}
+}
+
+// callerID reads the calling account's identifier out of the guard's
+// claims. A Session-ruled procedure always carries one; an unreadable
+// claim is an internal failure, not a client fault.
+func callerID(ctx context.Context) (uuid.UUID, error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return uuid.UUID{}, errors.New("oauthsso: the caller is unnamed")
+	}
+	id, err := user.UUIDFromWire(caller.UserID)
+	if err != nil {
+		return uuid.UUID{}, errors.New("oauthsso: the caller's identity is unreadable")
+	}
+	return id, nil
 }
 
 // BeginSignIn opens the authorization-code flow: the pending row is
@@ -236,11 +254,38 @@ func (h *rpcHandler) DeleteConnection(ctx context.Context, req *connect.Request[
 	}), nil
 }
 
-// ListLinkedConnections answers the holder's ledger. The procedure rides
-// the account-surface phase; until it lands, the contract answers
-// unimplemented.
-func (h *rpcHandler) ListLinkedConnections(context.Context, *connect.Request[authnv1.ListLinkedConnectionsRequest]) (*connect.Response[authnv1.ListLinkedConnectionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the linked-account surface is not served yet"))
+// ListLinkedConnections answers the calling account's bindings, oldest
+// first. The account is the claims' subject — the guard's Session rule
+// has already admitted a caller holding a session, and this procedure
+// reads no other account's rows.
+func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *connect.Request[authnv1.ListLinkedConnectionsRequest]) (*connect.Response[authnv1.ListLinkedConnectionsResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	linked, err := h.service.ListLinkedAccounts(ctx, userID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the linked accounts could not be read"))
+	}
+
+	out := make([]*authnv1.OAuthLinkedAccount, 0, len(linked))
+	for _, view := range linked {
+		entry := &authnv1.OAuthLinkedAccount{
+			Id:           FormatLinkedAccountID(view.LinkedAccount.ID),
+			ConnectionId: FormatID(view.LinkedAccount.ConnectionID),
+			Provider:     view.Provider,
+			Email:        view.LinkedAccount.Email,
+		}
+		if !view.LinkedAccount.CreatedAt.IsZero() {
+			entry.CreatedAt = timestamppb.New(view.LinkedAccount.CreatedAt)
+		}
+		out = append(out, entry)
+	}
+	return connect.NewResponse(&authnv1.ListLinkedConnectionsResponse{
+		LinkedAccounts: out,
+		Status:         responder.StatusSuccess,
+		Message:        "the linked accounts were read",
+	}), nil
 }
 
 // VerifySignInEmail spends the email code a verify_email-stage flow waits
@@ -258,11 +303,33 @@ func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *connect.Request
 	}), nil
 }
 
-// UnlinkConnection removes one linked account. The procedure rides the
-// account-surface phase; until it lands, the contract answers
-// unimplemented.
-func (h *rpcHandler) UnlinkConnection(context.Context, *connect.Request[authnv1.UnlinkConnectionRequest]) (*connect.Response[authnv1.UnlinkConnectionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the linked-account surface is not served yet"))
+// UnlinkConnection removes one of the calling account's bindings. The
+// stranding refusal is a failed_precondition whose message names the
+// way back in; a foreign or unknown binding answers not_found, the
+// same answer either way.
+func (h *rpcHandler) UnlinkConnection(ctx context.Context, req *connect.Request[authnv1.UnlinkConnectionRequest]) (*connect.Response[authnv1.UnlinkConnectionResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	linkedID, err := ParseLinkedAccountID(req.Msg.LinkedAccountId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+	}
+
+	switch err := h.service.UnlinkLinkedAccount(ctx, userID, linkedID); {
+	case errors.Is(err, ErrLinkedAccountNotFound):
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+	case errors.Is(err, ErrLastCredential):
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("set a password before unlinking the last provider"))
+	case err != nil:
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the linked account could not be removed"))
+	}
+
+	return connect.NewResponse(&authnv1.UnlinkConnectionResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the linked account was removed",
+	}), nil
 }
 
 // paramsOf maps a create's wire fields onto the service's words.

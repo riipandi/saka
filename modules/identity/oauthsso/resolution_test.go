@@ -3,6 +3,7 @@ package oauthsso
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,14 +147,20 @@ func resolvedFlow(t *testing.T, service *Service, identity ExternalIdentity) (Fl
 }
 
 // seedAccount writes one account row directly and answers its id — the
-// fixture the binding and the email-match branches read.
+// fixture the binding and the email-match branches read. The username
+// derives from the address's local part, so the fixture's rows never
+// collide on the column's unique index.
 func seedAccount(t *testing.T, pool *datastore.Postgres, email string, password bool) uuid.UUID {
 	t.Helper()
+	local := email
+	if at := strings.IndexByte(email, '@'); at > 0 {
+		local = email[:at]
+	}
 	var id uuid.UUID
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`INSERT INTO public.users (id, username, email, display_name, email_verified_at)
 		 VALUES (uuidv7(), $1, $2, $3, now()) RETURNING id`,
-		"hermione", email, "Hermione Granger").Scan(&id))
+		local, email, "Hermione Granger").Scan(&id))
 	if password {
 		if _, err := pool.Exec(t.Context(),
 			`INSERT INTO public.user_passwords (user_id, password_hash) VALUES ($1, 'hash')`, id); err != nil {

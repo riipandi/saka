@@ -477,6 +477,21 @@ func execAffected(ctx context.Context, db datastore.Querier, query string, args 
 	return tag.RowsAffected() > 0, nil
 }
 
+// scanLinkedAccountView renders one binding row beside its connection's
+// slug. The scanner is the row/columns pair both reads share — a
+// pgx.Rows and a pgx.Row satisfy the same shape.
+func scanLinkedAccountView(row interface{ Scan(dest ...any) error }) (LinkedAccountView, error) {
+	var view LinkedAccountView
+	err := row.Scan(&view.LinkedAccount.ID, &view.LinkedAccount.UserID, &view.LinkedAccount.ConnectionID,
+		&view.LinkedAccount.ProviderAccountID, &view.LinkedAccount.Email, &view.LinkedAccount.EmailVerified,
+		&view.LinkedAccount.Profile, &view.LinkedAccount.AccessToken, &view.LinkedAccount.RefreshToken,
+		&view.LinkedAccount.CreatedAt, &view.LinkedAccount.UpdatedAt, &view.Provider)
+	if err != nil {
+		return LinkedAccountView{}, err
+	}
+	return view, nil
+}
+
 // scanLinkedAccount renders one binding row onto the view. The sealed
 // token columns stay as stored.
 func scanLinkedAccount(row pgx.Row) (LinkedAccount, error) {
@@ -491,6 +506,96 @@ func scanLinkedAccount(row pgx.Row) (LinkedAccount, error) {
 		return LinkedAccount{}, err
 	}
 	return account, nil
+}
+
+// ---- The account surfaces ----
+
+// LinkedAccountView carries one binding beside its connection's slug —
+// the listing's word for "which provider this is".
+type LinkedAccountView struct {
+	LinkedAccount LinkedAccount
+	Provider      string
+}
+
+// linkedAccountViewColumns is the binding list the two reads share:
+// every column qualified with the binding's alias, and the connection's
+// provider slug riding last.
+const linkedAccountViewColumns = `l.id, l.user_id, l.connection_id, l.provider_account_id,
+	l.email, l.email_verified, l.profile, l.access_token, l.refresh_token,
+	l.created_at, l.updated_at, c.provider`
+
+// LinkedAccountsByUser reads the caller's bindings, oldest first. The
+// join carries the connection's slug; a connection deleted cascades its
+// bindings away, so the inner join hides nothing.
+func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]LinkedAccountView, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(linkedAccountViewColumns)
+	sb.From(linkedAccountTable + " l")
+	sb.Join(connectionTable+" c", "c.id = l.connection_id")
+	sb.Where(sb.Equal("l.user_id", userID))
+	sb.OrderBy("l.created_at")
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LinkedAccountView
+	for rows.Next() {
+		view, scanErr := scanLinkedAccountView(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		out = append(out, view)
+	}
+	return out, rows.Err()
+}
+
+// LinkedAccountByID reads one binding with its connection's slug.
+func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (LinkedAccountView, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(linkedAccountViewColumns)
+	sb.From(linkedAccountTable + " l")
+	sb.Join(connectionTable+" c", "c.id = l.connection_id")
+	sb.Where(sb.Equal("l.id", id))
+	query, args := sb.Build()
+	view, err := scanLinkedAccountView(db.QueryRow(ctx, query, args...))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return LinkedAccountView{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return LinkedAccountView{}, err
+	}
+	return view, nil
+}
+
+// KeepsAnotherCredential answers whether the account still holds a way
+// in once this binding leaves: another binding, a password, or a
+// passkey — the stranding rule's three sources. One scan answers all
+// three, and the binding being removed counts itself out.
+func (r *Repository) KeepsAnotherCredential(ctx context.Context, db datastore.Querier, userID, excludeID uuid.UUID) (bool, error) {
+	var others int
+	err := db.QueryRow(ctx, `SELECT
+		    (SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1 AND id <> $2)
+		  + (SELECT count(*) FROM public.user_passwords WHERE user_id = $1)
+		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID, excludeID).
+		Scan(&others)
+	if err != nil {
+		return false, err
+	}
+	return others > 0, nil
+}
+
+// DeleteLinkedAccount removes one binding. The guard carries the owner,
+// so a raced or foreign delete answers "not removed" instead of
+// touching someone else's row; the soft-delete trigger captures what
+// the unlink removed.
+func (r *Repository) DeleteLinkedAccount(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	sb.DeleteFrom(linkedAccountTable)
+	sb.Where(sb.Equal("id", id), sb.Equal("user_id", userID))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
 }
 
 // scanFlow renders one row onto the view. The hash and sealed columns
