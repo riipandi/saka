@@ -53,6 +53,7 @@ func (t OneTimeAccessEmailTask) Config() queue.QueueConfig {
 		MaxAttempts: 3,
 		Timeout:     30 * time.Second,
 		Backoff:     15 * time.Second,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

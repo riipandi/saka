@@ -215,10 +215,10 @@ func (s *rpcQueueService) ReplayDeadTasks(ctx context.Context, req *connect.Requ
 	if err := s.engine(); err != nil {
 		return nil, err
 	}
-	// The replay reaches through the engine's own all-queues pass: a
-	// queue-narrowed replay filters the answer, the engine's replay is the
-	// transaction the archive deletes under.
-	replayed, err := s.client.ReplayDead(ctx)
+	// The queue name narrows the replay the contract documents: absent, every
+	// queue's dead pile returns; present, only the named queue's. The engine
+	// owns the filter, so the response count and the rows that moved agree.
+	replayed, err := s.client.ReplayDead(ctx, req.Msg.GetQueue())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

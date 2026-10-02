@@ -93,6 +93,7 @@ func TestASignalDoesNotCancelAnInFlightTask(t *testing.T) {
 // into stop: the start context was cancelled, the dispatcher ended on its
 // own, and the stop that follows must still release the task context rather
 // than leave it to the process's lifetime.
+
 func TestStoppingAfterASignalStillReleasesTheTaskContext(t *testing.T) {
 	client := newTestClient(t)
 	client.Register(NewQueue[probeTask](func(context.Context, probeTask) error { return nil }))
@@ -112,6 +113,44 @@ func TestStoppingAfterASignalStillReleasesTheTaskContext(t *testing.T) {
 	// the assertion is that the call did not panic on an already-released
 	// context and that a second stop is equally harmless.
 	assert.True(t, client.Stop(stopCtx))
+}
+
+// TestARestartedDispatcherFetchesAgain pins the restart contract: a second
+// generation built over the same dispatcher must fetch, however the first
+// one ended. A stop racing a burst of saves can leave the fold flag armed
+// and the free-worker pool full — a trigger the new triggerer's CAS then
+// swallows, a pool the new refill would block on. Both must be reset, or the
+// restarted engine never fetches again while notify reports success.
+func TestARestartedDispatcherFetchesAgain(t *testing.T) {
+	client := newTestClient(t)
+
+	processed := make(chan string, 4)
+	client.Register(NewQueue[probeTask](func(_ context.Context, task probeTask) error {
+		processed <- task.Name
+		return nil
+	}))
+
+	startCtx, cancelStart := context.WithCancel(t.Context())
+	defer cancelStart()
+	client.Start(startCtx)
+
+	// End the first generation the way a stop racing a burst of saves
+	// produces it: the fold flag armed, the fetcher gone before it fetched.
+	client.dispatcher.triggered.Store(true)
+
+	stopCtx, cancelStop := context.WithTimeout(context.WithoutCancel(t.Context()), 5*time.Second)
+	defer cancelStop()
+	assert.True(t, client.Stop(stopCtx), "the first generation must drain")
+
+	client.Start(startCtx)
+	save(t, client.Add(probeTask{Name: "after restart"}))
+
+	select {
+	case name := <-processed:
+		assert.Equal(t, "after restart", name)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "the restarted dispatcher never fetched the task")
+	}
 }
 
 // deadlineProbeTask outlives its own queue timeout, so the outcome it settles

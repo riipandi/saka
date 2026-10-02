@@ -86,6 +86,27 @@ type (
 	}
 )
 
+// deadLetterRetention is how long an archived dead task stays replayable
+// before the cleanup retires it. A week is long enough for an operator to
+// notice a dead pile through the queue's administrative surface and replay
+// it, and short enough that a queue that keeps failing does not accumulate
+// payloads without bound.
+const deadLetterRetention = 7 * 24 * time.Hour
+
+// DeadLetter is the retention policy of a queue whose exhausted tasks must
+// stay replayable: failures only, the payload kept so the replay can re-run
+// the task, retired after deadLetterRetention. A recurring maintenance job
+// does not carry it — its successor re-enqueues itself, and a dead one is
+// reseeded on the next start — an outbound side effect does: a mail that
+// never went out, a logout that never reached its relying party.
+func DeadLetter() *Retention {
+	return &Retention{
+		Duration:   deadLetterRetention,
+		OnlyFailed: true,
+		Data:       &RetainData{OnlyFailed: true},
+	}
+}
+
 // NewQueue creates a new type-safe Queue of a given Task type.
 func NewQueue[T Task](processor QueueProcessor[T]) Queue {
 	var task T

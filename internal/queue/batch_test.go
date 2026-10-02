@@ -141,7 +141,7 @@ func TestReplayDeadRequeuesTheDeadTasks(t *testing.T) {
 		return err == nil && dead == 1
 	}, 10*time.Second, 20*time.Millisecond, "the task must exhaust and die")
 
-	replayed, err := client.ReplayDead(t.Context())
+	replayed, err := client.ReplayDead(t.Context(), "")
 	require.NoError(t, err)
 	require.EqualValues(t, 1, replayed)
 
@@ -151,6 +151,41 @@ func TestReplayDeadRequeuesTheDeadTasks(t *testing.T) {
 		return err == nil && dead == 1
 	}, 10*time.Second, 20*time.Millisecond, "the replayed task must exhaust again")
 	require.EqualValues(t, 4, executions.Load(), "two attempts before the replay, two after")
+}
+
+// A replay that names a queue brings back only that queue's dead: the other
+// queues' dead piles stay archived, and the response count covers what moved.
+func TestReplayDeadNarrowsToTheNamedQueue(t *testing.T) {
+	client := newTestClient(t)
+
+	runWith(t, client, NewQueue(func(ctx context.Context, task dlqTask) error {
+		return errors.New("always fails")
+	}))
+	runWith(t, client, NewQueue(func(ctx context.Context, task retainedProbeTask) error {
+		return errors.New("always fails")
+	}))
+
+	save(t, client.Add(dlqTask{Name: "first"}))
+	save(t, client.Add(retainedProbeTask{Name: "second"}))
+	require.Eventually(t, func() bool {
+		dlq, err := client.Dead(t.Context(), "dlq_probe")
+		retained, err2 := client.Dead(t.Context(), "retained")
+		return err == nil && err2 == nil && dlq == 1 && retained == 1
+	}, 10*time.Second, 20*time.Millisecond, "both queues must hold one dead task")
+
+	// The named queue's replay moves one; the other queue's dead stays put.
+	replayed, err := client.ReplayDead(t.Context(), "dlq_probe")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, replayed)
+
+	retained, err := client.Dead(t.Context(), "retained")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, retained, "the other queue's dead task must stay archived")
+
+	// An absent name replays what is left.
+	replayed, err = client.ReplayDead(t.Context(), "")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, replayed)
 }
 
 // A dead task whose queue retained no payload cannot come back: the replay
@@ -168,7 +203,7 @@ func TestReplaySkipsDeadTasksWithoutAPayload(t *testing.T) {
 		return err == nil && dead == 1
 	}, 10*time.Second, 20*time.Millisecond)
 
-	replayed, err := client.ReplayDead(t.Context())
+	replayed, err := client.ReplayDead(t.Context(), "")
 	require.NoError(t, err)
 	require.Zero(t, replayed)
 

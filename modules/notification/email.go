@@ -39,6 +39,7 @@ func (t NotificationEmailTask) Config() queue.QueueConfig {
 		MaxAttempts: 3,
 		Timeout:     5 * time.Minute,
 		Backoff:     5 * time.Minute,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

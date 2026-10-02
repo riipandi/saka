@@ -225,13 +225,16 @@ func (c *Client) Dead(ctx context.Context, queue string) (int64, error) {
 
 // ReplayDead re-enqueues the dead tasks the archive still carries — the ones
 // that exhausted their attempts and kept their payload, not yet expired —
-// under a fresh identity with a fresh attempt budget, and reports how many
-// went back. A dead task whose queue did not retain its payload cannot come
-// back: its content is gone, and it stays for the cleanup to expire.
-func (c *Client) ReplayDead(ctx context.Context) (int64, error) {
+// ReplayDead re-enqueues the dead tasks one queue — or every queue when the
+// name is empty — keeps in its archive: the ones that exhausted their
+// attempts and kept their payload, not yet expired. Each rides back under a
+// fresh identity with a fresh attempt budget. A dead task whose queue did
+// not retain its payload cannot come back: its content is gone, and it stays
+// for the cleanup to expire.
+func (c *Client) ReplayDead(ctx context.Context, queue string) (int64, error) {
 	var replayed int64
 	err := c.store.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		rows, err := deadRows(ctx, tx, now())
+		rows, err := deadRows(ctx, tx, now(), queue)
 		if err != nil {
 			return err
 		}

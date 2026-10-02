@@ -37,6 +37,7 @@ func (t BackchannelLogoutTask) Config() queue.QueueConfig {
 		MaxAttempts: 5,
 		Timeout:     30 * time.Second,
 		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

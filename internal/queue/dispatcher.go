@@ -85,7 +85,10 @@ type dispatcher struct {
 	// rather than inferring it from the free-worker tokens: a worker that
 	// leaves because the start context ended never returns its token, and
 	// counting tokens therefore missed it.
-	workers          sync.WaitGroup
+	workers sync.WaitGroup
+	// engines tracks the triggerer and the fetcher, so a stop waits for them
+	// to exit before the fields they read can be replaced by a restart.
+	engines          sync.WaitGroup
 	ticker           *time.Ticker
 	tasks            chan *taskRow
 	availableWorkers chan struct{}
@@ -113,8 +116,10 @@ func (d *dispatcher) init(client *Client, numWorkers int, releaseAfter time.Dura
 // start starts the dispatcher. To hard-stop it, cancel the provided context;
 // to stop it gracefully, call stop.
 func (d *dispatcher) start(ctx context.Context) {
-	// Abort if the dispatcher is already running.
-	if d.running.Load() {
+	// start is guarded by a CAS rather than a load: two concurrent starts
+	// must not both spawn a goroutine set, the second overwriting the first's
+	// channels while its fetcher still selects on them.
+	if !d.running.CompareAndSwap(false, true) {
 		return
 	}
 
@@ -124,6 +129,11 @@ func (d *dispatcher) start(ctx context.Context) {
 	// task in flight: WithoutCancel keeps the values and drops the
 	// cancellation, so a task's context stays live until stop releases it.
 	d.taskCtx, d.releaseCtx = context.WithCancel(context.WithoutCancel(ctx))
+	// A previous generation may have ended with a trigger armed (the fetcher
+	// exited before consuming it), leaving triggered true; a new generation
+	// starts from a clean fold or every later ready signal is swallowed by
+	// the CAS and the engine never fetches again.
+	d.triggered.Store(false)
 	d.tasks = make(chan *taskRow, d.numWorkers)
 	d.ticker = time.NewTicker(d.fallbackPoll)
 	d.ticker.Stop() // No need to poll yet.
@@ -131,13 +141,30 @@ func (d *dispatcher) start(ctx context.Context) {
 	d.trigger = make(chan struct{}, 10)
 	d.availableWorkers = make(chan struct{}, d.numWorkers)
 	d.workerIdle = make(chan struct{}, 1)
-	d.running.Store(true)
 
+	// A previous generation's tokens may still sit in the pool: a worker that
+	// leaves on a cancelled context never returns its token, and the buffer
+	// it left full would block the refill below forever. Drain first, then
+	// hand out one token per worker of this generation.
+drain:
+	for {
+		select {
+		case <-d.availableWorkers:
+		default:
+			break drain
+		}
+	}
 	for range d.numWorkers {
 		d.workers.Add(1)
 		go d.worker()
 		d.availableWorkers <- struct{}{}
 	}
+	// The triggerer and the fetcher are tracked on their own WaitGroup: stop
+	// must wait for them to exit before returning, because they read the
+	// channels and the ticker this method is about to leave behind, and the
+	// fetcher's deferred close of d.tasks must land before a restart builds a
+	// new generation over the same fields.
+	d.engines.Add(2)
 	go d.triggerer()
 	go d.fetcher()
 	d.signalReady()
@@ -171,9 +198,16 @@ func (d *dispatcher) stop(ctx context.Context) bool {
 	// holding a task, and waiting for them is what keeps their outcome writes
 	// alive. Treating "the fetcher has stopped" as "nothing is in flight" is
 	// what cancelled a context a settling task was still using.
+	//
+	// The triggerer and the fetcher are joined on a second wait, bounded by
+	// the same context: they must be out of their select loops — and the
+	// fetcher out of its deferred close of d.tasks — before this returns, or
+	// a restart would rebuild the channels under a goroutine still reading
+	// them.
 	done := make(chan struct{})
 	go func() {
 		d.workers.Wait()
+		d.engines.Wait()
 		close(done)
 	}()
 
@@ -199,6 +233,7 @@ func (d *dispatcher) releaseTaskContext() {
 // only when one is not already on its way, so a hundred tasks added in a
 // loop cost one fetch, not a hundred.
 func (d *dispatcher) triggerer() {
+	defer d.engines.Done()
 	for {
 		select {
 		case <-d.ready:
@@ -223,6 +258,7 @@ func (d *dispatcher) triggerer() {
 // fetcher fetches tasks from the database when the ticker ticks or a trigger
 // arrives, and stops when either context does.
 func (d *dispatcher) fetcher() {
+	defer d.engines.Done()
 	defer func() {
 		d.running.Store(false)
 		d.ticker.Stop()
@@ -249,11 +285,17 @@ func (d *dispatcher) fetcher() {
 func (d *dispatcher) worker() {
 	defer d.workers.Done()
 
+loop:
 	for {
 		select {
 		case task := <-d.tasks:
 			if task == nil {
-				break
+				// The fetcher closed the tasks channel: the engine is
+				// ending. A bare break would only leave the select — the
+				// closed channel is permanently ready, so the worker would
+				// spin receiving nil until the scheduler happened to pick
+				// the shutdown case.
+				break loop
 			}
 			d.processTask(task)
 			d.releaseWorker()

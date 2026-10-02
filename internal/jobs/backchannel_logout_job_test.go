@@ -52,14 +52,15 @@ func TestBackchannelLogoutRefusesANonSuccessAnswer(t *testing.T) {
 	err = backchannelLogoutProcessor(t.Context(), task, client)
 	require.Error(t, err, "a 5xx is the attempt's failure; the queue's retry owns the next one")
 
-	// The task's own config keeps the attempts bounded and the timeout
-	// below the release window.
+	// The task's own config keeps the attempts bounded, the timeout below the
+	// release window, and its dead tasks replayable.
 	config := task.Config()
 	assert.Equal(t, queue.QueueConfig{
 		Name:        BackchannelLogoutName,
 		MaxAttempts: 5,
 		Timeout:     30 * time.Second,
 		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
 	}, config)
 }
 

@@ -47,6 +47,7 @@ func (t EmailChangeRequestEmailTask) Config() queue.QueueConfig {
 		MaxAttempts: 5,
 		Timeout:     time.Minute,
 		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
 	}
 }
 
@@ -126,6 +127,7 @@ func (t EmailChangeNoticeTask) Config() queue.QueueConfig {
 		MaxAttempts: 5,
 		Timeout:     time.Minute,
 		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

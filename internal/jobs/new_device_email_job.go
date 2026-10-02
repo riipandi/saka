@@ -41,6 +41,7 @@ func (t NewDeviceEmailTask) Config() queue.QueueConfig {
 		MaxAttempts: 5,
 		Timeout:     time.Minute,
 		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

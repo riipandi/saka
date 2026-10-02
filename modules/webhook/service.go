@@ -84,6 +84,7 @@ func (t DeliverTask) Config() queue.QueueConfig {
 		MaxAttempts: maxAttempts,
 		Timeout:     attemptCapSec * time.Second,
 		Backoff:     attemptCapSec * time.Second,
+		Retention:   queue.DeadLetter(),
 	}
 }
 

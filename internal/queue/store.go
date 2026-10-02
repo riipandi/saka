@@ -265,7 +265,7 @@ func flushCompleted(ctx context.Context, q datastore.Querier) (int64, error) {
 // exhausted their attempts and kept their payload, not yet expired under
 // their queue's retention. A dead task whose payload is gone cannot be
 // replayed, and it stays for the cleanup to expire.
-func deadRows(ctx context.Context, q datastore.Querier, at time.Time) ([]*completedRow, error) {
+func deadRows(ctx context.Context, q datastore.Querier, at time.Time, queue string) ([]*completedRow, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "task", "attempts", "last_duration_micro", "succeeded", "error", "expires_at", "last_executed_at", "created_at")
 	sb.From(completedTable)
@@ -274,6 +274,9 @@ func deadRows(ctx context.Context, q datastore.Querier, at time.Time) ([]*comple
 		sb.IsNotNull("task"),
 		sb.Or(sb.IsNull("expires_at"), sb.GT("expires_at", at)),
 	)
+	if queue != "" {
+		sb.Where(sb.Equal("queue", queue))
+	}
 	sb.OrderBy("id ASC")
 
 	query, args := sb.Build()

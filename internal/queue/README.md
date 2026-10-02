@@ -376,7 +376,7 @@ cleanup job schedules; nothing else calls it.
 Reports how many dead tasks a queue's archive holds: the ones that exhausted their attempts.
 They are the replay's raw material.
 
-### `(*Client).ReplayDead(ctx context.Context) (int64, error)`
+### `(*Client).ReplayDead(ctx context.Context, queue string) (int64, error)`
 
 Re-enqueues the dead tasks the archive still carries under a fresh identity with a fresh
 attempt budget, and reports how many went back. A dead task whose queue did not retain its

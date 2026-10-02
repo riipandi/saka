@@ -242,7 +242,7 @@ The engines' own operational surface — an operations console reads and acts on
 | POST     | `/rpc/tango.system.v1.QueueService/GetTask`                     | ConnectRPC   | One task's state + decoded payload (admin)          |
 | POST     | `/rpc/tango.system.v1.QueueService/ListDeadTasks`               | ConnectRPC   | One page of the failed archive (admin)              |
 | POST     | `/rpc/tango.system.v1.QueueService/CancelTask`                  | ConnectRPC   | Remove one unclaimed task; claimed answers `failed_precondition` (admin) |
-| POST     | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks`             | ConnectRPC   | Re-enqueue the dead tasks; answers how many went (admin) |
+| POST     | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks`             | ConnectRPC   | Re-enqueue one queue's — or every queue's — dead tasks; answers how many went (admin) |
 | POST     | `/rpc/tango.system.v1.QueueService/FlushPendingTasks`           | ConnectRPC   | Remove every unclaimed task (admin)                 |
 | POST     | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks`         | ConnectRPC   | Remove every archive record (admin)                 |
 | POST     | `/rpc/tango.system.v1.SchedulerService/ListJobs`                | ConnectRPC   | Cron state rows: spec, next_due, last_fired (admin) |
