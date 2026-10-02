@@ -78,7 +78,7 @@ func (f *fakeIssuer) IssueSession(_ context.Context, _ datastore.Querier, accoun
 	return signin.Result{SessionID: "sess_test", AccessToken: "at", RefreshToken: "rt"}, nil
 }
 
-func (f *fakeIssuer) FindAccountByID(_ context.Context, id uuid.UUID) (*signin.Account, error) {
+func (f *fakeIssuer) FindAccountByIDAny(_ context.Context, id uuid.UUID) (*signin.Account, error) {
 	if id != f.known {
 		return nil, errors.New("fakeIssuer: unknown account")
 	}

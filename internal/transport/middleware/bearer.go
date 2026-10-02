@@ -38,15 +38,23 @@ func BearerAuth(auth Authenticator, public map[string]struct{}, options []connec
 	return authn.NewMiddleware(publicOnly(auth, public), options...).Wrap(inner)
 }
 
-// publicOnly excuses the public procedures from the authenticator. An unknown
+// publicOnly excuses the public procedures from the authenticator's
+// refusal: a public procedure answers without a caller, and an unknown
 // path is not public, so it is refused as unauthenticated rather than
 // unimplemented — the refusal hides which procedures exist from a caller
-// without a token.
+// without a token. A bearer presented on a public procedure still
+// attaches its caller, best-effort: the optional-session shapes — the
+// MFA enrollment's session-or-bridge caller — read the claims when the
+// request carries them and answer the public refusal when it does not.
 func publicOnly(auth Authenticator, public map[string]struct{}) Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if procedure, ok := authn.InferProcedure(req.URL); ok {
 			if _, isPublic := public[procedure]; isPublic {
-				return nil, nil
+				identity, err := auth(ctx, req)
+				if err != nil {
+					return nil, nil
+				}
+				return identity, nil
 			}
 		}
 		return auth(ctx, req)

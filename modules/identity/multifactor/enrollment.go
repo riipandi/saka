@@ -55,7 +55,7 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 	// The label the authenticator renders — "Tango: user@example.com" — is
 	// the account the ceremony is for. An account the issuer cannot read is
 	// a caller the guard should have refused, so the failure is internal.
-	account, err := s.issuer.FindAccountByID(ctx, userID)
+	account, err := s.issuer.FindAccountByIDAny(ctx, userID)
 	if err != nil {
 		return BeginTotpEnrollmentResult{}, fmt.Errorf("multifactor: enrollment account: %w", err)
 	}

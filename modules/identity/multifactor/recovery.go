@@ -166,7 +166,7 @@ func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, r
 	// The target is resolved before the tables are read: an unknown
 	// identifier is the operator's typo, and it answers the not-found the
 	// other administrative refusals keep.
-	if _, err := s.issuer.FindAccountByID(ctx, targetUserID); err != nil {
+	if _, err := s.issuer.FindAccountByIDAny(ctx, targetUserID); err != nil {
 		return ErrUserNotFound
 	}
 
@@ -208,7 +208,7 @@ func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, r
 	// failed enqueue is best-effort — the removal has committed, and the
 	// audit record already says so.
 	if s.notices != nil {
-		account, findErr := s.issuer.FindAccountByID(ctx, targetUserID)
+		account, findErr := s.issuer.FindAccountByIDAny(ctx, targetUserID)
 		if findErr != nil {
 			return fmt.Errorf("multifactor: disable notice account: %w", findErr)
 		}

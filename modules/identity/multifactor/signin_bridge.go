@@ -131,7 +131,7 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 		return CompleteSignInResult{}, ErrPendingExhausted
 	}
 
-	account, err := s.issuer.FindAccountByID(ctx, pending.UserID)
+	account, err := s.issuer.FindAccountByIDAny(ctx, pending.UserID)
 	if err != nil {
 		return CompleteSignInResult{}, err
 	}

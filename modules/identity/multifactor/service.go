@@ -153,7 +153,7 @@ type cryptoCipher interface {
 // the sign-in service itself, so the session rules live in one place.
 type signinIssuer interface {
 	IssueSession(ctx context.Context, db datastore.Querier, account *signin.Account, provider, event string, params signin.SessionParams) (signin.Result, error)
-	FindAccountByID(ctx context.Context, id uuid.UUID) (*signin.Account, error)
+	FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*signin.Account, error)
 }
 
 // NewService builds the service. A nil cipher fails every sealing on use —
