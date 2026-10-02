@@ -73,6 +73,8 @@ var catalog = []Event{
 	{EventPasswordResetEmailSent, "A password reset message was submitted for delivery."},
 	{EventPasswordReset, "A credential was replaced through a reset token."},
 	{EventPasswordAdded, "An account's first password credential was set by its holder."},
+	{EventBlocklistEntryAdded, "A blocked identifier was stored in the sign-up blocklist."},
+	{EventBlocklistEntryRemoved, "A blocked identifier was removed from the sign-up blocklist."},
 	{EventSigninBreachedPassword, "A session opened on a credential the breach corpus knows — flagged for a forced change, not refused."},
 	{EventTestEmailSent, "The deployment's smoke message was submitted for delivery."},
 	{EventSettingUpdated, "A database-backed setting override was written."},

@@ -268,6 +268,14 @@ const (
 	// record commits in the transaction that inserts the hash.
 	EventPasswordAdded = "password_added"
 
+	// EventBlocklistEntryAdded is a blocked identifier stored. The record
+	// commits in the transaction that inserts the row.
+	EventBlocklistEntryAdded = "blocklist_entry_added"
+
+	// EventBlocklistEntryRemoved is a blocked identifier deleted. The
+	// record commits in the transaction that deletes the row.
+	EventBlocklistEntryRemoved = "blocklist_entry_removed"
+
 	// EventSigninBreachedPassword is a session that opened on a credential
 	// the breach corpus knows — the flag-and-force-change answer, not a
 	// refusal: a rejection here is an oracle and locks a breached account

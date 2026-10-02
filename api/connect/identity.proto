@@ -1273,3 +1273,135 @@ message UpdateUserGroupsResponse {
   // message is the human-readable sentence describing what the call did.
   string message = 3;
 }
+
+// BlocklistService administers the sign-up blocklist: the identifiers no
+// open-mode sign-up may claim while the feature's setting is on. Every
+// procedure is administrative — the caller must carry a Bearer token whose
+// claims name an administrator, the same rule the other admin surfaces
+// apply.
+//
+// An entry is one email address (`john.doe@example.com`) or one domain
+// (`@example.com`, every address at it), stored lowercased and matched
+// case-insensitively. A blocked exact address also blocks the subaddressed
+// variants of it (`john.doe+tag@example.com`); the wildcard patterns are
+// not part of this grammar.
+service BlocklistService {
+  // ListBlocklistEntries answers one page of the entries, newest first.
+  rpc ListBlocklistEntries(ListBlocklistEntriesRequest) returns (ListBlocklistEntriesResponse);
+
+  // AddBlocklistEntry stores one entry. Adding an entry the list already
+  // carries is not an error: the answer is the stored row, so the caller
+  // sees the identifier's real state. The pattern is validated against the
+  // grammar here as far as the contract can — the length — and fully in
+  // the service.
+  rpc AddBlocklistEntry(AddBlocklistEntryRequest) returns (AddBlocklistEntryResponse);
+
+  // RemoveBlocklistEntry deletes one entry by its identifier. An unknown
+  // identifier answers the not-found code.
+  rpc RemoveBlocklistEntry(RemoveBlocklistEntryRequest) returns (RemoveBlocklistEntryResponse);
+}
+
+// BlocklistEntry is one blocked identifier as the list answers it.
+message BlocklistEntry {
+  // id is the entry row's identifier, the UUID string.
+  string id = 1;
+
+  // pattern is the stored entry: the lowercased email address or the
+  // `@domain` entry.
+  string pattern = 2;
+
+  // created_by is the administrator who added the entry, in the account
+  // wire form, when the row still names a live account.
+  optional string created_by = 3;
+
+  // created_at is the instant the entry was added.
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// ListBlocklistEntriesRequest carries the page and the sort the caller asks
+// for. Both page fields unset answer the first default-sized page.
+message ListBlocklistEntriesRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "pattern"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListBlocklistEntriesResponse is the page of entries and the pagination
+// block.
+message ListBlocklistEntriesResponse {
+  // entries are the blocklist entries, newest first unless sort_by says
+  // otherwise.
+  repeated BlocklistEntry entries = 1;
+
+  // metadata is the pagination block the list responses carry.
+  tango.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// AddBlocklistEntryRequest names the identifier to block.
+message AddBlocklistEntryRequest {
+  // pattern is the email address or the `@domain` entry to block, at most
+  // one `@`, only as the address's separator or the entry's first byte.
+  // The length bound keeps the row from carrying prose; the grammar is the
+  // service's check.
+  string pattern = 1 [
+    (buf.validate.field).string.min_len = 3,
+    (buf.validate.field).string.max_len = 254
+  ];
+}
+
+// AddBlocklistEntryResponse is the entry as stored — on a duplicate, the
+// row that was already there.
+message AddBlocklistEntryResponse {
+  // entry is the stored row.
+  BlocklistEntry entry = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// RemoveBlocklistEntry names the entry to delete.
+message RemoveBlocklistEntryRequest {
+  // id is the entry row's identifier, the UUID string the list answered.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RemoveBlocklistEntryResponse is empty: a successful deletion says so with
+// the protocol, and a missed one with the not-found code.
+message RemoveBlocklistEntryResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}

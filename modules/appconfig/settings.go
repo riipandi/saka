@@ -117,6 +117,22 @@ const (
 	// on.
 	SettingAccessAllowlist = "access.allowlist"
 
+	// SettingAccessBlocklistEnabled turns the sign-up blocklist on; off,
+	// the blocklist_entries table is dead and nothing is refused for it.
+	SettingAccessBlocklistEnabled = "access.blocklist_enabled"
+
+	// SettingAccessBlockEmailSubaddresses blocks an address whose base —
+	// the address with its subaddress removed — an existing account
+	// already holds, at sign-up and when an email change names the new
+	// address. The first sign-up for a base passes even when subaddressed.
+	SettingAccessBlockEmailSubaddresses = "access.block_email_subaddresses"
+
+	// SettingAccessBlocklistAppliesToSignins applies the allowlist and the
+	// blocklist at sign-in too, not only at sign-up. Dead while both lists
+	// are off; the subaddress blocker has no sign-in side — an account
+	// that already holds a subaddressed address keeps signing in.
+	SettingAccessBlocklistAppliesToSignins = "access.blocklist_applies_to_signins"
+
 	// SettingAuthSignupEmailEnabled gates the email identity at sign-up.
 	SettingAuthSignupEmailEnabled = "auth.signup_email_enabled"
 
@@ -269,6 +285,21 @@ func Catalog() []SettingDef {
 			Key:         SettingAccessAllowlist,
 			Default:     "",
 			Description: "The accepted sign-up addresses or @domain entries, comma- or newline-separated. Read only when access.allowlist_enabled is on.",
+		},
+		{
+			Key:         SettingAccessBlocklistEnabled,
+			Default:     "false",
+			Description: "Whether sign-ups are refused for the identifiers the blocklist names. Off, the blocklist table is dead text.",
+		},
+		{
+			Key:         SettingAccessBlockEmailSubaddresses,
+			Default:     "false",
+			Description: "Whether an address whose base an existing account already holds is refused at sign-up and at email change. The first sign-up for a base passes even when subaddressed.",
+		},
+		{
+			Key:         SettingAccessBlocklistAppliesToSignins,
+			Default:     "false",
+			Description: "Whether the allowlist and the blocklist also apply at sign-in. Dead while both lists are off; the subaddress blocker never applies at sign-in.",
 		},
 		{
 			Key:         SettingAuthSignupEmailEnabled,

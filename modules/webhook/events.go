@@ -147,6 +147,8 @@ var catalog = []Event{
 	{Source: audit.EventSchedulerJobRunNow, Name: "scheduler.job_run_now", Description: "A scheduled job was run on demand by an administrator."},
 
 	{Source: audit.EventPasswordAdded, Name: "user.password_added", Description: "An account's first password credential was set by its holder."},
+	{Source: audit.EventBlocklistEntryAdded, Name: "blocklist.entry_added", Description: "A blocked identifier was stored in the sign-up blocklist."},
+	{Source: audit.EventBlocklistEntryRemoved, Name: "blocklist.entry_removed", Description: "A blocked identifier was removed from the sign-up blocklist."},
 	{Source: audit.EventWebauthnReauthenticationCodeSent, Name: "session.reauthentication_code_sent", Description: "A reverification code was handed to the mail queue."},
 	{Name: EventTest, Description: "A test delivery was sent, at the operator's command — no record caused it."},
 }
