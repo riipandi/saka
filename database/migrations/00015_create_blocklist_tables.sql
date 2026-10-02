@@ -10,7 +10,7 @@ CREATE TABLE public.blocklist_entries (
     pattern text NOT NULL UNIQUE,
     created_by uuid REFERENCES public.users (id) ON DELETE SET NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT blocklist_entries_pattern_shape CHECK (pattern ~ '^([a-z0-9._%+=-]+(@[a-z0-9.-]+)?|@[a-z0-9.-]+)$')
+    CONSTRAINT blocklist_entries_pattern_shape CHECK (pattern ~ '^([a-z0-9._%+=-]+@[a-z0-9.-]+|@[a-z0-9.-]+)$')
 );
 
 -- +goose Down

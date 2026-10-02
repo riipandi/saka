@@ -73,6 +73,10 @@ type Service struct {
 	// policy is the credential check's runtime source. Nil keeps the
 	// static policy.
 	policy *password.Validator
+	// blocklist is the blocked-identifier gate the area wires after
+	// construction. Nil leaves the gate open — the state a test or a bare
+	// wiring is in — and the toggle decides whether the wired gate reads.
+	blocklist BlocklistChecker
 }
 
 // settingsReader is the sign-up policy's runtime source: the access mode,
@@ -91,6 +95,7 @@ const (
 	SettingAccessMode             = "access.mode"
 	SettingAccessAllowlistEnabled = "access.allowlist_enabled"
 	SettingAccessAllowlist        = "access.allowlist"
+	SettingAccessBlocklistEnabled = "access.blocklist_enabled"
 	SettingSignupUsernameEnabled  = "auth.signup_username_enabled"
 	SettingRequireUsername        = "auth.require_username"
 	SettingVerifyEmailAtSignup    = "auth.verify_email_at_signup"
@@ -130,6 +135,7 @@ type signupPolicy struct {
 	stampVerified   bool
 	allowlistOn     bool
 	allowlist       []string
+	blocklistOn     bool
 	usernameOn      bool
 	requireUsername bool
 	verifyEmail     bool
@@ -160,6 +166,11 @@ func (s *Service) policyOf(ctx context.Context) signupPolicy {
 		} else {
 			p.allowlist = splitAllowlist(list)
 		}
+	}
+	if on, err := s.settings.GetBool(ctx, SettingAccessBlocklistEnabled); err != nil {
+		s.log.WarnContext(ctx, "signup: access.blocklist_enabled unreadable; using the default", "error", err)
+	} else {
+		p.blocklistOn = on
 	}
 	if on, err := s.settings.GetBool(ctx, SettingSignupUsernameEnabled); err != nil {
 		s.log.WarnContext(ctx, "signup: auth.signup_username_enabled unreadable; using the default", "error", err)
@@ -264,6 +275,29 @@ func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
 	return s
 }
 
+// BlocklistChecker is the blocklist seam: the one question the sign-up gate
+// asks of the feature that owns the entries. The interface is this package's
+// — the consuming side defines it — and the identity area satisfies it with
+// the blocklist service after construction.
+type BlocklistChecker interface {
+	Blocked(ctx context.Context, address string) (bool, error)
+}
+
+// WithBlocklist wires the blocked-identifier gate. Nil keeps the gate open.
+func (s *Service) WithBlocklist(checker BlocklistChecker) *Service {
+	s.blocklist = checker
+	return s
+}
+
+// blocklistBlocked asks the wired gate. An unwired gate never blocks: the
+// bare wiring runs without the feature, the same state its tests build.
+func (s *Service) blocklistBlocked(ctx context.Context, address string) (bool, error) {
+	if s.blocklist == nil {
+		return false, nil
+	}
+	return s.blocklist.Blocked(ctx, address)
+}
+
 // validatePassword runs the credential through the wired policy.
 func (s *Service) validatePassword(ctx context.Context, clearText string) error {
 	if s.policy != nil {
@@ -299,10 +333,26 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 		return user.UserView{}, ErrUsernameRequired
 	}
 
-	// The allowlist is an open-mode filter, checked before anything touches
-	// the database: a refused address earns a cheap, account-blind refusal.
-	if !p.inviteMode && p.allowlistOn && !allowlisted(params.Email, p.allowlist) {
-		return user.UserView{}, ErrSignupNotAllowed
+	// The allowlist and the blocklist are open-mode filters, checked before
+	// anything touches the database: a refused address earns a cheap,
+	// account-blind refusal. The allowlist wins the two lists' conflict —
+	// an address it accepts passes the blocklist, so its answer decides
+	// both gates — and a blocklist that cannot be read lets the sign-up
+	// pass: a broken read must never lock the deployment out of its own
+	// door.
+	if !p.inviteMode {
+		accepted := p.allowlistOn && allowlisted(params.Email, p.allowlist)
+		if p.allowlistOn && !accepted {
+			return user.UserView{}, ErrSignupNotAllowed
+		}
+		if !accepted && p.blocklistOn {
+			blocked, blockedErr := s.blocklistBlocked(ctx, params.Email)
+			if blockedErr != nil {
+				s.log.WarnContext(ctx, "signup: the blocklist is unreadable; letting the sign-up pass", "error", blockedErr)
+			} else if blocked {
+				return user.UserView{}, ErrSignupNotAllowed
+			}
+		}
 	}
 
 	name := displayName(params.FirstName, params.LastName)

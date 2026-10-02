@@ -15,6 +15,7 @@ import (
 
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/user"
@@ -708,4 +709,147 @@ func TestSignupJoinsTheGroupsTheTokenCarried(t *testing.T) {
 		GroupIDs: []string{usergroup.FormatID(uuid.Nil())},
 	})
 	require.ErrorIs(t, err, ErrGroupNotFound)
+}
+
+// fakeBlocklist is the gate's test double: it answers from a pattern list
+// the way the real service does, and its read can fail on demand.
+type fakeBlocklist struct {
+	patterns []string
+	failing  bool
+	asked    []string
+}
+
+func (f *fakeBlocklist) Blocked(_ context.Context, address string) (bool, error) {
+	if f.failing {
+		return false, errors.New("the blocklist is unreadable")
+	}
+	f.asked = append(f.asked, address)
+	// The real match, borrowed directly: the helper is pure, so the double
+	// answers exactly what the wired gate answers.
+	return blocklist.Matches(address, f.patterns), nil
+}
+
+// openMode is the catalog the open-mode tests read: no invite token, no
+// allowlist, and the blocklist toggle as the test set it.
+func openSignup(blocklistOn bool) signupSettings {
+	return signupSettings{
+		SettingAccessMode:             "open",
+		SettingAccessAllowlistEnabled: "false",
+		SettingAccessBlocklistEnabled: map[bool]string{true: "true", false: "false"}[blocklistOn],
+	}
+}
+
+// TestSignupRefusesABlockedAddress pins the blocklist gate: the toggle on,
+// a blocked address — and the subaddressed variant of it, which the real
+// gate's carry-over answers — is refused with the same failure an
+// allowlist refusal and a closed mode carry, so the refusal names nothing.
+func TestSignupRefusesABlockedAddress(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.WithSignupSettings(openSignup(true))
+	gate := &fakeBlocklist{patterns: []string{"john.doe@example.com", "@spam.example"}}
+	service.WithBlocklist(gate)
+
+	for _, address := range []string{"john.doe@example.com", "JOHN.DOE@EXAMPLE.COM", "hermione@spam.example"} {
+		_, err := service.Signup(t.Context(), Params{
+			Username: "rongranger",
+			Email:    address,
+			Password: "expecto-patronum",
+		})
+		assert.ErrorIs(t, err, ErrSignupNotAllowed, "%q", address)
+	}
+	assert.Equal(t, 0, userCount(t, pool), "a refused sign-up created nothing")
+}
+
+// TestSignupLetsAnUnblockedAddressPass pins the gate's other side: the
+// toggle on and the address unblocked, the sign-up runs to its account.
+func TestSignupLetsAnUnblockedAddressPass(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.WithSignupSettings(openSignup(true))
+	service.WithBlocklist(&fakeBlocklist{patterns: []string{"john.doe@example.com"}})
+
+	_, err := service.Signup(t.Context(), Params{
+		Username: "hermione",
+		Email:    "hermione@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+}
+
+// TestSignupAppliesTheAllowlistOverTheBlocklist pins the lists' precedence:
+// an address the allowlist accepts passes even when the blocklist names it,
+// so the two lists' one conflict is decided the same way every time.
+func TestSignupAppliesTheAllowlistOverTheBlocklist(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.WithSignupSettings(signupSettings{
+		SettingAccessMode:             "open",
+		SettingAccessAllowlistEnabled: "true",
+		SettingAccessAllowlist:        "@example.com",
+		SettingAccessBlocklistEnabled: "true",
+	})
+	// The gate would refuse everything it is asked about — the allowlist
+	// must answer first for the sign-up to pass at all.
+	service.WithBlocklist(&fakeBlocklist{patterns: []string{"hermione@example.com"}})
+
+	_, err := service.Signup(t.Context(), Params{
+		Username: "hermione",
+		Email:    "hermione@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+}
+
+// TestSignupToleratesAnUnreadableBlocklist pins the fail-open stance: a
+// broken read refuses nothing — a deployment's own door never locks for a
+// breakage.
+func TestSignupToleratesAnUnreadableBlocklist(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.WithSignupSettings(openSignup(true))
+	service.WithBlocklist(&fakeBlocklist{failing: true})
+
+	_, err := service.Signup(t.Context(), Params{
+		Username: "hermione",
+		Email:    "hermione@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+}
+
+// TestSignupWithoutTheBlocklistToggleOrTheSeam pins the off states: the
+// toggle off keeps the gate shut even with a gate wired, and a bare wiring
+// — no seam at all — keeps the sign-up running.
+func TestSignupWithoutTheBlocklistToggleOrTheSeam(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+
+	toggleOff := testService(t, pool)
+	toggleOff.WithSignupSettings(openSignup(false))
+	toggleOff.WithBlocklist(&fakeBlocklist{patterns: []string{"hermione@example.com"}})
+	_, err := toggleOff.Signup(t.Context(), Params{
+		Username: "hermione",
+		Email:    "hermione@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err, "the toggle off, the wired gate is not asked")
+
+	noSeam := testService(t, pool)
+	noSeam.WithSignupSettings(openSignup(true))
+	_, err = noSeam.Signup(t.Context(), Params{
+		Username: "rongranger",
+		Email:    "rongranger@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err, "no seam, no gate")
 }

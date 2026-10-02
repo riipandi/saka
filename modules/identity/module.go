@@ -36,6 +36,7 @@ import (
 	"github.com/riipandi/tango/modules/appconfig"
 	"github.com/riipandi/tango/modules/devicelogin"
 	"github.com/riipandi/tango/modules/identity/authorization"
+	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
@@ -113,6 +114,11 @@ type Deps struct {
 	// Authorization administers the roles, the permission catalog's mirror,
 	// and the grants that bind them to accounts.
 	Authorization *authorization.Service
+
+	// Blocklist is the sign-up blocklist: the entries, and the gate the
+	// sign-up and sign-in features ask through their seams. A nil service
+	// leaves every gate open.
+	Blocklist *blocklist.Service
 
 	// Storage is the file engine the profile pictures live in. A nil engine
 	// leaves the picture procedures refusing while the account procedures
@@ -324,6 +330,13 @@ var Package = do.Package(
 			service.WithPasswordPolicy(policy)
 		}
 		return service, nil
+	}),
+
+	do.Lazy(func(i do.Injector) (*blocklist.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		return blocklist.NewService(pool, recorder, log), nil
 	}),
 
 	do.Lazy(func(i do.Injector) (*user.Service, error) {
@@ -567,6 +580,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		ExposeResetToken: c.App.ExposeResetToken && c.App.Mode == config.ModeDevelopment,
 		UserGroups:       do.MustInvoke[*usergroup.Service](i),
 		Authorization:    do.MustInvoke[*authorization.Service](i),
+		Blocklist:        do.MustInvoke[*blocklist.Service](i),
 		DeviceLogin:      do.MustInvoke[*devicelogin.Service](i),
 	}), nil
 }
@@ -593,6 +607,16 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.Verification != nil {
 		modules = append(modules, verification.NewModule(deps.Verification))
+	}
+	if deps.Blocklist != nil {
+		// The blocklist's gates ride the post-construction seams: the
+		// sign-up and sign-in features define the interfaces they ask
+		// through, and the blocklist service satisfies them here — the
+		// feature packages must not import each other.
+		if deps.Signup != nil {
+			deps.Signup.WithBlocklist(deps.Blocklist)
+		}
+		modules = append(modules, blocklist.NewModule(deps.Blocklist))
 	}
 	if deps.OneTimeAccess != nil {
 		modules = append(modules, onetimeaccess.NewModule(deps.OneTimeAccess))
