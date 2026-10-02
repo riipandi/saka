@@ -116,18 +116,15 @@ Keep this document as simple as possible!
   - Bulk user enumeration protection: Less private, more common - rate limits prevent determining which email addresses and phone numbers are registered in bulk, but targeted attacks are still feasible.
   - Strict user enumeration protection: More private - logical changes prevent attackers from determining if even a single email address or phone number has an account.
 
-### Email Rules (deferred)
+### Email Rules
 
-- [ ] **Block sign-ups that use disposable email addresses**: If enabled, all sign-up attempts using an email address from a disposable email domain will be rejected.
 - [x] **Block email subaddresses**: Prevent multiple accounts from signing up with one email address. Once an email is registered, subaddressed variants like `<foo+tag@example.com>`, `<a.lice@gmail.com>`, and `<bob-tag@yahoo.com>` are blocked from signing up or being added to an existing account.
-  Shipped as `access.block_email_subaddresses` (default false). The base comparison cuts the subaddress separators (`+`, `=`, `#` everywhere; `-` additionally at Yahoo's exact domains) and folds the dots at Gmail's domains (`gmail.com`, `googlemail.com`) — `a.lice@gmail.com` is Gmail's dot-fold reading, not a Yahoo hyphen. The first sign-up for a base passes even when subaddressed; the collision scan fails open when its read breaks. An email change (`RequestEmailChange`) toward an address whose base another account holds answers `failed_precondition` without naming the collided account. `modules/identity/blocklist` owns the helpers; the sign-up and verification features reach them through their own seams.
+- [x] **Block sign-ups that use disposable email addresses**: If enabled, all sign-up attempts using an email address from a disposable email domain will be rejected.
 
 ### Blocklist
 
 - [x] **Blocklist**: Block specific account identifiers from signing up. (default: false)
-  Shipped as `access.blocklist_enabled` plus the admin CRUD `tango.identity.v1.BlocklistService` over `public.blocklist_entries`. An entry is one email address or one `@domain` entry (the domain exact — a subdomain is a different domain); no wildcards. A blocked exact address carries over to its subaddressed variants. The refusal is the generic `not_found` "sign-up is not available". The allowlist wins: an address the allowlist accepts signs up even when the blocklist names it.
 - [x] **Apply allowlist and blocklist to sign-ins**: When enabled, the allowlist and blocklist will also apply to user sign-ins, not just sign-ups. (default: false)
-  Shipped as `access.blocklist_applies_to_signins`, read at every session mint inside `IssueSession` — every session-opening path (password, one-time access, MFA bridge) passes it. The refusal is `permission_denied` "sign-in is not permitted", and it answers only a proven credential: a wrong password still answers `invalid credentials`. Both toggles must be on for the lists to govern sign-ins.
 
 > Must enable the blocklist or the allowlist to use this setting.
 
