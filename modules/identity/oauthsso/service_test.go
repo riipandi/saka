@@ -25,7 +25,14 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 // the test hands in.
 func testService(t *testing.T, pool *datastore.Postgres, fetcher DiscoveryFetcher) *Service {
 	t.Helper()
-	return NewService(pool, testCipher(t), audit.NewRecorder(nil), fetcher, nil)
+	// The builtin slugs are the wiring's, not the row's: a create names a
+	// shipped provider only when the adapter set declares it, and a custom
+	// slug that collides with one is reserved. The adapters themselves are
+	// nil — these tests never begin a flow.
+	return NewService(pool, testCipher(t), audit.NewRecorder(nil), fetcher, nil).
+		WithProviders(ProviderSet{
+			Builtin: map[string]Provider{"google": nil, "github": nil},
+		})
 }
 
 // testCipher is the sealing key the container tests share.
@@ -145,13 +152,15 @@ func TestCreateRefusesAnUnknownBuiltinSlug(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidConnection)
 }
 
-func TestCreateBuiltinFillsTheShippedScopesAndCarriesNoEndpoints(t *testing.T) {
+func TestCreateBuiltinStoresNoEndpointsOfItsOwn(t *testing.T) {
 	pool := migratedPool(t)
 	service := testService(t, pool, nil)
 
 	created, err := service.Create(t.Context(), builtinParams())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"read:user", "user:email"}, created.Scopes)
+	// An empty scope list is the adapter's own default, read at the
+	// authorize request — the row stores none of the definition's.
+	assert.Empty(t, created.Scopes)
 	assert.Empty(t, created.Endpoints.Authorization)
 	assert.Empty(t, created.Endpoints.Token)
 }

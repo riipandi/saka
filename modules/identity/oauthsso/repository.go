@@ -176,6 +176,145 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 	return tag.RowsAffected() > 0, nil
 }
 
+// ---- The flows ----
+
+const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code_verifier,
+	stage, user_id, email, email_code_hash, wrong_codes, provider_account_id,
+	email_verified, given_name, family_name, profile, access_token, refresh_token,
+	redirect_to, created_at, expires_at`
+
+// CreateFlow writes one pending ceremony row. The state hash is the only
+// handle that exists yet — the flow token is minted at the callback, the
+// moment the SPA first carries it.
+func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connID uuid.UUID, stateHash, nonce, sealedVerifier string, expiresAt time.Time) (uuid.UUID, error) {
+	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	sb.InsertInto(flowTable)
+	sb.Cols("connection_id", "state_hash", "nonce", "code_verifier", "stage", "expires_at")
+	sb.Values(connID, stateHash, nonce, sealedVerifier, string(StagePending), expiresAt)
+	sb.SQL("RETURNING id")
+	query, args := sb.Build()
+
+	var id uuid.UUID
+	err := db.QueryRow(ctx, query, args...).Scan(&id)
+	if err != nil {
+		var pg *pgconn.PgError
+		if errors.As(err, &pg) && pg.Code == "23505" {
+			return uuid.Nil(), fmt.Errorf("oauthsso: the flow's state collided with a live one")
+		}
+		return uuid.Nil(), err
+	}
+	return id, nil
+}
+
+// PendingByState reads the one pending ceremony the state names: the row
+// the callback's browser carries, still un-consumed and inside its
+// window. An unknown, spent, or expired state is the same not-found —
+// the state is the credential, and a dead one answers nothing.
+func (r *Repository) PendingByState(ctx context.Context, stateHash string) (Flow, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(flowColumns)
+	sb.From(flowTable)
+	sb.Where(
+		sb.Equal("state_hash", stateHash),
+		sb.Equal("stage", string(StagePending)),
+		sb.IsNull("flow_token_hash"),
+		sb.GreaterThan("expires_at", time.Now().UTC()),
+	)
+	query, args := sb.Build()
+	return scanFlow(r.pool.QueryRow(ctx, query, args...))
+}
+
+// ConsumePending spends the pending ceremony on the identity the provider
+// answered. The WHERE holds `pending` and the NULL flow token, so of two
+// concurrent callbacks exactly one wins and the loser sees zero rows —
+// the state is single-use. The fresh flow token's hash is written here,
+// at the moment the SPA first carries it.
+func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, id uuid.UUID, resolution FlowResolution) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(
+		sb.Assign("stage", string(StageResolved)),
+		sb.Assign("flow_token_hash", resolution.FlowTokenHash),
+		sb.Assign("provider_account_id", resolution.ProviderAccountID),
+		sb.Assign("email", resolution.Email),
+		sb.Assign("email_verified", resolution.EmailVerified),
+		sb.Assign("given_name", resolution.GivenName),
+		sb.Assign("family_name", resolution.FamilyName),
+		sb.Assign("profile", profileJSONFromBytes(resolution.Profile)),
+		sb.Assign("access_token", resolution.SealedAccessToken),
+		sb.Assign("refresh_token", resolution.SealedRefreshToken),
+	)
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StagePending)), sb.IsNull("flow_token_hash"))
+	query, args := sb.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// LiveByFlowToken reads the ceremony the SPA's handle names, inside its
+// window and not yet completed. The stages it may rest in are the
+// caller's — the completion paths judge which ones they serve.
+func (r *Repository) LiveByFlowToken(ctx context.Context, db datastore.Querier, tokenHash string, stages ...FlowStage) (Flow, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(flowColumns)
+	sb.From(flowTable)
+	sb.Where(sb.Equal("flow_token_hash", tokenHash), sb.GreaterThan("expires_at", time.Now().UTC()))
+	if len(stages) > 0 {
+		words := make([]any, 0, len(stages))
+		for _, stage := range stages {
+			words = append(words, string(stage))
+		}
+		sb.Where(sb.In("stage", words...))
+	}
+	query, args := sb.Build()
+	return scanFlow(db.QueryRow(ctx, query, args...))
+}
+
+// DeleteExpiredFlows purges the ceremony rows past their expiry — the
+// sweep's delete. Every read filters on a live expiry, so an expired row
+// is unreachable before this sweep removes it.
+func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int64, error) {
+	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbt.DeleteFrom(flowTable)
+	dbt.Where(dbt.LessThan("expires_at", now))
+	query, args := dbt.Build()
+	tag, err := r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// scanFlow renders one row onto the view. The hash and sealed columns
+// stay as stored — the callers unseal at their own boundary.
+func scanFlow(row pgx.Row) (Flow, error) {
+	var flow Flow
+	err := row.Scan(&flow.ID, &flow.ConnectionID, &flow.StateHash, &flow.FlowTokenHash,
+		&flow.Nonce, &flow.CodeVerifier, &flow.Stage, &flow.UserID, &flow.Email,
+		&flow.EmailCodeHash, &flow.WrongCodes, &flow.ProviderAccountID,
+		&flow.EmailVerified, &flow.GivenName, &flow.FamilyName, &flow.Profile,
+		&flow.AccessToken, &flow.RefreshToken, &flow.RedirectTo, &flow.CreatedAt,
+		&flow.ExpiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Flow{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return Flow{}, err
+	}
+	return flow, nil
+}
+
+// profileJSONFromBytes passes the identity document through for its JSONB
+// column: an empty document is the column's empty object, never NULL.
+func profileJSONFromBytes(profile []byte) any {
+	if len(profile) == 0 {
+		return []byte(`{}`)
+	}
+	return profile
+}
+
 // scanConnection renders one row onto the view. The client secret rides
 // exactly as stored — sealed — and every surface read drops it before the
 // answer leaves the service.
@@ -230,7 +369,7 @@ func nullIfEmpty(s string) any {
 // struct — a builtin connection, whose endpoints are the code's own — is
 // the column's NULL.
 func endpointsJSON(e Endpoints) any {
-	if e.Authorization == "" && e.Token == "" && e.Userinfo == "" && e.Jwks == "" {
+	if e.Issuer == "" && e.Authorization == "" && e.Token == "" && e.Userinfo == "" && e.Jwks == "" {
 		return nil
 	}
 	raw, err := json.Marshal(e)

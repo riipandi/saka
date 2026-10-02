@@ -10,27 +10,33 @@ import (
 // ModuleName names the feature in composition reports and logs.
 const ModuleName = "oauthsso"
 
-// Module serves the OAuth SSO feature. The connection procedures ride the
-// RPC surface today; the flow's REST routes join the mount in the flow
-// phase, on this module's own router.
+// Module serves the OAuth SSO feature: the connection procedures, the
+// flow's REST routes, and — in the phases that follow — the resolution
+// and the account surfaces.
 type Module struct {
 	service    *Service
 	rpcHandler *rpcHandler
+	rest       *handler
 }
 
 // NewModule builds the module over the connection service.
 func NewModule(service *Service) *Module {
-	return &Module{service: service, rpcHandler: newRPCHandler(service)}
+	return &Module{
+		service:    service,
+		rpcHandler: newRPCHandler(service),
+		rest:       newHandler(service),
+	}
 }
 
 // Name reports the module in composition reports.
 func (m *Module) Name() string { return ModuleName }
 
-// Mount registers the feature's REST routes. The flow's start and callback
-// are the routes a browser crosses mid-redirect; they join in the flow
-// phase, and until then the feature mounts nothing on the application
-// router.
-func (m *Module) Mount(r chi.Router) {}
+// Mount registers the flow's REST routes. Both sit outside the bearer
+// group — the browser crossing them holds no token, that being the point
+// of the feature.
+func (m *Module) Mount(r chi.Router) {
+	m.rest.Mount(r)
+}
 
 // MountRPC registers the OAuth SSO procedures on the RPC router. The
 // handler options are the transport's — the shared snake_case codec and
@@ -39,6 +45,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	_, connectHandler := authnv1connect.NewOAuthSSOServiceHandler(m.rpcHandler, opts...)
 	r.Handle(authnv1connect.OAuthSSOServiceBeginSignInProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceContinueSignInProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceListConnectionsProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceGetConnectionProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceCreateConnectionProcedure, connectHandler)

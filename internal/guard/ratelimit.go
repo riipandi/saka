@@ -66,8 +66,11 @@ var RateAuthProcedures = map[string]struct{}{
 	authnv1connect.WebAuthnServiceVerifyLoginProcedure: {},
 	// The OAuth continue is a credential spend like the second factor's
 	// complete: the flow token is the single-use credential the procedure
-	// judges, and its success mints the token pair.
-	authnv1connect.OAuthSSOServiceContinueSignInProcedure: {},
+	// judges, and its success mints the token pair. The email-code spend
+	// rides the same bucket — the code is the guess, three wrong answers
+	// end the flow.
+	authnv1connect.OAuthSSOServiceContinueSignInProcedure:    {},
+	authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure: {},
 	// The email senders an authenticated or administrative caller reaches:
 	// a compromised account or an impatient operator must not become a
 	// mailbomb, so they count against the same tight budget as the public

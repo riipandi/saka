@@ -12,7 +12,6 @@ import (
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/oauthsso/builtin"
 	"github.com/riipandi/tango/pkg/crypto"
 )
 
@@ -76,9 +75,54 @@ type Service struct {
 	fetcher DiscoveryFetcher
 	log     *slog.Logger
 
+	// providers are the adapters the flows run through, wired after
+	// construction by the area: the feature root must not import the
+	// adapter packages, which import it for its types. A missing adapter
+	// — a builtin slug the set does not name, a nil custom adapter —
+	// refuses at the begin rather than failing the run.
+	providers ProviderSet
+
+	// baseURL is the origin the redirect URI and the SPA redirect are
+	// built from, wired after construction with the base URL.
+	baseURL string
+
 	// now is the instant the service's decisions read. It is a field so a
 	// test can hold the clock still without waiting out a window.
 	now func() time.Time
+}
+
+// ProviderSet is the adapter collection the area wires: the builtin
+// adapters by slug, and the one generic OIDC adapter every custom
+// connection shares.
+type ProviderSet struct {
+	Builtin map[string]Provider
+	Custom  Provider
+}
+
+// WithProviders wires the adapter set the flows run through. The wiring
+// rides the post-construction seam because the adapter packages import
+// this one for its types.
+func (s *Service) WithProviders(set ProviderSet) *Service {
+	s.providers = set
+	return s
+}
+
+// providerFor answers the adapter a connection's kind and slug run
+// through. A connection whose adapter the set does not name is a wiring
+// defect the flow refuses at the begin — the same fail-closed answer a
+// missing feature service gets.
+func (s *Service) providerFor(conn Connection) (Provider, error) {
+	switch conn.Kind {
+	case KindBuiltin:
+		if provider, ok := s.providers.Builtin[conn.Provider]; ok && provider != nil {
+			return provider, nil
+		}
+	case KindCustom:
+		if s.providers.Custom != nil {
+			return s.providers.Custom, nil
+		}
+	}
+	return nil, fmt.Errorf("oauthsso: no provider adapter is wired for %s connection %q", conn.Kind, conn.Provider)
 }
 
 // NewService builds the feature. A nil cipher is a deployment without an
@@ -270,24 +314,22 @@ func (s *Service) build(ctx context.Context, params ConnectionParams) (Connectio
 	switch conn.Kind {
 	case KindBuiltin:
 		// The endpoints are the code's own: a builtin create carries its
-		// credentials and nothing else, and the slug must name a shipped
-		// provider.
-		if _, ok := builtin.BySlug(conn.Provider); !ok {
+		// credentials and nothing else, and the slug must name an
+		// adapter the wiring shipped.
+		if _, ok := s.providers.Builtin[conn.Provider]; !ok {
 			return Connection{}, fmt.Errorf("%w: %q does not name a builtin provider", ErrInvalidConnection, conn.Provider)
 		}
 		if conn.DiscoveryURL != "" || conn.Endpoints.Authorization != "" || conn.Endpoints.Token != "" {
 			return Connection{}, fmt.Errorf("%w: a builtin connection carries no endpoints of its own", ErrInvalidConnection)
 		}
-		if len(conn.Scopes) == 0 {
-			def, _ := builtin.BySlug(conn.Provider)
-			conn.Scopes = def.Scopes
-		}
+		// An empty scope list is the adapter's own default set, read at
+		// the authorize request — the definition owns it, not the row.
 		conn.AttributeMapping = AttributeMapping{}
 	case KindCustom:
 		// The builtin slugs are reserved: a custom connection named
 		// `google` would answer BeginSignIn with the operator's endpoints
 		// under the code's name.
-		if _, reserved := builtin.BySlug(conn.Provider); reserved {
+		if _, reserved := s.providers.Builtin[conn.Provider]; reserved {
 			return Connection{}, fmt.Errorf("%w: %q is a builtin provider's slug", ErrInvalidConnection, conn.Provider)
 		}
 		if conn.Provider == "" {

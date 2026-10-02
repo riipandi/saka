@@ -70,21 +70,27 @@ CREATE TRIGGER trg_oauth_linked_accounts_deleted_record AFTER DELETE ON public.o
 -- The state and the flow token rest hashed (the raw values travel with
 -- the browser), the PKCE verifier rests sealed, and the stage carries
 -- the flow's position: pending (the callback has not resolved it),
--- verify_email (the provider's address needs the email code),
--- require_names (the provider answered no given or family names), and
--- completed (spent). Several live flows per account are legitimate — a
--- flow names no account until the callback resolves one, so there is no
--- uniqueness on the holder.
+-- resolved (the provider answered an identity; the resolution at the
+-- continue decides the account), verify_email (the provider's address
+-- needs the email code), require_names (the provider answered no given
+-- or family names), and completed (spent). Several live flows per
+-- account are legitimate — a flow names no account until the resolution
+-- picks one, so there is no uniqueness on the holder. The resolved
+-- identity and the tokens the provider minted rest on the row until the
+-- resolution binds them; the tokens are sealed like every other secret.
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.oauth_flows (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     connection_id UUID NOT NULL REFERENCES public.oauth_connections(id) ON DELETE CASCADE,
     state_hash TEXT NOT NULL UNIQUE,
-    flow_token_hash TEXT NOT NULL UNIQUE,
+    -- The flow token the SPA carries after the callback: NULL while the
+    -- browser is out walking (the state is the only handle then), written
+    -- hashed by the consume that resolves the identity.
+    flow_token_hash TEXT UNIQUE,
     nonce TEXT NOT NULL DEFAULT '',
     code_verifier TEXT NOT NULL DEFAULT '' CHECK (code_verifier = '' OR code_verifier LIKE 'enc:%'),
-    stage TEXT NOT NULL CHECK (stage IN ('pending', 'verify_email', 'require_names', 'completed')),
+    stage TEXT NOT NULL CHECK (stage IN ('pending', 'resolved', 'verify_email', 'require_names', 'completed')),
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     email TEXT NOT NULL DEFAULT '',
     -- The email code's hash while the verify_email stage stands, and the
@@ -92,6 +98,15 @@ CREATE TABLE IF NOT EXISTS public.oauth_flows (
     -- keep.
     email_code_hash TEXT NOT NULL DEFAULT '',
     wrong_codes INT NOT NULL DEFAULT 0,
+    -- The identity the callback resolved, held on the row until the
+    -- resolution binds it.
+    provider_account_id TEXT NOT NULL DEFAULT '',
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE CHECK (email_verified IN (TRUE, FALSE)),
+    given_name TEXT NOT NULL DEFAULT '',
+    family_name TEXT NOT NULL DEFAULT '',
+    profile JSONB NOT NULL DEFAULT '{}',
+    access_token TEXT NOT NULL DEFAULT '' CHECK (access_token = '' OR access_token LIKE 'enc:%'),
+    refresh_token TEXT NOT NULL DEFAULT '' CHECK (refresh_token = '' OR refresh_token LIKE 'enc:%'),
     redirect_to TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP)

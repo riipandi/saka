@@ -16,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
 	github.com/aws/smithy-go v1.28.2
 	github.com/briandowns/spinner v1.23.2
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/dunglas/go-urlpattern v1.0.0
 	github.com/dustin/go-humanize v1.1.0
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
@@ -70,6 +71,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.46.0
 	go.opentelemetry.io/proto/otlp v1.11.0
 	golang.org/x/crypto v0.57.0
+	golang.org/x/oauth2 v0.37.0
 	golang.org/x/term v0.46.0
 	google.golang.org/protobuf v1.36.12
 	resty.dev/v3 v3.0.0-rc.4

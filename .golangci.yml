@@ -116,6 +116,17 @@ linters:
           - noctx
           - wrapcheck
         path: _test\.go
+      - linters:
+          - gosec
+        # G710 flags the two redirects the OAuth flow exists to make. The
+        # start hands the browser to the provider's authorize URL, which
+        # the operator's connection row — not the caller — names: the
+        # request's provider segment only keys the row lookup, and the
+        # redirect URI inside it is built from the row's own slug. The
+        # callback hands the browser back to the SPA route under the
+        # configured base URL, carrying a token the server minted at the
+        # consume. No request value reaches a redirect target.
+        path: modules/identity/oauthsso/handler\.go
     paths:
       - third_party$
       - builtin$

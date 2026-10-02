@@ -40,6 +40,8 @@ import (
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
 	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/tango/modules/identity/oauthsso/builtin"
+	"github.com/riipandi/tango/modules/identity/oauthsso/custom"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/session"
@@ -552,7 +554,9 @@ var Package = do.Package(
 	// AUTH_SECRET_KEY never touches them. A nil cipher (no application
 	// secret) is answered at the call site: reads serve, a sealed write
 	// is refused. A nil fetcher leaves the discovery validation
-	// unavailable the same way.
+	// unavailable the same way. The adapters ride the post-construction
+	// seam: the adapter packages import the feature root for its types,
+	// so the selection lives here.
 	do.Lazy(func(i do.Injector) (*oauthsso.Service, error) {
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
@@ -571,7 +575,21 @@ var Package = do.Package(
 			}
 			cipher = built
 		}
-		return oauthsso.NewService(pool, cipher, recorder, oauthsso.FetcherAdapter(fetch), log), nil
+		var discovery oauthsso.DiscoveryFetcher
+		var identityReads oauthsso.IdentityFetcher
+		if fetch != nil {
+			discovery = oauthsso.FetcherAdapter(fetch)
+			identityReads = oauthsso.BearerFetchAdapter(fetch)
+		}
+		service := oauthsso.NewService(pool, cipher, recorder, discovery, log).
+			WithBaseURL(c.App.BaseURL)
+		return service.WithProviders(oauthsso.ProviderSet{
+			Builtin: map[string]oauthsso.Provider{
+				builtin.Google.Slug: builtin.NewGoogle(),
+				builtin.GitHub.Slug: builtin.NewGitHub(identityReads),
+			},
+			Custom: custom.New(identityReads),
+		}), nil
 	}),
 )
 

@@ -2,11 +2,11 @@ type: folder
 model: folder
 id: fl_TofiUEyN5c
 createdAt: 2026-10-02T20:13:13.015802
-updatedAt: 2026-10-02T20:13:13.015803
+updatedAt: 2026-10-02T20:32:47.123777
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication: {}
-authenticationType: null
+authenticationType: none
 description: ''
 headers: []
 name: OAuth SSO

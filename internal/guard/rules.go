@@ -175,6 +175,7 @@ var ProcedureRules = map[string]Entry{
 	// holder, the way the second-factor disable does.
 	authnv1connect.OAuthSSOServiceBeginSignInProcedure:           {Rule: Public},
 	authnv1connect.OAuthSSOServiceContinueSignInProcedure:        {Rule: Public},
+	authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure:     {Rule: Public},
 	authnv1connect.OAuthSSOServiceListConnectionsProcedure:       {Rule: Admin},
 	authnv1connect.OAuthSSOServiceGetConnectionProcedure:         {Rule: Admin},
 	authnv1connect.OAuthSSOServiceCreateConnectionProcedure:      {Rule: Admin},
@@ -560,6 +561,14 @@ var RestRules = []RestEntry{
 	// the exchange judges.
 	{Method: http.MethodPost, Pattern: "/api/device-login/requests", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/api/device-login/requests/{id}/exchange", Rule: Public},
+
+	// The OAuth flow's browser routes: the start hands the browser to
+	// the provider, the callback receives it back, and both are crossed
+	// by a caller that holds no token — the state and the flow token are
+	// the credentials the routes judge, the way the pairing cookie is
+	// the device login's. The answers are redirects, never an envelope.
+	{Method: http.MethodGet, Pattern: "/api/oauth/{provider}/start", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/api/oauth/{provider}/callback", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

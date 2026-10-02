@@ -24,13 +24,22 @@ type Definition struct {
 	// value is an OAuth2-only provider whose identity comes from
 	// UserinfoURL.
 	OIDC bool
+	// Issuer is the identifier the verified id_token's iss claim must
+	// answer. An OAuth2-only provider carries none.
+	Issuer string
 	// AuthorizationURL and TokenURL are the provider's fixed endpoints.
 	AuthorizationURL string
 	TokenURL         string
+	// JwksURL is the key set the id_token is verified against.
+	JwksURL string
 	// UserinfoURL is the identity endpoint an OAuth2-only provider
-	// serves; empty for an OIDC provider, whose id_token and userinfo
-	// endpoint the discovery document carries.
+	// serves; empty for an OIDC provider, whose id_token carries the
+	// claims.
 	UserinfoURL string
+	// EmailsURL is the address-list endpoint a provider serves beside
+	// its user API, where the verified flag lives. Empty for a provider
+	// whose id_token answers it.
+	EmailsURL string
 }
 
 // Google is the OIDC provider. The scopes are the minimum the identity
@@ -40,8 +49,10 @@ var Google = Definition{
 	DisplayName:      "Google",
 	Scopes:           []string{"openid", "email", "profile"},
 	OIDC:             true,
+	Issuer:           "https://accounts.google.com",
 	AuthorizationURL: "https://accounts.google.com/o/oauth2/v2/auth",
 	TokenURL:         "https://oauth2.googleapis.com/token",
+	JwksURL:          "https://www.googleapis.com/oauth2/v3/certs",
 }
 
 // GitHub is the OAuth2-only provider. `read:user` and `user:email` are
@@ -54,6 +65,7 @@ var GitHub = Definition{
 	AuthorizationURL: "https://github.com/login/oauth/authorize",
 	TokenURL:         "https://github.com/login/oauth/access_token",
 	UserinfoURL:      "https://api.github.com/user",
+	EmailsURL:        "https://api.github.com/user/emails",
 }
 
 // definitions indexes the shipped providers by slug.

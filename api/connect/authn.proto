@@ -1046,6 +1046,15 @@ service OAuthSSOService {
   // password sign-in pauses with.
   rpc ContinueSignIn(ContinueOAuthSignInRequest) returns (CompleteSignInResponse);
 
+  // VerifySignInEmail spends the email code a flow in the verify_email
+  // stage waits for: the provider's address was not verified at the
+  // source, so the account it names must prove it holds the address
+  // before anything links or is created. The code is single-use and
+  // three wrong answers end the flow, the same rule the other bridges
+  // keep. The answer names the stage the flow moved to; the sign-in
+  // itself completes through ContinueSignIn.
+  rpc VerifySignInEmail(VerifyOAuthSignInEmailRequest) returns (VerifyOAuthSignInEmailResponse);
+
   // ListConnections is the operator's view over every configured
   // connection, builtin and custom. Secrets are never answered.
   rpc ListConnections(ListOAuthConnectionsRequest) returns (ListOAuthConnectionsResponse) {
@@ -1129,6 +1138,36 @@ message ContinueOAuthSignInRequest {
     min_len: 1,
     max_len: 128
   }];
+}
+
+// VerifyOAuthSignInEmailRequest spends the email code a verify_email-stage
+// flow waits for.
+message VerifyOAuthSignInEmailRequest {
+  // flow_token is the handle the paused flow answers — the value the
+  // callback redirected the browser back with.
+  string flow_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is the single-use code the account received by email. The
+  // generated form is six or twelve characters.
+  string code = 2 [(buf.validate.field).string = {
+    min_len: 6,
+    max_len: 12
+  }];
+}
+
+// VerifyOAuthSignInEmailResponse names the stage the flow moved to: the
+// email proven, the flow either waits for the names or is ready for the
+// sign-in to complete.
+message VerifyOAuthSignInEmailResponse {
+  // stage is the flow's new stage: `require_names` or `resolved`, the
+  // words the client drives ContinueSignIn from.
+  string stage = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
 // ---- OAuth SSO: the connection administration ----

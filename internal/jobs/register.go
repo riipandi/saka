@@ -51,6 +51,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 	client.Register(queue.NewQueue[WebauthnCleanupTask](func(ctx context.Context, task WebauthnCleanupTask) error {
 		return webauthnCleanupProcessor(ctx, task, pool)
 	}))
+	// The OAuth flow rows expire the same way the ceremony sessions do:
+	// a ceremony whose window died answers nothing, and the sweep is the
+	// deletion its abandoned row needs.
+	client.Register(queue.NewQueue[OAuthCleanupTask](func(ctx context.Context, task OAuthCleanupTask) error {
+		return oauthCleanupProcessor(ctx, task, pool)
+	}))
 	// The back-channel logout deliveries ride the shared fetch client: a
 	// token is POSTed to the relying party's registered destination, and
 	// a failed attempt is the queue's retry, not the logout's failure.
@@ -194,6 +200,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	if err := s.seedOnce(ctx, WebauthnCleanupName,
 		webauthnCleanupSeed(DefaultWebauthnCleanupInterval),
 		DefaultWebauthnCleanupInterval); err != nil {
+		return err
+	}
+	if err := s.seedOnce(ctx, OAuthCleanupName,
+		oauthCleanupSeed(DefaultOAuthCleanupInterval),
+		DefaultOAuthCleanupInterval); err != nil {
 		return err
 	}
 	if err := s.seedOnce(ctx, WebhookPruneName,

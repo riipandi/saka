@@ -55,6 +55,10 @@ const (
 	// StagePending is the flow the browser is out walking: the callback
 	// has not resolved it yet.
 	StagePending FlowStage = "pending"
+	// StageResolved is the flow whose provider answered an identity: the
+	// email and the names rest on the row, and the continue call runs the
+	// resolution that decides the account.
+	StageResolved FlowStage = "resolved"
 	// StageVerifyEmail is the flow whose provider address the email code
 	// must prove before anything links or is created.
 	StageVerifyEmail FlowStage = "verify_email"
@@ -159,11 +163,16 @@ func ParseLinkedAccountID(wire string) (uuid.UUID, error) {
 }
 
 // Endpoints are the provider endpoints one connection talks to: the
-// authorization and token endpoints the flow needs, and the userinfo and
-// key-set endpoints the identity resolution reads. A builtin connection
-// carries them in code; a custom one either resolved them from its
-// discovery document or carries the operator's manual set.
+// authorization and token endpoints the flow needs, and the issuer, the
+// userinfo, and the key-set endpoints the identity resolution reads. A
+// builtin connection carries them in code; a custom one either resolved
+// them from its discovery document or carries the operator's manual set.
 type Endpoints struct {
+	// Issuer is the identifier the id_token's iss claim must answer. A
+	// manual endpoint set may name none — the flow then skips the issuer
+	// check and trusts the audience and the signature — while a
+	// discovered set always carries the document's.
+	Issuer        string
 	Authorization string
 	Token         string
 	Userinfo      string
@@ -202,3 +211,47 @@ type Connection struct {
 
 // BuiltIn reports whether the connection's endpoints are the code's own.
 func (c Connection) BuiltIn() bool { return c.Kind == KindBuiltin }
+
+// Flow is one row of flowTable: an authorization-code ceremony in
+// flight. The state and the flow token rest hashed — the raw values
+// travel only with the browser — and the PKCE verifier and the provider
+// tokens rest sealed.
+type Flow struct {
+	ID                uuid.UUID
+	ConnectionID      uuid.UUID
+	StateHash         string
+	FlowTokenHash     *string
+	Nonce             string
+	CodeVerifier      string
+	Stage             FlowStage
+	UserID            *uuid.UUID
+	Email             string
+	EmailCodeHash     string
+	WrongCodes        int
+	ProviderAccountID string
+	EmailVerified     bool
+	GivenName         string
+	FamilyName        string
+	Profile           []byte
+	AccessToken       string
+	RefreshToken      string
+	RedirectTo        string
+	CreatedAt         time.Time
+	ExpiresAt         time.Time
+}
+
+// FlowResolution is what the callback writes when the provider answered:
+// the identity the resolution will bind, the tokens it minted — sealed by
+// the service before the write — and the fresh flow token's hash, the
+// handle the SPA carries from the redirect onward.
+type FlowResolution struct {
+	FlowTokenHash      string
+	ProviderAccountID  string
+	Email              string
+	EmailVerified      bool
+	GivenName          string
+	FamilyName         string
+	Profile            []byte
+	SealedAccessToken  string
+	SealedRefreshToken string
+}

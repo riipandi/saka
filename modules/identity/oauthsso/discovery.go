@@ -125,6 +125,7 @@ func ResolveDiscovery(ctx context.Context, fetcher DiscoveryFetcher, discoveryUR
 	}
 
 	endpoints := Endpoints{
+		Issuer:        doc.Issuer,
 		Authorization: doc.AuthorizationEndpoint,
 		Token:         doc.TokenEndpoint,
 		Userinfo:      doc.UserinfoEndpoint,

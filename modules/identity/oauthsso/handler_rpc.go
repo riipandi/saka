@@ -22,11 +22,22 @@ func newRPCHandler(service *Service) *rpcHandler {
 	return &rpcHandler{service: service}
 }
 
-// BeginSignIn opens the authorization-code flow. The procedure rides the
-// flow phase; until it lands, the contract answers unimplemented rather
-// than a half-run flow.
-func (h *rpcHandler) BeginSignIn(context.Context, *connect.Request[authnv1.BeginOAuthSignInRequest]) (*connect.Response[authnv1.BeginOAuthSignInResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the OAuth sign-in flow is not served yet"))
+// BeginSignIn opens the authorization-code flow: the pending row is
+// written, and the answer is the authorize URL the browser navigates to.
+func (h *rpcHandler) BeginSignIn(ctx context.Context, req *connect.Request[authnv1.BeginOAuthSignInRequest]) (*connect.Response[authnv1.BeginOAuthSignInResponse], error) {
+	authorizeURL, err := h.service.Begin(ctx, req.Msg.Connection)
+	switch {
+	case errors.Is(err, ErrConnectionUnavailable):
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no enabled connection answers this provider"))
+	case err != nil:
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be opened"))
+	}
+
+	return connect.NewResponse(&authnv1.BeginOAuthSignInResponse{
+		AuthorizeUrl: authorizeURL,
+		Status:       "success",
+		Message:      "the sign-in flow was opened",
+	}), nil
 }
 
 // ContinueSignIn completes a paused flow. The procedure rides the flow
@@ -162,6 +173,14 @@ func (h *rpcHandler) DeleteConnection(ctx context.Context, req *connect.Request[
 // unimplemented.
 func (h *rpcHandler) ListLinkedConnections(context.Context, *connect.Request[authnv1.ListLinkedConnectionsRequest]) (*connect.Response[authnv1.ListLinkedConnectionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the linked-account surface is not served yet"))
+}
+
+// VerifySignInEmail spends the email code a verify_email-stage flow waits
+// for. The procedure rides the resolution phase — the code's row and its
+// email belong to the resolution's transaction; until it lands, the
+// contract answers unimplemented.
+func (h *rpcHandler) VerifySignInEmail(context.Context, *connect.Request[authnv1.VerifyOAuthSignInEmailRequest]) (*connect.Response[authnv1.VerifyOAuthSignInEmailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the email-code stage is not served yet"))
 }
 
 // UnlinkConnection removes one linked account. The procedure rides the
