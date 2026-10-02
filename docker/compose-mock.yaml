@@ -29,22 +29,27 @@ x-common: &common
 #   Client Secret: test-secret
 #   Redirect URI: http://localhost:3000/callback
 #
-# This image ships no Google provider preset, so the SSO simulation
-# runs the `custom` preset: default endpoint paths and standard
-# claims (sub, email, email_verified, name). Point a Tango `custom`
-# connection at https://localhost:3220 and let discovery fill the
-# endpoints.
+# Two simulations run here, both on the image's `custom` preset — this
+# image ships no real Google or GitHub provider:
+#   - ngauth-google (:3220) stands in for a Google-shaped OIDC source:
+#     standard endpoint paths, minimal claims, id_token carries the
+#     identity. Point a Tango `custom` connection at
+#     https://localhost:3220 and let discovery fill the endpoints.
+#   - ngauth-github (:3221) stands in for the GitHub simulation:
+#     GitHub's OAuth2 user API cannot be mimicked by ngauth, so the
+#     E2E connects it as a `custom` connection too, at
+#     https://localhost:3221.
 #####################################################################
 
 services:
-  ngauth-custom:
+  ngauth-google:
     <<: *common
     image: docker.io/ngauth/server:${NGAUTH_VERSION:-latest}
     platform: linux/amd64
-    hostname: ngauth-custom
+    hostname: ngauth-google
     ports: ["3220:3000"]
     volumes:
-      - "../.storage/ngauth_custom_data:/app/data:rw"
+      - "../.storage/ngauth_google_data:/app/data:rw"
       - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
     environment:
       NGAUTH_PRESET: custom
@@ -54,6 +59,28 @@ services:
       NGAUTH_SCOPE_FORMAT: string
       # https://localhost:3220/.well-known/openid-configuration
       NGAUTH_ISSUER: https://localhost:3220
+      NGAUTH_DATA: /app/data
+      NODE_ENV: development
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "127.0.0.1", "3000"]
+
+  ngauth-github:
+    <<: *common
+    image: docker.io/ngauth/server:${NGAUTH_VERSION:-latest}
+    platform: linux/amd64
+    hostname: ngauth-github
+    ports: ["3221:3000"]
+    volumes:
+      - "../.storage/ngauth_github_data:/app/data:rw"
+      - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
+    environment:
+      NGAUTH_PRESET: custom
+      NGAUTH_ACCESS_TOKEN_TTL: 7200
+      NGAUTH_SUPPORT_PKCE: "true"
+      NGAUTH_SCOPE_CLAIM_NAME: scope
+      NGAUTH_SCOPE_FORMAT: string
+      # https://localhost:3221/.well-known/openid-configuration
+      NGAUTH_ISSUER: https://localhost:3221
       NGAUTH_DATA: /app/data
       NODE_ENV: development
     healthcheck:
@@ -76,10 +103,11 @@ services:
       OIDC_DO_USER_INFO: false
       OIDC_TLS_VERIFY: true
     depends_on:
-      ngauth-custom: { condition: service_healthy }
+      ngauth-google: { condition: service_healthy }
 
 volumes:
-  ngauth_custom_data:
+  ngauth_google_data:
+  ngauth_github_data:
 
 networks:
   intranet:
