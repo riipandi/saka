@@ -83,7 +83,7 @@ Keep this document as simple as possible!
 - [x] **Open**: Sign-ups are enabled and all users can join your application.
   - Allowlist: Only allow sign-ups from accounts with pre-approved identifiers (default: false)
 - [x] **Invite-only**: Sign-ups are disabled, and only users who are invited can join (signup token).
-- [ ] **Waitlist**: Sign-ups are disabled, but people can join a waitlist.
+- [ ] **Waitlist**: Sign-ups are disabled, but people can join a waitlist. (dropped)
 
 ---
 
@@ -158,7 +158,7 @@ Keep this document as simple as possible!
 - [ ] **Passkey added**: Notify users when a new passkey is added to their account.
 - [ ] **Passkey removed**: Inform users when a passkey has been removed from their account.
 
-#### Waitlist
+#### Waitlist (dropped)
 
 - [ ] **Waitlist confirmation**: Confirm a user's successful addition to your application's waitlist.
 - [ ] **Waitlist invitation**: Invite users from your waitlist to join your application.
