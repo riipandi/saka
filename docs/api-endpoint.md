@@ -104,8 +104,8 @@ which `CompleteSignIn` spends.
 
 | Method | Procedure / Endpoint                                          | Protocol     | Summary |
 | ------ | ------------------------------------------------------------- | ------------ | ------- |
-| GET    | `/api/oauth/{provider}/start`                                  | REST         | Start the browser flow (302 to the provider's authorize URL) |
-| GET    | `/api/oauth/{provider}/callback`                               | REST         | Provider callback (302 back to the SPA with the flow token or an error code) |
+| GET    | `/oauth/{provider}/start`                                  | REST         | Start the browser flow (302 to the provider's authorize URL) |
+| GET    | `/oauth/{provider}/callback`                               | REST         | Provider callback (302 back to the SPA with the flow token or an error code) |
 | POST   | `/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn`              | ConnectRPC   | Open the flow (authorize URL) |
 | POST   | `/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn`           | ConnectRPC   | Complete the flow (token pair, MFA bridge, or the next stage) |
 | POST   | `/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail`        | ConnectRPC   | Spend the email code of a `verify_email` flow |

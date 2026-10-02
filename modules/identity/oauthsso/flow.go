@@ -216,7 +216,7 @@ func (s *Service) FlowByToken(ctx context.Context, flowToken string, stages ...F
 // redirectURI is the callback URL the connection registered with its
 // provider: the feature's own route under the deployment's origin.
 func (s *Service) redirectURI(provider string) string {
-	return s.baseURL + "/api/oauth/" + url.PathEscape(provider) + "/callback"
+	return s.baseURL + "/oauth/" + url.PathEscape(provider) + "/callback"
 }
 
 // FlowRedirect builds the SPA redirect a resolved ceremony answers with:

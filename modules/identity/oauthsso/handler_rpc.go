@@ -7,15 +7,66 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"uuid"
 
 	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/jwtutils"
 	"github.com/riipandi/tango/pkg/responder"
 )
+
+// ModuleName names the feature in composition reports and logs.
+const ModuleName = "oauthsso"
+
+// Module serves the OAuth SSO feature: the connection procedures and the
+// flow's REST routes. The type lives with the handlers — the area's
+// features list is the only registration the feature needs.
+type Module struct {
+	service    *Service
+	rpcHandler *rpcHandler
+	rest       *handler
+}
+
+// NewModule builds the module over the connection service.
+func NewModule(service *Service) *Module {
+	return &Module{
+		service:    service,
+		rpcHandler: newRPCHandler(service),
+		rest:       newHandler(service),
+	}
+}
+
+// Name reports the module in composition reports.
+func (m *Module) Name() string { return ModuleName }
+
+// Mount registers the flow's REST routes. Both sit outside the bearer
+// group — the browser crossing them holds no token, that being the point
+// of the feature — and at the root's own level: `/oauth` is the outbound
+// flow's prefix, the sibling of the inbound protocol's `/oidc`.
+func (m *Module) Mount(r chi.Router) {
+	m.rest.Mount(r)
+}
+
+// MountRPC registers the OAuth SSO procedures on the RPC router. The
+// handler options are the transport's — the shared snake_case codec and
+// the panic boundary — so the procedures answer exactly like the rest.
+func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
+	_, connectHandler := authnv1connect.NewOAuthSSOServiceHandler(m.rpcHandler, opts...)
+	r.Handle(authnv1connect.OAuthSSOServiceBeginSignInProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceContinueSignInProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceListConnectionsProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceGetConnectionProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceCreateConnectionProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceUpdateConnectionProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceDeleteConnectionProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure, connectHandler)
+}
 
 // rpcHandler is the transport mapping of the OAuth SSO procedures. The
 // service carries the rules; this type carries the connect codes and the

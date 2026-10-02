@@ -167,8 +167,8 @@ second factor answers `ContinueSignIn` with the MFA bridge, and `CompleteSignIn`
 | POST | `/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection` | Delete OAuth connection | done — guard `Admin`; the bindings cascade | `modules/identity/oauthsso.TestDeleteRemovesTheRowAndRecordsTheChange` |
 | POST | `/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections` | List linked OAuth connections | done — guard `Session`; the caller's own bindings, oldest first, never a secret | `modules/identity/oauthsso.TestListLinkedAnswersOnlyTheCallerRowsOldestFirst` |
 | POST | `/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection` | Unlink OAuth connection | done — guard `Session` + step-up; a foreign or unknown binding answers `not_found`; the last credential of an account with no password and no passkey answers `failed_precondition` — set a password first | `modules/identity/oauthsso/accounts_test.go` |
-| GET | `/api/oauth/{provider}/start` | Start the browser flow | done — guard `Public` (REST); answers the provider's authorize URL as a 302 | `modules/identity/oauthsso/flow_test.go` |
-| GET | `/api/oauth/{provider}/callback` | Provider callback | done — guard `Public` (REST); consumes the code, seals the tokens, and redirects the browser to the SPA with the flow token (or an `?error=` word) | `modules/identity/oauthsso/flow_test.go` |
+| GET | `/oauth/{provider}/start` | Start the browser flow | done — guard `Public` (REST); answers the provider's authorize URL as a 302 | `modules/identity/oauthsso/flow_test.go` |
+| GET | `/oauth/{provider}/callback` | Provider callback | done — guard `Public` (REST); consumes the code, seals the tokens, and redirects the browser to the SPA with the flow token (or an `?error=` word) | `modules/identity/oauthsso/flow_test.go` |
 
 Connection settings live in `public.settings` through `modules/appconfig`: secrets sealed `enc:`
 with the application cipher, `oauthsso.account_linking_enabled` gates the email-match link

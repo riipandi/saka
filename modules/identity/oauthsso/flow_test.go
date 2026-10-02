@@ -63,7 +63,7 @@ func TestBeginWritesAPendingFlowAndNeverStoresTheRawState(t *testing.T) {
 	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso")
 	require.NoError(t, err)
 	assert.Contains(t, authorizeURL, "state=")
-	assert.Equal(t, "https://app.hogwarts.example/api/oauth/hogwarts-sso/callback", provider.last.RedirectURI)
+	assert.Equal(t, "https://app.hogwarts.example/oauth/hogwarts-sso/callback", provider.last.RedirectURI)
 	assert.NotEmpty(t, provider.last.Nonce)
 	assert.NotEmpty(t, provider.last.Verifier)
 
@@ -128,7 +128,7 @@ func TestCallbackConsumesTheFlowAndSealsTheTokens(t *testing.T) {
 
 	// The verifier the adapter received is the one the begin sealed.
 	assert.NotEmpty(t, provider.last.Verifier)
-	assert.Equal(t, "https://app.hogwarts.example/api/oauth/hogwarts-sso/callback", provider.last.RedirectURI)
+	assert.Equal(t, "https://app.hogwarts.example/oauth/hogwarts-sso/callback", provider.last.RedirectURI)
 }
 
 func TestCallbackReplayIsRefused(t *testing.T) {

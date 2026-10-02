@@ -522,7 +522,7 @@ The sign-in fork runs through the `mfaGate` interface (`GateSignIn`, `KeepsConfi
 
 ### modules/identity/oauthsso
 
-Sign in with a provider: `tango.authn.v1.OAuthSSOService`, tango-only (Pocket ID is passkey-only and has no SSO surface). The client stack is `golang.org/x/oauth2` + `coreos/go-oidc/v3`; the outbound flow rides two REST routes (`/api/oauth/{provider}/start` and `/api/oauth/{provider}/callback`, guard `Public`, answers 302 redirects only — never a JSON envelope, because the browser is mid-redirect) and the completion procedures answer over ConnectRPC.
+Sign in with a provider: `tango.authn.v1.OAuthSSOService`, tango-only (Pocket ID is passkey-only and has no SSO surface). The client stack is `golang.org/x/oauth2` + `coreos/go-oidc/v3`; the outbound flow rides two REST routes (`/oauth/{provider}/start` and `/oauth/{provider}/callback`, guard `Public`, answers 302 redirects only — never a JSON envelope, because the browser is mid-redirect) and the completion procedures answer over ConnectRPC.
 
 Three tables (`00016`): `oauth_connections` (one per provider slug, `builtin` kinds carry their endpoints in code and store none), `oauth_linked_accounts` (one binding per connection + provider account id — `UNIQUE`), and `oauth_flows` (one authorization-code ceremony, `pending → resolved → verify_email | require_names → completed`). The client secret, the PKCE verifier, and the provider's tokens rest sealed `enc:` with the **application** cipher (`crypto.NewCipherFromHex(c.App.SecretKey)`) — connection credentials are operator configuration, not account-authentication material. A nil cipher refuses the sealed write at the call site.
 

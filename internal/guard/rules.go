@@ -567,8 +567,8 @@ var RestRules = []RestEntry{
 	// by a caller that holds no token — the state and the flow token are
 	// the credentials the routes judge, the way the pairing cookie is
 	// the device login's. The answers are redirects, never an envelope.
-	{Method: http.MethodGet, Pattern: "/api/oauth/{provider}/start", Rule: Public},
-	{Method: http.MethodGet, Pattern: "/api/oauth/{provider}/callback", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oauth/{provider}/start", Rule: Public},
+	{Method: http.MethodGet, Pattern: "/oauth/{provider}/callback", Rule: Public},
 }
 
 // ContractProcedures lists every procedure path the contracts declare.

@@ -38,8 +38,8 @@ func newHandler(service *Service) *handler {
 
 // Mount registers the flow's REST routes.
 func (h *handler) Mount(r chi.Router) {
-	r.Get("/api/oauth/{provider}/start", h.start)
-	r.Get("/api/oauth/{provider}/callback", h.callback)
+	r.Get("/oauth/{provider}/start", h.start)
+	r.Get("/oauth/{provider}/callback", h.callback)
 }
 
 // start hands the browser to the provider. The flow row is written before
