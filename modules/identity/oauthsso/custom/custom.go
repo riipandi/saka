@@ -119,9 +119,15 @@ func (p *Provider) Resolve(ctx context.Context, conn oauthsso.Connection, flow o
 	}, nil
 }
 
-// config renders the oauth2 client the connection's endpoints name.
+// config renders the oauth2 client the connection's endpoints name. An
+// empty scope list falls back to the standard OIDC trio — an authorize
+// request without `openid` answers no id_token, and a connection the
+// operator scoped loosely must still resolve.
 func (p *Provider) config(conn oauthsso.Connection, flow oauthsso.FlowSecrets) oauth2.Config {
 	scopes := conn.Scopes
+	if len(scopes) == 0 {
+		scopes = []string{"openid", "profile", "email"}
+	}
 	return oauth2.Config{
 		ClientID:     conn.ClientID,
 		ClientSecret: conn.ClientSecret,

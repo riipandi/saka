@@ -3,6 +3,7 @@ package oauthsso
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -75,7 +76,7 @@ func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[au
 		Fingerprint: client.Fingerprint,
 	})
 	if err != nil {
-		return nil, continueError(err)
+		return nil, continueError(ctx, err)
 	}
 
 	out := &authnv1.ContinueOAuthSignInResponse{
@@ -113,7 +114,7 @@ func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[au
 // continueError maps the resolution's failures onto the connect codes.
 // The unknown-flow answer is the same not_found a replay earns: a
 // refused continue learns nothing about which half failed.
-func continueError(err error) error {
+func continueError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, ErrFlowUnknown), errors.Is(err, ErrConnectionUnavailable):
 		return connect.NewError(connect.CodeNotFound, errors.New("no live flow answers this handle"))
@@ -128,6 +129,10 @@ func continueError(err error) error {
 	case errors.Is(err, ErrSignUpRefused):
 		return connect.NewError(connect.CodePermissionDenied, errors.New("the sign-up is not allowed"))
 	default:
+		// The mapped failures all name themselves; whatever lands here is
+		// the service's internals, and the wire answer says nothing about
+		// it. The log is where it speaks.
+		slog.ErrorContext(ctx, "oauthsso: the flow's completion failed", "error", err)
 		return connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be completed"))
 	}
 }
@@ -294,7 +299,7 @@ func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *connect.Reque
 func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *connect.Request[authnv1.VerifyOAuthSignInEmailRequest]) (*connect.Response[authnv1.VerifyOAuthSignInEmailResponse], error) {
 	stage, err := h.service.VerifySignInEmail(ctx, req.Msg.FlowToken, req.Msg.Code)
 	if err != nil {
-		return nil, continueError(err)
+		return nil, continueError(ctx, err)
 	}
 	return connect.NewResponse(&authnv1.VerifyOAuthSignInEmailResponse{
 		Stage:   string(stage),

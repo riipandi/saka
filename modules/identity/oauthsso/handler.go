@@ -2,6 +2,7 @@ package oauthsso
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -68,6 +69,11 @@ func (h *handler) callback(w http.ResponseWriter, r *http.Request) {
 	flowToken, err := h.service.Callback(r.Context(),
 		chi.URLParam(r, "provider"), query.Get("code"), query.Get("state"))
 	if err != nil {
+		// The browser's answer is the redirect below; the operator's is
+		// this line — a resolution the provider refused is the one
+		// failure the flow cannot say out loud.
+		slog.WarnContext(r.Context(), "oauthsso: the callback did not resolve",
+			"error", err, "provider", chi.URLParam(r, "provider"))
 		http.Redirect(w, r, h.errorRedirect(err), http.StatusFound)
 		return
 	}
