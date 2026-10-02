@@ -29,16 +29,19 @@ x-common: &common
 #   Client Secret: test-secret
 #   Redirect URI: http://localhost:3000/callback
 #
-# Two simulations run here, both on the image's `custom` preset — this
-# image ships no real Google or GitHub provider:
-#   - ngauth-google (:3220) stands in for a Google-shaped OIDC source:
-#     standard endpoint paths, minimal claims, id_token carries the
-#     identity. Point a Tango `custom` connection at
-#     https://localhost:3220 and let discovery fill the endpoints.
-#   - ngauth-github (:3221) stands in for the GitHub simulation:
-#     GitHub's OAuth2 user API cannot be mimicked by ngauth, so the
-#     E2E connects it as a `custom` connection too, at
-#     https://localhost:3221.
+# Two simulations run here:
+#   - ngauth-google (:3220) uses the image's `google` preset — Google's
+#     endpoint paths (/o/oauth2/v2/auth, /oauth2/v4/token, /oauth2/v3/
+#     certs) and minimal claims. The preset answers no refresh token
+#     (Google's own shape without access_type=offline), so a flow that
+#     resolves against it carries an empty refresh half. The E2E
+#     connects it to Tango as a `custom` connection and lets discovery
+#     fill the endpoints — the builtin adapter is pinned to the real
+#     hosts, which a mock cannot be.
+#   - ngauth-github (:3221) uses the `custom` preset, because the image
+#     ships no `github` preset: GitHub's OAuth2 user API cannot be
+#     mimicked by ngauth, so the GitHub simulation connects to Tango as
+#     a `custom` connection too.
 #####################################################################
 
 services:
@@ -52,11 +55,7 @@ services:
       - "../.storage/ngauth_google_data:/app/data:rw"
       - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
     environment:
-      NGAUTH_PRESET: custom
-      NGAUTH_ACCESS_TOKEN_TTL: 7200
-      NGAUTH_SUPPORT_PKCE: "true"
-      NGAUTH_SCOPE_CLAIM_NAME: scope
-      NGAUTH_SCOPE_FORMAT: string
+      NGAUTH_PRESET: google
       # https://localhost:3220/.well-known/openid-configuration
       NGAUTH_ISSUER: https://localhost:3220
       NGAUTH_DATA: /app/data
