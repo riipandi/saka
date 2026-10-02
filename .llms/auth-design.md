@@ -59,7 +59,7 @@ Keep this document as simple as possible!
 
 ## SSO Connections
 
-- [ ] **Account linking**: Allow users to link their account with an external SSO provider (default: true)
+- [x] **Account linking**: Allow users to link their account with an external SSO provider (default: true)
 
 ---
 

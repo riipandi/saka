@@ -146,6 +146,34 @@ recovery codes are hashed, single-use, shown exactly once, and rotated atomicall
 requires the second-factor proof and clears every MFA row; the administrator's way in needs no
 proof — the audit record names it.
 
+## OAuth SSO (tango-only)
+
+Upstream Pocket ID has no SSO; this surface is tango-only. Sign in with Google, GitHub, or a
+custom OIDC connection. The outbound flow rides two REST routes that answer 302 redirects only —
+the browser is mid-redirect, so errors reach the SPA as `?error=` codes, success as `?flow_token=`.
+The flow token is minted at the callback, not the begin; it is the credential the completion
+procedures answer, all guarded `Public` (rate: auth). A resolved account keeping a confirmed
+second factor answers `ContinueSignIn` with the MFA bridge, and `CompleteSignIn` finishes it.
+
+| Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
+| ------ | -------------------- | -------------------- | ------ | -------- |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn` | Begin OAuth sign in | done — guard `Public` (default bucket); writes the pending flow row and answers the authorize URL; an unknown or disabled connection answers `not_found`, so the endpoint is not a connection enumerator | `modules/identity/oauthsso.TestBeginWritesAPendingFlowAndNeverStoresTheRawState` |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn` | Continue OAuth sign in | done — guard `Public` (auth bucket); the resolution binds the identity: the existing binding, a verified address match (linking toggle), or the JIT account the open access mode creates; an unverified address pauses at `verify_email`, missing names at `require_names`; answers the token pair, the MFA bridge, or the stage the flow moved to | `modules/identity/oauthsso` resolution tests |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail` | Verify OAuth sign-in email | done — guard `Public` (auth bucket); spends the single-use email code a `verify_email` flow waits for; three wrong answers end the flow; the answer names the stage the flow moved to | `modules/identity/oauthsso.TestVerifySignInEmailSpendsTheCodeAndTheFlowCompletes`, `modules/identity/oauthsso.TestThreeWrongCodesEndTheFlow` |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/ListConnections` | List OAuth connections | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/GetConnection` | Get OAuth connection | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/CreateConnection` | Create OAuth connection | done — guard `Admin`; custom connections resolve their discovery document once at write time; builtin slugs are reserved | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/UpdateConnection` | Update OAuth connection | done — guard `Admin`; optional fields keep their stored value when unset | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection` | Delete OAuth connection | done — guard `Admin`; the bindings cascade | `modules/identity/oauthsso.TestDeleteRemovesTheRowAndRecordsTheChange` |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections` | List linked OAuth connections | done — guard `Session`; the caller's own bindings, oldest first, never a secret | `modules/identity/oauthsso.TestListLinkedAnswersOnlyTheCallerRowsOldestFirst` |
+| POST | `/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection` | Unlink OAuth connection | done — guard `Session` + step-up; a foreign or unknown binding answers `not_found`; the last credential of an account with no password and no passkey answers `failed_precondition` — set a password first | `modules/identity/oauthsso/accounts_test.go` |
+| GET | `/api/oauth/{provider}/start` | Start the browser flow | done — guard `Public` (REST); answers the provider's authorize URL as a 302 | `modules/identity/oauthsso/flow_test.go` |
+| GET | `/api/oauth/{provider}/callback` | Provider callback | done — guard `Public` (REST); consumes the code, seals the tokens, and redirects the browser to the SPA with the flow token (or an `?error=` word) | `modules/identity/oauthsso/flow_test.go` |
+
+Connection settings live in `public.settings` through `modules/appconfig`: secrets sealed `enc:`
+with the application cipher, `oauthsso.account_linking_enabled` gates the email-match link
+(default true), and JIT creation follows `access.mode` — no second toggle.
+
 ## Webhooks (tango-only)
 
 The outbound event surface tango carries and Pocket ID does not: an administrator registers a

@@ -94,6 +94,29 @@ completes — with a TOTP code or a recovery code.
 | POST     | `/rpc/tango.authn.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
 | POST     | `/rpc/tango.authn.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
 
+## OAuth SSO
+
+Tango-only; upstream Pocket ID has no SSO. Sign in with Google, GitHub, or a custom OIDC
+connection. The browser flow rides two REST routes that answer 302 redirects only; the
+completion procedures run over ConnectRPC with the flow token as the credential (guarded
+`Public`). A resolved account keeping a confirmed second factor answers with the MFA bridge,
+which `CompleteSignIn` spends.
+
+| Method | Procedure / Endpoint                                          | Protocol     | Summary |
+| ------ | ------------------------------------------------------------- | ------------ | ------- |
+| GET    | `/api/oauth/{provider}/start`                                  | REST         | Start the browser flow (302 to the provider's authorize URL) |
+| GET    | `/api/oauth/{provider}/callback`                               | REST         | Provider callback (302 back to the SPA with the flow token or an error code) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn`              | ConnectRPC   | Open the flow (authorize URL) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn`           | ConnectRPC   | Complete the flow (token pair, MFA bridge, or the next stage) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail`        | ConnectRPC   | Spend the email code of a `verify_email` flow |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ListConnections`          | ConnectRPC   | List connections (admin, secrets never answered) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/GetConnection`            | ConnectRPC   | Read one connection (admin) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/CreateConnection`         | ConnectRPC   | Register a connection (admin) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/UpdateConnection`         | ConnectRPC   | Rewrite a connection (admin) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection`         | ConnectRPC   | Remove a connection (admin, bindings cascade) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections`    | ConnectRPC   | List the holder's bindings (oldest first) |
+| POST   | `/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection`         | ConnectRPC   | Remove a binding (step-up; the last credential of a passwordless account is refused) |
+
 ## API Key
 
 A machine credential a holder issues for their own scripting and integrations. It acts as its
