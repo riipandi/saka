@@ -22,7 +22,7 @@ body:
       "client_secret": ""
     }
 bodyType: null
-description: 'Registers a connection. A custom kind carries its discovery URL or all four manual endpoints — the discovery document is fetched and validated before the row is written; a builtin kind carries neither. The client secret is stored sealed and never answered back. Guard: admin.'
+description: 'Registers a connection. A custom kind carries its discovery URL or its manual endpoints (authorization, token, and the key set; userinfo optional) — the discovery document is fetched and validated before the row is written; a builtin kind carries neither. The client secret is stored sealed and never answered back. Guard: admin.'
 headers:
 - enabled: true
   name: Content-Type

@@ -39,6 +39,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/multifactor"
+	"github.com/riipandi/tango/modules/identity/oauthsso"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/session"
@@ -102,6 +103,12 @@ type Deps struct {
 	// the creating browser polls and the approval procedures the other
 	// device answers. Nil when the feature is off.
 	DeviceLogin *devicelogin.Service
+
+	// OAuthSSO is the sign-in-with-a-provider feature: the connection
+	// CRUD the operator drives, the outbound flow the browser crosses,
+	// and the linked accounts the resolution binds. Nil when the feature
+	// is off.
+	OAuthSSO *oauthsso.Service
 
 	// ExposeResetToken mirrors `app.expose_reset_token`, gated on the
 	// development mode: the deployment's decision whether ForgotPassword
@@ -538,6 +545,34 @@ var Package = do.Package(
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		return devicelogin.NewService(pool, users, recorder, c.App.BaseURL), nil
 	}),
+
+	// The OAuth SSO service builds over the pool and the application
+	// cipher — the sealing half: the client secrets and, later, the
+	// provider tokens are deployment-configuration material, so rotating
+	// AUTH_SECRET_KEY never touches them. A nil cipher (no application
+	// secret) is answered at the call site: reads serve, a sealed write
+	// is refused. A nil fetcher leaves the discovery validation
+	// unavailable the same way.
+	do.Lazy(func(i do.Injector) (*oauthsso.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		fetch := do.MustInvoke[*fetcher.Client](i)
+		// The cipher seals the client secrets; it is the application
+		// half — derived from the application secret, not AUTH_SECRET_KEY
+		// — because a connection's credentials are operator
+		// configuration, not account-authentication material.
+		var cipher *crypto.Cipher
+		if c.App.SecretKey != "" {
+			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+			if err != nil {
+				return nil, fmt.Errorf("identity: oauthsso cipher: %w", err)
+			}
+			cipher = built
+		}
+		return oauthsso.NewService(pool, cipher, recorder, oauthsso.FetcherAdapter(fetch), log), nil
+	}),
 )
 
 // Mount resolves what this area's features need and builds the module the
@@ -581,6 +616,7 @@ func Mount(i do.Injector) (kernel.Module, error) {
 		Authorization:    do.MustInvoke[*authorization.Service](i),
 		Blocklist:        do.MustInvoke[*blocklist.Service](i),
 		DeviceLogin:      do.MustInvoke[*devicelogin.Service](i),
+		OAuthSSO:         do.MustInvoke[*oauthsso.Service](i),
 	}), nil
 }
 
@@ -658,6 +694,9 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.DeviceLogin != nil {
 		modules = append(modules, devicelogin.NewModule(deps.DeviceLogin))
+	}
+	if deps.OAuthSSO != nil {
+		modules = append(modules, oauthsso.NewModule(deps.OAuthSSO))
 	}
 	return modules
 }
