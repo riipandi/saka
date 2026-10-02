@@ -7,8 +7,8 @@ x-common: &common
     - "localhost:host-gateway"
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
-  shm_size: 128m # set shared memory limit
-  mem_limit: 256m # set memory limit
+  shm_size: 256m # set shared memory limit
+  mem_limit: 512m # set memory limit
   cpus: 1.0 # set CPUs limit
   healthcheck:
     start_period: 10s
@@ -17,96 +17,64 @@ x-common: &common
     retries: 3
 
 #####################################################################
-# ngauth comes with pre-seeded data for immediate testing:
-# 
-# Test Users
-#   Username: testuser / Password: password123
-#   Username: alice / Password: alice123
-#   Username: bob / Password: bob123
-# 
-# Test Clients
-#   Client ID: test-client
-#   Client Secret: test-secret
-#   Redirect URI: http://localhost:3000/callback
+# The mock identity providers the OAuth SSO E2E runs against. One
+# mock-oauth2-server carries both simulations as issuerIds — the first
+# path segment of every URL — so the google simulation discovers at
+#   https://localhost:3220/google/.well-known/openid-configuration
+# and the github simulation at
+#   https://localhost:3221/github/.well-known/openid-configuration
+# (both connect to Tango as `custom` connections; the builtin adapters
+# are pinned to the real hosts).
 #
-# Two simulations run here:
-#   - ngauth-google (:3220) uses the image's `google` preset — Google's
-#     endpoint paths (/o/oauth2/v2/auth, /oauth2/v4/token, /oauth2/v3/
-#     certs) and minimal claims. The preset answers no refresh token
-#     (Google's own shape without access_type=offline), so a flow that
-#     resolves against it carries an empty refresh half. The E2E
-#     connects it to Tango as a `custom` connection and lets discovery
-#     fill the endpoints — the builtin adapter is pinned to the real
-#     hosts, which a mock cannot be.
-#   - ngauth-github (:3221) uses the `custom` preset, because the image
-#     ships no `github` preset: GitHub's OAuth2 user API cannot be
-#     mimicked by ngauth, so the GitHub simulation connects to Tango as
-#     a `custom` connection too.
+# The login page takes a username and derives the identity from it —
+# no accounts to seed, no rate limits:
+#   alice@…            a verified address with names      (JIT, linking,
+#                       binding, MFA branches)
+#   unverified-*       email_verified = false             (the email-code
+#                       gate)
+#   nonames-*          no given/family claims             (the continue
+#                       step)
+#
+# The nginx front terminates TLS: the SSO feature holds every provider
+# endpoint to https, so the browser's redirects and the server-side
+# fetches cross one. The pair serves the mkcert certificate the
+# `task cert:generate` wrote — localhost by name.
 #####################################################################
 
 services:
-  ngauth-google:
+  mock-oauth2:
     <<: *common
-    image: docker.io/ngauth/server:${NGAUTH_VERSION:-latest}
+    image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION:-6.0}
     platform: linux/amd64
-    hostname: ngauth-google
-    ports: ["3220:3000"]
+    hostname: mock-oauth2
+    expose: ["8080"]
     volumes:
-      - "../.storage/ngauth_google_data:/app/data:rw"
-      - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
+      # The identity the login page's username answers with: one config
+      # serves both issuers, and the subject prefixes pick the branch —
+      # `unverified-*` carries an unverified address, `nonames-*` no
+      # given/family claims, anything else the verified shape.
+      - "./mock-oauth2/config.json:/app/config.json:ro"
     environment:
-      NGAUTH_PRESET: google
-      # https://localhost:3220/.well-known/openid-configuration
-      NGAUTH_ISSUER: https://localhost:3220
-      NGAUTH_DATA: /app/data
-      NODE_ENV: development
+      JSON_CONFIG_PATH: /app/config.json
     healthcheck:
-      test: ["CMD", "nc", "-vz", "127.0.0.1", "3000"]
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/isalive || exit 1"]
 
-  ngauth-github:
+  mock-tls:
     <<: *common
-    image: docker.io/ngauth/server:${NGAUTH_VERSION:-latest}
-    platform: linux/amd64
-    hostname: ngauth-github
-    ports: ["3221:3000"]
+    image: docker.io/nginx:${MOCK_NGINX_VERSION:-1.31-alpine-slim}
+    hostname: mock-tls
+    ports: ["3220:3220", "3221:3221"]
+    configs:
+      - source: mock_proxy
+        target: /etc/nginx/conf.d/default.conf
     volumes:
-      - "../.storage/ngauth_github_data:/app/data:rw"
-      - "../storage/config/localhost_key.pem:/app/data/private-key.pem:ro"
-    environment:
-      NGAUTH_PRESET: custom
-      NGAUTH_ACCESS_TOKEN_TTL: 7200
-      NGAUTH_SUPPORT_PKCE: "true"
-      NGAUTH_SCOPE_CLAIM_NAME: scope
-      NGAUTH_SCOPE_FORMAT: string
-      # https://localhost:3221/.well-known/openid-configuration
-      NGAUTH_ISSUER: https://localhost:3221
-      NGAUTH_DATA: /app/data
-      NODE_ENV: development
-    healthcheck:
-      test: ["CMD", "nc", "-vz", "127.0.0.1", "3000"]
-
-  oidc-test-client:
-    <<: *common
-    image: ghcr.io/beryju/oidc-test-client:${OIDC_TEST_CLIENT_VERSION:-latest}
-    hostname: oidc-test-client
-    ports: ["9009:9009"]
-    environment:
-      OIDC_BIND: 0.0.0.0:9009
-      OIDC_CLIENT_ID: test-client
-      OIDC_CLIENT_SECRET: test-secret
-      OIDC_ROOT_URL: http://localhost:9009
-      OIDC_PROVIDER: https://localhost:3220
-      OIDC_SCOPES: "openid,profile,email"
-      OIDC_DO_REFRESH: false
-      OIDC_DO_INTROSPECTION: false
-      OIDC_DO_USER_INFO: false
-      OIDC_TLS_VERIFY: true
+      - "../storage/config:/etc/nginx/certs:ro"
     depends_on:
-      ngauth-google: { condition: service_healthy }
+      mock-oauth2: { condition: service_healthy }
 
-volumes:
-  ngauth_google_data:
-  ngauth_github_data:
+configs:
+  mock_proxy:
+    file: ./mock-proxy.conf
 
 networks:
   intranet:

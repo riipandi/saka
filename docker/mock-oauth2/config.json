@@ -1,0 +1,83 @@
+{
+    "interactiveLogin": true,
+    "tokenCallbacks": [
+        {
+            "issuerId": "google",
+            "tokenExpiry": 3600,
+            "requestMappings": [
+                {
+                    "requestParam": "subject",
+                    "match": "^unverified-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": false,
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts"
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": "^nonames-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": ".*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true,
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts"
+                    }
+                }
+            ]
+        },
+        {
+            "issuerId": "github",
+            "tokenExpiry": 3600,
+            "requestMappings": [
+                {
+                    "requestParam": "subject",
+                    "match": "^unverified-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": false,
+                        "name": "${subject} Hogwarts"
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": "^nonames-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": ".*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true,
+                        "name": "${subject} Hogwarts"
+                    }
+                }
+            ]
+        }
+    ]
+}
