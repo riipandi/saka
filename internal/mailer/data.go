@@ -16,6 +16,7 @@ const (
 	TemplateOneTimeAccess         = "one-time-access"
 	TemplatePasswordReset         = "password-reset"
 	TemplatePasswordChangedNotice = "password-changed-notice"
+	TemplateReauthenticationCode  = "reauthentication-code"
 	TemplateTestEmail             = "test-email"
 	TemplateUserBanned            = "user-banned"
 	TemplateUserUnbanned          = "user-unbanned"
@@ -95,6 +96,13 @@ type (
 	PasswordChangedNoticeData struct {
 		Name  string
 		Email string
+	}
+	// ReauthenticationCodeData renders TemplateReauthenticationCode — the
+	// reverification code a sensitive action asked for. The code is the
+	// message's whole credential; there is no link to click.
+	ReauthenticationCodeData struct {
+		Code             string
+		ExpirationString string
 	}
 	// TestEmailData renders TemplateTestEmail.
 	TestEmailData struct {

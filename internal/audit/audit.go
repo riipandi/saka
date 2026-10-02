@@ -129,9 +129,14 @@ const (
 	EventWebauthnSignIn = "webauthn_sign_in"
 
 	// EventWebauthnReauthenticationGranted is a step-up proof answered by a
-	// passkey assertion; the record names the token's window, never its
-	// value.
+	// passkey assertion, a password, or an email code; the record names the
+	// factor and the token's window, never its value.
 	EventWebauthnReauthenticationGranted = "webauthn_reauthentication_granted"
+
+	// EventWebauthnReauthenticationCodeSent is a reverification code handed
+	// to the email queue. The record names the send; the code itself is
+	// never in the log.
+	EventWebauthnReauthenticationCodeSent = "webauthn_reauthentication_code_sent"
 
 	// EventWebauthnReauthenticationConsumed is a step-up token spent by a
 	// guarded procedure. One token is one proof: the record is how a

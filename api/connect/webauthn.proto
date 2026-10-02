@@ -62,13 +62,21 @@ service WebAuthnService {
   // an account that would be left with no way in at all is refused.
   rpc DeleteCredential(DeleteCredentialRequest) returns (DeleteCredentialResponse);
 
-  // Reauthenticate proves the caller again — by password or by a passkey
-  // assertion — and answers a single-use reauthentication token. A guarded
+  // Reauthenticate proves the caller again — by password, by a passkey
+  // assertion, or by the email code SendReauthenticationCode sent — and
+  // answers a single-use reauthentication token. A guarded
   // procedure spends the token through its `X-Tango-Reauthentication`
   // header; the proof is judged once, at the call that needs it, and dies
   // with its window. The password is checked against the caller's own
   // account; the assertion resolves an account that must be the caller's.
   rpc Reauthenticate(ReauthenticateRequest) returns (ReauthenticateResponse);
+
+  // SendReauthenticationCode delivers a single-use code to the caller's
+  // own email address — the reverification factor an account with no
+  // proof material holds: no password is set, or no passkey is enrolled.
+  // The code is spent by Reauthenticate's email_code proof and replaces
+  // the previous live code when it is sent again.
+  rpc SendReauthenticationCode(SendReauthenticationCodeRequest) returns (SendReauthenticationCodeResponse);
 
   // AdminListCredentials names one account's passkeys — the roll the
   // account's own ListCredentials answers, aimed by the request's user_id
@@ -86,8 +94,8 @@ service WebAuthnService {
 }
 
 // ReauthenticateRequest carries the proof the caller re-proves with. One
-// proof per call: a password, or a passkey assertion over a ceremony the
-// sign-in begin answered.
+// proof per call: a password, a passkey assertion over a ceremony the
+// sign-in begin answered, or the email code SendReauthenticationCode sent.
 message ReauthenticateRequest {
   oneof proof {
     // password is the account's current password, checked against the
@@ -97,6 +105,11 @@ message ReauthenticateRequest {
     // passkey is the assertion path: the ceremony handle BeginLogin
     // answered and the credential JSON the browser produced.
     PasskeyProof passkey = 2;
+
+    // email_code is the reverification factor an account with no proof
+    // material holds: the single-use code SendReauthenticationCode sent
+    // to the caller's own address.
+    string email_code = 3 [(buf.validate.field).string.min_len = 1];
   }
 }
 
@@ -120,6 +133,14 @@ message ReauthenticateResponse {
   // expires_at is when the proof dies unspent.
   google.protobuf.Timestamp expires_at = 2;
 }
+
+// SendReauthenticationCodeRequest is empty: the address is the caller's
+// own, the one the account holds.
+message SendReauthenticationCodeRequest {}
+
+// SendReauthenticationCodeResponse is empty: the code travels by email
+// alone and the success says nothing about the account it went to.
+message SendReauthenticationCodeResponse {}
 
 // BeginRegistrationRequest is empty: the account is the access token's
 // subject, the ceremony state rests server-side.

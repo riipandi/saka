@@ -54,6 +54,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(authnv1connect.WebAuthnServiceUpdateCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceDeleteCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceReauthenticateProcedure, connectHandler)
+	r.Handle(authnv1connect.WebAuthnServiceSendReauthenticationCodeProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceAdminListCredentialsProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure, connectHandler)
 	r.Handle(authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure, connectHandler)
@@ -265,15 +266,17 @@ func (h *rpcHandler) Reauthenticate(ctx context.Context, req *connect.Request[au
 		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 
-	var password, sessionID, credential string
+	var password, sessionID, credential, emailCode string
 	switch proof := req.Msg.Proof.(type) {
 	case *authnv1.ReauthenticateRequest_Password:
 		password = proof.Password
 	case *authnv1.ReauthenticateRequest_Passkey:
 		sessionID, credential = proof.Passkey.SessionId, proof.Passkey.Credential
+	case *authnv1.ReauthenticateRequest_EmailCode:
+		emailCode = proof.EmailCode
 	}
 
-	token, expiresAt, err := h.service.Reauthenticate(ctx, userID, password, sessionID, credential)
+	token, expiresAt, err := h.service.Reauthenticate(ctx, userID, password, sessionID, credential, emailCode)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -281,6 +284,21 @@ func (h *rpcHandler) Reauthenticate(ctx context.Context, req *connect.Request[au
 		Token:     token,
 		ExpiresAt: timestamppb.New(expiresAt),
 	}), nil
+}
+
+// SendReauthenticationCode delivers the email-code reverification factor to
+// the caller's own address. The success says nothing about the account; the
+// unavailable-delivery refusal is a failed-precondition the SPA routes to a
+// notice, not an internal error it cannot act on.
+func (h *rpcHandler) SendReauthenticationCode(ctx context.Context, req *connect.Request[authnv1.SendReauthenticationCodeRequest]) (*connect.Response[authnv1.SendReauthenticationCodeResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	if err := h.service.SendReauthenticationCode(ctx, userID); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&authnv1.SendReauthenticationCodeResponse{}), nil
 }
 
 // mapError translates the service's failures into the codes the Connect
@@ -317,6 +335,12 @@ func mapError(err error) error {
 	case errors.Is(err, ErrAccountUnknown):
 		return connect.NewError(connect.CodeNotFound,
 			errors.New("the account is not found"))
+	case errors.Is(err, ErrCodeSendUnavailable):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("the code delivery is not available on this deployment"))
+	case errors.Is(err, ErrResendTooSoon):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("a code was sent recently; wait before asking again"))
 	case errors.Is(err, ErrClonedCredential):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("the credential is refused; contact the operator"))

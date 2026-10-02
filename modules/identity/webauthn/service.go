@@ -20,6 +20,7 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/internal/mailer"
 	"github.com/riipandi/tango/modules/identity/signin"
 )
 
@@ -156,10 +157,27 @@ type Service struct {
 	log      *slog.Logger
 	now      func() time.Time
 
+	// mail is the renderer the code delivery checks, and codeMail is the
+	// enqueue seam internal/jobs satisfies. Either nil leaves the code
+	// path answering unavailable — the proof types a caller still holds
+	// keep working.
+	mail     *mailer.Service
+	codeMail codeEnqueuer
+
 	// totpEnrollments is the post-construction seam to the second factor's
 	// own enrollment count. Nil until the area wires it; a nil counter
 	// counts zero TOTP devices.
 	totpEnrollments TotpEnrollmentCounter
+}
+
+// WithDelivery wires the email-code proof's send pair: the mailer renders
+// and checks the SMTP configuration, the enqueuer — internal/jobs's
+// notifier — carries the message. Nil either keeps the code proof answering
+// unavailable while the password and passkey proofs go on working.
+func (s *Service) WithDelivery(mail *mailer.Service, enqueuer codeEnqueuer) *Service {
+	s.mail = mail
+	s.codeMail = enqueuer
+	return s
 }
 
 // NewService builds the service over the deployment's pool and settings.

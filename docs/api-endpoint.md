@@ -70,7 +70,8 @@ single-use token that lives `session.reverification_window` (default 30 minutes)
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/BeginLogin`                            | ConnectRPC   | Open a ceremony sign-in challenge           |
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/VerifyLogin`                           | ConnectRPC   | Verify the assertion and open the session   |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password or passkey)         |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password, passkey, or email code) |
+| POST     | `/rpc/tango.authn.v1.WebAuthnService/SendReauthenticationCode`              | ConnectRPC   | Email the reverification code (self)         |
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential`                 | ConnectRPC   | Rename a user's passkey (admin)             |
 | POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |

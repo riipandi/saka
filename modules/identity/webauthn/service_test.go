@@ -440,7 +440,7 @@ func TestAStepUpProofSpendsOnce(t *testing.T) {
 	enroll(t, service, userID, soft, "key")
 
 	// The password proof mints the token.
-	token, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	token, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, token)
 	assert.True(t, expiresAt.After(time.Now()))
@@ -448,7 +448,7 @@ func TestAStepUpProofSpendsOnce(t *testing.T) {
 	// The passkey proof mints one too, over its own ceremony.
 	options, sessionID, err := service.BeginLogin(t.Context())
 	require.NoError(t, err)
-	_, _, err = service.Reauthenticate(t.Context(), userID, "", sessionID, soft.Get(t, options, testOrigin, userID[:]))
+	_, _, err = service.Reauthenticate(t.Context(), userID, "", sessionID, soft.Get(t, options, testOrigin, userID[:]), "")
 	require.NoError(t, err)
 
 	// Each token spends exactly once.
@@ -471,7 +471,7 @@ func TestAForeignAssertionIsNotAProof(t *testing.T) {
 
 	options, sessionID, err := service.BeginLogin(t.Context())
 	require.NoError(t, err)
-	_, _, err = service.Reauthenticate(t.Context(), userID, "", sessionID, soft.Get(t, options, testOrigin, other[:]))
+	_, _, err = service.Reauthenticate(t.Context(), userID, "", sessionID, soft.Get(t, options, testOrigin, other[:]), "")
 	assert.ErrorIs(t, err, ErrProofRefused)
 }
 
@@ -480,7 +480,7 @@ func TestAWrongPasswordIsNotAProof(t *testing.T) {
 	userID, account := seedAccount(t, service.pool, "hermione")
 	issuer.accounts[userID] = account
 
-	_, _, err := service.Reauthenticate(t.Context(), userID, "marauder", "", "")
+	_, _, err := service.Reauthenticate(t.Context(), userID, "marauder", "", "", "")
 	assert.ErrorIs(t, err, ErrProofRefused)
 }
 
@@ -507,7 +507,7 @@ func TestAStepUpProofLivesInTheReverificationWindow(t *testing.T) {
 	// held still so the two reads share one instant.
 	at := time.Now()
 	service.now = func() time.Time { return at }
-	token, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	token, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, 2*time.Minute, expiresAt.Sub(at))
 
@@ -516,7 +516,7 @@ func TestAStepUpProofLivesInTheReverificationWindow(t *testing.T) {
 
 	// Past the window a fresh grant is dead on arrival: the proof was
 	// confirmed at grant time, and no consumption may outlive the window.
-	token, _, err = service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	token, _, err = service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "", "")
 	require.NoError(t, err)
 	service.now = func() time.Time { return at.Add(3 * time.Minute) }
 	assert.ErrorIs(t, service.ConsumeReauthentication(t.Context(), stepUpCaller(t, userID), token), ErrProofRefused)
@@ -531,7 +531,7 @@ func TestTheReverificationWindowFallsBackToTheDefault(t *testing.T) {
 
 	at := time.Now()
 	service.now = func() time.Time { return at }
-	_, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "")
+	_, expiresAt, err := service.Reauthenticate(t.Context(), userID, "expecto-patronum", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, reverificationWindowDefault, expiresAt.Sub(at))
 }

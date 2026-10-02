@@ -445,7 +445,19 @@ var Package = do.Package(
 		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
 			reader = settings
 		}
-		return webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, reader, recorder, log)
+		service, err := webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, reader, recorder, log)
+		if err != nil {
+			return nil, err
+		}
+		// The email-code proof's send pair rides the post-construction
+		// seam, the way the password recovery service takes its notifier:
+		// the delivery is optional wiring, and a nil pair leaves the
+		// password and passkey proofs working.
+		if mail := do.MustInvoke[*mailer.Service](i); mail != nil {
+			service.WithDelivery(mail, jobs.NewReauthenticationCodeNotifier(
+				do.MustInvoke[*queue.Client](i), log))
+		}
+		return service, nil
 	}),
 
 	// The step-up consumer is the webauthn service behind the interface the

@@ -132,7 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON public.sessions US
 
 -- --------------------------------------------------------
 -- Table: public.auth_tokens — one-time access, email verification,
--- reauthentication, password-reset, and email-change tokens (hash-only).
+-- reauthentication, reauthentication-code, password-reset, and
+-- email-change tokens (hash-only).
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.auth_tokens (
@@ -149,7 +150,7 @@ CREATE TABLE IF NOT EXISTS public.auth_tokens (
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP),
     last_sent_at TIMESTAMPTZ DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'password_reset', 'email_change')),
+    CONSTRAINT chk_auth_token_purpose CHECK (purpose IN ('email_verification', 'one_time_access', 'reauthentication', 'reauthentication_code', 'password_reset', 'email_change')),
     -- A device pair travels only beside a one-time-access code, and a
     -- pending address only beside an email-change token. One-time-access
     -- may carry no device at all: the email path binds the code to nothing.

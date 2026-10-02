@@ -137,8 +137,11 @@ var ProcedureRules = map[string]Entry{
 	authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure: {Rule: Admin},
 	authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure: {Rule: Admin},
 	// The re-proof runs on the caller's own session — it is the proof, not
-	// the guarded call, so it carries no token of its own.
-	authnv1connect.WebAuthnServiceReauthenticateProcedure: {Rule: Session},
+	// the guarded call, so it carries no token of its own. The code send is
+	// the same: the account is the session's own, the proof travels by
+	// email, and an impersonated caller is refused beside the re-proof.
+	authnv1connect.WebAuthnServiceReauthenticateProcedure:           {Rule: Session},
+	authnv1connect.WebAuthnServiceSendReauthenticationCodeProcedure: {Rule: Session},
 
 	// The password recovery surfaces split at the same line. The trigger and
 	// the spend are reached before any token exists — a caller who lost the

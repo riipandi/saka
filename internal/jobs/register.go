@@ -78,6 +78,9 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		client.Register(queue.NewQueue[OneTimeAccessEmailTask](func(ctx context.Context, task OneTimeAccessEmailTask) error {
 			return oneTimeAccessProcessor(ctx, task, mail, baseURL)
 		}))
+		client.Register(queue.NewQueue[ReauthenticationCodeEmailTask](func(ctx context.Context, task ReauthenticationCodeEmailTask) error {
+			return reauthenticationCodeProcessor(ctx, task, mail)
+		}))
 		client.Register(queue.NewQueue[UserBannedEmailTask](func(ctx context.Context, task UserBannedEmailTask) error {
 			return userBannedProcessor(ctx, task, mail)
 		}))

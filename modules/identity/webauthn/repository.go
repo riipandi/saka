@@ -381,3 +381,69 @@ func (r *Repository) ConsumeReauthenticationToken(ctx context.Context, db datast
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+// UpsertReauthenticationCode writes the one live email-code row: the
+// purpose sits under the partial unique index, so resend replaces — the
+// newest code is the only one that works. The clock is the caller's.
+func (r *Repository) UpsertReauthenticationCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error {
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(AuthTokensTable)
+	ib.Cols("id", "user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
+	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication_code", expiresAt, sentAt)
+	// The conflict target carries the partial index's predicate: the unique
+	// index excludes reauthentication, so a bare column list matches nothing.
+	ib.SQL("ON CONFLICT (user_id, purpose) WHERE purpose <> 'reauthentication' DO UPDATE SET " +
+		"token_hash = EXCLUDED.token_hash, " +
+		"expires_at = EXCLUDED.expires_at, " +
+		"last_sent_at = EXCLUDED.last_sent_at")
+
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("webauthn: upsert reauthentication code: %w", err)
+	}
+	return nil
+}
+
+// ConsumeReauthenticationCode spends one email code: single use is the
+// DELETE's WHERE — the hash, the account, the purpose, the window. A wrong,
+// foreign, or expired code deletes nothing and answers false.
+func (r *Repository) ConsumeReauthenticationCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, now time.Time) (bool, error) {
+	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbt.DeleteFrom(AuthTokensTable)
+	dbt.Where(
+		dbt.Equal("token_hash", tokenHash),
+		dbt.Equal("user_id", userID),
+		dbt.Equal("purpose", "reauthentication_code"),
+		dbt.GreaterThan("expires_at", now),
+	)
+
+	query, args := dbt.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("webauthn: consume reauthentication code: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// ReauthenticationCodeSentAt reads the live code row's last send, the stamp
+// the resend cooldown judges. No row is an account that never asked.
+func (r *Repository) ReauthenticationCodeSentAt(ctx context.Context, db datastore.Querier, userID uuid.UUID) (*time.Time, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("last_sent_at")
+	sb.From(AuthTokensTable)
+	sb.Where(
+		sb.Equal("user_id", userID),
+		sb.Equal("purpose", "reauthentication_code"),
+	)
+
+	query, args := sb.Build()
+	row := db.QueryRow(ctx, query, args...)
+	var sentAt *time.Time
+	if err := row.Scan(&sentAt); err != nil {
+		if errors.Is(err, datastore.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("webauthn: read reauthentication code stamp: %w", err)
+	}
+	return sentAt, nil
+}

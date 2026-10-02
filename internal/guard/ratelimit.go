@@ -57,6 +57,9 @@ var RateAuthProcedures = map[string]struct{}{
 	// session changes the stakes, not the shape — the proof's budget is what
 	// makes a drive against the account's password expensive.
 	authnv1connect.WebAuthnServiceReauthenticateProcedure: {},
+	// The code send provokes one email per call — the same mailbomb a
+	// driving sign-in code request is — so it shares the credential bucket.
+	authnv1connect.WebAuthnServiceSendReauthenticationCodeProcedure: {},
 	// The passkey assertion is a credential attempt like the password: the
 	// verification is the guess, and the budget the bucket shares is what
 	// makes a drive against the credential space expensive.
