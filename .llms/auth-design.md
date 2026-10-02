@@ -6,9 +6,9 @@ Keep this document as simple as possible!
 
 ### Email
 
-- [ ] **Sign-up with email**: Allow users to sign up with their email address (default: true)
+- [x] **Sign-up with email**: Allow users to sign up with their email address (default: true)
 - [x] **Require email address**: Users must provide an email address to sign up and must maintain one on their account at all times (default: true)
-- [ ] **Verify at sign-up**: Require users to verify their email addresses before they can sign-up (default: true)
+- [x] **Verify at sign-up**: Require users to verify their email addresses before they can sign-up (default: true)
   - Email verification code: Verify by entering a one-time passcode sent to the email address
 - [x] **Sign-in with email**: Allow users to sign in with their email address (default: true)
   - Email verification code: Users can sign-in with an email verification code
@@ -21,7 +21,7 @@ Keep this document as simple as possible!
 ### Username
 
 - [x] **Sign-up with username**: Allow users to add a username during sign-up (default: false)
-- [ ] **Require username**: Users must create a username for their account (default: false)
+- [x] **Require username**: Users must create a username for their account (default: false)
 - [x] **Sign-in with username**: Allow users to sign in with their username (default: false)
 
 ### Password
@@ -51,9 +51,9 @@ Keep this document as simple as possible!
 
 - [x] **First and last name**: Users have the ability to set their first and last name (default: true)
 - [x] **Require first and last name**: Users must provide both first and last name at sign-up (default: true)
-- [ ] **Allow users to delete their account**: Can override on a per-user basis in the user profile. (default: false)
+- [x] **Allow users to delete their account**: Can override on a per-user basis in the user profile. (default: false)
 - [x] **Allow users to change their email address** (default: true)
-- [ ] **Allow users to change their username** (default: true)
+- [x] **Allow users to change their username** (default: true)
 
 ---
 
@@ -65,7 +65,7 @@ Keep this document as simple as possible!
 
 ## Multi-Factor
 
-- [ ] **Require multi-factor authentication**: Will enforce users to setup multi-factor authentication after sign-in and sign-up. (default: false)
+- [x] **Require multi-factor authentication**: Will enforce users to setup multi-factor authentication after sign-in and sign-up. (default: false)
 
 ### MFA strategies
 
@@ -79,9 +79,9 @@ Keep this document as simple as possible!
 
 ## Access Mode (default: open)
 
-- [ ] **Open**: Sign-ups are enabled and all users can join your application.
+- [x] **Open**: Sign-ups are enabled and all users can join your application.
   - Allowlist: Only allow sign-ups from accounts with pre-approved identifiers (default: false)
-- [ ] **Invite-only**: Sign-ups are disabled, and only users who are invited can join (signup token).
+- [x] **Invite-only**: Sign-ups are disabled, and only users who are invited can join (signup token).
 - [ ] **Waitlist**: Sign-ups are disabled, but people can join a waitlist.
 
 ---
@@ -90,9 +90,9 @@ Keep this document as simple as possible!
 
 ### Session lifetime
 
-- [ ] **Maximum lifetime**: Set the maximum lifetime duration for a session. Accepts between 5 minutes and 10 years. (default: 7 days)
-- [ ] **Inactivity timeout**: Set the inactivity timeout for a session. Accepts between 5 minutes and 1 year. (default: 6 hours)
-- [ ] **Reverification window**: Customize how long a successful sign-in or reverification remains valid for protected sensitive actions. (default: 30 minutes)
+- [x] **Maximum lifetime**: Set the maximum lifetime duration for a session. Accepts between 5 minutes and 10 years. (default: 7 days)
+- [x] **Inactivity timeout**: Set the inactivity timeout for a session. Accepts between 5 minutes and 1 year. (default: 6 hours)
+- [x] **Reverification window**: Customize how long a successful sign-in or reverification remains valid for protected sensitive actions. (default: 30 minutes)
 
 > You should be aware of browser limitations that may cause users to be signed out before the configured maximum lifetime, even when this feature is disabled.
 
