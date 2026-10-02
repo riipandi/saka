@@ -106,6 +106,9 @@ func (r *Recorder) WithSink(sink Sink) *Recorder {
 // NewRecorder builds the recorder. A nil logger discards, which is the state
 // a test that reads only rows is in.
 func NewRecorder(log *slog.Logger) *Recorder {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
 	return &Recorder{log: log}
 }
 

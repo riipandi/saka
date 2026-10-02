@@ -4,16 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
 
 	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
 	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
+	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/queue"
 	"github.com/riipandi/tango/internal/scheduler"
 	"github.com/riipandi/tango/pkg/responder"
+)
+
+// errInternal is the one wire answer an internal failure carries. The cause
+// travels to the process log instead: a driver error's text — SQL fragments,
+// constraint names, cipher failures — is not a caller's to read.
+var errInternal = errors.New("internal error")
+
+// The resource types the queue and scheduler records name, the way a module
+// names its own.
+const (
+	resourceQueueTask    = "queue_task"
+	resourceSchedulerJob = "scheduler_job"
 )
 
 // rpcQueueService answers the queue's administrative procedures over
@@ -23,10 +39,37 @@ import (
 // their row's UUID encodes, the way an account's id leaves as `user_…`.
 type rpcQueueService struct {
 	client *queue.Client
+	// db and audit write the record a destructive action leaves behind. The
+	// action is a single statement, so the record rides the pool rather than
+	// a transaction the handler does not own.
+	db    datastore.Querier
+	audit *audit.Recorder
+	log   *slog.Logger
 }
 
-func newRPCQueueService(client *queue.Client) *rpcQueueService {
-	return &rpcQueueService{client: client}
+func newRPCQueueService(client *queue.Client, db datastore.Querier, audit *audit.Recorder, log *slog.Logger) *rpcQueueService {
+	return &rpcQueueService{client: client, db: db, audit: audit, log: log}
+}
+
+// internalFailure logs the cause and answers the wire the one static message,
+// so a driver error's text never reaches a caller.
+func (s *rpcQueueService) internalFailure(ctx context.Context, what string, err error) error {
+	s.log.ErrorContext(ctx, "queue: "+what, "err", err.Error())
+	return connect.NewError(connect.CodeInternal, errInternal)
+}
+
+// record writes the audit entry one completed action leaves behind. The
+// surface may be absent — a bare test router — and recording never is a
+// condition of the action.
+func (s *rpcQueueService) record(ctx context.Context, event, resourceID string, payload map[string]string) {
+	s.audit.Record(ctx, s.db, audit.Entry{
+		Event:        event,
+		Trigger:      audit.TriggerUser,
+		Status:       audit.StatusSuccess,
+		ResourceType: resourceQueueTask,
+		ResourceID:   resourceID,
+		Payload:      payload,
+	})
 }
 
 // ListQueues reports one page of registered queues with the pagination
@@ -40,7 +83,7 @@ func (s *rpcQueueService) ListQueues(ctx context.Context, req *connect.Request[s
 		sortAscending(req.Msg.GetSortOrder(), true),
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to list queues", err)
 	}
 
 	queues := make([]*systemv1.QueueSummary, 0, len(views))
@@ -78,7 +121,7 @@ func (s *rpcQueueService) ListTasks(ctx context.Context, req *connect.Request[sy
 		sortAscending(req.Msg.GetSortOrder(), false),
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to list tasks", err)
 	}
 
 	tasks := make([]*systemv1.PendingTask, 0, len(views))
@@ -117,7 +160,7 @@ func (s *rpcQueueService) GetTask(ctx context.Context, req *connect.Request[syst
 	}
 	detail, exists, err := s.client.Detail(ctx, id)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to fetch task", err)
 	}
 	if !exists {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("queue: no task answers that id"))
@@ -160,7 +203,7 @@ func (s *rpcQueueService) ListDeadTasks(ctx context.Context, req *connect.Reques
 		sortAscending(req.Msg.GetSortOrder(), true),
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to list dead tasks", err)
 	}
 
 	tasks := make([]*systemv1.DeadTask, 0, len(views))
@@ -198,11 +241,15 @@ func (s *rpcQueueService) CancelTask(ctx context.Context, req *connect.Request[s
 	}
 	cancelled, err := s.client.Cancel(ctx, id)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to cancel task", err)
 	}
 	if !cancelled {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("queue: the task is claimed and can no longer be cancelled"))
 	}
+	// The record names the task the way the log's readers do — the row's own
+	// identifier, the UUID the wire form encoded, because resource_id is a
+	// UUID column.
+	s.record(ctx, audit.EventQueueTaskCancelled, id.String(), nil)
 	return connect.NewResponse(&systemv1.CancelTaskResponse{
 		Status:  "success",
 		Message: "the task was cancelled",
@@ -220,8 +267,13 @@ func (s *rpcQueueService) ReplayDeadTasks(ctx context.Context, req *connect.Requ
 	// owns the filter, so the response count and the rows that moved agree.
 	replayed, err := s.client.ReplayDead(ctx, req.Msg.GetQueue())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to replay dead tasks", err)
 	}
+	payload := map[string]string{"replayed": strconv.FormatInt(replayed, 10)}
+	if queue := req.Msg.GetQueue(); queue != "" {
+		payload["queue"] = queue
+	}
+	s.record(ctx, audit.EventQueueDeadReplayed, "", payload)
 	return connect.NewResponse(&systemv1.ReplayDeadTasksResponse{
 		Replayed: replayed,
 		Status:   "success",
@@ -236,8 +288,11 @@ func (s *rpcQueueService) FlushPendingTasks(ctx context.Context, _ *connect.Requ
 	}
 	flushed, err := s.client.Flush(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to flush pending tasks", err)
 	}
+	s.record(ctx, audit.EventQueuePendingFlushed, "", map[string]string{
+		"flushed": strconv.FormatInt(flushed, 10),
+	})
 	return connect.NewResponse(&systemv1.FlushPendingTasksResponse{
 		Flushed: flushed,
 		Status:  "success",
@@ -253,8 +308,11 @@ func (s *rpcQueueService) FlushCompletedTasks(ctx context.Context, _ *connect.Re
 	}
 	flushed, err := s.client.FlushCompleted(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to flush completed tasks", err)
 	}
+	s.record(ctx, audit.EventQueueCompletedFlushed, "", map[string]string{
+		"flushed": strconv.FormatInt(flushed, 10),
+	})
 	return connect.NewResponse(&systemv1.FlushCompletedTasksResponse{
 		Flushed: flushed,
 		Status:  "success",
@@ -276,10 +334,20 @@ func (s *rpcQueueService) engine() error {
 // Job ids leave as the `scd_` TypeID their state row's UUID encodes.
 type rpcSchedulerService struct {
 	scheduler *scheduler.Scheduler
+	db        datastore.Querier
+	audit     *audit.Recorder
+	log       *slog.Logger
 }
 
-func newRPCSchedulerService(s *scheduler.Scheduler) *rpcSchedulerService {
-	return &rpcSchedulerService{scheduler: s}
+func newRPCSchedulerService(s *scheduler.Scheduler, db datastore.Querier, audit *audit.Recorder, log *slog.Logger) *rpcSchedulerService {
+	return &rpcSchedulerService{scheduler: s, db: db, audit: audit, log: log}
+}
+
+// internalFailure is the queue service's answer shared by both engines: the
+// cause travels to the log, the wire carries the one static message.
+func (s *rpcSchedulerService) internalFailure(ctx context.Context, what string, err error) error {
+	s.log.ErrorContext(ctx, "scheduler: "+what, "err", err.Error())
+	return connect.NewError(connect.CodeInternal, errInternal)
 }
 
 // ListJobs reports one page of registered jobs with the pagination block
@@ -293,7 +361,7 @@ func (s *rpcSchedulerService) ListJobs(ctx context.Context, req *connect.Request
 		sortAscending(req.Msg.GetSortOrder(), true),
 		int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to list jobs", err)
 	}
 
 	jobs := make([]*systemv1.SchedulerJob, 0, len(views))
@@ -327,7 +395,18 @@ func (s *rpcSchedulerService) RunNow(ctx context.Context, req *connect.Request[s
 	case errors.Is(err, scheduler.ErrJobUnknown):
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("scheduler: no job answers that id"))
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, s.internalFailure(ctx, "failed to run job now", err)
+	}
+	// The record names the job by the state row's own identifier: the wire
+	// id decoded back to the UUID the column holds.
+	if raw, decodeErr := scheduler.UUIDFromWire(req.Msg.GetId()); decodeErr == nil {
+		s.audit.Record(ctx, s.db, audit.Entry{
+			Event:        audit.EventSchedulerJobRunNow,
+			Trigger:      audit.TriggerUser,
+			Status:       audit.StatusSuccess,
+			ResourceType: resourceSchedulerJob,
+			ResourceID:   raw.String(),
+		})
 	}
 	return connect.NewResponse(&systemv1.RunSchedulerJobNowResponse{
 		Status:  "success",

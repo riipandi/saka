@@ -415,6 +415,28 @@ const (
 	// EventWebhookTested is a test delivery queued to one endpoint — the
 	// queueing is the happening; the delivery rows carry the outcome.
 	EventWebhookTested = "webhook_tested"
+
+	// EventQueueTaskCancelled is a pending task an administrator removed
+	// before a worker claimed it. The record names the task's wire identity;
+	// a claimed task cannot be cancelled and writes nothing.
+	EventQueueTaskCancelled = "queue_task_cancelled"
+
+	// EventQueueDeadReplayed is the archive's dead tasks re-enqueued — one
+	// queue's, or every queue's. The payload counts what went back and names
+	// the queue; an absent name covered them all.
+	EventQueueDeadReplayed = "queue_dead_replayed"
+
+	// EventQueuePendingFlushed is every unclaimed task removed. The payload
+	// counts what went; a claimed task is in flight and survives a flush.
+	EventQueuePendingFlushed = "queue_pending_flushed"
+
+	// EventQueueCompletedFlushed is every archived record removed, retention
+	// notwithstanding. The payload counts what went.
+	EventQueueCompletedFlushed = "queue_completed_flushed"
+
+	// EventSchedulerJobRunNow is a job's task enqueued on demand, without
+	// advancing the job's schedule. The record names the job's wire identity.
+	EventSchedulerJobRunNow = "scheduler_job_run_now"
 )
 
 // The trigger values the trigger_type column's enum allows. A record this

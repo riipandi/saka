@@ -7,7 +7,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/health"
 	"github.com/riipandi/tango/internal/kernel"
@@ -65,6 +67,15 @@ type Options struct {
 	// Scheduler is the durable cron scheduler the administrative surface
 	// reads and triggers. A nil scheduler answers the same way.
 	Scheduler *scheduler.Scheduler
+	// DB is the query surface the queue and scheduler procedures write their
+	// audit records through. A nil surface skips recording — the state a
+	// bare test router is in — because a record is a side effect of the
+	// action, never its condition.
+	DB datastore.Querier
+	// Audit writes the records the queue and scheduler's destructive
+	// procedures leave behind. A nil recorder writes none, which is the same
+	// bare-test state.
+	Audit *audit.Recorder
 	// Injector is the samber/do container the run composed. Only the debug
 	// build's devtool reads it; a release build ignores the field.
 	Injector do.Injector

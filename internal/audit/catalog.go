@@ -104,6 +104,11 @@ var catalog = []Event{
 	{EventWebhookDeleted, "A webhook endpoint was removed."},
 	{EventWebhookSecretRotated, "A webhook endpoint's signing secret was replaced."},
 	{EventWebhookTested, "A test delivery was queued to one webhook endpoint."},
+	{EventQueueTaskCancelled, "A pending task was removed from the queue before a worker claimed it."},
+	{EventQueueDeadReplayed, "Dead tasks were re-enqueued from the archive, for one queue or every queue."},
+	{EventQueuePendingFlushed, "Every unclaimed task was removed from the queue."},
+	{EventQueueCompletedFlushed, "Every archived task record was removed."},
+	{EventSchedulerJobRunNow, "A scheduled job's task was enqueued immediately, without advancing its schedule."},
 }
 
 // eventIndex is the catalog keyed by name, built once from the slice so a

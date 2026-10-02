@@ -204,7 +204,7 @@ func rpcRouter(opts Options) http.Handler {
 	// guard names every procedure administrative, so an anonymous miss is a
 	// 404 before the handler ever runs.
 	_, queueHandler := systemv1connect.NewQueueServiceHandler(
-		newRPCQueueService(opts.QueueClient),
+		newRPCQueueService(opts.QueueClient, opts.DB, opts.Audit, opts.Logger),
 		options...,
 	)
 	r.Handle(systemv1connect.QueueServiceListQueuesProcedure, queueHandler)
@@ -217,7 +217,7 @@ func rpcRouter(opts Options) http.Handler {
 	r.Handle(systemv1connect.QueueServiceFlushCompletedTasksProcedure, queueHandler)
 
 	_, schedulerHandler := systemv1connect.NewSchedulerServiceHandler(
-		newRPCSchedulerService(opts.Scheduler),
+		newRPCSchedulerService(opts.Scheduler, opts.DB, opts.Audit, opts.Logger),
 		options...,
 	)
 	r.Handle(systemv1connect.SchedulerServiceListJobsProcedure, schedulerHandler)

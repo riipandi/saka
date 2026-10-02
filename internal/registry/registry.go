@@ -32,7 +32,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/fetcher"
 	"github.com/riipandi/tango/internal/guard"
 	"github.com/riipandi/tango/internal/health"
@@ -135,9 +137,13 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		Reauthentication: do.MustInvoke[guard.ReauthConsumer](i),
 		// The engines' own operational surface reads them the same way: the
 		// queue procedures answer from the client, the scheduler ones from
-		// its state rows.
+		// its state rows. Their destructive procedures record through the
+		// pool and the recorder — the action is a single statement, so the
+		// record rides the pool.
 		QueueClient: do.MustInvoke[*queue.Client](i),
 		Scheduler:   do.MustInvoke[*scheduler.Scheduler](i),
+		DB:          do.MustInvoke[*datastore.Postgres](i),
+		Audit:       do.MustInvoke[*audit.Recorder](i),
 		Injector:    i,
 	}), nil
 }
