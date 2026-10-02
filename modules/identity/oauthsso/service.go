@@ -82,6 +82,17 @@ type Service struct {
 	// refuses at the begin rather than failing the run.
 	providers ProviderSet
 
+	// issuer is the session mint the resolution binds accounts through,
+	// the mfa gate the second factor's fork runs, settings the JIT
+	// policy's runtime source, blocklist the identifier gate, and codes
+	// the email code's delivery. Each rides the post-construction seam
+	// like the adapters do; a nil issuer refuses every continue.
+	issuer    signInIssuer
+	mfa       mfaGate
+	settings  settingsReader
+	blocklist blocklistChecker
+	codes     CodeNotifier
+
 	// baseURL is the origin the redirect URI and the SPA redirect are
 	// built from, wired after construction with the base URL.
 	baseURL string

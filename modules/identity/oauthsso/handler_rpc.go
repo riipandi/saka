@@ -9,6 +9,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/tango/pkg/responder"
 )
 
 // rpcHandler is the transport mapping of the OAuth SSO procedures. The
@@ -40,10 +42,76 @@ func (h *rpcHandler) BeginSignIn(ctx context.Context, req *connect.Request[authn
 	}), nil
 }
 
-// ContinueSignIn completes a paused flow. The procedure rides the flow
-// phase; until it lands, the contract answers unimplemented.
-func (h *rpcHandler) ContinueSignIn(context.Context, *connect.Request[authnv1.ContinueOAuthSignInRequest]) (*connect.Response[authnv1.CompleteSignInResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the OAuth sign-in flow is not served yet"))
+// ContinueSignIn completes a paused flow: the resolution binds the
+// identity, the fork answers the bridge or the session, and the flow
+// spends. The client facts ride the request's context, the way the
+// password sign-in records them.
+func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[authnv1.ContinueOAuthSignInRequest]) (*connect.Response[authnv1.ContinueOAuthSignInResponse], error) {
+	client := audit.ClientFromContext(ctx)
+	answer, err := h.service.ContinueSignIn(ctx, ContinueParams{
+		FlowToken:   req.Msg.FlowToken,
+		GivenName:   req.Msg.GivenName,
+		FamilyName:  req.Msg.FamilyName,
+		UserAgent:   client.UserAgent,
+		IPAddress:   client.IPAddress,
+		Fingerprint: client.Fingerprint,
+	})
+	if err != nil {
+		return nil, continueError(err)
+	}
+
+	out := &authnv1.ContinueOAuthSignInResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the sign-in flow completed",
+		Stage:   string(answer.Stage),
+	}
+	switch {
+	case answer.Bridge != nil:
+		out.MfaRequired = true
+		out.MfaPendingToken = answer.Bridge.Token
+		out.MfaPendingExpiresAt = timestamppb.New(answer.Bridge.ExpiresAt)
+		out.Stage = string(StageCompleted)
+		out.Message = "the account keeps a confirmed second factor"
+	case answer.Session != nil:
+		out.AccessToken = answer.Session.AccessToken
+		out.TokenType = answer.Session.TokenType
+		out.AccessExpiresIn = answer.Session.AccessExpiresIn
+		out.RefreshExpiresIn = answer.Session.RefreshExpiresIn
+		out.RefreshToken = answer.Session.RefreshToken
+		out.SessionId = answer.Session.SessionID
+		out.User = &authnv1.AuthenticatedUser{
+			Id:          answer.Session.User.ID,
+			Username:    answer.Session.User.Username,
+			Email:       answer.Session.User.Email,
+			DisplayName: answer.Session.User.DisplayName,
+		}
+		out.Stage = string(StageCompleted)
+	default:
+		out.Message = "the sign-in flow moved to the " + string(answer.Stage) + " stage"
+	}
+	return connect.NewResponse(out), nil
+}
+
+// continueError maps the resolution's failures onto the connect codes.
+// The unknown-flow answer is the same not_found a replay earns: a
+// refused continue learns nothing about which half failed.
+func continueError(err error) error {
+	switch {
+	case errors.Is(err, ErrFlowUnknown), errors.Is(err, ErrConnectionUnavailable):
+		return connect.NewError(connect.CodeNotFound, errors.New("no live flow answers this handle"))
+	case errors.Is(err, ErrNamesRequired):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the flow waits for a given and a family name"))
+	case errors.Is(err, ErrInvalidCode):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the code does not answer the flow's request"))
+	case errors.Is(err, ErrFlowEnded):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the flow answered wrong too many times and ended"))
+	case errors.Is(err, ErrLinkingDisabled):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("account linking is disabled"))
+	case errors.Is(err, ErrSignUpRefused):
+		return connect.NewError(connect.CodePermissionDenied, errors.New("the sign-up is not allowed"))
+	default:
+		return connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be completed"))
+	}
 }
 
 // ListConnections answers the operator's listing, secrets never included.
@@ -176,11 +244,18 @@ func (h *rpcHandler) ListLinkedConnections(context.Context, *connect.Request[aut
 }
 
 // VerifySignInEmail spends the email code a verify_email-stage flow waits
-// for. The procedure rides the resolution phase — the code's row and its
-// email belong to the resolution's transaction; until it lands, the
-// contract answers unimplemented.
-func (h *rpcHandler) VerifySignInEmail(context.Context, *connect.Request[authnv1.VerifyOAuthSignInEmailRequest]) (*connect.Response[authnv1.VerifyOAuthSignInEmailResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the email-code stage is not served yet"))
+// for. The answer names the stage the flow moved to; the sign-in itself
+// completes through ContinueSignIn.
+func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *connect.Request[authnv1.VerifyOAuthSignInEmailRequest]) (*connect.Response[authnv1.VerifyOAuthSignInEmailResponse], error) {
+	stage, err := h.service.VerifySignInEmail(ctx, req.Msg.FlowToken, req.Msg.Code)
+	if err != nil {
+		return nil, continueError(err)
+	}
+	return connect.NewResponse(&authnv1.VerifyOAuthSignInEmailResponse{
+		Stage:   string(stage),
+		Status:  responder.StatusSuccess,
+		Message: "the address is proven and the sign-in flow moved on",
+	}), nil
 }
 
 // UnlinkConnection removes one linked account. The procedure rides the

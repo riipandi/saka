@@ -35,6 +35,7 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 		mailer.TemplateEmailVerification,
 		mailer.TemplateLoginNewDevice,
 		mailer.TemplateMfaDisabledNotice,
+		mailer.TemplateOAuthSignInCode,
 		mailer.TemplateOneTimeAccess,
 		mailer.TemplatePasswordChangedNotice,
 		mailer.TemplatePasswordReset,
@@ -77,6 +78,9 @@ func fixtures() map[string]mailer.View {
 		}},
 		mailer.TemplateMfaDisabledNotice: {Data: mailer.MfaDisabledNoticeData{
 			Name: "Neveu", Reason: "Lost authenticator device, verified over support",
+		}},
+		mailer.TemplateOAuthSignInCode: {Data: mailer.OAuthSignInCodeData{
+			ProviderName: "Hogwarts", Code: "EXPECTOPATRONUM", ExpirationString: "10 minutes",
 		}},
 		mailer.TemplateOneTimeAccess: {Data: mailer.OneTimeAccessData{
 			Code:             "GRYFFINDOR",

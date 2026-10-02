@@ -212,6 +212,23 @@ type Connection struct {
 // BuiltIn reports whether the connection's endpoints are the code's own.
 func (c Connection) BuiltIn() bool { return c.Kind == KindBuiltin }
 
+// LinkedAccount is one row of linkedAccountTable: a provider identity
+// bound to an account. The tokens rest sealed exactly as the flow row
+// carried them — an empty value is the provider that answered none.
+type LinkedAccount struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	ConnectionID      uuid.UUID
+	ProviderAccountID string
+	Email             string
+	EmailVerified     bool
+	Profile           []byte
+	AccessToken       string
+	RefreshToken      string
+	CreatedAt         time.Time
+	UpdatedAt         *time.Time
+}
+
 // Flow is one row of flowTable: an authorization-code ceremony in
 // flight. The state and the flow token rest hashed — the raw values
 // travel only with the browser — and the PKCE verifier and the provider

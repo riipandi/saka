@@ -583,6 +583,26 @@ var Package = do.Package(
 		}
 		service := oauthsso.NewService(pool, cipher, recorder, discovery, log).
 			WithBaseURL(c.App.BaseURL)
+		// The resolution's seams ride the post-construction wiring: the
+		// session mint, the second factor's fork, the JIT policy's
+		// runtime source, the identifier gate, and the email code's
+		// delivery. Each is what its interface names; the queue-backed
+		// notifier keeps the raw code out of the feature.
+		if signinService := do.MustInvoke[*signin.Service](i); signinService != nil {
+			service = service.WithIssuer(signinService)
+		}
+		if mfa := do.MustInvoke[*multifactor.Service](i); mfa != nil {
+			service = service.WithMFAGate(mfa)
+		}
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service = service.WithSettings(settings)
+		}
+		if gates := do.MustInvoke[*blocklist.Service](i); gates != nil {
+			service = service.WithBlocklist(gates)
+		}
+		if client := do.MustInvoke[*queue.Client](i); client != nil {
+			service = service.WithCodeNotifier(jobs.NewOAuthSignInCodeNotifier(client, log))
+		}
 		return service.WithProviders(oauthsso.ProviderSet{
 			Builtin: map[string]oauthsso.Provider{
 				builtin.Google.Slug: builtin.NewGoogle(),

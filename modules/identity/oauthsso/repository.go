@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/user"
 )
 
 // The failures the repository reports. The service maps them onto the
@@ -183,6 +184,13 @@ const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code
 	email_verified, given_name, family_name, profile, access_token, refresh_token,
 	redirect_to, created_at, expires_at`
 
+const linkedAccountColumns = `id, user_id, connection_id, provider_account_id, email,
+	email_verified, profile, access_token, refresh_token, created_at, updated_at`
+
+// maxWrongCodes is the three-strikes ceiling the email code's stage
+// keeps — the same rule the other single-use bridges keep.
+const maxWrongCodes = 3
+
 // CreateFlow writes one pending ceremony row. The state hash is the only
 // handle that exists yet — the flow token is minted at the callback, the
 // moment the SPA first carries it.
@@ -285,6 +293,204 @@ func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int
 		return 0, err
 	}
 	return tag.RowsAffected(), nil
+}
+
+// ---- The resolution's reads and writes ----
+
+// LinkedAccountByProvider reads the binding one connection holds for a
+// provider account id — the resolution's first question. An absent row
+// is datastore.ErrNoRows, the answer that sends the resolution down the
+// link-or-create branches.
+func (r *Repository) LinkedAccountByProvider(ctx context.Context, db datastore.Querier, connectionID uuid.UUID, providerAccountID string) (LinkedAccount, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(linkedAccountColumns)
+	sb.From(linkedAccountTable)
+	sb.Where(sb.Equal("connection_id", connectionID), sb.Equal("provider_account_id", providerAccountID))
+	query, args := sb.Build()
+	return scanLinkedAccount(db.QueryRow(ctx, query, args...))
+}
+
+// CreateLinkedAccount binds one provider identity to an account. The
+// caller's transaction owns the write, so the binding and whatever it
+// rides — the account's creation or the session it opens — commit as one
+// fact.
+func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Querier, row LinkedAccount) error {
+	row.ID = uuid.NewV7()
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(linkedAccountTable)
+	ib.Cols("id", "user_id", "connection_id", "provider_account_id", "email", "email_verified", "profile", "access_token", "refresh_token")
+	ib.Values(row.ID, row.UserID, row.ConnectionID, row.ProviderAccountID, row.Email,
+		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken)
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AccountIDByEmail reads the account an address names. The lookup runs
+// over the users table alone — no join on the password — because a
+// provider-verified address is itself the credential, and an account
+// that holds no password is exactly the one an OAuth binding fits.
+func (r *Repository) AccountIDByEmail(ctx context.Context, db datastore.Querier, email string) (uuid.UUID, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id")
+	sb.From(user.UserTable)
+	sb.Where(sb.Equal("email", email))
+	query, args := sb.Build()
+	var id uuid.UUID
+	err := db.QueryRow(ctx, query, args...).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil(), datastore.ErrNoRows
+	}
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	return id, nil
+}
+
+// CreateAccount writes the JIT account: an address the provider verified
+// (or the email code proved), the names the flow carries, and no
+// password. The caller's transaction owns the write.
+func (r *Repository) CreateAccount(ctx context.Context, db datastore.Querier, row user.UserSchema) (uuid.UUID, error) {
+	row.ID = uuid.NewV7()
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(user.UserTable)
+	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name", "email_verified_at")
+	ib.Values(row.ID, nullIfEmpty(row.Username), row.Email, nullIfEmpty(row.FirstName),
+		nullIfEmpty(row.LastName), row.DisplayName, row.EmailVerifiedAt)
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return uuid.Nil(), err
+	}
+	return row.ID, nil
+}
+
+// MoveToVerifyEmail pauses the flow for the email code: the stage flip
+// is guarded on the stage it leaves, so a raced continue loses instead
+// of double-sending, and the window widens by a full flow lifetime — the
+// ceremony is actively driven now, not idling since its begin.
+func (r *Repository) MoveToVerifyEmail(ctx context.Context, db datastore.Querier, id uuid.UUID, codeHash string, at time.Time) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(
+		sb.Assign("stage", string(StageVerifyEmail)),
+		sb.Assign("email_code_hash", codeHash),
+		sb.Assign("wrong_codes", 0),
+		sb.Assign("expires_at", at),
+	)
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageResolved)))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
+}
+
+// MoveToRequireNames pauses the flow for the names the provider did not
+// supply, the same guarded flip the verify stage keeps.
+func (r *Repository) MoveToRequireNames(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(sb.Assign("stage", string(StageRequireNames)))
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageResolved)))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
+}
+
+// UpdateFlowNames stores the names the caller collected at the names
+// stage. The guarded update answers whether the flow still rests there.
+func (r *Repository) UpdateFlowNames(ctx context.Context, db datastore.Querier, id uuid.UUID, given, family string) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(sb.Assign("given_name", given), sb.Assign("family_name", family))
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageRequireNames)))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
+}
+
+// SpendEmailCode consumes the verify_email stage: the guarded update
+// carries the code's hash and the three-strikes ceiling in its WHERE, so
+// a wrong code, an expired flow, and a raced repeat all answer the same
+// "not spent". The address is marked verified — the code proved it — and
+// the flow returns to the stage the resolution reads.
+func (r *Repository) SpendEmailCode(ctx context.Context, db datastore.Querier, id uuid.UUID, codeHash string, next FlowStage) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(
+		sb.Assign("stage", string(next)),
+		sb.Assign("email_verified", true),
+		sb.Assign("email_code_hash", ""),
+		sb.Assign("wrong_codes", 0),
+	)
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageVerifyEmail)),
+		sb.Equal("email_code_hash", codeHash), sb.LessThan("wrong_codes", maxWrongCodes))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
+}
+
+// StrikeEmailCode counts one wrong answer and reports whether the flow
+// has spent its three. The increment rides a compare-and-set — the WHERE
+// carries the count the caller read — so two racers cannot both land the
+// same strike, and a loser's answer is the same "not spent".
+func (r *Repository) StrikeEmailCode(ctx context.Context, db datastore.Querier, id uuid.UUID, strikes int) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(sb.Assign("wrong_codes", strikes+1))
+	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageVerifyEmail)), sb.Equal("wrong_codes", strikes))
+	query, args := sb.Build()
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil || !landed {
+		return false, err
+	}
+	return strikes+1 >= maxWrongCodes, nil
+}
+
+// FailFlow ends a flow that proved hostile — the three-strikes spend. The
+// row stays for the sweep to collect, unreachable by every read.
+func (r *Repository) FailFlow(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("email_code_hash", ""))
+	sb.Where(sb.Equal("id", id))
+	query, args := sb.Build()
+	_, err := db.Exec(ctx, query, args...)
+	return err
+}
+
+// CompleteFlow spends the flow the resolution served: the account the
+// session opened (or the bridge owed) is bound to the row, and the
+// guarded update answers whether this continue was the winner.
+func (r *Repository) CompleteFlow(ctx context.Context, db datastore.Querier, id uuid.UUID, userID uuid.UUID) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	sb.Update(flowTable)
+	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("user_id", userID))
+	sb.Where(sb.Equal("id", id), sb.In("stage", string(StageResolved), string(StageRequireNames)))
+	query, args := sb.Build()
+	return execAffected(ctx, db, query, args...)
+}
+
+// execAffected answers whether the write found its row — the guarded
+// updates' shared shape.
+func execAffected(ctx context.Context, db datastore.Querier, query string, args ...any) (bool, error) {
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// scanLinkedAccount renders one binding row onto the view. The sealed
+// token columns stay as stored.
+func scanLinkedAccount(row pgx.Row) (LinkedAccount, error) {
+	var account LinkedAccount
+	err := row.Scan(&account.ID, &account.UserID, &account.ConnectionID, &account.ProviderAccountID,
+		&account.Email, &account.EmailVerified, &account.Profile, &account.AccessToken,
+		&account.RefreshToken, &account.CreatedAt, &account.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return LinkedAccount{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return LinkedAccount{}, err
+	}
+	return account, nil
 }
 
 // scanFlow renders one row onto the view. The hash and sealed columns

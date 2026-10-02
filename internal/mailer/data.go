@@ -13,6 +13,7 @@ const (
 	TemplateEmailVerification     = "email-verification"
 	TemplateLoginNewDevice        = "login-with-new-device"
 	TemplateMfaDisabledNotice     = "mfa-disabled-notice"
+	TemplateOAuthSignInCode       = "oauth-sign-in-code"
 	TemplateOneTimeAccess         = "one-time-access"
 	TemplatePasswordReset         = "password-reset"
 	TemplatePasswordChangedNotice = "password-changed-notice"
@@ -126,5 +127,14 @@ type (
 	MfaDisabledNoticeData struct {
 		Name   string
 		Reason string
+	}
+	// OAuthSignInCodeData renders TemplateOAuthSignInCode — the one-time
+	// code a sign-in-through-a-provider flow sends when the provider's
+	// address carries no verified mark. The code is the message's whole
+	// credential; there is no link to click.
+	OAuthSignInCodeData struct {
+		ProviderName     string
+		Code             string
+		ExpirationString string
 	}
 )

@@ -1044,7 +1044,7 @@ service OAuthSSOService {
   // completes are judged. The answer is the token pair, or the MFA bridge
   // when the account keeps a confirmed second factor — the same shape the
   // password sign-in pauses with.
-  rpc ContinueSignIn(ContinueOAuthSignInRequest) returns (CompleteSignInResponse);
+  rpc ContinueSignIn(ContinueOAuthSignInRequest) returns (ContinueOAuthSignInResponse);
 
   // VerifySignInEmail spends the email code a flow in the verify_email
   // stage waits for: the provider's address was not verified at the
@@ -1127,17 +1127,69 @@ message ContinueOAuthSignInRequest {
   // callback redirected the browser back with.
   string flow_token = 1 [(buf.validate.field).string.min_len = 1];
 
-  // given_name is the account's given name, collected by the client.
-  string given_name = 2 [(buf.validate.field).string = {
-    min_len: 1,
-    max_len: 128
-  }];
+  // given_name is the account's given name, collected by the client when
+  // the flow paused for names. Empty on any other stage; the names stage
+  // judges their presence, which the contract cannot express.
+  string given_name = 2 [(buf.validate.field).string.max_len = 128];
 
-  // family_name is the account's family name, collected by the client.
-  string family_name = 3 [(buf.validate.field).string = {
-    min_len: 1,
-    max_len: 128
-  }];
+  // family_name is the account's family name, collected by the client
+  // when the flow paused for names. Empty on any other stage.
+  string family_name = 3 [(buf.validate.field).string.max_len = 128];
+}
+
+// ContinueOAuthSignInResponse is the paused flow's answer: the token pair
+// when the sign-in completed, or the MFA bridge when the account keeps a
+// confirmed second factor — the same fork the password sign-in pauses
+// with, and the same bridge MultifactorService.CompleteSignIn spends.
+message ContinueOAuthSignInResponse {
+  // mfa_required is true when the account keeps a confirmed
+  // authenticator: no tokens were issued, and the caller finishes the
+  // sign-in through MultifactorService.CompleteSignIn with the pending
+  // token. Every token field below is empty in that case.
+  bool mfa_required = 1;
+
+  // mfa_pending_token is the short-lived bridge the resolution minted.
+  // It is presented to CompleteSignIn together with the second factor
+  // and has no other use.
+  string mfa_pending_token = 2;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 3;
+
+  // access_token is the Bearer JWT.
+  string access_token = 4;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 5;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 6;
+
+  // refresh_expires_in is the session window in seconds.
+  int32 refresh_expires_in = 7;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token, stored server-side only as a hash.
+  string refresh_token = 8;
+
+  // session_id is the session's TypeID (`sess_…`).
+  string session_id = 9;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 10;
+
+  // status is the outcome word the client checks — success.
+  string status = 11;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 12;
+
+  // stage is the flow's new stage when no session opened and no bridge
+  // was owed: `verify_email` (the code request went out) or
+  // `require_names` (the names must be collected and the call repeated
+  // with them). Empty on a session or a bridge.
+  string stage = 13;
 }
 
 // VerifyOAuthSignInEmailRequest spends the email code a verify_email-stage
