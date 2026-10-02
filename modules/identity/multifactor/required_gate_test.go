@@ -2,6 +2,7 @@ package multifactor
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -34,6 +35,10 @@ type gateSettings struct{}
 
 func (gateSettings) GetInt64(_ context.Context, _ string) (int64, error) {
 	return 604800, nil
+}
+
+func (gateSettings) GetString(_ context.Context, _ string) (string, error) {
+	return "", errors.New("no string settings in this test")
 }
 
 func (gateSettings) GetBool(_ context.Context, key string) (bool, error) {

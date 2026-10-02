@@ -17,6 +17,7 @@ import (
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/session"
@@ -40,6 +41,13 @@ var (
 	// ErrAccountBanned is an account inside its ban window. The reason is
 	// not attached: it is operator-facing material, not a wire detail.
 	ErrAccountBanned = errors.New("signin: account is banned")
+
+	// ErrSigninRestricted is an address the access lists hold back from
+	// signing in: the blocklist names it, the allowlist does not rescue
+	// it, and access.blocklist_applies_to_signins lets the lists govern
+	// sign-ins. The refusal names no reason — a blocked address learns
+	// what a wrong password's sender learns.
+	ErrSigninRestricted = errors.New("signin: sign-in is not permitted")
 
 	// ErrEmailUnverified is the account whose email address no verification
 	// code has confirmed yet. It is its own answer — distinct from the
@@ -79,6 +87,10 @@ type Service struct {
 	// policy is the breach check's runtime source. Nil arms no flag — the
 	// state a bare wiring is in.
 	policy *password.Validator
+
+	// blocklist is the access lists' sign-in gate. Nil leaves the gate
+	// out — the state a test or a bare wiring is in.
+	blocklist BlocklistChecker
 
 	// notices is the new-device notification channel. Nil until wired; a
 	// service without one skips the mail, never the sign-in.
@@ -328,6 +340,8 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		return Result{}, ErrAccountDisabled
 	case bannedAt(account, now):
 		return Result{}, ErrAccountBanned
+	case s.signinRestricted(ctx, account.Email):
+		return Result{}, ErrSigninRestricted
 	}
 
 	refresh, err := NewRefreshToken()
@@ -538,6 +552,7 @@ func (s *Service) SessionLifetime(ctx context.Context, remember bool) time.Durat
 type sessionSettings interface {
 	GetInt64(ctx context.Context, key string) (int64, error)
 	GetBool(ctx context.Context, key string) (bool, error)
+	GetString(ctx context.Context, key string) (string, error)
 }
 
 // SettingSessionMaxLifetime is the catalog key the session bound reads. The
@@ -563,6 +578,70 @@ const (
 func (s *Service) WithSessionSettings(reader sessionSettings) *Service {
 	s.settings = reader
 	return s
+}
+
+// SettingAccessBlocklistEnabled arms the blocklist everywhere. The catalog
+// owns the name; this constant is how this package spells it.
+const SettingAccessBlocklistEnabled = "access.blocklist_enabled"
+
+// SettingAccessBlocklistAppliesToSignins is the sign-in gate's own toggle:
+// the lists govern sign-ups regardless; this one extends them to sign-ins.
+const SettingAccessBlocklistAppliesToSignins = "access.blocklist_applies_to_signins"
+
+// SettingAccessAllowlistEnabled and SettingAccessAllowlist are the
+// allowlist's keys: an address the allowlist accepts signs in even when the
+// blocklist names it — the precedence the sign-up gate runs.
+const (
+	SettingAccessAllowlistEnabled = "access.allowlist_enabled"
+	SettingAccessAllowlist        = "access.allowlist"
+)
+
+// BlocklistChecker is the blocklist's sign-in seam: the one question the
+// gate asks of the feature that owns the entries, after the settings and
+// the allowlist have had their say. The interface is this package's — the
+// consuming side defines it — and the identity area satisfies it with the
+// blocklist service after construction.
+type BlocklistChecker interface {
+	Blocked(ctx context.Context, address string) (bool, error)
+}
+
+// WithBlocklist wires the blocklist gate. Nil leaves the gate out — the
+// state a test or a bare wiring is in.
+func (s *Service) WithBlocklist(checker BlocklistChecker) *Service {
+	s.blocklist = checker
+	return s
+}
+
+// signinRestricted answers whether this account's address the lists hold
+// back. The toggle decides, the allowlist rescues first, and every read
+// failure lets the sign-in pass — the lists fail open, and a broken read
+// must not lock every account out.
+func (s *Service) signinRestricted(ctx context.Context, address string) bool {
+	if s.settings == nil || s.blocklist == nil {
+		return false
+	}
+	on, err := s.settings.GetBool(ctx, SettingAccessBlocklistEnabled)
+	if err != nil || !on {
+		return false
+	}
+	applies, err := s.settings.GetBool(ctx, SettingAccessBlocklistAppliesToSignins)
+	if err != nil || !applies {
+		return false
+	}
+	allowlistOn, err := s.settings.GetBool(ctx, SettingAccessAllowlistEnabled)
+	if err == nil && allowlistOn {
+		if entries, listErr := s.settings.GetString(ctx, SettingAccessAllowlist); listErr == nil {
+			if blocklist.Allowlisted(address, blocklist.SplitAllowlist(entries)) {
+				return false
+			}
+		}
+	}
+	blocked, err := s.blocklist.Blocked(ctx, address)
+	if err != nil {
+		s.log.WarnContext(ctx, "signin: the blocklist read failed; letting the sign-in pass", "error", err)
+		return false
+	}
+	return blocked
 }
 
 // WithPasswordPolicy wires the breach check's runtime source. Nil arms no

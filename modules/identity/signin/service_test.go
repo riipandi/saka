@@ -19,6 +19,7 @@ import (
 	"connectrpc.com/connect"
 
 	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
+	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
@@ -396,6 +397,10 @@ func (s stubSettingReader) GetInt64(context.Context, string) (int64, error) {
 	return s.seconds, nil
 }
 
+func (s stubSettingReader) GetString(context.Context, string) (string, error) {
+	return "", errors.New("no string settings in this test")
+}
+
 func (s stubSettingReader) GetBool(_ context.Context, key string) (bool, error) {
 	if key == SettingMFARequired {
 		return s.mfaRequired, nil
@@ -435,4 +440,114 @@ func TestRPCSignInRefusesAnIncompleteCredential(t *testing.T) {
 	request := connect.NewRequest(&authnv1.SignInRequest{})
 	_, err := handler.SignIn(t.Context(), request)
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
+// keyedSettings is the gate double that answers each catalog key its own
+// state, with the allowlist's value alongside.
+type keyedSettings struct {
+	values    map[string]bool
+	allowlist string
+}
+
+func (s keyedSettings) GetInt64(context.Context, string) (int64, error) {
+	return 0, errors.New("no int settings in this test")
+}
+
+func (s keyedSettings) GetString(_ context.Context, key string) (string, error) {
+	if key == SettingAccessAllowlist {
+		return s.allowlist, nil
+	}
+	return "", errors.New("no string settings in this test")
+}
+
+func (s keyedSettings) GetBool(_ context.Context, key string) (bool, error) {
+	on, ok := s.values[key]
+	if !ok {
+		return false, errors.New("unreadable setting")
+	}
+	return on, nil
+}
+
+// blockingList is the blocklist double: it blocks the one address, and it
+// can fail its read on demand.
+type blockingList struct {
+	address string
+	failing bool
+}
+
+func (b *blockingList) Blocked(_ context.Context, address string) (bool, error) {
+	if b.failing {
+		return false, errors.New("the blocklist read failed")
+	}
+	return address == b.address, nil
+}
+
+// TestIssueSessionTheListsApplyAtSignIn pins the sign-in gate's table: the
+// toggles on and a blocked address is refused before anything mints, the
+// allowlist rescues its own, the toggles off or a failed read or an
+// unwired gate lets the sign-in pass — the lists' fail-open stance.
+func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	blocked := &blockingList{address: "hermione@example.com"}
+	ctx := t.Context()
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+	issue := func(service *Service) error {
+		account, err := service.repo.FindAccountByIdentity(ctx, "hermione@example.com")
+		require.NoError(t, err)
+		_, err = service.IssueSession(ctx, pool, account, ProviderPassword, audit.EventSignIn, SessionParams{})
+		return err
+	}
+
+	base := func(toggles map[string]bool) *Service {
+		service := testService(t, pool)
+		service.WithSessionSettings(keyedSettings{values: toggles})
+		service.WithBlocklist(blocked)
+		return service
+	}
+
+	// Both toggles on and a blocked address: refused, whatever the
+	// credential proved.
+	err := issue(base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	}))
+	assert.ErrorIs(t, err, ErrSigninRestricted)
+
+	// The allowlist rescues its own even when the blocklist names it.
+	rescued := testService(t, pool)
+	rescued.WithSessionSettings(keyedSettings{
+		values: map[string]bool{
+			SettingAccessBlocklistEnabled:          true,
+			SettingAccessBlocklistAppliesToSignins: true,
+			SettingAccessAllowlistEnabled:          true,
+		},
+		allowlist: "hermione@example.com",
+	})
+	rescued.WithBlocklist(blocked)
+	assert.NoError(t, issue(rescued))
+
+	// The sign-in toggle off: the lists stay a sign-up matter.
+	off := base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: false,
+	})
+	assert.NoError(t, issue(off))
+
+	// A failed read lets the sign-in pass.
+	failing := base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	})
+	failing.WithBlocklist(&blockingList{address: "hermione@example.com", failing: true})
+	assert.NoError(t, issue(failing))
+
+	// An unwired gate is the bare wiring: nothing blocks.
+	unwired := testService(t, pool)
+	unwired.WithSessionSettings(keyedSettings{values: map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	}})
+	assert.NoError(t, issue(unwired))
 }

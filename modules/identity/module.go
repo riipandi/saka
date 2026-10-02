@@ -261,7 +261,6 @@ var Package = do.Package(
 		}
 		return service, nil
 	}),
-
 	// The session lifecycle builds over the sign-in issuer through the
 	// interface the session package defines — the renewal and the opening
 	// must not drift apart, and the issuer satisfies it without an adapter.
@@ -610,11 +609,15 @@ func features(deps Deps) []kernel.Module {
 	}
 	if deps.Blocklist != nil {
 		// The blocklist's gates ride the post-construction seams: the
-		// sign-up and sign-in features define the interfaces they ask
-		// through, and the blocklist service satisfies them here — the
-		// feature packages must not import each other.
+		// sign-up, sign-in, and verification features define the
+		// interfaces they ask through, and the blocklist service
+		// satisfies them here — the feature packages must not import
+		// each other.
 		if deps.Signup != nil {
 			deps.Signup.WithBlocklist(deps.Blocklist)
+		}
+		if deps.SignIn != nil {
+			deps.SignIn.WithBlocklist(deps.Blocklist)
 		}
 		if deps.Verification != nil {
 			deps.Verification.WithSubaddressGuard(deps.Blocklist)

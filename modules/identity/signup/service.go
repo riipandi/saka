@@ -12,6 +12,7 @@ import (
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/password"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/modules/identity/usergroup"
@@ -166,7 +167,7 @@ func (s *Service) policyOf(ctx context.Context) signupPolicy {
 		if list, err := s.settings.GetString(ctx, SettingAccessAllowlist); err != nil {
 			s.log.WarnContext(ctx, "signup: access.allowlist unreadable; treating as empty", "error", err)
 		} else {
-			p.allowlist = splitAllowlist(list)
+			p.allowlist = blocklist.SplitAllowlist(list)
 		}
 	}
 	if on, err := s.settings.GetBool(ctx, SettingAccessBlocklistEnabled); err != nil {
@@ -196,42 +197,6 @@ func (s *Service) policyOf(ctx context.Context) signupPolicy {
 		p.stampVerified = !on
 	}
 	return p
-}
-
-// splitAllowlist parses the allowlist value: comma- or newline-separated
-// entries, trimmed, lowercased for the case-insensitive match. An `@domain`
-// entry accepts every address at that domain.
-func splitAllowlist(value string) []string {
-	fields := strings.FieldsFunc(value, func(r rune) bool {
-		return r == ',' || r == '\n' || r == ';'
-	})
-	entries := make([]string, 0, len(fields))
-	for _, field := range fields {
-		entry := strings.ToLower(strings.TrimSpace(field))
-		if entry != "" {
-			entries = append(entries, entry)
-		}
-	}
-	return entries
-}
-
-// allowlisted matches the address against the entries: an `@domain` entry
-// accepts every address at that domain, an address entry matches exactly,
-// both case-insensitively.
-func allowlisted(address string, entries []string) bool {
-	address = strings.ToLower(address)
-	for _, entry := range entries {
-		if strings.HasPrefix(entry, "@") {
-			if strings.HasSuffix(address, entry) {
-				return true
-			}
-			continue
-		}
-		if address == entry {
-			return true
-		}
-	}
-	return false
 }
 
 // usernamePattern mirrors the column's check: 3-32 ASCII letters, digits,
@@ -360,7 +325,7 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 	// pass: a broken read must never lock the deployment out of its own
 	// door.
 	if !p.inviteMode {
-		accepted := p.allowlistOn && allowlisted(params.Email, p.allowlist)
+		accepted := p.allowlistOn && blocklist.Allowlisted(params.Email, p.allowlist)
 		if p.allowlistOn && !accepted {
 			return user.UserView{}, ErrSignupNotAllowed
 		}

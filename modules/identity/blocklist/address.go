@@ -129,6 +129,44 @@ func Matches(address string, patterns []string) bool {
 	return false
 }
 
+// SplitAllowlist parses the allowlist value: comma-, semicolon-, or
+// newline-separated entries, trimmed, lowercased for the case-insensitive
+// match. The sign-up and sign-in gates parse the same catalog value, so
+// they parse it the same way.
+func SplitAllowlist(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n' || r == ';'
+	})
+	entries := make([]string, 0, len(fields))
+	for _, field := range fields {
+		entry := strings.ToLower(strings.TrimSpace(field))
+		if entry != "" {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
+// Allowlisted matches the address against the entries: an `@domain` entry
+// accepts every address at that domain — subdomains included, which is the
+// allowlist's looser reading of a domain — and an address entry matches
+// exactly, both case-insensitively.
+func Allowlisted(address string, entries []string) bool {
+	address = strings.ToLower(address)
+	for _, entry := range entries {
+		if strings.HasPrefix(entry, "@") {
+			if strings.HasSuffix(address, entry) {
+				return true
+			}
+			continue
+		}
+		if address == entry {
+			return true
+		}
+	}
+	return false
+}
+
 // splitAddress splits the address at its last `@` — the separator a
 // quoted-local part may contain, though the grammar an entry accepts never
 // carries one.

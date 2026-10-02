@@ -359,6 +359,9 @@ func mapError(err error) error {
 	case errors.Is(err, signin.ErrAccountBanned):
 		return connect.NewError(connect.CodeUnauthenticated,
 			errors.New("the account is banned"))
+	case errors.Is(err, signin.ErrSigninRestricted):
+		return connect.NewError(connect.CodePermissionDenied,
+			errors.New("sign-in is not permitted"))
 	default:
 		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}

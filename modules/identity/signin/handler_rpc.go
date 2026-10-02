@@ -134,6 +134,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("account is disabled"))
 	case errors.Is(err, ErrAccountBanned):
 		return connect.NewError(connect.CodePermissionDenied, errors.New("account is banned"))
+	case errors.Is(err, ErrSigninRestricted):
+		return connect.NewError(connect.CodePermissionDenied, errors.New("sign-in is not permitted"))
 	case errors.Is(err, ErrEmailUnverified):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("email address is not verified"))
 	case errors.Is(err, jwks.ErrNoSigningKey):
