@@ -45,7 +45,7 @@ type Result struct {
 // half, and a development seed resolves that from the environment. Callers
 // that can seal append it through SeedJWKS.
 func All() []Seeder {
-	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), Settings()}
+	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), DefaultBucket(), Settings()}
 }
 
 // SeedJWKS returns All plus the JWKS provisioning seeder. It answers All

@@ -16,7 +16,7 @@ func TestNotificationSeederPublishesTheDevelopmentNotices(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 6)
+	require.Len(t, results, 7)
 	require.Equal(t, seeders.NotificationSeederName, results[4].Name)
 	require.Len(t, results[4].Created, 5)
 	assert.Empty(t, results[4].Skipped)
