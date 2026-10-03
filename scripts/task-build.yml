@@ -7,11 +7,11 @@ tasks:
     desc: Build frontend + Go binaries (debug and release in one pass)
     deps: [rpc:generate]
     # The Vite build is the single source of the binary flags: plugin-golang
-    # compiles the SPA, then embeds it into both binaries with the version
+    # compiles the webapp, then embeds it into both binaries with the version
     # stamps, tags, and strip flags declared in vite.config.ts. Do not add a
     # raw `go build` here — it would overwrite those binaries with a build
     # that lost the flags.
-    cmd: pnpm exec vite build
+    cmd: pnpm exec vp build
 
   start:
     desc: Run the release binary

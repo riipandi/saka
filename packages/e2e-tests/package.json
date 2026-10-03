@@ -1,0 +1,21 @@
+{
+    "name": "e2e-tests",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "e2e:install": "playwright install chromium --with-deps",
+        "e2e:chrome": "playwright test --headed --project Chromium",
+        "e2e:firefox": "playwright test --headed --project Firefox",
+        "e2e:mobile": "playwright test --headed --project 'Mobile Chrome'",
+        "e2e:safari": "playwright test --headed --project Safari",
+        "e2e:report": "playwright show-report e2e-result",
+        "e2e:ui": "playwright test --ui",
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.63.0",
+        "typescript": "catalog:",
+        "vite-plus": "catalog:"
+    }
+}

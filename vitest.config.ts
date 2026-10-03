@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
-const excludedPath = ['node_modules', 'tests-e2e', 'e2e-tests']
+const excludedPath = ['node_modules', 'packages/*/node_modules', 'tests-e2e', 'e2e-tests']
 
 export default defineConfig({
   test: {
@@ -50,7 +50,7 @@ export default defineConfig({
         test: {
           name: 'app',
           environment: 'happy-dom',
-          include: ['./app/**/*.test.ts'],
+          include: ['./packages/webapp/**/*.test.ts'],
           exclude: excludedPath,
           globals: true
         }
@@ -61,7 +61,7 @@ export default defineConfig({
         test: {
           name: 'plugins',
           environment: 'node',
-          include: ['./plugins/**/*.test.ts'],
+          include: ['./packages/plugins/**/*.test.ts'],
           exclude: excludedPath,
           globals: true
         }

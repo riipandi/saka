@@ -1,10 +1,9 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
-import { comlink } from 'vite-plugin-comlink'
+import { defineConfig } from 'vite-plus'
 import pkg from './package.json' with { type: 'json' }
-import email from './plugins/plugin-email.ts'
-import golang from './plugins/plugin-golang.ts'
+import email from './packages/plugins/plugin-email.ts'
+import golang from './packages/plugins/plugin-golang.ts'
+import embedManifest from './packages/plugins/plugin-manifest.ts'
 
 // const isTestOrCI = process.env.CI || process.env.VITEST
 const isStorybook = process.env.STORYBOOK === 'true'
@@ -20,6 +19,24 @@ const goVersionLdflags = [
   `-X ${goModule}/internal/config.AppVersion=${APP_VERSION}`,
   `-X ${goModule}/internal/config.BuildHash=${BUILD_HASH}`,
   `-X ${goModule}/internal/config.BuildDate=${BUILD_DATE}`
+]
+
+const ignoredPatterns = [
+  '.output',
+  '.storage',
+  '.tanstack',
+  '**/*.md',
+  '**/*.mdx',
+  '**/*.yml',
+  '**/*.yaml',
+  '**/*.toml',
+  '**/*.tmpl',
+  '/codegen/**',
+  '/public/**',
+  '/storage/**',
+  '/temp/**',
+  '/packages/webapp/public/**',
+  '/packages/e2e-tests/e2e-result/**'
 ]
 
 /**
@@ -40,36 +57,74 @@ const goVersionLdflags = [
  * HMR socket to this server. In production the shell resolves every tag
  * from the build manifest, one entry per page.
  *
- * The root is the repository so the manifest keys name the source paths
- * the Go side knows: app/main.tsx is the application document, and a
- * second page adds its own key to the input map (see web.Page).
- */
-/**
+ * Monorepo: the SPA sources live in packages/webapp (the package builds
+ * the same bundle standalone — this config's vite root points at that
+ * package, so both builds agree on the manifest keys), the email templates
+ * in packages/email (`vp build packages/email` compiles them alone), the
+ * Vite plugins in packages/plugins, and Playwright in packages/e2e-tests.
+ * This root config is still the canonical binary pipeline: the email
+ * plugin compiles the templates into the Go embed directories, and the go
+ * plugin closes the pass by compiling both binaries. The manifest keys
+ * are webapp-root-relative — web/shell.go names the same key.
+ *
  * The manifest lives under `.vite/`, a dot directory go:embed silently
  * skips — deliberate: the Vite-internal manifest never ships in the
- * binary. The Go fragment instead reads this derived copy, written next
- * to the assets after every build, so every pipeline that compiles the
- * frontend (task build, goreleaser, Docker, CI) feeds the embed from one
- * source.
+ * binary. The Go fragment reads the derived copy (`assets.json`) the
+ * shared `VitePluginEmbedManifest` plugin writes after every build, so every
+ * pipeline that compiles the frontend (task build, goreleaser, Docker,
+ * CI) feeds the embed from one source.
  */
-function manifestForEmbed() {
-  return {
-    name: 'manifest-for-embed',
-    closeBundle() {
-      const out = resolve('web/output')
-      const internal = resolve(out, '.vite/manifest.json')
-      if (!existsSync(internal)) return
-      writeFileSync(resolve(out, 'assets.json'), readFileSync(internal))
-    }
-  }
-}
 
 export default defineConfig({
+  staged: {
+    '*.{ts,tsx,js,jsx,css,json}': 'vp check --fix',
+    '*.go': 'gofmt -w'
+  },
+  fmt: {
+    endOfLine: 'lf',
+    useTabs: false,
+    tabWidth: 2,
+    printWidth: 100,
+    insertFinalNewline: true,
+    jsxSingleQuote: true,
+    singleQuote: true,
+    semi: false,
+    bracketSpacing: true,
+    trailingComma: 'none',
+    overrides: [
+      {
+        files: ['*.json', '*.jsonc'],
+        options: {
+          tabWidth: 4
+        }
+      }
+    ],
+    sortImports: {
+      order: 'asc',
+      groups: [['builtin', 'external'], ['internal'], ['parent', 'sibling', 'index']],
+      internalPattern: ['#/'],
+      partitionByComment: false,
+      partitionByNewline: false,
+      newlinesBetween: false,
+      ignoreCase: true
+    },
+    ignorePatterns: ignoredPatterns
+  },
+  lint: {
+    options: { typeAware: true, typeCheck: true },
+    rules: {
+      'typescript/no-floating-promises': 'error',
+      'typescript/no-misused-promises': 'error'
+    },
+    ignorePatterns: ignoredPatterns
+  },
+  run: {
+    cache: true
+  },
   plugins: [
-    comlink(),
-    manifestForEmbed(),
+    embedManifest(),
     email({
-      templateDir: resolve('email/templates'),
+      templateDir: resolve('packages/email/templates'),
       outputDir: resolve('web/email')
     }),
     golang({
@@ -96,8 +151,8 @@ export default defineConfig({
     })
   ],
   resolve: { tsconfigPaths: true },
-  root: resolve('.'),
-  publicDir: resolve('public'),
+  root: resolve('packages/webapp'),
+  publicDir: resolve('packages/webapp/public'),
   build: {
     manifest: true,
     emptyOutDir: true,
@@ -105,10 +160,9 @@ export default defineConfig({
     outDir: resolve('web/output'),
     reportCompressedSize: false,
     rolldownOptions: {
-      input: { app: resolve('app/main.tsx') }
+      input: { app: resolve('packages/webapp/src/main.tsx') }
     }
   },
-  worker: { plugins: () => [comlink()] },
   // The compiler's port: bound to the loopback, proxied by the Go
   // debug build, and never opened by a developer or a deployment.
   server: isStorybook ? undefined : { port: 5173, host: '127.0.0.1', strictPort: true }

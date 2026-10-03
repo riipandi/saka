@@ -14,9 +14,12 @@ import { resolve } from 'node:path'
 // /debug/passkey pages, and the base-url flag binding is where the RP
 // identity derives from.
 const serverBaseURL = 'http://localhost:3080'
+// Paths are relative to this package: the config lives in
+// packages/e2e-tests and the runner's cwd is the package, while the Go
+// module and the build output stay at the repository root.
 const serverCommand = [
-  'go build -tags debug -o ./build/debug/saka ./cmd',
-  `./build/debug/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
+  'go build -tags debug -o ../../build/debug/saka ../../cmd',
+  `../../build/debug/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
 ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one
@@ -38,7 +41,7 @@ const projects: Project[] = [
 ]
 
 export default defineConfig({
-  testDir: resolve('e2e-tests'),
+  testDir: resolve('workflow'),
   outputDir: resolve('.output/e2e-tests'),
   timeout: 30_000,
   fullyParallel: false,

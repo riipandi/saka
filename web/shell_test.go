@@ -10,7 +10,7 @@ import (
 
 func TestTheShellRendersThePageAndTheFragment(t *testing.T) {
 	html, err := RenderPage(Page{
-		Entry:       "app/main.tsx",
+		Entry:       "src/main.tsx",
 		Title:       "Sign in — Saka",
 		Description: "Sign in to your account",
 		Noindex:     true,

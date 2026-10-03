@@ -610,4 +610,3 @@ type stagingFingerprint struct {
 func micros(t time.Time) time.Time {
 	return t.Truncate(time.Microsecond)
 }
-

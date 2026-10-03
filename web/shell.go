@@ -16,7 +16,7 @@ import (
 // Page describes one document the shell renders: the build entry whose
 // fragment it embeds, and the head meta it carries.
 type Page struct {
-	// Entry is the source path the manifest names — "app/main.tsx" for the
+	// Entry is the source path the manifest names — "src/main.tsx" for the
 	// application shell, another path for a second document.
 	Entry string
 	// Title is the document title.
@@ -31,7 +31,7 @@ type Page struct {
 
 // DefaultPage is the application document every unmatched GET renders.
 var DefaultPage = Page{
-	Entry:       "app/main.tsx",
+	Entry:       "src/main.tsx",
 	Title:       "Monolith Go React",
 	Description: "Monolith Go, React, and TanStack application template",
 	Noindex:     true,

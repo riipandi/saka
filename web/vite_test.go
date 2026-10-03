@@ -14,8 +14,8 @@ import (
 func manifestFS() fstest.MapFS {
 	return fstest.MapFS{
 		"assets.json": &fstest.MapFile{Data: []byte(`{
-			"app/main.tsx": {
-				"file": "assets/app-Bq7k.css.e0f.js", "name": "app", "src": "app/main.tsx",
+			"src/main.tsx": {
+				"file": "assets/app-Bq7k.css.e0f.js", "name": "app", "src": "src/main.tsx",
 				"isEntry": true, "css": ["assets/app-Bq7k.css"], "imports": ["shared/chunk.tsx"]
 			},
 			"landing/main.tsx": {
@@ -31,7 +31,7 @@ func manifestFS() fstest.MapFS {
 }
 
 func TestTheReleaseFragmentResolvesTheEntry(t *testing.T) {
-	f, err := ViteHTMLFragment(ViteConfig{FS: manifestFS(), ViteEntry: "app/main.tsx"})
+	f, err := ViteHTMLFragment(ViteConfig{FS: manifestFS(), ViteEntry: "src/main.tsx"})
 	require.NoError(t, err)
 
 	tags := string(f.Tags)
@@ -45,7 +45,7 @@ func TestTheReleaseFragmentResolvesTheEntry(t *testing.T) {
 }
 
 func TestTheMultiPageBuildOwnePerEntryFragments(t *testing.T) {
-	app, err := ViteHTMLFragment(ViteConfig{FS: manifestFS(), ViteEntry: "app/main.tsx"})
+	app, err := ViteHTMLFragment(ViteConfig{FS: manifestFS(), ViteEntry: "src/main.tsx"})
 	require.NoError(t, err)
 	landing, err := ViteHTMLFragment(ViteConfig{FS: manifestFS(), ViteEntry: "landing/main.tsx"})
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestTheMultiPageBuildOwnePerEntryFragments(t *testing.T) {
 
 func TestTheDevFragmentIsSameOrigin(t *testing.T) {
 	f, err := ViteHTMLFragment(ViteConfig{
-		IsDev: true, ViteEntry: "app/main.tsx", ViteTemplate: ViteReact,
+		IsDev: true, ViteEntry: "src/main.tsx", ViteTemplate: ViteReact,
 	})
 	require.NoError(t, err)
 
@@ -65,25 +65,25 @@ func TestTheDevFragmentIsSameOrigin(t *testing.T) {
 	assert.Contains(t, tags, "import RefreshRuntime from '/@react-refresh'",
 		"the React preamble rides the dev fragment")
 	assert.Contains(t, tags, `<script type="module" src="/@vite/client">`)
-	assert.Contains(t, tags, `<script type="module" src="/app/main.tsx">`)
+	assert.Contains(t, tags, `<script type="module" src="/src/main.tsx">`)
 	assert.NotContains(t, tags, "http://", "the browser never learns another port — the Go surface proxies the compiler")
 }
 
 func TestTheDevFragmentKeepsAnExplicitBase(t *testing.T) {
 	f, err := ViteHTMLFragment(ViteConfig{
 		IsDev: true, ViteURL: "http://localhost:5173",
-		ViteEntry: "app/main.tsx", ViteTemplate: ViteReact,
+		ViteEntry: "src/main.tsx", ViteTemplate: ViteReact,
 	})
 	require.NoError(t, err)
 
 	tags := string(f.Tags)
 	assert.Contains(t, tags, "import RefreshRuntime from 'http://localhost:5173/@react-refresh'")
-	assert.Contains(t, tags, `<script type="module" src="http://localhost:5173/app/main.tsx">`)
+	assert.Contains(t, tags, `<script type="module" src="http://localhost:5173/src/main.tsx">`)
 }
 
 func TestTheVanillaDevFragmentSkipsThePreamble(t *testing.T) {
 	f, err := ViteHTMLFragment(ViteConfig{
-		IsDev: true, ViteEntry: "app/main.tsx", ViteTemplate: ViteNone,
+		IsDev: true, ViteEntry: "src/main.tsx", ViteTemplate: ViteNone,
 	})
 	require.NoError(t, err)
 	assert.NotContains(t, string(f.Tags), "RefreshRuntime")
@@ -96,7 +96,7 @@ func TestAnUnknownEntryIsAnErrorNotASilentTag(t *testing.T) {
 }
 
 func TestAManifestLessConfigIsRefusedOutsideDev(t *testing.T) {
-	_, err := ViteHTMLFragment(ViteConfig{ViteEntry: "app/main.tsx"})
+	_, err := ViteHTMLFragment(ViteConfig{ViteEntry: "src/main.tsx"})
 	require.Error(t, err)
 	assert.True(t, strings.HasPrefix(err.Error(), "vite:"), "the error names its package")
 }

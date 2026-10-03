@@ -32,11 +32,10 @@
         "useDefineForClassFields": true,
         "verbatimModuleSyntax": true,
         "paths": {
-            "~/apiclient/*": ["./api/client/*"],
             "~/codegen/*": ["./codegen/proto/ts/*"],
-            "#/*": ["./app/*"]
+            "#/*": ["./packages/webapp/src/*"]
         }
     },
     "include": ["**/*.ts", "**/*.tsx"],
-    "exclude": [".output", ".tanstack", "build", "codegen", "release", "public", "temp", "web"]
+    "exclude": [".output", ".tanstack", "build", "codegen", "release", "temp", "web"]
 }

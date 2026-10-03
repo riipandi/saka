@@ -107,7 +107,7 @@ Register the entry in `vite.config.ts`'s input map:
 
 ```ts
 const viteEntries = {
-  app: resolve('app/main.tsx'),
+  app: resolve('src/main.tsx'),
   landing: resolve('app/landing.tsx')
 }
 ```

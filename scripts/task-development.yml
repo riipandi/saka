@@ -6,7 +6,7 @@ tasks:
   dev:
     desc: Dev loop on one origin (:3080) — Vite compiles + HMR behind the Go proxy, the binary rebuilt from build/debug on every Go change
     deps: [rpc:generate]
-    cmd: pnpm exec vite dev {{.CLI_ARGS}}
+    cmd: pnpm exec vp dev {{.CLI_ARGS}}
 
   run:
     desc: Run the CLI directly (debug build)
@@ -18,11 +18,11 @@ tasks:
 
   email:dev:
     desc: Run React Email dev UI (:3030)
-    cmd: pnpm exec email dev --dir ./email/templates --port 3030
+    cmd: pnpm exec vp run email#dev
 
   email:build:
-    desc: Compile email templates (one Vite pass, no Go binary)
-    cmd: SAKA_SKIP_GO=1 pnpm exec vite build
+    desc: Compile email templates into the Go embed (one Vite pass, no binary)
+    cmd: pnpm exec vp build packages/email
 
   deps:
     desc: Install Go toolchain binaries (golangci-lint, goose, etc)

@@ -11,30 +11,29 @@ tasks:
 
   cleanup:dist:
     desc: Remove build artifacts
-    cmd: pnpm dlx del-cli .{output,tanstack} build web/output codegen storage
+    cmd: pnpm dlx del-cli .{output,tanstack} build web/output codegen packages/webapp/dist packages/e2e-tests/e2e-result storage
 
   cleanup:deps:
     desc: Remove dependencies
-    cmd: pnpm dlx del-cli pnpm-lock.yaml pnpm-workspace.yaml node_modules vendor
+    cmd: pnpm dlx del-cli pnpm-lock.yaml pnpm-workspace.yaml node_modules packages/*/node_modules vendor
 
   format:
     desc: Format all files (Go + JS)
     cmds:
       - gofmt -w .
-      - pnpm exec oxfmt --write .
+      - pnpm exec vp fmt --write .
 
   check:
     desc: Run all checks (go vet + migration files + JS formatting)
     cmds:
       - go vet ./...
       - go run -tags debug ./cmd migrate:validate
-      - pnpm exec oxfmt --check
-      - pnpm exec oxlint
+      - pnpm exec vp check
 
   lint:
     desc: Run all linters (Go + JS)
     cmds:
-      - pnpm exec oxlint --fix .
+      - pnpm exec vp lint --fix .
       - golangci-lint run -c .golangci.yml ./...
 
   typecheck:

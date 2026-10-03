@@ -24,7 +24,7 @@ type ViteConfig struct {
 	IsDev bool
 
 	// ViteEntry is the source path of the entry point, as the manifest
-	// names it — "app/main.tsx" for the application shell. A multi-page
+	// names it — "src/main.tsx" for the application shell. A multi-page
 	// build carries one entry per document; an empty entry asks the
 	// manifest for its single entry point and fails when there are many.
 	ViteEntry string

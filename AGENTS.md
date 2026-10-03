@@ -10,7 +10,7 @@ instructions; the detail lives in `.llms/`. Read in this order:
 
 ## Shape
 
-- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The SPA (React 19, TanStack, Vite) builds into `web/output/` and embeds. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3080`.
+- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The frontend is a pnpm + Vite+ monorepo under `packages/`: `webapp` (the React 19 + TanStack SPA source, plus `public/`), `email` (React Email templates — `vp build packages/email` compiles them into the Go embed), `plugins` (the Vite plugins: email, golang), `e2e-tests` (Playwright). The production pipeline stays in the root `vite.config.ts`, which compiles the SPA and the templates and embeds both into the binary (`web/output/`, `web/email/`); the Go shell (`web/shell.go`) owns the HTML document, so there is no `index.html`. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3080`.
 - Implemented surfaces are listed in `.llms/index.md` and `.llms/architecture.md`; the rest of `internal/**` and `modules/**` is a scaffold. Do not document, test, or treat a stub as working.
 - Pocket ID is passkey-only. Surfaces it never had are `[Saka]` in Yaak. Auth flows beyond ported endpoints follow Better Auth.
 - Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
@@ -19,6 +19,15 @@ instructions; the detail lives in `.llms/`. Read in this order:
 ## Stack (summary)
 
 Go 1.27.1, Node ≥ 24.21, pnpm, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do` DI, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, local and S3 storage. DI rules (`do.Package`, no singletons, no package `init`) and the registry seams are in `.llms/rules.md` and the skill `golang-samber-do`.
+
+## Vite+ toolchain
+
+The frontend toolchain is Vite+ (`vp`): one CLI over Vite/Rolldown, Vitest, Oxlint, Oxfmt, and its task runner. Docs: `node_modules/vite-plus/docs` or <https://viteplus.dev/guide/>.
+
+- `vp <name>` runs a built-in; `vp run <name>` runs a `package.json` script or a `vite.config.ts` task — they may differ. Check both before assuming what a name runs.
+- `vp check` = format + lint + type check (`--fix` to write); `vp fmt` / `vp lint` are the pieces. The lint/fmt settings live in the root `vite.config.ts` (migrated from the former `.oxlintrc.json` / `.oxfmtrc.json`).
+- `vp toolchain [tool]` shows versions; `vp why <package>` the dependency graph. Run `vp install` after pulling remote changes.
+- **Commit hooks.** The dispatcher is `core.hooksPath → .vite-hooks/_` (generated; `prepare: vp config` reinstalls it). The project-owned `.vite-hooks/pre-commit` runs `vp staged` — the `staged` block in the root `vite.config.ts` maps `*.{ts,tsx,js,jsx,css,json}` to `vp check --fix` and `*.go` to `gofmt -w`, re-staging fixed files — then guards the Yaak export with `scripts/check-yaak-secrets.sh`. `VP_GIT_HOOKS=0` skips hooks per process.
 
 ## Ambiguous decisions
 
