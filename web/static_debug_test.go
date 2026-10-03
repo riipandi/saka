@@ -38,7 +38,7 @@ func TestSetupStaticJSONFallbacks(t *testing.T) {
 	r := chi.NewRouter()
 	SetupStatic(r)
 
-	for _, path := range []string{"/api/missing", "/.well-known/missing", "/static/missing.js"} {
+	for _, path := range []string{"/api/missing", "/.well-known/missing", "/storage/missing.js"} {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 
