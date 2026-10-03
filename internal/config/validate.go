@@ -71,7 +71,6 @@ func (c Config) Validate() error {
 	check(c.Database.ConnectAttempts > 0, "database.connect_attempts: must be positive")
 	check(c.Database.ConnectRetryInterval > 0, "database.connect_retry_interval: must be positive")
 	check(c.Database.SearchPath != "", "database.search_path: must not be empty")
-	check(c.Database.Timezone != "", "database.timezone: must not be empty")
 
 	check(isHeaderValue(c.Fetcher.UserAgent),
 		"fetcher.user_agent: must be a single header value of at most 256 characters")
@@ -258,11 +257,11 @@ func (c Config) Validate() error {
 	check(c.Queue.CleanupInterval > 0, "queue.cleanup_interval: must be positive")
 	check(!c.Queue.Encrypt || c.App.SecretKey != "",
 		"queue.encrypt: requires app.secret_key, the secret it seals payloads with")
-	if _, err := time.LoadLocation(c.Queue.Timezone); err != nil {
-		check(false, "queue.timezone: %q is not a time zone: %v", c.Queue.Timezone, err)
-	}
 
 	check(c.App.AuditRetentionDays > 0, "app.audit_retention_days: must be greater than 0")
+	if _, err := time.LoadLocation(c.App.Timezone); err != nil {
+		check(false, "app.timezone: %q is not a time zone: %v", c.App.Timezone, err)
+	}
 	check(c.Server.Host != "", "server.host: must not be empty")
 	check(c.Server.Port > 0 && c.Server.Port <= 65535, "server.port: %d must be between 1 and 65535", c.Server.Port)
 	check(c.Server.ReadTimeout > 0, "server.read_timeout: must be positive")
@@ -446,7 +445,6 @@ func (c Config) kvStoreDrivers() []string {
 	}
 	return keys
 }
-
 
 // JWTAlgorithmMaterialError reports a named auth.jwt_algorithm whose signing
 // material is missing. nil means the algorithm is unset (the material then

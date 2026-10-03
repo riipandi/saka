@@ -60,6 +60,7 @@ type PublishedApp struct {
 	ExposeResetToken   bool   `json:"expose_reset_token,omitzero"`
 	ExposeTotpSecret   bool   `json:"expose_totp_secret,omitzero"`
 	AuditRetentionDays int    `json:"audit_retention_days,omitzero"`
+	Timezone           string `json:"timezone,omitzero"`
 	SecretKey          string `json:"secret_key,omitzero"`
 }
 
@@ -102,7 +103,6 @@ type PublishedDatabase struct {
 	ConnectAttempts      int      `json:"connect_attempts,omitzero"`
 	ConnectRetryInterval Duration `json:"connect_retry_interval,omitzero"`
 	SearchPath           string   `json:"search_path,omitzero"`
-	Timezone             string   `json:"timezone,omitzero"`
 }
 
 // PublishedFetcher is the fetcher section.
@@ -224,7 +224,6 @@ type PublishedQueue struct {
 	ReleaseAfter    Duration `json:"release_after,omitzero"`
 	CleanupInterval Duration `json:"cleanup_interval,omitzero"`
 	Encrypt         bool     `json:"encrypt,omitzero"`
-	Timezone        string   `json:"timezone,omitzero"`
 }
 
 // PublishedOIDC is the oidc section. The enable switch is public — it is
@@ -309,8 +308,9 @@ func publishedSecretRender(secret string) string {
 func (c Config) Published(full bool) Published {
 	public := Published{
 		App: PublishedApp{
-			Mode:    c.App.Mode,
-			BaseURL: c.App.BaseURL,
+			Mode:     c.App.Mode,
+			BaseURL:  c.App.BaseURL,
+			Timezone: c.App.Timezone,
 		},
 		Auth: PublishedAuth{
 			OneTimeAccessEmailAsAdminEnabled:           c.Auth.OneTimeAccessEmailAsAdminEnabled,
@@ -364,7 +364,6 @@ func (c Config) Published(full bool) Published {
 		ConnectAttempts:      c.Database.ConnectAttempts,
 		ConnectRetryInterval: seconds(c.Database.ConnectRetryInterval),
 		SearchPath:           c.Database.SearchPath,
-		Timezone:             c.Database.Timezone,
 	}
 	public.Fetcher = PublishedFetcher{
 		UserAgent:               c.Fetcher.UserAgent,
@@ -450,7 +449,6 @@ func (c Config) Published(full bool) Published {
 		ReleaseAfter:    seconds(c.Queue.ReleaseAfter),
 		CleanupInterval: seconds(c.Queue.CleanupInterval),
 		Encrypt:         c.Queue.Encrypt,
-		Timezone:        c.Queue.Timezone,
 	}
 	public.RateLimit = PublishedRateLimit{
 		Driver: c.RateLimit.Driver,

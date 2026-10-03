@@ -133,7 +133,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 				DSN:                  c.Database.URL,
 				ApplicationName:      config.AppIdentifier,
 				SearchPath:           c.Database.SearchPath,
-				Timezone:             c.Database.Timezone,
+				Timezone:             c.App.Timezone,
 				MaxConns:             c.Database.MaxConns,
 				MinConns:             c.Database.MinConns,
 				MaxConnLifetime:      c.Database.MaxConnLifetime,
@@ -295,7 +295,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			pool := do.MustInvoke[*datastore.Postgres](i)
 			client := do.MustInvoke[*queue.Client](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			location, err := time.LoadLocation(c.Queue.Timezone)
+			location, err := time.LoadLocation(c.App.Timezone)
 			if err != nil {
 				return nil, err
 			}

@@ -163,9 +163,10 @@ const (
 	DefaultQueueCleanupArchive = time.Hour
 )
 
-// DefaultSchedulerTimezone is where a spec that names no zone fires. UTC is
-// the only zone that needs no data file and reads the same on every host.
-const DefaultSchedulerTimezone = "UTC"
+// DefaultTimezone is the zone the deployment runs in: the database sessions
+// and the cron specs that name no zone of their own all resolve against it.
+// UTC is the only zone that needs no data file and reads the same on every host.
+const DefaultTimezone = "UTC"
 
 // DefaultRateLimitAuthLimit is the credential bucket's budget per window: the
 // sign-in, the code verifications, and the email senders share it. Ten a
@@ -236,6 +237,7 @@ func Default() Config {
 			// happened last quarter", short enough that the table stays a
 			// table rather than an archive.
 			AuditRetentionDays: 90,
+			Timezone:           DefaultTimezone,
 		},
 		Auth: Auth{
 			Issuer:        "saka",
@@ -281,7 +283,6 @@ func Default() Config {
 			ConnectAttempts:      5,
 			ConnectRetryInterval: 2 * time.Second,
 			SearchPath:           "public,internal,reference",
-			Timezone:             "UTC",
 		},
 		KVStore: KVStore{
 			// Disabled by default, so a fresh checkout runs on Postgres and
@@ -378,7 +379,6 @@ func Default() Config {
 			ReleaseAfter:    DefaultQueueReleaseAfter,
 			CleanupInterval: DefaultQueueCleanupArchive,
 			Encrypt:         false,
-			Timezone:        DefaultSchedulerTimezone,
 		},
 		Server: Server{
 			Host:            "0.0.0.0",

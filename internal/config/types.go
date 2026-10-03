@@ -66,6 +66,11 @@ type App struct {
 	// is a decision a deployment should make on purpose, not a default it
 	// never noticed.
 	AuditRetentionDays int `koanf:"audit_retention_days" json:"audit_retention_days"`
+	// Timezone is the one zone the deployment runs in: every pooled
+	// database session is pinned to it and a cron spec that names no zone
+	// of its own is resolved against it, so "0 3 * * *" is three in the
+	// morning in this zone everywhere the process looks.
+	Timezone string `koanf:"timezone" json:"timezone"`
 }
 
 // Auth holds the JWT signing settings. The asymmetric signing key lives in
@@ -156,9 +161,8 @@ type Database struct {
 	// waiting, which is what a command that only reads one key wants.
 	ConnectAttempts      int           `koanf:"connect_attempts" json:"connect_attempts"`
 	ConnectRetryInterval time.Duration `koanf:"connect_retry_interval" json:"connect_retry_interval"`
-	// SearchPath and Timezone are applied to every pooled connection.
+	// SearchPath is applied to every pooled connection.
 	SearchPath string `koanf:"search_path" json:"search_path"`
-	Timezone   string `koanf:"timezone" json:"timezone"`
 }
 
 // Fetcher holds the outbound HTTP client used to call external services.
@@ -516,11 +520,6 @@ type Queue struct {
 	// (app.secret_key). A task still in flight when the flag flips is read
 	// as the plaintext it is; every task written afterwards is sealed.
 	Encrypt bool `koanf:"encrypt" json:"encrypt"`
-	// Timezone resolves a cron spec that names no zone of its own, so
-	// "0 3 * * *" is three in the morning somewhere in particular. It lives
-	// here because the scheduler is a queue client: it enqueues its jobs
-	// onto this queue, and there is no second scheduling concept.
-	Timezone string `koanf:"timezone" json:"timezone"`
 }
 
 // RateLimit holds the request throttling settings.

@@ -784,4 +784,3 @@ func TestTheAlgorithmMaterialRuleIsShared(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), `auth.jwt_algorithm: "HS256" requires auth.secret_key`)
 }
-

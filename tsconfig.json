@@ -5,6 +5,7 @@
         "allowSyntheticDefaultImports": true,
         "composite": false,
         "erasableSyntaxOnly": false,
+        "esModuleInterop": true,
         "exactOptionalPropertyTypes": false,
         "inlineSourceMap": true,
         "isolatedModules": true,

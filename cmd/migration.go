@@ -59,7 +59,7 @@ func databaseOptions(ctx context.Context, cfg config.Config) datastore.PostgresO
 		ConnectAttempts:      cfg.Database.ConnectAttempts,
 		ConnectRetryInterval: cfg.Database.ConnectRetryInterval,
 		SearchPath:           cfg.Database.SearchPath,
-		Timezone:             cfg.Database.Timezone,
+		Timezone:             cfg.App.Timezone,
 		Logger:               probeLogger(ctx),
 	}
 }
