@@ -197,6 +197,31 @@ func nullIfEmpty(value string) any {
 	return value
 }
 
+// userEmailAccount is the one account the strict mode's notice names: the
+// address the unknown caller typed and the display name the greeting uses.
+type userEmailAccount struct {
+	Email       string
+	DisplayName string
+}
+
+// FindUserEmailAccount reads the account the email is on record with. The
+// strict mode's notice reads it after the insert's collision, on the pool —
+// the transaction that saw the collision is already over.
+func (r *Repository) FindUserEmailAccount(ctx context.Context, db datastore.Querier, email string) (userEmailAccount, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("email", "display_name")
+	sb.From(user.UserTable)
+	sb.Where(sb.Equal("email", email))
+
+	query, args := sb.Build()
+	row := db.QueryRow(ctx, query, args...)
+	var account userEmailAccount
+	if err := row.Scan(&account.Email, &account.DisplayName); err != nil {
+		return userEmailAccount{}, err
+	}
+	return account, nil
+}
+
 // CreatePassword stores the account's primary credential.
 func (r *Repository) CreatePassword(ctx context.Context, db datastore.Querier, row password.UserPasswordSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
@@ -240,6 +265,14 @@ func (r *Repository) ConsumeSignupToken(ctx context.Context, db datastore.Querie
 func errUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// uniqueViolationOn reports whether the failure was the named constraint's.
+// An error that carries no constraint name — a driver that swallowed it —
+// answers false, so the caller's fallback stays the honest refusal.
+func uniqueViolationOn(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraint
 }
 
 // AssertGroupsExist refuses a group id that names no group, so a token never

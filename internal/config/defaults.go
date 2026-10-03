@@ -369,6 +369,7 @@ func Default() Config {
 				UserUnbannedNoticeEnabled:    true,
 				APIKeyExpiringNoticeEnabled:  true,
 				EmailChangeNoticeEnabled:     true,
+				SignupAttemptNoticeEnabled:   true,
 				AnnouncementEmailEnabled:     true,
 			},
 		},

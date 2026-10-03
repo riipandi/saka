@@ -337,6 +337,9 @@ var Package = do.Package(
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
 		}
+		if client := do.MustInvoke[*queue.Client](i); client != nil {
+			service.WithExistingEmailNotifier(jobs.NewSignupNotifier(client, log, do.MustInvoke[*config.Config](i).Mailer.Notifications.SignupAttemptNoticeEnabled))
+		}
 		return service, nil
 	}),
 

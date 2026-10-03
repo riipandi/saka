@@ -308,11 +308,17 @@ func (s *Service) WithEmailChangeNotifier(notices changeNoticeEnqueuer) *Service
 // the appconfig feature out of this one's import graph.
 type emailChangeSettings interface {
 	GetBool(ctx context.Context, key string) (bool, error)
+	GetString(ctx context.Context, key string) (string, error)
 }
 
 // SettingChangeEmailEnabled is the catalog key the change gate reads. The
 // catalog owns the name; this constant is how this package spells it.
 const SettingChangeEmailEnabled = "users.change_email_enabled"
+
+// SettingUserEnumerationProtection is the strict mode's key: strict, a
+// change toward a taken address answers as if the verification started —
+// no code, no refusal that names the collision.
+const SettingUserEnumerationProtection = "auth.user_enumeration_protection"
 
 // SettingAccessBlockSubaddresses is the catalog key the subaddress guard
 // reads. The catalog owns the name; this constant is how this package
@@ -369,6 +375,19 @@ func (s *Service) emailChangeOpen(ctx context.Context) bool {
 	return on
 }
 
+// changeIsStrict answers the enumeration mode. An unreadable setting keeps
+// the default: the bulk behaviour, the honest refusals.
+func (s *Service) changeIsStrict(ctx context.Context) bool {
+	if s.settings == nil {
+		return false
+	}
+	mode, err := s.settings.GetString(ctx, SettingUserEnumerationProtection)
+	if err != nil {
+		return false
+	}
+	return mode == "strict"
+}
+
 // RequestEmailChange writes the pending change for the signed-in account and
 // enqueues its token to the address the change moves to. The code is the
 // flow's whole credential: it is generated here, shown once in the message,
@@ -401,10 +420,24 @@ func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newE
 	if newEmail == account.Email {
 		return ErrSameEmail
 	}
+	taken := false
 	if _, findErr := s.repo.FindUserByEmail(ctx, s.pool, newEmail); findErr == nil {
-		return ErrEmailTaken
+		taken = true
 	} else if !errors.Is(findErr, datastore.ErrNoRows) {
 		return findErr
+	}
+	// The strict mode answers the taken address as if the verification had
+	// started: no code, no mail, no refusal that names the collision — the
+	// response is the shape every requestable address answers with, and
+	// the existence question has no left answer. The caller is
+	// authenticated here, but the account behind the address is still
+	// none of its business. A read that failed answers honestly: the
+	// strict shim must not swallow a real failure into a fake success.
+	if taken && s.changeIsStrict(ctx) {
+		return nil
+	}
+	if taken {
+		return ErrEmailTaken
 	}
 	// The subaddress blocker is the change flow's other refusal: the new
 	// address's base is one an account already holds. It fails open with

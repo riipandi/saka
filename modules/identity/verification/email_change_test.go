@@ -36,6 +36,11 @@ type stubGate struct {
 
 func (g stubGate) GetBool(context.Context, string) (bool, error) { return g.on, nil }
 
+// GetString answers nothing: an unreadable mode key keeps the bulk default.
+func (g stubGate) GetString(context.Context, string) (string, error) {
+	return "", errors.New("unreadable setting")
+}
+
 func pendingCount(t *testing.T, service *Service, name string) int64 {
 	t.Helper()
 	count, err := service.queue.Pending(t.Context(), name)
@@ -331,6 +336,7 @@ func TestRequestEmailChangeToleratesAFailingScan(t *testing.T) {
 type toggleGate struct {
 	changeEmail       bool
 	blockSubaddresses bool
+	strict            bool
 }
 
 func (g toggleGate) GetBool(_ context.Context, key string) (bool, error) {
@@ -341,4 +347,68 @@ func (g toggleGate) GetBool(_ context.Context, key string) (bool, error) {
 		return g.blockSubaddresses, nil
 	}
 	return false, errors.New("unreadable setting")
+}
+
+func (g toggleGate) GetString(_ context.Context, key string) (string, error) {
+	if key == SettingUserEnumerationProtection {
+		if g.strict {
+			return "strict", nil
+		}
+		return "bulk", nil
+	}
+	return "", errors.New("unreadable setting")
+}
+
+// TestRequestEmailChangeUnderStrictHidesTheTakenAddress pins the strict
+// enumeration answer: a change toward an address another account holds
+// answers as if the verification had started — no error, no token row, no
+// message on either queue — so the response no longer tells the caller the
+// address is taken. The bulk default keeps the honest refusal.
+func TestRequestEmailChangeUnderStrictHidesTheTakenAddress(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	inner := testService(t, pool, true)
+	service := inner.
+		WithEmailChangeNotifier(jobs.NewEmailChangeNotifier(inner.queue, nil, true)).
+		WithEmailChangeGate(toggleGate{changeEmail: true, blockSubaddresses: false, strict: true})
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
+	seedUser(t, pool, "sneveu", "neveu@example.com", false)
+
+	require.NoError(t, service.RequestEmailChange(t.Context(), userID, "neveu@example.com"),
+		"strict answers the started shape, not the collision")
+
+	// Nothing was spent: no token row, no message on either queue the
+	// honest request sends.
+	assert.Zero(t, pendingChangeCount(t, pool, userID.String()))
+	assert.Zero(t, pendingCount(t, inner, jobs.EmailChangeRequestEmailName))
+	assert.Zero(t, pendingCount(t, inner, jobs.EmailChangeNoticeName))
+}
+
+// TestRequestEmailChangeUnderBulkKeepsTheRefusal pins the mode's default: a
+// taken address answers the collision it always answered.
+func TestRequestEmailChangeUnderBulkKeepsTheRefusal(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := emailChangeService(t, pool, true)
+	userID := uuid.MustParse(seedUser(t, pool, "rlangdon", "langdon@example.com", false))
+	seedUser(t, pool, "sneveu", "neveu@example.com", false)
+
+	err := service.RequestEmailChange(t.Context(), userID, "neveu@example.com")
+	assert.ErrorIs(t, err, ErrEmailTaken)
+}
+
+// pendingChangeCount counts the email-change token rows one account holds.
+func pendingChangeCount(t *testing.T, pool *datastore.Postgres, userID string) int64 {
+	t.Helper()
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("count(*)")
+	sb.From(AuthTokenTable)
+	sb.Where(sb.Equal("user_id", userID), sb.Equal("purpose", PurposeEmailChange))
+
+	query, args := sb.Build()
+	var count int64
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&count))
+	return count
 }

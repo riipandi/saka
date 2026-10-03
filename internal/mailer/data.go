@@ -18,6 +18,7 @@ const (
 	TemplatePasswordReset         = "password-reset"
 	TemplatePasswordChangedNotice = "password-changed-notice"
 	TemplateReauthenticationCode  = "reauthentication-code"
+	TemplateSignupAttemptNotice   = "signup-attempt-existing-email"
 	TemplateTestEmail             = "test-email"
 	TemplateUserBanned            = "user-banned"
 	TemplateUserUnbanned          = "user-unbanned"
@@ -95,6 +96,14 @@ type (
 	// PasswordChangedNoticeData renders TemplatePasswordChangedNotice —
 	// the "your password was changed" receipt a completed reset sends.
 	PasswordChangedNoticeData struct {
+		Name  string
+		Email string
+	}
+	// SignupAttemptNoticeData renders TemplateSignupAttemptNotice — the
+	// "someone tried to sign up with this address" notice the strict
+	// enumeration mode sends to the address on file. It carries no code
+	// and grants nothing.
+	SignupAttemptNoticeData struct {
 		Name  string
 		Email string
 	}

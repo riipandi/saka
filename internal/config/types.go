@@ -470,6 +470,10 @@ type MailerNotifications struct {
 	// a change is pending and the confirmation the new address receives after
 	// it completes. The request token itself is transactional and always sent.
 	EmailChangeNoticeEnabled bool `koanf:"email_change_notice_enabled" json:"email_change_notice_enabled"`
+	// SignupAttemptNoticeEnabled gates the notice the address on file
+	// receives when the strict enumeration mode answers a taken-email
+	// sign-up for it.
+	SignupAttemptNoticeEnabled bool `koanf:"signup_attempt_notice_enabled" json:"signup_attempt_notice_enabled"`
 	// AnnouncementEmailEnabled gates the email pass a published notification
 	// asks for. The notice itself is always written — this gate is only the
 	// mail the pass would duplicate it with.

@@ -860,3 +860,124 @@ func TestSignupWithoutTheBlocklistToggleOrTheSeam(t *testing.T) {
 	})
 	require.NoError(t, err, "no seam, no gate")
 }
+
+// recordingNotices is the strict mode's seam double: it remembers the
+// addresses the taken-email notices went to.
+type recordingNotices struct{ attempts []string }
+
+func (r *recordingNotices) EnqueueSignupAttemptExistingEmail(_ context.Context, email, _ string) {
+	r.attempts = append(r.attempts, email)
+}
+
+// TestStrictModeAnswersTheSuccessShapeForATakenEmail pins the strict
+// enumeration answer: a sign-up that names a taken email earns the shape a
+// fresh sign-up answers with — a minted identifier, the caller's own
+// fields, the verification state the gate stamps — and the address on file
+// earns the notice instead of a verification code. Nothing is created.
+func TestStrictModeAnswersTheSuccessShapeForATakenEmail(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	notices := &recordingNotices{}
+	verifier := &recordingVerifier{repo: verification.NewRepository()}
+	service := testService(t, pool).
+		WithSignupSettings(signupSettings{
+			"access.mode":                    "open",
+			"auth.verify_email_at_signup":    "true",
+			SettingUserEnumerationProtection: "strict",
+		}).
+		WithVerification(verifier).
+		WithExistingEmailNotifier(notices)
+
+	// The honest counterpart first: a fresh sign-up under the same policy.
+	honest, err := service.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+
+	// The strict shim: the address vittoria's account already holds, a
+	// username nobody holds.
+	shim, err := service.Signup(t.Context(), Params{
+		Username: "sophie",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err, "strict answers the success shape, not a refusal")
+
+	// The wire shapes agree: the same fields carry the same kinds of
+	// values, so a diff between the two answers names no account.
+	assert.NotEmpty(t, shim.ID)
+	assert.NotEqual(t, honest.ID, shim.ID, "the decoy identifier is minted, not read")
+	assert.Equal(t, "vittoria@example.com", shim.Email)
+	assert.Equal(t, "sophie", shim.Username)
+	assert.Equal(t, honest.EmailVerified, shim.EmailVerified, "the gate stamps both the same way")
+	assert.False(t, shim.CreatedAt.IsZero())
+
+	// Nothing was created, no code was spent on the unknown caller (the
+	// one issued code is the honest counterpart's), and the address on
+	// file learned of the attempt.
+	assert.Equal(t, 1, userCount(t, pool))
+	require.Len(t, verifier.issued, 1, "the honest sign-up's code is the only one")
+	require.Len(t, notices.attempts, 1)
+	assert.Equal(t, "vittoria@example.com", notices.attempts[0])
+}
+
+// TestStrictModeStillRefusesATakenUsername pins the mode's asymmetry: a
+// username is not a verified contact channel, so its refusal stays honest —
+// there is nothing to leak past the name the caller typed.
+func TestStrictModeStillRefusesATakenUsername(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	notices := &recordingNotices{}
+	service := testService(t, pool).
+		WithSignupSettings(signupSettings{
+			"access.mode":                    "open",
+			SettingUserEnumerationProtection: "strict",
+		}).
+		WithExistingEmailNotifier(notices)
+	_, err := service.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+
+	_, err = service.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "sophie@example.com",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, ErrAccountExists)
+	assert.Empty(t, notices.attempts, "the notice belongs to the email's owner only")
+	assert.Equal(t, 1, userCount(t, pool))
+}
+
+// TestBulkModeKeepsTheHonestRefusal pins the default: without strict, a
+// taken email answers the refusal it always answered.
+func TestBulkModeKeepsTheHonestRefusal(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	notices := &recordingNotices{}
+	service := testService(t, pool).
+		WithSignupSettings(openMode).
+		WithExistingEmailNotifier(notices)
+	_, err := service.Signup(t.Context(), Params{
+		Username: "vittoria",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	require.NoError(t, err)
+
+	_, err = service.Signup(t.Context(), Params{
+		Username: "sophie",
+		Email:    "vittoria@example.com",
+		Password: "expecto-patronum",
+	})
+	assert.ErrorIs(t, err, ErrAccountExists)
+	assert.Empty(t, notices.attempts)
+	assert.Equal(t, 1, userCount(t, pool))
+}

@@ -51,6 +51,12 @@ var (
 	ErrUsernameInvalid = errors.New("signup: username is invalid")
 )
 
+// errEmailCollision is the strict mode's internal sentinel: the insert
+// failed on the email's unique index and the caller earns the success
+// shape. It never escapes the service — the WithTx boundary resolves it
+// into the decoy answer.
+var errEmailCollision = errors.New("signup: the email is taken (strict)")
+
 // Service creates an account from a signup token.
 type Service struct {
 	pool *datastore.Postgres
@@ -78,6 +84,10 @@ type Service struct {
 	// construction. Nil leaves the gate open — the state a test or a bare
 	// wiring is in — and the toggle decides whether the wired gate reads.
 	blocklist BlocklistChecker
+	// notices is the strict mode's seam: the owner's notice a taken-email
+	// sign-up sends. Nil skips the mail; the strict answer itself is the
+	// policy's, not the seam's.
+	notices EnumerationNotifier
 }
 
 // settingsReader is the sign-up policy's runtime source: the access mode,
@@ -101,6 +111,9 @@ const (
 	SettingSignupUsernameEnabled   = "auth.signup_username_enabled"
 	SettingRequireUsername         = "auth.require_username"
 	SettingVerifyEmailAtSignup     = "auth.verify_email_at_signup"
+	// SettingUserEnumerationProtection is the strict mode's key: strict, a
+	// taken email earns the success shape instead of the refusal.
+	SettingUserEnumerationProtection = "auth.user_enumeration_protection"
 )
 
 // VerificationIssuer is the email-verification seam: the code's row belongs
@@ -142,6 +155,9 @@ type signupPolicy struct {
 	usernameOn        bool
 	requireUsername   bool
 	verifyEmail       bool
+	// strict is the enumeration-protection mode: on, a taken email earns
+	// the success shape instead of the refusal.
+	strict bool
 }
 
 // policy reads the catalog. The bare wiring answers the historical policy —
@@ -195,6 +211,11 @@ func (s *Service) policyOf(ctx context.Context) signupPolicy {
 	} else {
 		p.verifyEmail = on
 		p.stampVerified = !on
+	}
+	if mode, err := s.settings.GetString(ctx, SettingUserEnumerationProtection); err != nil {
+		s.log.WarnContext(ctx, "signup: auth.user_enumeration_protection unreadable; using the default", "error", err)
+	} else {
+		p.strict = mode == "strict"
 	}
 	return p
 }
@@ -261,6 +282,23 @@ type BlocklistChecker interface {
 // WithBlocklist wires the blocked-identifier gate. Nil keeps the gate open.
 func (s *Service) WithBlocklist(checker BlocklistChecker) *Service {
 	s.blocklist = checker
+	return s
+}
+
+// EnumerationNotifier is the strict mode's seam: the notice the address on
+// file receives when an unknown caller signs up with it. The interface is
+// this package's — the consuming side defines it — and the queue-backed
+// adapter is wired in the area's Package.
+type EnumerationNotifier interface {
+	// EnqueueSignupAttemptExistingEmail tells the address's owner the
+	// attempt happened. It carries no code and grants nothing.
+	EnqueueSignupAttemptExistingEmail(ctx context.Context, email, displayName string)
+}
+
+// WithExistingEmailNotifier wires the strict mode's notice. Nil keeps the
+// answer and skips the mail.
+func (s *Service) WithExistingEmailNotifier(notices EnumerationNotifier) *Service {
+	s.notices = notices
 	return s
 }
 
@@ -395,6 +433,15 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 			EmailVerifiedAt: verifiedAt,
 		})
 		if errUniqueViolation(createErr) {
+			// The username's refusal stays honest in both modes: a username
+			// is not a verified contact channel, and there is nothing to
+			// leak past the name the caller typed. The email's is where the
+			// strict mode moves the answer — the caller earns the success
+			// shape and the address on file earns the notice. An unparseable
+			// constraint falls back to the refusal: the safe answer.
+			if p.strict && uniqueViolationOn(createErr, "users_email_key") {
+				return errEmailCollision
+			}
 			return ErrAccountExists
 		}
 		if createErr != nil {
@@ -474,7 +521,20 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 		return nil
 	})
 	if err != nil {
-		return user.UserView{}, err
+		if !errors.Is(err, errEmailCollision) {
+			return user.UserView{}, err
+		}
+		// The strict answer. The collision was the insert's verdict; the
+		// read on the pool names the account the notice goes to — a row
+		// deleted between the two answers the honest refusal instead.
+		existing, findErr := s.repo.FindUserEmailAccount(ctx, s.pool, params.Email)
+		if findErr != nil {
+			return user.UserView{}, ErrAccountExists
+		}
+		if s.notices != nil {
+			s.notices.EnqueueSignupAttemptExistingEmail(ctx, params.Email, existing.DisplayName)
+		}
+		return s.decoyView(params, name, p), nil
 	}
 	if pendingVerification != nil {
 		if deliverErr := s.verifier.DeliverForSignup(ctx, pendingVerification.UserID, pendingVerification.Email, pendingVerification.DisplayName, pendingVerification.RawToken); deliverErr != nil {
@@ -494,6 +554,32 @@ type pendingCode struct {
 	Email       string
 	DisplayName string
 	RawToken    string
+}
+
+// decoyView builds the success answer the strict mode serves for a taken
+// email: the fields the caller itself supplied, a fresh identifier, and the
+// verification state the honest path would have stamped — the shape a
+// fresh sign-up answers with, describing no account. The identifier is
+// minted, not read: a zero value would be the oracle the mode exists to
+// close.
+func (s *Service) decoyView(params Params, name string, p signupPolicy) user.UserView {
+	view := user.UserView{
+		ID:            user.FormatID(uuid.NewV7()),
+		Username:      params.Username,
+		Email:         params.Email,
+		DisplayName:   name,
+		Timezone:      user.DefaultTimezone,
+		Disabled:      false,
+		EmailVerified: p.stampVerifiedAt(s.now()) != nil,
+		CreatedAt:     s.now(),
+	}
+	if params.FirstName != "" {
+		view.FirstName = &params.FirstName
+	}
+	if params.LastName != "" {
+		view.LastName = &params.LastName
+	}
+	return view
 }
 
 // displayName composes the name the UI shows from the optional given and
