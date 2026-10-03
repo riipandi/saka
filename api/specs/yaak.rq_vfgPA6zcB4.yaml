@@ -17,6 +17,9 @@ description: |-
   Ported from Pocket ID `PUT /api/users/me/profile-picture`. Saka answers it at the same REST route, guarded by the authenticated caller itself.
 
   Parameters: none
+
+  The account's row stores a reference to the stored `storage_objects` row (`picture_file_id`), not a path - the object row owns the location, so a backend or key change never rewrites the account table.
+
 headers: []
 method: PUT
 name: '[Pocket ID] Update current user''s profile picture'

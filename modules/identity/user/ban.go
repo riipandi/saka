@@ -104,7 +104,7 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 		if readErr != nil {
 			return readErr
 		}
-		banView = view(read)
+		banView = s.view(read)
 		return nil
 	})
 	if err != nil {
@@ -159,7 +159,7 @@ func (s *Service) UnbanUser(ctx context.Context, id string) (BanOutcome, error) 
 		if readErr != nil {
 			return readErr
 		}
-		unbanView = view(read)
+		unbanView = s.view(read)
 		return nil
 	})
 	if err != nil {
@@ -200,5 +200,5 @@ func (s *Service) UnlockUser(ctx context.Context, id string) (UserView, error) {
 	if _, err := s.restrictions.Unlock(ctx, userID, nil); err != nil {
 		return UserView{}, err
 	}
-	return view(existing), nil
+	return s.view(existing), nil
 }

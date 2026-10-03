@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),
-    avatar_url TEXT, -- Storage key of the uploaded avatar; NULL = bundled default picture
+    picture_file_id UUID REFERENCES public.storage_objects (id) ON DELETE SET NULL,
     disabled BOOLEAN NOT NULL DEFAULT FALSE,
     -- The account's preference document (locale, timezone, and whatever a
     -- later preference adds); NULL means every preference is absent, and an

@@ -84,6 +84,25 @@ func FormatObjectID(raw uuid.UUID) string {
 	return id.String()
 }
 
+// ParseObjectID reads the object row's UUID out of its wire form — the
+// inverse of FormatObjectID, for a caller that stores the reference, not
+// the location: the column and the foreign key resolve the UUID, the wire
+// form never crosses into a query.
+func ParseObjectID(wire string) (uuid.UUID, error) {
+	anyID, err := typeid.FromString(wire)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("storage: object id %q: %w", wire, err)
+	}
+	if anyID.Prefix() != "file" {
+		return uuid.UUID{}, fmt.Errorf("storage: object id %q: not a file id", wire)
+	}
+	parsed, err := uuid.Parse(anyID.UUID())
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("storage: object id %q: %w", wire, err)
+	}
+	return parsed, nil
+}
+
 // formatObjectID reads the object row's UUID out of the text form its
 // column scans into, and answers the wire form. A column value that is not
 // a UUID is a database defect the read refuses.

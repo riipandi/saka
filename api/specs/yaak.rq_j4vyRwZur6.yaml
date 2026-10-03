@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_j4vyRwZur6
 createdAt: 2026-09-25T10:33:40.835356
-updatedAt: 2026-09-26T18:47:27.388354
+updatedAt: 2026-10-03T22:58:36.170676
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication:
@@ -13,7 +13,7 @@ body:
   bodyType: application/json
   text: |-
     {
-      "id": "REPLACE_USER_ID",
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
       "username": "hermione",
       "email": "hermione@example.com",
       "first_name": "Hermione",
@@ -39,6 +39,8 @@ description: |-
   - ban_expires (body, optional): RFC 3339 instant the ban lifts
 
   The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+
+  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
 headers:
 - enabled: true
   name: Content-Type

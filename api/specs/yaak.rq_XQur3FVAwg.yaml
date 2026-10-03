@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_XQur3FVAwg
 createdAt: 2026-09-25T10:33:40.723878
-updatedAt: 2026-09-26T18:47:27.385270
+updatedAt: 2026-10-03T22:58:00.650690
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication:
@@ -15,7 +15,7 @@ body:
     {
       "username": "hermione",
       "email": "hermione@example.com",
-      "password": "expecto-patronum",
+      "password": "${[ faker.internet.password() ]}",
       "first_name": "Hermione",
       "last_name": "Granger",
       "is_admin": false
@@ -33,6 +33,8 @@ description: |-
   - last_name (body, required): Family name
   - password (body, optional): Primary credential
   - display_name (body, optional): Falls back to the composed names
+
+  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
 headers:
 - enabled: true
   name: Content-Type

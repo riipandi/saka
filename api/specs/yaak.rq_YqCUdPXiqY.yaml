@@ -18,6 +18,9 @@ description: |-
   Ported from Pocket ID `GET /api/users/me` as the `saka.identity.v1.UserService/GetCurrentUser` procedure. The target is the token's subject, never something the request names; a delegated session is refused.
 
   Parameters: none
+
+  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+
 headers:
 - enabled: true
   name: Content-Type

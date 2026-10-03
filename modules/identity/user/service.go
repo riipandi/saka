@@ -68,6 +68,12 @@ type Service struct {
 	// picture procedures refuse while it is absent.
 	pictures *storage.Manager
 
+	// assetsURL is the public origin the browser fetches stored files
+	// from — `app.assets_url`. The avatar URL the views answer composes
+	// from it; empty degrades every view's picture URL to the empty
+	// string, the state a test or a bare wiring is in.
+	assetsURL string
+
 	// sessions ends the rows a ban withdraws. It is nil in the tests that
 	// exercise the account procedures only; a ban then writes its fields
 	// without ending sessions, and the notification interface answers the
@@ -255,6 +261,13 @@ func (s *Service) WithSettings(reader settingsReader) *Service {
 	return s
 }
 
+// WithAssetsURL wires the public origin the avatar URLs compose from —
+// `app.assets_url`. Empty keeps every view's picture URL empty.
+func (s *Service) WithAssetsURL(url string) *Service {
+	s.assetsURL = url
+	return s
+}
+
 // gateOpen answers the self-service gate: the global setting when the
 // account carries no override, the override's answer otherwise. An
 // unreadable setting refuses — a gate that cannot answer is a gate closed.
@@ -380,6 +393,11 @@ type UserView struct {
 	BannedAt      *time.Time
 	BanExpires    *time.Time
 	BanReason     *string
+	// AvatarURL is the account's picture's public URL — the storage
+	// serving origin plus the referenced object's bucket and key. Empty
+	// when the account has no picture: the client shows its bundled
+	// default, the picture the read route answers by redirect.
+	AvatarURL string
 }
 
 // CreateUser creates an account directly, without a signup token. The
@@ -452,7 +470,7 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 			}
 		}
 
-		created = view(row)
+		created = s.view(row)
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventAccountCreated,
 			Status: audit.StatusSuccess,
@@ -484,7 +502,7 @@ func (s *Service) GetUser(ctx context.Context, id string) (UserView, error) {
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, view(row))
+	filled, err := s.withGroup(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -507,7 +525,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, subject string) (UserView,
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, view(row))
+	filled, err := s.withGroup(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -612,7 +630,7 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, view(row))
+	filled, err := s.withGroup(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -730,7 +748,7 @@ func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascendin
 
 	views := make([]UserView, 0, len(rows))
 	for _, row := range rows {
-		views = append(views, view(row))
+		views = append(views, s.view(row))
 	}
 	filled, err := s.withGroups(ctx, views)
 	if err != nil {
@@ -836,7 +854,9 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 
 // ReadAccount reads one account row and answers the canonical view. It is
 // the read-back the account-creating features share: sign-up assembles its
-// answer from it, so both doors describe the account the same way.
+// answer from it, so both doors describe the account the same way. The
+// accounts these doors create carry no picture, so the view answers an
+// empty avatar URL — no assets origin to compose one from.
 func ReadAccount(ctx context.Context, db datastore.Querier, id uuid.UUID) (UserView, error) {
 	row, err := (&Repository{}).GetUser(ctx, db, id)
 	if err != nil {
@@ -869,6 +889,9 @@ func WireView(user UserView) *identityv1.User {
 		EmailVerified: user.EmailVerified,
 		CreatedAt:     user.CreatedAt.Format(rfc3339),
 		BanReason:     user.BanReason,
+		// The picture's public URL, empty when the account has none — the
+		// client's bundled default answers for it.
+		AvatarUrl: user.AvatarURL,
 		// The document is the read-side view of the stored preferences; a
 		// client that wants the locale or the timezone reads it here.
 		Metadata: &identityv1.UserMetadata{
@@ -971,6 +994,18 @@ func view(row UserSchema) UserView {
 		BanExpires:    row.BanExpires,
 		BanReason:     row.BanReason,
 	}
+}
+
+// view wraps the pure mapping with the picture URL: the serving origin and
+// the joined object's bucket and key compose the public URL an account's
+// picture answers with. An account without a picture, or a service wired
+// without an origin, answers the empty URL.
+func (s *Service) view(row UserSchema) UserView {
+	mapped := view(row)
+	if row.PictureBucket != nil && row.PictureKey != nil && s.assetsURL != "" {
+		mapped.AvatarURL = strings.TrimSuffix(s.assetsURL, "/") + "/" + *row.PictureBucket + "/" + *row.PictureKey
+	}
+	return mapped
 }
 
 // optional hands the view a pointer for a column that may be NULL.

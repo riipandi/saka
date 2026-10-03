@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/restrictions"
@@ -26,24 +27,30 @@ func NewRepository() *Repository {
 
 // userColumns are the columns the account procedures read, in scan order.
 // The main table rides the `u` alias — the active-ban join needs it — and
-// the ban trio is the read model the join provides: the restriction row is
-// the ban's storage, these columns are its view.
+// the ban trio plus the picture pair are the read models the joins provide:
+// the restriction row is the ban's storage, the filestore object row the
+// picture's, and these columns are their views.
 var UserColumns = []string{
 	"u.id", "u.username", "u.email", "u.first_name", "u.last_name", "u.display_name",
 	"u.metadata", "u.disabled", "u.email_verified_at", "u.created_at",
 	"ar.started_at AS banned_at", "ar.expires_at AS ban_expires", "ar.reason AS ban_reason",
-	"u.avatar_url",
+	"b.name AS picture_bucket", "so.key AS picture_key",
 	"u.self_delete_override",
 }
 
-// ActiveBanJoin arms the ban read model: the account's active ban
-// restriction, one row at most (a re-ban replaces the open row's terms), as
-// the three columns the account views answer from. The reads that scan
-// UserColumns call it; a caller that does not must answer the ban fields
-// some other way.
+// ActiveBanJoin arms the ban read model (the account's active ban
+// restriction, one row at most — a re-ban replaces the open row's terms) and
+// the picture read model (the filestore object the account's picture
+// reference names). Both joins are left ones on purpose: an account the
+// restriction row or the object row does not name is the unbanned account
+// and the default-picture account, rows the read must keep. The reads that
+// scan UserColumns call it; a caller that does not must answer the ban and
+// picture fields some other way.
 func ActiveBanJoin(sb *sqlbuilder.SelectBuilder) {
 	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageObjects+" so", "so.id = u.picture_file_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageBuckets+" b", "b.id = so.bucket_id")
 }
 
 // ScanSchema reads one row into the schema. The nullable columns scan through
@@ -52,12 +59,12 @@ func ActiveBanJoin(sb *sqlbuilder.SelectBuilder) {
 // value.
 func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	var row UserSchema
-	var username, firstName, lastName, banReason, picturePath *string
+	var username, firstName, lastName, banReason, pictureBucket, pictureKey *string
 	err := scan(
 		&row.ID, &username, &row.Email, &firstName, &lastName,
 		&row.DisplayName, &row.Metadata, &row.Disabled,
 		&row.EmailVerifiedAt, &row.CreatedAt,
-		&row.BannedAt, &row.BanExpires, &banReason, &picturePath,
+		&row.BannedAt, &row.BanExpires, &banReason, &pictureBucket, &pictureKey,
 		&row.SelfDeleteOverride,
 	)
 	if err != nil {
@@ -67,7 +74,8 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	row.FirstName = deref(firstName)
 	row.LastName = deref(lastName)
 	row.BanReason = banReason
-	row.AvatarURL = picturePath
+	row.PictureBucket = pictureBucket
+	row.PictureKey = pictureKey
 	return row, nil
 }
 
@@ -272,19 +280,21 @@ func nullJSON(value []byte) any {
 	return value
 }
 
-// SetProfilePicturePath points the account's picture at a storage key, or
-// clears it when the key is empty — the reset's way back to the bundled
-// default picture.
-func (r *Repository) SetAvatarURL(ctx context.Context, db datastore.Querier, id uuid.UUID, path string) (bool, error) {
+// SetPictureFileID points the account's picture at a filestore object row,
+// or clears it when the id is empty — the reset's way back to the bundled
+// default picture. The id is the object row's UUID, not its wire TypeID: the
+// column holds what the foreign key resolves, and the wire form never
+// crosses into a query.
+func (r *Repository) SetPictureFileID(ctx context.Context, db datastore.Querier, id uuid.UUID, fileID string) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(UserTable)
-	ub.SetMore(ub.Assign("avatar_url", nullIfEmpty(path)))
+	ub.SetMore(ub.Assign("picture_file_id", nullIfEmpty(fileID)))
 	ub.Where(ub.Equal("id", id))
 
 	query, args := ub.Build()
 	tag, err := db.Exec(ctx, query, args...)
 	if err != nil {
-		return false, fmt.Errorf("user: set profile picture path: %w", err)
+		return false, fmt.Errorf("user: set picture reference: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }

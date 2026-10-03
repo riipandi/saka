@@ -574,17 +574,11 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 	require.NoError(t, stored.Close())
 	assert.Equal(t, picture, storedBody)
 
-	// The row names the key the engine holds the file under.
-	var storedPath *string
-	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("avatar_url")
-	sb.From(UserTable)
-	sb.Where(sb.Equal("id", rowID(t, created.ID)))
-	query, args := sb.Build()
-	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&storedPath))
-	require.NotNil(t, storedPath)
-	// The row names the bucket-scoped reference the engine stores under.
-	assert.Equal(t, "devbucket/avatars/"+rowID(t, created.ID)+".png", *storedPath)
+	// The row names the object the engine holds the file in: the reference
+	// is the filestore row's identity, and the join answers the location.
+	bucket, key := storedPictureReference(t, pool, created.ID)
+	assert.Equal(t, "devbucket", bucket)
+	assert.Equal(t, "avatars/"+rowID(t, created.ID)+".png", key)
 }
 
 // TestPictureUpdateMovesTheKeyWhenTheKindChanges pins the naming contract: the
@@ -638,21 +632,33 @@ func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
 	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
 }
 
-// storedPictureKey reads the key the account's row names.
-func storedPictureKey(t *testing.T, pool *datastore.Postgres, userID string) string {
-	userID = rowID(t, userID)
+// storedPictureReference reads the location the account's picture
+// reference resolves to: the object row's bucket and key, through the same
+// join the account reads answer from.
+func storedPictureReference(t *testing.T, pool *datastore.Postgres, userID string) (string, string) {
 	t.Helper()
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("avatar_url")
-	sb.From(UserTable)
-	sb.Where(sb.Equal("id", userID))
+	sb.Select("b.name", "so.key")
+	sb.From(UserTable + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.storage_objects so", "so.id = u.picture_file_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.storage_buckets b", "b.id = so.bucket_id")
+	sb.Where(sb.Equal("u.id", rowID(t, userID)))
 	query, args := sb.Build()
 
-	var key *string
-	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&key))
+	var bucket, key *string
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&bucket, &key))
+	require.NotNil(t, bucket, "the row names the picture it stored")
 	require.NotNil(t, key, "the row names the picture it stored")
-	return *key
+	return *bucket, *key
+}
+
+// storedPictureKey reads the bucket-scoped reference the account's picture
+// reference resolves to: `<bucket>/<key>`.
+func storedPictureKey(t *testing.T, pool *datastore.Postgres, userID string) string {
+	t.Helper()
+	bucket, key := storedPictureReference(t, pool, userID)
+	return bucket + "/" + key
 }
 
 // TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration refuses a payload
@@ -701,14 +707,14 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 
 	require.NoError(t, service.ResetProfilePicture(t.Context(), created.ID))
 
-	var storedPath *string
+	var pictureFileID *string
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("avatar_url")
+	sb.Select("picture_file_id")
 	sb.From(UserTable)
 	sb.Where(sb.Equal("id", rowID(t, created.ID)))
 	query, args := sb.Build()
-	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&storedPath))
-	assert.Nil(t, storedPath)
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&pictureFileID))
+	assert.Nil(t, pictureFileID)
 
 	// The file left the engine: no read answers the key anymore.
 	_, err = pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")

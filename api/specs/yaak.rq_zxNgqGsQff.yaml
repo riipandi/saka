@@ -2,13 +2,12 @@ type: http_request
 model: http_request
 id: rq_zxNgqGsQff
 createdAt: 2026-09-25T10:33:41.055291
-updatedAt: 2026-09-26T18:47:27.386965
+updatedAt: 2026-10-03T22:56:59.869102
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication: {}
 authenticationType: null
-body:
-  filePath: /Users/ariss/Downloads/DALL·E 2023-04-06 14.39.37 - a cool, cute, and stylish astronaout mascot wearing white costum in 2d but looks in 3d isomorphic.png
+body: {}
 bodyType: binary
 description: |-
   Update a specific user's profile picture.

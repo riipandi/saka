@@ -37,11 +37,17 @@ type UserSchema struct {
 	// public.account_restrictions by the reads that answer it. No insert
 	// or update writes these — the ban's storage is the restriction row,
 	// and the writes go through the restrictions feature.
-	BannedAt           *time.Time `db:"banned_at"`
-	BanExpires         *time.Time `db:"ban_expires"`
-	BanReason          *string    `db:"ban_reason"`
-	AvatarURL          *string    `db:"avatar_url"`
-	SelfDeleteOverride *bool      `db:"self_delete_override"`
+	BannedAt   *time.Time `db:"banned_at"`
+	BanExpires *time.Time `db:"ban_expires"`
+	BanReason  *string    `db:"ban_reason"`
+	// The picture read-model: the filestore object the account's picture
+	// row names, joined from public.storage_objects and its bucket by the
+	// reads that answer it. No insert or update writes these — the
+	// picture's storage is the object row, and the writes go through the
+	// storage engine. Bucket and key are what a public URL composes from.
+	PictureBucket      *string `db:"picture_bucket"`
+	PictureKey         *string `db:"picture_key"`
+	SelfDeleteOverride *bool   `db:"self_delete_override"`
 }
 
 // UserMetadata is the account's preference document — the typed shape of

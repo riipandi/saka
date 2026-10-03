@@ -379,11 +379,13 @@ var Package = do.Package(
 	}),
 
 	do.Lazy(func(i do.Injector) (*user.Service, error) {
+		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		service := user.NewService(pool, recorder, log, pictures)
+		service.WithAssetsURL(c.App.AssetsURL)
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
 		}

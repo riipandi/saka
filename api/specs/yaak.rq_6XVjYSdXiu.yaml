@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_6XVjYSdXiu
 createdAt: 2026-09-25T10:33:40.668220
-updatedAt: 2026-09-27T08:33:03.554146
+updatedAt: 2026-10-03T22:57:40.701824
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_xxFhnsiD2K
 authentication: {}
@@ -15,7 +15,7 @@ body:
       "limit": 25,
       "search": "",
       "sort_by": "created_at",
-      "sort_order": "SORT_ORDER_DESC"
+      "sort_order": "asc"
     }
 bodyType: application/json
 description: |-
@@ -29,6 +29,8 @@ description: |-
   - search (body, optional): Search term
   - sort_by (body, optional): One of username, email, first_name, last_name, display_name, created_at; absent orders newest first
   - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
+
+  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
 headers:
 - enabled: true
   name: Content-Type
