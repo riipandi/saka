@@ -91,7 +91,7 @@ var omittedKeys = []string{
 //
 // Validate reports a key here only when the variable leaves it unusable. An unset
 // APP_MODE falls back to development, an empty base_url is a valid value, an unset
-// APP_ASSETS_URL falls back to the built-in /static mount, an unset OTEL_ENDPOINT
+// APP_ASSETS_URL falls back to the built-in /storage mount, an unset OTEL_ENDPOINT
 // falls back to the collector on the default port, and an unset HOST or PORT falls
 // back to the listen address in the defaults, so none of
 // them is an error on its own: naming them would report a choice the user made on

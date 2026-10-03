@@ -84,21 +84,28 @@ func (s *Service) UploadLogo(ctx context.Context, id string, data []byte) error 
 		// the validator's contract honest.
 		key = "oidc-logos/" + id + "." + ext
 	}
-	if row.LogoPath != nil && *row.LogoPath != key {
-		if err := s.pictures.Delete(ctx, *row.LogoPath); err != nil {
-			return fmt.Errorf("oidc: delete the replaced logo: %w", err)
+	ref := storage.DefaultBucketName + "/" + key
+	bucket, objKey, refErr := storage.SplitRef(ref)
+	if refErr != nil {
+		return fmt.Errorf("oidc: logo reference: %w", refErr)
+	}
+	if row.LogoPath != nil && *row.LogoPath != ref {
+		if delBucket, delKey, delErr := storage.SplitRef(*row.LogoPath); delErr == nil {
+			if err := s.pictures.Delete(ctx, delBucket, delKey); err != nil {
+				return fmt.Errorf("oidc: delete the replaced logo: %w", err)
+			}
 		}
 	}
 	metadata := map[string]any{"content_type": mime}
-	if err := s.pictures.Stage(ctx, key, bytes.NewReader(data), metadata); err != nil {
+	if err := s.pictures.Stage(ctx, bucket, objKey, bytes.NewReader(data), metadata); err != nil {
 		return fmt.Errorf("oidc: stage logo: %w", err)
 	}
-	if err := s.pictures.Sync(ctx, key); err != nil {
+	if err := s.pictures.Sync(ctx, ref); err != nil {
 		return fmt.Errorf("oidc: sync logo: %w", err)
 	}
 
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if _, err := s.repo.SetLogoPath(ctx, tx, id, &key); err != nil {
+		if _, err := s.repo.SetLogoPath(ctx, tx, id, &ref); err != nil {
 			return err
 		}
 		s.audit.Record(ctx, tx, audit.Entry{
@@ -125,8 +132,10 @@ func (s *Service) DeleteLogo(ctx context.Context, id string) error {
 		return nil
 	}
 	if s.pictures != nil {
-		if err := s.pictures.Delete(ctx, *row.LogoPath); err != nil {
-			return fmt.Errorf("oidc: delete logo: %w", err)
+		if delBucket, delKey, refErr := storage.SplitRef(*row.LogoPath); refErr == nil {
+			if err := s.pictures.Delete(ctx, delBucket, delKey); err != nil {
+				return fmt.Errorf("oidc: delete logo: %w", err)
+			}
 		}
 	}
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
@@ -160,11 +169,15 @@ func (s *Service) Logo(ctx context.Context, id string) (LogoFile, error) {
 	if row.LogoPath == nil || *row.LogoPath == "" {
 		return LogoFile{}, ErrLogoMissing
 	}
-	manifest, err := s.pictures.Manifest(ctx, *row.LogoPath)
+	bucket, key, refErr := storage.SplitRef(*row.LogoPath)
+	if refErr != nil {
+		return LogoFile{}, ErrLogoMissing
+	}
+	manifest, err := s.pictures.Manifest(ctx, bucket, key)
 	if err != nil {
 		return LogoFile{}, fmt.Errorf("oidc: read logo manifest: %w", err)
 	}
-	body, err := s.pictures.Open(ctx, *row.LogoPath)
+	body, err := s.pictures.Open(ctx, bucket, key)
 	if err != nil {
 		return LogoFile{}, fmt.Errorf("oidc: read logo: %w", err)
 	}

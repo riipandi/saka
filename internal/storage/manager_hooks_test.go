@@ -22,16 +22,16 @@ func TestBeforeSyncHookRunsBeforeTheFileIsHashed(t *testing.T) {
 
 	original := bytes.Repeat([]byte("original"), 40)
 	replacement := bytes.Repeat([]byte("clean"), 40)
-	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(original), nil))
+	require.NoError(t, manager.Stage(ctx, testBucket, "k", bytes.NewReader(original), nil))
 
-	manager.WithBeforeSync(func(ctx context.Context, key, path string) error {
-		assert.Equal(t, "k", key)
+	manager.WithBeforeSync(func(ctx context.Context, ref, path string) error {
+		assert.Equal(t, testBucket+"/k", ref)
 		assert.FileExists(t, path)
 		return os.WriteFile(path, replacement, 0o600)
 	})
-	require.NoError(t, manager.Sync(ctx, "k"))
+	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
 
-	reader, err := manager.Open(ctx, "k")
+	reader, err := manager.Open(ctx, testBucket, "k")
 	require.NoError(t, err)
 	defer func() { _ = reader.Close() }()
 	got, err := io.ReadAll(reader)
@@ -46,22 +46,22 @@ func TestBeforeSyncHookRejectionFailsTheRoundAndKeepsTheFile(t *testing.T) {
 	manager, _, _ := newManager(t)
 	ctx := t.Context()
 
-	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader([]byte("bad")), nil))
-	manager.WithBeforeSync(func(ctx context.Context, key, path string) error {
+	require.NoError(t, manager.Stage(ctx, testBucket, "k", bytes.NewReader([]byte("bad")), nil))
+	manager.WithBeforeSync(func(ctx context.Context, ref, path string) error {
 		return errors.New("rejected by policy")
 	})
 
-	err := manager.Sync(ctx, "k")
+	err := manager.Sync(ctx, testBucket+"/k")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "before-sync hook")
 
 	// The retry replays the hook: it runs again on the next attempt.
 	calls := 0
-	manager.WithBeforeSync(func(ctx context.Context, key, path string) error {
+	manager.WithBeforeSync(func(ctx context.Context, ref, path string) error {
 		calls++
 		return nil
 	})
-	require.NoError(t, manager.Sync(ctx, "k"), "a retry with a passing hook finishes the round")
+	require.NoError(t, manager.Sync(ctx, testBucket+"/k"), "a retry with a passing hook finishes the round")
 	assert.Equal(t, 1, calls)
 }
 
@@ -69,22 +69,22 @@ func TestAfterSyncHookRunsOnceTheManifestIsReady(t *testing.T) {
 	manager, _, _ := newManager(t)
 	ctx := t.Context()
 
-	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(bytes.Repeat([]byte("x"), 40)), nil))
+	require.NoError(t, manager.Stage(ctx, testBucket, "k", bytes.NewReader(bytes.Repeat([]byte("x"), 40)), nil))
 
 	var seen Manifest
 	manager.WithAfterSync(func(ctx context.Context, manifest Manifest) error {
 		seen = manifest
 		// The hook owns the moment before cleanup: its post-processing
 		// can still read the staging copy if it needs to.
-		assert.FileExists(t, filepath.Join(manager.Staging(), "k"))
+		assert.FileExists(t, filepath.Join(manager.Staging(), testBucket, "k"))
 		return nil
 	})
-	require.NoError(t, manager.Sync(ctx, "k"))
+	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
 
 	assert.Equal(t, StatusReady, seen.Status)
 
 	// Cleanup happened after the hook: the upload round is fully closed.
-	assert.NoFileExists(t, filepath.Join(manager.Staging(), "k"))
+	assert.NoFileExists(t, filepath.Join(manager.Staging(), testBucket, "k"))
 }
 
 func TestAfterSyncHookFailureIsReplayedByTheRetry(t *testing.T) {
@@ -96,7 +96,7 @@ func TestAfterSyncHookFailureIsReplayedByTheRetry(t *testing.T) {
 	ctx := t.Context()
 
 	data := bytes.Repeat([]byte("retry"), 40)
-	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(data), nil))
+	require.NoError(t, manager.Stage(ctx, testBucket, "k", bytes.NewReader(data), nil))
 
 	fail := true
 	var runs int
@@ -108,17 +108,17 @@ func TestAfterSyncHookFailureIsReplayedByTheRetry(t *testing.T) {
 		return nil
 	})
 
-	require.Error(t, manager.Sync(ctx, "k"))
-	assert.FileExists(t, filepath.Join(manager.Staging(), "k"),
+	require.Error(t, manager.Sync(ctx, testBucket+"/k"))
+	assert.FileExists(t, filepath.Join(manager.Staging(), testBucket, "k"),
 		"the staging file survives so the retry can replay the hook")
 
 	fail = false
-	require.NoError(t, manager.Sync(ctx, "k"))
+	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
 	assert.Equal(t, 2, runs)
-	assert.NoFileExists(t, filepath.Join(manager.Staging(), "k"))
+	assert.NoFileExists(t, filepath.Join(manager.Staging(), testBucket, "k"))
 
 	// The retry went through the fast path: the file is intact and ready.
-	manifest, err := manager.Manifest(ctx, "k")
+	manifest, err := manager.Manifest(ctx, testBucket, "k")
 	require.NoError(t, err)
 	assert.Equal(t, StatusReady, manifest.Status)
 }
@@ -130,7 +130,7 @@ func TestManagerWithoutHooksBehavesAsBefore(t *testing.T) {
 	ctx := t.Context()
 
 	data := bytes.Repeat([]byte("plain"), 40)
-	require.NoError(t, manager.Stage(ctx, "k", bytes.NewReader(data), nil))
-	require.NoError(t, manager.Sync(ctx, "k"))
-	assert.NoFileExists(t, filepath.Join(manager.Staging(), "k"))
+	require.NoError(t, manager.Stage(ctx, testBucket, "k", bytes.NewReader(data), nil))
+	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
+	assert.NoFileExists(t, filepath.Join(manager.Staging(), testBucket, "k"))
 }

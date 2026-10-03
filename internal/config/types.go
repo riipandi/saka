@@ -45,9 +45,9 @@ type App struct {
 	SecretKey string `koanf:"secret_key" json:"secret_key"`
 	// BaseURL is the public origin, used to build absolute links.
 	BaseURL string `koanf:"base_url" json:"base_url"`
-	// AssetsURL is where the browser fetches static assets from: the built-in
-	// /static mount today, an S3 bucket or a CDN origin whenever a deployment
-	// points the variable there.
+	// AssetsURL is where the browser fetches stored files from: the built-in
+	// /storage/{bucket}/{key} mount by default, an S3 bucket or a CDN origin
+	// whenever a deployment points the variable there.
 	AssetsURL string `koanf:"assets_url" json:"assets_url"`
 	// ExposeResetToken answers the raw password-reset token in the
 	// ForgotPassword response. It is a development mode only aid — the

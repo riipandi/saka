@@ -11,16 +11,20 @@ import (
 	"strings"
 )
 
-// filesDir is the directory under the data directory the final files live
-// in, one subtree per key. The engine's own root is shared — staging sits
-// beside it — so the files namespace is one level down and the garbage
-// collection's listing never sees a staging path or another feature's
-// directory.
-const filesDir = "files"
+// reservedDirs are the data-directory subtrees the engine owns for itself.
+// Bucket directories sit beside them, so the listing walk skips them: a
+// staging file or a log must never be swept by the garbage collection.
+var reservedDirs = map[string]struct{}{
+	"staging": {},
+	"logs":    {},
+	"backup":  {},
+	"config":  {},
+	"files":   {}, // the pre-bucket finals tree, retired with the revamp
+}
 
-// FS is the local-filesystem backend: every key is one file under the data
-// directory, at the same path its key spells — the deployment where a stored
-// file has a visible form on the machine that stored it.
+// FS is the local-filesystem backend: every bucket/key is one file under the
+// data directory, at the same path its key spells — the deployment where a
+// stored file has a visible form on the machine that stored it.
 type FS struct {
 	root string
 }
@@ -90,12 +94,13 @@ func (s *FS) Delete(_ context.Context, key string) error {
 	return nil
 }
 
-// List walks the files directory and calls fn for every key. Temp files —
-// the crash leftovers a put's rename leaves behind — are skipped: only the
-// backend's real files are listed, and only they may be deleted.
+// List walks the data directory and calls fn for every bucket/key the
+// backend holds. Temp files — the crash leftovers a put's rename leaves
+// behind — are skipped, as are the engine's own reserved subtrees
+// (staging, logs, backup, config) and dot entries: only the backend's real
+// files are listed, and only they may be deleted.
 func (s *FS) List(_ context.Context, fn func(key string) error) error {
-	root := filepath.Join(s.root, filesDir)
-	entries, err := os.OpenRoot(root)
+	entries, err := os.OpenRoot(s.root)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
@@ -108,28 +113,46 @@ func (s *FS) List(_ context.Context, fn func(key string) error) error {
 		if err != nil {
 			return err
 		}
+		if path == "." {
+			return nil
+		}
+		// Only bucket directories (a single top-level segment) are the
+		// engine's to sweep; everything deeper is a key segment.
+		if !strings.Contains(path, "/") {
+			if _, reserved := reservedDirs[path]; reserved {
+				return fs.SkipDir
+			}
+		}
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			return nil
 		}
 		// A walk over an fs.FS yields the paths relative to its root —
-		// exactly the keys the backend stores.
+		// exactly the bucket-scoped keys the backend stores.
 		return fn(filepath.ToSlash(path))
 	})
 }
 
 // pruneDirs removes the directories a deleted file's subtree emptied, so a
-// churn of keys does not leave an empty skeleton behind. Errors are the
-// caller's to never see: an unremovable directory only costs a listing.
+// churn of keys does not leave an empty skeleton behind. The bucket
+// directory itself is kept — an empty bucket is still a bucket. Errors are
+// the caller's to never see: an unremovable directory only costs a listing.
 func (s *FS) pruneDirs(key string) {
 	dir := filepath.Dir(s.path(key))
-	for root := filepath.Join(s.root, filesDir) + "/"; strings.HasPrefix(dir, root); dir = filepath.Dir(dir) {
+	for {
+		// Stop before removing the bucket's own directory: dir's parent
+		// being the root means dir is the bucket directory.
+		if dir == s.root || filepath.Dir(dir) == s.root {
+			return
+		}
 		if err := os.Remove(dir); err != nil {
 			return
 		}
+		dir = filepath.Dir(dir)
 	}
 }
 
-// path is where one key's file lives: files/<key>.
+// path is where one bucket/key's file lives: <bucket>/<key> under the data
+// directory, mirroring the public /storage path.
 func (s *FS) path(key string) string {
-	return filepath.Join(s.root, filesDir, filepath.FromSlash(key))
+	return filepath.Join(s.root, filepath.FromSlash(key))
 }

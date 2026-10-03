@@ -64,6 +64,10 @@ func testService(t *testing.T, pool *datastore.Postgres) *Service {
 func testPictureService(t *testing.T, pool *datastore.Postgres) (*Service, *storage.Manager) {
 	t.Helper()
 
+	if _, err := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
 	manager := storage.NewManager(storage.NewFS(t.TempDir()), pool,
 		t.TempDir(), slog.New(slog.DiscardHandler))
 	return NewService(pool, nil, nil, manager), manager
@@ -566,7 +570,7 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 
 	// The engine holds the file whole under the key the row names — the
 	// same tree of keys both drivers keep.
-	stored, err := pictures.Open(t.Context(), "avatars/"+rowID(t, created.ID)+".png")
+	stored, err := pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err)
 	storedBody, err := io.ReadAll(stored)
 	require.NoError(t, err)
@@ -582,7 +586,8 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 	query, args := sb.Build()
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&storedPath))
 	require.NotNil(t, storedPath)
-	assert.Equal(t, "avatars/"+rowID(t, created.ID)+".png", *storedPath)
+	// The row names the bucket-scoped reference the engine stores under.
+	assert.Equal(t, "default/avatars/"+rowID(t, created.ID)+".png", *storedPath)
 }
 
 // TestPictureUpdateMovesTheKeyWhenTheKindChanges pins the naming contract: the
@@ -602,23 +607,23 @@ func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
 
 	png := append([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, []byte("first")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, png))
-	pngKey := "avatars/" + rowID(t, created.ID) + ".png"
+	pngKey := "default/avatars/" + rowID(t, created.ID) + ".png"
 	assert.Equal(t, pngKey, storedPictureKey(t, pool, created.ID))
 
 	// The second upload is another kind, so it lands under another key.
 	jpeg := append([]byte{0xff, 0xd8, 0xff}, []byte("second")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, jpeg))
-	jpegKey := "avatars/" + rowID(t, created.ID) + ".jpg"
+	jpegKey := "default/avatars/" + rowID(t, created.ID) + ".jpg"
 	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
 
 	// The replaced picture left the engine whole: no object answers its key,
 	// and no manifest row keeps the garbage collection from ever sweeping it.
-	_, err = pictures.Open(t.Context(), pngKey)
+	_, err = pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 	// The manifest row left with the object: a row without a file is what
 	// the garbage collection keeps a key for, so one that lingered would
 	// make the old name unsweepable forever.
-	_, err = storage.NewManifests().Load(t.Context(), pool, pngKey)
+	_, err = storage.NewManifests().Load(t.Context(), pool, "00000000-0000-0000-0000-000000000000", pngKey)
 	assert.ErrorIs(t, err, storage.ErrNoManifest)
 
 	// The read answers the picture the row now names.
@@ -709,7 +714,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 	assert.Nil(t, storedPath)
 
 	// The file left the engine: no read answers the key anymore.
-	_, err = pictures.Open(t.Context(), "avatars/"+rowID(t, created.ID)+".png")
+	_, err = pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -737,6 +742,10 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	// The backend's root is the test's own, so the object can be taken away
 	// from underneath the engine — the state another driver's tree leaves.
 	root := t.TempDir()
+	if _, seedErr := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		t.Fatal(seedErr)
+	}
 	manager := storage.NewManager(storage.NewFS(root), pool,
 		t.TempDir(), slog.New(slog.DiscardHandler))
 	service := NewService(pool, nil, nil, manager)
@@ -752,8 +761,11 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	// The object leaves the backend while the manifest row stays: exactly
 	// the state another driver's tree produces.
 	key := storedPictureKey(t, pool, created.ID)
-	require.NoError(t, os.Remove(filepath.Join(root, "files", filepath.FromSlash(key))))
-	_, err = storage.NewManifests().Load(t.Context(), pool, key)
+	require.NoError(t, os.Remove(filepath.Join(root, filepath.FromSlash(key))))
+	var bucketID string
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT id FROM storage_buckets WHERE name = 'default'`).Scan(&bucketID))
+	_, err = storage.NewManifests().Load(t.Context(), pool, bucketID, "avatars/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err, "the manifest row outlives the object")
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -819,6 +831,10 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 		}
 	}
 
+	if _, seedErr := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		t.Fatal(seedErr)
+	}
 	manager := storage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
 	service := NewService(pool, nil, nil, manager)
 
@@ -854,14 +870,14 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 		keys = append(keys, awssdk.ToString(item.Key))
 	}
 	assert.Equal(t,
-		[]string{"saka-user-test/avatars/" + rowID(t, created.ID) + ".png"}, keys)
+		[]string{"saka-user-test/default/avatars/" + rowID(t, created.ID) + ".png"}, keys)
 
 	// The object carries the feature's content type: a direct read of the
 	// bucket — a presigned URL, a console preview — answers what the
 	// bytes are without consulting the manifest.
 	headed, err := client.HeadObject(t.Context(), &s3.HeadObjectInput{
 		Bucket: awssdk.String("saka-user-test"),
-		Key:    awssdk.String("saka-user-test/avatars/" + rowID(t, created.ID) + ".png"),
+		Key:    awssdk.String("saka-user-test/default/avatars/" + rowID(t, created.ID) + ".png"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "image/png", awssdk.ToString(headed.ContentType))

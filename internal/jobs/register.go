@@ -64,7 +64,7 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		return backchannelLogoutProcessor(ctx, task, http)
 	}))
 	if uploader != nil {
-		client.Register(queue.NewQueue[ChunkUploadTask](func(ctx context.Context, task ChunkUploadTask) error {
+		client.Register(queue.NewQueue[StorageUploadTask](func(ctx context.Context, task StorageUploadTask) error {
 			return uploadProcessor(ctx, task, uploader)
 		}))
 		client.Register(queue.NewQueue[StorageGCTask](func(ctx context.Context, task StorageGCTask) error {

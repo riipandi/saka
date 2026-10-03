@@ -28,7 +28,7 @@ func TestEveryJobFitsTheDefaultReleaseWindow(t *testing.T) {
 		timeout time.Duration
 	}{
 		{"cleanup", jobs.CleanupTask{}.Config().Timeout},
-		{"storage upload", jobs.ChunkUploadTask{}.Config().Timeout},
+		{"storage upload", jobs.StorageUploadTask{}.Config().Timeout},
 		{"storage gc", jobs.StorageGCTask{}.Config().Timeout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

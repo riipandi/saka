@@ -17,7 +17,7 @@ import (
 	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/internal/transport/middleware"
-	"github.com/riipandi/saka/internal/transport/static"
+	transportstorage "github.com/riipandi/saka/internal/transport/storage"
 	"github.com/riipandi/saka/pkg/responder"
 	"github.com/riipandi/saka/web"
 )
@@ -191,12 +191,17 @@ func NewRouter(opts Options) chi.Router {
 	// letting the SPA claim them.
 	mountDevtool(r, opts.Injector)
 
-	// The uploads are served outside the group: a page that loads an image
+	// Stored files are served outside the group: a page that loads an image
 	// spends no rate-limit check, the budget belonging to the API a client
 	// calls rather than to the assets it renders. It is mounted before the
-	// SPA, whose not-found handler would otherwise answer a missing upload
-	// with index.html.
-	static.Mount(r, static.NewLocal(static.Dir(opts.Config.Storage.LocalPath)))
+	// SPA, whose not-found handler would otherwise answer a missing object
+	// with index.html. A run without the storage engine mounts nothing —
+	// the SPA keeps the paths.
+	if opts.Injector != nil {
+		if manager, err := do.Invoke[*storage.Manager](opts.Injector); err == nil && manager != nil {
+			transportstorage.Mount(r, manager)
+		}
+	}
 
 	// The SPA mounts last and renders the Go shell; the debug build points
 	// its fragment at the Vite dev server, the release build resolves its

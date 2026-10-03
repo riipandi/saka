@@ -60,20 +60,21 @@ type Picture struct {
 	Default     bool
 }
 
-// pictureKey composes the storage key one account's picture lives under:
-// `avatars/<id>.<ext>`. The extension travels in the name so the object says
-// what it is wherever it is listed — the backend's browser, a presigned URL,
-// the local deployment's file tree — without a lookup. It comes from the
-// sniffed bytes, never from the name the client sent.
+// pictureKey composes the bucket-scoped reference one account's picture
+// lives under: `<bucket>/avatars/<id>.<ext>`. The extension travels in the
+// name so the object says what it is wherever it is listed — the backend's
+// browser, the local deployment's file tree — without a lookup. It comes
+// from the sniffed bytes, never from the name the client sent. The bucket is
+// the seeded default until the storage default-bucket setting is wired in.
 func pictureKey(userID uuid.UUID, ext string) string {
 	key, err := storage.Key("avatars", userID.String()+"."+ext)
 	if err != nil {
 		// A UUID and an extension from the fixed table above cannot form an
 		// invalid key; the fallback is here for the validator's contract, not
 		// for this composition.
-		return "avatars/" + userID.String() + "." + ext
+		key = "avatars/" + userID.String() + "." + ext
 	}
-	return key
+	return storage.DefaultBucketName + "/" + key
 }
 
 // sniffPictureType reads the picture's kind off its magic bytes, answering the
@@ -134,24 +135,30 @@ func (s *Service) UpdateProfilePicture(ctx context.Context, id string, data []by
 	}
 
 	key := pictureKey(userID, ext)
-	if row.AvatarURL != nil && *row.AvatarURL != key {
-		if err := s.pictures.Delete(ctx, *row.AvatarURL); err != nil {
-			return fmt.Errorf("user: delete the replaced picture: %w", err)
-		}
-	}
 	// owner is the fact the upload-finished notice addresses: the staging
 	// caller names the account its file belongs to, and the notice ride the
 	// manifest's metadata. user_id stays beside it — the older record —
 	// because removing a key from free-form metadata is a change no reader
 	// asked for.
 	metadata := map[string]any{"content_type": mime, "owner": userID.String(), "user_id": userID.String()}
-	if err := s.pictures.Stage(ctx, key, bytes.NewReader(data), metadata); err != nil {
+	bucket, key, err := storage.SplitRef(key)
+	if err != nil {
+		return fmt.Errorf("user: picture reference: %w", err)
+	}
+	if row.AvatarURL != nil && *row.AvatarURL != bucket+"/"+key {
+		if delBucket, delKey, refErr := storage.SplitRef(*row.AvatarURL); refErr == nil {
+			if err := s.pictures.Delete(ctx, delBucket, delKey); err != nil {
+				return fmt.Errorf("user: delete the replaced picture: %w", err)
+			}
+		}
+	}
+	if err := s.pictures.Stage(ctx, bucket, key, bytes.NewReader(data), metadata); err != nil {
 		return fmt.Errorf("user: stage picture: %w", err)
 	}
-	if err := s.pictures.Sync(ctx, key); err != nil {
+	if err := s.pictures.Sync(ctx, bucket+"/"+key); err != nil {
 		return fmt.Errorf("user: sync picture: %w", err)
 	}
-	if _, err := s.repo.SetAvatarURL(ctx, s.pool, userID, key); err != nil {
+	if _, err := s.repo.SetAvatarURL(ctx, s.pool, userID, bucket+"/"+key); err != nil {
 		return err
 	}
 	// The record is written after the row names the key: the file and the
@@ -191,8 +198,10 @@ func (s *Service) ResetProfilePicture(ctx context.Context, id string) error {
 		return fmt.Errorf("user: read for picture reset: %w", err)
 	}
 	if row.AvatarURL != nil {
-		if err := s.pictures.Delete(ctx, *row.AvatarURL); err != nil {
-			return fmt.Errorf("user: delete picture: %w", err)
+		if delBucket, delKey, refErr := storage.SplitRef(*row.AvatarURL); refErr == nil {
+			if err := s.pictures.Delete(ctx, delBucket, delKey); err != nil {
+				return fmt.Errorf("user: delete picture: %w", err)
+			}
 		}
 	}
 	if _, err := s.repo.SetAvatarURL(ctx, s.pool, userID, ""); err != nil {
@@ -226,8 +235,15 @@ func (s *Service) ProfilePicture(ctx context.Context, id string) (Picture, error
 	if row.AvatarURL == nil {
 		return Picture{Body: io.NopCloser(bytes.NewReader(nil)), Default: true}, nil
 	}
+	bucket, key, refErr := storage.SplitRef(*row.AvatarURL)
+	if refErr != nil {
+		// A value the engine's reference vocabulary cannot parse was never
+		// staged by this engine: the bundled default answers, the state a
+		// reset produces.
+		return Picture{Body: io.NopCloser(bytes.NewReader(nil)), Default: true}, nil
+	}
 
-	manifest, err := s.pictures.Manifest(ctx, *row.AvatarURL)
+	manifest, err := s.pictures.Manifest(ctx, bucket, key)
 	if errors.Is(err, storage.ErrNotFound) {
 		// The row names a key the engine holds no file for: the picture was
 		// lost without its row. The bundled default answers rather than an
@@ -239,7 +255,7 @@ func (s *Service) ProfilePicture(ctx context.Context, id string) (Picture, error
 		return Picture{}, fmt.Errorf("user: read picture manifest: %w", err)
 	}
 	mime, _ := manifest.Metadata["content_type"].(string)
-	body, err := s.pictures.Open(ctx, *row.AvatarURL)
+	body, err := s.pictures.Open(ctx, bucket, key)
 	if errors.Is(err, storage.ErrNotFound) {
 		s.log.WarnContext(ctx, "user: the picture is missing from the backend",
 			slog.String("user_id", userID.String()),

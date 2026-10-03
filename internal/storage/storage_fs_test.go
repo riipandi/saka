@@ -15,7 +15,8 @@ import (
 )
 
 // newFSStore builds a local backend over a throwaway directory and returns
-// a key with known bytes, the shape every store test runs through.
+// a bucket-scoped key with known bytes, the shape every store test runs
+// through.
 func newFSStore(t *testing.T) (*FS, string, []byte) {
 	t.Helper()
 
@@ -80,7 +81,7 @@ func TestFSStoreDeleteMissingFileIsQuiet(t *testing.T) {
 	assert.NoError(t, store.Delete(t.Context(), key))
 }
 
-func TestFSStoreListSkipsTempFiles(t *testing.T) {
+func TestFSStoreListSkipsTempFilesAndEngineDirectories(t *testing.T) {
 	store, key, data := newFSStore(t)
 	ctx := t.Context()
 
@@ -90,23 +91,33 @@ func TestFSStoreListSkipsTempFiles(t *testing.T) {
 	// backend writes one under the key's own basename, so the fixture does
 	// too.
 	require.NoError(t, os.WriteFile(
-		filepath.Join(store.root, filesDir, "avatars", ".usr_1.png.tmp"),
+		filepath.Join(store.root, "avatars", ".usr_1.png.tmp"),
 		[]byte("x"), 0o600))
+
+	// The engine's own subtrees live beside the bucket directories; the
+	// listing must never name anything inside them, or the garbage
+	// collection would sweep staging files and logs.
+	for dir := range reservedDirs {
+		require.NoError(t, os.MkdirAll(filepath.Join(store.root, dir), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(store.root, dir, "private.bin"), []byte("x"), 0o600))
+	}
 
 	keys, err := listedKeys(ctx, store)
 	require.NoError(t, err)
 	assert.Equal(t, []string{key}, keys)
 }
 
-func TestFSStoreDeletePrunesTheEmptyDirs(t *testing.T) {
+func TestFSStoreDeleteKeepsTheBucketDirectory(t *testing.T) {
 	store, key, data := newFSStore(t)
 	ctx := t.Context()
 
 	require.NoError(t, store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), "image/png"))
 	require.NoError(t, store.Delete(ctx, key))
 
-	_, err := os.Stat(filepath.Join(store.root, filesDir, "avatars", "usr_1"))
-	assert.True(t, os.IsNotExist(err), "an emptied subtree must not linger")
+	// The emptied file subtree goes, but the bucket's own directory stays:
+	// an empty bucket is still a bucket.
+	assert.NoDirExists(t, filepath.Join(store.root, "avatars", "usr_1"))
+	assert.DirExists(t, filepath.Join(store.root, "avatars"))
 }
 
 func TestFSStorePutStopsWhenTheContextEnds(t *testing.T) {

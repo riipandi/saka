@@ -223,11 +223,12 @@ func DefaultUserAgent() string {
 // of them carries the whole message.
 const DefaultMailerTimeout = 15 * time.Second
 
-// DefaultAssetsURL is where the browser fetches static assets from when a
-// deployment names none: the /static mount the application itself serves.
-// A deployment may point app.assets_url at an S3 bucket or a CDN origin —
-// the value is one URL, and nothing else changes with it.
-const DefaultAssetsURL = "http://localhost:3080/static"
+// DefaultAssetsURL is where the browser fetches stored files from when a
+// deployment names none: the /storage mount the application itself serves,
+// with the bucket name and key following it in the path. A deployment may
+// point app.assets_url at an S3 bucket or a CDN origin — the value is one
+// URL, and nothing else changes with it.
+const DefaultAssetsURL = "http://localhost:3080/storage"
 
 // Default returns the built-in configuration. These values are the lowest
 // precedence layer: every other source may replace them, but a key no source

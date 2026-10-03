@@ -295,7 +295,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			client := do.MustInvoke[*queue.Client](i)
 			return storage.NewWatcher(manager.Staging(), c.Storage.Watch.Debounce, log,
 				func(key string) {
-					if _, err := client.Add(jobs.ChunkUploadTask{Key: key}).Save(); err != nil {
+					if _, err := client.Add(jobs.StorageUploadTask{Key: key}).Save(); err != nil {
 						// The staging file is still on disk, so the loss is a
 						// delayed upload, not a lost one: the next scan or the
 						// next write re-enqueues it.

@@ -44,14 +44,18 @@ func TestUploadProgressAnswersTheManifestState(t *testing.T) {
 	pool := testutils.MigratedPostgres(t, "transport_progress_test")
 	store := storage.NewFS(t.TempDir())
 	manager := storage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
-	require.NoError(t, manager.Stage(t.Context(), "avatars/robert-langdon.png",
+	if _, err := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
+	require.NoError(t, manager.Stage(t.Context(), "default", "avatars/robert-langdon.png",
 		bytes.NewReader(bytes.Repeat([]byte("grimoire"), 64)), nil))
-	require.NoError(t, manager.Sync(t.Context(), "avatars/robert-langdon.png"))
+	require.NoError(t, manager.Sync(t.Context(), "default/avatars/robert-langdon.png"))
 
 	router := progressRouter(t, pool, manager)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/uploads/avatars/robert-langdon.png", nil))
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/uploads/default/avatars/robert-langdon.png", nil))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var body struct {
@@ -64,13 +68,13 @@ func TestUploadProgressAnswersTheManifestState(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Equal(t, "success", body.Status)
-	assert.Equal(t, "avatars/robert-langdon.png", body.Data.Key)
+	assert.Equal(t, "default/avatars/robert-langdon.png", body.Data.Key)
 	assert.Equal(t, "ready", body.Data.Status)
 	assert.Equal(t, int64(512), body.Data.Size)
 
 	// A key nothing stored is the not-found, never an index page.
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/uploads/avatars/nobody.png", nil))
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/uploads/default/avatars/nobody.png", nil))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 

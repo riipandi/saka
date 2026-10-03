@@ -21,21 +21,28 @@ const (
 	StatusFailed  = "failed"
 )
 
-// storageFilesTable is the manifest table the builders name, the same
-// one-constant-per-table rule the queue's store follows.
-const storageFilesTable = "storage_files"
+// The manifest tables the builders name, the one-constant-per-table rule the
+// queue's store follows.
+const (
+	objectsTable = "storage_objects"
+	bucketsTable = "storage_buckets"
+)
 
 // File is one stored file. The content hash is the SHA-256 of the whole
 // file: one read tells whether the bytes on the staging side still match
 // what the backend holds.
 //
-// Metadata is the feature's own free-form record — content type, original
-// file name, owner — carried and rewritten but never interpreted here.
-// StagingSize and StagingMtime fingerprint the staging file the hash was
-// computed from: a retry that finds both unchanged reuses the stored hash
-// instead of reading the file again.
+// Bucket is the name of the bucket the file lives in (the logical namespace
+// the row is scoped by) and BucketID its storage_buckets row id. Metadata is
+// the feature's own free-form record — content type, original file name,
+// owner — carried and rewritten but never interpreted here. StagingSize and
+// StagingMtime fingerprint the staging file the hash was computed from: a
+// retry that finds both unchanged reuses the stored hash instead of reading
+// the file again.
 type File struct {
 	ID           string
+	BucketID     string
+	Bucket       string
 	Key          string
 	Size         int64
 	ContentHash  string
@@ -48,34 +55,37 @@ type File struct {
 // Manifest is one stored file's record.
 type Manifest = File
 
-// ErrNoManifest is what Load answers for a key nothing stored yet.
+// ErrNoManifest is what Load answers for a bucket/key nothing stored yet.
 var ErrNoManifest = errors.New("storage: no manifest for key")
 
 // Manifests reads and writes the manifest table. Every method takes the
 // Querier to run on, so a caller that must be transactional passes its
 // transaction and one that must not passes the pool — the repository never
-// opens a transaction of its own, the same rule the seeders follow.
+// opens a transaction of its own, the same rule the seeders follow. Bucket
+// scoping is by bucket id, which the manager resolves from the bucket name
+// before calling in.
 type Manifests struct{}
 
 // NewManifests builds the manifest repository.
 func NewManifests() *Manifests { return &Manifests{} }
 
-// Load reads the manifest a key holds. ErrNoManifest for a key nothing
-// stored yet — the answer that makes an upload the file's first.
-func (Manifests) Load(ctx context.Context, q datastore.Querier, key string) (Manifest, error) {
+// Load reads the manifest a bucket/key holds. ErrNoManifest for a pair
+// nothing stored yet — the answer that makes an upload the file's first.
+func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key string) (Manifest, error) {
 	fb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	fb.Select(
-		"id", "key", "size", "content_hash", "status",
-		"metadata", "staging_size", "staging_mtime",
+		"o.id", "b.name", "o.key", "o.size", "o.content_hash", "o.status",
+		"o.metadata", "o.staging_size", "o.staging_mtime",
 	)
-	fb.From(storageFilesTable)
-	fb.Where(fb.Equal("key", key))
+	fb.From(objectsTable + " o")
+	fb.Join(bucketsTable + " b ON b.id = o.bucket_id")
+	fb.Where(fb.Equal("o.bucket_id", bucketID), fb.Equal("o.key", key))
 
 	var file File
 	var metadata []byte
 	query, args := fb.Build()
 	err := q.QueryRow(ctx, query, args...).Scan(
-		&file.ID, &file.Key, &file.Size, &file.ContentHash, &file.Status,
+		&file.ID, &file.Bucket, &file.Key, &file.Size, &file.ContentHash, &file.Status,
 		&metadata, &file.StagingSize, &file.StagingMtime,
 	)
 	if errors.Is(err, datastore.ErrNoRows) {
@@ -84,6 +94,7 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, key string) (Man
 	if err != nil {
 		return Manifest{}, fmt.Errorf("storage: load file %q: %w", key, err)
 	}
+	file.BucketID = bucketID
 	err = json.Unmarshal(metadata, &file.Metadata)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("storage: decode metadata of %q: %w", key, err)
@@ -103,10 +114,10 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 	// The trailing clause rides on the builder the flavor documents for
 	// exactly this shape: an upsert that hands back the row it wrote.
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(storageFilesTable)
-	ib.Cols("key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
-	ib.Values(file.Key, file.Size, file.ContentHash, file.Status, metadata, file.StagingSize, nullableTime(file.StagingMtime))
-	ib.SQL("ON CONFLICT (key) DO UPDATE SET " +
+	ib.InsertInto(objectsTable)
+	ib.Cols("bucket_id", "key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
+	ib.Values(file.BucketID, file.Key, file.Size, file.ContentHash, file.Status, metadata, file.StagingSize, nullableTime(file.StagingMtime))
+	ib.SQL("ON CONFLICT (bucket_id, key) DO UPDATE SET " +
 		"size = EXCLUDED.size, " +
 		"content_hash = EXCLUDED.content_hash, " +
 		"status = EXCLUDED.status, " +
@@ -117,7 +128,7 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 
 	query, args := ib.Build()
 	if _, err := q.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("storage: save file %q: %w", file.Key, err)
+		return fmt.Errorf("storage: save file %q in bucket %s: %w", file.Key, file.BucketID, err)
 	}
 	return nil
 }
@@ -125,7 +136,7 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 // Stage records the intent to store a file: the row exists before the first
 // byte travels, carrying the feature's metadata and the staging fingerprint.
 // An upload that never arrives leaves a pending row the next Stage or Sync
-// of the same key overwrites, not a half-stored file.
+// of the same bucket/key overwrites, not a half-stored file.
 //
 // A re-stage clears the stored content hash. The fingerprint written here is
 // the new file's, so the row's hash — the previous version's — must not
@@ -133,17 +144,17 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 // hashing and upload the new bytes under the old digest. Clearing it means a
 // re-stage always pays for one hash, and a retry of an unchanged file still
 // takes the reuse path off the checkpoint the sync itself committed.
-func (Manifests) Stage(ctx context.Context, q datastore.Querier, key string, size int64, mtime time.Time, metadata map[string]any) error {
+func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any) error {
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("storage: encode metadata of %q: %w", key, err)
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(storageFilesTable)
-	ib.Cols("key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
-	ib.Values(key, size, "", StatusPending, encoded, size, nullableTime(mtime))
-	ib.SQL("ON CONFLICT (key) DO UPDATE SET " +
+	ib.InsertInto(objectsTable)
+	ib.Cols("bucket_id", "key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
+	ib.Values(bucketID, key, size, "", StatusPending, encoded, size, nullableTime(mtime))
+	ib.SQL("ON CONFLICT (bucket_id, key) DO UPDATE SET " +
 		"content_hash = EXCLUDED.content_hash, " +
 		"metadata = EXCLUDED.metadata, " +
 		"staging_size = EXCLUDED.staging_size, " +
@@ -157,21 +168,21 @@ func (Manifests) Stage(ctx context.Context, q datastore.Querier, key string, siz
 	return nil
 }
 
-// UpdateMetadata replaces the metadata a key carries, keeping everything
-// else — the status, the content hash — exactly as it is. A key nothing
-// stored yet gets a pending row, so metadata can be set before or after the
-// bytes travel.
-func (Manifests) UpdateMetadata(ctx context.Context, q datastore.Querier, key string, metadata map[string]any) error {
+// UpdateMetadata replaces the metadata a bucket/key carries, keeping
+// everything else — the status, the content hash — exactly as it is. A pair
+// nothing stored yet gets a pending row, so metadata can be set before or
+// after the bytes travel.
+func (Manifests) UpdateMetadata(ctx context.Context, q datastore.Querier, bucketID, key string, metadata map[string]any) error {
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("storage: encode metadata of %q: %w", key, err)
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(storageFilesTable)
-	ib.Cols("key", "content_hash", "status", "metadata")
-	ib.Values(key, "", StatusPending, encoded)
-	ib.SQL("ON CONFLICT (key) DO UPDATE SET metadata = EXCLUDED.metadata")
+	ib.InsertInto(objectsTable)
+	ib.Cols("bucket_id", "key", "content_hash", "status", "metadata")
+	ib.Values(bucketID, key, "", StatusPending, encoded)
+	ib.SQL("ON CONFLICT (bucket_id, key) DO UPDATE SET metadata = EXCLUDED.metadata")
 
 	query, args := ib.Build()
 	if _, err := q.Exec(ctx, query, args...); err != nil {
@@ -180,14 +191,14 @@ func (Manifests) UpdateMetadata(ctx context.Context, q datastore.Querier, key st
 	return nil
 }
 
-// Delete removes a key's manifest row. ErrNotFound for a key nothing
-// stored; the caller deletes the bytes after the row is gone, so a crash
-// between the two leaves an unreferenced object for the garbage collection,
-// never a manifest that names missing bytes.
-func (Manifests) Delete(ctx context.Context, q datastore.Querier, key string) error {
+// Delete removes a bucket/key's manifest row. ErrNotFound for a pair
+// nothing stored; the caller deletes the bytes after the row is gone, so a
+// crash between the two leaves an unreferenced object for the garbage
+// collection, never a manifest that names missing bytes.
+func (Manifests) Delete(ctx context.Context, q datastore.Querier, bucketID, key string) error {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(storageFilesTable)
-	db.Where(db.Equal("key", key))
+	db.DeleteFrom(objectsTable)
+	db.Where(db.Equal("bucket_id", bucketID), db.Equal("key", key))
 
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
@@ -200,13 +211,15 @@ func (Manifests) Delete(ctx context.Context, q datastore.Querier, key string) er
 	return nil
 }
 
-// StoredKeys lists every key at least one manifest row names. It is the
-// keep-set the garbage collection diffs the backend's listing against: an
-// object the backend holds and this set does not is unreferenced.
-func (Manifests) StoredKeys(ctx context.Context, q datastore.Querier) (map[string]struct{}, error) {
+// StoredKeys lists every key of one bucket at least one manifest row names.
+// It is the keep-set the garbage collection diffs the backend's listing
+// against: an object the backend holds and this set does not is
+// unreferenced.
+func (Manifests) StoredKeys(ctx context.Context, q datastore.Querier, bucketID string) (map[string]struct{}, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key")
-	sb.From(storageFilesTable)
+	sb.From(objectsTable)
+	sb.Where(sb.Equal("bucket_id", bucketID))
 
 	query, args := sb.Build()
 	rows, err := q.Query(ctx, query, args...)
@@ -224,6 +237,34 @@ func (Manifests) StoredKeys(ctx context.Context, q datastore.Querier) (map[strin
 		keys[key] = struct{}{}
 	}
 	return keys, rows.Err()
+}
+
+// StoredRefs lists every bucket-scoped reference (`bucket/key`) the manifest
+// table names, across all buckets. It is the keep-set the garbage
+// collection diffs the backend's physical listing against, since the backend
+// stores each file at `bucket/key`.
+func (Manifests) StoredRefs(ctx context.Context, q datastore.Querier) (map[string]struct{}, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("b.name", "o.key")
+	sb.From(objectsTable + " o")
+	sb.Join(bucketsTable + " b ON b.id = o.bucket_id")
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list stored references: %w", err)
+	}
+	defer rows.Close()
+
+	refs := make(map[string]struct{})
+	for rows.Next() {
+		var bucket, key string
+		if err := rows.Scan(&bucket, &key); err != nil {
+			return nil, fmt.Errorf("storage: scan stored reference: %w", err)
+		}
+		refs[bucket+"/"+key] = struct{}{}
+	}
+	return refs, rows.Err()
 }
 
 // nullableTime hands a zero time to the driver as NULL, the value an absent
