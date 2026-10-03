@@ -147,14 +147,17 @@ func (s *Service) UpdateProfilePicture(ctx context.Context, id string, data []by
 	}
 	if row.PictureBucket != nil && row.PictureKey != nil &&
 		(*row.PictureBucket != bucket || *row.PictureKey != key) {
-		if err := s.pictures.Delete(ctx, *row.PictureBucket, *row.PictureKey); err != nil {
+		err = s.pictures.Delete(ctx, *row.PictureBucket, *row.PictureKey)
+		if err != nil {
 			return fmt.Errorf("user: delete the replaced picture: %w", err)
 		}
 	}
-	if err := s.pictures.Stage(ctx, bucket, key, bytes.NewReader(data), metadata); err != nil {
+	err = s.pictures.Stage(ctx, bucket, key, bytes.NewReader(data), metadata)
+	if err != nil {
 		return fmt.Errorf("user: stage picture: %w", err)
 	}
-	if err := s.pictures.Sync(ctx, bucket+"/"+key); err != nil {
+	err = s.pictures.Sync(ctx, bucket+"/"+key)
+	if err != nil {
 		return fmt.Errorf("user: sync picture: %w", err)
 	}
 	manifest, err := s.pictures.Manifest(ctx, bucket, key)
