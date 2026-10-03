@@ -27,7 +27,7 @@ pnpm dlx tiged riipandi/tango myapp-name
 3. Install the frontend dependencies: `pnpm install`
 4. Write a starter config file: `task config:generate`
 5. Generate the secret keys into your env file: `task key:generate`
-6. Start the local Postgres: `docker compose -f docker/compose.yaml up -d pgsql`
+6. Start the local Postgres: `docker compose -f container/compose.yaml up -d pgsql`
 7. Set `DATABASE_URL` in `.env.local` (see `.env.example`)
 8. Run the database migrations: `task db:migrate`
 9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `tango initialize`)
@@ -100,7 +100,7 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
 
 ## Local HTTPS
 
-The nginx service in `docker/compose-dev.yaml` reads certificates from `storage/config`. Generate them with
+The nginx service in `container/compose-dev.yaml` reads certificates from `storage/config`. Generate them with
 [`mkcert`](https://github.com/FiloSottile/mkcert), falling back to a self-signed `openssl` certificate when
 `mkcert` is unavailable:
 

@@ -38,7 +38,7 @@ const (
 	protocolSkewAllowanceSec = 2 * 60
 )
 
-// ProtocolCleanupTask deletes the oauth2_sessions rows whose expiry has
+// ProtocolCleanupTask deletes the oauth_sessions rows whose expiry has
 // passed. The interval it re-enqueues itself with rides in the payload, the
 // way the other maintenance jobs carry theirs.
 type ProtocolCleanupTask struct {
@@ -110,9 +110,9 @@ func deleteExpiredProtocolSessions(ctx context.Context, pool *datastore.Postgres
 	total := 0
 	for {
 		tag, err := pool.Exec(ctx,
-			`DELETE FROM public.oauth2_sessions
+			`DELETE FROM public.oauth_sessions
 			 WHERE ctid IN (
-				 SELECT ctid FROM public.oauth2_sessions
+				 SELECT ctid FROM public.oauth_sessions
 				 WHERE expires_at IS NOT NULL AND expires_at < $1
 				 LIMIT $2
 			 )`, cutoff, protocolCleanupBatch)
@@ -134,9 +134,9 @@ func deleteExpiredJTIs(ctx context.Context, pool *datastore.Postgres, cutoff tim
 	total := 0
 	for {
 		tag, err := pool.Exec(ctx,
-			`DELETE FROM public.oauth2_jtis
+			`DELETE FROM public.oauth_jtis
 			 WHERE ctid IN (
-				 SELECT ctid FROM public.oauth2_jtis
+				 SELECT ctid FROM public.oauth_jtis
 				 WHERE expires_at < $1
 				 LIMIT $2
 			 )`, cutoff, protocolCleanupBatch)

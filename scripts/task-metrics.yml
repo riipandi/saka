@@ -13,7 +13,7 @@ vars:
 
 tasks:
   # ----------------------------------------------------------------------------
-  # Observability stack — the services live in docker/compose-dev.yaml, which
+  # Observability stack — the services live in container/compose-dev.yaml, which
   # includes compose-sre.yaml (openobserve + otel-collector). These are the
   # shortcuts for wiring the application to the stack: start it, check it,
   # read back what it shipped.
@@ -22,7 +22,7 @@ tasks:
   metrics:up:
     desc: Start the observability stack (OpenObserve + OTel collector)
     cmds:
-      - docker compose -f docker/compose.yaml up --detach --remove-orphans openobserve otelcol
+      - docker compose -f container/compose.yaml up --detach --remove-orphans openobserve otelcol
       - task: metrics:health
 
   metrics:health:
@@ -113,4 +113,4 @@ tasks:
 
   metrics:down:
     desc: Stop the observability stack
-    cmd: docker compose -f docker/compose.yaml stop openobserve otelcol
+    cmd: docker compose -f container/compose.yaml stop openobserve otelcol

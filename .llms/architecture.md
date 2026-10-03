@@ -132,15 +132,13 @@ Checks (check names are generic — `database`, `kvstore`, `storage` — never t
 
 ### observability stack (docker)
 
-`docker/compose-sre.yaml` — the observability stack: **OpenObserve** (the one backend for logs, metrics, and traces, `openobserve-enterprise` per `OPENOBSERVE_VERSION`) and the **OpenTelemetry Collector Contrib** (`otel/opentelemetry-collector-contrib` per `OTEL_COLLECTOR_VERSION`), included by `docker/compose-dev.yaml`. The collector is the only OTLP front door: the application dials its `:4318` (OTLP/HTTP — there is no gRPC listener, matching the exporters' http/protobuf-only decision), and the collector exports every signal to OpenObserve's `api/{org}` OTLP endpoints with the Basic header (`ZO_ROOT_USER_EMAIL:ZO_ROOT_USER_PASSWORD`, base64, interpolated from `OPENOBSERVE_AUTH`). The contrib distribution also runs the `postgresql` and `redis` receivers against the dev databases (`pgsql:5432`, `valkey:6379`, `tls.insecure` on because the dev Postgres serves plaintext), which is what replaced the postgres-exporter and redis-exporter sidecars the VictoriaMetrics stack used. `docker/otel-collector.yaml` is the collector's config — the file's comment names the ingestion doc and the two database-monitoring guides it follows — and `stream-name: default` puts every signal in the `default` streams. The collector image is distroless (no shell, no curl), so its compose healthcheck is commented out and `metrics:health` probes `:4318` from the host instead; the endpoint answers 404 on GET (POST-only), which itself proves the process is up.
+`container/compose-sre.yaml` — the observability stack: **OpenObserve** (the one backend for logs, metrics, and traces, `openobserve-enterprise` per `OPENOBSERVE_VERSION`) and the **OpenTelemetry Collector Contrib** (`otel/opentelemetry-collector-contrib` per `OTEL_COLLECTOR_VERSION`), included by `container/compose-dev.yaml`. The collector is the only OTLP front door: the application dials its `:4318` (OTLP/HTTP — there is no gRPC listener, matching the exporters' http/protobuf-only decision), and the collector exports every signal to OpenObserve's `api/{org}` OTLP endpoints with the Basic header (`ZO_ROOT_USER_EMAIL:ZO_ROOT_USER_PASSWORD`, base64, interpolated from `OPENOBSERVE_AUTH`). The contrib distribution also runs the `postgresql` and `redis` receivers against the dev databases (`pgsql:5432`, `valkey:6379`, `tls.insecure` on because the dev Postgres serves plaintext), which is what replaced the postgres-exporter and redis-exporter sidecars the VictoriaMetrics stack used. `container/otel-collector.yaml` is the collector's config — the file's comment names the ingestion doc and the two database-monitoring guides it follows — and `stream-name: default` puts every signal in the `default` streams. The collector image is distroless (no shell, no curl), so its compose healthcheck is commented out and `metrics:health` probes `:4318` from the host instead; the endpoint answers 404 on GET (POST-only), which itself proves the process is up.
 
 Auth gotchas pinned by the live bring-up: the Basic credential is `email:password`, not `email:token` — `ZO_ROOT_USER_TOKEN` did not authenticate the query API on this build. The endpoint must not carry a trailing slash (the collector appends `/v1/logs` itself). `OTEL_HEADERS` is the specification's `name=value,...` form (`Authorization=Basic ...`); a colon-carrying name like `"Authorization: Basic ..."` reaches net/http as one invalid header name — the exporter logs `invalid header field name` every second and nothing ships. OpenObserve's search API takes `start_time`/`end_time` **inside** the `query` object, in **microseconds**; anywhere else answers `[file_list] invalid time range`.
 
 **The nginx edge note the old stack carried** (a `stub_status` scrape feeding an edge dashboard) went with VictoriaMetrics; the nginx config still writes its access log as JSON under `.storage/nginx_logs`, but nothing scrapes it — ingest it through the collector's `filelog` receiver when edge metrics matter again.
 
-**The dashboards that read the signals** moved with the backend swap: the `docker/perses/` provisioning tree and the Perses MCP server are removed with Perses itself; OpenObserve ships its own dashboards (see the OpenObserve dashboards repository) and its UI serves them directly. The application's RED metrics still come from the transport's own instrumentation and the exposition at `otel.metrics.prometheus_path`.
-
-
+**The dashboards that read the signals** moved with the backend swap: the `container/perses/` provisioning tree and the Perses MCP server are removed with Perses itself; OpenObserve ships its own dashboards (see the OpenObserve dashboards repository) and its UI serves them directly. The application's RED metrics still come from the transport's own instrumentation and the exposition at `otel.metrics.prometheus_path`.
 
 ### scripts/task-metrics.yml
 
@@ -799,7 +797,7 @@ RFC 6749 §2.3.1's two spellings of the same credential.
 tokens minted to it — the `TokenIntrospectionIsClientAllowed` callback
 answers `info.ClientID == client.ID`, and a stranger's introspection
 answers `access_denied`. **PAR** (RFC 9126) rides the same
-`oauth2_sessions` rows: a pushed request creates an authorization session
+`oauth_sessions` rows: a pushed request creates an authorization session
 whose pointer row resolves by the PAR id, the request URI is
 `urn:ietf:params:oauth:request_uri:…`, the lifetime 5 minutes, and a client
 whose `requires_pushed_authorization_requests` is set is refused at the
@@ -876,7 +874,7 @@ first-writer-wins. One creating browser holds at most
 lock on the token's hash so concurrent creations cannot race past the
 cap; expiry frees the room, and a refused creation answers 429.
 
-**Protocol state expires twice and is swept once.** Every `oauth2_sessions`
+**Protocol state expires twice and is swept once.** Every `oauth_sessions`
 row carries the expiry of the object it holds — the grant's refresh window,
 the session's timeout, the pointer's code lifetime — and a lookup refuses a
 row the column judges dead, within a two-minute clock-skew allowance
@@ -891,7 +889,7 @@ it, and the batches keep a backlog from a stopped deployment off one
 long-running statement. The consent cascade deletes what revocation kills
 at once; the sweep is for the rows nothing revokes — the codes never
 exchanged, the sessions abandoned, the grants left to age out. The sweep
-also reaps `oauth2_jtis`, whose rows are the JTI claims the replay
+also reaps `oauth_jtis`, whose rows are the JTI claims the replay
 protection holds: `provider.WithJTIConsumer` claims every jti a
 client-presented JWT carries (a DPoP proof, a client assertion) with a
 fifteen-minute window, the INSERT's unique index makes the second

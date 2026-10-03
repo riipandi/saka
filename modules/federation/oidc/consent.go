@@ -284,7 +284,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 	}
 	if len(grants) > 0 {
 		sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-		sb.DeleteFrom("public.oauth2_sessions")
+		sb.DeleteFrom("public.oauth_sessions")
 		sb.Where(
 			sb.In("request_data->>'grant_id'", toAny(grants)...),
 			sb.In("kind", sessionKindAuthCode, sessionKindRefresh),
@@ -295,7 +295,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 		}
 	}
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom("public.oauth2_sessions")
+	sb.DeleteFrom("public.oauth_sessions")
 	sb.Where(
 		sb.Equal("kind", sessionKindGrant),
 		sb.Equal("client_id", clientID),
@@ -327,7 +327,7 @@ func (s *Service) removeAuthorization(ctx context.Context, db datastore.Querier,
 func (s *Service) grantKeysFor(ctx context.Context, db datastore.Querier, userID, clientID string) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key")
-	sb.From("public.oauth2_sessions")
+	sb.From("public.oauth_sessions")
 	sb.Where(
 		sb.Equal("kind", sessionKindGrant),
 		sb.Equal("client_id", clientID),

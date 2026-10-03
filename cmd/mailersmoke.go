@@ -29,7 +29,7 @@ proved end to end against a real server before anything depends on it.
 
 It prints the server, the sender, the template, and where the message went:
 
-  docker compose -f docker/compose.yaml up -d mailpit
+  docker compose -f container/compose.yaml up -d mailpit
   task mailer:smoke -- --to=you@example.com
 
 Open the Mailpit UI at http://localhost:8025 to read the message back. A run

@@ -9,7 +9,7 @@ import (
 )
 
 // The protocol stores' contract: the objects round trip through the
-// oauth2_sessions rows, the pointers resolve the presented credentials,
+// oauth_sessions rows, the pointers resolve the presented credentials,
 // and an unknown handle is the library's not-found.
 
 func TestTheGrantStoreRoundTripsAndResolvesTheTokens(t *testing.T) {

@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+x-common: &common
+  networks: ["intranet"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  cpus: 1.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
+
+services:
+  pgsql:
+    <<: *common
+    # image: dhi.io/postgres:${PGSQL_VERSION:-18} # production
+    # image: dhi.io/postgres:${PGSQL_VERSION:-18-debian13-dev}
+    image: docker.io/postgres:${PGSQL_VERSION:-18-alpine}
+    hostname: postgres
+    ports: ["5432:5432"]
+    volumes: ["../.storage/pgsql_data:/var/lib/postgresql/18/docker:rw"]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: securedb
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      POSTGRES_DATABASES: testdb,piimaskdb
+    configs: [{ source: pgsql_multidb, target: /docker-entrypoint-initdb.d/multidb.sh }]
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+
+  valkey:
+    <<: *common
+    image: docker.io/valkey/valkey:${VALKEY_VERSION:-9.2-alpine}
+    hostname: valkey
+    ports: ["6379:6379"]
+    volumes: ["valkey_data:/data:rw"]
+    environment:
+      ALLOW_EMPTY_PASSWORD: "no" # recommended only for development
+      VALKEY_DISABLE_COMMANDS: FLUSHDB,FLUSHALL
+    command: "--appendonly yes --appendfsync everysec --requirepass securedb"
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --no-auth-warning -a securedb ping | grep PONG"]
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  silo:
+    <<: *common
+    image: docker.io/pgsty/silo:${SILO_VERSION:-latest}
+    hostname: silo
+    ports: ["9100:9100", "9101:9101"]
+    environment:
+      MINIO_BROWSER_LOGIN_ANIMATION: off
+      MINIO_DOMAIN: ${MINIO_DOMAIN:-localhost}
+      MINIO_ROOT_USER: ${STORAGE_S3_ACCESS_KEY:-s3admin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_S3_SECRET_KEY:-s3passw0rd}
+      MC_HOST_local: http://${MINIO_ROOT_USER:-s3admin}:${MINIO_ROOT_PASSWORD:-s3passw0rd}@localhost:9100
+    volumes: ["../.storage/silo_data:/data:rw"]
+    command: server /data --address "0.0.0.0:9100" --console-address "0.0.0.0:9101"
+    post_start:
+      # docker-compose exec silo /usr/bin/mc alias ls
+      - command: sh -c "/usr/bin/mc mb local/devbucket --ignore-existing"
+      - command: sh -c "/usr/bin/mc mb local/otelbucket --ignore-existing"
+      - command: sh -c "/usr/bin/mc mb local/testbucket --ignore-existing"
+      - command: sh -c "/usr/bin/mc mb local/dbarchive --ignore-existing"
+      - command: sh -c "/usr/bin/mc anonymous set download local/devbucket"
+      - command: sh -c "/usr/bin/mc anonymous set download local/otelbucket"
+      - command: sh -c "/usr/bin/mc anonymous set download local/testbucket"
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
+    healthcheck:
+      test: ["CMD", "/usr/bin/silo", "healthcheck", "ready", "--address", "127.0.0.1:9100"]
+
+  mailpit:
+    <<: *common
+    image: docker.io/axllent/mailpit:${MAILPIT_VERSION:-latest}
+    hostname: mailpit
+    volumes: ["../.storage/mailpit_data:/data:rw"]
+    ports: ["1025:1025", "8025:8025"]
+    environment:
+      TZ: Asia/Jakarta
+      MP_TAGS_USERNAME: true
+      MP_DISABLE_VERSION_CHECK: true
+      MP_ALLOW_UNTRUSTED_TLS: true
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+      MP_SMTP_AUTH: "maileruser1:mailerpass1 maileruser2:mailerpass2"
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "nc -vz 127.0.0.1 8025 || exit 1"]
+
+  # The mock identity providers the OAuth SSO E2E runs against. One
+  # mock-oauth2-server carries both simulations as issuerIds.
+  # 
+  # The identity the login page's username answers with: one config
+  # serves both issuers, and the subject prefixes pick the branch —
+  # `unverified-*` carries an unverified address, `nonames-*` no
+  # given/family claims, anything else the verified shape.
+  # 
+  # https://localhost:3220/google/.well-known/openid-configuration
+  # https://localhost:3220/github/.well-known/openid-configuration
+  mock-oauth2:
+    <<: *common
+    image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION:-6.0}
+    platform: linux/amd64
+    hostname: mock-oauth2
+    expose: ["8080"]
+    volumes: ["./mock-oauth2.json:/app/config.json:ro"]
+    environment:
+      JSON_CONFIG_PATH: /app/config.json
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/isalive || exit 1"]
+
+  nginx:
+    <<: *common
+    # image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-slim}
+    image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-otel}
+    hostname: nginx
+    ports: ["9180:9180", "3443:3443", "3220:3220"]
+    volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
+    configs: [{ source: nginx_config, target: /etc/nginx/templates/default.conf.template }]
+    shm_size: 32m # set shared memory limit
+    mem_limit: 64m # set memory limit
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "127.0.0.1", "9180"]
+    depends_on:
+      mock-oauth2: { condition: service_started }
+      silo: { condition: service_started }
+
+configs:
+  nginx_config:
+    file: ./nginx-proxy.conf
+
+  pgsql_multidb:
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      if [ -z "$${POSTGRES_DATABASES:-}" ]; then
+        echo "No databases requested for creation."
+        exit 0
+      fi
+      echo "Multiple database creation requested: $$POSTGRES_DATABASES"
+      IFS=',' read -ra databases <<<"$$POSTGRES_DATABASES"
+      for db in "$${databases[@]}"; do
+        echo "  Creating database '$$db' with owner '$$POSTGRES_USER'"
+        psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
+          -c "CREATE DATABASE \"$$db\" WITH OWNER = \"$$POSTGRES_USER\" ENCODING = 'UTF8' LC_COLLATE = 'en_US.UTF-8' LC_CTYPE = 'en_US.UTF-8' TEMPLATE = template0;"
+      done
+      echo "Multiple databases and schemas created successfully."
+
+volumes:
+  pgsql_data:
+  valkey_data:
+  mailpit_data:
+  silo_data:
+
+networks:
+  intranet:
+    driver: bridge
+    enable_ipv6: false

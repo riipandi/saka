@@ -15,42 +15,42 @@ set -euo pipefail
 status=0
 
 report() {
-  echo "$1: $2" >&2
-  echo "  $3" >&2
-  status=1
+    echo "$1: $2" >&2
+    echo "  $3" >&2
+    status=1
 }
 
 for file in "$@"; do
-  [ -f "$file" ] || continue
+    [ -f "$file" ] || continue
 
-  # Credential-shaped JSON fields.
-  while IFS= read -r match; do
-    [ -n "$match" ] || continue
-    value=$(printf '%s' "$match" | sed -E 's/^"[a-z_]+"[[:space:]]*:[[:space:]]*"(.*)"$/\1/')
-    [ -n "$value" ] || continue
-    case "$value" in
-      REPLACE_*) continue ;;
-      *'${['*) continue ;;
-    esac
-    report "$file" "credential field holds a literal" "$match"
-  done < <(grep -oE '"(secret|password|current_password|new_password)"[[:space:]]*:[[:space:]]*"[^"]*"' "$file" || true)
+    # Credential-shaped JSON fields.
+    while IFS= read -r match; do
+        [ -n "$match" ] || continue
+        value=$(printf '%s' "$match" | sed -E 's/^"[a-z_]+"[[:space:]]*:[[:space:]]*"(.*)"$/\1/')
+        [ -n "$value" ] || continue
+        case "$value" in
+        REPLACE_*) continue ;;
+        *'${['*) continue ;;
+        esac
+        report "$file" "credential field holds a literal" "$match"
+    done < <(grep -oE '"(secret|password|current_password|new_password)"[[:space:]]*:[[:space:]]*"[^"]*"' "$file" || true)
 
-  # A JWT literal in a header or body.
-  while IFS= read -r match; do
-    [ -n "$match" ] || continue
-    report "$file" "bearer JWT literal; use \${[ accessToken ]}" "$match"
-  done < <(grep -oE 'Bearer eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' "$file" || true)
+    # A JWT literal in a header or body.
+    while IFS= read -r match; do
+        [ -n "$match" ] || continue
+        report "$file" "bearer JWT literal; use \${[ accessToken ]}" "$match"
+    done < <(grep -oE 'Bearer eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' "$file" || true)
 
-  # An API key literal outside a placeholder.
-  while IFS= read -r match; do
-    [ -n "$match" ] || continue
-    report "$file" "API key literal; use \${[ apiKey ]}" "$match"
-  done < <(grep -oE '\b(pik|sk)_[A-Za-z0-9]{12,}' "$file" | grep -v 'REPLACE_' || true)
+    # An API key literal outside a placeholder.
+    while IFS= read -r match; do
+        [ -n "$match" ] || continue
+        report "$file" "API key literal; use \${[ apiKey ]}" "$match"
+    done < <(grep -oE '\b(pik|sk)_[A-Za-z0-9]{12,}' "$file" | grep -v 'REPLACE_' || true)
 done
 
 if [ "$status" -ne 0 ]; then
-  echo "" >&2
-  echo "Credentials belong in a Yaak environment, not in the tracked export." >&2
+    echo "" >&2
+    echo "Credentials belong in a Yaak environment, not in the tracked export." >&2
 fi
 
 exit "$status"

@@ -41,7 +41,7 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		return auditCleanupProcessor(ctx, task, pool)
 	}))
 	// The protocol state's retention runs the same way: the expired
-	// oauth2_sessions rows belong to no feature, and the sweeps the queue
+	// oauth_sessions rows belong to no feature, and the sweeps the queue
 	// carries are the one deletion path they have.
 	client.Register(queue.NewQueue[ProtocolCleanupTask](func(ctx context.Context, task ProtocolCleanupTask) error {
 		return protocolCleanupProcessor(ctx, task, pool)

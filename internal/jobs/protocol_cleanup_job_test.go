@@ -17,12 +17,12 @@ import (
 // window is reaped, a row inside the grace, a live row, and a row whose
 // expiry is NULL all survive, and the run re-enqueues its successor.
 
-// seedSession inserts one oauth2_sessions row directly, the expiry the
+// seedSession inserts one oauth_sessions row directly, the expiry the
 // test chooses. A nil expiresAt is the column's NULL.
 func seedSession(t *testing.T, pool *datastore.Postgres, kind, key string, expiresAt any) {
 	t.Helper()
 	_, err := pool.Exec(t.Context(),
-		`INSERT INTO public.oauth2_sessions (kind, key, request_id, request_data, expires_at)
+		`INSERT INTO public.oauth_sessions (kind, key, request_id, request_data, expires_at)
 		 VALUES ($1, $2, $2, '{"probe":true}'::jsonb, $3)`,
 		kind, key, expiresAt)
 	require.NoError(t, err)
@@ -33,7 +33,7 @@ func countSessions(t *testing.T, pool *datastore.Postgres, kind string) int {
 	t.Helper()
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth2_sessions WHERE kind = $1`, kind).Scan(&count))
+		`SELECT count(*) FROM public.oauth_sessions WHERE kind = $1`, kind).Scan(&count))
 	return count
 }
 
@@ -41,7 +41,7 @@ func countSessions(t *testing.T, pool *datastore.Postgres, kind string) int {
 func seedJTI(t *testing.T, pool *datastore.Postgres, jti string, expiresAt time.Time) {
 	t.Helper()
 	_, err := pool.Exec(t.Context(),
-		`INSERT INTO public.oauth2_jtis (jti, expires_at) VALUES ($1, $2)
+		`INSERT INTO public.oauth_jtis (jti, expires_at) VALUES ($1, $2)
 		 ON CONFLICT (jti) DO UPDATE SET expires_at = EXCLUDED.expires_at`,
 		jti, expiresAt)
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func countJTIs(t *testing.T, pool *datastore.Postgres, jti string) int {
 	t.Helper()
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth2_jtis WHERE jti = $1`, jti).Scan(&count))
+		`SELECT count(*) FROM public.oauth_jtis WHERE jti = $1`, jti).Scan(&count))
 	return count
 }
 
@@ -115,7 +115,7 @@ func TestProtocolCleanupReapsOnlyWhatExpiredBeyondTheGrace(t *testing.T) {
 	var expired, inGrace, live int
 	for key, dest := range map[string]*int{"expired": &expired, "in-grace": &inGrace, "live": &live} {
 		require.NoError(t, pool.QueryRow(t.Context(),
-			`SELECT count(*) FROM public.oauth2_sessions WHERE kind = 'grant' AND key = $1`, key).Scan(dest))
+			`SELECT count(*) FROM public.oauth_sessions WHERE kind = 'grant' AND key = $1`, key).Scan(dest))
 	}
 	assert.Equal(t, 0, expired, "the row past the grace is reaped")
 	assert.Equal(t, 1, inGrace, "a row inside the grace survives")
@@ -158,11 +158,11 @@ func TestProtocolCleanupKeepsAnActiveRedemptionWorking(t *testing.T) {
 
 	var live int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth2_sessions WHERE key = $1`, "live-grant").Scan(&live))
+		`SELECT count(*) FROM public.oauth_sessions WHERE key = $1`, "live-grant").Scan(&live))
 	assert.Equal(t, 1, live, "the live row outlives the sweep")
 
 	var expired int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth2_sessions WHERE key = $1`, "expired-grant").Scan(&expired))
+		`SELECT count(*) FROM public.oauth_sessions WHERE key = $1`, "expired-grant").Scan(&expired))
 	assert.Equal(t, 0, expired, "the expired row does not outlive the sweep")
 }

@@ -120,7 +120,7 @@ configuration check would reject the ordinary submission server.
 ## Proving it works
 
 ```sh
-docker compose -f docker/compose.yaml up -d mailpit
+docker compose -f container/compose.yaml up -d mailpit
 task mailer:smoke -- --to=you@example.com
 ```
 

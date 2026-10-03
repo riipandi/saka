@@ -54,17 +54,11 @@ tasks:
   # ----------------------------------------------------------------------------
   compose:up:
     desc: Start docker compose services
-    cmd: docker compose -f docker/compose.yaml up --detach --remove-orphans
+    cmd: docker compose -f container/compose.yaml up --detach --remove-orphans
 
   compose:down:
     desc: Stop docker compose services
-    cmd: docker compose -f docker/compose.yaml down --remove-orphans
-
-  compose:cleanup:
-    desc: Stop services and remove volumes
-    cmds:
-      - docker-compose -f docker/compose-dev.yaml down --remove-orphans --volumes
-      - pnpm dlx del-cli .storage/{mailpit_data,pgsql_data,valkey_data,silo_data}
+    cmd: docker compose -f container/compose.yaml down --remove-orphans
 
   compose:restart:
     desc: Restart docker compose services
@@ -72,8 +66,14 @@ tasks:
       - task: compose:down
       - task: compose:up
 
+  compose:cleanup:
+    desc: Stop services and remove volumes
+    cmds:
+      - docker-compose -f container/compose.yaml down --remove-orphans --volumes
+      - pnpm dlx del-cli .storage/*_data .storage/nginx_logs
+
   compose:reset:
     desc: Reset docker compose services
+    deps: [compose:cleanup]
     cmds:
-      - task: compose:cleanup
       - task: compose:up

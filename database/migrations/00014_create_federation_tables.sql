@@ -116,10 +116,10 @@ CREATE INDEX IF NOT EXISTS idx_user_groups_allowed_oidc_clients_client_id
     ON public.user_groups_allowed_oidc_clients USING btree (oidc_client_id);
 
 -- --------------------------------------------------------
--- Table: public.oauth2_sessions (Fosite-style OAuth 2.0 storage)
+-- Table: public.oauth_sessions (Fosite-style OAuth 2.0 storage)
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.oauth2_sessions (
+CREATE TABLE IF NOT EXISTS public.oauth_sessions (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     kind TEXT NOT NULL,
     key TEXT NOT NULL,
@@ -133,29 +133,29 @@ CREATE TABLE IF NOT EXISTS public.oauth2_sessions (
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES public.oidc_clients(id) ON DELETE CASCADE,
-    CONSTRAINT chk_oauth2_sessions_client_id CHECK (client_id IS NULL OR client_id = request_data ->> 'client_id')
+    CONSTRAINT chk_oauth_sessions_client_id CHECK (client_id IS NULL OR client_id = request_data ->> 'client_id')
 ) USING heap;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth2_sessions_kind_key ON public.oauth2_sessions (kind, key);
-CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_kind_request ON public.oauth2_sessions (kind, request_id);
-CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_expires_at ON public.oauth2_sessions (expires_at);
-CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_client_subject
-    ON public.oauth2_sessions (client_id, (request_data #>> '{session,subject}'), kind, active);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_sessions_kind_key ON public.oauth_sessions (kind, key);
+CREATE INDEX IF NOT EXISTS idx_oauth_sessions_kind_request ON public.oauth_sessions (kind, request_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_sessions_expires_at ON public.oauth_sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_sessions_client_subject
+    ON public.oauth_sessions (client_id, (request_data #>> '{session,subject}'), kind, active);
 
 -- --------------------------------------------------------
--- Table: public.oauth2_jtis (replay-protected JWT IDs)
+-- Table: public.oauth_jtis (replay-protected JWT IDs)
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.oauth2_jtis (
+CREATE TABLE IF NOT EXISTS public.oauth_jtis (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     jti TEXT NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_oauth2_jtis_expires_at ON public.oauth2_jtis (expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_jtis_expires_at ON public.oauth_jtis (expires_at);
 
--- The protocol's login/consent state lives in oauth2_sessions (one kind
+-- The protocol's login/consent state lives in oauth_sessions (one kind
 -- per manager pointer); the historical interaction_sessions draft never
 -- shipped and no code claims it.
 
@@ -187,19 +187,19 @@ DROP TRIGGER IF EXISTS trg_custom_claims_deleted_record ON public.custom_claims;
 DROP TRIGGER IF EXISTS trg_oidc_clients_deleted_record ON public.oidc_clients;
 
 DROP INDEX IF EXISTS idx_scim_providers_client;
-DROP INDEX IF EXISTS idx_oauth2_jtis_expires_at;
-DROP INDEX IF EXISTS idx_oauth2_sessions_client_subject;
-DROP INDEX IF EXISTS idx_oauth2_sessions_expires_at;
-DROP INDEX IF EXISTS idx_oauth2_sessions_kind_request;
-DROP INDEX IF EXISTS idx_oauth2_sessions_kind_key;
+DROP INDEX IF EXISTS idx_oauth_jtis_expires_at;
+DROP INDEX IF EXISTS idx_oauth_sessions_client_subject;
+DROP INDEX IF EXISTS idx_oauth_sessions_expires_at;
+DROP INDEX IF EXISTS idx_oauth_sessions_kind_request;
+DROP INDEX IF EXISTS idx_oauth_sessions_kind_key;
 DROP INDEX IF EXISTS idx_user_authorized_oidc_clients_last_used_at;
 DROP INDEX IF EXISTS idx_user_groups_allowed_oidc_clients_client_id;
 DROP INDEX IF EXISTS idx_custom_claims_user_group_id;
 DROP INDEX IF EXISTS idx_custom_claims_user_id;
 
 DROP TABLE IF EXISTS public.scim_service_providers;
-DROP TABLE IF EXISTS public.oauth2_jtis;
-DROP TABLE IF EXISTS public.oauth2_sessions;
+DROP TABLE IF EXISTS public.oauth_jtis;
+DROP TABLE IF EXISTS public.oauth_sessions;
 DROP TABLE IF EXISTS public.user_groups_allowed_oidc_clients;
 DROP TABLE IF EXISTS public.oidc_clients_allowed_user_groups;
 DROP TABLE IF EXISTS public.user_authorized_oidc_clients;

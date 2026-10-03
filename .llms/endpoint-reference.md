@@ -529,7 +529,7 @@ endpoints, and CIMD support. The RFC 8414 alias
 `/.well-known/oauth-authorization-server` serves the same document — one
 document cannot drift from itself.
 
-**Storage.** The four managers map onto `oauth2_sessions` (`kind`, unique
+**Storage.** The four managers map onto `oauth_sessions` (`kind`, unique
 `(kind,key)`, JSONB `request_data`, nullable `expires_at`): the object
 rows — grants (`kind='grant'`, keyed by grant id), authorization sessions
 (`kind='authn'`, PAR included), logout sessions (`kind='logout'`), device
@@ -543,7 +543,7 @@ pointer rows are the secondary lookups. Rows expire per object
 (`expires_at`): the grant's refresh window, the session's timeout, the
 pointer's code lifetime; lookups refuse what the column judges dead and
 the `protocol_cleanup` job reaps the rest (`internal/jobs`), the claimed
-`oauth2_jtis` rows included — every jti a client-presented JWT carries
+`oauth_jtis` rows included — every jti a client-presented JWT carries
 is claimed once there, a second presentation loses to the unique index. Client
 resolution
 (`DCRManager.Client`) reads `oidc_clients`: a standard client maps grant types
@@ -634,7 +634,7 @@ an empty roll admits nobody. An ineligible account receives `access_denied`;
 an existing consent does not bypass the gate. The consent catalogue
 (`ListMyClients`) and the SCIM visibility roll follow the same rule.
 **Expired state fails closed and is swept:** a lookup refuses any
-`oauth2_sessions` row the `expires_at` column judges dead (two-minute
+`oauth_sessions` row the `expires_at` column judges dead (two-minute
 skew allowance), and the hourly `protocol_cleanup` job reaps the rows
 past a one-hour grace in bounded batches — no `protocol` row outlives
 its expiry by more than the sweep's interval.
@@ -686,7 +686,7 @@ tables will name directly.
 discovery documents; off, they answer 404 while the management surface runs.
 
 **Cleanup.** A recurring job (`protocol_cleanup`, the `audit_cleanup`
-pattern, hourly) deletes expired `oauth2_sessions` rows past a one-hour
+pattern, hourly) deletes expired `oauth_sessions` rows past a one-hour
 grace in bounded batches, and the lookup itself refuses a row the
 `expires_at` column judges dead (see the retention note above).
 

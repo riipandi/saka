@@ -14,7 +14,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 )
 
-// The oauth2_sessions rows the protocol managers write. One kind per
+// The oauth_sessions rows the protocol managers write. One kind per
 // object; the pointer kinds resolve a presented token to the row that
 // owns it, keyed by the token's SHA-256 so no presented credential sits
 // in the database in plain text.
@@ -61,7 +61,7 @@ func (st protocolStore) save(ctx context.Context, kind, key, clientID string, ex
 		client = clientID
 	}
 	_, err = st.pool.Exec(ctx,
-		`INSERT INTO public.oauth2_sessions (kind, key, request_id, client_id, request_data, expires_at)
+		`INSERT INTO public.oauth_sessions (kind, key, request_id, client_id, request_data, expires_at)
 		 VALUES ($1, $2, $1, $3, $4, $5)
 		 ON CONFLICT (kind, key) DO UPDATE
 		 SET request_data = EXCLUDED.request_data, client_id = EXCLUDED.client_id,
@@ -102,7 +102,7 @@ const protocolSkewAllowanceSeconds = 120
 func (st protocolStore) loadDocument(ctx context.Context, kind, key string) ([]byte, error) {
 	var data []byte
 	err := st.pool.QueryRow(ctx,
-		`SELECT request_data FROM public.oauth2_sessions
+		`SELECT request_data FROM public.oauth_sessions
 		 WHERE kind = $1 AND key = $2 AND active
 		   AND (expires_at IS NULL OR expires_at > now() - make_interval(secs => $3))`,
 		kind, key, protocolSkewAllowanceSeconds).Scan(&data)
@@ -128,7 +128,7 @@ func (st protocolStore) saveCAS(ctx context.Context, kind, key, clientID string,
 		client = clientID
 	}
 	tag, err := st.pool.Exec(ctx,
-		`UPDATE public.oauth2_sessions
+		`UPDATE public.oauth_sessions
 		 SET request_data = $1, client_id = $2, expires_at = $3
 		 WHERE kind = $4 AND key = $5 AND request_data = $6`,
 		data, client, expires, kind, key, expected)
@@ -146,7 +146,7 @@ func (st protocolStore) loadPointer(ctx context.Context, kind, hash string) (tok
 }
 
 func (st protocolStore) delete(ctx context.Context, kind, key string) error {
-	_, err := st.pool.Exec(ctx, `DELETE FROM public.oauth2_sessions WHERE kind = $1 AND key = $2`, kind, key)
+	_, err := st.pool.Exec(ctx, `DELETE FROM public.oauth_sessions WHERE kind = $1 AND key = $2`, kind, key)
 	return err
 }
 

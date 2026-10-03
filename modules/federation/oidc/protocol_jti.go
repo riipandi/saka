@@ -6,7 +6,7 @@ import (
 )
 
 // jtiReplayWindowSeconds is how long one JWT ID stays claimed in
-// oauth2_jtis. The library's consumer answers only the jti itself — no
+// oauth_jtis. The library's consumer answers only the jti itself — no
 // expiry rides the call — so the window must outlast the lifetime of
 // every JWT whose jti it sees: the DPoP proofs and client assertion
 // JWTs the endpoints validate, whose claims the library caps well under
@@ -28,7 +28,7 @@ var ErrJTIReplayed = errors.New("oidc: the jti was already presented")
 // protocol cleanup sweep reaps what passes.
 func (st protocolStore) consumeJTI(ctx context.Context, jti string) error {
 	tag, err := st.pool.Exec(ctx,
-		`INSERT INTO public.oauth2_jtis (jti, expires_at)
+		`INSERT INTO public.oauth_jtis (jti, expires_at)
 		 VALUES ($1, now() + make_interval(secs => $2))
 		 ON CONFLICT (jti) DO NOTHING`,
 		jti, jtiReplayWindowSeconds)

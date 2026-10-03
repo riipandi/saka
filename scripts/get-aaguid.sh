@@ -61,8 +61,8 @@ if command -v jq &>/dev/null; then
         exit 1
     fi
     TRIMMED_FILE="$PROJECT_DIR/modules/identity/webauthn/aaguid.trimmed.json"
-    jq 'map_values({name: .name})' "$TEMP_FILE" > "$TRIMMED_FILE" \
-        && mv "$TRIMMED_FILE" "$TEMP_FILE"
+    jq 'map_values({name: .name})' "$TEMP_FILE" >"$TRIMMED_FILE" &&
+        mv "$TRIMMED_FILE" "$TEMP_FILE"
 else
     echo "[ERROR] 'jq' is required to trim the AAGUID catalog"
     echo "[INFO] The upstream payload carries inline icons the embed must not carry."
