@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS public.users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT NULL,
     last_login_at TIMESTAMPTZ DEFAULT NULL,
+    -- The failed-password-verification streak behind the lockout policy. A
+    -- success zeroes it, and so does the lift or expiry of the lockout row
+    -- in account_restrictions — the streak never outlives a sign-in run, so
+    -- it stays a counter on the account row while the durable restriction
+    -- (ban or lockout) lives in its own table.
+    failed_attempts INT NOT NULL DEFAULT 0,
     banned_at TIMESTAMPTZ DEFAULT NULL,
     ban_expires TIMESTAMPTZ DEFAULT NULL,
     ban_reason TEXT DEFAULT NULL,
@@ -42,6 +48,29 @@ CREATE INDEX IF NOT EXISTS idx_users_display_name ON public.users USING gin (dis
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING GIN (username gin_trgm_ops) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_last_login_at ON public.users (last_login_at) WHERE last_login_at IS NOT NULL;
+
+-- --------------------------------------------------------
+-- Table: public.account_restrictions — ban and lockout as one concept:
+-- a restriction row with an expiry window. The active predicate every
+-- check shares is `lifted_at IS NULL AND (expires_at IS NULL OR
+-- expires_at > now())`. A NULL expires_at is indefinite (the ban shape);
+-- an expired lockout is lifted by the next read that finds it.
+-- --------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.account_restrictions (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CONSTRAINT chk_account_restrictions_kind CHECK (kind IN ('ban', 'lockout')),
+    reason TEXT DEFAULT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ DEFAULT NULL,
+    lifted_at TIMESTAMPTZ DEFAULT NULL,
+    lifted_by UUID REFERENCES public.users(id) ON DELETE SET NULL
+) USING heap;
+
+CREATE INDEX IF NOT EXISTS idx_account_restrictions_user_active
+    ON public.account_restrictions USING btree (user_id) WHERE lifted_at IS NULL;
+
 
 -- --------------------------------------------------------
 -- Table: public.user_passwords (junction table)
@@ -289,6 +318,7 @@ DROP INDEX IF EXISTS idx_user_passwords_created_at;
 DROP TABLE IF EXISTS public.audit_logs;
 DROP TABLE IF EXISTS public.device_login_requests;
 DROP TABLE IF EXISTS public.known_devices;
+DROP TABLE IF EXISTS public.account_restrictions;
 DROP TABLE IF EXISTS public.signup_tokens_user_groups;
 DROP TABLE IF EXISTS public.signup_tokens;
 DROP TABLE IF EXISTS public.auth_tokens;

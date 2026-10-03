@@ -252,6 +252,24 @@ const (
 	// happenings, and the log's one filter cannot see inside a payload.
 	EventUserUnbanned = "user_unbanned"
 
+	// EventUserLocked is the automated lockout the failed-attempt policy
+	// wrote. The record commits in the transaction that inserts the
+	// lockout row and names the account; the payload carries the attempt
+	// streak and the expiry the settings answered at the trip.
+	EventUserLocked = "user_locked"
+
+	// EventUserUnlocked is an open lockout lifted — by the admin's
+	// UnlockUser or by the expiry read that found it. The two are
+	// different happenings: the admin's record names the actor, the
+	// expiry's carries none.
+	EventUserUnlocked = "user_unlocked"
+
+	// EventPasswordRemoved is the account's password credential deleted
+	// through the self-service removal — the step-up proof rode the
+	// header, and the record commits in the transaction that clears the
+	// hash.
+	EventPasswordRemoved = "password_removed"
+
 	// EventPasswordResetEmailSent is a reset message submitted — by the
 	// account's own request or by an administrator's trigger. The record
 	// lands after the enqueue, the same convention the verification mail

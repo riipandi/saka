@@ -1,0 +1,56 @@
+type: http_request
+model: http_request
+id: rq_a8YqWm3eT5k
+createdAt: 2026-10-03T07:30:00
+updatedAt: 2026-10-03T07:30:00
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Deletes the signed-in account's password credential — the self-service counterpart of Add password, for an account moving to passkey-only sign-in. The proof is the step-up token the guard consumes from the X-Tango-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent). The removal is refused while the account keeps no other live credential (passkey or binding) with failed_precondition; live sessions are ended and the account's address learns of the removal in a notification.
+
+  Guard: Session + step-up.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+- enabled: true
+  name: Authorization
+  value: Bearer {{[ accessToken ]}}
+  id: null
+- enabled: true
+  name: X-Tango-Reauthentication
+  value: '{{[ reauthenticationToken ]}}'
+  id: null
+method: POST
+name: '[Tango] Remove password'
+sortPriority: 500.0
+url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/RemovePassword
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

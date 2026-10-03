@@ -169,6 +169,28 @@ const (
 	// sign-up.
 	SettingAuthSignupPasswordEnabled = "auth.signup_password_enabled"
 
+	// SettingAuthUserEnumerationProtection picks what sign-up, the
+	// forgot-password trigger, and the email change answer when the
+	// address an unknown caller names already rests on an account: bulk,
+	// the plain refusals; strict, the success shapes that hide the
+	// account's existence.
+	SettingAuthUserEnumerationProtection = "auth.user_enumeration_protection"
+
+	// SettingLockoutEnabled gates the lockout policy: on, a failed-password
+	// streak that reaches lockout.max_attempts writes a lockout restriction
+	// against the account.
+	SettingLockoutEnabled = "lockout.enabled"
+
+	// SettingLockoutMaxAttempts is the failed-password streak a lockout
+	// lands at. The streak resets on a success, on the lift, and on the
+	// expiry — it is never a lifetime tally.
+	SettingLockoutMaxAttempts = "lockout.max_attempts"
+
+	// SettingLockoutDuration is how long an automated lockout binds, a Go
+	// duration string (1h). Empty means the lockout never lifts by itself —
+	// UnlockUser is the only way out.
+	SettingLockoutDuration = "lockout.duration"
+
 	// SettingPasswordMinLength is the shortest password accepted, in
 	// characters.
 	SettingPasswordMinLength = "password.min_length"
@@ -357,6 +379,26 @@ func Catalog() []SettingDef {
 			Default:     "true",
 			Public:      true,
 			Description: "Whether a password identity may be claimed at sign-up.",
+		},
+		{
+			Key:         SettingAuthUserEnumerationProtection,
+			Default:     "bulk",
+			Description: "What sign-up, forgot-password, and email change answer when the address an unknown caller names already rests on an account: bulk, the plain refusals; strict, the success shapes that hide the account's existence — a sign-up names the verification screen and mails the address on file instead.",
+		},
+		{
+			Key:         SettingLockoutEnabled,
+			Default:     "true",
+			Description: "Whether the failed-password streak can lock an account. Off, sign-in attempts are never counted toward a lockout.",
+		},
+		{
+			Key:         SettingLockoutMaxAttempts,
+			Default:     "100",
+			Description: "The failed-password streak an automated lockout lands at. The streak resets on a successful verification, on the lockout's lift, and on its expiry — never a lifetime tally. The reader's floor is 5.",
+		},
+		{
+			Key:         SettingLockoutDuration,
+			Default:     "1h",
+			Description: "How long an automated lockout binds, a duration string (1h). Empty means the lockout never lifts by itself — UnlockUser is the only way out.",
 		},
 		{
 			Key:         SettingPasswordMinLength,

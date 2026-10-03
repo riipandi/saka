@@ -124,6 +124,17 @@ service UserService {
   // to show, the backend judges the length and the character rules.
   rpc AddPassword(AddPasswordRequest) returns (AddPasswordResponse);
 
+  // RemovePassword deletes the signed-in account's password credential —
+  // the self-service counterpart of AddPassword, for an account moving to
+  // passkey-only sign-in. The proof is the step-up token the guard consumes
+  // from the X-Tango-Reauthentication header, the same shape the addition
+  // demands. The removal is refused while the account keeps no other live
+  // credential (passkey or binding): an account that cannot sign in again is
+  // a state the self-service never writes. Live sessions ride the queue's
+  // password-changed notices, and the account's address learns of the
+  // removal in a notification.
+  rpc RemovePassword(RemovePasswordRequest) returns (RemovePasswordResponse);
+
   // BanUser applies a ban to the named account: the start instant is now,
   // the reason is required, and the expiry is optional — absent, the ban
   // never lifts by itself. Every live session the account holds is ended in
@@ -140,6 +151,16 @@ service UserService {
   // success: the state the caller asked for is the state the row is in.
   // A notification is queued to the account's address.
   rpc UnbanUser(UnbanUserRequest) returns (UnbanUserResponse);
+
+  // UnlockUser lifts the named account's open lockout — the automated
+  // restriction the failed-attempt policy writes when a sign-in run trips
+  // `lockout.max_attempts`. The admin lift is the same unit the expiry is:
+  // the lockout row is lifted, and the account's failed-attempt streak
+  // starts fresh, because the lockout answered for the streak. An account
+  // with no open lockout is the same success — the state the caller asked
+  // for is the state the account is in. A ban is not a lockout and the
+  // procedure does not touch one; UnbanUser owns that.
+  rpc UnlockUser(UnlockUserRequest) returns (UnlockUserResponse);
 }
 
 // UserGroupService administers the groups accounts belong to. A group is an
@@ -846,6 +867,26 @@ message UnbanUserResponse {
   string message = 3;
 }
 
+// UnlockUserRequest names the account whose lockout is lifted.
+message UnlockUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// UnlockUserResponse answers the account as the unlock left it.
+message UnlockUserResponse {
+  // user is the account's view after the write — the failed-attempt
+  // counter is zero and no lockout row stands against the account.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
 // GetCurrentUserRequest is empty: the account is the caller the token names.
 message GetCurrentUserRequest {}
 
@@ -922,6 +963,18 @@ message AddPasswordRequest {
 }
 
 message AddPasswordResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
+}
+
+// RemovePasswordRequest carries nothing: the proof rode the
+// X-Tango-Reauthentication header, and the account is the token's subject.
+message RemovePasswordRequest {
+}
+
+// RemovePasswordResponse answers the removal the caller asked for.
+message RemovePasswordResponse {
   // status and message are the shared envelope's fields.
   string status = 1;
   string message = 2;

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,11 +31,12 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 		SettingPasswordRuleUppercase, SettingPasswordRuleNumber,
 		SettingPasswordRuleSpecial, SettingMFARequired,
 		SettingUsersSelfDeleteEnabled, SettingUsersChangeEmailEnabled,
-		SettingUsersChangeUsernameEnabled,
+		SettingUsersChangeUsernameEnabled, SettingLockoutEnabled,
 	}
 	enums := map[string][]string{
-		SettingAccessMode:          {"open", "invite"},
-		SettingPasswordMinStrength: {"off", "normal"},
+		SettingAccessMode:                    {"open", "invite"},
+		SettingPasswordMinStrength:           {"off", "normal"},
+		SettingAuthUserEnumerationProtection: {"bulk", "strict"},
 	}
 
 	for _, def := range Catalog() {
@@ -68,6 +70,15 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 			value, err := strconv.Atoi(def.Default)
 			require.NoError(t, err, "%s: the default must be an integer", def.Key)
 			assert.GreaterOrEqual(t, value, 8, "the floor the tests pin the policy to")
+		case def.Key == SettingLockoutMaxAttempts:
+			value, err := strconv.Atoi(def.Default)
+			require.NoError(t, err, "%s: the default must be an integer", def.Key)
+			assert.GreaterOrEqual(t, value, 5, "the reader's floor")
+		case def.Key == SettingLockoutDuration:
+			if def.Default != "" {
+				_, err := time.ParseDuration(def.Default)
+				require.NoError(t, err, "%s: the default must be a duration or empty", def.Key)
+			}
 		case def.Key == SettingAccessAllowlist:
 			assert.Equal(t, "", def.Default, "the allowlist ships empty; an operator fills it")
 		}
@@ -85,6 +96,8 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 		SettingPasswordMinStrength, SettingPasswordRuleLowercase,
 		SettingPasswordRuleUppercase, SettingPasswordRuleNumber,
 		SettingPasswordRuleSpecial, SettingMFARequired,
+		SettingAuthUserEnumerationProtection,
+		SettingLockoutEnabled, SettingLockoutMaxAttempts, SettingLockoutDuration,
 		SettingSessionMaxLifetime, SettingSessionInactivityTimeout,
 		SettingSessionReverificationWindow, SettingUsersSelfDeleteEnabled,
 		SettingUsersChangeEmailEnabled, SettingUsersChangeUsernameEnabled,

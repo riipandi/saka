@@ -191,6 +191,14 @@ func (h *rpcHandler) UnbanUser(ctx context.Context, req *connect.Request[identit
 	}), nil
 }
 
+// UnlockUser lifts one account's open lockout. The restrictions feature it
+// belongs to ships with the unified-restrictions change; until then the
+// procedure is scaffold and answers unimplemented — the Yaak row carries the
+// (unimplemented) marker and no guard rule names it.
+func (h *rpcHandler) UnlockUser(ctx context.Context, req *connect.Request[identityv1.UnlockUserRequest]) (*connect.Response[identityv1.UnlockUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("not yet implemented"))
+}
+
 // banMessage answers the sentence the response carries: the expiry names
 // itself when there is one, and the ended sessions are counted so the
 // caller sees what the ban did beyond the row.
@@ -324,6 +332,14 @@ func (h *rpcHandler) AddPassword(ctx context.Context, req *connect.Request[ident
 		Status:  responder.StatusSuccess,
 		Message: "the password was added",
 	}), nil
+}
+
+// RemovePassword deletes the caller's password credential. The removal and
+// its last-credential refusal ship with the security-notices change; until
+// then the procedure is scaffold and answers unimplemented — the Yaak row
+// carries the (unimplemented) marker and no guard rule names it.
+func (h *rpcHandler) RemovePassword(ctx context.Context, req *connect.Request[identityv1.RemovePasswordRequest]) (*connect.Response[identityv1.RemovePasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("not yet implemented"))
 }
 
 // listMetadata maps the responder's pagination onto the shared block. The
