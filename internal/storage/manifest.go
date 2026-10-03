@@ -253,6 +253,85 @@ func (Manifests) Delete(ctx context.Context, q datastore.Querier, bucketID, key 
 	return nil
 }
 
+// TouchStaging moves a pending row's fingerprint to where the staging file
+// now sits: the bytes a session has received. The write is the receipt
+// each chunk leaves, so a retry's checkpoint compares against what the
+// last chunk wrote and the expiry job can age the row by its last activity.
+func (Manifests) TouchStaging(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time) error {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(objectsTable)
+	ub.Set(
+		ub.Assign("size", size),
+		ub.Assign("staging_size", size),
+		ub.Assign("staging_mtime", mtime),
+	)
+	ub.Where(ub.Equal("bucket_id", bucketID), ub.Equal("key", key), ub.Equal("status", StatusPending))
+
+	query, args := ub.Build()
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("storage: touch staging %q: %w", key, err)
+	}
+	return nil
+}
+
+// PendingRefs lists the bucket-scoped references whose manifest is pending
+// and carries no session marker — the Stage-path uploads a dead run staged
+// but never enqueued. A session's interrupted bytes are not here: the
+// session's metadata key is the marker, and its staging file is whole only
+// when its completion enqueue happened.
+func (Manifests) PendingRefs(ctx context.Context, q datastore.Querier) ([]string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("b.name", "o.key")
+	sb.From(objectsTable + " o")
+	sb.Join(bucketsTable + " b ON b.id = o.bucket_id")
+	sb.Where(sb.Equal("o.status", StatusPending), "NOT (o.metadata ? "+sb.Var(TusLengthKey)+")")
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list pending uploads: %w", err)
+	}
+	defer rows.Close()
+
+	var refs []string
+	for rows.Next() {
+		var bucket, key string
+		if err := rows.Scan(&bucket, &key); err != nil {
+			return nil, fmt.Errorf("storage: scan pending upload: %w", err)
+		}
+		refs = append(refs, bucket+"/"+key)
+	}
+	return refs, rows.Err()
+}
+
+// ExpiredSessionRefs lists the bucket-scoped references of the sessions
+// whose last activity rests before the instant the caller computed — the
+// rows the expiry job reclaims, staging file and manifest row together.
+func (Manifests) ExpiredSessionRefs(ctx context.Context, q datastore.Querier, before time.Time) ([]string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("b.name", "o.key")
+	sb.From(objectsTable + " o")
+	sb.Join(bucketsTable + " b ON b.id = o.bucket_id")
+	sb.Where(sb.Equal("o.status", StatusPending), "o.metadata ? "+sb.Var(TusLengthKey), sb.LessThan("o.updated_at", before))
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list expired sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var refs []string
+	for rows.Next() {
+		var bucket, key string
+		if err := rows.Scan(&bucket, &key); err != nil {
+			return nil, fmt.Errorf("storage: scan expired session: %w", err)
+		}
+		refs = append(refs, bucket+"/"+key)
+	}
+	return refs, rows.Err()
+}
+
 // StoredKeys lists every key of one bucket at least one manifest row names.
 // It is the keep-set the garbage collection diffs the backend's listing
 // against: an object the backend holds and this set does not is

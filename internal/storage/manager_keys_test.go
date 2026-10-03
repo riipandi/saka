@@ -140,7 +140,7 @@ func TestManagerCarriesAndRewritesMetadata(t *testing.T) {
 	assert.Equal(t, StatusReady, after.Status)
 }
 
-func TestManagerProgressFollowsTheUpload(t *testing.T) {
+func TestManagerManifestFollowsTheUpload(t *testing.T) {
 	manager, _, _ := newManager(t)
 	ctx := t.Context()
 
@@ -149,17 +149,17 @@ func TestManagerProgressFollowsTheUpload(t *testing.T) {
 
 	// While the file still waits in staging, the row Stage created reports
 	// pending — the status reader's before picture.
-	before, err := manager.Progress(ctx, testBucket, "k")
+	before, err := manager.Manifest(ctx, testBucket, "k")
 	require.NoError(t, err)
 	assert.Equal(t, StatusPending, before.Status)
 	assert.Equal(t, int64(len(data)), before.Size)
 
 	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
 
-	progress, err := manager.Progress(ctx, testBucket, "k")
+	after, err := manager.Manifest(ctx, testBucket, "k")
 	require.NoError(t, err)
-	assert.Equal(t, StatusReady, progress.Status)
-	assert.Equal(t, int64(len(data)), progress.Size)
+	assert.Equal(t, StatusReady, after.Status)
+	assert.Equal(t, int64(len(data)), after.Size)
 }
 
 func TestManagerRetryReusesTheCheckpointedHash(t *testing.T) {

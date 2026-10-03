@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -25,10 +26,28 @@ func UnboundedFor(paths ...string) func(http.Handler) http.Handler {
 	for _, path := range paths {
 		named[path] = struct{}{}
 	}
+	return unboundedFor(func(path string) bool {
+		_, ok := named[path]
+		return ok
+	})
+}
 
+// UnboundedForPrefix is UnboundedFor for a family of paths: every request
+// whose path carries the prefix is served without the deadlines. The
+// resumable uploads are the family — their paths end in the upload's
+// bucket-scoped reference, which no exact list can enumerate.
+func UnboundedForPrefix(prefix string) func(http.Handler) http.Handler {
+	return unboundedFor(func(path string) bool {
+		return strings.HasPrefix(path, prefix)
+	})
+}
+
+// unboundedFor is the deadline-dropping middleware both entry points share;
+// the predicate decides which requests it lifts.
+func unboundedFor(match func(string) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if _, ok := named[r.URL.Path]; !ok {
+			if !match(r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}

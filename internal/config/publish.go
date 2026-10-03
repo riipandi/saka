@@ -269,16 +269,9 @@ type PublishedCORS struct {
 // PublishedStorage is the storage section. The S3 credentials are published
 // only as their redactions.
 type PublishedStorage struct {
-	Driver    string         `json:"driver,omitzero"`
-	LocalPath string         `json:"local_path,omitzero"`
-	Watch     PublishedWatch `json:"watch,omitzero"`
-	S3        PublishedS3    `json:"s3,omitzero"`
-}
-
-// PublishedWatch is the staging watcher's settings.
-type PublishedWatch struct {
-	Enable   bool     `json:"enable,omitzero"`
-	Debounce Duration `json:"debounce,omitzero"`
+	Driver    string      `json:"driver,omitzero"`
+	LocalPath string      `json:"local_path,omitzero"`
+	S3        PublishedS3 `json:"s3,omitzero"`
 }
 
 // PublishedWebhook is the webhook section: the delivery policy an operator
@@ -488,10 +481,6 @@ func (c Config) Published(full bool) Published {
 	public.Storage = PublishedStorage{
 		Driver:    c.Storage.Driver,
 		LocalPath: c.Storage.LocalPath,
-		Watch: PublishedWatch{
-			Enable:   c.Storage.Watch.Enable,
-			Debounce: seconds(c.Storage.Watch.Debounce),
-		},
 		S3: PublishedS3{
 			AccessKey:        sealed.Storage.S3.AccessKey,
 			SecretKey:        sealed.Storage.S3.SecretKey,

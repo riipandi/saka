@@ -186,22 +186,34 @@ func TestMatchRestReadsThePathParameter(t *testing.T) {
 	assert.ErrorIs(t, rule(caller("01a0da1c-0000-7000-8000-000000000000", false), target), guard.ErrNotSelf)
 }
 
-// TestMatchRestAbsorbsTheTrailingKey keeps the catch-all honest: the upload
-// progress route names a key that carries slashes, so the pattern's last
-// segment absorbs the rest of the path — and a pattern whose catch-all has
-// nothing to absorb names no route at all.
-func TestMatchRestAbsorbsTheTrailingKey(t *testing.T) {
-	_, target := guard.MatchRest(guard.RestRules, "GET", "/api/uploads/avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png")
-	assert.Equal(t, "avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png", target.PathParams["key"])
+// TestMatchRestCarriesTheTusRoutes pins the uploads' protocol surface: every
+// method the tus client speaks is authenticated (any signed-in account may
+// upload), the catch-all absorbs the bucket-scoped reference a HEAD, PATCH,
+// or DELETE names, and a method the protocol does not define on the prefix
+// is administrative — an unnamed route defaults, it does not slip through.
+func TestMatchRestCarriesTheTusRoutes(t *testing.T) {
+	// The creation sits on the bare prefix and demands a caller; the
+	// discovery does not — it names what a client may rely on before it
+	// holds a credential.
+	for _, method := range []string{"OPTIONS"} {
+		rule, _ := guard.MatchRest(guard.RestRules, method, "/api/uploads")
+		assert.NoError(t, rule(nil, guard.Target{}), method)
+	}
+	rule, _ := guard.MatchRest(guard.RestRules, "POST", "/api/uploads")
+	assert.NoError(t, rule(caller("01a0", false), guard.Target{}))
+	assert.ErrorIs(t, rule(nil, guard.Target{}), guard.ErrUnauthenticated)
 
-	// A bare prefix names no key: the catch-all answers at least one
-	// segment, so the empty remainder is a different route.
-	rule, _ := guard.MatchRest(guard.RestRules, "GET", "/api/uploads")
-	assert.ErrorIs(t, rule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
+	// The session's own methods sit on the bucket-scoped reference; the
+	// discovery answers without a credential, the rest do not.
+	for _, method := range []string{"HEAD", "PATCH", "DELETE"} {
+		rule, target := guard.MatchRest(guard.RestRules, method, "/api/uploads/avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png")
+		assert.NoError(t, rule(caller("01a0", false), target), method)
+		assert.ErrorIs(t, rule(nil, target), guard.ErrUnauthenticated, method)
+	}
 
-	// The rule names the read, not every method under the prefix.
-	rule, _ = guard.MatchRest(guard.RestRules, "DELETE", "/api/uploads/avatars/01a0da1c.png")
-	assert.ErrorIs(t, rule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
+	// A method the protocol does not define defaults to administrative.
+	getRule, _ := guard.MatchRest(guard.RestRules, "GET", "/api/uploads/avatars/01a0da1c.png")
+	assert.ErrorIs(t, getRule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
 }
 
 // TestPublicProceduresComeFromTheTable pins the derivation: the set the

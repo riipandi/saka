@@ -61,6 +61,13 @@ func mountDevtool(r chi.Router, injector do.Injector) {
 			_, _ = w.Write([]byte(page))
 		})
 	}
+	for path, body := range web.UploadProbePages {
+		page := body
+		r.Get(path, func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(page))
+		})
+	}
 }
 
 // devtoolID is the codec's answer on both directions: the identifier in its

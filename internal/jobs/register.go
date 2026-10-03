@@ -70,6 +70,9 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		client.Register(queue.NewQueue[StorageGCTask](func(ctx context.Context, task StorageGCTask) error {
 			return gcProcessor(ctx, task, uploader)
 		}))
+		client.Register(queue.NewQueue[StorageUploadExpiryTask](func(ctx context.Context, task StorageUploadExpiryTask) error {
+			return storageUploadExpiryProcessor(ctx, task, uploader)
+		}))
 	}
 	client.Register(queue.NewQueue[APIKeyExpiryScanTask](func(ctx context.Context, task APIKeyExpiryScanTask) error {
 		return apiKeyExpiryScanProcessor(ctx, task, pool, client, expiryEmailEnabled && apiKeyExpiringNoticeEnabled && mail != nil, mail)
@@ -242,6 +245,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	}
 	if s.uploader == nil {
 		return nil
+	}
+	if err := s.seedOnce(ctx, StorageUploadExpiryName,
+		storageUploadExpirySeed(DefaultStorageUploadExpiryInterval),
+		DefaultStorageUploadExpiryInterval); err != nil {
+		return err
 	}
 	return s.seedOnce(ctx, StorageGCName, gcSeed(DefaultStorageGCInterval), DefaultStorageGCInterval)
 }

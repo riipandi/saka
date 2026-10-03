@@ -156,14 +156,25 @@ func NewRouter(opts Options) chi.Router {
 		// outside it: they are the surface a monitor reaches.
 		throttled.Group(func(mod chi.Router) {
 			mod.Use(middleware.RESTBearer(opts.Authenticator, restGuardRules))
-			// The upload progress read mounts beside the modules: the same
-			// bearer middleware guards it, and the storage engine it reads
-			// is infrastructure's to resolve. A container without the
-			// engine — a test's bare router — mounts no route, the smaller
+			// The tus uploads are the one surface a chunked transfer
+			// rides: a PATCH is one chunk of a whole whose travel time no
+			// unary deadline can bound, so the family is lifted out of the
+			// request deadlines above it.
+			mod.Use(middleware.UnboundedForPrefix("/api/uploads"))
+			// The uploads mount beside the modules: the same bearer
+			// middleware guards them, and the engine they drive is
+			// infrastructure's to resolve. A container without the engine
+			// — a test's bare router — mounts no route, the smaller
 			// feature rather than a broken one.
 			if opts.Injector != nil {
 				if manager, err := do.Invoke[*storage.Manager](opts.Injector); err == nil && manager != nil {
-					mod.Get("/api/uploads/*", uploadProgressHandler(manager))
+					log := do.MustInvoke[*slog.Logger](opts.Injector)
+					// One handler serves both routes: the per-upload locks
+					// the creation-with-upload append and the PATCHes race
+					// over live on the instance, not on the route.
+					tus := storage.NewTusHandler(manager, log)
+					mod.Handle("/api/uploads", tus)
+					mod.Handle("/api/uploads/*", tus)
 				}
 			}
 			kernel.Mount(mod, opts.Modules...)

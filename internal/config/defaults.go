@@ -85,11 +85,6 @@ const DefaultCORSMaxAge = time.Hour
 // more replaces it through the configuration.
 const DefaultCacheMaxMemory = 32 << 20
 
-// DefaultStorageWatchDebounce is how long a staging path must stay quiet
-// before the watcher enqueues its upload, so a file written in many small
-// writes triggers one upload, not one per write.
-const DefaultStorageWatchDebounce = 2 * time.Second
-
 // DefaultCORSOrigins is the origin list a fresh checkout gets: the Vite dev
 // server the SPA is served from in development. Production names its own
 // origin through the configuration, so a browser has to prove where the call
@@ -421,10 +416,6 @@ func Default() Config {
 		Storage: Storage{
 			Driver:    StorageLocal,
 			LocalPath: DefaultDataDir,
-			Watch: Watch{
-				Enable:   true,
-				Debounce: DefaultStorageWatchDebounce,
-			},
 			S3: S3{
 				// Disabled by default along with the driver, but the values
 				// point at the service compose starts, so switching the driver

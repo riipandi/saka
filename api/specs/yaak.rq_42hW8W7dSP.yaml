@@ -1,0 +1,56 @@
+type: http_request
+model: http_request
+id: rq_42hW8W7dSP
+createdAt: 2026-10-03T19:00:35.566933
+updatedAt: 2026-10-03T19:00:35.566933
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_9GjzmC2N4g
+authentication: {}
+authenticationType: null
+body:
+  text: chunk bytes go here
+bodyType: application/offset+octet-stream
+description: |-
+  Appends one chunk at the offset the request claims: the body rides application/offset+octet-stream and the Upload-Offset names the file's end the client believes. A claim the staging file's size does not match answers 409 - two writers raced, or the client lost its position - and the resume path is a HEAD followed by a correct PATCH. When the append reaches the declared length the completion fires inside the same request: the queue takes the file to its backend, and the answer's Upload-Offset is the whole size.
+
+  Saka-only: the tus protocol is implemented in-house over the storage engine; there is no upstream endpoint to port.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/offset+octet-stream
+  id: null
+- enabled: true
+  name: Upload-Offset
+  value: ${[ prompt.text(label='Upload Offset', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='', placeholder='0') ]}
+  id: null
+method: PATCH
+name: '[Saka] Upload (tus) - Append chunk'
+sortPriority: 0.4
+url: ${[ apiBaseURL ]}/api/uploads/:bucket/:key
+urlParameters:
+- enabled: true
+  name: :bucket
+  value: ${[ prompt.text(label='Bucket', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='', placeholder='default') ]}
+  id: path-bucket:0
+- enabled: true
+  name: :key
+  value: ${[ prompt.text(label='Key', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='', placeholder='some/path/to/file.ext') ]}
+  id: path-key:1
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

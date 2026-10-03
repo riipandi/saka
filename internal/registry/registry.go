@@ -229,26 +229,27 @@ func Runners(i do.Injector) ([]Runner, error) {
 		{Name: "scheduler", Start: jobScheduler.Start, Stop: jobScheduler.Stop},
 	}
 
-	// The watcher ends with the run's context: a settle in flight is one
-	// task either enqueued or not, and its enqueues are durable either way.
-	c := do.MustInvoke[*config.Config](i)
-	if c.Storage.Watch.Enable {
-		watcher, err := do.Invoke[*storage.Watcher](i)
-		if err != nil {
-			return nil, err
-		}
-		log := do.MustInvoke[*slog.Logger](i)
-		runners = append(runners, Runner{
-			Name: "staging watch",
-			Start: func(ctx context.Context) {
-				go func() {
-					if err := watcher.Start(ctx); err != nil {
-						log.ErrorContext(ctx, "serve: staging watch ended", "err", err)
-					}
-				}()
-			},
-		})
+	// The boot-time sweep re-enqueues the staging uploads a dead run left
+	// behind — the recovery the staging watcher's startup scan used to
+	// carry, read from the manifest instead of walked off the filesystem.
+	// It runs once and ends; its Start is synchronous because the work is
+	// short. A failure here is the run's failure, the same way a queue
+	// that cannot be built is.
+	manager, err := do.Invoke[*storage.Manager](i)
+	if err != nil {
+		return nil, err
 	}
+	client := do.MustInvoke[*queue.Client](i)
+	log := do.MustInvoke[*slog.Logger](i)
+	runners = append(runners, Runner{
+		Name: "upload sweep",
+		Start: func(ctx context.Context) {
+			if _, err := jobs.SweepUploads(ctx, manager, client, log); err != nil {
+				log.ErrorContext(ctx, "serve: upload sweep failed", "err", err)
+				panic(err)
+			}
+		},
+	})
 	return runners, nil
 }
 

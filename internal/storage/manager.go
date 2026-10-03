@@ -25,18 +25,6 @@ type DB interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context, tx datastore.Querier) error) error
 }
 
-// Progress is the upload state of one bucket/key, the data a status endpoint
-// reads while the queue works. A whole-file upload is one step — pending
-// while the manifest says so, ready once the backend holds the bytes — and
-// the size is the only magnitude the round has.
-type Progress struct {
-	// Status is pending while the file travels, ready once the backend
-	// holds it.
-	Status string
-	// Size is the file's byte size, known from the moment it is staged.
-	Size int64
-}
-
 // BeforeSyncHook gates one sync attempt. It runs after the staging file
 // exists and before its fingerprint is read, so a hook that rewrites or
 // replaces the file is hashed from its own output. key is the bucket-scoped
@@ -74,6 +62,10 @@ type Manager struct {
 	// the upload round; nil means no hook, and a nil hook costs nothing.
 	beforeSync BeforeSyncHook
 	afterSync  AfterSyncHook
+	// uploadEnqueuer is the completion seam a tus session's final chunk
+	// rides. Nil leaves completion silent; the startup sweep is the slower
+	// path the same file still takes.
+	uploadEnqueuer UploadEnqueuer
 }
 
 // NewManager builds the engine. staging is the directory a caller writes the
@@ -138,22 +130,21 @@ func (m *Manager) UpdateMetadata(ctx context.Context, bucket, key string, metada
 	return m.manifests.UpdateMetadata(ctx, m.db, bucketID, key, metadata)
 }
 
-// Progress reports how far one bucket/key's upload has travelled. The REST
-// progress read (`GET /api/uploads/{bucket}/{key}`, mounted beside the
-// transport) maps the manifest onto its answer, and the after-sync hook
-// pushes the finished transition to the metadata's owner — the sources of
-// truth stay the manifest's row and this read of it.
-func (m *Manager) Progress(ctx context.Context, bucket, key string) (Progress, error) {
-	manifest, err := m.Manifest(ctx, bucket, key)
-	if err != nil {
-		return Progress{}, err
-	}
-	return Progress{Status: manifest.Status, Size: manifest.Size}, nil
-}
-
-// Staging is the directory the next file is written into. The watcher owns
-// it; a caller that does not run the watcher names the same directory.
+// Staging is the directory the next file is written into: the sweep reads
+// it, the tus handler writes through it, and the data-directory layout
+// keeps it a sibling of the bucket directories.
 func (m *Manager) Staging() string { return m.staging }
+
+// Bucket resolves one bucket row by name — the limits the tus creation
+// enforces (size ceiling, accept list) and the existence check an unknown
+// name fails with ErrNotFound.
+func (m *Manager) Bucket(ctx context.Context, name string) (Bucket, error) {
+	bucket, err := m.buckets.Resolve(ctx, m.db, name)
+	if errors.Is(err, ErrNoBucket) {
+		return Bucket{}, ErrNotFound
+	}
+	return bucket, err
+}
 
 // Stage writes a file into the staging directory and records the intent:
 // the bucket/key's metadata and the staging fingerprint land in the manifest

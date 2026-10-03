@@ -617,22 +617,8 @@ type Storage struct {
 	// process: the backup default and the storage health check both read it, so
 	// there is no second path to disagree with it.
 	LocalPath string `koanf:"local_path" json:"local_path"`
-	// Watch holds the staging watcher: it notices a finished or changed
-	// staging file and enqueues the upload.
-	Watch Watch `koanf:"watch" json:"watch"`
 	// S3 holds the object-storage settings, used when Driver is StorageS3.
 	S3 S3 `koanf:"s3" json:"s3"`
-}
-
-// Watch holds the staging directory watcher settings.
-type Watch struct {
-	// Enable switches the staging watcher on. Without it, staging files sit
-	// until something enqueues their upload itself.
-	Enable bool `koanf:"enable" json:"enable"`
-	// Debounce is how long a staging path must stay quiet before its upload
-	// is enqueued, so a file written in many small writes triggers one
-	// upload, not one per write.
-	Debounce time.Duration `koanf:"debounce" json:"debounce"`
 }
 
 // S3 holds the object-storage settings for an S3-compatible service, which may

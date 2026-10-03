@@ -287,7 +287,6 @@ func (c Config) Validate() error {
 	check(isOneOf(c.Storage.Driver, StorageLocal, StorageS3),
 		"storage.driver: %q is not one of %s", c.Storage.Driver, joinValues(StorageLocal, StorageS3))
 	check(c.Storage.LocalPath != "", "storage.local_path: must not be empty")
-	check(c.Storage.Watch.Debounce > 0, "storage.watch.debounce: must be positive")
 
 	// The S3 section is checked only when the driver selects it. A local
 	// deployment never dials an object store, so holding its settings to

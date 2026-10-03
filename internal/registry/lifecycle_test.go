@@ -42,7 +42,6 @@ func servedInjector(t *testing.T) *do.RootScope {
 
 	cfg := config.Default()
 	cfg.Database.URL = dsn
-	cfg.Storage.Watch.Enable = true
 	cfg.App.BaseURL = "https://idp.example.com"
 	// The protocol feature signs through the jwks service; the HMAC key
 	// is the signing key a bare run carries. The stored pair is sealed
@@ -147,7 +146,7 @@ func TestRunnersAreTheLongRunningComponentsInStartOrder(t *testing.T) {
 	for _, runner := range runners {
 		names = append(names, runner.Name)
 	}
-	assert.Equal(t, []string{"queue", "scheduler", "staging watch"}, names)
+	assert.Equal(t, []string{"queue", "scheduler", "upload sweep"}, names)
 
 	// The drain ownership travels with the list: the queue outlives the
 	// listener, so the container's shutdown walk drains it; the scheduler

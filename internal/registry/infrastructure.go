@@ -275,8 +275,10 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			// The upload's after-sync hook rides here rather than on the
 			// manager's provider: the hook enqueues through the client this
 			// provider builds, and the manager must not construct against
-			// the queue to stay buildable without one.
+			// the queue to stay buildable without one. The tus completion's
+			// enqueue seam is the same shape.
 			uploader.WithAfterSync(jobs.NewUploadFinishedEnqueuer(client, log).Uploaded)
+			uploader.WithUploadEnqueuer(jobs.NewUploadEnqueuer(client, log))
 			return client, nil
 		}),
 
@@ -286,22 +288,6 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			uploader := do.MustInvoke[*storage.Manager](i)
 			log := do.MustInvoke[*slog.Logger](i)
 			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.Auth.ExpiryEmailEnabled, true, log), nil
-		}),
-
-		do.Lazy(func(i do.Injector) (*storage.Watcher, error) {
-			c := do.MustInvoke[*config.Config](i)
-			log := do.MustInvoke[*slog.Logger](i)
-			manager := do.MustInvoke[*storage.Manager](i)
-			client := do.MustInvoke[*queue.Client](i)
-			return storage.NewWatcher(manager.Staging(), c.Storage.Watch.Debounce, log,
-				func(key string) {
-					if _, err := client.Add(jobs.StorageUploadTask{Key: key}).Save(); err != nil {
-						// The staging file is still on disk, so the loss is a
-						// delayed upload, not a lost one: the next scan or the
-						// next write re-enqueues it.
-						log.Error("storage: enqueue upload", "key", key, "err", err)
-					}
-				}), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*scheduler.Scheduler, error) {

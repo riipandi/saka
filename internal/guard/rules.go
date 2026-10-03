@@ -524,12 +524,18 @@ var RestRules = []RestEntry{
 		Param:   "id",
 	},
 
-	// The upload progress is a signed-in read, not an owner-scoped one: the
-	// key a progress poll names is the storage key a client already holds,
-	// and the answer — a status word and a byte size — is the same fact the
-	// file's own read carries. The catch-all is the rule's shape because a
-	// storage key carries slashes inside it.
-	{Method: http.MethodGet, Pattern: "/api/uploads/{key...}", Rule: Authenticated},
+	// The upload surface is the tus protocol's own: the resumable-upload
+	// methods a client drives are signed-in writes — any authenticated
+	// account may upload into any bucket, the per-bucket authorization
+	// model being a follow-up — and the creation names the target in its
+	// Upload-Metadata, so there is no owner field for a self rule to
+	// compare.
+	{Method: http.MethodOptions, Pattern: "/api/uploads", Rule: Public},
+	{Method: http.MethodOptions, Pattern: "/api/uploads/{id...}", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/api/uploads", Rule: Authenticated},
+	{Method: http.MethodHead, Pattern: "/api/uploads/{id...}", Rule: Authenticated},
+	{Method: http.MethodPatch, Pattern: "/api/uploads/{id...}", Rule: Authenticated},
+	{Method: http.MethodDelete, Pattern: "/api/uploads/{id...}", Rule: Authenticated},
 
 	// The configuration read is the deployment's bootstrap document: the
 	// public subset to an anonymous caller, the full non-secret document to
