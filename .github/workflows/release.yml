@@ -22,7 +22,6 @@ concurrency:
 
 env:
   CI: true
-  LEFTHOOK: 0
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: true
   CGO_ENABLED: 0
 

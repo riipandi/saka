@@ -12,7 +12,6 @@
     },
     "type": "module",
     "scripts": {
-        "prepare": "lefthook install || true",
         "preinstall": "npx only-allow pnpm",
         "postinstall": "go mod download",
         "e2e-install": "playwright install chromium --with-deps",
@@ -51,7 +50,6 @@
         "happy-dom": "^20.14.5",
         "jsdom": "^30.1.1",
         "kill-port-process-cli": "^1.0.16",
-        "lefthook": "^2.1.16",
         "npm-check-updates": "^23.1.0",
         "oxfmt": "^0.71.0",
         "oxlint": "^1.86.0",
