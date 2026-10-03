@@ -24,6 +24,7 @@
         "@testing-library/dom": "^10.4.2",
         "@testing-library/react": "^16.3.3",
         "@types/node": "^26.6.4",
+        "@vitejs/plugin-react": "catalog:",
         "@vitest/coverage-v8": "^5.0.3",
         "@vitest/ui": "^5.0.3",
         "happy-dom": "^20.14.5",

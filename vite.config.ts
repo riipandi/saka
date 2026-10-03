@@ -1,3 +1,4 @@
+import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite-plus'
 import pkg from './package.json' with { type: 'json' }
@@ -94,9 +95,7 @@ export default defineConfig({
     overrides: [
       {
         files: ['*.json', '*.jsonc'],
-        options: {
-          tabWidth: 4
-        }
+        options: { tabWidth: 4 }
       }
     ],
     sortImports: {
@@ -123,6 +122,7 @@ export default defineConfig({
   },
   plugins: [
     embedManifest(),
+    react({ compiler: true }),
     email({
       templateDir: resolve('packages/email/templates'),
       outputDir: resolve('web/email')

@@ -1,3 +1,4 @@
+import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { comlink } from 'vite-plugin-comlink'
@@ -18,7 +19,15 @@ import embedManifest from '../plugins/plugin-manifest.ts'
  * module graph and the HMR socket here.
  */
 export default defineConfig({
-  plugins: [comlink(), embedManifest()],
+  plugins: [
+    comlink(),
+    embedManifest(),
+    // React Compiler (native oxc path, requires `oxc-transform-react`).
+    // Defaults: compilationMode 'infer', panicThreshold 'none' (components
+    // that violate the Rules of React are skipped, never broken), target 19.
+    // Storybook compiles via its own framework plugins — uncompiled reference.
+    react({ compiler: true })
+  ],
   resolve: { tsconfigPaths: true },
   root: resolve(import.meta.dirname),
   publicDir: resolve(import.meta.dirname, 'public'),
@@ -32,9 +41,11 @@ export default defineConfig({
       input: { app: resolve(import.meta.dirname, 'src/main.tsx') }
     }
   },
-  worker: { plugins: () => [comlink()] }
-  // The compiler's port: bound to the loopback, proxied by the Go debug
-  // build, and never opened by a developer or a deployment. No proxy
-  // block here — the proxy is the Go debug build's side
+  worker: { plugins: () => [comlink()] },
+  // The compiler's port: bound to IPv4 loopback on purpose — the Go debug
+  // proxy (web/static_debug.go, viteDevServer) targets 127.0.0.1, and a
+  // bare `localhost` bind lands on ::1, which the proxy cannot reach.
+  // No proxy block here — the proxy is the Go debug build's side
   // (web/static_debug.go forwards :3080 paths to this server).
+  server: { port: 5173, host: '127.0.0.1', strictPort: true }
 })
