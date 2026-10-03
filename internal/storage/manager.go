@@ -66,6 +66,13 @@ type Manager struct {
 	// rides. Nil leaves completion silent; the startup sweep is the slower
 	// path the same file still takes.
 	uploadEnqueuer UploadEnqueuer
+	// signer mints and verifies the signed links a private object is read
+	// over. Nil fails every SignedURL and every private read closed: the
+	// /storage mount answers a private object 404 rather than serving it.
+	signer *Signer
+	// signedURLTTL is the expiry source a SignedURL without an explicit
+	// ttl reads. Nil makes the explicit ttl mandatory.
+	signedURLTTL SignedURLTTLFunc
 }
 
 // NewManager builds the engine. staging is the directory a caller writes the
@@ -96,6 +103,57 @@ func (m *Manager) WithBeforeSync(hook BeforeSyncHook) *Manager {
 func (m *Manager) WithAfterSync(hook AfterSyncHook) *Manager {
 	m.afterSync = hook
 	return m
+}
+
+// StageOptions carries the knobs a stage can set. The zero value stages a
+// public file.
+type StageOptions struct {
+	// Private marks the object signed-link-only: a plain read of /storage
+	// answers 404 — the same shape a missing object answers, so the
+	// manifest never leaks which keys exist — and the bytes travel only
+	// behind a link the Signer minted.
+	Private bool
+}
+
+// WithSigner installs the signed-link signer the private objects are read
+// over and the SignedURL composition mints with. Returns the manager, so
+// registry wiring reads as a chain.
+func (m *Manager) WithSigner(signer *Signer) *Manager {
+	m.signer = signer
+	return m
+}
+
+// WithSignedURLTTL installs the expiry source a SignedURL without an
+// explicit ttl reads — the `storage.signed_url_expires` setting's runtime
+// value. Returns the manager, so registry wiring reads as a chain.
+func (m *Manager) WithSignedURLTTL(ttl SignedURLTTLFunc) *Manager {
+	m.signedURLTTL = ttl
+	return m
+}
+
+// SignedURL composes the signed link a private object is read over:
+// `{base}/{bucket}/{key}?exp=…&sig=…`. base is the public origin the
+// assets are served from (app.assets_url), the path prefix `/storage`
+// included. An explicit ttl wins; without one the wired expiry source
+// answers, and without that the composition fails — an expiry that
+// silently defaulted would be a policy decided by accident.
+func (m *Manager) SignedURL(ctx context.Context, base, bucket, key string, ttl time.Duration) (string, error) {
+	if m.signer == nil {
+		return "", fmt.Errorf("storage: signed links need a signer wired")
+	}
+	if ttl <= 0 {
+		if m.signedURLTTL == nil {
+			return "", fmt.Errorf("storage: signed links need an explicit ttl or a wired expiry source")
+		}
+		resolved, err := m.signedURLTTL(ctx)
+		if err != nil {
+			return "", fmt.Errorf("storage: signed link ttl: %w", err)
+		}
+		if ttl = resolved; ttl <= 0 {
+			return "", fmt.Errorf("storage: signed link ttl resolved to %s", ttl)
+		}
+	}
+	return m.signer.SignedURL(base, bucket, key, time.Now().Add(ttl))
 }
 
 // Manifest reads the stored manifest of a bucket/key, the version a feature
@@ -156,9 +214,15 @@ func (m *Manager) Bucket(ctx context.Context, name string) (Bucket, error) {
 // The bucket must already exist in storage_buckets; an unknown bucket is
 // refused with ErrNotFound. metadata is the feature's own record (content
 // type, original file name, owner); the engine carries it, never reads it.
-// Re-staging a bucket/key replaces its metadata and makes the stored
-// manifest stale, so the next sync uploads the new version.
-func (m *Manager) Stage(ctx context.Context, bucket, key string, r io.Reader, metadata map[string]any) error {
+// The options carry the knobs a stage can set — Private marks the object
+// signed-link-only. Re-staging a bucket/key replaces its metadata and
+// options and makes the stored manifest stale, so the next sync uploads
+// the new version.
+func (m *Manager) Stage(ctx context.Context, bucket, key string, r io.Reader, metadata map[string]any, opts ...StageOptions) error {
+	var opt StageOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 	if err := ValidateBucketName(bucket); err != nil {
 		return err
 	}
@@ -174,8 +238,8 @@ func (m *Manager) Stage(ctx context.Context, bucket, key string, r io.Reader, me
 	}
 	// A key may name a subdirectory, so the target directory exists before
 	// the rename. The temp file makes a half-written staging file
-	// invisible: the watcher only ever sees the final name, complete or
-	// absent.
+	// invisible: the next stage or sync of the same key only ever sees the
+	// final name, complete or absent.
 	target := m.stagingPath(bucket, key)
 	if mkdirErr := os.MkdirAll(filepath.Dir(target), 0o755); mkdirErr != nil {
 		return fmt.Errorf("storage: staging %q: %w", key, mkdirErr)
@@ -204,7 +268,7 @@ func (m *Manager) Stage(ctx context.Context, bucket, key string, r io.Reader, me
 	if err != nil {
 		return fmt.Errorf("storage: staging %q: %w", key, err)
 	}
-	if err := m.manifests.Stage(ctx, m.db, bucketID, key, info.Size(), micros(info.ModTime()), metadata); err != nil {
+	if err := m.manifests.Stage(ctx, m.db, bucketID, key, info.Size(), micros(info.ModTime()), metadata, opt.Private); err != nil {
 		return err
 	}
 	m.metrics.recordStaged(ctx)
@@ -546,3 +610,4 @@ type stagingFingerprint struct {
 func micros(t time.Time) time.Time {
 	return t.Truncate(time.Microsecond)
 }
+

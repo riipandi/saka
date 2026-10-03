@@ -210,7 +210,10 @@ func NewRouter(opts Options) chi.Router {
 	// the SPA keeps the paths.
 	if opts.Injector != nil {
 		if manager, err := do.Invoke[*storage.Manager](opts.Injector); err == nil && manager != nil {
-			transportstorage.Mount(r, manager)
+			// A run without the signer still mounts: public files serve,
+			// private ones fail closed at the handler.
+			signer, _ := do.Invoke[*storage.Signer](opts.Injector)
+			transportstorage.Mount(r, manager, signer)
 		}
 	}
 

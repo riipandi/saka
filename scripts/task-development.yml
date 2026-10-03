@@ -40,5 +40,5 @@ tasks:
     desc: Update dependencies
     deps: [rpc:generate]
     cmds:
-      - pnpm exec npm-check-updates --configFilePath .config --configFileName ncurc.json
+      - pnpm exec npm-check-updates --configFileName .ncurc.json
       - go mod download && go mod tidy

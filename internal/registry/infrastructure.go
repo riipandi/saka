@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/apikey"
+	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/federation/scimsync"
 	"github.com/riipandi/saka/modules/identity"
 	"github.com/riipandi/saka/modules/identity/jwks"
@@ -223,13 +224,37 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			return storage.New(*c)
 		}),
 
+		do.Lazy(func(i do.Injector) (*storage.Signer, error) {
+			c := do.MustInvoke[*config.Config](i)
+			if c.App.SecretKey == "" {
+				// No secret, no signer: the mount still serves the public
+				// files, and a private one fails closed at the handler.
+				return nil, nil
+			}
+			return storage.NewSigner(c.App.SecretKey)
+		}),
+
 		do.Lazy(func(i do.Injector) (*storage.Manager, error) {
 			c := do.MustInvoke[*config.Config](i)
 			pool := do.MustInvoke[*datastore.Postgres](i)
 			store := do.MustInvoke[storage.Store](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			return storage.NewManager(store, pool,
-				filepath.Join(c.Storage.LocalPath, "staging"), log), nil
+			signer := do.MustInvoke[*storage.Signer](i)
+			manager := storage.NewManager(store, pool,
+				filepath.Join(c.Storage.LocalPath, "staging"), log).WithSigner(signer)
+			// The signed links' default expiry is the operator's setting,
+			// read fresh at every mint through the cache the settings
+			// service keeps.
+			if settings, err := do.Invoke[*appconfig.Settings](i); err == nil && settings != nil {
+				manager.WithSignedURLTTL(func(ctx context.Context) (time.Duration, error) {
+					seconds, err := settings.GetInt64(ctx, appconfig.SettingStorageSignedURLExpires)
+					if err != nil {
+						return 0, err
+					}
+					return time.Duration(seconds) * time.Second, nil
+				})
+			}
+			return manager, nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*queue.Client, error) {

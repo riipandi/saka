@@ -178,7 +178,7 @@ interface GoBuildResult {
 }
 
 // CGO_ENABLED=0 because the release link flags pass -extldflags -static,
-// which no platform links when cgo is on. It is also what .config/goreleaser.yaml
+// which no platform links when cgo is on. It is also what .goreleaser.yaml
 // sets, so both build paths produce the same binary. A dependency that has a
 // cgo path and a pure-Go path picks the pure-Go one, which is what makes the
 // static link work rather than a reason to drop the flag.

@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS public.storage_objects (
     -- staging side still match what the backend holds.
     content_hash TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    -- A private object is only served over a signed link: a plain read of
+    -- /storage answers 404, the same shape a missing object answers, so the
+    -- manifest itself never has to leak which keys exist.
+    is_private BOOLEAN NOT NULL DEFAULT false,
     -- Free-form metadata the storing feature owns: content type, original
     -- file name, owner id. The engine never reads it, only carries it.
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,

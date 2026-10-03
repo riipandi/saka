@@ -121,13 +121,8 @@ Build the image with `task docker:build`. Read the [Deployment Guidelines](./doc
 
 ## License
 
-Licensed under either of [Apache License 2.0][license-apache] or [MIT license][license-mit] at your option.
-
-> Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you,
-> as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-
-Copyrights in this project are retained by their contributors. See the [LICENSE-APACHE](./LICENSE-APACHE) and
-[LICENSE-MIT](./LICENSE-MIT) files for more information.
+This project licensed under the [Apache License 2.0][license-apache].
+See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) for more information.
 
 ---
 
@@ -140,7 +135,6 @@ Copyrights in this project are retained by their contributors. See the [LICENSE-
 [go-chi]: https://github.com/go-chi/chi
 [golang]: https://go.dev/doc/install
 [license-apache]: https://choosealicense.com/licenses/apache-2.0/
-[license-mit]: https://choosealicense.com/licenses/mit/
 [nodejs]: https://nodejs.org/en/download
 [pnpm]: https://pnpm.io/installation
 [postgres]: https://www.postgresql.org/

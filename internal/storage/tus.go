@@ -81,7 +81,7 @@ func (m *Manager) TusBegin(ctx context.Context, bucket, key string, length int64
 	if err := m.truncateStaging(bucket, key); err != nil {
 		return err
 	}
-	if err := m.manifests.Stage(ctx, m.db, bucketID, key, 0, micros(time.Now()), metadata); err != nil {
+	if err := m.manifests.Stage(ctx, m.db, bucketID, key, 0, micros(time.Now()), metadata, false); err != nil {
 		return err
 	}
 	m.metrics.recordStaged(ctx)

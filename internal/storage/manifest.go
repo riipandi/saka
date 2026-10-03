@@ -37,10 +37,12 @@ const (
 // Bucket is the name of the bucket the file lives in (the logical namespace
 // the row is scoped by) and BucketID its storage_buckets row id. Metadata is
 // the feature's own free-form record — content type, original file name,
-// owner — carried and rewritten but never interpreted here. StagingSize and
-// StagingMtime fingerprint the staging file the hash was computed from: a
-// retry that finds both unchanged reuses the stored hash instead of reading
-// the file again.
+// owner — carried and rewritten but never interpreted here. IsPrivate marks
+// the file signed-link-only: the /storage mount answers a plain read with
+// the 404 a missing object gets, and the bytes travel only behind a link
+// the Signer minted. StagingSize and StagingMtime fingerprint the staging
+// file the hash was computed from: a retry that finds both unchanged
+// reuses the stored hash instead of reading the file again.
 //
 // ID is the object row's identifier in its wire form — the TypeID whose
 // prefix tells a reader of a log line or a support ticket what it names
@@ -54,6 +56,7 @@ type File struct {
 	Size         int64
 	ContentHash  string
 	Status       string
+	IsPrivate    bool
 	Metadata     map[string]any
 	StagingSize  int64
 	StagingMtime time.Time
@@ -115,7 +118,7 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key st
 	fb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	fb.Select(
 		"o.id", "b.name", "o.key", "o.size", "o.content_hash", "o.status",
-		"o.metadata", "o.staging_size", "o.staging_mtime",
+		"o.is_private", "o.metadata", "o.staging_size", "o.staging_mtime",
 	)
 	fb.From(objectsTable + " o")
 	fb.Join(bucketsTable + " b ON b.id = o.bucket_id")
@@ -126,7 +129,7 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key st
 	query, args := fb.Build()
 	err := q.QueryRow(ctx, query, args...).Scan(
 		&rawID, &file.Bucket, &file.Key, &file.Size, &file.ContentHash, &file.Status,
-		&metadata, &file.StagingSize, &file.StagingMtime,
+		&file.IsPrivate, &metadata, &file.StagingSize, &file.StagingMtime,
 	)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return Manifest{}, ErrNoManifest
@@ -146,7 +149,9 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key st
 
 // Save commits one manifest. It runs inside the caller's transaction, so a
 // manifest is visible whole or not at all. A pending save is the checkpoint
-// a retry resumes from; a ready save is the finished one.
+// a retry resumes from; a ready save is the finished one. IsPrivate is
+// deliberately absent from the write set: the stage owns the flag, and a
+// sync's round trip must not flip what the staging write decided.
 func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error {
 	metadata, err := json.Marshal(file.Metadata)
 	if err != nil {
@@ -186,7 +191,7 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 // hashing and upload the new bytes under the old digest. Clearing it means a
 // re-stage always pays for one hash, and a retry of an unchanged file still
 // takes the reuse path off the checkpoint the sync itself committed.
-func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any) error {
+func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any, isPrivate bool) error {
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("storage: encode metadata of %q: %w", key, err)
@@ -194,10 +199,11 @@ func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key s
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(objectsTable)
-	ib.Cols("bucket_id", "key", "size", "content_hash", "status", "metadata", "staging_size", "staging_mtime")
-	ib.Values(bucketID, key, size, "", StatusPending, encoded, size, nullableTime(mtime))
+	ib.Cols("bucket_id", "key", "size", "content_hash", "status", "is_private", "metadata", "staging_size", "staging_mtime")
+	ib.Values(bucketID, key, size, "", StatusPending, isPrivate, encoded, size, nullableTime(mtime))
 	ib.SQL("ON CONFLICT (bucket_id, key) DO UPDATE SET " +
 		"content_hash = EXCLUDED.content_hash, " +
+		"is_private = EXCLUDED.is_private, " +
 		"metadata = EXCLUDED.metadata, " +
 		"staging_size = EXCLUDED.staging_size, " +
 		"staging_mtime = EXCLUDED.staging_mtime, " +

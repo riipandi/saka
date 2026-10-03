@@ -42,24 +42,20 @@ type ManagerSource interface {
 }
 
 // Mount registers the /storage mount on the router, backed by the storage
-// engine.
-func Mount(r chi.Router, manager ManagerSource) {
-	h := handler(manager)
+// engine. The signer verifies the links a private object is read over; nil
+// fails every private read closed — a private object answers 404 whether a
+// signer is wired or not, so marking objects private without a signer has
+// broken them on purpose.
+func Mount(r chi.Router, manager ManagerSource, signer *engine.Signer) {
+	h := handler(manager, signer)
 	r.Handle(Path, h)
 	r.Handle(Path+"/*", h)
 }
 
-// handler is the one place the mount's policy lives: immutable cache
-// headers, the not-found boundary, and bucket/key parsing.
-func handler(source ManagerSource) http.Handler {
+// handler is the one place the mount's policy lives: the visibility check,
+// the cache headers, the not-found boundary, and bucket/key parsing.
+func handler(source ManagerSource, signer *engine.Signer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Stored files are immutable by convention — a stored file's name
-		// carries its identity — so a client may cache one for as long as
-		// it likes without a revalidation round trip. The path is what
-		// names the content, so a replacement lands under a new name.
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-
 		bucket, key, ok := splitRequestPath(r.URL.Path)
 		if !ok {
 			miss(w, r)
@@ -72,10 +68,30 @@ func handler(source ManagerSource) http.Handler {
 			return
 		}
 		if err != nil {
-			w.Header().Del("Cache-Control")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
+
+		// A private object is the signed link's only audience. The refusal
+		// is the 404 a missing object gets — never a 403 that confirms the
+		// key exists — and the response must not be cached where a later
+		// holder of the link could dig the bytes out of.
+		if manifest.IsPrivate {
+			exp, _ := strconv.ParseInt(r.URL.Query().Get("exp"), 10, 64)
+			if signer == nil || !signer.Verify(bucket, key, exp, r.URL.Query().Get("sig")) {
+				miss(w, r)
+				return
+			}
+			w.Header().Set("Cache-Control", "private, no-store")
+		} else {
+			// Stored files are immutable by convention — a stored file's
+			// name carries its identity — so a client may cache one for as
+			// long as it likes without a revalidation round trip. The path
+			// is what names the content, so a replacement lands under a new
+			// name.
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 
 		body, err := source.Open(r.Context(), bucket, key)
 		if err != nil {
@@ -123,9 +139,9 @@ func splitRequestPath(path string) (bucket, key string, ok bool) {
 	return bucket, key, true
 }
 
-// miss answers a request the mount cannot serve. The cache header above
-// describes the bytes of a file that exists, so a miss must not carry it: a
-// client that kept the 404 would never see the file a later write stores.
+// miss answers a request the mount cannot serve. The cache header a served
+// file carries describes its bytes, so a miss must not carry one: a client
+// that kept the 404 would never see the file a later write stores.
 func miss(w http.ResponseWriter, r *http.Request) {
 	w.Header().Del("Cache-Control")
 	http.NotFound(w, r)

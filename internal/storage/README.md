@@ -338,6 +338,18 @@ file belongs to — the storage_buckets row's own name. `storage.New(cfg)` build
 `storage.driver` section names (`FS` over `storage.local_path`, `S3` over `storage.s3.*`);
 both translate their protocol's not-found shape into `ErrNotFound` at the edge.
 
+### Private files and signed links
+
+A manifest row's `is_private` flag (set at stage time through `StageOptions`) marks a file
+readable only over a signed link: a plain read of `/storage` answers the 404 a missing
+object gets — never a 403 that would confirm the key exists — and the response carries
+`Cache-Control: private, no-store`, so the bytes are not cached where a later holder of the
+link could dig them out. The link is `?exp=<unix>&sig=<hex>`: the expiry is inside the HMAC
+payload (`storage.Signer`, keyed with `app.secret_key`, constant-time compare), so a
+truncated lifetime cannot be edited longer. `Manager.SignedURL` composes the full link; its
+default ttl is the `storage.signed_url_expires` appconfig setting, read at every mint. A
+run without a signer fails every private read closed; public files are untouched.
+
 ## Database Schema
 
 Two tables, created by migration `database/migrations/00009_create_filestore_tables.sql`:
