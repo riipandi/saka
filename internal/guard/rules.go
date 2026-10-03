@@ -20,6 +20,8 @@ import (
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
 	settingsv1 "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1"
 	settingsv1connect "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1/settingsv1connect"
+	storagev1 "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1"
+	storagev1connect "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1/storagev1connect"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
 	webhookv1 "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1"
@@ -360,6 +362,17 @@ var ProcedureRules = map[string]Entry{
 	webhookv1connect.WebhookServiceListAllDeliveriesProcedure: {Rule: Admin},
 	webhookv1connect.WebhookServiceListEventTypesProcedure:    {Rule: Admin},
 
+	// The storage bucket surface is administrative all the way through: a
+	// bucket is a deployment-wide namespace — it changes what the engine
+	// stores, what `/storage` serves, and what every uploading feature
+	// writes into. The default bucket itself is also the deletion guard's
+	// subject, read from the settings at call time.
+	storagev1connect.BucketServiceCreateBucketProcedure: {Rule: Admin},
+	storagev1connect.BucketServiceUpdateBucketProcedure: {Rule: Admin},
+	storagev1connect.BucketServiceDeleteBucketProcedure: {Rule: Admin},
+	storagev1connect.BucketServiceListBucketsProcedure:  {Rule: Admin},
+	storagev1connect.BucketServiceGetBucketProcedure:    {Rule: Admin},
+
 	// The application-configuration surface is the deployment's own settings.
 	// The test-email send is administrative: it proves the mailer from the
 	// settings screen, so it is not an account read, and there is no self
@@ -595,6 +608,7 @@ func ContractProcedures() []string {
 		federationv1.File_federation_proto,
 		identityv1.File_identity_proto,
 		notificationv1.File_notification_proto,
+		storagev1.File_storage_proto,
 		webhookv1.File_webhook_proto,
 		settingsv1.File_settings_proto,
 		systemv1.File_system_proto,

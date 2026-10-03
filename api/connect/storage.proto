@@ -1,0 +1,201 @@
+// The storage bucket contract: the logical namespaces the file engine
+// serves.
+//
+// A bucket is a first path segment: `/storage/{bucket}/{key}` resolves its
+// first piece against this table before anything is streamed. The buckets
+// themselves are administrative data — an administrator creates, renames
+// the limits of, and deletes them — while every authenticated account may
+// upload into any of them through the tus surface. The deletion rules the
+// service enforces are stricter than the protocol suggests: a bucket that
+// still holds objects is refused, and so is the bucket the
+// `storage.default_bucket` setting names, because half the writers would
+// lose their target on the next stage.
+syntax = "proto3";
+
+package saka.storage.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1;storagev1";
+
+// BucketService manages the deployment's storage buckets. Every procedure
+// is administrative: a bucket changes what the whole deployment stores and
+// serves.
+service BucketService {
+  // CreateBucket registers a new bucket. The name is unique
+  // deployment-wide.
+  rpc CreateBucket(CreateBucketRequest) returns (CreateBucketResponse);
+
+  // UpdateBucket rewrites a bucket's limits. Every field is optional and an
+  // absent field keeps its stored value. The name itself is immutable: it is
+  // the first segment of every stored reference and every URL already
+  // published.
+  rpc UpdateBucket(UpdateBucketRequest) returns (UpdateBucketResponse);
+
+  // DeleteBucket removes an empty bucket. A bucket that still holds objects
+  // is refused, and so is the bucket the default-bucket setting names.
+  rpc DeleteBucket(DeleteBucketRequest) returns (DeleteBucketResponse);
+
+  // ListBuckets answers every bucket the deployment holds. Buckets are a
+  // small, administrator-managed set, so the answer carries no pagination.
+  rpc ListBuckets(ListBucketsRequest) returns (ListBucketsResponse);
+
+  // GetBucket answers one bucket's view by name.
+  rpc GetBucket(GetBucketRequest) returns (GetBucketResponse);
+}
+
+// Bucket is a bucket's view.
+message Bucket {
+  // id is the bucket row's identifier, in its wire form: the prefix names
+  // what it identifies, the database column stays a UUID.
+  string id = 1;
+
+  // name is the bucket's slug, unique deployment-wide: the first segment of
+  // every `/storage/{bucket}/{key}` URL the deployment serves.
+  string name = 2;
+
+  // file_size_limit is the largest object the bucket accepts, in bytes,
+  // absent when the bucket is unlimited.
+  optional int64 file_size_limit = 3;
+
+  // allowed_mime_types are the content types the bucket accepts, absent
+  // when the bucket accepts any.
+  repeated string allowed_mime_types = 4;
+
+  // created_at is the registration instant.
+  google.protobuf.Timestamp created_at = 5;
+
+  // updated_at is the last field-changing write, absent when the row was
+  // never updated.
+  optional google.protobuf.Timestamp updated_at = 6;
+}
+
+// CreateBucketRequest carries the new bucket's name and optional limits.
+message CreateBucketRequest {
+  // name is the bucket's slug: one path segment, lowercase letters, digits,
+  // dash, and underscore, at most 100 characters. The names the engine
+  // reserves for its own data directories (staging, logs, backup, config,
+  // files) are refused at the service boundary.
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    pattern: "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$"
+  }];
+
+  // file_size_limit is the largest object the bucket accepts, in bytes. It
+  // must be positive: zero would mean an object that cannot exist, not an
+  // unlimited one.
+  optional int64 file_size_limit = 2 [(buf.validate.field).int64.gt = 0];
+
+  // allowed_mime_types are the content types the bucket accepts. Absent
+  // means no type list is set — the bucket accepts any type.
+  optional MimeTypeSet allowed_mime_types = 3;
+}
+
+// MimeTypeSet wraps the content-type list so an update can tell an absent
+// list from an empty one.
+message MimeTypeSet {
+  // types are the content types. An empty list accepts no type.
+  repeated string types = 1 [(buf.validate.field).repeated.items.string.max_len = 255];
+}
+
+// CreateBucketResponse is the created bucket.
+message CreateBucketResponse {
+  // bucket is the created bucket's view.
+  Bucket bucket = 1;
+
+  // status is the envelope's success marker.
+  string status = 2;
+
+  // message is the envelope's human-readable outcome.
+  string message = 3;
+}
+
+// UpdateBucketRequest carries the limit changes. The name is the target and
+// cannot be changed.
+message UpdateBucketRequest {
+  // name is the bucket to update.
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    pattern: "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$"
+  }];
+
+  // file_size_limit replaces the size limit when present. Absent keeps the
+  // stored value.
+  optional int64 file_size_limit = 2 [(buf.validate.field).int64.gt = 0];
+
+  // allowed_mime_types replaces the type list when present. Absent keeps
+  // the stored value.
+  optional MimeTypeSet allowed_mime_types = 3;
+}
+
+// UpdateBucketResponse is the updated bucket.
+message UpdateBucketResponse {
+  // bucket is the updated bucket's view.
+  Bucket bucket = 1;
+
+  // status is the envelope's success marker.
+  string status = 2;
+
+  // message is the envelope's human-readable outcome.
+  string message = 3;
+}
+
+// DeleteBucketRequest names the bucket to remove.
+message DeleteBucketRequest {
+  // name is the bucket to delete.
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    pattern: "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$"
+  }];
+}
+
+// DeleteBucketResponse confirms the removal.
+message DeleteBucketResponse {
+  // status is the envelope's success marker.
+  string status = 1;
+
+  // message is the envelope's human-readable outcome.
+  string message = 2;
+}
+
+// ListBucketsRequest carries no filter: the set is small and
+// administrator-managed.
+message ListBucketsRequest {}
+
+// ListBucketsResponse answers every bucket.
+message ListBucketsResponse {
+  // buckets are the deployment's buckets, oldest first.
+  repeated Bucket buckets = 1;
+
+  // status is the envelope's success marker.
+  string status = 2;
+
+  // message is the envelope's human-readable outcome.
+  string message = 3;
+}
+
+// GetBucketRequest names the bucket to read.
+message GetBucketRequest {
+  // name is the bucket to read.
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    pattern: "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$"
+  }];
+}
+
+// GetBucketResponse is the bucket's view.
+message GetBucketResponse {
+  // bucket is the bucket's view.
+  Bucket bucket = 1;
+
+  // status is the envelope's success marker.
+  string status = 2;
+
+  // message is the envelope's human-readable outcome.
+  string message = 3;
+}

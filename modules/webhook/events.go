@@ -86,6 +86,10 @@ var catalog = []Event{
 	{Source: audit.EventAPIKeyRevoked, Name: "api_key.revoked", Description: "A machine credential was revoked."},
 	{Source: audit.EventAPIKeyExpiryEmailSent, Name: "api_key.expiry_email_sent", Description: "An API key expiry reminder was submitted for delivery."},
 
+	{Source: audit.EventStorageBucketCreated, Name: "storage_bucket.created", Description: "A storage bucket was registered."},
+	{Source: audit.EventStorageBucketUpdated, Name: "storage_bucket.updated", Description: "A storage bucket's limits were rewritten."},
+	{Source: audit.EventStorageBucketDeleted, Name: "storage_bucket.deleted", Description: "A storage bucket was removed."},
+
 	{Source: audit.EventNotificationCreated, Name: "notification.created", Description: "A notification was published to its audience."},
 	{Source: audit.EventNotificationCancelled, Name: "notification.cancelled", Description: "A notification was withdrawn."},
 

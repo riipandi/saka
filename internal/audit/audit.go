@@ -162,6 +162,18 @@ const (
 	// every email record, it names the delivery, not the message's contents.
 	EventAPIKeyExpiryEmailSent = "api_key_expiry_email_sent"
 
+	// EventStorageBucketCreated is a storage bucket registered. The payload
+	// names the bucket; the limits live on the row, not in the record.
+	EventStorageBucketCreated = "storage_bucket_created"
+
+	// EventStorageBucketUpdated is a bucket's limits rewritten. The name is
+	// immutable, so an update is always a limits change.
+	EventStorageBucketUpdated = "storage_bucket_updated"
+
+	// EventStorageBucketDeleted is a bucket removed. Only empty buckets that
+	// no setting names can reach this event.
+	EventStorageBucketDeleted = "storage_bucket_deleted"
+
 	// EventNotificationCreated is a notification published to its audience.
 	// The payload names the category, the audience kind, and whether an
 	// email pass was asked for.

@@ -11,8 +11,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.jetify.com/typeid"
 
 	"github.com/riipandi/saka/database"
 	"github.com/riipandi/saka/internal/datastore"
@@ -106,6 +108,35 @@ func TestManagerSyncStoresTheManifestAndDropsTheStagingFile(t *testing.T) {
 	paths, err := listedKeys(ctx, store)
 	require.NoError(t, err)
 	assert.Equal(t, []string{testBucket + "/docs/report.txt"}, paths)
+}
+
+// TestTheManifestAnswersTheObjectIdInItsWireForm pins the identifier's wire
+// form: the manifest's id carries the file TypeID's prefix, and parsing it
+// back answers the UUID the column stores.
+func TestTheManifestAnswersTheObjectIdInItsWireForm(t *testing.T) {
+	manager, _, _ := newManager(t)
+	ctx := t.Context()
+
+	data := bytes.Repeat([]byte("grimoire"), 100)
+	require.NoError(t, manager.Stage(ctx, testBucket, "docs/typed.txt", bytes.NewReader(data), nil))
+	require.NoError(t, manager.Sync(ctx, testBucket+"/docs/typed.txt"))
+
+	manifest, err := manager.Manifest(ctx, testBucket, "docs/typed.txt")
+	require.NoError(t, err)
+	require.Regexp(t, `^file_[a-z0-9]{26}$`, manifest.ID,
+		"the manifest's id carries the object TypeID's prefix")
+
+	typed, err := typeid.Parse[FileID](manifest.ID)
+	require.NoError(t, err)
+
+	var rawID string
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id")
+	sb.From(objectsTable)
+	sb.Where(sb.Equal("bucket_id", manager.mustBucketID(ctx, testBucket)), sb.Equal("key", "docs/typed.txt"))
+	query, args := sb.Build()
+	require.NoError(t, manager.db.QueryRow(ctx, query, args...).Scan(&rawID))
+	assert.Equal(t, rawID, typed.UUID(), "the typed id carries the column's bytes")
 }
 
 func TestManagerSyncOfTheSameBytesIsAShortCircuit(t *testing.T) {

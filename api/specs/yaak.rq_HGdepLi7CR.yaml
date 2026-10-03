@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_HGdepLi7CR
+createdAt: 2026-10-03T17:53:06.223981
+updatedAt: 2026-10-03T18:08:53.211312
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_9GjzmC2N4g
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "name": "reports"
+    }
+bodyType: application/json
+description: '[Saka] Answers one bucket''s view by name. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: Get Storage Bucket
+sortPriority: 2222.222222222222
+url: ${[ apiBaseURL ]}/rpc/saka.storage.v1.BucketService/GetBucket
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

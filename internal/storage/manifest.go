@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
+	"go.jetify.com/typeid"
 
 	"github.com/riipandi/saka/internal/datastore"
 )
@@ -39,6 +41,11 @@ const (
 // StagingMtime fingerprint the staging file the hash was computed from: a
 // retry that finds both unchanged reuses the stored hash instead of reading
 // the file again.
+//
+// ID is the object row's identifier in its wire form — the TypeID whose
+// prefix tells a reader of a log line or a support ticket what it names
+// without a lookup. The column stays a UUID; the conversion lives in the
+// scan and nowhere else.
 type File struct {
 	ID           string
 	BucketID     string
@@ -50,6 +57,39 @@ type File struct {
 	Metadata     map[string]any
 	StagingSize  int64
 	StagingMtime time.Time
+}
+
+// FileIDPrefix is the TypeID prefix of an object row's identifier.
+type FileIDPrefix struct{}
+
+// Prefix reports the TypeID prefix.
+func (FileIDPrefix) Prefix() string { return "file" }
+
+// FileID is the typed identifier of one row of the objects table, in its
+// wire form.
+type FileID = typeid.TypeID[FileIDPrefix]
+
+// FormatObjectID renders the wire form of an object row's UUID. Rows read
+// from the database always carry a valid UUID, so the render cannot fail;
+// an invalid one answers the empty string, which no consumer should
+// mistake for an id.
+func FormatObjectID(raw uuid.UUID) string {
+	id, err := typeid.FromUUID[FileID](raw.String())
+	if err != nil {
+		return ""
+	}
+	return id.String()
+}
+
+// formatObjectID reads the object row's UUID out of the text form its
+// column scans into, and answers the wire form. A column value that is not
+// a UUID is a database defect the read refuses.
+func formatObjectID(raw string) (string, error) {
+	parsed, err := uuid.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("storage: object id %q: %w", raw, err)
+	}
+	return FormatObjectID(parsed), nil
 }
 
 // Manifest is one stored file's record.
@@ -82,10 +122,10 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key st
 	fb.Where(fb.Equal("o.bucket_id", bucketID), fb.Equal("o.key", key))
 
 	var file File
-	var metadata []byte
+	var rawID, metadata string
 	query, args := fb.Build()
 	err := q.QueryRow(ctx, query, args...).Scan(
-		&file.ID, &file.Bucket, &file.Key, &file.Size, &file.ContentHash, &file.Status,
+		&rawID, &file.Bucket, &file.Key, &file.Size, &file.ContentHash, &file.Status,
 		&metadata, &file.StagingSize, &file.StagingMtime,
 	)
 	if errors.Is(err, datastore.ErrNoRows) {
@@ -95,8 +135,10 @@ func (Manifests) Load(ctx context.Context, q datastore.Querier, bucketID, key st
 		return Manifest{}, fmt.Errorf("storage: load file %q: %w", key, err)
 	}
 	file.BucketID = bucketID
-	err = json.Unmarshal(metadata, &file.Metadata)
-	if err != nil {
+	if file.ID, err = formatObjectID(rawID); err != nil {
+		return Manifest{}, fmt.Errorf("storage: load file %q: %w", key, err)
+	}
+	if err := json.Unmarshal([]byte(metadata), &file.Metadata); err != nil {
 		return Manifest{}, fmt.Errorf("storage: decode metadata of %q: %w", key, err)
 	}
 	return file, nil

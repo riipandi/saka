@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/saka/modules/federation"
 	"github.com/riipandi/saka/modules/identity"
 	"github.com/riipandi/saka/modules/notification"
+	"github.com/riipandi/saka/modules/storage"
 	"github.com/riipandi/saka/modules/webhook"
 )
 
@@ -74,6 +75,11 @@ func Areas() []Area {
 		// The protocol endpoints claim their own root paths, so the order
 		// beside the other areas is descriptive rather than a dependency.
 		{Name: federation.ModuleName, Package: federation.Package, Mount: federation.Mount},
+		// The storage area serves the buckets the file engine resolves and
+		// the administrative surface that manages them. It mounts with the
+		// other administrative areas and claims nothing the earlier areas
+		// claim.
+		{Name: storage.AreaName, Package: storage.Package, Mount: storage.Mount},
 	}
 }
 

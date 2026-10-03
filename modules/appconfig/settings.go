@@ -244,6 +244,11 @@ const (
 
 	// SettingUsersChangeUsernameEnabled gates the username change flow.
 	SettingUsersChangeUsernameEnabled = "users.change_username_enabled"
+
+	// SettingStorageDefaultBucket names the bucket the stage path writes
+	// into when a feature names none. A deletion of the bucket this setting
+	// names is refused, so changing the selection is the way out.
+	SettingStorageDefaultBucket = "storage.default_bucket"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -460,6 +465,11 @@ func Catalog() []SettingDef {
 			Key:         SettingUsersChangeUsernameEnabled,
 			Default:     "true",
 			Description: "Whether the username change flow is offered.",
+		},
+		{
+			Key:         SettingStorageDefaultBucket,
+			Default:     "default",
+			Description: "The bucket the stage path writes into when a feature names none. A deletion of the bucket this setting names is refused, so changing the selection is the way out of it.",
 		},
 	}
 }
