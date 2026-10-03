@@ -6,11 +6,11 @@ a fragment engine ported from olivere/vite. There is no `index.html` — the bui
 the application entry, and every path the routes above it did not claim renders the shell.
 
 > **Origin:** the fragment engine is based on [olivere/vite](https://github.com/olivere/vite)
-> (MIT), ported and reduced to what tango serves: one fragment per entry point, resolved
+> (MIT), ported and reduced to what saka serves: one fragment per entry point, resolved
 > from the build manifest in release and from the dev server in debug. The handler and
 > metadata layers upstream carries were not ported — serving the assets stays with the
 > `SetupStatic` seam and the HTML document stays with the shell. Upstream is no longer
-> tracked: the engine is owned and evolved by tango.
+> tracked: the engine is owned and evolved by saka.
 
 ## Features
 
@@ -80,7 +80,7 @@ flowchart TB
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. `internal/transport`'s
+The package lives inside the `saka` module and is not published. `internal/transport`'s
 `NewRouter` mounts it last with one call — `web.SetupStatic(r)` — because the SPA answers
 whatever the routes above it did not claim; its own not-found and method-not-allowed
 boundaries keep API and protocol paths in the envelope. The build pipeline is the
@@ -95,7 +95,7 @@ templates, then rebuilds both Go targets (debug and release) with the new output
 task dev
 ```
 
-One command, one origin. The `golang` plugin builds `build/debug/tango`, starts it, and
+One command, one origin. The `golang` plugin builds `build/debug/saka`, starts it, and
 rebuilds it on every Go change — that is the Go hot reload; Vite keeps the module
 transform and the HMR, but the browser never sees it: **:3080** is the only origin, the
 shell's fragment carries same-origin paths, and the debug build proxies the compiler's
@@ -117,7 +117,7 @@ Name the page in Go:
 ```go
 var LandingPage = web.Page{
     Entry:       "landing/main.tsx",
-    Title:       "Tango — sign in",
+    Title:       "Saka — sign in",
     Description: "Passkey-first sign in",
     Noindex:     false,
 }
@@ -137,7 +137,7 @@ mounted beside it, the way every other chi mount is.
 ### 3. Build for Release
 
 ```bash
-TANGO_SKIP_GO=1 pnpm exec vite build   # assets + manifest into web/output
+SAKA_SKIP_GO=1 pnpm exec vite build   # assets + manifest into web/output
 task build                             # both Go targets embed it
 ```
 
@@ -218,4 +218,4 @@ go test -race ./web/
 ## Credits
 
 The fragment engine is based on [olivere/vite](https://github.com/olivere/vite) by Oliver
-Eilhauer, adapted for the tango architecture.
+Eilhauer, adapted for the saka architecture.

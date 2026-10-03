@@ -19,13 +19,13 @@
 // nothing about whether the procedure or the account exists.
 syntax = "proto3";
 
-package tango.auditlog.v1;
+package saka.auditlog.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1;auditlogv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1;auditlogv1";
 
 // AuditLogService reads the audit trail.
 service AuditLogService {
@@ -171,7 +171,7 @@ message ListResponse {
   repeated AuditLog logs = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -231,7 +231,7 @@ message ListAllResponse {
   repeated AuditLog logs = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -263,7 +263,7 @@ message ListForUserResponse {
   repeated AuditLog logs = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.

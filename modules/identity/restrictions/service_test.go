@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The lockout policy the tests run: five attempts — the reader's floor —

@@ -1,6 +1,6 @@
 # Fetcher
 
-Fetcher is tango's outbound HTTP client. Integrations call external services through one
+Fetcher is saka's outbound HTTP client. Integrations call external services through one
 `Client`; the composition root builds it from `config.Fetcher` and the process logger.
 
 > **Relation to the registry:** `internal/registry` registers the client, `serve` resolves
@@ -12,7 +12,7 @@ Fetcher is tango's outbound HTTP client. Integrations call external services thr
 - **One client for every integration** — method, absolute URL, query, headers, and
   body in, status, headers, and body out. The upstream address is hardcoded at
   the call site
-- **A product token, not a browser token** — `tango/<version> (+https://github.com/riipandi/tango)`.
+- **A product token, not a browser token** — `saka/<version> (+https://github.com/riipandi/saka)`.
   The generated config file does not list `fetcher.user_agent`; the binary default stands
 - **One attempt budget** — `fetcher.timeout` bounds the dial, the handshake, and the
   attempt. The caller's context still cancels the attempt and any wait between retries

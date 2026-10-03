@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // BanNotifier is the adapter between the user service's banNotifier

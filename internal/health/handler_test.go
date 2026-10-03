@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/health"
+	"github.com/riipandi/saka/internal/health"
 )
 
 // nonEmptyLines splits output into lines, dropping blank ones.
@@ -186,14 +186,14 @@ func TestHandlerOrdersDetailsByName(t *testing.T) {
 func TestHandlerPublishesInfo(t *testing.T) {
 	checker := health.NewChecker(
 		health.WithCheck(health.Check{Name: "postgres", Check: passing}),
-		health.WithInfo(map[string]string{"name": "tango", "version": "1.2.3"}),
+		health.WithInfo(map[string]string{"name": "saka", "version": "1.2.3"}),
 	)
 
 	_, body := getHealth(t, checker)
 
 	data, ok := body["data"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "tango", data["name"])
+	assert.Equal(t, "saka", data["name"])
 	assert.Equal(t, "1.2.3", data["version"])
 	assert.NotContains(t, data, "info", "info entries must be flattened, not nested")
 }
@@ -282,13 +282,13 @@ func TestWriteTextHealthyReport(t *testing.T) {
 			},
 			"storage": {Name: "storage", Target: "/srv/storage", Status: health.StatusUp},
 		},
-		Info: map[string]string{"name": "tango", "version": "1.2.3", "uptime": "3 hours"},
+		Info: map[string]string{"name": "saka", "version": "1.2.3", "uptime": "3 hours"},
 	}
 
 	var out strings.Builder
 	require.NoError(t, health.WriteText(&out, result, nil))
 
-	assert.Equal(t, `name: tango
+	assert.Equal(t, `name: saka
 uptime: 3 hours
 version: 1.2.3
 status: healthy
@@ -543,7 +543,7 @@ func TestMarshalIsDeterministic(t *testing.T) {
 			"storage":  {Name: "storage", Status: health.StatusUp},
 			"postgres": {Name: "postgres", Status: health.StatusUp},
 		},
-		Info: map[string]string{"version": "1", "name": "tango", "uptime": "<1 minute"},
+		Info: map[string]string{"version": "1", "name": "saka", "uptime": "<1 minute"},
 	}
 
 	encoded, err := json.Marshal(result)
@@ -560,7 +560,7 @@ func TestMarshalIsDeterministic(t *testing.T) {
 	// fields, in key order.
 	assert.Contains(t, string(encoded), `"took_ms":1`)
 	assert.Less(t, strings.Index(string(encoded), `"postgres"`), strings.Index(string(encoded), `"storage"`))
-	assert.Less(t, strings.Index(string(encoded), `"took_ms":1`), strings.Index(string(encoded), `"name":"tango"`))
-	assert.Less(t, strings.Index(string(encoded), `"name":"tango"`), strings.Index(string(encoded), `"uptime"`))
+	assert.Less(t, strings.Index(string(encoded), `"took_ms":1`), strings.Index(string(encoded), `"name":"saka"`))
+	assert.Less(t, strings.Index(string(encoded), `"name":"saka"`), strings.Index(string(encoded), `"uptime"`))
 	assert.Less(t, strings.Index(string(encoded), `"uptime"`), strings.Index(string(encoded), `"version"`))
 }

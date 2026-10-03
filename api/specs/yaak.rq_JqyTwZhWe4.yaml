@@ -19,7 +19,7 @@ description: |-
 
   The window is fixed at one hour — the refresh rotation keeps the delegation alive inside it, and the actor pair survives every renewal because it is re-signed from the session row. A target that is an administrator (or the caller itself) answers `permission_denied`; an unknown or malformed identifier answers `not_found`; a disabled or banned target answers the ended-session failure. The delegation is refused on self-service procedures by the guard, and both halves of its life are audited (`impersonation_started`, `impersonation_stopped`).
 
-  Tango-only surface, modeled on Better Auth's admin plugin but fitted to this architecture. Call Stop impersonating to end the delegation and return to the administrator's own account.
+  Saka-only surface, modeled on Better Auth's admin plugin but fitted to this architecture. Call Stop impersonating to end the delegation and return to the administrator's own account.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: QFBNheJfzY
 method: POST
-name: '[Tango] Impersonate user'
+name: '[Saka] Impersonate user'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/ImpersonateUser
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/ImpersonateUser
 urlParameters: []
 settingSendCookies:
   enabled: false

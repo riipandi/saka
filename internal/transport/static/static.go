@@ -23,7 +23,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // Path is the route prefix the uploads are served under. It is the path

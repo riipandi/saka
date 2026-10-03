@@ -7,7 +7,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
-	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/saka/internal/audit"
 )
 
 // FingerprintHeader is the header the frontend sends its browser fingerprint

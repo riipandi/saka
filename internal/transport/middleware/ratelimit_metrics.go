@@ -7,9 +7,9 @@ import (
 
 // meterName is the instrumentation scope the rate-limit counter is registered
 // under, rendered into otel_scope_name by the bridge.
-const meterName = "github.com/riipandi/tango/internal/transport/middleware"
+const meterName = "github.com/riipandi/saka/internal/transport/middleware"
 
-// The outcomes one check carries on tango.http.ratelimit.requests. A degraded
+// The outcomes one check carries on saka.http.ratelimit.requests. A degraded
 // check passed the request through with the limiter unable to answer — the
 // pass-through the limiter contract promises, counted so a limiter that has
 // quietly gone down still shows on a dashboard.
@@ -30,7 +30,7 @@ type rateLimitMetrics struct {
 func rateLimitInstrumentation() *rateLimitMetrics {
 	meter := otel.Meter(meterName)
 	var err error
-	requests, err := meter.Int64Counter("tango.http.ratelimit.requests",
+	requests, err := meter.Int64Counter("saka.http.ratelimit.requests",
 		metric.WithDescription("Rate limit checks by surface and outcome"),
 		metric.WithUnit("{request}"))
 	if err != nil {

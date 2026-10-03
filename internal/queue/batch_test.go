@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // testKey is a 64-character hex key, the shape APP_SECRET_KEY stores.

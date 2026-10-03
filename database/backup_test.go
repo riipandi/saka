@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // A data-only dump carries rows and no DDL, and loading it into another
@@ -305,7 +305,7 @@ func TestDumpOfEmptyDatabase(t *testing.T) {
 	content := dump(t, dumper(t, sourceDSN), database.DumpOptions{})
 
 	assert.Contains(t, content, "CREATE TABLE")
-	assert.Contains(t, content, "-- tango database dump")
+	assert.Contains(t, content, "-- saka database dump")
 
 	_, targetDSN := migratedPool(t)
 	_, err := database.NewRestorer(dumper(t, targetDSN), true).
@@ -323,7 +323,7 @@ func TestDumpHeaderCarriesNoCredentials(t *testing.T) {
 	lines := strings.Split(header, "\n")
 
 	require.Len(t, lines, 4)
-	assert.True(t, strings.HasPrefix(lines[0], "-- tango database dump"))
+	assert.True(t, strings.HasPrefix(lines[0], "-- saka database dump"))
 	assert.True(t, strings.HasPrefix(lines[1], "-- server: PostgreSQL"))
 	assert.True(t, strings.HasPrefix(lines[2], "-- database: "))
 	assert.True(t, strings.HasPrefix(lines[3], "-- generated: "))

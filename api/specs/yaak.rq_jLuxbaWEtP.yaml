@@ -22,7 +22,7 @@ bodyType: application/json
 description: |-
   Create an account. The access mode decides the token: invite mode requires a valid signup token (chained from CreateSignupToken), open mode ignores it. The identity toggles decide whether username is required, and whether the account leaves with an email-verification code outstanding (sign-in refuses `failed_precondition` until the code confirms the address).
 
-  Ported from Pocket ID `POST /api/signup` as the `tango.identity.v1.SignupService/Signup` procedure.
+  Ported from Pocket ID `POST /api/signup` as the `saka.identity.v1.SignupService/Signup` procedure.
 
   Parameters:
   - username (body, optional): Account handle; required when auth.require_username is on
@@ -43,7 +43,7 @@ headers:
 method: POST
 name: '[Pocket ID] Sign up'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.SignupService/Signup
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/Signup
 urlParameters: []
 settingSendCookies:
   enabled: false

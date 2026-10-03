@@ -9,9 +9,9 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/federation/oidc"
-	"github.com/riipandi/tango/modules/identity/restrictions"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/federation/oidc"
+	"github.com/riipandi/saka/modules/identity/restrictions"
 )
 
 // The visibility roll the sync applies is the OIDC authorization's own: a

@@ -8,7 +8,7 @@ folderId: null
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
-description: 'Tango-only outbound event surface: signed delivery endpoints, their deliveries, and the event catalog.'
+description: 'Saka-only outbound event surface: signed delivery endpoints, their deliveries, and the event catalog.'
 headers: []
 name: Webhooks
 sortPriority: 15703.703703703704

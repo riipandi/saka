@@ -3,7 +3,7 @@
 
 -- --------------------------------------------------------
 -- Table: public.api_keys — the account's machine credentials, a
--- tango-only surface. The key travels once, in the create response;
+-- saka-only surface. The key travels once, in the create response;
 -- only the hash rests here.
 -- --------------------------------------------------------
 

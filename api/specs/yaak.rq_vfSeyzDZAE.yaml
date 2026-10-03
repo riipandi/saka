@@ -29,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Update OAuth connection'
+name: '[Saka] Update OAuth connection'
 sortPriority: 916.6666666666669
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/UpdateConnection
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/UpdateConnection
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -25,9 +25,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List linked OAuth connections'
+name: '[Saka] List linked OAuth connections'
 sortPriority: 918.8888888888888
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/ListLinkedConnections
 urlParameters: []
 settingSendCookies:
   enabled: false

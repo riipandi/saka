@@ -13,11 +13,11 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/modules/federation/oidc"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/modules/federation/oidc"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // sqlb is the builder flavor the feature's queries use.

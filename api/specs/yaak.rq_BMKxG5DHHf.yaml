@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Queue surface — one page of the pending table, newest first. Rows carry no payload; Get task detail inspects one.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List pending tasks (queue)'
+name: '[Saka] List pending tasks (queue)'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/ListTasks
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ListTasks
 urlParameters: []
 settingSendCookies:
   enabled: false

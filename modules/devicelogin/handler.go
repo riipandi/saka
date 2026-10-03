@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The cookie the creating browser holds: the request id and the pairing
 // token ride it, so the exchange proves the same browser that created
 // the request is the one polling for it.
-const pairingCookie = "tango_device_pairing"
+const pairingCookie = "saka_device_pairing"
 
 // handler serves the device side: the two endpoints a browser that
 // cannot sign itself in reaches without a credential.

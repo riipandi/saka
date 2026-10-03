@@ -22,9 +22,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/internal/transport/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -84,7 +84,7 @@ type Authenticator = middleware.Authenticator
 // It reads the same `server` section the router's request deadline is read
 // from, so a timeout is decided in one place on both sides of the boundary.
 func NewServer(cfg config.Config, handler http.Handler) *http.Server {
-	observed := otelhttp.NewHandler(handler, "tango", otelhttp.WithFilter(
+	observed := otelhttp.NewHandler(handler, "saka", otelhttp.WithFilter(
 		func(r *http.Request) bool {
 			path := r.URL.Path
 			return strings.HasPrefix(path, "/api") || strings.HasPrefix(path, RPCPath)

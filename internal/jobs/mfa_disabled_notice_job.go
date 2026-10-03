@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // MfaDisabledNoticeName is the queue the MFA-removal notices run on.

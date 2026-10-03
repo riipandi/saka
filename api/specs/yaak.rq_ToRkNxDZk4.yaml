@@ -35,7 +35,7 @@ headers:
 method: POST
 name: '[Pocket ID] Delete signup token'
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.SignupService/DeleteSignupToken
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/DeleteSignupToken
 urlParameters:
 - enabled: true
   name: id

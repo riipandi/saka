@@ -14,12 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // stubAuthenticator accepts the one bearer token the tests carry and answers
@@ -60,7 +60,7 @@ func TestRPCRefusesACallWithoutAToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 
@@ -74,7 +74,7 @@ func TestRPCRefusesACallWithoutAToken(t *testing.T) {
 func TestRPCAcceptsTheBearerToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
-	req := rpcRequest(t, "/tango.test.v1.FeatureService/Ping", "{}")
+	req := rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}")
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -87,7 +87,7 @@ func TestRPCPublicProcedureNeedsNoToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Check", "{}"))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"healthy"`)
@@ -100,7 +100,7 @@ func TestRPCUnknownProcedureIsUnauthenticatedWithoutAToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Absent", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Absent", "{}"))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.True(t, strings.Contains(rec.Body.String(), "unauthenticated"))
@@ -113,7 +113,7 @@ func TestRPCNilAuthenticatorLeavesTheSurfaceOpen(t *testing.T) {
 	router := newRPCRouterWithAuth(t, nil)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }

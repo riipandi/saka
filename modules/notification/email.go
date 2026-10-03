@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // NotificationEmailName is the queue the notification email pass runs on.

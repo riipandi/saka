@@ -14,7 +14,7 @@ const LogDir = "logs"
 
 // LogFileName is the name of the active log file, inside LogDir. The rotated
 // files take a timestamp suffix from it.
-const LogFileName = "tango.log"
+const LogFileName = "saka.log"
 
 // UploadsDir is the subdirectory of Storage.LocalPath the /static route serves:
 // files a feature wrote there whole, such as an avatar or an exported report.
@@ -127,7 +127,7 @@ var DefaultCORSHeaders = []string{
 // DefaultCORSExposedHeaders is the response header list a browser script may
 // read on a cross-origin answer: the gRPC-Web status fields
 // connectrpc/cors-go exposes, so an error's code and message are visible to
-// the caller instead of opaque. Tango serves no trailers, so the list needs
+// the caller instead of opaque. Saka serves no trailers, so the list needs
 // nothing else.
 var DefaultCORSExposedHeaders = []string{
 	"Grpc-Message",
@@ -215,7 +215,7 @@ const (
 // It is not a browser token: an upstream that special-cases browsers would
 // be answering a client this process is not.
 func DefaultUserAgent() string {
-	return AppIdentifier + "/" + AppVersion + " (+https://github.com/riipandi/tango)"
+	return AppIdentifier + "/" + AppVersion + " (+https://github.com/riipandi/saka)"
 }
 
 // DefaultMailerTimeout bounds one mail submission. It is longer than the
@@ -254,7 +254,7 @@ func Default() Config {
 			AuditRetentionDays: 90,
 		},
 		Auth: Auth{
-			Issuer:        "tango",
+			Issuer:        "saka",
 			AccessTTL:     15 * time.Minute,
 			SessionDriver: SessionDB,
 			// The API key's expiry reminder is off by default, the way the
@@ -358,7 +358,7 @@ func Default() Config {
 		},
 		Mailer: Mailer{
 			FromEmail: "mailer@example.com",
-			FromName:  "Tango Mailer",
+			FromName:  "Saka Mailer",
 			SMTPPort:  587,
 			Timeout:   DefaultMailerTimeout,
 			Notifications: MailerNotifications{

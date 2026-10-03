@@ -10,12 +10,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	auditlogv1 "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1"
-	auditlogv1connect "github.com/riipandi/tango/codegen/proto/go/tango/auditlog/v1/auditlogv1connect"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	auditlogv1 "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1"
+	auditlogv1connect "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1/auditlogv1connect"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Module serves the audit-log procedures. Everything it answers is an RPC

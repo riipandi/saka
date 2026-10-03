@@ -28,9 +28,9 @@ headers:
   value: Bearer {{[ accessToken ]}}
   id: null
 method: POST
-name: '[Tango] Add blocklist entry'
+name: '[Saka] Add blocklist entry'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.BlocklistService/AddBlocklistEntry
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry
 urlParameters: []
 settingSendCookies:
   enabled: false

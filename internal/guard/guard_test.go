@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // caller builds the principal a request runs as: the account the token names,
@@ -158,7 +158,7 @@ func TestSelfReadsAPathParameter(t *testing.T) {
 // table does not name refuses a caller without the role, so a new procedure
 // is protected the moment it is mounted.
 func TestRuleForDefaultsToAdministrative(t *testing.T) {
-	rule := guard.RuleFor("/tango.unknown.v1.UnknownService/Absent")
+	rule := guard.RuleFor("/saka.unknown.v1.UnknownService/Absent")
 	require.NotNil(t, rule)
 
 	assert.ErrorIs(t, rule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)

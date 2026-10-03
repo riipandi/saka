@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Retrieve all groups a specific user belongs to.
 
-  Ported from Pocket ID `GET /api/users/{id}/groups`. Tango's UserGroupService answers group CRUD and member assignment per group (`SetUserGroupMembers`), but no per-user read yet. Placeholder until the procedure ships.
+  Ported from Pocket ID `GET /api/users/{id}/groups`. Saka's UserGroupService answers group CRUD and member assignment per group (`SetUserGroupMembers`), but no per-user read yet. Placeholder until the procedure ships.
 
   Parameters:
   - id (path, required): User ID
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Get user groups'
 sortPriority: 5055.555555555556
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/GetUserGroups
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/GetUserGroups
 urlParameters:
 - enabled: true
   name: id

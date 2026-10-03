@@ -8,7 +8,7 @@ swap_size_mb = 512
 console_command = "/bin/sh"
 
 [build]
-# image = "ghcr.io/riipandi/tango:latest"
+# image = "ghcr.io/riipandi/saka:latest"
 dockerfile = "Dockerfile"
 
 [build.args]

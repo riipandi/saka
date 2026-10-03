@@ -11,7 +11,7 @@ authenticationType: bearer
 body:
   text: '{}'
 bodyType: application/json
-description: 'One page of every API key the deployment holds, newest first, revoked ones included. Tango-only: upstream carries no administrative view over its keys, so this request is the [Tango] surface, not a mirror.'
+description: 'One page of every API key the deployment holds, newest first, revoked ones included. Saka-only: upstream carries no administrative view over its keys, so this request is the [Saka] surface, not a mirror.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -22,9 +22,9 @@ headers:
   value: application/json
   id: xx0V0FuBgG
 method: POST
-name: '[Tango] List all API keys'
+name: '[Saka] List all API keys'
 sortPriority: 3666.6666666666665
-url: ${[ apiBaseURL ]}/rpc/tango.apikey.v1.ApiKeyService/ListAllAPIKeys
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys
 urlParameters: []
 settingSendCookies:
   enabled: false

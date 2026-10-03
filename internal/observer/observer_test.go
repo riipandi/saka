@@ -16,8 +16,8 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/observer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/observer"
 )
 
 // traceConfig returns a configuration with tracing on and nothing else, pointed
@@ -113,7 +113,7 @@ func TestTheServiceResourceIsBuiltHere(t *testing.T) {
 
 	server := newCollector(t)
 	cfg := traceConfig(server.URL)
-	cfg.OTEL.ServiceName = "tango-test"
+	cfg.OTEL.ServiceName = "saka-test"
 	cfg.OTEL.Environment = "test"
 
 	obs, err := observer.New(context.Background(), cfg)
@@ -128,7 +128,7 @@ func TestTheServiceResourceIsBuiltHere(t *testing.T) {
 	require.NotEmpty(t, received)
 
 	body := string(received[0].body)
-	assert.Contains(t, body, "tango-test", "the service name comes from the configuration")
+	assert.Contains(t, body, "saka-test", "the service name comes from the configuration")
 	assert.Contains(t, body, "test", "the deployment environment comes from the configuration")
 	assert.NotContains(t, body, "from-the-shell",
 		"a resource attribute from the environment must not be sent")

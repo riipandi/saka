@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Mints one more secret for a client. Several live secrets are legitimate — a rotation is an addition followed by a deletion, never a swap. Absent a value, a 32-character alphanumeric secret is drawn; a supplied one must carry at least 16 characters of the same alphabet. The raw value is shown exactly once.
 
-  Tango procedure tango.federation.v1.OidcClientService/CreateSecret. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/CreateSecret. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -35,7 +35,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create client secret'
 sortPriority: 14000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/CreateSecret
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/CreateSecret
 urlParameters:
 - enabled: true
   name: id

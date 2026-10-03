@@ -69,7 +69,7 @@ type App struct {
 }
 
 // Auth holds the JWT signing settings. The asymmetric signing key lives in
-// the database (public.jwks, provisioned by tango initialize); the config
+// the database (public.jwks, provisioned by saka initialize); the config
 // carries only the optional HMAC secret and the algorithm override.
 type Auth struct {
 	// SecretKey is the hex-encoded HMAC key, used when no key pair is given.

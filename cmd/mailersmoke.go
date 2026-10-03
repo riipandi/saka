@@ -11,9 +11,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // mailerSmokeTemplate is the template a smoke run sends by default. It is the

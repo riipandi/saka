@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // The refusals a rule raises. They are sentinel errors because the transport
@@ -213,7 +213,7 @@ func Reauthenticated(caller *jwtutils.Caller, _ Target) error {
 // ReauthenticationHeader carries the step-up proof a Reauthenticated
 // procedure demands. The token is single use: the guarded call that reads it
 // spends it, and a replay answers the same refusal an unknown token does.
-const ReauthenticationHeader = "X-Tango-Reauthentication"
+const ReauthenticationHeader = "X-Saka-Reauthentication"
 
 // ReauthConsumer spends a step-up proof. The guard defines the seam; the
 // feature that mints the tokens implements it, and the transport's guard

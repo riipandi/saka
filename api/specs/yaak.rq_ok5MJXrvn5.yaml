@@ -20,7 +20,7 @@ description: |-
 
   An unknown or malformed identifier answers `not_found`; an expiry in the past answers `invalid_argument`; an already-banned account is the same success, with the reason and expiry replaced and the live sessions ended again. An access token already issued keeps working until its own expiry — the statelessness the protocol settles — but the refresh token dies here.
 
-  Tango-only surface, modeled on Better Auth's `ban-user` admin operation.
+  Saka-only surface, modeled on Better Auth's `ban-user` admin operation.
 headers:
 - enabled: true
   name: Content-Type
@@ -31,9 +31,9 @@ headers:
   value: '1'
   id: XT88Kz6r5K
 method: POST
-name: '[Tango] Ban user'
+name: '[Saka] Ban user'
 sortPriority: 26000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/BanUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/BanUser
 urlParameters: []
 settingSendCookies:
   enabled: false

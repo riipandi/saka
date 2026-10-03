@@ -30,7 +30,7 @@ headers:
   value: application/x-www-form-urlencoded
   id: null
 method: POST
-name: '[Tango] Poll device code for token'
+name: '[Saka] Poll device code for token'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/token
 urlParameters: []

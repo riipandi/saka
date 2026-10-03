@@ -22,7 +22,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
 // Provider is the generic OIDC adapter.

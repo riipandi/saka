@@ -9,7 +9,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // File status values. A file is pending while its bytes travel, ready once

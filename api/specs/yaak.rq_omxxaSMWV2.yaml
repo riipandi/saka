@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] List API keys'
 sortPriority: 74.07407407407406
-url: ${[ apiBaseURL ]}/rpc/tango.apikey.v1.ApiKeyService/ListAPIKeys
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys
 urlParameters:
 - enabled: false
   name: pagination[page]

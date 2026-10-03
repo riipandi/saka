@@ -7,8 +7,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/identity/usergroup"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
 // UserDirectory is the account facts the preview builds its claims from.

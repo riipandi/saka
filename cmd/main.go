@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 func main() {

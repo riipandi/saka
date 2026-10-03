@@ -9,8 +9,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // AllowedClientsTable is the group-side client allowlist — the inverse of

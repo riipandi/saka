@@ -11,9 +11,9 @@ import (
 
 // meterName is the instrumentation scope every storage instrument is
 // registered under, rendered into otel_scope_name by the bridge.
-const meterName = "github.com/riipandi/tango/internal/storage"
+const meterName = "github.com/riipandi/saka/internal/storage"
 
-// The outcomes one sync carries on tango.storage.uploads. A skipped sync
+// The outcomes one sync carries on saka.storage.uploads. A skipped sync
 // found no staging file — the retry that arrived after another attempt
 // finished, which is the idempotence contract working.
 const (
@@ -38,27 +38,27 @@ func newStorageMetrics() *storageMetrics {
 	meter := otel.Meter(meterName)
 	m := &storageMetrics{}
 	var err error
-	if m.staged, err = meter.Int64Counter("tango.storage.files.staged",
+	if m.staged, err = meter.Int64Counter("saka.storage.files.staged",
 		metric.WithDescription("Files written into the staging directory"),
 		metric.WithUnit("{file}")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.uploads, err = meter.Int64Counter("tango.storage.uploads",
+	if m.uploads, err = meter.Int64Counter("saka.storage.uploads",
 		metric.WithDescription("Sync rounds by outcome: uploaded, skipped as already done, or failed"),
 		metric.WithUnit("{upload}")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.duration, err = meter.Float64Histogram("tango.storage.upload.duration",
+	if m.duration, err = meter.Float64Histogram("saka.storage.upload.duration",
 		metric.WithDescription("Time one sync round spent hashing and uploading"),
 		metric.WithUnit("s")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.bytes, err = meter.Int64Counter("tango.storage.bytes.uploaded",
+	if m.bytes, err = meter.Int64Counter("saka.storage.bytes.uploaded",
 		metric.WithDescription("Staging bytes that reached the backend"),
 		metric.WithUnit("By")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.settled, err = meter.Int64Counter("tango.storage.staging.settled",
+	if m.settled, err = meter.Int64Counter("saka.storage.staging.settled",
 		metric.WithDescription("Staging files that went quiet and had their upload enqueued"),
 		metric.WithUnit("{file}")); err != nil {
 		panic("storage: " + err.Error())

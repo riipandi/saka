@@ -1,7 +1,7 @@
 // Package oauthsso is the sign-in-with-a-provider feature: the builtin
 // Google and GitHub connections, the operator-configured custom OIDC ones,
 // the outbound authorization-code flow they run, and the linked accounts
-// they bind into accounts. The feature is tango-only — upstream Pocket ID
+// they bind into accounts. The feature is saka-only — upstream Pocket ID
 // never signed an account in through an external identity provider.
 //
 // The surface splits at the transport: the operator's connection CRUD and

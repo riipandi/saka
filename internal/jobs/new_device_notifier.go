@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/signin"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/signin"
 )
 
 // DeviceNotifier is the adapter between the sign-in service's

@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/cache"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/cache"
 )
 
 // TestAListingIsServedFromTheCache pins the read the administrative

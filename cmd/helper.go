@@ -8,9 +8,9 @@ import (
 
 	"github.com/briandowns/spinner"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // spinnerDelay is how fast the indicator animates. The braille set has ten

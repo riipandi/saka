@@ -6,7 +6,7 @@ import (
 
 	"connectrpc.com/authn"
 
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // apiKeyHeader is the header a machine credential travels under.

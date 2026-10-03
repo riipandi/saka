@@ -10,12 +10,12 @@
 // refuses a catalog that asks for it.
 syntax = "proto3";
 
-package tango.settings.v1;
+package saka.settings.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1;settingsv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1;settingsv1";
 
 // SettingsService manages the deployment's database-backed settings. The
 // administrative procedures carry the values in the clear to an

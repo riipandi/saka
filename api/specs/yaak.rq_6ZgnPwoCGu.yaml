@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] Answer how many live notifications target the caller and carry no receipt yet - the number a bell badge shows. Authenticated: any caller.'
+description: '[Saka] Answer how many live notifications target the caller and carry no receipt yet - the number a bell badge shows. Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: Unread Count
 sortPriority: 78.18930041152262
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/UnreadCount
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/UnreadCount
 urlParameters: []
 settingSendCookies:
   enabled: false

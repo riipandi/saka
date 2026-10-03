@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_oTHPnZqWaG', behavior='smart', ttl='0', result='first', join=', ', path='$.webhooks[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Remove an endpoint. Its deliveries survive with the endpoint identifier nulled. Admin only.'
+description: '[Saka] Remove an endpoint. Its deliveries survive with the endpoint identifier nulled. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Delete Webhook
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/Delete
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/Delete
 urlParameters: []
 settingSendCookies:
   enabled: false

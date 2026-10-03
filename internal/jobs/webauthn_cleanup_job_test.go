@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/webauthn"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/webauthn"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // ceremonySession writes one live ceremony row. The table's check refuses an

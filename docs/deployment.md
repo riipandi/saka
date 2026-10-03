@@ -4,17 +4,17 @@
 
 ```sh
 # Create Fly.io app
-fly apps create tango --org personal
+fly apps create saka --org personal
 ```
 
 ## Attach Postgres database
 
 ```sh
 # Create volume for the data.
-fly postgres create --name tango-db --region sjc --password $(openssl rand -hex 8)
+fly postgres create --name saka-db --region sjc --password $(openssl rand -hex 8)
 
 # Attach Postgres database
-fly postgres attach tango-db -a tango
+fly postgres attach saka-db -a saka
 ```
 
 ## Launch and deploy
@@ -22,7 +22,7 @@ fly postgres attach tango-db -a tango
 ```sh
 # Prepare deploy configuration file
 cp deploy/fly.toml.example fly.toml
-sed -i '' 's/CHANGEME_APP_NAME/tango/g' fly.toml
+sed -i '' 's/CHANGEME_APP_NAME/saka/g' fly.toml
 
 # Prepare environment variables
 cp .env.example .env.production
@@ -50,19 +50,19 @@ fly deploy --remote-only --now
 ## Setup custom domain
 
 Point DNS A Record to the assigned IP address.
-Or, if using subdomain you can point `tango.fly.dev` CNAME record.
+Or, if using subdomain you can point `saka.fly.dev` CNAME record.
 
 ```sh
 # Allocate IPv4 (required)
-fly ips allocate-v4 -a tango --shared
-fly ips allocate-v4 -a tango # dedicated
+fly ips allocate-v4 -a saka --shared
+fly ips allocate-v4 -a saka # dedicated
 
 # Allocate IPv6 (optional)
-fly ips allocate-v6 -a tango
+fly ips allocate-v6 -a saka
 
 # List allocated IPs
-fly ips list -a tango
+fly ips list -a saka
 
 # Assign custom domain
-fly certs create app.example.com -a tango
+fly certs create app.example.com -a saka
 ```

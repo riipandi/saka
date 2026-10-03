@@ -21,11 +21,11 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // Package registers the service this area owns.

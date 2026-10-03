@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The columns a role list sorts by, mapped to the SQL expression each is

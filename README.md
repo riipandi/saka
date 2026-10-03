@@ -19,18 +19,18 @@ You will need [`Go >= 1.27`][golang], [`Node.js >= 24.21`][nodejs], [`PNPM >= 12
 [`Docker >= 20.10`][docker] installed on your machine.
 
 ```bash
-pnpm dlx tiged riipandi/tango myapp-name
+pnpm dlx tiged riipandi/saka myapp-name
 ```
 
 1. Install the Go toolchain binaries: `task deps`
-2. Find and replace `tango`, `Tango`, and `MyApplication` across the source files.
+2. Find and replace `saka`, `Saka`, and `MyApplication` across the source files.
 3. Install the frontend dependencies: `pnpm install`
 4. Write a starter config file: `task config:generate`
 5. Generate the secret keys into your env file: `task key:generate`
 6. Start the local Postgres: `docker compose -f container/compose.yaml up -d pgsql`
 7. Set `DATABASE_URL` in `.env.local` (see `.env.example`)
 8. Run the database migrations: `task db:migrate`
-9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `tango initialize`)
+9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `saka initialize`)
 10. Start the development servers: `task dev`
 
 The browser opens **:3080** only — the Go server renders the document, its shell points

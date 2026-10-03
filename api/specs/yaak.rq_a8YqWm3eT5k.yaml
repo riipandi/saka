@@ -11,7 +11,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  Deletes the signed-in account's password credential — the self-service counterpart of Add password, for an account moving to passkey-only sign-in. The proof is the step-up token the guard consumes from the X-Tango-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent). The removal is refused while the account keeps no other live credential (passkey or binding) with failed_precondition; live sessions are ended and the account's address learns of the removal in a notification.
+  Deletes the signed-in account's password credential — the self-service counterpart of Add password, for an account moving to passkey-only sign-in. The proof is the step-up token the guard consumes from the X-Saka-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent). The removal is refused while the account keeps no other live credential (passkey or binding) with failed_precondition; live sessions are ended and the account's address learns of the removal in a notification.
 
   Guard: Session + step-up.
 headers:
@@ -28,13 +28,13 @@ headers:
   value: Bearer {{[ accessToken ]}}
   id: null
 - enabled: true
-  name: X-Tango-Reauthentication
+  name: X-Saka-Reauthentication
   value: '{{[ reauthenticationToken ]}}'
   id: null
 method: POST
-name: '[Tango] Remove password'
+name: '[Saka] Remove password'
 sortPriority: 500.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/RemovePassword
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/RemovePassword
 urlParameters: []
 settingSendCookies:
   enabled: false

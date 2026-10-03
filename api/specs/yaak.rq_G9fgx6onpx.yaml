@@ -20,7 +20,7 @@ bodyType: application/json
 description: |-
   Replace a group's two fields. Both are required.
 
-  Ported from Pocket ID `PUT /api/user-groups/{id}` as the `tango.identity.v1.UserGroupService/UpdateUserGroup` procedure.
+  Ported from Pocket ID `PUT /api/user-groups/{id}` as the `saka.identity.v1.UserGroupService/UpdateUserGroup` procedure.
 
   Parameters:
   - id (body, required): user group ID
@@ -40,7 +40,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update user group'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/UpdateUserGroup
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/UpdateUserGroup
 urlParameters:
 - enabled: true
   name: id

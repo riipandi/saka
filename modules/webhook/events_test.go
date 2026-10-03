@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/saka/internal/audit"
 )
 
 // TestTheCatalogCoversEveryAuditEvent pins the catalog's completeness: the

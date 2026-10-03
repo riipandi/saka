@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // TestOTLPShipsToARealVictoriaLogs is the end-to-end check of the shipping path:
@@ -27,7 +27,7 @@ import (
 func TestOTLPShipsToARealVictoriaLogs(t *testing.T) {
 	store := testutils.StartVictoriaLogs(t.Context(), t)
 
-	marker := "tango-otlp-e2e"
+	marker := "saka-otlp-e2e"
 	cfg := config.Default()
 	cfg.Log.Transport = []string{config.LogTransportOTLP}
 	cfg.OTEL.Endpoint = store.OTLPEndpoint
@@ -63,7 +63,7 @@ func TestOTLPShipsToARealVictoriaLogs(t *testing.T) {
 func TestEveryTransportShipsTheSameEntry(t *testing.T) {
 	store := testutils.StartVictoriaLogs(t.Context(), t)
 
-	marker := "tango-all-transports"
+	marker := "saka-all-transports"
 	dir := t.TempDir()
 
 	cfg := config.Default()

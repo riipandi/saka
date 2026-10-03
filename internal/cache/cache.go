@@ -12,8 +12,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // Cache is the key-value surface a feature reads through. Every method is

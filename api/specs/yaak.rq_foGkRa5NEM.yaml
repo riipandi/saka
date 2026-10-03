@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   The same readiness as the REST probe, spoken in ConnectRPC: a healthy system answers the result, an unhealthy one fails with unavailable naming the checks that are down.
 
-  tango built-in; no Pocket ID counterpart.
+  saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] System Health Check via RPC'
+name: '[Saka] System Health Check via RPC'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.HealthService/Check
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.HealthService/Check
 urlParameters: []
 settingSendCookies:
   enabled: false

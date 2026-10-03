@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
 )
 
 func TestACollectorThatIsDownDoesNotStopConstruction(t *testing.T) {

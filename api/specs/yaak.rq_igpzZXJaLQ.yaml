@@ -28,7 +28,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update SCIM service provider'
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Update
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/Update
 urlParameters:
 - enabled: true
   name: id

@@ -12,10 +12,10 @@ bodyType: null
 description: |-
   Readiness probe at /api/healthz: the aggregated availability of the dependencies the process runs on, with one entry per check in check-name order.
 
-  tango built-in; no Pocket ID counterpart.
+  saka built-in; no Pocket ID counterpart.
 headers: []
 method: GET
-name: '[Tango] System Health Check via REST'
+name: '[Saka] System Health Check via REST'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/api/healthz
 urlParameters: []

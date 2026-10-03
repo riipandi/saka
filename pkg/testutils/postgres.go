@@ -50,7 +50,7 @@ func StartPostgres(ctx context.Context, t testing.TB) *Postgres {
 // on Docker Desktop proxies (macOS/Windows).
 func startPostgres(ctx context.Context) (*Postgres, error) {
 	container, err := tcpg.Run(ctx, postgresImage,
-		tcpg.WithDatabase("tango_test"),
+		tcpg.WithDatabase("saka_test"),
 		tcpg.WithUsername("postgres"),
 		tcpg.WithPassword("postgres"),
 		tcpg.BasicWaitStrategies(),

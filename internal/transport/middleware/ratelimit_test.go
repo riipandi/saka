@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/responder"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // valkeyClient opens the backend client a KV limiter test runs against.

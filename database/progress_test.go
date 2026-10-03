@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // newProgressMigrator returns a migrator that records every progress event on a

@@ -6,8 +6,8 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The failures the account surfaces report. The handler maps them onto

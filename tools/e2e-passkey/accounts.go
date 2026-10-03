@@ -14,10 +14,10 @@ func signup(client *rpcClient, adminToken, username, displayName string) string 
 	if idx := strings.IndexByte(displayName, ' '); idx > 0 {
 		first, last = displayName[:idx], displayName[idx+1:]
 	}
-	token := client.mustRPC("tango.identity.v1.SignupService/CreateSignupToken", map[string]any{
+	token := client.mustRPC("saka.identity.v1.SignupService/CreateSignupToken", map[string]any{
 		"ttl_seconds": 86400,
 	}, adminToken)
-	created := client.mustRPC("tango.identity.v1.SignupService/Signup", map[string]any{
+	created := client.mustRPC("saka.identity.v1.SignupService/Signup", map[string]any{
 		"username":  username,
 		"email":     username + "@example.com",
 		"password":  passwordOf(username),
@@ -36,7 +36,7 @@ func signup(client *rpcClient, adminToken, username, displayName string) string 
 // adminCreateUser creates an account that carries no password — the state a
 // one-time code serves.
 func adminCreateUser(client *rpcClient, adminToken, username, displayName string) string {
-	created := client.mustRPC("tango.identity.v1.UserService/CreateUser", map[string]any{
+	created := client.mustRPC("saka.identity.v1.UserService/CreateUser", map[string]any{
 		"username":   username,
 		"email":      username + "@example.com",
 		"first_name": displayName,
@@ -53,7 +53,7 @@ func adminCreateUser(client *rpcClient, adminToken, username, displayName string
 // passwordSignIn signs in with the password on an account that owes no
 // second factor, and answers the access token.
 func passwordSignIn(client *rpcClient, identity, password string) string {
-	answer := client.mustRPC("tango.authn.v1.AuthService/SignIn", map[string]any{
+	answer := client.mustRPC("saka.authn.v1.AuthService/SignIn", map[string]any{
 		"identity": identity,
 		"password": password,
 	}, "")
@@ -67,7 +67,7 @@ func passwordSignIn(client *rpcClient, identity, password string) string {
 // passwordBridge signs in with the password on an MFA-enabled account and
 // answers the pending token the bridge carries.
 func passwordBridge(client *rpcClient, identity, password string) string {
-	answer := client.mustRPC("tango.authn.v1.AuthService/SignIn", map[string]any{
+	answer := client.mustRPC("saka.authn.v1.AuthService/SignIn", map[string]any{
 		"identity": identity,
 		"password": password,
 	}, "")
@@ -80,7 +80,7 @@ func passwordBridge(client *rpcClient, identity, password string) string {
 // currentSession answers the caller's newest live session — the list
 // includes the ended ones, so the pick reads the revoked_at absence.
 func currentSession(client *rpcClient, accessToken string) string {
-	sessions := client.mustRPC("tango.authn.v1.SessionService/ListSessions", map[string]any{}, accessToken)
+	sessions := client.mustRPC("saka.authn.v1.SessionService/ListSessions", map[string]any{}, accessToken)
 	list, _ := sessions["sessions"].([]any)
 	for _, entry := range list {
 		row, _ := entry.(map[string]any)

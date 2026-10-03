@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] Answer the webhook event catalog: every event a receiver can subscribe to, with the sentence that says what happened. Admin only.'
+description: '[Saka] Answer the webhook event catalog: every event a receiver can subscribe to, with the sentence that says what happened. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: List Webhook Event Types
 sortPriority: 4137.631458619113
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/ListEventTypes
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/ListEventTypes
 urlParameters: []
 settingSendCookies:
   enabled: false

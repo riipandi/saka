@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // remoteUser is one account's SCIM 2.0 document, the fields the sync
@@ -172,7 +172,7 @@ func (s *Service) reconcile(ctx context.Context, snap snapshot, stats *Stats) er
 
 // validateRemoteSnapshot refuses a listing whose rows lack the
 // identifiers the reconcile works with: the remote id a delete targets
-// and the externalId the match is keyed by. Tango provisions every
+// and the externalId the match is keyed by. Saka provisions every
 // resource with an externalId, so a row without one is not a row the
 // snapshot contract describes — the pass fails before any write rather
 // than deleting what it cannot read.

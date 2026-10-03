@@ -24,38 +24,38 @@ import (
 	"github.com/samber/do/v2"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/cache"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/internal/jobs"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/appconfig"
-	"github.com/riipandi/tango/modules/devicelogin"
-	"github.com/riipandi/tango/modules/identity/authorization"
-	"github.com/riipandi/tango/modules/identity/blocklist"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/multifactor"
-	"github.com/riipandi/tango/modules/identity/oauthsso"
-	"github.com/riipandi/tango/modules/identity/oauthsso/builtin"
-	"github.com/riipandi/tango/modules/identity/oauthsso/custom"
-	"github.com/riipandi/tango/modules/identity/onetimeaccess"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/modules/identity/signup"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/identity/usergroup"
-	"github.com/riipandi/tango/modules/identity/verification"
-	"github.com/riipandi/tango/modules/identity/webauthn"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/cache"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/internal/jobs"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/appconfig"
+	"github.com/riipandi/saka/modules/devicelogin"
+	"github.com/riipandi/saka/modules/identity/authorization"
+	"github.com/riipandi/saka/modules/identity/blocklist"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/multifactor"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
+	"github.com/riipandi/saka/modules/identity/oauthsso/builtin"
+	"github.com/riipandi/saka/modules/identity/oauthsso/custom"
+	"github.com/riipandi/saka/modules/identity/onetimeaccess"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/modules/identity/signup"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/usergroup"
+	"github.com/riipandi/saka/modules/identity/verification"
+	"github.com/riipandi/saka/modules/identity/webauthn"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // ModuleName is the name the area reports under.
@@ -237,7 +237,7 @@ var Package = do.Package(
 			// A table with no rows yet is a fresh database: initialize
 			// provisions, and the run still serves — signing answers the
 			// missing key on the first call that needs it.
-			log.Warn("jwks: no signing key yet; run tango initialize")
+			log.Warn("jwks: no signing key yet; run saka initialize")
 		} else {
 			return nil, fmt.Errorf("identity: jwks: resolve algorithm: %w", err)
 		}
@@ -461,7 +461,7 @@ var Package = do.Package(
 			}
 			cipher = built
 		}
-		service := multifactor.NewService(pool, cipher, issuer, recorder, "Tango", log)
+		service := multifactor.NewService(pool, cipher, issuer, recorder, "Saka", log)
 		// The enrollment ceiling reads the catalog at call time; a nil
 		// settings feature keeps the constant, the state a bare wiring is
 		// in.

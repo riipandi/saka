@@ -29,7 +29,7 @@ import (
 	"go.loglayer.dev/integrations/sloghandler/v3"
 	"go.loglayer.dev/v3"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // Logger is the application logger: the LogLayer core behind it, the sinks it

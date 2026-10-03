@@ -168,7 +168,7 @@ go test ./internal/logger/
 ```
 
 Prove the pipeline end to end with the metrics stack: `task metrics:up`, then
-`LOG_TRANSPORT=console,file,otlp task metrics:smoke`, then `task metrics:query -- 'marker:"tango-logger-smoke"'`.
+`LOG_TRANSPORT=console,file,otlp task metrics:smoke`, then `task metrics:query -- 'marker:"saka-logger-smoke"'`.
 
 ## Design Decisions
 

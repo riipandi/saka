@@ -5,7 +5,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
+	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 )
 
 // mapError translates the service's failures into the codes the Connect

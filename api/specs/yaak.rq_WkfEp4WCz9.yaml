@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Hangs a claim on an account. The key is unique per subject; the value may be a plain string or a JSON document — the tokens carry it as the document it names.
 
-  Tango procedure tango.federation.v1.CustomClaimService/CreateUserClaim. Guard: admin.
+  Saka procedure saka.federation.v1.CustomClaimService/CreateUserClaim. Guard: admin.
 
   Parameters:
   - user_id (body, required): the account, in its wire form (user_...)
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create user custom claim'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/CreateUserClaim
 urlParameters: []
 settingSendCookies:
   enabled: false

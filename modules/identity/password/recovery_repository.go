@@ -9,8 +9,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/restrictions"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/restrictions"
 )
 
 // Repository reads and writes the reset token and the account state it

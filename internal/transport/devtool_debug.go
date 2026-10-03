@@ -19,8 +19,8 @@ import (
 	dohttp "github.com/samber/do/v2/http"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/pkg/responder"
-	"github.com/riipandi/tango/web"
+	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/web"
 )
 
 func mountDevtool(r chi.Router, injector do.Injector) {

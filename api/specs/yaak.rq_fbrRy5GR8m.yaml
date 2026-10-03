@@ -13,7 +13,7 @@ body:
       "id": "whk_xxxxxxxxxxxxxxxxxxxxxxxx"
     }
 bodyType: application/json
-description: '[Tango] Answer one endpoint view. It carries no secret field. Admin only.'
+description: '[Saka] Answer one endpoint view. It carries no secret field. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Get Webhook
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/Get
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/Get
 urlParameters: []
 settingSendCookies:
   enabled: false

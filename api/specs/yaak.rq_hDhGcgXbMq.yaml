@@ -13,7 +13,7 @@ body:
       "email": "${[ prompt.text(label='Identity', store='none', namespace='${[ctx.workspace()]}', ttl='0', placeholder='Email or username', defaultValue='${[ identity ]}') ]}"
     }
 bodyType: application/json
-description: '[Tango] Issues a password reset token for the named email address and enqueues the message carrying the token and the reset link. The answer is identical whether the account exists — the endpoint is not an account enumerator. A repeat inside the 60s cooldown the last send opened answers resource_exhausted. Public: a caller who lost the password holds no credential.'
+description: '[Saka] Issues a password reset token for the named email address and enqueues the message carrying the token and the reset link. The answer is identical whether the account exists — the endpoint is not an account enumerator. A repeat inside the 60s cooldown the last send opened answers resource_exhausted. Public: a caller who lost the password holds no credential.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -24,9 +24,9 @@ headers:
   value: application/json
   id: R2hCWvhHXt
 method: POST
-name: '[Tango] Enroll password recovery'
+name: '[Saka] Enroll password recovery'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.PasswordRecoveryService/ForgotPassword
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

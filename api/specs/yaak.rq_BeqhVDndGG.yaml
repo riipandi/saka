@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Replaces a client's logo. The bytes travel base64-encoded in the RPC body, at most 2 MiB; the kind is read off the magic bytes — a PNG, JPEG, or WebP only, an SVG refused, because the format is a script host. The raw image answers the logo endpoint.
 
-  Tango procedure tango.federation.v1.OidcClientService/UploadLogo. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/UploadLogo. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update client logo'
 sortPriority: 8000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UploadLogo
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/UploadLogo
 urlParameters:
 - enabled: true
   name: id

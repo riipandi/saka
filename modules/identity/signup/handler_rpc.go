@@ -9,12 +9,12 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/responder"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

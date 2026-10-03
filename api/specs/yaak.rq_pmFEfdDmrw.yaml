@@ -28,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Delete my account'
+name: '[Saka] Delete my account'
 sortPriority: 11500.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/DeleteMyAccount
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/DeleteMyAccount
 urlParameters: []
 settingSendCookies:
   enabled: false

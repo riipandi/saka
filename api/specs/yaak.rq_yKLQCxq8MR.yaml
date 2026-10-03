@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Removes one setting override, so the item answers its catalog default again. An item already at its default answers unchanged.
 
-  Tango procedure tango.settings.v1.SettingsService/Reset. Guard: admin.
+  Saka procedure saka.settings.v1.SettingsService/Reset. Guard: admin.
 
   Parameters:
   - key (body, required): the setting catalog key
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Reset setting to default'
+name: '[Saka] Reset setting to default'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Reset
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/Reset
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Removes one of an account's passkeys, aimed by the request's user_id.
 
-  Pocket ID's mirror is `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; the surface is tango's `WebAuthnService`, the same door the holder's own delete uses — the stranding refusal (an account left with no way in) holds here too.
+  Pocket ID's mirror is `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; the surface is saka's `WebAuthnService`, the same door the holder's own delete uses — the stranding refusal (an account left with no way in) holds here too.
 
   Guard: Admin.
 headers:
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Delete user passkey (admin)'
+name: '[Saka] Delete user passkey (admin)'
 sortPriority: 24000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential
 urlParameters:
 - enabled: true
   name: id

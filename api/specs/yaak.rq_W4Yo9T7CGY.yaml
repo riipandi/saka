@@ -35,7 +35,7 @@ headers:
 method: POST
 name: '[Pocket ID] List signup tokens'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.SignupService/ListSignupTokens
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/ListSignupTokens
 urlParameters:
 - enabled: false
   name: pagination[page]

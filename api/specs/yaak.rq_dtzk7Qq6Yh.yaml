@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Withdraw the calling account's consent for one client. The client's live grants and tokens for the account die with the ledger row.
 
-  Procedure: `tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`
+  Procedure: `saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: '[Pocket ID] Revoke authorization for an OIDC client'
 sortPriority: 16267.489711934157
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient
 urlParameters:
 - enabled: true
   name: clientId

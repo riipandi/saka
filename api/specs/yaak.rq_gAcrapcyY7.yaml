@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Audit log filter options'
+name: '[Saka] Audit log filter options'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.auditlog.v1.AuditLogService/FilterOptions
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/FilterOptions
 urlParameters: []
 settingSendCookies:
   enabled: false

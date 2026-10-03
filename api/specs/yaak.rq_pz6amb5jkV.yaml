@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Answers every catalog item with its effective value (the override when one rests, the default when not), the default carried alongside, ordered by key.
 
-  Tango procedure tango.settings.v1.SettingsService/List. Guard: admin. Sealed items are opened - the administrator reads values in the clear.
+  Saka procedure saka.settings.v1.SettingsService/List. Guard: admin. Sealed items are opened - the administrator reads values in the clear.
 headers:
 - enabled: true
   name: Content-Type
@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List all settings'
+name: '[Saka] List all settings'
 sortPriority: 111.1111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/List
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/List
 urlParameters: []
 settingSendCookies:
   enabled: false

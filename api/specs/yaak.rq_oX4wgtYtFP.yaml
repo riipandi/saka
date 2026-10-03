@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_oTHPnZqWaG', behavior='smart', ttl='0', result='first', join=', ', path='$.webhooks[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Replace an endpoint signing secret. The new plaintext is shown exactly once; deliveries after the rotation sign with it. Admin only.'
+description: '[Saka] Replace an endpoint signing secret. The new plaintext is shown exactly once; deliveries after the rotation sign with it. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Rotate Webhook Secret
 sortPriority: 4111.111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/RotateSecret
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/RotateSecret
 urlParameters: []
 settingSendCookies:
   enabled: false

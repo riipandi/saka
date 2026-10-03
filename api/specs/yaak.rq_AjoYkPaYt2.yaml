@@ -14,7 +14,7 @@ bodyType: application/json
 description: |-
   One account's consent ledger. Administrative.
 
-  Procedure: `tango.federation.v1.OidcConsentService/ListUserAuthorizedClients`
+  Procedure: `saka.federation.v1.OidcConsentService/ListUserAuthorizedClients`
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: '[Pocket ID] List authorized clients for a user'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListUserAuthorizedClients
 urlParameters: []
 settingSendCookies:
   enabled: false

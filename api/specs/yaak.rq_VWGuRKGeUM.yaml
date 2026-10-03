@@ -15,7 +15,7 @@ body:
       "limit": 20
     }
 bodyType: application/json
-description: '[Tango] List one page of every delivery the deployment holds, narrowed by the event filter when given. Attempts name response metadata only. Admin only.'
+description: '[Saka] List one page of every delivery the deployment holds, narrowed by the event filter when given. Attempts name response metadata only. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: List All Webhook Deliveries
 sortPriority: 4136.8185744043085
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/ListAllDeliveries
 urlParameters: []
 settingSendCookies:
   enabled: false

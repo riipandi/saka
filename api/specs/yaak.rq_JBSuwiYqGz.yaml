@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Consume a one-time access code and sign its holder in. Anonymous by design: the code is the credential. The response is the token pair a password sign-in answers with.
 
-  Mirror of Pocket ID `POST /api/one-time-access-token/{token}`, ported as the RPC procedure `tango.authn.v1.OneTimeAccessService/ExchangeToken`.
+  Mirror of Pocket ID `POST /api/one-time-access-token/{token}`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/ExchangeToken`.
 
   Body:
   - token: the code the email linked to (6 or 12 characters)
@@ -33,7 +33,7 @@ headers:
 method: POST
 name: '[Pocket ID] Exchange one-time access token'
 sortPriority: 20000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OneTimeAccessService/ExchangeToken
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken
 urlParameters:
 - enabled: true
   name: ''

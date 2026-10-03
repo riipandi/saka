@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/mailer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/mailer"
 )
 
 // sender is the identity every template renders with.
@@ -135,16 +135,16 @@ func TestEveryTemplateRendersBothBodies(t *testing.T) {
 }
 
 func TestRenderedBodiesCarryTheIdentityAndTheData(t *testing.T) {
-	templates, err := mailer.NewTemplates(mailer.Sender{AppName: "Tango", LogoURL: "https://cdn.example.com/logo.svg"})
+	templates, err := mailer.NewTemplates(mailer.Sender{AppName: "Saka", LogoURL: "https://cdn.example.com/logo.svg"})
 	require.NoError(t, err)
 
 	body, err := templates.Render(mailer.TemplatePasswordReset, fixtures()[mailer.TemplatePasswordReset])
 	require.NoError(t, err)
 
 	assert.Contains(t, body.HTML, "https://cdn.example.com/logo.svg")
-	assert.Contains(t, body.HTML, "Tango")
+	assert.Contains(t, body.HTML, "Saka")
 	assert.Contains(t, body.HTML, "expecto-patronum")
-	assert.Contains(t, body.Text, "Tango")
+	assert.Contains(t, body.Text, "Saka")
 	assert.Contains(t, body.Text, "expecto-patronum")
 }
 

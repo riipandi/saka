@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/apikey"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/apikey"
+	"github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 )
@@ -202,7 +202,7 @@ func startExpiryMailer(t *testing.T) (*mailer.Service, *testutils.Mailpit) {
 	cfg.Mailer.SMTPPort = smtpPort
 	cfg.Mailer.SMTPUsername = server.Username
 	cfg.Mailer.SMTPPassword = server.Password
-	cfg.Mailer.FromEmail = "no-reply@tango.test"
+	cfg.Mailer.FromEmail = "no-reply@saka.test"
 
 	client, err := mailer.New(cfg, nil)
 	require.NoError(t, err)

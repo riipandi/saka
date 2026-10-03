@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // The failures the provider adapters report. The handler maps them onto

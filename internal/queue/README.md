@@ -1,12 +1,12 @@
 # Queue
 
-Queue is tango's built-in task queue, built on PostgreSQL. It provides type-safe, persistent
+Queue is saka's built-in task queue, built on PostgreSQL. It provides type-safe, persistent
 task queues that run within the application — no external message broker required.
 
 > **Origin:** based on [Backlite](https://github.com/mikestefanello/backlite) (MIT, originally
 > SQLite-based), ported to PostgreSQL with the shared `datastore` pool, UUIDv7 primary keys,
 > `TIMESTAMPTZ` columns, `go-sqlbuilder` query construction, and `encoding/json/v2` payloads.
-> Upstream is no longer tracked: the engine is owned and evolved by tango.
+> Upstream is no longer tracked: the engine is owned and evolved by saka.
 
 ## Features
 
@@ -94,7 +94,7 @@ a minute is what a quiet queue costs.
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. The composition root wires
+The package lives inside the `saka` module and is not published. The composition root wires
 it in `internal/registry`: the client is built from the shared `datastore.Postgres` pool with
 the `queue` config section, and `internal/jobs.Register` lists the application's job queues
 and seeds the recurring ones.
@@ -121,7 +121,7 @@ package jobs
 import (
     "time"
 
-    "github.com/riipandi/tango/internal/queue"
+    "github.com/riipandi/saka/internal/queue"
 )
 
 // EmailTask represents an email to send.
@@ -523,4 +523,4 @@ go test -race ./internal/queue/
 ## Credits
 
 Based on [Backlite](https://github.com/mikestefanello/backlite) by Mike Stefanello, adapted
-for PostgreSQL and the tango architecture.
+for PostgreSQL and the saka architecture.

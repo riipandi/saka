@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
 // OAuthCleanupName is the queue the flow sweep runs on.

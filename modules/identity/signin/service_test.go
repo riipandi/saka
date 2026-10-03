@@ -18,17 +18,17 @@ import (
 
 	"connectrpc.com/connect"
 
-	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/testutils"
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The HMAC secret a test deployment signs with: 32 bytes of hex, the form

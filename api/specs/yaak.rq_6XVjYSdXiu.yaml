@@ -21,7 +21,7 @@ bodyType: application/json
 description: |-
   List users with pagination, an optional search term, and sorting.
 
-  Ported from Pocket ID `GET /api/users` as the `tango.identity.v1.UserService/ListUsers` procedure.
+  Ported from Pocket ID `GET /api/users` as the `saka.identity.v1.UserService/ListUsers` procedure.
 
   Parameters:
   - page (body, optional): One-based page number
@@ -41,7 +41,7 @@ headers:
 method: POST
 name: '[Pocket ID] List users'
 sortPriority: 7000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/ListUsers
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/ListUsers
 urlParameters:
 - enabled: false
   name: search

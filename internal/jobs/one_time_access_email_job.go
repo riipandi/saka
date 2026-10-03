@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // OneTimeAccessEmailName is the queue the one-time access emails run on.

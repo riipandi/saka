@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // The add-password flow: a first credential set through the step-up proof,

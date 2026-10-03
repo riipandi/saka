@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] List one page of the delivery endpoints, newest first. The enabled and event filters narrow the page; the signing secrets are never present. Admin only.'
+description: '[Saka] List one page of the delivery endpoints, newest first. The enabled and event filters narrow the page; the signing secrets are never present. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: List Webhooks
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/List
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/List
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -22,7 +22,7 @@ export default function App() {
   return (
     <main className='s-card'>
       <Mark />
-      <h1 className='s-card__title'>Hello, Tango!</h1>
+      <h1 className='s-card__title'>Hello, Saka!</h1>
       <p className='s-card__text'>
         Monolith Go, React, and TanStack application. The surfaces land here.
       </p>

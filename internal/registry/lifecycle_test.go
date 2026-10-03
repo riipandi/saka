@@ -16,13 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/registry"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/registry"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // servedInjector builds the container over a fresh migrated database, the
@@ -111,9 +111,9 @@ func TestPrewarmResolvesEveryBlockingService(t *testing.T) {
 	// watcher belongs to Runners — resolved there when storage.watch.enable
 	// is on, and its construction cannot fail on a dependency.
 	cold := map[string]string{
-		"*github.com/riipandi/tango/internal/datastore.Valkey": "opt-in backend, disabled in this run",
-		"github.com/riipandi/tango/internal/cache.Cache":       "module-facing, cold until a feature resolves it",
-		"*github.com/riipandi/tango/internal/storage.Watcher":  "runner-owned, not on the prewarm walk",
+		"*github.com/riipandi/saka/internal/datastore.Valkey": "opt-in backend, disabled in this run",
+		"github.com/riipandi/saka/internal/cache.Cache":       "module-facing, cold until a feature resolves it",
+		"*github.com/riipandi/saka/internal/storage.Watcher":  "runner-owned, not on the prewarm walk",
 	}
 
 	invoked := make(map[string]bool)

@@ -17,7 +17,7 @@ func TestReservedKeysAreRefusedOnCreateAndUpdate(t *testing.T) {
 	service := testService(t, pool)
 	userWire, groupWire := seedSubject(t, pool)
 
-	for _, key := range []string{"sub", "email", "groups", "tango:token_type"} {
+	for _, key := range []string{"sub", "email", "groups", "saka:token_type"} {
 		_, err := service.CreateByUser(t.Context(), userWire, key, "evil")
 		assert.ErrorIs(t, err, ErrReservedClaim, "user create with %q", key)
 		_, err = service.CreateByGroup(t.Context(), groupWire, key, "evil")

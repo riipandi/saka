@@ -16,13 +16,13 @@
 // list it already reads, so the stream carries no replay and no cursor.
 syntax = "proto3";
 
-package tango.notification.v1;
+package saka.notification.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1;notificationv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1;notificationv1";
 
 // NotificationService is the one surface over notifications: the four
 // administrative procedures write them, the account procedures read the
@@ -255,7 +255,7 @@ message ListAllNotificationsResponse {
   repeated Notification notifications = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -334,7 +334,7 @@ message ListNotificationsResponse {
   repeated Notification notifications = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.

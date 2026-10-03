@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/usergroup"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
 // The consent surface's contract: the ledger answers what the approval

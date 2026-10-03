@@ -32,7 +32,7 @@ func signingTestKey(t *testing.T) jwk.Key {
 }
 
 func TestTheLogoutTokenCarriesTheBackchannelMemberSet(t *testing.T) {
-	token, err := signLogoutToken(signingTestKey(t), jwa.HS256(), "https://tango.example",
+	token, err := signLogoutToken(signingTestKey(t), jwa.HS256(), "https://saka.example",
 		"client-one", "hogwarts", "sess_elder-wand")
 	require.NoError(t, err)
 
@@ -70,7 +70,7 @@ func TestTheLogoutTokenCarriesTheBackchannelMemberSet(t *testing.T) {
 	assert.WithinDuration(t, time.Now().Add(2*time.Minute), exp, 30*time.Second)
 
 	// A token without a session identifier carries no sid member.
-	bare, err := signLogoutToken(signingTestKey(t), jwa.HS256(), "https://tango.example",
+	bare, err := signLogoutToken(signingTestKey(t), jwa.HS256(), "https://saka.example",
 		"client-one", "hogwarts", "")
 	require.NoError(t, err)
 	parsedBare, err := jwt.ParseString(bare, jwt.WithKey(jwa.HS256(), []byte(testHMACKey)))

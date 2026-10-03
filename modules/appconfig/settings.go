@@ -12,10 +12,10 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/cache"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/cache"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // The failures the settings feature reports. The handler maps them to

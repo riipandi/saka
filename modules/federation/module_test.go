@@ -10,17 +10,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	federationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1/federationv1connect"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/appconfig"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/user"
+	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/appconfig"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // TestTheAreaForwardsFeatureProcedures pins the RPC forwarding through the

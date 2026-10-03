@@ -27,7 +27,7 @@ bodyType: application/json
 description: |-
   Defines a client and mints its first secret. The identifier is generated when absent — letters, digits, underscores, and hyphens only. The raw secret is shown exactly once; only its SHA-256 hash is stored. A public client forces the PKCE requirement on, and allowed_user_groups (the groups' wire identifiers) turns the group restriction on.
 
-  Tango procedure tango.federation.v1.OidcClientService/CreateClient. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/CreateClient. Guard: admin.
 
   Parameters:
   - id (body, optional): the client_id the relying party will present
@@ -47,7 +47,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create OIDC client'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/CreateClient
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/CreateClient
 urlParameters: []
 settingSendCookies:
   enabled: false

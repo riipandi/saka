@@ -13,16 +13,16 @@ body:
       "code": "${[ response.body.path(request='rq_RZ4HSoJBXM', behavior='smart', ttl='0', result='first', join=', ', path='$.recovery_codes[${[ prompt.text(store=\'none\', namespace=\'${[ctx.workspace()]}\', ttl=\'0\', label=\'Index\', defaultValue=\'0\') ]}]') ]}"
     }
 bodyType: application/json
-description: '[Tango] Spends one recovery code as a standalone proof of identity — the step-up a sensitive client flow asks for without a new sign-in. The code is consumed exactly once: it cannot verify twice, and it cannot open a session with afterwards. A wrong, spent, or unknown code answers unauthenticated with one message. Requires a Bearer session; a machine credential is refused by the guard.'
+description: '[Saka] Spends one recovery code as a standalone proof of identity — the step-up a sensitive client flow asks for without a new sign-in. The code is consumed exactly once: it cannot verify twice, and it cannot open a session with afterwards. A wrong, spent, or unknown code answers unauthenticated with one message. Requires a Bearer session; a machine credential is refused by the guard.'
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
   id: zxu44pSGQg
 method: POST
-name: '[Tango] Verify recovery code'
+name: '[Saka] Verify recovery code'
 sortPriority: 4740.740740740741
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/VerifyRecoveryCode
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/VerifyRecoveryCode
 urlParameters: []
 settingSendCookies:
   enabled: false

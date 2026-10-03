@@ -8,8 +8,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/storage"
 )
 
 // UploadFinishedName is the queue the upload-finished notices run on.

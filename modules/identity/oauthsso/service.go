@@ -10,9 +10,9 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // The failures the service reports. The handler maps them onto the codes

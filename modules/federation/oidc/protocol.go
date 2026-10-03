@@ -18,9 +18,9 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // The paths the protocol serves. The provider registers its routes with
@@ -232,7 +232,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithLogoutEndpoint(protocolEndSessionEndpoint),
 			provider.WithLogoutPolicies(logoutPolicy(service))),
 		// Introspection is client-scoped: a client reads only the tokens
-		// minted to it. RFC 7662 leaves the policy open; tango's answer is
+		// minted to it. RFC 7662 leaves the policy open; saka's answer is
 		// that a token says nothing to a stranger.
 		provider.WithTokenIntrospection(func(_ context.Context, client *goidc.Client, info goidc.TokenInfo) bool {
 			return info.ClientID == client.ID
@@ -241,7 +241,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		// RFC 7009 revocation is open to every registered client — the
 		// ownership of the presented token is the library's own
 		// client-scoped check — and an access-token hint must reach the
-		// grant, because tango's access tokens are JWTs the store never
+		// grant, because saka's access tokens are JWTs the store never
 		// sees by themselves.
 		provider.WithTokenRevocation(revocationPolicy(),
 			provider.WithTokenRevocationRevokeGrantOnAccessToken(),
@@ -342,7 +342,7 @@ func defaultDeviceCodeFunc() goidc.RandomFunc {
 // flattenBasicAuth copies the Authorization header's Basic credentials
 // onto the form, when the form carries none of its own. The endpoints it
 // wraps authenticate a client from the form — the library reads one
-// authentication method per client, and secret-post is the one tango's
+// authentication method per client, and secret-post is the one saka's
 // clients declare — while RFC 6749 §2.3.1 lets the same client present
 // the same pair in the Basic header.
 func flattenBasicAuth() func(http.Handler) http.Handler {
@@ -432,8 +432,8 @@ var protectedClaimKeys = map[string]struct{}{
 	"at_hash": {}, "c_hash": {}, "s_hash": {},
 	"given_name": {}, "family_name": {}, "name": {}, "display_name": {},
 	"preferred_username": {}, "picture": {}, "email": {}, "email_verified": {},
-	"groups":           {},
-	"tango:token_type": {},
+	"groups":          {},
+	"saka:token_type": {},
 }
 
 // idTokenClaims merges the account facts and the operator-defined claims

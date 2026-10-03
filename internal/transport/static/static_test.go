@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/transport/static"
+	"github.com/riipandi/saka/internal/transport/static"
 )
 
 // serve runs one request through the local driver over dir.

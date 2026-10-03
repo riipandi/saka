@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_kgrwkQQuFE', behavior='smart', ttl='0', result='first', join=', ', path='$.notifications[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Read one notification''s full view, with the audiences its kind names. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
+description: '[Saka] Read one notification''s full view, with the audiences its kind names. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Get Notification
 sortPriority: 61.72839506172839
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/GetNotification
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/GetNotification
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Issue a one-time access code for one account, for an administrator to hand over. The code exists in the response alone: only its hash is stored.
 
-  Mirror of Pocket ID `POST /api/users/{id}/one-time-access-token`, ported as the RPC procedure `tango.authn.v1.OneTimeAccessService/CreateToken`.
+  Mirror of Pocket ID `POST /api/users/{id}/one-time-access-token`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/CreateToken`.
 
   Body:
   - id: the account's identifier (uuid)
@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create one-time access token for user (admin)'
 sortPriority: 19000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OneTimeAccessService/CreateToken
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/CreateToken
 urlParameters:
 - enabled: true
   name: id

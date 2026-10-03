@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/envfile"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/envfile"
+	"github.com/riipandi/saka/pkg/printext"
 	"github.com/urfave/cli/v3"
 )
 
@@ -23,7 +23,7 @@ var keyGenerateCmd = &cli.Command{
 
 Without --algorithm the HMAC secret uses HS256; an HS* --algorithm replaces
 it. The JWT signing key pair is not generated here — it lives in the
-database's public.jwks table, provisioned by tango initialize and rotated by
+database's public.jwks table, provisioned by saka initialize and rotated by
 jwks:generate.
 
 Without --env-file the values are only printed to stdout. With --env-file a

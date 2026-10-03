@@ -1,6 +1,6 @@
 # Scheduler
 
-Scheduler is tango's durable cron scheduler, built on PostgreSQL. It fires tasks at cron
+Scheduler is saka's durable cron scheduler, built on PostgreSQL. It fires tasks at cron
 times across any number of replicas, where exactly one replica wins each tick — no external
 scheduler service, no leader election, no paid module.
 
@@ -77,7 +77,7 @@ double-scheduled.
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. The composition root
+The package lives inside the `saka` module and is not published. The composition root
 wires it in `internal/registry`: the scheduler is built from the shared `datastore.Postgres`
 pool and the queue client, and its job list comes from `jobs.Scheduled()` in
 `internal/jobs/register.go` — the same one place the application's job lists are spelled
@@ -99,7 +99,7 @@ A scheduled job is a queue task first: the tick enqueues it, the queue runs it.
 ```go
 package jobs
 
-import "github.com/riipandi/tango/internal/queue"
+import "github.com/riipandi/saka/internal/queue"
 
 // ReportTask builds the daily report.
 type ReportTask struct {

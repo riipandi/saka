@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/riipandi/tango/pkg/validate"
+	"github.com/riipandi/saka/pkg/validate"
 )
 
 // WriteError maps an error to the standard response envelope.

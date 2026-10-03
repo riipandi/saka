@@ -10,9 +10,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
-	"github.com/riipandi/tango/internal/observer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
+	"github.com/riipandi/saka/internal/observer"
 )
 
 // # The process logger

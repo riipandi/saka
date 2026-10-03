@@ -15,7 +15,7 @@ body:
     }
 bodyType: application/json
 description: |-
-  Exchange the refresh token for a fresh pair. The token is rotated in place — the row keeps its identifier, the secret and the window are replaced — so the session keeps its identity across renewals. A spent, ended, or expired token answers the same failure an unknown one does. Tango-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+  Exchange the refresh token for a fresh pair. The token is rotated in place — the row keeps its identifier, the secret and the window are replaced — so the session keeps its identity across renewals. A spent, ended, or expired token answers the same failure an unknown one does. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
 
   Parameters:
   - refresh_token (body, required): the credential a sign-in or a renewal answered with
@@ -29,9 +29,9 @@ headers:
   value: application/json
   id: bEP77pys06
 method: POST
-name: '[Tango] Refresh token pair'
+name: '[Saka] Refresh token pair'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/Refresh
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/Refresh
 urlParameters: []
 settingSendCookies:
   enabled: false

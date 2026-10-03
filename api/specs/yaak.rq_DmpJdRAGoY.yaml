@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Verify passkey sign-in'
+name: '[Saka] Verify passkey sign-in'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/VerifyLogin
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/VerifyLogin
 urlParameters: []
 settingSendCookies:
   enabled: false

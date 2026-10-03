@@ -5,12 +5,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
-	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/modules/identity/user"
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // ModuleName names the feature in composition reports and logs. The

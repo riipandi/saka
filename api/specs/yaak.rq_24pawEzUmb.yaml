@@ -14,7 +14,7 @@ bodyType: null
 description: |-
   Answers the deployment resolved configuration, the JSON file view of the world.
 
-  Tango endpoint GET /api/configuration (replaces Pocket ID GET /api/application-configuration and /all - one endpoint, scope follows the caller).
+  Saka endpoint GET /api/configuration (replaces Pocket ID GET /api/application-configuration and /all - one endpoint, scope follows the caller).
 
   Anonymous or non-admin token: the public subset (app mode, base URL, sign-in and announcement toggles). Administrator token: every non-secret setting. Secrets are absent by construction.
 headers:
@@ -23,7 +23,7 @@ headers:
   value: '1'
   id: XgYJZSktgb
 method: GET
-name: '[Tango] Get app configuration'
+name: '[Saka] Get app configuration'
 sortPriority: 4000.0
 url: ${[ apiBaseURL ]}/api/configuration
 urlParameters: []

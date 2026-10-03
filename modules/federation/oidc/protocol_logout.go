@@ -9,7 +9,7 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // The JOSE type member RFC 9068 names for JWT access tokens. The provider
@@ -29,7 +29,7 @@ const auditEventSessionEnded = "oidc_session_ended"
 // The logout verifies the hint is an ID token, then withdraws the
 // subject's grants and tokens for the client in one transaction.
 func logoutPolicy(service *Service) goidc.LogoutPolicy {
-	return goidc.NewLogoutPolicy("tango-end-session",
+	return goidc.NewLogoutPolicy("saka-end-session",
 		func(_ *http.Request, session *goidc.LogoutSession) bool {
 			return session.IDTokenHint != ""
 		},
@@ -64,7 +64,7 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 			}
 
 			// The hint's sid names the OP session the RP correlates — a
-			// token the provider minted itself carries none, tango never
+			// token the provider minted itself carries none, saka never
 			// writing the member; a third-party hint's answer rides
 			// through so the client's session matching keeps working.
 			sid := hintSessionID(claims)
@@ -78,7 +78,7 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 }
 
 // hintSessionID reads the session identifier a hint's claims carry, when
-// one does. The delivery's sid is the RP's correlation, not tango's —
+// one does. The delivery's sid is the RP's correlation, not saka's —
 // the row's identity never names it.
 func hintSessionID(claims *goidc.IDToken) string {
 	if claims == nil {

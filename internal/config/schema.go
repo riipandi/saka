@@ -42,7 +42,7 @@ func SchemaDoc() ([]byte, error) {
 		// definition below is envDirective, added after reflection.
 		DoNotReference: true,
 	}
-	if err := r.AddGoComments("github.com/riipandi/tango/internal/config", "."); err != nil {
+	if err := r.AddGoComments("github.com/riipandi/saka/internal/config", "."); err != nil {
 		return nil, fmt.Errorf("config: schema comments: %w", err)
 	}
 
@@ -53,7 +53,7 @@ func SchemaDoc() ([]byte, error) {
 	// 2020-12 meta-schema's $dynamicRef would refuse the file outright.
 	doc.Version = "http://json-schema.org/draft-07/schema#"
 	doc.ID = ""
-	doc.Title = "Tango application configuration"
+	doc.Title = "Saka application configuration"
 	doc.Description = schemaDescription
 
 	// The directive definition is the one shared branch every scalar unions

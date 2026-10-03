@@ -11,14 +11,14 @@ import (
 	"connectrpc.com/validate"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/tango/internal/guard"
+	"github.com/riipandi/saka/internal/guard"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	notificationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/notification/v1/notificationv1connect"
-	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport/middleware"
+	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
+	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport/middleware"
 )
 
 // RPCPath is the route prefix the ConnectRPC surface is mounted on. The SPA,

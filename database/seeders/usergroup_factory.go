@@ -11,9 +11,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/identity/usergroup"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
 // UserGroupSeederName is the name this seeder reports under.

@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Mark one of the caller's own keys revoked. The revocation is a stamp, not a deletion, and revoking an already-revoked key is the same success.
 
-  Ported from Pocket ID `DELETE /api/api-keys/{id}` as the `tango.apikey.v1.ApiKeyService/RevokeAPIKey` procedure.
+  Ported from Pocket ID `DELETE /api/api-keys/{id}` as the `saka.apikey.v1.ApiKeyService/RevokeAPIKey` procedure.
 
   Parameters:
   - id (body, required): the key row's ID
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Revoke API key'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.apikey.v1.ApiKeyService/RevokeAPIKey
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey
 urlParameters:
 - enabled: true
   name: id

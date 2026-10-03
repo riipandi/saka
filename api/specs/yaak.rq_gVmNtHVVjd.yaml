@@ -27,9 +27,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Continue OAuth sign in'
+name: '[Saka] Continue OAuth sign in'
 sortPriority: 912.2222222222222
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/ContinueSignIn
 urlParameters: []
 settingSendCookies:
   enabled: false

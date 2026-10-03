@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // The back-channel logout delivery: the token rides the form member the

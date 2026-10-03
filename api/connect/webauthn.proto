@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package tango.authn.v1;
+package saka.authn.v1;
 
 import "authn.proto";
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1;authnv1";
 
 // WebAuthnService is the passkey surface: enrollment, usernameless sign-in,
 // and the credential roll an account manages.
@@ -65,7 +65,7 @@ service WebAuthnService {
   // Reauthenticate proves the caller again — by password, by a passkey
   // assertion, or by the email code SendReauthenticationCode sent — and
   // answers a single-use reauthentication token. A guarded
-  // procedure spends the token through its `X-Tango-Reauthentication`
+  // procedure spends the token through its `X-Saka-Reauthentication`
   // header; the proof is judged once, at the call that needs it, and dies
   // with its window. The password is checked against the caller's own
   // account; the assertion resolves an account that must be the caller's.
@@ -127,7 +127,7 @@ message PasskeyProof {
 message ReauthenticateResponse {
   // token is the raw reauthentication token, in clear text, exactly once.
   // The database keeps only its hash. It rides the
-  // `X-Tango-Reauthentication` header of the next guarded call.
+  // `X-Saka-Reauthentication` header of the next guarded call.
   string token = 1;
 
   // expires_at is when the proof dies unspent.

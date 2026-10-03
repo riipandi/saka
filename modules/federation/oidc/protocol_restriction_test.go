@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/identity/usergroup"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/usergroup"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // The group restriction gate on the protocol path: a client is restricted

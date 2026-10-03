@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/webhook"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/webhook"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The hex the test cipher builds from: sixty-four hex characters, the shape

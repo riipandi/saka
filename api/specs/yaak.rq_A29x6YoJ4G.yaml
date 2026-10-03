@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Replaces one of an account's claims — key and value together. A claim row the group surface owns is refused: the subject kind is the row's own, and a claim cannot silently move between subjects.
 
-  Tango procedure tango.federation.v1.CustomClaimService/UpdateUserClaim. Guard: admin.
+  Saka procedure saka.federation.v1.CustomClaimService/UpdateUserClaim. Guard: admin.
 
   Parameters:
   - id (body, required): the claim row's identifier, a TypeID (cclm_...)
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update user custom claim'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/UpdateUserClaim
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/UpdateUserClaim
 urlParameters: []
 settingSendCookies:
   enabled: false

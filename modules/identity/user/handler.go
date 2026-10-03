@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // maxPictureSize is the read cap the picture write enforces before the bytes

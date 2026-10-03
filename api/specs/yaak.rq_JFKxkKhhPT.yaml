@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Queue surface — one summary per registered queue: configuration and live pending/dead counts (page/limit, search, sort).
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List task queues with live counts (queue)'
+name: '[Saka] List task queues with live counts (queue)'
 sortPriority: 111.1111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/ListQueues
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ListQueues
 urlParameters: []
 settingSendCookies:
   enabled: false

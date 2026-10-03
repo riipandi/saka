@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // The groups the user group seeder writes, in the order its report carries

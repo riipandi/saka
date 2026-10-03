@@ -14,7 +14,7 @@ bodyType: application/json
 description: |-
   Mirror of Pocket ID GET /api/application-configuration/all.
 
-  Excluded in Tango: the full configuration read is merged into GET /api/configuration - an administrator token widens the answer there. This request is kept only as the upstream checklist entry.
+  Excluded in Saka: the full configuration read is merged into GET /api/configuration - an administrator token widens the answer there. This request is kept only as the upstream checklist entry.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,7 +27,7 @@ headers:
 method: POST
 name: '[Pocket ID] List all application configurations (excluded)'
 sortPriority: 6000.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/GetAll
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.AppConfigService/GetAll
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -10,7 +10,7 @@ import (
 	"go.jetify.com/typeid"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // Repository reads and writes the session rows the lifecycle procedures

@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  End the session the access token names. The row is stamped and the refresh token dies with it; the access token keeps working until its own expiry — the statelessness the protocol settles. Tango-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+  End the session the access token names. The row is stamped and the refresh token dies with it; the access token keeps working until its own expiry — the statelessness the protocol settles. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
 
   Parameters: none (the session is the claims' `sid`).
 headers:
@@ -25,9 +25,9 @@ headers:
   value: application/json
   id: Kxbj9z3umC
 method: POST
-name: '[Tango] Sign out'
+name: '[Saka] Sign out'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/SignOut
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/SignOut
 urlParameters: []
 settingSendCookies:
   enabled: false

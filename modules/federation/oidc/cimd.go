@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // The client-id metadata document (CIMD): a client whose identifier is the

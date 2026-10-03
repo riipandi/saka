@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/envfile"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/envfile"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedDatabase returns a DSN for a fresh database with the schema applied,

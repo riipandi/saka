@@ -11,14 +11,14 @@ import (
 
 	"uuid"
 
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/responder"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the account procedures report. The handler maps them to

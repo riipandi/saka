@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The RFC 7009 revocation surface, driven through a provider assembled
-// with tango's real stores: a client revokes its own refresh token, a
+// with saka's real stores: a client revokes its own refresh token, a
 // stranger cannot, an unknown token is a quiet success.
 
 // revokePool pairs the migrated pool with the service its client rows
@@ -54,10 +54,10 @@ func revokeProvider(t *testing.T, pool *revokePool) http.Handler {
 	clients := clientStore{
 		pool:    pool.Postgres,
 		repo:    NewRepository(),
-		baseURL: "https://tango.example",
+		baseURL: "https://saka.example",
 	}
 	p, err := provider.New(provider.Config{
-		Issuer: "https://tango.example",
+		Issuer: "https://saka.example",
 		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
 			return goidc.JSONWebKeySet{}, nil
 		},

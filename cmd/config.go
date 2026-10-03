@@ -16,10 +16,10 @@ import (
 	"github.com/rodaine/table"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/envfile"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/envfile"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // ErrDatabaseURLUnset is returned when no DSN is available. It names the

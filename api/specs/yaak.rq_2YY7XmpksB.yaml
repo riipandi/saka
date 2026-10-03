@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Stamps the answer — approve or deny. A request decided once is decided forever; a repeat answers not_found. The impersonated caller is refused. Guard: session.
 
-  Procedure: `tango.authn.v1.DeviceApprovalService/Decide`
+  Procedure: `saka.authn.v1.DeviceApprovalService/Decide`
 headers:
 - enabled: true
   name: Content-Type
@@ -29,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Decide device login request'
+name: '[Saka] Decide device login request'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.DeviceApprovalService/Decide
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.DeviceApprovalService/Decide
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 func TestCORSPreflightNamesTheAllowedOrigin(t *testing.T) {
@@ -78,7 +78,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	// browser asked about, so the defaults are proven by accepting every
 	// one of them and refusing what the list does not name.
 	for _, method := range config.DefaultCORSMethods {
-		req := httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+		req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 		req.Header.Set("Origin", "http://localhost:3080")
 		req.Header.Set("Access-Control-Request-Method", method)
 		rec := httptest.NewRecorder()
@@ -90,7 +90,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	}
 
 	// A method neither the Connect nor the REST surface answers is refused.
-	req := httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodTrace)
 	rec := httptest.NewRecorder()
@@ -102,7 +102,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	// preflightable without the configuration naming them. rs/cors answers a
 	// preflight by echoing the names back, and its matcher demands the list
 	// sorted, which is the order a browser sends.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	req.Header.Set("Access-Control-Request-Headers", "connect-protocol-version, content-type, x-api-key")
@@ -114,7 +114,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 		"the requested protocol headers are within the defaults")
 
 	// A header outside the defaults is refused.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	req.Header.Set("Access-Control-Request-Headers", "x-unknown")
@@ -130,7 +130,7 @@ func TestCORSNamesTheExposedResponseHeaders(t *testing.T) {
 		MaxAge:         time.Hour,
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/rpc/tango.system.v1.HealthService/Check", nil)
+	req := httptest.NewRequest(http.MethodPost, "/rpc/saka.system.v1.HealthService/Check", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	rec := httptest.NewRecorder()
 
@@ -154,7 +154,7 @@ func TestCORSConfigOverridesTheDefaults(t *testing.T) {
 
 	// A named method list is the operator's policy: POST, which the defaults
 	// answer, is now refused.
-	req := httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	rec := httptest.NewRecorder()
@@ -163,7 +163,7 @@ func TestCORSConfigOverridesTheDefaults(t *testing.T) {
 		"a named list replaces the defaults wholesale")
 
 	// A named header list answers only its own names.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	req.Header.Set("Access-Control-Request-Headers", "x-custom")

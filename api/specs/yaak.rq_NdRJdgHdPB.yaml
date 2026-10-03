@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Remove an account. The database trigger archives the removed row. An administrator cannot delete the account they are signed in with.
 
-  Ported from Pocket ID `DELETE /api/users/{id}` as the `tango.identity.v1.UserService/DeleteUser` procedure.
+  Ported from Pocket ID `DELETE /api/users/{id}` as the `saka.identity.v1.UserService/DeleteUser` procedure.
 
   Parameters:
   - id (body, required): User ID
@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] Delete user'
 sortPriority: 15000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/DeleteUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/DeleteUser
 urlParameters:
 - enabled: true
   name: id

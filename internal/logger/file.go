@@ -6,7 +6,7 @@ import (
 
 	"go.loglayer.dev/transports/lumberjack/v3"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // fileSink is the rotating file transport behind the async worker the sinks

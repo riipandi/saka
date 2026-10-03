@@ -9,9 +9,9 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // AuditCleanupName is the queue the audit-trail retention runs on.

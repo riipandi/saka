@@ -9,7 +9,7 @@ import (
 
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // RequestIDHeader is the header a request id is read from and written to. It

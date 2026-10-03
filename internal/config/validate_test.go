@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // resolveAndValidate is the pair a caller that needs the whole configuration
@@ -52,7 +52,7 @@ func TestValidationRejectsBadDriver(t *testing.T) {
 }
 
 func TestValidationAcceptsAConfigWithNoSigningMaterial(t *testing.T) {
-	// The asymmetric signing key is the database's (tango initialize
+	// The asymmetric signing key is the database's (saka initialize
 	// provisions it) and the HMAC secret is optional, so a config naming
 	// neither is a valid deployment: the key pairs come from the rows.
 	_, err := resolveAndValidate(t, config.Options{
@@ -118,7 +118,7 @@ func TestValidationAcceptsAnUnconfiguredMailer(t *testing.T) {
 
 	assert.Empty(t, cfg.Mailer.SMTPHost)
 	assert.Equal(t, "mailer@example.com", cfg.Mailer.FromEmail)
-	assert.Equal(t, "Tango Mailer", cfg.Mailer.FromName)
+	assert.Equal(t, "Saka Mailer", cfg.Mailer.FromName)
 	assert.Equal(t, 587, cfg.Mailer.SMTPPort)
 }
 
@@ -182,7 +182,7 @@ func TestRedactedHidesSecrets(t *testing.T) {
 
 	assert.Equal(t, "[redacted]", redacted.Auth.SecretKey)
 	assert.NotContains(t, redacted.Database.URL, "pass")
-	assert.Contains(t, redacted.Database.URL, "localhost:5432/tango")
+	assert.Contains(t, redacted.Database.URL, "localhost:5432/saka")
 	assert.NotContains(t, cfg.String(), "pass", "String must not leak the password")
 }
 
@@ -248,11 +248,11 @@ func TestMaskedReducesTheDSNRatherThanMaskingIt(t *testing.T) {
 	// A connection string is a composite value: revealing part of the string
 	// says nothing, while the host is the part a reader needs.
 	cfg := config.Default()
-	cfg.Database.URL = "postgresql://user:sup3rs3cret@localhost:5432/tango?sslmode=disable"
+	cfg.Database.URL = "postgresql://user:sup3rs3cret@localhost:5432/saka?sslmode=disable"
 
 	masked := cfg.Masked()
 
-	assert.Equal(t, "localhost:5432/tango", masked.Database.URL)
+	assert.Equal(t, "localhost:5432/saka", masked.Database.URL)
 	assert.NotContains(t, masked.Database.URL, "sup3rs3cret")
 }
 

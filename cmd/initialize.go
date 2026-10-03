@@ -13,15 +13,15 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 var initializeCmd = &cli.Command{
@@ -126,7 +126,7 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		// indented beneath it — and exits nonzero without a second print
 		// of the message the CLI's error path would add.
 		if _, err = fmt.Fprintf(p.Writer(),
-			"status: refused\n  this database already holds %d %s — initialize never touches a running installation\n  to recover administrator access: tango admin:reset-password <email>\n",
+			"status: refused\n  this database already holds %d %s — initialize never touches a running installation\n  to recover administrator access: saka admin:reset-password <email>\n",
 			accounts, printext.Plural(int(accounts), "account")); err != nil {
 			return err
 		}

@@ -14,7 +14,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // QueueView is one registered queue's configuration and live counts.

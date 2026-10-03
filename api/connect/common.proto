@@ -8,9 +8,9 @@
 // spells the same snake_case key the REST envelope emits.
 syntax = "proto3";
 
-package tango.common.v1;
+package saka.common.v1;
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/common/v1;commonv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/common/v1;commonv1";
 
 // ListMetadata is the pagination block a list response carries, flat like the
 // REST envelope's metadata. The item indices are zero-based and inclusive,

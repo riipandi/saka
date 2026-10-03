@@ -1,10 +1,10 @@
-// Package webhook is the webhook area: the outbound event surface tango
+// Package webhook is the webhook area: the outbound event surface saka
 // carries and Pocket ID does not.
 //
 // It is an area of its own rather than a feature of identity because a
 // delivery endpoint is not an account fact — it is a destination the
 // deployment streams its events to, and the events it streams are the audit
-// catalog's. The area is tango-only, and the surface that manages the
+// catalog's. The area is saka-only, and the surface that manages the
 // endpoints is administrative all the way through.
 //
 // The emission seam rides the audit recorder: the recorder carries a sink
@@ -20,13 +20,13 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // Package registers the service this area owns, and arms the audit

@@ -11,13 +11,13 @@ import (
 
 	"connectrpc.com/connect"
 
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/scheduler"
-	"github.com/riipandi/tango/pkg/responder"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/scheduler"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // errInternal is the one wire answer an internal failure carries. The cause

@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Answers the claim maps a client would receive for one account — id token, access token, userinfo — built from the account as it stands. No token is minted and none of the claims are secrets; the custom claims join when the customclaim feature lands.
 
-  Tango procedure tango.federation.v1.OidcClientService/PreviewClient. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/PreviewClient. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Preview OIDC client data for user'
 sortPriority: 10000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/PreviewClient
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/PreviewClient
 urlParameters:
 - enabled: true
   name: id

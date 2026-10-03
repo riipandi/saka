@@ -11,8 +11,8 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
 )
 
 // exportedRecords decodes the first export the collector received into its log

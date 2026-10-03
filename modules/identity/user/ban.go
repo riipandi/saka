@@ -7,8 +7,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // BanParams carries the terms of a ban: the reason the audit trail and the

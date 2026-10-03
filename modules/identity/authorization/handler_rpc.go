@@ -9,11 +9,11 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	authzv1 "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1"
-	authzv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1/authzv1connect"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	authzv1 "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1"
+	authzv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1/authzv1connect"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

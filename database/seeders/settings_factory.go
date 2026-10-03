@@ -7,8 +7,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/appconfig"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/appconfig"
 )
 
 // SettingsSeederName is the name this seeder reports under.

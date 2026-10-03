@@ -24,7 +24,7 @@ headers:
   value: application/json
   id: null
 method: POST
-name: '[Tango] Approve authorization interaction'
+name: '[Saka] Approve authorization interaction'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID/complete
 urlParameters: []

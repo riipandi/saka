@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // GroupSummary is the group fact an account view carries: enough to render

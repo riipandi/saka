@@ -9,7 +9,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
@@ -30,7 +30,7 @@ func TestNewKeyGeneratorSelectsTheSecretAlgorithm(t *testing.T) {
 }
 
 func TestNewKeyGeneratorRefusesAnAsymmetricName(t *testing.T) {
-	// The signing key pair is the database's (tango initialize provisions
+	// The signing key pair is the database's (saka initialize provisions
 	// it, jwks:generate rotates it), so an asymmetric algorithm has no role
 	// in the environment's secret keys.
 	for _, algorithm := range []string{"ES256", "RS256", "EdDSA"} {

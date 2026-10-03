@@ -15,7 +15,7 @@ body:
       "terminate_sessions": true
     }
 bodyType: application/json
-description: '[Tango] Spends a reset token from the reset email on a new password. The token is the whole credential — the caller carries none. The new password must meet the account policy (min 8 chars, 3 of 4 classes, or a 16+ char passphrase) and must differ from the current one. terminate_sessions (default true) revokes every live session once the reset commits; send false to keep them. Unknown, expired, and spent tokens answer permission_denied with one message; a same-password reset answers invalid_argument.'
+description: '[Saka] Spends a reset token from the reset email on a new password. The token is the whole credential — the caller carries none. The new password must meet the account policy (min 8 chars, 3 of 4 classes, or a 16+ char passphrase) and must differ from the current one. terminate_sessions (default true) revokes every live session once the reset commits; send false to keep them. Unknown, expired, and spent tokens answer permission_denied with one message; a same-password reset answers invalid_argument.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -26,9 +26,9 @@ headers:
   value: application/json
   id: RAhkbRYAMg
 method: POST
-name: '[Tango] Finalize password recovery'
+name: '[Saka] Finalize password recovery'
 sortPriority: 333.3333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.PasswordRecoveryService/ResetPassword
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

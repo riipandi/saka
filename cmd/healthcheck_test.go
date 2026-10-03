@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/pkg/envfile"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/pkg/envfile"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // passing is a check function that always succeeds.
@@ -52,7 +52,7 @@ func runHealthCmdIn(t *testing.T, dataDir string, args ...string) (string, error
 
 	var out bytes.Buffer
 	root := testRoot(&out, "", healthCheckCmd)
-	err := root.Run(context.Background(), append([]string{"tango", healthCheckCmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", healthCheckCmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -241,7 +241,7 @@ func TestHealthTextReportsEveryFailure(t *testing.T) {
 func TestHealthJSONMatchesTheAPIShape(t *testing.T) {
 	checker := health.NewChecker(
 		health.WithCheck(health.Check{Name: "postgres", Check: passing}),
-		health.WithInfo(map[string]string{"name": "tango"}),
+		health.WithInfo(map[string]string{"name": "saka"}),
 	)
 
 	encoded, err := json.Marshal(checker.Check(t.Context()))
@@ -296,13 +296,13 @@ func TestRedactDSNOmitsCredentials(t *testing.T) {
 	}{
 		{
 			name: "url form",
-			dsn:  "postgresql://postgres:supersecret@db.internal:5432/tango?sslmode=disable",
-			want: "db.internal:5432/tango",
+			dsn:  "postgresql://postgres:supersecret@db.internal:5432/saka?sslmode=disable",
+			want: "db.internal:5432/saka",
 		},
 		{
 			name: "key value form",
-			dsn:  "host=db.internal port=5432 dbname=tango user=postgres password=supersecret",
-			want: "db.internal:5432/tango",
+			dsn:  "host=db.internal port=5432 dbname=saka user=postgres password=supersecret",
+			want: "db.internal:5432/saka",
 		},
 		{
 			name: "unparsable dsn reports a placeholder",

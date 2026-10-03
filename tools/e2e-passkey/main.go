@@ -37,7 +37,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/riipandi/tango/pkg/testutils/softauthn"
+	"github.com/riipandi/saka/pkg/testutils/softauthn"
 )
 
 func main() {
@@ -54,7 +54,7 @@ func main() {
 
 	// ---- S0. The administrator opens the session every admin door runs on.
 
-	admin := client.mustRPC("tango.authn.v1.AuthService/SignIn", map[string]any{
+	admin := client.mustRPC("saka.authn.v1.AuthService/SignIn", map[string]any{
 		"identity": adminIdentity,
 		"password": adminPassword,
 	}, "")
@@ -117,14 +117,14 @@ func main() {
 	// honest completion would pay for it.
 	bridge = passwordBridge(client, "vittoria", passwordOf("vittoria"))
 	for range 3 {
-		if code := client.tryRPC("tango.authn.v1.MultifactorService/CompleteSignIn", map[string]any{
+		if code := client.tryRPC("saka.authn.v1.MultifactorService/CompleteSignIn", map[string]any{
 			"pending_token": bridge,
 			"code":          "000000",
 		}, ""); code != http.StatusUnauthorized {
 			fail("a wrong code answered %d; the refusal must be unauthenticated", code)
 		}
 	}
-	if code := client.tryRPC("tango.authn.v1.MultifactorService/CompleteSignIn", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.MultifactorService/CompleteSignIn", map[string]any{
 		"pending_token": bridge,
 		"code":          "000000",
 	}, ""); code != http.StatusUnauthorized {
@@ -134,7 +134,7 @@ func main() {
 
 	// The one-time code on the MFA account mints the bridge, not a session.
 	oneTimeCode := issueOneTimeCode(client, adminToken, vittoria)
-	exchange := client.mustRPC("tango.authn.v1.OneTimeAccessService/ExchangeToken", map[string]any{
+	exchange := client.mustRPC("saka.authn.v1.OneTimeAccessService/ExchangeToken", map[string]any{
 		"token": oneTimeCode,
 	}, "")
 	if !anyTrue(exchange["mfa_required"]) || str(exchange, "mfa_pending_token") == "" {
@@ -148,7 +148,7 @@ func main() {
 
 	silas := adminCreateUser(client, adminToken, "silas", "Silas")
 	oneTimeCode = issueOneTimeCode(client, adminToken, silas)
-	exchange = client.mustRPC("tango.authn.v1.OneTimeAccessService/ExchangeToken", map[string]any{
+	exchange = client.mustRPC("saka.authn.v1.OneTimeAccessService/ExchangeToken", map[string]any{
 		"token": oneTimeCode,
 	}, "")
 	silasToken := str(exchange, "access_token")
@@ -160,7 +160,7 @@ func main() {
 	silasDevice := softauthn.New(false, false, true)
 	silasCredential := enroll(client, silasDevice, silasToken, "Silas key")
 
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/AdminDeleteCredential", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/AdminDeleteCredential", map[string]any{
 		"user_id":       silas,
 		"credential_id": silasCredential,
 	}, adminToken); code != http.StatusBadRequest {
@@ -192,9 +192,9 @@ func main() {
 	// enrollment, no restart in between.
 
 	settingsUpdate(client, adminToken, "webauthn.allow_synced_passkeys", "false")
-	syncedOptions, syncedSession := ceremony(client, "tango.authn.v1.WebAuthnService/BeginRegistration", vittoriaToken)
+	syncedOptions, syncedSession := ceremony(client, "saka.authn.v1.WebAuthnService/BeginRegistration", vittoriaToken)
 	synced := softauthn.New(true, true, true)
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyRegistration", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyRegistration", map[string]any{
 		"session_id": syncedSession,
 		"credential": mustCreate(synced, syncedOptions, baseURL),
 		"name":       "Synced key",
@@ -205,8 +205,8 @@ func main() {
 	pass("the synced-passkey toggle is judged at enrollment")
 
 	settingsUpdate(client, adminToken, "passkey.max_credentials", "1")
-	limitOptions, limitSession := ceremony(client, "tango.authn.v1.WebAuthnService/BeginRegistration", vittoriaToken)
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyRegistration", map[string]any{
+	limitOptions, limitSession := ceremony(client, "saka.authn.v1.WebAuthnService/BeginRegistration", vittoriaToken)
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyRegistration", map[string]any{
 		"session_id": limitSession,
 		"credential": mustCreate(softauthn.New(false, false, true), limitOptions, baseURL),
 		"name":       "Beyond the limit",
@@ -219,7 +219,7 @@ func main() {
 	// ---- S6. The lifecycle: rename by the holder, the admin doors over
 	// another account, the delete-last allowed under a password.
 
-	renamed := client.mustRPC("tango.authn.v1.WebAuthnService/UpdateCredential", map[string]any{
+	renamed := client.mustRPC("saka.authn.v1.WebAuthnService/UpdateCredential", map[string]any{
 		"credential_id": enrolled,
 		"name":          "Sophie's laptop",
 	}, sophieToken)
@@ -228,19 +228,19 @@ func main() {
 	}
 	pass("the holder renamed their passkey")
 
-	adminRoll := client.mustRPC("tango.authn.v1.WebAuthnService/AdminListCredentials", map[string]any{
+	adminRoll := client.mustRPC("saka.authn.v1.WebAuthnService/AdminListCredentials", map[string]any{
 		"user_id": sophie,
 	}, adminToken)
 	adminList, _ := adminRoll["credentials"].([]any)
 	if len(adminList) != 1 {
 		fail("the admin roll carries %d credentials; sophie enrolled one", len(adminList))
 	}
-	client.mustRPC("tango.authn.v1.WebAuthnService/AdminUpdateCredential", map[string]any{
+	client.mustRPC("saka.authn.v1.WebAuthnService/AdminUpdateCredential", map[string]any{
 		"user_id":       sophie,
 		"credential_id": enrolled,
 		"name":          "Renamed by the operator",
 	}, adminToken)
-	client.mustRPC("tango.authn.v1.WebAuthnService/AdminDeleteCredential", map[string]any{
+	client.mustRPC("saka.authn.v1.WebAuthnService/AdminDeleteCredential", map[string]any{
 		"user_id":       sophie,
 		"credential_id": enrolled,
 	}, adminToken)
@@ -249,24 +249,24 @@ func main() {
 	// Delete-last is allowed: the password is the way back in. Sophie
 	// re-enrolls to have one to lose, then loses it.
 	second := enroll(client, device, sophieToken, "Second key")
-	client.mustRPC("tango.authn.v1.WebAuthnService/DeleteCredential", map[string]any{
+	client.mustRPC("saka.authn.v1.WebAuthnService/DeleteCredential", map[string]any{
 		"credential_id": second,
-	}, sophieToken, "X-Tango-Reauthentication", reauthPassword(client, sophieToken, passwordOf("sophie")))
+	}, sophieToken, "X-Saka-Reauthentication", reauthPassword(client, sophieToken, passwordOf("sophie")))
 	pass("the delete-last allowed under a password")
 
 	// ---- S7. The negative set.
 
 	// A replayed assertion: the same body twice over the same, already
 	// consumed ceremony handle — the second refused.
-	options, sessionID := ceremony(client, "tango.authn.v1.WebAuthnService/BeginLogin", "")
+	options, sessionID := ceremony(client, "saka.authn.v1.WebAuthnService/BeginLogin", "")
 	assertion := mustGet(vittoriaDevice, options, baseURL, handleOf(vittoria))
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": assertion,
 	}, ""); code != http.StatusOK {
 		fail("the fresh assertion answered %d", code)
 	}
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": assertion,
 	}, ""); code != http.StatusUnauthorized {
@@ -275,9 +275,9 @@ func main() {
 	pass("the replayed assertion refused")
 
 	// An expired ceremony: a minute of silence, then the verify refuses.
-	options, sessionID = ceremony(client, "tango.authn.v1.WebAuthnService/BeginLogin", "")
+	options, sessionID = ceremony(client, "saka.authn.v1.WebAuthnService/BeginLogin", "")
 	time.Sleep(61 * time.Second)
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": mustGet(vittoriaDevice, options, baseURL, handleOf(vittoria)),
 	}, ""); code != http.StatusUnauthorized {
@@ -287,8 +287,8 @@ func main() {
 
 	// An unknown credential: an authenticator sophie never enrolled.
 	stranger := softauthn.New(false, false, true)
-	options, sessionID = ceremony(client, "tango.authn.v1.WebAuthnService/BeginLogin", "")
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	options, sessionID = ceremony(client, "saka.authn.v1.WebAuthnService/BeginLogin", "")
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": mustGet(stranger, options, baseURL, handleOf(sophie)),
 	}, ""); code != http.StatusUnauthorized {
@@ -297,26 +297,26 @@ func main() {
 	pass("the unknown credential refused")
 
 	// A banned account: sophie's passkey is real, the account is closed.
-	client.mustRPC("tango.identity.v1.UserService/BanUser", map[string]any{
+	client.mustRPC("saka.identity.v1.UserService/BanUser", map[string]any{
 		"id":     sophie,
 		"reason": "the E2E ladder is holding the door",
 	}, adminToken)
-	options, sessionID = ceremony(client, "tango.authn.v1.WebAuthnService/BeginLogin", "")
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	options, sessionID = ceremony(client, "saka.authn.v1.WebAuthnService/BeginLogin", "")
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": mustGet(device, options, baseURL, handleOf(sophie)),
 	}, ""); code != http.StatusUnauthorized {
 		fail("the banned account answered %d", code)
 	}
-	client.mustRPC("tango.identity.v1.UserService/UnbanUser", map[string]any{
+	client.mustRPC("saka.identity.v1.UserService/UnbanUser", map[string]any{
 		"id": sophie,
 	}, adminToken)
 	pass("the banned account refused, then unbanned")
 
 	// A cloned credential: the counter rewinds, the refusal is silent.
 	vittoriaDevice.RewindCounter()
-	options, sessionID = ceremony(client, "tango.authn.v1.WebAuthnService/BeginLogin", "")
-	if code := client.tryRPC("tango.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
+	options, sessionID = ceremony(client, "saka.authn.v1.WebAuthnService/BeginLogin", "")
+	if code := client.tryRPC("saka.authn.v1.WebAuthnService/VerifyLogin", map[string]any{
 		"session_id": sessionID,
 		"credential": mustGet(vittoriaDevice, options, baseURL, handleOf(vittoria)),
 	}, ""); code != http.StatusBadRequest {

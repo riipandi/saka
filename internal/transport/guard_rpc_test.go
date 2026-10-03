@@ -11,15 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/signup"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/signup"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // callerAuthenticator answers the caller the request's token names, so a test

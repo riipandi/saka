@@ -10,13 +10,13 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
-	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/printext"
-	"github.com/riipandi/tango/pkg/responder"
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/printext"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

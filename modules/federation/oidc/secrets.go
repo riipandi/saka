@@ -9,9 +9,9 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // Secret is one stored client secret: the hash is the value's whole

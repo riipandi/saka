@@ -7,9 +7,9 @@ only record of what is served.
 Every ConnectRPC procedure is called with `POST` under `/rpc`; the wire is snake_case JSON. REST
 routes live under `/api` (or their root path) and are throttled with the same policy.
 
-## Authentication (tango-only)
+## Authentication (saka-only)
 
-Password authentication is a tango-only surface; upstream Pocket ID signs users in with passkeys
+Password authentication is a saka-only surface; upstream Pocket ID signs users in with passkeys
 only. `SignIn` takes
 `{"identity": "<username or email>", "password": "<plaintext>", "remember": <bool>}` and answers
 the token pair plus the session view; `remember` selects the long or short session lifetime. A
@@ -18,24 +18,24 @@ confirmed TOTP enrollment turns a successful sign-in into a pending bridge inste
 
 | Method   | Procedure / Endpoint                                          | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
-| POST     | `/rpc/tango.authn.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
-| POST     | `/rpc/tango.authn.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
-| POST     | `/rpc/tango.authn.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
-| POST     | `/rpc/tango.authn.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
-| POST     | `/rpc/tango.authn.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
-| POST     | `/rpc/tango.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
-| POST     | `/rpc/tango.authn.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
-| POST     | `/rpc/tango.authn.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
-| POST     | `/rpc/tango.authn.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
-| POST     | `/rpc/tango.authn.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
+| POST     | `/rpc/saka.authn.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
+| POST     | `/rpc/saka.authn.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
+| POST     | `/rpc/saka.authn.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
+| POST     | `/rpc/saka.authn.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
+| POST     | `/rpc/saka.authn.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
+| POST     | `/rpc/saka.authn.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
+| POST     | `/rpc/saka.authn.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
 
-## Password Recovery (tango-only)
+## Password Recovery (saka-only)
 
 | Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
-| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
-| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
-| POST     | `/rpc/tango.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
 
 The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
 email and stored only as a hash.
@@ -50,10 +50,10 @@ less, twelve above — and stored as SHA-256 hashes. The email paths are gated b
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
 | -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/CreateToken`                      | ConnectRPC   | Create one-time access token for user (admin) |
-| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/ExchangeToken`                    | ConnectRPC   | Exchange one-time access token               |
-| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
-| POST     | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/CreateToken`                      | ConnectRPC   | Create one-time access token for user (admin) |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken`                    | ConnectRPC   | Exchange one-time access token               |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
 
 ## Passkeys (WebAuthn)
 
@@ -63,40 +63,40 @@ single-use token that lives `session.reverification_window` (default 30 minutes)
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
 | -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/ListCredentials`                       | ConnectRPC   | List the account's passkeys                 |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/UpdateCredential`                      | ConnectRPC   | Rename a passkey                            |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/BeginLogin`                            | ConnectRPC   | Open a ceremony sign-in challenge           |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/VerifyLogin`                           | ConnectRPC   | Verify the assertion and open the session   |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password, passkey, or email code) |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/SendReauthenticationCode`              | ConnectRPC   | Email the reverification code (self)         |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential`                 | ConnectRPC   | Rename a user's passkey (admin)             |
-| POST     | `/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/ListCredentials`                       | ConnectRPC   | List the account's passkeys                 |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/UpdateCredential`                      | ConnectRPC   | Rename a passkey                            |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginLogin`                            | ConnectRPC   | Open a ceremony sign-in challenge           |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyLogin`                           | ConnectRPC   | Verify the assertion and open the session   |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password, passkey, or email code) |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode`              | ConnectRPC   | Email the reverification code (self)         |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminUpdateCredential`                 | ConnectRPC   | Rename a user's passkey (admin)             |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |
 
 ## MFA TOTP
 
-Tango-only; upstream Pocket ID has no TOTP. A confirmed enrollment turns a successful password
+Saka-only; upstream Pocket ID has no TOTP. A confirmed enrollment turns a successful password
 sign-in into a pending bridge (5-minute TTL, 3-wrong-codes budget) that only `CompleteSignIn`
 completes — with a TOTP code or a recovery code.
 
 | Method   | Procedure / Endpoint                                          | Protocol     | Summary                      |
 | -------- | ------------------------------------------------------------- | ------------ | ---------------------------- |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/BeginTotpEnrollment`  | ConnectRPC   | Start TOTP enrollment (secret shown once, sealed at rest) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/ConfirmTotpEnrollment`| ConnectRPC   | Confirm and enable TOTP (recovery codes shown once) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/ListTotpEnrollments`  | ConnectRPC   | List the account's authenticators (never a secret) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/DeleteTotpEnrollment` | ConnectRPC   | Delete one authenticator (second-factor proof) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/CompleteSignIn`       | ConnectRPC   | Complete a pending sign-in   |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/RegenerateRecoveryCodes` | ConnectRPC | Rotate recovery codes (shown once) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/DisableMfa`           | ConnectRPC   | Disable MFA (second-factor proof) |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
-| POST     | `/rpc/tango.authn.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/BeginTotpEnrollment`  | ConnectRPC   | Start TOTP enrollment (secret shown once, sealed at rest) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/ConfirmTotpEnrollment`| ConnectRPC   | Confirm and enable TOTP (recovery codes shown once) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/ListTotpEnrollments`  | ConnectRPC   | List the account's authenticators (never a secret) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/DeleteTotpEnrollment` | ConnectRPC   | Delete one authenticator (second-factor proof) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/CompleteSignIn`       | ConnectRPC   | Complete a pending sign-in   |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/RegenerateRecoveryCodes` | ConnectRPC | Rotate recovery codes (shown once) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/DisableMfa`           | ConnectRPC   | Disable MFA (second-factor proof) |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
+| POST     | `/rpc/saka.authn.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
 
 ## OAuth SSO
 
-Tango-only; upstream Pocket ID has no SSO. Sign in with Google, GitHub, or a custom OIDC
+Saka-only; upstream Pocket ID has no SSO. Sign in with Google, GitHub, or a custom OIDC
 connection. The browser flow rides two REST routes that answer 302 redirects only; the
 completion procedures run over ConnectRPC with the flow token as the credential (guarded
 `Public`). A resolved account keeping a confirmed second factor answers with the MFA bridge,
@@ -106,16 +106,16 @@ which `CompleteSignIn` spends.
 | ------ | ------------------------------------------------------------- | ------------ | ------- |
 | GET    | `/oauth/{provider}/start`                                  | REST         | Start the browser flow (302 to the provider's authorize URL) |
 | GET    | `/oauth/{provider}/callback`                               | REST         | Provider callback (302 back to the SPA with the flow token or an error code) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn`              | ConnectRPC   | Open the flow (authorize URL) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn`           | ConnectRPC   | Complete the flow (token pair, MFA bridge, or the next stage) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail`        | ConnectRPC   | Spend the email code of a `verify_email` flow |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ListConnections`          | ConnectRPC   | List connections (admin, secrets never answered) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/GetConnection`            | ConnectRPC   | Read one connection (admin) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/CreateConnection`         | ConnectRPC   | Register a connection (admin) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/UpdateConnection`         | ConnectRPC   | Rewrite a connection (admin) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection`         | ConnectRPC   | Remove a connection (admin, bindings cascade) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections`    | ConnectRPC   | List the holder's bindings (oldest first) |
-| POST   | `/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection`         | ConnectRPC   | Remove a binding (step-up; the last credential of a passwordless account is refused) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/BeginSignIn`              | ConnectRPC   | Open the flow (authorize URL) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/ContinueSignIn`           | ConnectRPC   | Complete the flow (token pair, MFA bridge, or the next stage) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/VerifySignInEmail`        | ConnectRPC   | Spend the email code of a `verify_email` flow |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/ListConnections`          | ConnectRPC   | List connections (admin, secrets never answered) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/GetConnection`            | ConnectRPC   | Read one connection (admin) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/CreateConnection`         | ConnectRPC   | Register a connection (admin) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/UpdateConnection`         | ConnectRPC   | Rewrite a connection (admin) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/DeleteConnection`         | ConnectRPC   | Remove a connection (admin, bindings cascade) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/ListLinkedConnections`    | ConnectRPC   | List the holder's bindings (oldest first) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection`         | ConnectRPC   | Remove a binding (step-up; the last credential of a passwordless account is refused) |
 
 ## API Key
 
@@ -125,11 +125,11 @@ stored as a SHA-256 hash of the presented `<prefix>.<secret>` string.
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary          |
 | -------- | --------------------------------------------------------------------------- | ------------ | ---------------- |
-| POST     | `/rpc/tango.apikey.v1.ApiKeyService/CreateAPIKey`                            | ConnectRPC   | Create API key   |
-| POST     | `/rpc/tango.apikey.v1.ApiKeyService/ListAPIKeys`                             | ConnectRPC   | List API keys    |
-| POST     | `/rpc/tango.apikey.v1.ApiKeyService/RenewAPIKey`                             | ConnectRPC   | Renew API key    |
-| POST     | `/rpc/tango.apikey.v1.ApiKeyService/RevokeAPIKey`                            | ConnectRPC   | Revoke API key   |
-| POST     | `/rpc/tango.apikey.v1.ApiKeyService/ListAllAPIKeys`                          | ConnectRPC   | List all API keys (tango-only, administrative) |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey`                            | ConnectRPC   | Create API key   |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys`                             | ConnectRPC   | List API keys    |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey`                             | ConnectRPC   | Renew API key    |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey`                            | ConnectRPC   | Revoke API key   |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys`                          | ConnectRPC   | List all API keys (saka-only, administrative) |
 
 ## Authorization
 
@@ -138,17 +138,17 @@ account's roles plus its direct grants. The catalog is seeded and read-only.
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary          |
 | -------- | --------------------------------------------------------------------------- | ------------ | ---------------- |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListPermissions`                   | ConnectRPC   | List the permission catalog |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListRoles`                         | ConnectRPC   | List roles       |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/GetRole`                           | ConnectRPC   | Get role by ID   |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/CreateRole`                        | ConnectRPC   | Create role      |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/UpdateRole`                        | ConnectRPC   | Update role      |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/DeleteRole`                        | ConnectRPC   | Delete role      |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetRolePermissions`                | ConnectRPC   | Replace a role's permissions |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListUserRoles`                     | ConnectRPC   | List an account's roles |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetUserRoles`                      | ConnectRPC   | Replace an account's roles |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/ListUserPermissions`               | ConnectRPC   | List an account's direct grants |
-| POST     | `/rpc/tango.authz.v1.AuthorizationService/SetUserPermissions`                | ConnectRPC   | Replace an account's direct grants |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/ListPermissions`                   | ConnectRPC   | List the permission catalog |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/ListRoles`                         | ConnectRPC   | List roles       |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/GetRole`                           | ConnectRPC   | Get role by ID   |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/CreateRole`                        | ConnectRPC   | Create role      |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/UpdateRole`                        | ConnectRPC   | Update role      |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/DeleteRole`                        | ConnectRPC   | Delete role      |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/SetRolePermissions`                | ConnectRPC   | Replace a role's permissions |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/ListUserRoles`                     | ConnectRPC   | List an account's roles |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/SetUserRoles`                      | ConnectRPC   | Replace an account's roles |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/ListUserPermissions`               | ConnectRPC   | List an account's direct grants |
+| POST     | `/rpc/saka.authz.v1.AuthorizationService/SetUserPermissions`                | ConnectRPC   | Replace an account's direct grants |
 
 ## Audit Logs
 
@@ -157,35 +157,35 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 
 | Method   | Procedure / Endpoint                                            | Protocol     | Summary                              |
 | -------- | --------------------------------------------------------------- | ------------ | ------------------------------------ |
-| POST     | `/rpc/tango.auditlog.v1.AuditLogService/List`                   | ConnectRPC   | List the caller's own audit logs     |
-| POST     | `/rpc/tango.auditlog.v1.AuditLogService/ListAll`                | ConnectRPC   | List all audit logs (admin)          |
-| POST     | `/rpc/tango.auditlog.v1.AuditLogService/ListForUser`            | ConnectRPC   | List one account's audit logs (admin) |
-| POST     | `/rpc/tango.auditlog.v1.AuditLogService/FilterOptions`          | ConnectRPC   | List filter facets (admin)           |
+| POST     | `/rpc/saka.auditlog.v1.AuditLogService/List`                   | ConnectRPC   | List the caller's own audit logs     |
+| POST     | `/rpc/saka.auditlog.v1.AuditLogService/ListAll`                | ConnectRPC   | List all audit logs (admin)          |
+| POST     | `/rpc/saka.auditlog.v1.AuditLogService/ListForUser`            | ConnectRPC   | List one account's audit logs (admin) |
+| POST     | `/rpc/saka.auditlog.v1.AuditLogService/FilterOptions`          | ConnectRPC   | List filter facets (admin)           |
 
 ## Users
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.identity.v1.UserService/GetCurrentUser`                          | ConnectRPC   | The account the caller is                       |
-| POST     | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser`                       | ConnectRPC   | Update the signed-in account's own profile (names, locale, timezone) |
-| POST     | `/rpc/tango.identity.v1.UserService/ListUsers`                               | ConnectRPC   | List users (admin)                              |
-| POST     | `/rpc/tango.identity.v1.UserService/GetUser`                                 | ConnectRPC   | Get user by ID (admin)                          |
-| POST     | `/rpc/tango.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
-| POST     | `/rpc/tango.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
-| POST     | `/rpc/tango.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
-| POST     | `/rpc/tango.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin; the ban is a row in `account_restrictions`, ends the live sessions) |
-| POST     | `/rpc/tango.identity.v1.UserService/UnbanUser`                               | ConnectRPC   | Unban a user (admin)                            |
-| POST     | `/rpc/tango.identity.v1.UserService/UnlockUser`                              | ConnectRPC   | Lift an account's lockout (admin; zeroes the failed-attempt streak) |
-| POST     | `/rpc/tango.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
-| POST     | `/rpc/tango.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (self-service; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
-| POST     | `/rpc/tango.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Tango-Reauthentication`; refused when a password already stands) |
-| POST     | `/rpc/tango.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
+| POST     | `/rpc/saka.identity.v1.UserService/GetCurrentUser`                          | ConnectRPC   | The account the caller is                       |
+| POST     | `/rpc/saka.identity.v1.UserService/UpdateCurrentUser`                       | ConnectRPC   | Update the signed-in account's own profile (names, locale, timezone) |
+| POST     | `/rpc/saka.identity.v1.UserService/ListUsers`                               | ConnectRPC   | List users (admin)                              |
+| POST     | `/rpc/saka.identity.v1.UserService/GetUser`                                 | ConnectRPC   | Get user by ID (admin)                          |
+| POST     | `/rpc/saka.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
+| POST     | `/rpc/saka.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
+| POST     | `/rpc/saka.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
+| POST     | `/rpc/saka.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin; the ban is a row in `account_restrictions`, ends the live sessions) |
+| POST     | `/rpc/saka.identity.v1.UserService/UnbanUser`                               | ConnectRPC   | Unban a user (admin)                            |
+| POST     | `/rpc/saka.identity.v1.UserService/UnlockUser`                              | ConnectRPC   | Lift an account's lockout (admin; zeroes the failed-attempt streak) |
+| POST     | `/rpc/saka.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
+| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (self-service; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
+| POST     | `/rpc/saka.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Saka-Reauthentication`; refused when a password already stands) |
+| POST     | `/rpc/saka.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
 | PUT      | `/api/users/me/profile-picture`                                              | HTTP/REST    | Update own profile picture (raw-body upload)    |
 | DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
 | PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
 | GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture (public)               |
 
-## Blocklist (tango-only)
+## Blocklist (saka-only)
 
 Admin CRUD over the identifiers no open-mode sign-up may claim while
 `access.blocklist_enabled` is on. An entry is one email address or one
@@ -201,18 +201,18 @@ sign-up and when an email change names the new address (`failed_precondition`).
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.identity.v1.BlocklistService/ListBlocklistEntries`               | ConnectRPC   | List blocklist entries, newest first (admin)    |
-| POST     | `/rpc/tango.identity.v1.BlocklistService/AddBlocklistEntry`                  | ConnectRPC   | Add one entry (admin; idempotent — a repeat answers the stored row) |
-| POST     | `/rpc/tango.identity.v1.BlocklistService/RemoveBlocklistEntry`               | ConnectRPC   | Remove one entry by ID (admin)                  |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/ListBlocklistEntries`               | ConnectRPC   | List blocklist entries, newest first (admin)    |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry`                  | ConnectRPC   | Add one entry (admin; idempotent — a repeat answers the stored row) |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/RemoveBlocklistEntry`               | ConnectRPC   | Remove one entry by ID (admin)                  |
 
 ## Sign-up and Signup Tokens
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.identity.v1.SignupService/Signup`                                | ConnectRPC   | Sign up (requires a signup token)               |
-| POST     | `/rpc/tango.identity.v1.SignupService/ListSignupTokens`                      | ConnectRPC   | List signup tokens (admin)                      |
-| POST     | `/rpc/tango.identity.v1.SignupService/CreateSignupToken`                     | ConnectRPC   | Create signup token (admin; raw token shown once) |
-| POST     | `/rpc/tango.identity.v1.SignupService/DeleteSignupToken`                     | ConnectRPC   | Delete signup token (admin)                     |
+| POST     | `/rpc/saka.identity.v1.SignupService/Signup`                                | ConnectRPC   | Sign up (requires a signup token)               |
+| POST     | `/rpc/saka.identity.v1.SignupService/ListSignupTokens`                      | ConnectRPC   | List signup tokens (admin)                      |
+| POST     | `/rpc/saka.identity.v1.SignupService/CreateSignupToken`                     | ConnectRPC   | Create signup token (admin; raw token shown once) |
+| POST     | `/rpc/saka.identity.v1.SignupService/DeleteSignupToken`                     | ConnectRPC   | Delete signup token (admin)                     |
 
 ## User Groups
 
@@ -221,23 +221,23 @@ membership update is a replace: the request names the whole member set.
 
 | Method   | Procedure / Endpoint                                                             | Protocol     | Summary                           |
 | -------- | -------------------------------------------------------------------------------- | ------------ | --------------------------------- |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/ListUserGroups`                          | ConnectRPC   | List user groups (admin)          |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/GetUserGroup`                            | ConnectRPC   | Get user group by ID (admin)      |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/CreateUserGroup`                         | ConnectRPC   | Create user group (admin)         |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/UpdateUserGroup`                         | ConnectRPC   | Update user group (admin)         |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/DeleteUserGroup`                         | ConnectRPC   | Delete user group (admin)         |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/SetUserGroupMembers`                     | ConnectRPC   | Update users in a group (admin)   |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/GetUserGroups`                           | ConnectRPC   | List one user's groups            |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/UpdateUserGroups`                        | ConnectRPC   | Replace one user's groups (admin) |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/ListUserGroups`                          | ConnectRPC   | List user groups (admin)          |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/GetUserGroup`                            | ConnectRPC   | Get user group by ID (admin)      |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/CreateUserGroup`                         | ConnectRPC   | Create user group (admin)         |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/UpdateUserGroup`                         | ConnectRPC   | Update user group (admin)         |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/DeleteUserGroup`                         | ConnectRPC   | Delete user group (admin)         |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/SetUserGroupMembers`                     | ConnectRPC   | Update users in a group (admin)   |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/GetUserGroups`                           | ConnectRPC   | List one user's groups            |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/UpdateUserGroups`                        | ConnectRPC   | Replace one user's groups (admin) |
 
 ## Email Verification and Email Change
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                          |
-| POST     | `/rpc/tango.identity.v1.EmailVerificationService/VerifyEmail`                | ConnectRPC   | Verify email (token is the credential)           |
-| POST     | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
-| POST     | `/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                          |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail`                | ConnectRPC   | Verify email (token is the credential)           |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
 
 ## Notifications
 
@@ -247,34 +247,34 @@ stream; `system` notices target accounts and carry neither a topic nor a global 
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.notification.v1.NotificationService/CreateNotification`          | ConnectRPC   | Create a notification (admin)                   |
-| POST     | `/rpc/tango.notification.v1.NotificationService/GetNotification`             | ConnectRPC   | Get one notification                            |
-| POST     | `/rpc/tango.notification.v1.NotificationService/ListAllNotifications`        | ConnectRPC   | List every notification (admin)                 |
-| POST     | `/rpc/tango.notification.v1.NotificationService/CancelNotification`          | ConnectRPC   | Cancel one notification (admin)                 |
-| POST     | `/rpc/tango.notification.v1.NotificationService/ListNotifications`           | ConnectRPC   | List the caller's notifications                 |
-| POST     | `/rpc/tango.notification.v1.NotificationService/MarkNotificationRead`        | ConnectRPC   | Mark one read                                   |
-| POST     | `/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead`    | ConnectRPC   | Mark every notification read                    |
-| POST     | `/rpc/tango.notification.v1.NotificationService/UnreadCount`                 | ConnectRPC   | Count unread notifications                      |
-| POST     | `/rpc/tango.notification.v1.NotificationService/WatchNotifications`          | ConnectRPC   | Stream the broker (server-streaming)            |
+| POST     | `/rpc/saka.notification.v1.NotificationService/CreateNotification`          | ConnectRPC   | Create a notification (admin)                   |
+| POST     | `/rpc/saka.notification.v1.NotificationService/GetNotification`             | ConnectRPC   | Get one notification                            |
+| POST     | `/rpc/saka.notification.v1.NotificationService/ListAllNotifications`        | ConnectRPC   | List every notification (admin)                 |
+| POST     | `/rpc/saka.notification.v1.NotificationService/CancelNotification`          | ConnectRPC   | Cancel one notification (admin)                 |
+| POST     | `/rpc/saka.notification.v1.NotificationService/ListNotifications`           | ConnectRPC   | List the caller's notifications                 |
+| POST     | `/rpc/saka.notification.v1.NotificationService/MarkNotificationRead`        | ConnectRPC   | Mark one read                                   |
+| POST     | `/rpc/saka.notification.v1.NotificationService/MarkAllNotificationsRead`    | ConnectRPC   | Mark every notification read                    |
+| POST     | `/rpc/saka.notification.v1.NotificationService/UnreadCount`                 | ConnectRPC   | Count unread notifications                      |
+| POST     | `/rpc/saka.notification.v1.NotificationService/WatchNotifications`          | ConnectRPC   | Stream the broker (server-streaming)            |
 
 ## Settings
 
-Tango-only. The catalog in code declares every item; `public.app_settings` stores the overrides
+Saka-only. The catalog in code declares every item; `public.app_settings` stores the overrides
 alone. A sealed item seals its value (AES-256-GCM); a public item never rests sealed.
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/tango.settings.v1.SettingsService/List`                                | ConnectRPC   | List settings with effective values (admin)     |
-| POST     | `/rpc/tango.settings.v1.SettingsService/Update`                              | ConnectRPC   | Update one setting (admin)                      |
-| POST     | `/rpc/tango.settings.v1.SettingsService/Reset`                               | ConnectRPC   | Reset one setting to its default (admin)        |
-| POST     | `/rpc/tango.settings.v1.SettingsService/ListPublic`                          | ConnectRPC   | List public settings (anonymous)                |
+| POST     | `/rpc/saka.settings.v1.SettingsService/List`                                | ConnectRPC   | List settings with effective values (admin)     |
+| POST     | `/rpc/saka.settings.v1.SettingsService/Update`                              | ConnectRPC   | Update one setting (admin)                      |
+| POST     | `/rpc/saka.settings.v1.SettingsService/Reset`                               | ConnectRPC   | Reset one setting to its default (admin)        |
+| POST     | `/rpc/saka.settings.v1.SettingsService/ListPublic`                          | ConnectRPC   | List public settings (anonymous)                |
 
 ## Application Configuration
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | GET      | `/api/configuration`                                                         | HTTP/REST    | The configuration document: the public subset to an anonymous caller, every non-secret setting to an administrator |
-| POST     | `/rpc/tango.system.v1.AppConfigService/TestEmail`                            | ConnectRPC   | Send a test email (admin)                       |
+| POST     | `/rpc/saka.system.v1.AppConfigService/TestEmail`                            | ConnectRPC   | Send a test email (admin)                       |
 
 The configuration's source is the JSON file resolved at startup; there is no write surface.
 
@@ -284,16 +284,16 @@ The engines' own operational surface — an operations console reads and acts on
 
 | Method   | Procedure / Endpoint                                            | Protocol     | Summary                                             |
 | -------- | --------------------------------------------------------------- | ------------ | --------------------------------------------------- |
-| POST     | `/rpc/tango.system.v1.QueueService/ListQueues`                  | ConnectRPC   | Per-queue summary: config + live pending/dead counts (admin) |
-| POST     | `/rpc/tango.system.v1.QueueService/ListTasks`                   | ConnectRPC   | One page of the pending table, newest first (admin) |
-| POST     | `/rpc/tango.system.v1.QueueService/GetTask`                     | ConnectRPC   | One task's state + decoded payload (admin)          |
-| POST     | `/rpc/tango.system.v1.QueueService/ListDeadTasks`               | ConnectRPC   | One page of the failed archive (admin)              |
-| POST     | `/rpc/tango.system.v1.QueueService/CancelTask`                  | ConnectRPC   | Remove one unclaimed task; claimed answers `failed_precondition` (admin) |
-| POST     | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks`             | ConnectRPC   | Re-enqueue one queue's — or every queue's — dead tasks; answers how many went (admin) |
-| POST     | `/rpc/tango.system.v1.QueueService/FlushPendingTasks`           | ConnectRPC   | Remove every unclaimed task (admin)                 |
-| POST     | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks`         | ConnectRPC   | Remove every archive record (admin)                 |
-| POST     | `/rpc/tango.system.v1.SchedulerService/ListJobs`                | ConnectRPC   | Cron state rows: spec, next_due, last_fired (admin) |
-| POST     | `/rpc/tango.system.v1.SchedulerService/RunNow`                  | ConnectRPC   | Enqueue a job's task now, schedule untouched (admin)|
+| POST     | `/rpc/saka.system.v1.QueueService/ListQueues`                  | ConnectRPC   | Per-queue summary: config + live pending/dead counts (admin) |
+| POST     | `/rpc/saka.system.v1.QueueService/ListTasks`                   | ConnectRPC   | One page of the pending table, newest first (admin) |
+| POST     | `/rpc/saka.system.v1.QueueService/GetTask`                     | ConnectRPC   | One task's state + decoded payload (admin)          |
+| POST     | `/rpc/saka.system.v1.QueueService/ListDeadTasks`               | ConnectRPC   | One page of the failed archive (admin)              |
+| POST     | `/rpc/saka.system.v1.QueueService/CancelTask`                  | ConnectRPC   | Remove one unclaimed task; claimed answers `failed_precondition` (admin) |
+| POST     | `/rpc/saka.system.v1.QueueService/ReplayDeadTasks`             | ConnectRPC   | Re-enqueue one queue's — or every queue's — dead tasks; answers how many went (admin) |
+| POST     | `/rpc/saka.system.v1.QueueService/FlushPendingTasks`           | ConnectRPC   | Remove every unclaimed task (admin)                 |
+| POST     | `/rpc/saka.system.v1.QueueService/FlushCompletedTasks`         | ConnectRPC   | Remove every archive record (admin)                 |
+| POST     | `/rpc/saka.system.v1.SchedulerService/ListJobs`                | ConnectRPC   | Cron state rows: spec, next_due, last_fired (admin) |
+| POST     | `/rpc/saka.system.v1.SchedulerService/RunNow`                  | ConnectRPC   | Enqueue a job's task now, schedule untouched (admin)|
 
 ## OIDC Federation
 
@@ -303,31 +303,31 @@ under `/oidc` (the specifications' own shapes). Discovery at
 
 | Method   | Service / Endpoint                                                            | Protocol     | Summary                                     |
 | -------- | ----------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/ListClients`                      | ConnectRPC   | List OIDC clients (admin)                   |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/CreateClient`                     | ConnectRPC   | Create OIDC client (admin; first secret shown once) |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/GetClient`                        | ConnectRPC   | Get OIDC client (admin)                     |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/UpdateClient`                     | ConnectRPC   | Update OIDC client (admin)                  |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteClient`                     | ConnectRPC   | Delete OIDC client (admin)                  |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups`          | ConnectRPC   | Replace a client's allowed groups (admin)   |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta`                    | ConnectRPC   | Get client metadata (admin)                 |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/PreviewClient`                    | ConnectRPC   | Preview the claims a client would receive (admin) |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/UploadLogo`                       | ConnectRPC   | Upload client logo (admin)                  |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo`                       | ConnectRPC   | Delete client logo (admin)                  |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/ListSecrets`                      | ConnectRPC   | List client secrets (admin)                 |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/CreateSecret`                     | ConnectRPC   | Create client secret (admin; shown once)    |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret`                     | ConnectRPC   | Delete client secret (admin)                |
-| POST     | `/rpc/tango.federation.v1.OidcClientService/RefreshClient`                    | ConnectRPC   | Re-fetch a CIMD client's document (admin)   |
-| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients`         | ConnectRPC   | The caller's consent ledger                 |
-| POST     | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`        | ConnectRPC   | Revoke the caller's consent for one client  |
-| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients`                   | ConnectRPC   | The clients the caller may authorize        |
-| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients`       | ConnectRPC   | One account's consent ledger (admin)        |
-| POST     | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients`        | ConnectRPC   | The deployment-wide ledger (admin)          |
-| POST     | `/rpc/tango.federation.v1.CustomClaimService/Suggest`                         | ConnectRPC   | Custom-claim key suggestions (admin)        |
-| POST     | `/rpc/tango.federation.v1.CustomClaimService/List{User,Group}Claims`          | ConnectRPC   | List a subject's claims (admin)             |
-| POST     | `/rpc/tango.federation.v1.CustomClaimService/Create{User,Group}Claim`         | ConnectRPC   | Create a claim on a subject (admin)         |
-| POST     | `/rpc/tango.federation.v1.CustomClaimService/Update{User,Group}Claim`         | ConnectRPC   | Replace one claim row (admin)               |
-| POST     | `/rpc/tango.federation.v1.CustomClaimService/Delete{User,Group}Claim`         | ConnectRPC   | Delete one claim row (admin)                |
-| POST     | `/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients`               | ConnectRPC   | Replace a group's client allowlist (admin)  |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/ListClients`                      | ConnectRPC   | List OIDC clients (admin)                   |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/CreateClient`                     | ConnectRPC   | Create OIDC client (admin; first secret shown once) |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/GetClient`                        | ConnectRPC   | Get OIDC client (admin)                     |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/UpdateClient`                     | ConnectRPC   | Update OIDC client (admin)                  |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/DeleteClient`                     | ConnectRPC   | Delete OIDC client (admin)                  |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/UpdateAllowedUserGroups`          | ConnectRPC   | Replace a client's allowed groups (admin)   |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/GetClientMeta`                    | ConnectRPC   | Get client metadata (admin)                 |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/PreviewClient`                    | ConnectRPC   | Preview the claims a client would receive (admin) |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/UploadLogo`                       | ConnectRPC   | Upload client logo (admin)                  |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/DeleteLogo`                       | ConnectRPC   | Delete client logo (admin)                  |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/ListSecrets`                      | ConnectRPC   | List client secrets (admin)                 |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/CreateSecret`                     | ConnectRPC   | Create client secret (admin; shown once)    |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/DeleteSecret`                     | ConnectRPC   | Delete client secret (admin)                |
+| POST     | `/rpc/saka.federation.v1.OidcClientService/RefreshClient`                    | ConnectRPC   | Re-fetch a CIMD client's document (admin)   |
+| POST     | `/rpc/saka.federation.v1.OidcConsentService/ListMyAuthorizedClients`         | ConnectRPC   | The caller's consent ledger                 |
+| POST     | `/rpc/saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`        | ConnectRPC   | Revoke the caller's consent for one client  |
+| POST     | `/rpc/saka.federation.v1.OidcConsentService/ListMyClients`                   | ConnectRPC   | The clients the caller may authorize        |
+| POST     | `/rpc/saka.federation.v1.OidcConsentService/ListUserAuthorizedClients`       | ConnectRPC   | One account's consent ledger (admin)        |
+| POST     | `/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients`        | ConnectRPC   | The deployment-wide ledger (admin)          |
+| POST     | `/rpc/saka.federation.v1.CustomClaimService/Suggest`                         | ConnectRPC   | Custom-claim key suggestions (admin)        |
+| POST     | `/rpc/saka.federation.v1.CustomClaimService/List{User,Group}Claims`          | ConnectRPC   | List a subject's claims (admin)             |
+| POST     | `/rpc/saka.federation.v1.CustomClaimService/Create{User,Group}Claim`         | ConnectRPC   | Create a claim on a subject (admin)         |
+| POST     | `/rpc/saka.federation.v1.CustomClaimService/Update{User,Group}Claim`         | ConnectRPC   | Replace one claim row (admin)               |
+| POST     | `/rpc/saka.federation.v1.CustomClaimService/Delete{User,Group}Claim`         | ConnectRPC   | Delete one claim row (admin)                |
+| POST     | `/rpc/saka.identity.v1.UserGroupService/SetAllowedOidcClients`               | ConnectRPC   | Replace a group's client allowlist (admin)  |
 | GET, POST | `/oidc/authorize`                                                            | HTTP/REST    | Authorization endpoint                      |
 | POST     | `/oidc/token`                                                                 | HTTP/REST    | Token endpoint (code, refresh, device grants) |
 | GET, POST | `/oidc/userinfo`                                                             | HTTP/REST    | Userinfo (bearer)                           |
@@ -340,20 +340,20 @@ under `/oidc` (the specifications' own shapes). Discovery at
 
 ## SCIM Provisioning
 
-Outbound provisioning: tango is the SCIM client, not the server. One provider row per OIDC
+Outbound provisioning: saka is the SCIM client, not the server. One provider row per OIDC
 client names a remote base URL and the bearer token the sync presents (sealed at rest, shown
 once at create). One pass pushes the client's visible accounts and groups out until the remote
 matches the local snapshot; it also runs hourly and, debounced, after account or group changes.
 
 | Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
 | -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
-| POST     | `/rpc/tango.federation.v1.ScimProviderService/GetByClient`    | ConnectRPC   | The provider one client syncs to (admin)   |
-| POST     | `/rpc/tango.federation.v1.ScimProviderService/Create`         | ConnectRPC   | Attach a provisioning target (admin; token shown once) |
-| POST     | `/rpc/tango.federation.v1.ScimProviderService/Update`         | ConnectRPC   | Replace endpoint and token (admin; empty token keeps the stored one) |
-| POST     | `/rpc/tango.federation.v1.ScimProviderService/Delete`         | ConnectRPC   | Remove the provisioning target (admin)     |
-| POST     | `/rpc/tango.federation.v1.ScimProviderService/Sync`           | ConnectRPC   | Run one provisioning pass now (admin; counts in the answer) |
+| POST     | `/rpc/saka.federation.v1.ScimProviderService/GetByClient`    | ConnectRPC   | The provider one client syncs to (admin)   |
+| POST     | `/rpc/saka.federation.v1.ScimProviderService/Create`         | ConnectRPC   | Attach a provisioning target (admin; token shown once) |
+| POST     | `/rpc/saka.federation.v1.ScimProviderService/Update`         | ConnectRPC   | Replace endpoint and token (admin; empty token keeps the stored one) |
+| POST     | `/rpc/saka.federation.v1.ScimProviderService/Delete`         | ConnectRPC   | Remove the provisioning target (admin)     |
+| POST     | `/rpc/saka.federation.v1.ScimProviderService/Sync`           | ConnectRPC   | Run one provisioning pass now (admin; counts in the answer) |
 
-## Webhooks (tango-only)
+## Webhooks (saka-only)
 
 The outbound event surface: an administrator registers a destination — a URL, a method, optional
 custom headers — and subscribes it to the event catalog. Every audit record is a candidate
@@ -371,16 +371,16 @@ exactly once.
 
 | Method   | Procedure / Endpoint                                          | Protocol     | Summary                                          |
 | -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------------ |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/List`                   | ConnectRPC   | List endpoints (admin)                           |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/Create`                 | ConnectRPC   | Register an endpoint (secret shown once) (admin) |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/Get`                    | ConnectRPC   | Read one endpoint (admin)                        |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/Update`                 | ConnectRPC   | Rewrite an endpoint (admin)                      |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/Delete`                 | ConnectRPC   | Remove an endpoint (admin)                       |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/RotateSecret`           | ConnectRPC   | Replace the signing secret (admin)               |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/Test`                   | ConnectRPC   | Queue a `webhook.test` delivery (admin)          |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries`         | ConnectRPC   | List one endpoint's deliveries (admin)           |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries`      | ConnectRPC   | List every delivery (admin)                      |
-| POST     | `/rpc/tango.webhook.v1.WebhookService/ListEventTypes`         | ConnectRPC   | The event catalog (admin)                        |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/List`                   | ConnectRPC   | List endpoints (admin)                           |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/Create`                 | ConnectRPC   | Register an endpoint (secret shown once) (admin) |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/Get`                    | ConnectRPC   | Read one endpoint (admin)                        |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/Update`                 | ConnectRPC   | Rewrite an endpoint (admin)                      |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/Delete`                 | ConnectRPC   | Remove an endpoint (admin)                       |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/RotateSecret`           | ConnectRPC   | Replace the signing secret (admin)               |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/Test`                   | ConnectRPC   | Queue a `webhook.test` delivery (admin)          |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/ListDeliveries`         | ConnectRPC   | List one endpoint's deliveries (admin)           |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/ListAllDeliveries`      | ConnectRPC   | List every delivery (admin)                      |
+| POST     | `/rpc/saka.webhook.v1.WebhookService/ListEventTypes`         | ConnectRPC   | The event catalog (admin)                        |
 
 ## Device Login
 
@@ -393,8 +393,8 @@ only as SHA-256 hashes; decisions are single-use.
 | -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
 | POST     | `/api/device-login/requests`                                  | HTTP/REST    | Create a pairing request (pairing cookie rides the response) |
 | POST     | `/api/device-login/requests/{id}/exchange`                    | HTTP/REST    | Long-poll the decision (25s window; 202 while pending) |
-| POST     | `/rpc/tango.authn.v1.DeviceApprovalService/Inspect`           | ConnectRPC   | Read the request the code names (authenticated) |
-| POST     | `/rpc/tango.authn.v1.DeviceApprovalService/Decide`            | ConnectRPC   | Approve or deny (authenticated; single decision) |
+| POST     | `/rpc/saka.authn.v1.DeviceApprovalService/Inspect`           | ConnectRPC   | Read the request the code names (authenticated) |
+| POST     | `/rpc/saka.authn.v1.DeviceApprovalService/Decide`            | ConnectRPC   | Approve or deny (authenticated; single decision) |
 
 ## Health Check
 
@@ -402,7 +402,7 @@ only as SHA-256 hashes; decisions are single-use.
 | -------- | -------------------------------------------------- | ------------ | -------------------------- |
 | GET      | `/healthz`                                         | HTTP/REST    | Liveness; touches no dependency |
 | GET      | `/api/healthz`                                     | HTTP/REST    | Readiness document         |
-| POST     | `/rpc/tango.system.v1.HealthService/Check`         | ConnectRPC   | Readiness over ConnectRPC  |
+| POST     | `/rpc/saka.system.v1.HealthService/Check`         | ConnectRPC   | Readiness over ConnectRPC  |
 
 ## Well Known
 
@@ -433,9 +433,9 @@ every row is uncallable. The designed surfaces live in `.llms/endpoint-reference
 
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |
-| API resources (upstream `ApiService`) | — | `tango.admin.v1.ApiService` |
-| Version metadata | — | `tango.system.v1.VersionService` |
-| Initial admin setup | — | `tango initialize` + `tango admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |
+| API resources (upstream `ApiService`) | — | `saka.admin.v1.ApiService` |
+| Version metadata | — | `saka.system.v1.VersionService` |
+| Initial admin setup | — | `saka initialize` + `saka admin:reset-password` (CLI, release build); the RPC stubs `SignupService/GetSetupAvailability` and `SetupInitialAdmin` are excluded |
 
 ## Future Improvements (deferred, decided 2026-09-28)
 

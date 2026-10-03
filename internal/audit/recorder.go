@@ -9,8 +9,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // Table is the table records live in. The migration owns the schema; this is

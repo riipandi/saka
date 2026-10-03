@@ -5,10 +5,10 @@ request checklist: one request per row, named `<METHOD> <path>` for REST and
 `<METHOD> /rpc/<package>.<Service>/<Method>` for ConnectRPC. Status vocabulary:
 **done** (implemented with test evidence in the Evidence column), **partial**
 (implemented with a noted deviation), **planned** (unimplemented — owning phase
-named), **excluded** (out of scope per `.llms/tango-deviations.md` — never parity work).
+named), **excluded** (out of scope per `.llms/saka-deviations.md` — never parity work).
 
-Tango-only extensions (not in the upstream spec) and all structural deviations (envelope,
-pagination, snake_case) are documented in `.llms/tango-deviations.md` — read it before porting
+Saka-only extensions (not in the upstream spec) and all structural deviations (envelope,
+pagination, snake_case) are documented in `.llms/saka-deviations.md` — read it before porting
 upstream handlers.
 
 ## Transport split
@@ -37,8 +37,8 @@ classification is the guard's tables (`internal/guard/ratelimit.go`), the budget
 configuration's; a public procedure missing from the tables fails a test rather than slipping
 past uncounted.
 
-The contracts frozen so far are `tango.common.v1` (`common.proto`: the shared response metadata
-block) and `tango.system.v1` (`system.proto`: `HealthService`, `AppConfigService`, `QueueService`,
+The contracts frozen so far are `saka.common.v1` (`common.proto`: the shared response metadata
+block) and `saka.system.v1` (`system.proto`: `HealthService`, `AppConfigService`, `QueueService`,
 `SchedulerService`). The transport rules — snake_case
 field naming on both surfaces, and an unknown `/rpc` path answering the Connect error document —
 are pinned by `internal/transport/handler_rpc_test.go`.
@@ -48,24 +48,24 @@ are pinned by `internal/transport/handler_rpc_test.go`.
 > The code is still the only record of what is served — re-verify against it before trusting a
 > row, and keep a row's Evidence honest in the same change that ships the endpoint.
 
-## Authentication (tango-only)
+## Authentication (saka-only)
 
-Password authentication is a tango-only surface: upstream Pocket ID signs users in with passkeys
-only. The contract lives in `api/connect/authn.proto` under `tango.authn.v1` — `AuthService` issues
+Password authentication is a saka-only surface: upstream Pocket ID signs users in with passkeys
+only. The contract lives in `api/connect/authn.proto` under `saka.authn.v1` — `AuthService` issues
 the credentials, `SessionService` carries the lifecycle of the session a sign-in opened. The
 session is the server's one trace of an authenticated caller: who opened it, from where, under
 which refresh token, and — since the lifecycle landed — whether it has ended and who ended it.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.AuthService/SignIn` | Sign in with password | done — body `{identity, password, remember}`; indistinguishable failures for unknown identity vs wrong password; disabled or banned accounts fail closed; `remember` selects the long or short session lifetime; answers the token pair + session id + user view; an account keeping a confirmed factor answers the MFA challenge instead (`mfa_required`, no tokens, `CompleteSignIn` spends the bridge), and while `mfa.required` stands an account keeping none answers the enrollment fork — `mfa_required` + `mfa_enrollment_required` with a bridge that admits the enrollment pair's optional `pending_token`, no token until a factor is confirmed | `modules/identity/signin` (service tests), `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
-| POST | `/rpc/tango.authn.v1.SessionService/SignOut` | Sign out | done — guard `Session` (machine credential + sid-less token refused); stamps `revoked_at`/`revoked_by` in a transaction, idempotent; the refresh token dies with the stamp and the access token keeps working until its own expiry — the statelessness the protocol settles; audit `sign_out` names the session | `modules/identity/session.TestSignOutStampsTheRowAndTheRefreshTokenDies`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
-| POST | `/rpc/tango.authn.v1.SessionService/GetSession` | Inspect current session | done — the session's view (provider, remember, agent, address, the instant it ends) beside the account view; an ended session answers `unauthenticated`, which is the signal a resuming client needs | `modules/identity/session.TestGetSessionAnswersTheLiveRowAndRefusesAnEndedOne`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
-| POST | `/rpc/tango.authn.v1.SessionService/ListSessions` | List own sessions | done — newest first, ended ones included, the caller's own marked; the caller's own session must be live (a sign-out ends the holder's view of the list — `unauthenticated`, "the session has ended") | `modules/identity/session.TestListSessionsAnswersTheAccountsOwnNewestFirst`, `modules/identity/session.TestAnEndedSessionCannotManageSessions` |
-| POST | `/rpc/tango.authn.v1.SessionService/RevokeSession` | Revoke one own session | done — guard `Session`; the caller's own session must be live; ownership is the not-found shape, an already-ended target is the same success that records nothing; audit `session_revoked` is its own event, because ending your current session and ending one you named are different happenings | `modules/identity/session.TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers` |
-| POST | `/rpc/tango.authn.v1.SessionService/Refresh` | Refresh token pair | done — guard `Session`; the refresh token is rotated in place (the row keeps its identifier, the secret and the window are replaced), a disabled or banned account's renewal is refused, an idle session — last activity older than `session.inactivity_timeout` — is refused and revoked on the spot, and a session ended between the read and the write costs the new secret and nothing else; no audit record — a renewal is the session continuing, not a happening an operator audits for | `modules/identity/session.TestRefreshRotatesTheTokenAndKeepsTheSession`, `modules/identity/session.TestAnIdleSessionIsRefusedAndRotatedOut`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
-| POST | `/rpc/tango.authn.v1.SessionService/SignOutOtherSessions` | Sign out other sessions | done — guard `Session`; every live session of the account except the caller's own is stamped in one transaction under row locks, each with its own `session_revoked` record carrying the `sign_out_others` reason; the caller's own session must be live; the response counts what the call ended; the kept row and its refresh token survive | `modules/identity/session.TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn`, `internal/transport.TestTheBulkSignOutsSweepTheAccountSessions` |
-| POST | `/rpc/tango.authn.v1.SessionService/SignOutAllSessions` | Sign out all sessions | done — guard `Session`; every live session of the account, the caller's own included, is stamped in one transaction under row locks, each with its own `session_revoked` record carrying the `sign_out_all` reason; the caller's own session must be live; the access token itself keeps working until its own expiry — the statelessness the protocol settles — so a client that means to discard its credential drops the token pair too | `modules/identity/session.TestSignOutAllSessionsEndsTheCallerOwnRowToo`, `internal/transport.TestTheBulkSignOutsSweepTheAccountSessions` |
+| POST | `/rpc/saka.authn.v1.AuthService/SignIn` | Sign in with password | done — body `{identity, password, remember}`; indistinguishable failures for unknown identity vs wrong password; disabled or banned accounts fail closed; `remember` selects the long or short session lifetime; answers the token pair + session id + user view; an account keeping a confirmed factor answers the MFA challenge instead (`mfa_required`, no tokens, `CompleteSignIn` spends the bridge), and while `mfa.required` stands an account keeping none answers the enrollment fork — `mfa_required` + `mfa_enrollment_required` with a bridge that admits the enrollment pair's optional `pending_token`, no token until a factor is confirmed | `modules/identity/signin` (service tests), `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
+| POST | `/rpc/saka.authn.v1.SessionService/SignOut` | Sign out | done — guard `Session` (machine credential + sid-less token refused); stamps `revoked_at`/`revoked_by` in a transaction, idempotent; the refresh token dies with the stamp and the access token keeps working until its own expiry — the statelessness the protocol settles; audit `sign_out` names the session | `modules/identity/session.TestSignOutStampsTheRowAndTheRefreshTokenDies`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
+| POST | `/rpc/saka.authn.v1.SessionService/GetSession` | Inspect current session | done — the session's view (provider, remember, agent, address, the instant it ends) beside the account view; an ended session answers `unauthenticated`, which is the signal a resuming client needs | `modules/identity/session.TestGetSessionAnswersTheLiveRowAndRefusesAnEndedOne`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
+| POST | `/rpc/saka.authn.v1.SessionService/ListSessions` | List own sessions | done — newest first, ended ones included, the caller's own marked; the caller's own session must be live (a sign-out ends the holder's view of the list — `unauthenticated`, "the session has ended") | `modules/identity/session.TestListSessionsAnswersTheAccountsOwnNewestFirst`, `modules/identity/session.TestAnEndedSessionCannotManageSessions` |
+| POST | `/rpc/saka.authn.v1.SessionService/RevokeSession` | Revoke one own session | done — guard `Session`; the caller's own session must be live; ownership is the not-found shape, an already-ended target is the same success that records nothing; audit `session_revoked` is its own event, because ending your current session and ending one you named are different happenings | `modules/identity/session.TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers` |
+| POST | `/rpc/saka.authn.v1.SessionService/Refresh` | Refresh token pair | done — guard `Session`; the refresh token is rotated in place (the row keeps its identifier, the secret and the window are replaced), a disabled or banned account's renewal is refused, an idle session — last activity older than `session.inactivity_timeout` — is refused and revoked on the spot, and a session ended between the read and the write costs the new secret and nothing else; no audit record — a renewal is the session continuing, not a happening an operator audits for | `modules/identity/session.TestRefreshRotatesTheTokenAndKeepsTheSession`, `modules/identity/session.TestAnIdleSessionIsRefusedAndRotatedOut`, `internal/transport.TestTheSessionLifecycleEndsInAStamp` |
+| POST | `/rpc/saka.authn.v1.SessionService/SignOutOtherSessions` | Sign out other sessions | done — guard `Session`; every live session of the account except the caller's own is stamped in one transaction under row locks, each with its own `session_revoked` record carrying the `sign_out_others` reason; the caller's own session must be live; the response counts what the call ended; the kept row and its refresh token survive | `modules/identity/session.TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn`, `internal/transport.TestTheBulkSignOutsSweepTheAccountSessions` |
+| POST | `/rpc/saka.authn.v1.SessionService/SignOutAllSessions` | Sign out all sessions | done — guard `Session`; every live session of the account, the caller's own included, is stamped in one transaction under row locks, each with its own `session_revoked` record carrying the `sign_out_all` reason; the caller's own session must be live; the access token itself keeps working until its own expiry — the statelessness the protocol settles — so a client that means to discard its credential drops the token pair too | `modules/identity/session.TestSignOutAllSessionsEndsTheCallerOwnRowToo`, `internal/transport.TestTheBulkSignOutsSweepTheAccountSessions` |
 
 Shared rules: the token pair answers two lifetimes — `access_expires_in` for the JWT and
 `refresh_expires_in` for the session window the row was written with; the account's identifier
@@ -78,17 +78,17 @@ randomness (`pkg/crypto.NewRefreshTokenPair`, the one draw both the opening and 
 The account-state checks are the issuer's, so every way of opening or continuing a session refuses
 the same. Audit events cover sign-in, sign-out, and named revocations; a renewal records nothing.
 
-## Password Recovery (tango-only)
+## Password Recovery (saka-only)
 
-Upstream Pocket ID has no passwords, so the whole flow is tango's. The contract lives in
+Upstream Pocket ID has no passwords, so the whole flow is saka's. The contract lives in
 `api/connect/authn.proto` under `PasswordRecoveryService`; the implementation is
 `modules/identity/password` (`recovery_*`).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.PasswordRecoveryService/ForgotPassword` | Forgot password | done — guard `Public`; anti-enumeration: an unknown address answers the same success; a mailer-less run refuses; the token is 256 bits of lowercase hex, shown once in the email and stored only as a hash | `modules/identity/password.TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow`, `modules/identity/password.TestForgotPasswordIssuesOneTokenPerAccount` |
-| POST | `/rpc/tango.authn.v1.PasswordRecoveryService/ResetPassword` | Reset password | done — guard `Public`; the token is the credential; the swap, the session termination, and the audit record commit in one transaction, so a rollback returns the token; `terminate_sessions` selects whether the live sessions die with the credential | `modules/identity/password.TestResetPasswordSwapsTheCredentialAndEndsTheSessions`, `modules/identity/password.TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential` |
-| POST | `/rpc/tango.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | Reset a user's password (admin) | done — guard `Admin`; answers the states `ForgotPassword` hides (unknown account, banned, no address); the flow then travels by email like a self-service reset | `modules/identity/password.TestAdminResetTriggerReportsTheStatesForgotPasswordHides` |
+| POST | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | Forgot password | done — guard `Public`; anti-enumeration: an unknown address answers the same success; a mailer-less run refuses; the token is 256 bits of lowercase hex, shown once in the email and stored only as a hash | `modules/identity/password.TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow`, `modules/identity/password.TestForgotPasswordIssuesOneTokenPerAccount` |
+| POST | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword` | Reset password | done — guard `Public`; the token is the credential; the swap, the session termination, and the audit record commit in one transaction, so a rollback returns the token; `terminate_sessions` selects whether the live sessions die with the credential | `modules/identity/password.TestResetPasswordSwapsTheCredentialAndEndsTheSessions`, `modules/identity/password.TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential` |
+| POST | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | Reset a user's password (admin) | done — guard `Admin`; answers the states `ForgotPassword` hides (unknown account, banned, no address); the flow then travels by email like a self-service reset | `modules/identity/password.TestAdminResetTriggerReportsTheStatesForgotPasswordHides` |
 
 Shared rules: the password-changed notice to the account's address rides the durable queue and is
 gated by `mailer.notifications.password_changed_notice_enabled`; a reset that ends sessions ends
@@ -104,10 +104,10 @@ sign-in answers with, under a session whose provider names `one_time_access`.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/CreateToken` | Create one-time access token for user (admin) | done — guard `Admin`; body `{id, ttl_seconds?}` (60..86400, unset 900); the six-character form is a code that lives fifteen minutes or less, twelve above; answers `{token, expires_at}`; only the hash is stored, so the response is the last the code exists | `modules/identity/onetimeaccess.TestCreateTokenIssuesACodeTheExchangeAccepts`, `internal/transport.TestTheOneTimeAccessLoopEndsInASession` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/ExchangeToken` | Exchange one-time access token | done — guard `Public`, the one procedure a caller reaches without a credential; body `{token, device_token?}`; the code's spend, the session it opens, and the audit record commit in one transaction, so a rollback returns the code; a device token the email request paired with the code must come back exact, and a mismatch leaves the code spendable; a disabled or banned account is refused with the code intact; answers the token pair + user view | `modules/identity/onetimeaccess.TestExchangeRefusesADeviceTokenThatDoesNotMatch`, `modules/identity/onetimeaccess.TestExchangeRefusesADisabledOrBannedAccount`, `internal/transport.TestTheOneTimeAccessGuardIsDeclared` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — guard `Admin`; body `{id, ttl_seconds?}`; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off (default); refused with `resource_exhausted` inside the one-minute resend cooldown the last issued code stamped; the code travels by email alone, never through the caller; the message rides the `one_time_access_email` queue task (3 attempts, 30s timeout, 15s backoff — tighter than the verification email's, because the code expires) | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode`, `modules/identity/onetimeaccess.TestRequestEmailAsAdminRefusesInsideTheCooldown`, `modules/identity/onetimeaccess.TestRequestEmailRefusesADisabledPath` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — guard `Public`; body `{email}`; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off (default); an address no account holds answers the same success a known one does, so the response is not the enumeration; a request inside the one-minute resend cooldown holds the send and answers that same success — the earlier code stays standing; the answer carries a 16-character device token the exchange demands back, real whether the address exists or not; the code travels in the message as text to type — no link (`redirect_path` reserved out of the contract) | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress`, `modules/identity/onetimeaccess.TestRequestEmailHoldsTheSendInsideTheCooldown`, `internal/transport.TestTheOneTimeAccessGuardIsDeclared` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/CreateToken` | Create one-time access token for user (admin) | done — guard `Admin`; body `{id, ttl_seconds?}` (60..86400, unset 900); the six-character form is a code that lives fifteen minutes or less, twelve above; answers `{token, expires_at}`; only the hash is stored, so the response is the last the code exists | `modules/identity/onetimeaccess.TestCreateTokenIssuesACodeTheExchangeAccepts`, `internal/transport.TestTheOneTimeAccessLoopEndsInASession` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken` | Exchange one-time access token | done — guard `Public`, the one procedure a caller reaches without a credential; body `{token, device_token?}`; the code's spend, the session it opens, and the audit record commit in one transaction, so a rollback returns the code; a device token the email request paired with the code must come back exact, and a mismatch leaves the code spendable; a disabled or banned account is refused with the code intact; answers the token pair + user view | `modules/identity/onetimeaccess.TestExchangeRefusesADeviceTokenThatDoesNotMatch`, `modules/identity/onetimeaccess.TestExchangeRefusesADisabledOrBannedAccount`, `internal/transport.TestTheOneTimeAccessGuardIsDeclared` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — guard `Admin`; body `{id, ttl_seconds?}`; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off (default); refused with `resource_exhausted` inside the one-minute resend cooldown the last issued code stamped; the code travels by email alone, never through the caller; the message rides the `one_time_access_email` queue task (3 attempts, 30s timeout, 15s backoff — tighter than the verification email's, because the code expires) | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode`, `modules/identity/onetimeaccess.TestRequestEmailAsAdminRefusesInsideTheCooldown`, `modules/identity/onetimeaccess.TestRequestEmailRefusesADisabledPath` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — guard `Public`; body `{email}`; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off (default); an address no account holds answers the same success a known one does, so the response is not the enumeration; a request inside the one-minute resend cooldown holds the send and answers that same success — the earlier code stays standing; the answer carries a 16-character device token the exchange demands back, real whether the address exists or not; the code travels in the message as text to type — no link (`redirect_path` reserved out of the contract) | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress`, `modules/identity/onetimeaccess.TestRequestEmailHoldsTheSendInsideTheCooldown`, `internal/transport.TestTheOneTimeAccessGuardIsDeclared` |
 
 Shared rules: codes are drawn from an alphabet without ambiguous characters and stored as
 SHA-256 hashes; the unique index on `(user_id, purpose)` keeps an account to one code at a time,
@@ -118,23 +118,23 @@ The email links to `<base-url>/login-code?code=<token>` (plus `&redirect=` when 
 a path), and the frontend forwards the code to the exchange. Audit events: `one_time_access_email_sent`
 (the address only — the code is never in the record) and `one_time_access_sign_in`.
 
-## MFA TOTP (tango-only)
+## MFA TOTP (saka-only)
 
-Upstream Pocket ID has no TOTP; this surface is tango-only and follows the database contract in
+Upstream Pocket ID has no TOTP; this surface is saka-only and follows the database contract in
 `.llms/porting-plan/database.md` — the tables now carry the names `mfa_totp`, `mfa_recovery_codes`,
 and `mfa_pending` (migration `00004_create_multifactor_tables.sql`).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.MultifactorService/BeginTotpEnrollment` | Start TOTP enrollment | done — caller the handler resolves: a session, or the `mfa.required` enrollment bridge in the optional `pending_token` (an unusable bridge answers `unauthenticated`); answers the Base32 secret + otpauth URI exactly once; the secret is stored sealed (`enc:`); a second begin replaces the unconfirmed row | `modules/identity/multifactor` (service tests), `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/ConfirmTotpEnrollment` | Confirm and enable TOTP | done — caller the handler resolves as its begin sibling; verifies one code against the enrollment; sets `confirmed_at`; answers the recovery codes exactly once | `modules/identity/multifactor.TestConfirmTotpEnrollmentActivatesOnTheRightCode`, `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/ListTotpEnrollments` | List TOTP enrollments | done — self; the settings-page shape, never a secret; the decrypted-secret aid answers only behind the development exposure gate | `modules/identity/multifactor.TestListTotpEnrollmentsCarriesTheSecretOnlyWhereTheAidRuns` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/DeleteTotpEnrollment` | Delete one TOTP enrollment | done — self; the code field proves a held factor (another authenticator or a recovery code); deleting an unconfirmed row needs no proof | `modules/identity/multifactor.TestDeleteTotpEnrollmentProvesTheLastRemoval` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/CompleteSignIn` | Complete a pending sign-in | done — guard `Public`; spends the pending bridge a password sign-in minted (5-minute TTL, 3-wrong-codes budget) with a TOTP code or a recovery code; issues the full token pair | `modules/identity/multifactor.TestCompleteSignInOpensTheSessionOncePerCode`, `modules/identity/multifactor.TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/RegenerateRecoveryCodes` | Regenerate recovery codes | done — self; requires a held factor as the code field; the fresh set answers exactly once, the old set dies | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/DisableMfa` | Disable MFA | done — self; requires the second-factor proof; drops every authenticator and the recovery set | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/VerifyRecoveryCode` | Verify a recovery code | done — self; spends one code as a standalone identity proof, consumed exactly once | `modules/identity/multifactor.TestVerifyRecoveryCodeSpendsOneCodeStandalone` |
-| POST | `/rpc/tango.authn.v1.MultifactorService/AdminDisableMfa` | Disable a user's MFA (admin) | done — guard `Admin`; the administrative session is the authority, no proof code; refuses an account with nothing confirmed (`failed_precondition`); a notice is queued to the account | `modules/identity/multifactor.TestAdminDisableMfaStripsEveryFactorWithoutAProof`, `modules/identity/multifactor.TestAdminDisableMfaRefusesAnUnknownAccount` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/BeginTotpEnrollment` | Start TOTP enrollment | done — caller the handler resolves: a session, or the `mfa.required` enrollment bridge in the optional `pending_token` (an unusable bridge answers `unauthenticated`); answers the Base32 secret + otpauth URI exactly once; the secret is stored sealed (`enc:`); a second begin replaces the unconfirmed row | `modules/identity/multifactor` (service tests), `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/ConfirmTotpEnrollment` | Confirm and enable TOTP | done — caller the handler resolves as its begin sibling; verifies one code against the enrollment; sets `confirmed_at`; answers the recovery codes exactly once | `modules/identity/multifactor.TestConfirmTotpEnrollmentActivatesOnTheRightCode`, `modules/identity/multifactor.TestTheRequiredGateRoutesAFactorlessSignInToEnrollment` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/ListTotpEnrollments` | List TOTP enrollments | done — self; the settings-page shape, never a secret; the decrypted-secret aid answers only behind the development exposure gate | `modules/identity/multifactor.TestListTotpEnrollmentsCarriesTheSecretOnlyWhereTheAidRuns` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/DeleteTotpEnrollment` | Delete one TOTP enrollment | done — self; the code field proves a held factor (another authenticator or a recovery code); deleting an unconfirmed row needs no proof | `modules/identity/multifactor.TestDeleteTotpEnrollmentProvesTheLastRemoval` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/CompleteSignIn` | Complete a pending sign-in | done — guard `Public`; spends the pending bridge a password sign-in minted (5-minute TTL, 3-wrong-codes budget) with a TOTP code or a recovery code; issues the full token pair | `modules/identity/multifactor.TestCompleteSignInOpensTheSessionOncePerCode`, `modules/identity/multifactor.TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/RegenerateRecoveryCodes` | Regenerate recovery codes | done — self; requires a held factor as the code field; the fresh set answers exactly once, the old set dies | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/DisableMfa` | Disable MFA | done — self; requires the second-factor proof; drops every authenticator and the recovery set | `modules/identity/multifactor.TestRegenerateAndDisableRequireTheSecondFactor` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/VerifyRecoveryCode` | Verify a recovery code | done — self; spends one code as a standalone identity proof, consumed exactly once | `modules/identity/multifactor.TestVerifyRecoveryCodeSpendsOneCodeStandalone` |
+| POST | `/rpc/saka.authn.v1.MultifactorService/AdminDisableMfa` | Disable a user's MFA (admin) | done — guard `Admin`; the administrative session is the authority, no proof code; refuses an account with nothing confirmed (`failed_precondition`); a notice is queued to the account | `modules/identity/multifactor.TestAdminDisableMfaStripsEveryFactorWithoutAProof`, `modules/identity/multifactor.TestAdminDisableMfaRefusesAnUnknownAccount` |
 
 Fixed parameters: issuer = the configured app name, 6 digits, 30-second period, SHA-1,
 ±1 step bounded skew. Sign-in composition: a confirmed TOTP enrollment turns a successful
@@ -146,9 +146,9 @@ recovery codes are hashed, single-use, shown exactly once, and rotated atomicall
 requires the second-factor proof and clears every MFA row; the administrator's way in needs no
 proof — the audit record names it.
 
-## OAuth SSO (tango-only)
+## OAuth SSO (saka-only)
 
-Upstream Pocket ID has no SSO; this surface is tango-only. Sign in with Google, GitHub, or a
+Upstream Pocket ID has no SSO; this surface is saka-only. Sign in with Google, GitHub, or a
 custom OIDC connection. The outbound flow rides two REST routes that answer 302 redirects only —
 the browser is mid-redirect, so errors reach the SPA as `?error=` codes, success as `?flow_token=`.
 The flow token is minted at the callback, not the begin; it is the credential the completion
@@ -157,16 +157,16 @@ second factor answers `ContinueSignIn` with the MFA bridge, and `CompleteSignIn`
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn` | Begin OAuth sign in | done — guard `Public` (default bucket); writes the pending flow row and answers the authorize URL; an unknown or disabled connection answers `not_found`, so the endpoint is not a connection enumerator | `modules/identity/oauthsso.TestBeginWritesAPendingFlowAndNeverStoresTheRawState` |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/ContinueSignIn` | Continue OAuth sign in | done — guard `Public` (auth bucket); the resolution binds the identity: the existing binding, a verified address match (linking toggle), or the JIT account the open access mode creates; an unverified address pauses at `verify_email`, missing names at `require_names`; answers the token pair, the MFA bridge, or the stage the flow moved to | `modules/identity/oauthsso` resolution tests |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail` | Verify OAuth sign-in email | done — guard `Public` (auth bucket); spends the single-use email code a `verify_email` flow waits for; three wrong answers end the flow; the answer names the stage the flow moved to | `modules/identity/oauthsso.TestVerifySignInEmailSpendsTheCodeAndTheFlowCompletes`, `modules/identity/oauthsso.TestThreeWrongCodesEndTheFlow` |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/ListConnections` | List OAuth connections | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/GetConnection` | Get OAuth connection | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/CreateConnection` | Create OAuth connection | done — guard `Admin`; custom connections resolve their discovery document once at write time; builtin slugs are reserved | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/UpdateConnection` | Update OAuth connection | done — guard `Admin`; optional fields keep their stored value when unset | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection` | Delete OAuth connection | done — guard `Admin`; the bindings cascade | `modules/identity/oauthsso.TestDeleteRemovesTheRowAndRecordsTheChange` |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/ListLinkedConnections` | List linked OAuth connections | done — guard `Session`; the caller's own bindings, oldest first, never a secret | `modules/identity/oauthsso.TestListLinkedAnswersOnlyTheCallerRowsOldestFirst` |
-| POST | `/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection` | Unlink OAuth connection | done — guard `Session` + step-up; a foreign or unknown binding answers `not_found`; the last credential of an account with no password and no passkey answers `failed_precondition` — set a password first | `modules/identity/oauthsso/accounts_test.go` |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/BeginSignIn` | Begin OAuth sign in | done — guard `Public` (default bucket); writes the pending flow row and answers the authorize URL; an unknown or disabled connection answers `not_found`, so the endpoint is not a connection enumerator | `modules/identity/oauthsso.TestBeginWritesAPendingFlowAndNeverStoresTheRawState` |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/ContinueSignIn` | Continue OAuth sign in | done — guard `Public` (auth bucket); the resolution binds the identity: the existing binding, a verified address match (linking toggle), or the JIT account the open access mode creates; an unverified address pauses at `verify_email`, missing names at `require_names`; answers the token pair, the MFA bridge, or the stage the flow moved to | `modules/identity/oauthsso` resolution tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/VerifySignInEmail` | Verify OAuth sign-in email | done — guard `Public` (auth bucket); spends the single-use email code a `verify_email` flow waits for; three wrong answers end the flow; the answer names the stage the flow moved to | `modules/identity/oauthsso.TestVerifySignInEmailSpendsTheCodeAndTheFlowCompletes`, `modules/identity/oauthsso.TestThreeWrongCodesEndTheFlow` |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/ListConnections` | List OAuth connections | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/GetConnection` | Get OAuth connection | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/CreateConnection` | Create OAuth connection | done — guard `Admin`; custom connections resolve their discovery document once at write time; builtin slugs are reserved | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/UpdateConnection` | Update OAuth connection | done — guard `Admin`; optional fields keep their stored value when unset | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/DeleteConnection` | Delete OAuth connection | done — guard `Admin`; the bindings cascade | `modules/identity/oauthsso.TestDeleteRemovesTheRowAndRecordsTheChange` |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/ListLinkedConnections` | List linked OAuth connections | done — guard `Session`; the caller's own bindings, oldest first, never a secret | `modules/identity/oauthsso.TestListLinkedAnswersOnlyTheCallerRowsOldestFirst` |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection` | Unlink OAuth connection | done — guard `Session` + step-up; a foreign or unknown binding answers `not_found`; the last credential of an account with no password and no passkey answers `failed_precondition` — set a password first | `modules/identity/oauthsso/accounts_test.go` |
 | GET | `/oauth/{provider}/start` | Start the browser flow | done — guard `Public` (REST); answers the provider's authorize URL as a 302 | `modules/identity/oauthsso/flow_test.go` |
 | GET | `/oauth/{provider}/callback` | Provider callback | done — guard `Public` (REST); consumes the code, seals the tokens, and redirects the browser to the SPA with the flow token (or an `?error=` word) | `modules/identity/oauthsso/flow_test.go` |
 
@@ -174,9 +174,9 @@ Connection settings live in `public.settings` through `modules/appconfig`: secre
 with the application cipher, `oauthsso.account_linking_enabled` gates the email-match link
 (default true), and JIT creation follows `access.mode` — no second toggle.
 
-## Webhooks (tango-only)
+## Webhooks (saka-only)
 
-The outbound event surface tango carries and Pocket ID does not: an administrator registers a
+The outbound event surface saka carries and Pocket ID does not: an administrator registers a
 destination and subscribes it to the event catalog. Every audit record is a candidate delivery,
 mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an endpoint that
 lists no events, or lists the `*` wildcard, receives every one of them. All procedures carry the
@@ -184,16 +184,16 @@ admin guard.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.webhook.v1.WebhookService/List` | List webhook endpoints | done — guard `Admin`; `enabled` and `event` filters; the `event` filter names a catalog event or the wildcard; secrets never present | `modules/webhook.TestEmissionMatchesSubscriptions`, `internal/guard` webhook rules |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Create` | Create a webhook endpoint | done — returns the signing secret exactly once; the secret is sealed `enc:` with the application cipher and a create without it is refused `failed_precondition`; subscription entries must be catalog names or `*` (`invalid_argument` otherwise) | `modules/webhook.TestCreateShowsTheSecretOnceAndRefusesADuplicateName`, `modules/webhook.TestCreateRejectsAnUnknownEvent` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Get` | Get a webhook endpoint | done — no secret field; exercised by the create/rotate suites' read-back | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Update` | Update a webhook endpoint | done — partial update; absent fields keep values; headers and event types replace wholesale when present | `modules/webhook.TestEmissionMatchesSubscriptions` (the disabled endpoint), `modules/webhook.TestCreateRejectsAnUnknownEvent` (event replacement) |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | done — deliveries survive with `webhook_id` nulled; a delivery whose endpoint is gone is marked failed, not retried | `modules/webhook.TestDeleteKeepsTheDeliveries` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | done — returns the new plaintext exactly once; new deliveries sign with it; the stored ciphertext is never answered again | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/Test` | Send a test delivery | done — queues a `webhook.test` delivery, subscription or not | `modules/webhook.TestTheTestDeliveryRidesItsOwnEvent` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | done — newest first, paginated; latest attempt rides along | `modules/webhook.TestRunDeliverySignsTheBodyAndRecordsTheAttempt` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | done — `event` filter names a catalog event or the wildcard; redacted response metadata only | `modules/webhook.TestEmissionMatchesSubscriptions` |
-| POST | `/rpc/tango.webhook.v1.WebhookService/ListEventTypes` | List webhook event types | done — guard `Admin`; serves the whole catalog with descriptions, in declaration order | E2E probe (2026-09-30): 77 entries over a freshly built binary |
+| POST | `/rpc/saka.webhook.v1.WebhookService/List` | List webhook endpoints | done — guard `Admin`; `enabled` and `event` filters; the `event` filter names a catalog event or the wildcard; secrets never present | `modules/webhook.TestEmissionMatchesSubscriptions`, `internal/guard` webhook rules |
+| POST | `/rpc/saka.webhook.v1.WebhookService/Create` | Create a webhook endpoint | done — returns the signing secret exactly once; the secret is sealed `enc:` with the application cipher and a create without it is refused `failed_precondition`; subscription entries must be catalog names or `*` (`invalid_argument` otherwise) | `modules/webhook.TestCreateShowsTheSecretOnceAndRefusesADuplicateName`, `modules/webhook.TestCreateRejectsAnUnknownEvent` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/Get` | Get a webhook endpoint | done — no secret field; exercised by the create/rotate suites' read-back | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/Update` | Update a webhook endpoint | done — partial update; absent fields keep values; headers and event types replace wholesale when present | `modules/webhook.TestEmissionMatchesSubscriptions` (the disabled endpoint), `modules/webhook.TestCreateRejectsAnUnknownEvent` (event replacement) |
+| POST | `/rpc/saka.webhook.v1.WebhookService/Delete` | Delete a webhook endpoint | done — deliveries survive with `webhook_id` nulled; a delivery whose endpoint is gone is marked failed, not retried | `modules/webhook.TestDeleteKeepsTheDeliveries` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/RotateSecret` | Rotate the signing secret | done — returns the new plaintext exactly once; new deliveries sign with it; the stored ciphertext is never answered again | `modules/webhook.TestRotateSecretAffectsNewDeliveriesOnly` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/Test` | Send a test delivery | done — queues a `webhook.test` delivery, subscription or not | `modules/webhook.TestTheTestDeliveryRidesItsOwnEvent` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | done — newest first, paginated; latest attempt rides along | `modules/webhook.TestRunDeliverySignsTheBodyAndRecordsTheAttempt` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | done — `event` filter names a catalog event or the wildcard; redacted response metadata only | `modules/webhook.TestEmissionMatchesSubscriptions` |
+| POST | `/rpc/saka.webhook.v1.WebhookService/ListEventTypes` | List webhook event types | done — guard `Admin`; serves the whole catalog with descriptions, in declaration order | E2E probe (2026-09-30): 77 entries over a freshly built binary |
 
 Delivery contract: HMAC-SHA256 over `t=<unix>,v1=<hex>` where the digest covers the signed
 timestamp concatenated with the exact canonical body bytes. Headers on every delivery:
@@ -236,11 +236,11 @@ managing credentials.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.apikey.v1.ApiKeyService/CreateAPIKey` | Create API key | done — guard `Session`, the rule a machine credential is refused by; the raw key is `<prefix>.<secret>`, drawn from the full alphanumeric alphabet with the crypto source, and shown exactly once — the row stores the SHA-256 of the presented string, so a database leak cannot replay it; the name is unique per owner (the `(name, owner)` index), the window must lie in the future, and a duplicate answers `already_exists` | `modules/apikey.TestCreateShowsTheKeyOnceAndRefusesADuplicateName` |
-| POST | `/rpc/tango.apikey.v1.ApiKeyService/ListAPIKeys` | List API keys | done — the caller's own keys, ordered by `name`, `created_at`, `expires_at`, or `last_used_at` (absent: newest first); revoked ones included; revoked stays listed because the revocation is a stamp the view carries, not a deletion | `modules/apikey.TestListOwnScopesToTheOwnerAndListAllSeesEverything` |
-| POST | `/rpc/tango.apikey.v1.ApiKeyService/RenewAPIKey` | Renew API key | done — guard `Session`; an unexpired key is refused with `failed_precondition` (renewal is how a key lives past its expiry, not how it escapes one); an expired one earns a new secret and a new window, the reminder stamp dies with the old window, and the new raw key is shown once | `modules/apikey.TestRenewReplacesAnExpiredKeyAndRefusesALiveOne` |
-| POST | `/rpc/tango.apikey.v1.ApiKeyService/RevokeAPIKey` | Revoke API key | done — guard `Session`; soft by the `revoked_at` stamp the schema reserved, idempotent (a second revocation is the same success and records nothing), and a key another account owns answers `not_found` | `modules/apikey.TestRevokeIsSoftAndIdempotent` |
-| POST | `/rpc/tango.apikey.v1.ApiKeyService/ListAllAPIKeys` | List all API keys | done — guard `Admin`; tango-only, the administrative view over every key the deployment holds (upstream has none); same sort whitelist as the owner's list; the answer names each key's owner | `modules/apikey.TestListOwnScopesToTheOwnerAndListAllSeesEverything`, `internal/transport.TestTheAPIKeyGuardIsDeclared` |
+| POST | `/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey` | Create API key | done — guard `Session`, the rule a machine credential is refused by; the raw key is `<prefix>.<secret>`, drawn from the full alphanumeric alphabet with the crypto source, and shown exactly once — the row stores the SHA-256 of the presented string, so a database leak cannot replay it; the name is unique per owner (the `(name, owner)` index), the window must lie in the future, and a duplicate answers `already_exists` | `modules/apikey.TestCreateShowsTheKeyOnceAndRefusesADuplicateName` |
+| POST | `/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys` | List API keys | done — the caller's own keys, ordered by `name`, `created_at`, `expires_at`, or `last_used_at` (absent: newest first); revoked ones included; revoked stays listed because the revocation is a stamp the view carries, not a deletion | `modules/apikey.TestListOwnScopesToTheOwnerAndListAllSeesEverything` |
+| POST | `/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey` | Renew API key | done — guard `Session`; an unexpired key is refused with `failed_precondition` (renewal is how a key lives past its expiry, not how it escapes one); an expired one earns a new secret and a new window, the reminder stamp dies with the old window, and the new raw key is shown once | `modules/apikey.TestRenewReplacesAnExpiredKeyAndRefusesALiveOne` |
+| POST | `/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey` | Revoke API key | done — guard `Session`; soft by the `revoked_at` stamp the schema reserved, idempotent (a second revocation is the same success and records nothing), and a key another account owns answers `not_found` | `modules/apikey.TestRevokeIsSoftAndIdempotent` |
+| POST | `/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys` | List all API keys | done — guard `Admin`; saka-only, the administrative view over every key the deployment holds (upstream has none); same sort whitelist as the owner's list; the answer names each key's owner | `modules/apikey.TestListOwnScopesToTheOwnerAndListAllSeesEverything`, `internal/transport.TestTheAPIKeyGuardIsDeclared` |
 
 Shared rules: the authwall is one read — the hash of the presented header is looked up against
 `revoked_at IS NULL AND expires_at > now AND NOT users.disabled`, so an unknown, expired, revoked,
@@ -250,29 +250,29 @@ not a decision, and its write is best-effort. The refusal never says which half 
 events: `api_key_created`, `api_key_renewed`, `api_key_revoked`, and
 `api_key_expiry_email_sent` — recorded in the transaction that caused them, naming the owner in
 `user_id` and the key in `resource_type`/`resource_id`. Not ported: the static API key (a
-configuration credential acting as a manufactured administrator — tango issues keys through the
-surface instead) and the upstream's direct-send reminder mail (tango's reminder travels the
+configuration credential acting as a manufactured administrator — saka issues keys through the
+surface instead) and the upstream's direct-send reminder mail (saka's reminder travels the
 durable queue).
 
 ## APIs
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.admin.v1.ApiService/ListApis` | List APIs | planned — no proto yet; upstream's API-access surface | — |
-| POST | `/rpc/tango.admin.v1.ApiService/CreateAPI` | Create API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/GetAPI` | Get API by ID | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/UpdateAPI` | Update API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/DeleteAPI` | Delete API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/SetPermissions` | Update API permissions | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/SetCimdAccess` | Update metadata document client access | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableClients` | List clients that can still be granted access | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/ListClients` | List clients with access to an API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/GrantClient` | Grant a client access to an API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/RevokeClient` | Revoke a client's access to an API | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/ListApisForClient` | List APIs a client may access | planned | — |
-| POST | `/rpc/tango.admin.v1.ApiService/ListAssignableApisForClient` | List APIs a client can still be granted | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/ListApis` | List APIs | planned — no proto yet; upstream's API-access surface | — |
+| POST | `/rpc/saka.admin.v1.ApiService/CreateAPI` | Create API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/GetAPI` | Get API by ID | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/UpdateAPI` | Update API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/DeleteAPI` | Delete API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/SetPermissions` | Update API permissions | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/SetCimdAccess` | Update metadata document client access | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/ListAssignableClients` | List clients that can still be granted access | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/ListClients` | List clients with access to an API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/GrantClient` | Grant a client access to an API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/RevokeClient` | Revoke a client's access to an API | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/ListApisForClient` | List APIs a client may access | planned | — |
+| POST | `/rpc/saka.admin.v1.ApiService/ListAssignableApisForClient` | List APIs a client can still be granted | planned | — |
 
-Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above — this upstream
+Saka's machine credentials live in `ApiKeyService` (`modules/apikey`) above — this upstream
 `ApiService` surface (API resources + client grants) is a separate, unbuilt feature.
 
 ## Application Configuration
@@ -280,7 +280,7 @@ Tango's machine credentials live in `ApiKeyService` (`modules/apikey`) above —
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
 | GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
-| POST | `/rpc/tango.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
+| POST | `/rpc/saka.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |
 
@@ -294,13 +294,13 @@ secret in the full document is the value through the redaction path
 redact.go prints — `[redacted]`, the datastore URLs reduced to
 `host:port/database`, an unset secret omitted — the same rendering
 `config:print`'s fail-safe uses, never the value itself. The test-email
-procedure is on `tango.system.v1.AppConfigService` in
+procedure is on `saka.system.v1.AppConfigService` in
 `api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
 probe (`task mailer:smoke`).
 
 ## Settings
 
-Tango-only surface — Pocket ID has no generic settings CRUD. The catalog in
+Saka-only surface — Pocket ID has no generic settings CRUD. The catalog in
 code declares every item (key, default, sealed, public, description);
 `public.app_settings` in `00006_create_settings_table.sql` stores the overrides
 alone. No delete surface exists by design: an item is removed by resetting
@@ -308,10 +308,10 @@ it, and a key not in the catalog is refused everywhere.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.settings.v1.SettingsService/List` | List settings | implemented — admin; every catalog item with its effective value (override resting, else default) and the default it falls back to | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/Update` | Update setting | implemented — admin; catalog keys only; a sealed item seals the value (AES-256-GCM, `enc:` prefix) | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/Reset` | Reset setting to default | implemented — admin; drops the override; an item already at its default answers unchanged | `modules/appconfig/settings.go` |
-| POST | `/rpc/tango.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value; served from one cache entry a change drops, `nocache` in the body reads the source | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/saka.settings.v1.SettingsService/List` | List settings | implemented — admin; every catalog item with its effective value (override resting, else default) and the default it falls back to | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+| POST | `/rpc/saka.settings.v1.SettingsService/Update` | Update setting | implemented — admin; catalog keys only; a sealed item seals the value (AES-256-GCM, `enc:` prefix) | `modules/appconfig/settings.go` |
+| POST | `/rpc/saka.settings.v1.SettingsService/Reset` | Reset setting to default | implemented — admin; drops the override; an item already at its default answers unchanged | `modules/appconfig/settings.go` |
+| POST | `/rpc/saka.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value; served from one cache entry a change drops, `nocache` in the body reads the source | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
 
 Whether a value rests sealed is told by its `enc:` prefix alone — there is
 no flag column — and a public item never rests sealed: the catalog refuses
@@ -332,54 +332,54 @@ transaction, with the key in the payload and never the value.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.auditlog.v1.AuditLogService/List` | List audit logs | done — the caller's own records; guard `Authenticated`, so a delegated (impersonated) caller is refused; sorted by `event`, `username`, `ip_address`, or `created_at` (absent: newest first) | `modules/auditlog` (service tests), `internal/transport.TestTheAuditListAnswersTheCallersOwnRecordsOnly` |
-| POST | `/rpc/tango.auditlog.v1.AuditLogService/ListAll` | List all audit logs | done — guard `Admin`; filters `event`, `user_id`, `search` (username/email); sorted by `event`, `username`, `ip_address`, or `created_at` (absent: newest first) | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
-| POST | `/rpc/tango.auditlog.v1.AuditLogService/ListForUser` | (tango-only) list one account's records | done — guard `Admin`; the administrative view of a single account | `modules/auditlog` (service tests) |
-| POST | `/rpc/tango.auditlog.v1.AuditLogService/FilterOptions` | List filter facets | done — guard `Admin`; facets are `events` (distinct events in the table) and `users` (accounts that appear in it). Upstream's `client-names` facet is **not** ported: tango has no OIDC client, so `payload->>'client_name'` is never written | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
+| POST | `/rpc/saka.auditlog.v1.AuditLogService/List` | List audit logs | done — the caller's own records; guard `Authenticated`, so a delegated (impersonated) caller is refused; sorted by `event`, `username`, `ip_address`, or `created_at` (absent: newest first) | `modules/auditlog` (service tests), `internal/transport.TestTheAuditListAnswersTheCallersOwnRecordsOnly` |
+| POST | `/rpc/saka.auditlog.v1.AuditLogService/ListAll` | List all audit logs | done — guard `Admin`; filters `event`, `user_id`, `search` (username/email); sorted by `event`, `username`, `ip_address`, or `created_at` (absent: newest first) | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
+| POST | `/rpc/saka.auditlog.v1.AuditLogService/ListForUser` | (saka-only) list one account's records | done — guard `Admin`; the administrative view of a single account | `modules/auditlog` (service tests) |
+| POST | `/rpc/saka.auditlog.v1.AuditLogService/FilterOptions` | List filter facets | done — guard `Admin`; facets are `events` (distinct events in the table) and `users` (accounts that appear in it). Upstream's `client-names` facet is **not** ported: saka has no OIDC client, so `payload->>'client_name'` is never written | `modules/auditlog` (service tests), `internal/transport.TestTheAdministrativeAuditProceduresAnswerAnAdministrator` |
 
 The writer is `internal/audit` (shared infrastructure, injected into the features); the reader is `modules/auditlog`. The event vocabulary lives in `internal/audit/audit.go` — that file is the single source of what can be written (sign-in/out and revocations, account and group lifecycle, email verification and change, one-time access, API keys, impersonation, MFA ceremonies, profile pictures); read it before adding a row that names an event. Retention: `app.audit_retention_days` (default 90) applied by the `audit_cleanup` recurring job.
 
 ## Custom Claims
 
 Implemented in `modules/federation/customclaim` — the contract is
-`tango.federation.v1.CustomClaimService` in `api/connect/federation.proto`
+`saka.federation.v1.CustomClaimService` in `api/connect/federation.proto`
 (the claims are a token-issuance concern, so the surface lives in the
 federation area beside the clients the claims ride; the earlier plan's
-`tango.identity.v1` namespace is superseded). A claim is unique per subject
+`saka.identity.v1` namespace is superseded). A claim is unique per subject
 (`(key, user_id, user_group_id)`, `NULLS NOT DISTINCT`), its value is a plain
 string or a JSON document — the tokens carry it as the document it names —
 and the identifiers travel as TypeIDs (`cclm_…`). The user and group
 surfaces answer the same table, and each refuses a row that belongs to the
 other subject kind, so a claim cannot silently move between subjects.
 **Reserved keys** (settled 2026-09-29, mirroring Pocket ID v2.14.0's
-`isReservedClaim` plus tango's own discriminator): the registered JWT claim
+`isReservedClaim` plus saka's own discriminator): the registered JWT claim
 names (`sub`, `iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `auth_time`,
 `nonce`, `acr`, `amr`, `azp`, `client_id`), the standard profile claims
-tango emits (`given_name`, `family_name`, `name`, `display_name`,
+saka emits (`given_name`, `family_name`, `name`, `display_name`,
 `preferred_username`, `email`, `email_verified`, `groups`), and
-`tango:token_type` are refused on create and update with `invalid_argument`.
+`saka:token_type` are refused on create and update with `invalid_argument`.
 The comparison is exact — a differently cased variant cannot collide with a
 protected claim and is not blocked. At issuance the merge drops protected
 keys a second time, so legacy rows predating the rule cannot overwrite
 `sub`, `iss`, `aud`, the time claims, or the token-kind marker.
 
-Upstream replaces a subject's whole claim set in one PUT; tango addresses
+Upstream replaces a subject's whole claim set in one PUT; saka addresses
 each row (create, update, delete by identifier) — the deviation
-`.llms/tango-deviations.md` carries. The merge into the tokens happens at
+`.llms/saka-deviations.md` carries. The merge into the tokens happens at
 issuance time (userinfo and the ID token), the same merge the preview
 renders.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/Suggest` | Get custom claim suggestions | done — admin; the keys in use, ordered by how often they carry | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done — admin; duplicate key on the subject is `already_exists`, an unknown account is `failed_precondition`, a reserved key (registered JWT names, the standard profile claims, `tango:token_type`) is `invalid_argument` | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done — admin; full replace of key and value; a group claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | done — admin; idempotent not-found | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done — admin; the claim every member's tokens carry; a reserved key is `invalid_argument` | `modules/federation/customclaim` (service tests), `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done — admin; a user claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
-| POST | `/rpc/tango.federation.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | done — admin | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/Suggest` | Get custom claim suggestions | done — admin; the keys in use, ordered by how often they carry | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/ListUserClaims` | List a user's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/CreateUserClaim` | Create a user custom claim | done — admin; duplicate key on the subject is `already_exists`, an unknown account is `failed_precondition`, a reserved key (registered JWT names, the standard profile claims, `saka:token_type`) is `invalid_argument` | `modules/federation/customclaim.TestCreateListAndSuggestCoverTheLifecycle`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/UpdateUserClaim` | Update a user custom claim | done — admin; full replace of key and value; a group claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/DeleteUserClaim` | Delete a user custom claim | done — admin; idempotent not-found | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/ListGroupClaims` | List a user group's custom claims | done — admin; ordered by key | `modules/federation/customclaim` (service tests) |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/CreateGroupClaim` | Create a group custom claim | done — admin; the claim every member's tokens carry; a reserved key is `invalid_argument` | `modules/federation/customclaim` (service tests), `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/UpdateGroupClaim` | Update a group custom claim | done — admin; a user claim is refused; a reserved key is `invalid_argument` | `modules/federation/customclaim.TestUpdateAndDeleteRefuseTheOtherSubjectKind`, `modules/federation/customclaim.TestReservedKeysAreRefusedOnCreateAndUpdate` |
+| POST | `/rpc/saka.federation.v1.CustomClaimService/DeleteGroupClaim` | Delete a group custom claim | done — admin | `modules/federation/customclaim` (service tests) |
 
 Audit events: `custom_claim_created`, `custom_claim_updated`,
 `custom_claim_deleted` — recorded in the causing transaction, the payload
@@ -393,7 +393,7 @@ pairing request; the account holder, signed in elsewhere, reads what the
 request names and answers it. The device side is REST: the two routes a
 browser reaches without a credential, the pairing secret riding an
 http-only cookie the exchange demands back. The approval side is
-ConnectRPC under `tango.authn.v1.DeviceApprovalService`, guarded
+ConnectRPC under `saka.authn.v1.DeviceApprovalService`, guarded
 `Session` — a machine credential has no browser to pair — and the
 handlers refuse an impersonated caller, so a token acting for another
 cannot mint sessions for a third device.
@@ -411,8 +411,8 @@ the approval. Audit events: `device_login_approved`,
 | ------ | -------------------- | -------------------- | ------ | -------- |
 | POST | `/api/device-login/requests` | Create device login request | done — REST, public; the pairing cookie rides the response, the device token never travels the body; one browser holds at most 8 live requests — a ninth creation answers 429 until one expires | `modules/devicelogin` (service tests), `internal/guard` (RestRules) |
 | POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | done — REST, public; long-poll, the pairing cookie proves the creating browser; the approval answers the account view | `modules/devicelogin` (service tests) |
-| POST | `/rpc/tango.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
-| POST | `/rpc/tango.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
+| POST | `/rpc/saka.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
+| POST | `/rpc/saka.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
 
 ## Health
 
@@ -420,20 +420,20 @@ the approval. Audit events: `device_login_approved`,
 | ------ | -------- | -------------------- | ------ | -------- |
 | GET | `/healthz` | Responds to healthchecks | REST — liveness, dependencies untouched | `internal/transport.TestAPIHealthzReportsTheChecker` |
 | GET | `/api/healthz` | Readiness document | REST — per-dependency results | `internal/transport.TestAPIHealthzReportsTheChecker` |
-| POST | `/rpc/tango.system.v1.HealthService/Check` | Readiness over ConnectRPC | done — the same checker and the same result as `/api/healthz`; fails with `unavailable` naming the checks that are down | `internal/transport.TestRPCCheckAnswersTheReadinessDocument`, `internal/transport.TestRPCUnhealthyAnswersUnavailable` |
+| POST | `/rpc/saka.system.v1.HealthService/Check` | Readiness over ConnectRPC | done — the same checker and the same result as `/api/healthz`; fails with `unavailable` naming the checks that are down | `internal/transport.TestRPCCheckAnswersTheReadinessDocument`, `internal/transport.TestRPCUnhealthyAnswersUnavailable` |
 
-## Queue & Scheduler (tango-only)
+## Queue & Scheduler (saka-only)
 
 The engines' own operational surface — an operations console reads and acts
-on them over RPC; the frontend integration is deferred. `tango.system.v1.QueueService`
-and `tango.system.v1.SchedulerService` in `system.proto`; every procedure is
+on them over RPC; the frontend integration is deferred. `saka.system.v1.QueueService`
+and `saka.system.v1.SchedulerService` in `system.proto`; every procedure is
 `Admin` in `internal/guard/rules.go`. The engine facts come from
 `internal/queue` (`Queues`, `Tasks`, `Detail`, `DeadTasks`) and
 `internal/scheduler` (`Jobs`, `RunNow`); the transport maps the wire only.
 The four list procedures page like the account list: `page` (one-based) and
 `limit` normalize through `responder.NormalizePage`, `sort_by`/`sort_order`
 resolve through a whitelist the store owns, and the answer carries
-`tango.common.v1.ListMetadata` with the `status` and `message` words every
+`saka.common.v1.ListMetadata` with the `status` and `message` words every
 response of this surface carries. `status` is always the call's outcome;
 `state` names the task's own condition (`pending`, `running`, `success`,
 `failure`) — the mutation responses add their counts to the message ("flushed
@@ -444,46 +444,46 @@ account id is.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.QueueService/ListQueues` | List task queues with live counts (queue) | done — per-queue config + pending/dead counts; `page`/`limit`, `search` on the name, `sort_by` in name/pending/dead | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed`, `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
-| POST | `/rpc/tango.system.v1.QueueService/ListTasks` | List pending tasks (queue) | done — pending-table page, queue filter, `sort_by` in created_at/priority/attempts/wait_until (absent: newest first); no payload; ids are `que_…` | `internal/queue.TestInspectFiltersByQueueName` |
-| POST | `/rpc/tango.system.v1.QueueService/GetTask` | Get task detail with payload (queue) | done — `que_…` id; state across both tables + decoded payload; unknown or malformed id `not_found` | `internal/queue.TestInspectAnswersAnArchivedTask`, `internal/queue.TestInspectReportsAnUnknownTaskAsAbsent` |
-| POST | `/rpc/tango.system.v1.QueueService/ListDeadTasks` | List failed tasks in the archive (queue) | done — replayable failures, queue filter, `sort_by` in created_at/attempts/last_executed_at (absent: oldest first) | `internal/queue.TestInspectAnswersAnArchivedTask` |
-| POST | `/rpc/tango.system.v1.QueueService/CancelTask` | Cancel a waiting task (queue) | done — `que_…` id; unclaimed removes; claimed `failed_precondition`; unknown or malformed `not_found` | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed` |
-| POST | `/rpc/tango.system.v1.QueueService/ReplayDeadTasks` | Replay failed tasks (queue) | done — re-enqueues under fresh identities, answers the count | `internal/queue.TestReplayDeadRequeuesTheDeadTasks` |
-| POST | `/rpc/tango.system.v1.QueueService/FlushPendingTasks` | Flush all waiting tasks (queue) | done — every unclaimed row | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
-| POST | `/rpc/tango.system.v1.QueueService/FlushCompletedTasks` | Flush the completed archive (queue) | done — retention notwithstanding | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
-| POST | `/rpc/tango.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: `scd_…` id, spec, next_due, last_fired; `page`/`limit`, `search` on name/spec, `sort_by` in name/next_due/updated_at; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
-| POST | `/rpc/tango.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — `scd_…` id parameter; enqueues without advancing next_due; unknown or malformed id `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
+| POST | `/rpc/saka.system.v1.QueueService/ListQueues` | List task queues with live counts (queue) | done — per-queue config + pending/dead counts; `page`/`limit`, `search` on the name, `sort_by` in name/pending/dead | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed`, `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/saka.system.v1.QueueService/ListTasks` | List pending tasks (queue) | done — pending-table page, queue filter, `sort_by` in created_at/priority/attempts/wait_until (absent: newest first); no payload; ids are `que_…` | `internal/queue.TestInspectFiltersByQueueName` |
+| POST | `/rpc/saka.system.v1.QueueService/GetTask` | Get task detail with payload (queue) | done — `que_…` id; state across both tables + decoded payload; unknown or malformed id `not_found` | `internal/queue.TestInspectAnswersAnArchivedTask`, `internal/queue.TestInspectReportsAnUnknownTaskAsAbsent` |
+| POST | `/rpc/saka.system.v1.QueueService/ListDeadTasks` | List failed tasks in the archive (queue) | done — replayable failures, queue filter, `sort_by` in created_at/attempts/last_executed_at (absent: oldest first) | `internal/queue.TestInspectAnswersAnArchivedTask` |
+| POST | `/rpc/saka.system.v1.QueueService/CancelTask` | Cancel a waiting task (queue) | done — `que_…` id; unclaimed removes; claimed `failed_precondition`; unknown or malformed `not_found` | `internal/queue.TestInspectReadsWhatTheDispatcherHasNotClaimed` |
+| POST | `/rpc/saka.system.v1.QueueService/ReplayDeadTasks` | Replay failed tasks (queue) | done — re-enqueues under fresh identities, answers the count | `internal/queue.TestReplayDeadRequeuesTheDeadTasks` |
+| POST | `/rpc/saka.system.v1.QueueService/FlushPendingTasks` | Flush all waiting tasks (queue) | done — every unclaimed row | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/saka.system.v1.QueueService/FlushCompletedTasks` | Flush the completed archive (queue) | done — retention notwithstanding | `internal/transport.TestRPCQueueProceduresAnswerWithoutTheEngine` |
+| POST | `/rpc/saka.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: `scd_…` id, spec, next_due, last_fired; `page`/`limit`, `search` on name/spec, `sort_by` in name/next_due/updated_at; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
+| POST | `/rpc/saka.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — `scd_…` id parameter; enqueues without advancing next_due; unknown or malformed id `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
 
 ## OIDC
 
 The provider surface is implemented across management, protocol, consent, and
-CIMD. `tango.federation.v1.OidcClientService` and
+CIMD. `saka.federation.v1.OidcClientService` and
 `OidcConsentService` use ConnectRPC (`modules/federation/oidc`); the logo and
 OAuth/OIDC protocol routes use REST. The endpoint table records active
 implementation status and evidence; planned rows remain explicitly marked.
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListClients` | List OIDC clients | done — admin; page/limit/search over the name; sorted by `id`, `name`, or `created_at` (absent: newest first); every client carries its secrets' views and its allowed groups | `modules/federation/oidc` (service tests), `internal/guard` (rules) |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateClient` | Create OIDC client | done — admin; the identifier is operator-chosen (letters, digits, `_`, `-`) or generated; the first secret is shown exactly once, only its SHA-256 hash stored in the `credentials` JSONB; a public client forces `pkce_enabled` on | `modules/federation/oidc.TestCreateMintsASecretTheRowCannotReplay` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClient` | Get OIDC client | done — admin; the full view with secrets' views and groups | `modules/federation/oidc` (service tests) |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done — admin; full replace under the row lock; secrets, logo, and restriction untouched | `modules/federation/oidc.TestUpdateReplacesTheFieldsAndKeepsTheSecrets` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | done — admin; the codes, sessions, grants, and restrictions die with the row by the cascades | `modules/federation/oidc.TestDeleteRemovesTheClientAndTheRecordNamesIt` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | done — admin; the replace, not a delta; an unknown group refuses the replacement whole | `modules/federation/oidc.TestAllowedGroupsReplaceWholeAndRefuseAnUnknownGroup` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | done — admin; the display facts a sign-in page renders | `modules/federation/oidc` (service tests) |
-| POST | `/rpc/tango.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | done — admin; the id-token, access-token, and userinfo claim maps built from the account's own views, no token minted; custom claims join when the customclaim feature does | `modules/federation/oidc.TestPreviewBuildsTheClaimMapsForTheAccount` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | done — admin; CIMD full: the id IS the metadata document's URL, the fetch is allowlist-gated (`oidc.cimd_url_allowlist`, judged again at refresh), the document's rules are held (auth method `none` only, an initiating grant required, `response_type` code only, redirect URIs without wildcards/script schemes); the refresh rewrites the document-named fields and sets `metadata_expires_at` | `modules/federation/oidc/cimd_test.go` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/UploadLogo` | Update client logo | done — admin; bytes payload, kind sniffed off the magic bytes (PNG/JPEG/WebP, 2 MiB; SVG refused — deviation), staged then synced in-request | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | done — admin; idempotent — a client without a logo is the same success | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — admin; prefixes and windows, values never returned | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
-| POST | `/rpc/tango.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped — guard `Authenticated`, the caller's own ledger | `internal/guard` (rules) |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — guard `Authenticated`; revocation cascades to the grants and the pointers riding them | `modules/federation/oidc.TestRevokingAConsentKillsTheGrantsAndTheirTokens` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped — guard `Authenticated`; the fail-closed restriction catalogue: a client counts as restricted when its flag is set or its allowed-groups roll carries rows, restricted clients answer only for their allowed groups' members | `modules/federation/oidc.TestTheAccessibleClientListFollowsTheGroupRestriction`, `modules/federation/oidc.TestTheCatalogueHidesAFlaggedClientWithNoGroups` |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — guard `Admin` | `internal/guard` (rules) |
-| POST | `/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped — guard `Admin` | `internal/guard` (rules) |
+| POST | `/rpc/saka.federation.v1.OidcClientService/ListClients` | List OIDC clients | done — admin; page/limit/search over the name; sorted by `id`, `name`, or `created_at` (absent: newest first); every client carries its secrets' views and its allowed groups | `modules/federation/oidc` (service tests), `internal/guard` (rules) |
+| POST | `/rpc/saka.federation.v1.OidcClientService/CreateClient` | Create OIDC client | done — admin; the identifier is operator-chosen (letters, digits, `_`, `-`) or generated; the first secret is shown exactly once, only its SHA-256 hash stored in the `credentials` JSONB; a public client forces `pkce_enabled` on | `modules/federation/oidc.TestCreateMintsASecretTheRowCannotReplay` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/GetClient` | Get OIDC client | done — admin; the full view with secrets' views and groups | `modules/federation/oidc` (service tests) |
+| POST | `/rpc/saka.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done — admin; full replace under the row lock; secrets, logo, and restriction untouched | `modules/federation/oidc.TestUpdateReplacesTheFieldsAndKeepsTheSecrets` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | done — admin; the codes, sessions, grants, and restrictions die with the row by the cascades | `modules/federation/oidc.TestDeleteRemovesTheClientAndTheRecordNamesIt` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | done — admin; the replace, not a delta; an unknown group refuses the replacement whole | `modules/federation/oidc.TestAllowedGroupsReplaceWholeAndRefuseAnUnknownGroup` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | done — admin; the display facts a sign-in page renders | `modules/federation/oidc` (service tests) |
+| POST | `/rpc/saka.federation.v1.OidcClientService/PreviewClient` | Preview OIDC client data for user | done — admin; the id-token, access-token, and userinfo claim maps built from the account's own views, no token minted; custom claims join when the customclaim feature does | `modules/federation/oidc.TestPreviewBuildsTheClaimMapsForTheAccount` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/RefreshClient` | Refresh client metadata document | done — admin; CIMD full: the id IS the metadata document's URL, the fetch is allowlist-gated (`oidc.cimd_url_allowlist`, judged again at refresh), the document's rules are held (auth method `none` only, an initiating grant required, `response_type` code only, redirect URIs without wildcards/script schemes); the refresh rewrites the document-named fields and sets `metadata_expires_at` | `modules/federation/oidc/cimd_test.go` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/UploadLogo` | Update client logo | done — admin; bytes payload, kind sniffed off the magic bytes (PNG/JPEG/WebP, 2 MiB; SVG refused — deviation), staged then synced in-request | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/DeleteLogo` | Delete client logo | done — admin; idempotent — a client without a logo is the same success | `modules/federation/oidc.TestTheLogoLifecycleCoversTheKindCheckAndTheReset` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/ListSecrets` | List client secrets | done — admin; prefixes and windows, values never returned | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/CreateSecret` | Create client secret | done — admin; show-once raw value, SHA-256 hash + 4-character prefix stored in `credentials`; several live secrets are legitimate — a rotation is an addition followed by a deletion | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/DeleteSecret` | Delete client secret | done — admin; one secret withdrawn, the others survive; an unknown one is not found | `modules/federation/oidc.TestSecretsAddWithdrawAndNeverReplayEachOther` |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/ListMyAuthorizedClients` | List authorized clients for current user | shipped — guard `Authenticated`, the caller's own ledger | `internal/guard` (rules) |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — guard `Authenticated`; revocation cascades to the grants and the pointers riding them | `modules/federation/oidc.TestRevokingAConsentKillsTheGrantsAndTheirTokens` |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped — guard `Authenticated`; the fail-closed restriction catalogue: a client counts as restricted when its flag is set or its allowed-groups roll carries rows, restricted clients answer only for their allowed groups' members | `modules/federation/oidc.TestTheAccessibleClientListFollowsTheGroupRestriction`, `modules/federation/oidc.TestTheCatalogueHidesAFlaggedClientWithNoGroups` |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — guard `Admin` | `internal/guard` (rules) |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped — guard `Admin` | `internal/guard` (rules) |
 | GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
 | GET | `/oidc/authorize/{id}` | Resume the authorization interaction | done — REST, public; the callback the SPA's interaction page returns to once the account is signed in; without a decision it answers the interaction document (`consent_required`) | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
 | POST | `/oidc/authorize/{id}` | Complete the authorization interaction | done — REST, public; the SPA posts the consent decision the flow grants scopes from | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
@@ -498,7 +498,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors | `modules/federation/oidc` (protocol mount) |
 
 The protocol design notes below record implementation behavior for device flow,
-PAR, end-session `id_token_hint` verification, and discovery. Tango's own JWKS
+PAR, end-session `id_token_hint` verification, and discovery. Saka's own JWKS
 endpoint (`/.well-known/jwks.json`, `modules/identity/jwks`) is published by the
 identity module; the federation provider uses that key set.
 
@@ -611,7 +611,7 @@ code already redeemed or gone) and never reach issuance. No token-type
 discriminator claim is minted: the hint's identity rides the JOSE type
 member instead — access tokens carry RFC 9068's `at+jwt` and ID tokens
 carry none, and the end-session policy refuses a hint whose member reads
-`at+jwt`. `tango:token_type` survives only as a reserved custom-claim
+`at+jwt`. `saka:token_type` survives only as a reserved custom-claim
 key. Scopes are `openid`, `profile`, `email`,
 `groups`, and `offline_access` — the last one the persistent-access ask:
 the grant that carries it rides the long refresh window the
@@ -692,7 +692,7 @@ grace in bounded batches, and the lookup itself refuses a row the
 
 ## SCIM
 
-Outbound provisioning, ported from Pocket ID's `internal/scimsync`: tango is the SCIM client, not
+Outbound provisioning, ported from Pocket ID's `internal/scimsync`: saka is the SCIM client, not
 the server. One provider row per OIDC client names a remote base URL and the bearer token the
 sync presents (sealed `enc:` at rest, shown once in the Create answer). One pass pushes the
 client's visible accounts and groups out until the remote matches the local snapshot — the
@@ -711,11 +711,11 @@ re-encoded.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/GetByClient` | Get SCIM service provider | done — admin; answers the provider one client syncs to, token always empty | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Create` | Create SCIM service provider | done — admin; token shown once, sealed `enc:` at rest; a client with a provider answers failed-precondition; the client must exist | `modules/federation/scimsync.TestCreateSealsTheTokenAndAnswersItOnce` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Update` | Update SCIM service provider | done — admin; empty token keeps the stored one; the client binding is not replaceable | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | done — admin; the remote data the sync pushed stays where it is | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
-| POST | `/rpc/tango.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | done — admin; one pass now, counts in the answer; E2E-probed create/update/delete against a scripted remote, banned accounts push `active: false`, remote orphans are deleted | `modules/federation/scimsync.TestSyncProvisionsTheVisibleAccountsAndGroups` |
+| POST | `/rpc/saka.federation.v1.ScimProviderService/GetByClient` | Get SCIM service provider | done — admin; answers the provider one client syncs to, token always empty | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/saka.federation.v1.ScimProviderService/Create` | Create SCIM service provider | done — admin; token shown once, sealed `enc:` at rest; a client with a provider answers failed-precondition; the client must exist | `modules/federation/scimsync.TestCreateSealsTheTokenAndAnswersItOnce` |
+| POST | `/rpc/saka.federation.v1.ScimProviderService/Update` | Update SCIM service provider | done — admin; empty token keeps the stored one; the client binding is not replaceable | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/saka.federation.v1.ScimProviderService/Delete` | Delete SCIM service provider | done — admin; the remote data the sync pushed stays where it is | `modules/federation/scimsync.TestAProviderRoundTripsThroughTheRepository` |
+| POST | `/rpc/saka.federation.v1.ScimProviderService/Sync` | Sync SCIM service provider | done — admin; one pass now, counts in the answer; E2E-probed create/update/delete against a scripted remote, banned accounts push `active: false`, remote orphans are deleted | `modules/federation/scimsync.TestSyncProvisionsTheVisibleAccountsAndGroups` |
 
 ## User Groups
 
@@ -726,62 +726,62 @@ the member count every answer carries is what the query computes, never a column
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.identity.v1.UserGroupService/ListUserGroups` | List user groups | done — the group's identifier travels in its wire form, the TypeID `ugrp_…` (`modules/identity/usergroup`), and a request that names a group without the prefix is refused; page/limit/search over the name and the display name; sorted by `name`, `display_name`, `user_count`, or `created_at`, ascending by default, the name columns case-insensitively; the LEFT join makes an empty group a row with a zero count, not an absence | `modules/identity/usergroup.TestListGroupsSearchesPaginatesAndSorts`, `internal/transport.TestTheUserGroupLoopEndsInAMemberList` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/GetUserGroup` | Get user group by ID | done — the detail carries the members as the account wire view, ordered by username, and the client allowlist the group names, ordered by the client's name (the parity read upstream's group view embeds) | `modules/identity/usergroup.TestCreateGroupStoresTheRowAndRefusesADuplicateName`, `modules/identity/usergroup.TestGroupDetailCarriesTheClientRoll` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/CreateUserGroup` | Create user group | done — the duplicate name is the unique index's answer read from the write's failure, mapped to `already_exists`; the created row is read back inside the transaction | `modules/identity/usergroup.TestCreateGroupStoresTheRowAndRefusesADuplicateName` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/UpdateUserGroup` | Update user group | done — full replace of the two fields; a name another group holds is refused and the other group stays intact; an unknown identifier is `not_found` | `modules/identity/usergroup.TestUpdateGroupReplacesTheFieldsAndRefusesADuplicate` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/DeleteUserGroup` | Delete user group | done — the membership rows die with the group by the foreign keys' cascade, the accounts are untouched; the record of the deletion names the member count it took away, the one fact a later reader cannot reconstruct | `modules/identity/usergroup.TestDeleteGroupRemovesTheMemberships` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/SetUserGroupMembers` | Update users in a group | done — the replace, not a delta: an empty list empties the group; every identifier must name an account, and a member that does not exist refuses the replacement whole, so the group keeps the set it held | `modules/identity/usergroup.TestSetMembersReplacesTheWholeSet` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients` | Update allowed OIDC clients (group side) | done — admin; the group-side roll of the client restriction, the mirror of the client surface's `UpdateAllowedUserGroups`; the replace is whole, an unknown client refuses the replacement | `modules/identity/usergroup.TestSetAllowedOidcClientsReplacesTheRollAndRefusesAnUnknownClient` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/GetUserGroups` | Get user groups | done — the groups one account belongs to, ordered by display name; mirrors upstream `GET /api/users/{id}/groups` | `modules/identity/usergroup.TestGetUserGroupsAnswersTheAccountSMembership` |
-| POST | `/rpc/tango.identity.v1.UserGroupService/UpdateUserGroups` | Update user groups | done — the whole-set replace of one account's memberships; every named group must exist, an unknown one refuses the replacement | `modules/identity/usergroup.TestUpdateUserGroupsReplacesAndRefusesTheUnknown` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/ListUserGroups` | List user groups | done — the group's identifier travels in its wire form, the TypeID `ugrp_…` (`modules/identity/usergroup`), and a request that names a group without the prefix is refused; page/limit/search over the name and the display name; sorted by `name`, `display_name`, `user_count`, or `created_at`, ascending by default, the name columns case-insensitively; the LEFT join makes an empty group a row with a zero count, not an absence | `modules/identity/usergroup.TestListGroupsSearchesPaginatesAndSorts`, `internal/transport.TestTheUserGroupLoopEndsInAMemberList` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/GetUserGroup` | Get user group by ID | done — the detail carries the members as the account wire view, ordered by username, and the client allowlist the group names, ordered by the client's name (the parity read upstream's group view embeds) | `modules/identity/usergroup.TestCreateGroupStoresTheRowAndRefusesADuplicateName`, `modules/identity/usergroup.TestGroupDetailCarriesTheClientRoll` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/CreateUserGroup` | Create user group | done — the duplicate name is the unique index's answer read from the write's failure, mapped to `already_exists`; the created row is read back inside the transaction | `modules/identity/usergroup.TestCreateGroupStoresTheRowAndRefusesADuplicateName` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/UpdateUserGroup` | Update user group | done — full replace of the two fields; a name another group holds is refused and the other group stays intact; an unknown identifier is `not_found` | `modules/identity/usergroup.TestUpdateGroupReplacesTheFieldsAndRefusesADuplicate` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/DeleteUserGroup` | Delete user group | done — the membership rows die with the group by the foreign keys' cascade, the accounts are untouched; the record of the deletion names the member count it took away, the one fact a later reader cannot reconstruct | `modules/identity/usergroup.TestDeleteGroupRemovesTheMemberships` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/SetUserGroupMembers` | Update users in a group | done — the replace, not a delta: an empty list empties the group; every identifier must name an account, and a member that does not exist refuses the replacement whole, so the group keeps the set it held | `modules/identity/usergroup.TestSetMembersReplacesTheWholeSet` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/SetAllowedOidcClients` | Update allowed OIDC clients (group side) | done — admin; the group-side roll of the client restriction, the mirror of the client surface's `UpdateAllowedUserGroups`; the replace is whole, an unknown client refuses the replacement | `modules/identity/usergroup.TestSetAllowedOidcClientsReplacesTheRollAndRefusesAnUnknownClient` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/GetUserGroups` | Get user groups | done — the groups one account belongs to, ordered by display name; mirrors upstream `GET /api/users/{id}/groups` | `modules/identity/usergroup.TestGetUserGroupsAnswersTheAccountSMembership` |
+| POST | `/rpc/saka.identity.v1.UserGroupService/UpdateUserGroups` | Update user groups | done — the whole-set replace of one account's memberships; every named group must exist, an unknown one refuses the replacement | `modules/identity/usergroup.TestUpdateUserGroupsReplacesAndRefusesTheUnknown` |
 
 Audit events: `group_created`, `group_updated`, `group_deleted`,
 `group_members_updated`, and `group_allowed_clients_updated` — the
 membership change is its own event, because the log's one filter cannot see
-inside a payload. Upstream records nothing for groups; tango records every
+inside a payload. Upstream records nothing for groups; saka records every
 administrative write, the way it does for accounts. Not ported: the LDAP
-guards (tango has no LDAP) and the custom claims a group carries (the
+guards (saka has no LDAP) and the custom claims a group carries (the
 customclaim feature owns them).
 
 ## Users
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.identity.v1.SignupService/Signup` | Sign up | done — open mode creates the account without a token; invite mode requires a valid signup token; password and names required; created unverified or verified per `auth.verify_email_at_signup`; answers the canonical account view; the allowlist and the blocklist gate it (see the blocklist rows), and the block-email-subaddresses rule refuses an address whose base another account holds | `modules/identity/signup` (service tests) |
-| POST | `/rpc/tango.identity.v1.SignupService/GetSetupAvailability` | Check initial admin setup availability | excluded — the bootstrap travels the `tango initialize` CLI (release build), not an RPC procedure; a setup surface on the wire would be a public endpoint racing the operator for the first account | — |
-| POST | `/rpc/tango.identity.v1.SignupService/SetupInitialAdmin` | Sign up initial admin user | excluded — see `GetSetupAvailability` above | — |
-| POST | `/rpc/tango.identity.v1.SignupService/ListSignupTokens` | List signup tokens | done — admin Bearer; paginated; sorted by `created_at`, `expires_at`, `usage_count`, or `usage_limit` (absent: newest first); each token answers the groups its sign-ups join | `modules/identity/signup` (service tests) |
-| POST | `/rpc/tango.identity.v1.SignupService/CreateSignupToken` | Create signup token | done — admin Bearer; raw token shown once; optional `user_group_ids` links the groups every account signed up under the token joins, checked to exist at issue time | `modules/identity/signup.TestSignupJoinsTheGroupsTheTokenCarried` |
-| POST | `/rpc/tango.identity.v1.SignupService/DeleteSignupToken` | Delete signup token | done — admin Bearer | `modules/identity/signup` (service tests) |
-| POST | `/rpc/tango.identity.v1.BlocklistService/ListBlocklistEntries` | List blocklist entries | done — admin Bearer; paginated; sorted by `pattern` or `created_at` (absent: newest first); an entry is one email address or one `@domain` entry (`modules/identity/blocklist`) | `modules/identity/blocklist/service_test.go` |
-| POST | `/rpc/tango.identity.v1.BlocklistService/AddBlocklistEntry` | Add blocklist entry | done — admin Bearer; idempotent: a pattern the list already carries answers the stored row, and only a first insert writes the audit event; the grammar is the column's CHECK read twice (`ValidatePattern`), the length is the contract's `buf.validate` constraint; the record names the administrator who added it | `modules/identity/blocklist/service_test.go` |
-| POST | `/rpc/tango.identity.v1.BlocklistService/RemoveBlocklistEntry` | Remove blocklist entry | done — admin Bearer; an unknown identifier is `not_found`; the removal is recorded in the same transaction | `modules/identity/blocklist/service_test.go` |
-| POST | `/rpc/tango.identity.v1.UserService/ListUsers` | List users | done — admin Bearer; paginated; optional search over username/email/display_name; sorted by `username`, `email`, `first_name`, `last_name`, `display_name`, `created_at`, or `last_login_at` (absent: newest first); every account view carries its group memberships and its `metadata` document (the typed locale + timezone block) | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/GetUser` | Get user by ID | done — admin Bearer; the view carries the group memberships | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/CreateUser` | Create user | done — admin Bearer; mandatory names; optional password (absent = no credential); optional `user_group_ids` joins the groups at creation — an unknown id rolls the whole creation back, and the answer carries the memberships | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/UpdateUser` | Update user | done — admin Bearer; full replace; mandatory names; ban fields as a unit; `timezone` reset to `UTC` when empty and refused when it names no zone the tz database carries | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/DeleteUser` | Delete user | done — admin Bearer; refuses the signed-in account | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/UpdateCurrentUser` | Update current user | done — guard `Authenticated`; full replace of the signed-in account's own profile fields — the names, the locale, and the timezone (IANA, validated with `time.LoadLocation`, empty resets to `UTC`) | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/GetCurrentUser` | Get current user | done — guard `Authenticated`; the signed-in account's view | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/DeleteMyAccount` | Delete own account | done — guard `Authenticated`; refused `not_found`-shaped while `users.self_delete_enabled` is off or the account's `self_delete_override` refuses (NULL defers to the global toggle); an impersonated caller is refused at the handler — a delegation may not end the account it wears; the real delete archives the row through the soft-delete trigger, and the audit names the account in `resource_type`/`resource_id` | `modules/identity/user` (service tests, `deleted_records` capture) |
-| POST | `/rpc/tango.identity.v1.UserService/AddPassword` | Add the first password credential | done — guard `Session` + step-up (`X-Tango-Reauthentication`; the email-code factor rides `Reauthenticate`'s oneof); refused `failed_precondition` when a password already stands (the change flow is a different procedure) and for an impersonated caller; the write runs the account policy — min length, the char rules, the breach corpus (fail-open) — and records `password_added` in the hash's transaction; the strength floor is the frontend's (`password.min_strength` stays unenforced, `TODO(strength)`) | `modules/identity/password.TestAddPasswordSetsTheFirstCredential` |
-| POST | `/rpc/tango.identity.v1.UserService/BanUser` | Ban a user | done — admin Bearer; the ban rides an `account_restrictions` row (kind `ban`), re-banning replaces the reason and expiry and keeps the start; audit `user_banned`; the ban ends the account's live sessions in the same transaction | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/UnbanUser` | Unban a user | done — admin Bearer; lifts the open ban rows; audit `user_unbanned` | `modules/identity/user` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/UnlockUser` | Lift an account's lockout (admin) | done — guard `Admin`; lifts the open lockout rows and zeroes the failed-attempt streak; audit `user_unlocked`; the scaffolds' phases are done | `modules/identity/restrictions` (service tests) |
-| POST | `/rpc/tango.identity.v1.UserService/RemovePassword` | Remove the password credential | done — guard `Session` + step-up; refused `failed_precondition` when the account holds no password or keeps no other live credential (the chained check reads the passkey roll and the SSO bindings); the hash row is deleted and `password_removed` is recorded in its transaction; the removal notice rides the queue behind `mailer.notifications.password_removed_notice_enabled`; sessions stay valid — the removal does not end them | `modules/identity/password` (remove-password tests) |
+| POST | `/rpc/saka.identity.v1.SignupService/Signup` | Sign up | done — open mode creates the account without a token; invite mode requires a valid signup token; password and names required; created unverified or verified per `auth.verify_email_at_signup`; answers the canonical account view; the allowlist and the blocklist gate it (see the blocklist rows), and the block-email-subaddresses rule refuses an address whose base another account holds | `modules/identity/signup` (service tests) |
+| POST | `/rpc/saka.identity.v1.SignupService/GetSetupAvailability` | Check initial admin setup availability | excluded — the bootstrap travels the `saka initialize` CLI (release build), not an RPC procedure; a setup surface on the wire would be a public endpoint racing the operator for the first account | — |
+| POST | `/rpc/saka.identity.v1.SignupService/SetupInitialAdmin` | Sign up initial admin user | excluded — see `GetSetupAvailability` above | — |
+| POST | `/rpc/saka.identity.v1.SignupService/ListSignupTokens` | List signup tokens | done — admin Bearer; paginated; sorted by `created_at`, `expires_at`, `usage_count`, or `usage_limit` (absent: newest first); each token answers the groups its sign-ups join | `modules/identity/signup` (service tests) |
+| POST | `/rpc/saka.identity.v1.SignupService/CreateSignupToken` | Create signup token | done — admin Bearer; raw token shown once; optional `user_group_ids` links the groups every account signed up under the token joins, checked to exist at issue time | `modules/identity/signup.TestSignupJoinsTheGroupsTheTokenCarried` |
+| POST | `/rpc/saka.identity.v1.SignupService/DeleteSignupToken` | Delete signup token | done — admin Bearer | `modules/identity/signup` (service tests) |
+| POST | `/rpc/saka.identity.v1.BlocklistService/ListBlocklistEntries` | List blocklist entries | done — admin Bearer; paginated; sorted by `pattern` or `created_at` (absent: newest first); an entry is one email address or one `@domain` entry (`modules/identity/blocklist`) | `modules/identity/blocklist/service_test.go` |
+| POST | `/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry` | Add blocklist entry | done — admin Bearer; idempotent: a pattern the list already carries answers the stored row, and only a first insert writes the audit event; the grammar is the column's CHECK read twice (`ValidatePattern`), the length is the contract's `buf.validate` constraint; the record names the administrator who added it | `modules/identity/blocklist/service_test.go` |
+| POST | `/rpc/saka.identity.v1.BlocklistService/RemoveBlocklistEntry` | Remove blocklist entry | done — admin Bearer; an unknown identifier is `not_found`; the removal is recorded in the same transaction | `modules/identity/blocklist/service_test.go` |
+| POST | `/rpc/saka.identity.v1.UserService/ListUsers` | List users | done — admin Bearer; paginated; optional search over username/email/display_name; sorted by `username`, `email`, `first_name`, `last_name`, `display_name`, `created_at`, or `last_login_at` (absent: newest first); every account view carries its group memberships and its `metadata` document (the typed locale + timezone block) | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/GetUser` | Get user by ID | done — admin Bearer; the view carries the group memberships | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/CreateUser` | Create user | done — admin Bearer; mandatory names; optional password (absent = no credential); optional `user_group_ids` joins the groups at creation — an unknown id rolls the whole creation back, and the answer carries the memberships | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/UpdateUser` | Update user | done — admin Bearer; full replace; mandatory names; ban fields as a unit; `timezone` reset to `UTC` when empty and refused when it names no zone the tz database carries | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/DeleteUser` | Delete user | done — admin Bearer; refuses the signed-in account | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/UpdateCurrentUser` | Update current user | done — guard `Authenticated`; full replace of the signed-in account's own profile fields — the names, the locale, and the timezone (IANA, validated with `time.LoadLocation`, empty resets to `UTC`) | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/GetCurrentUser` | Get current user | done — guard `Authenticated`; the signed-in account's view | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/DeleteMyAccount` | Delete own account | done — guard `Authenticated`; refused `not_found`-shaped while `users.self_delete_enabled` is off or the account's `self_delete_override` refuses (NULL defers to the global toggle); an impersonated caller is refused at the handler — a delegation may not end the account it wears; the real delete archives the row through the soft-delete trigger, and the audit names the account in `resource_type`/`resource_id` | `modules/identity/user` (service tests, `deleted_records` capture) |
+| POST | `/rpc/saka.identity.v1.UserService/AddPassword` | Add the first password credential | done — guard `Session` + step-up (`X-Saka-Reauthentication`; the email-code factor rides `Reauthenticate`'s oneof); refused `failed_precondition` when a password already stands (the change flow is a different procedure) and for an impersonated caller; the write runs the account policy — min length, the char rules, the breach corpus (fail-open) — and records `password_added` in the hash's transaction; the strength floor is the frontend's (`password.min_strength` stays unenforced, `TODO(strength)`) | `modules/identity/password.TestAddPasswordSetsTheFirstCredential` |
+| POST | `/rpc/saka.identity.v1.UserService/BanUser` | Ban a user | done — admin Bearer; the ban rides an `account_restrictions` row (kind `ban`), re-banning replaces the reason and expiry and keeps the start; audit `user_banned`; the ban ends the account's live sessions in the same transaction | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/UnbanUser` | Unban a user | done — admin Bearer; lifts the open ban rows; audit `user_unbanned` | `modules/identity/user` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/UnlockUser` | Lift an account's lockout (admin) | done — guard `Admin`; lifts the open lockout rows and zeroes the failed-attempt streak; audit `user_unlocked`; the scaffolds' phases are done | `modules/identity/restrictions` (service tests) |
+| POST | `/rpc/saka.identity.v1.UserService/RemovePassword` | Remove the password credential | done — guard `Session` + step-up; refused `failed_precondition` when the account holds no password or keeps no other live credential (the chained check reads the passkey roll and the SSO bindings); the hash row is deleted and `password_removed` is recorded in its transaction; the removal notice rides the queue behind `mailer.notifications.password_removed_notice_enabled`; sessions stay valid — the removal does not end them | `modules/identity/password` (remove-password tests) |
 | PUT | `/api/users/{id}/profile-picture` | Update user profile picture | done — REST raw-body upload; self-service Bearer (guard `Self("id")` on the path param); magic-byte sniff (PNG/JPEG/WebP), max 2 MiB; stored at `avatars/<id>.<ext>` with the extension the sniffed bytes earn, so a kind change moves the key and deletes the replaced picture first; staged then synced in-request | `modules/identity/user` (service + handler tests), `internal/guard` (rule) |
-| POST | `/rpc/tango.identity.v1.UserService/ResetProfilePicture` | Reset user profile picture | done — self-service Bearer (guard `Self("id")`); deletes the stored file and clears the row | `modules/identity/user` (service tests), `internal/guard` (rule), `internal/transport` (guard) |
-| POST | `/rpc/tango.authn.v1.SessionService/ImpersonateUser` | Impersonate a user (admin) | done — guard `Admin`; opens a **new** session on the target account with the delegation recorded (`sessions.impersonated_by`, the access token's `ActorID`); refuses another administrator, the caller themselves, and an unknown account; audit `impersonation_started`; a delegated caller is refused on self-service procedures by the guard | `modules/identity/session.TestImpersonateUserOpensADelegatedSession`, `modules/identity/session.TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown`, `internal/transport.TestTheGuardRefusesAnImpersonatedCallerOnASelfProcedure` |
-| POST | `/rpc/tango.authn.v1.SessionService/StopImpersonating` | Stop impersonating | done — guard `Authenticated` (callable while the delegation is active); ends the delegated session and reissues the actor's own token pair; audit `impersonation_stopped` | `modules/identity/session.TestStopImpersonatingEndsTheDelegationAndReissuesTheActor`, `modules/identity/session.TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — public; anti-enumeration: an unknown address answers the same success and a real device token; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — admin; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off; the code travels by email alone | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/CreateToken` | Create one-time access token for user (admin) | done — admin; the six-character code is the short window’s form; only the hash is stored, so the response is the last the code exists | `modules/identity/onetimeaccess.TestCreateTokenIssuesACodeTheExchangeAccepts` |
-| POST | `/rpc/tango.authn.v1.OneTimeAccessService/ExchangeToken` | Exchange one-time access token | done — public; the code’s spend, the session, and the audit record commit in one transaction, so a rollback returns the code; a device token the email request paired with the code must come back exact | `modules/identity/onetimeaccess.TestExchangeRefusesADeviceTokenThatDoesNotMatch`, `internal/transport.TestTheOneTimeAccessLoopEndsInASession` |
-| POST | `/rpc/tango.identity.v1.EmailVerificationService/SendEmail` | Send email verification | done — self-service Bearer; refuses verified; resend cooldown on last_sent_at; token row upserted, email via the durable queue | `modules/identity/verification` (service tests, Mailpit end-to-end) |
-| POST | `/rpc/tango.identity.v1.EmailVerificationService/VerifyEmail` | Verify email | done — public; token is the credential; consumed on success | `modules/identity/verification` (service tests) |
-| POST | `/rpc/tango.identity.v1.EmailVerificationService/RequestEmailChange` | Request email change | done — self-service Bearer; the token row binds the pending address (`auth_tokens.payload`); refused `already_exists` when another account holds the address and `failed_precondition` when it is the current one; resend cooldown; confirm-code email to the NEW address is transactional, the pending notice to the OLD address is gated by `mailer.notifications.email_change_notice_enabled` | `modules/identity/verification/email_change_test.go` |
-| POST | `/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange` | Confirm email change | done — public; token is the credential; the move, the verified stamp, and the token delete commit in one transaction; uniqueness re-judged inside it, so a lost race leaves the token unconsumed; success notice to the new address is gated | `modules/identity/verification/email_change_test.go` |
+| POST | `/rpc/saka.identity.v1.UserService/ResetProfilePicture` | Reset user profile picture | done — self-service Bearer (guard `Self("id")`); deletes the stored file and clears the row | `modules/identity/user` (service tests), `internal/guard` (rule), `internal/transport` (guard) |
+| POST | `/rpc/saka.authn.v1.SessionService/ImpersonateUser` | Impersonate a user (admin) | done — guard `Admin`; opens a **new** session on the target account with the delegation recorded (`sessions.impersonated_by`, the access token's `ActorID`); refuses another administrator, the caller themselves, and an unknown account; audit `impersonation_started`; a delegated caller is refused on self-service procedures by the guard | `modules/identity/session.TestImpersonateUserOpensADelegatedSession`, `modules/identity/session.TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown`, `internal/transport.TestTheGuardRefusesAnImpersonatedCallerOnASelfProcedure` |
+| POST | `/rpc/saka.authn.v1.SessionService/StopImpersonating` | Stop impersonating | done — guard `Authenticated` (callable while the delegation is active); ends the delegated session and reissues the actor's own token pair; audit `impersonation_stopped` | `modules/identity/session.TestStopImpersonatingEndsTheDelegationAndReissuesTheActor`, `modules/identity/session.TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail` | Request one-time access email | done — public; anti-enumeration: an unknown address answers the same success and a real device token; refused with `permission_denied` while `auth.one_time_access_email_as_unauthenticated_enabled` is off | `modules/identity/onetimeaccess.TestRequestEmailAnswersTheSameForAnUnknownAddress` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin` | Request one-time access email (admin) | done — admin; refused with `permission_denied` while `auth.one_time_access_email_as_admin_enabled` is off; the code travels by email alone | `modules/identity/onetimeaccess.TestRequestEmailAsAdminSendsWithoutExposingTheCode` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/CreateToken` | Create one-time access token for user (admin) | done — admin; the six-character code is the short window’s form; only the hash is stored, so the response is the last the code exists | `modules/identity/onetimeaccess.TestCreateTokenIssuesACodeTheExchangeAccepts` |
+| POST | `/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken` | Exchange one-time access token | done — public; the code’s spend, the session, and the audit record commit in one transaction, so a rollback returns the code; a device token the email request paired with the code must come back exact | `modules/identity/onetimeaccess.TestExchangeRefusesADeviceTokenThatDoesNotMatch`, `internal/transport.TestTheOneTimeAccessLoopEndsInASession` |
+| POST | `/rpc/saka.identity.v1.EmailVerificationService/SendEmail` | Send email verification | done — self-service Bearer; refuses verified; resend cooldown on last_sent_at; token row upserted, email via the durable queue | `modules/identity/verification` (service tests, Mailpit end-to-end) |
+| POST | `/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail` | Verify email | done — public; token is the credential; consumed on success | `modules/identity/verification` (service tests) |
+| POST | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange` | Request email change | done — self-service Bearer; the token row binds the pending address (`auth_tokens.payload`); refused `already_exists` when another account holds the address and `failed_precondition` when it is the current one; resend cooldown; confirm-code email to the NEW address is transactional, the pending notice to the OLD address is gated by `mailer.notifications.email_change_notice_enabled` | `modules/identity/verification/email_change_test.go` |
+| POST | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange` | Confirm email change | done — public; token is the credential; the move, the verified stamp, and the token delete commit in one transaction; uniqueness re-judged inside it, so a lost race leaves the token unconsumed; success notice to the new address is gated | `modules/identity/verification/email_change_test.go` |
 | GET | `/api/users/{id}/profile-picture.png` | Get user profile picture | done — REST; public; streams the stored bytes, an account without one answers the bundled default by redirect to `/images/default-avatar.png` | `modules/identity/user` (handler test) |
 | GET | `/api/uploads/{key}` | Get upload progress | done — REST; guard `Authenticated`; the manifest's own state (`key`, `status` `pending`\|`ready`\|`failed`, byte `size`) — the engine stages whole files, so there is no per-chunk distance; a key nothing stored answers not_found; the finished transition also rides the `AfterSyncHook` into an `upload_finished_notice` addressed to the staging metadata's `owner` | `internal/transport.TestUploadProgressAnswersTheManifestState`, `internal/transport.TestUploadProgressRefusesAnUnauthenticatedCaller`, `internal/jobs.TestUploadFinishedProcessorTellsTheOwner` |
 
@@ -804,18 +804,18 @@ administrative roll doors ride the permission catalog.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/BeginRegistration` | Begin passkey registration | done — guard `Session`; answers the creation options JSON and the ceremony handle (`wcs_…`, one minute); the unverified enrollment row is the ceremony state | `modules/identity/webauthn` (service tests, soft authenticator) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/VerifyRegistration` | Verify passkey registration | done — guard `Session`; verifies the attestation against the stored challenge, records the counter and backup flags; the limits are judged here, an empty name falls back to the AAGUID's model name; a failed verification costs the ceremony | `modules/identity/webauthn.TestEnrollmentEndsInACredential`, `TestEnrollmentBeyondTheCredentialLimitIsRefused`, `TestEnrollmentRefusesASyncedPasskeyWhenTheToggleIsOff` |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/BeginLogin` | Begin passkey sign-in | done — public; empty `allowCredentials`, the discoverable sign-in: the account resolves from the credential the browser presents | `modules/identity/webauthn` (service tests) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/VerifyLogin` | Verify passkey sign-in | done — public; the assertion with user verification is full authentication: the session issues in one step, no bridge, even on an MFA-enabled account; a rewound counter answers `failed_precondition` (the clone refusal, silent by design) | `modules/identity/webauthn.TestSignInEndsInAWholeSession`, `TestAClonedCredentialIsRefused` |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/ListCredentials` | List passkeys | done — guard `Session`; the caller's roll, oldest first, no key material | `modules/identity/webauthn` (service tests) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/UpdateCredential` | Rename passkey | done — guard `Session`; another account's credential answers not-found, the same refusal an unknown id earns | `modules/identity/webauthn` (service tests) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/DeleteCredential` | Delete passkey | done — guard `Session` + step-up (`X-Tango-Reauthentication`); deleting the last credential is allowed while the password row exists | `modules/identity/webauthn` (service tests) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/Reauthenticate` | Reauthenticate (step-up proof) | done — guard `Session`; proves the caller by password, passkey assertion, or the email code `SendReauthenticationCode` sent, and answers a single-use token (the `session.reverification_window`, hashed at rest); the guarded call spends it through the `X-Tango-Reauthentication` header; the audit record names the factor used | `modules/identity/webauthn.TestAStepUpProofSpendsOnce`, `TestTheEmailCodeProofMintsTheToken`, `internal/transport` (interceptor consumption) |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/SendReauthenticationCode` | Send the email-code reverification factor | done — guard `Session`; delivers a single-use twelve-character code to the caller's own address (hashed at rest, one live row, resend replaces after the one-minute cooldown); unavailable when the deployment has no mailer or queue | `modules/identity/webauthn.TestAResendReplacesTheLiveCode`, `TestAnUnwiredDeliveryAnswersUnavailable` |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials` | List user passkeys (admin) | done — guard `Admin`; the roll over a named account — Pocket ID's mirror `GET /api/users/{id}/webauthn-credentials` | `modules/identity/webauthn.TestAdminSeesAnotherAccountsRoll` |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminUpdateCredential` | Rename user passkey (admin) | done — guard `Admin`; the holder's rules over any account; audit `webauthn_credential_admin_renamed` | `modules/identity/webauthn.TestAdminRenamesAnotherAccountsPasskey` |
-| POST | `/rpc/tango.authn.v1.WebAuthnService/AdminDeleteCredential` | Delete user passkey (admin) | done — guard `Admin`; the stranding refusal holds here too — Pocket ID's mirror `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; audit `webauthn_credential_admin_removed` | `modules/identity/webauthn.TestAdminDeleteRefusesTheLastWayIn` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration` | Begin passkey registration | done — guard `Session`; answers the creation options JSON and the ceremony handle (`wcs_…`, one minute); the unverified enrollment row is the ceremony state | `modules/identity/webauthn` (service tests, soft authenticator) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration` | Verify passkey registration | done — guard `Session`; verifies the attestation against the stored challenge, records the counter and backup flags; the limits are judged here, an empty name falls back to the AAGUID's model name; a failed verification costs the ceremony | `modules/identity/webauthn.TestEnrollmentEndsInACredential`, `TestEnrollmentBeyondTheCredentialLimitIsRefused`, `TestEnrollmentRefusesASyncedPasskeyWhenTheToggleIsOff` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/BeginLogin` | Begin passkey sign-in | done — public; empty `allowCredentials`, the discoverable sign-in: the account resolves from the credential the browser presents | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/VerifyLogin` | Verify passkey sign-in | done — public; the assertion with user verification is full authentication: the session issues in one step, no bridge, even on an MFA-enabled account; a rewound counter answers `failed_precondition` (the clone refusal, silent by design) | `modules/identity/webauthn.TestSignInEndsInAWholeSession`, `TestAClonedCredentialIsRefused` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/ListCredentials` | List passkeys | done — guard `Session`; the caller's roll, oldest first, no key material | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/UpdateCredential` | Rename passkey | done — guard `Session`; another account's credential answers not-found, the same refusal an unknown id earns | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/DeleteCredential` | Delete passkey | done — guard `Session` + step-up (`X-Saka-Reauthentication`); deleting the last credential is allowed while the password row exists | `modules/identity/webauthn` (service tests) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/Reauthenticate` | Reauthenticate (step-up proof) | done — guard `Session`; proves the caller by password, passkey assertion, or the email code `SendReauthenticationCode` sent, and answers a single-use token (the `session.reverification_window`, hashed at rest); the guarded call spends it through the `X-Saka-Reauthentication` header; the audit record names the factor used | `modules/identity/webauthn.TestAStepUpProofSpendsOnce`, `TestTheEmailCodeProofMintsTheToken`, `internal/transport` (interceptor consumption) |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode` | Send the email-code reverification factor | done — guard `Session`; delivers a single-use twelve-character code to the caller's own address (hashed at rest, one live row, resend replaces after the one-minute cooldown); unavailable when the deployment has no mailer or queue | `modules/identity/webauthn.TestAResendReplacesTheLiveCode`, `TestAnUnwiredDeliveryAnswersUnavailable` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials` | List user passkeys (admin) | done — guard `Admin`; the roll over a named account — Pocket ID's mirror `GET /api/users/{id}/webauthn-credentials` | `modules/identity/webauthn.TestAdminSeesAnotherAccountsRoll` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminUpdateCredential` | Rename user passkey (admin) | done — guard `Admin`; the holder's rules over any account; audit `webauthn_credential_admin_renamed` | `modules/identity/webauthn.TestAdminRenamesAnotherAccountsPasskey` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential` | Delete user passkey (admin) | done — guard `Admin`; the stranding refusal holds here too — Pocket ID's mirror `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; audit `webauthn_credential_admin_removed` | `modules/identity/webauthn.TestAdminDeleteRefusesTheLastWayIn` |
 
 Expired ceremony rows and the spent proof tokens are swept hourly by the `webauthn_cleanup` job
 (`internal/jobs`). The AAGUID catalog ships embedded (`aaguid.json`, names only) and names an
@@ -827,8 +827,8 @@ build's simulation pages at `/debug/passkey/*` (Utilities below).
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.system.v1.VersionService/Current` | Get current deployed version | planned — no proto yet; `system.proto` carries the health, configuration, queue, and scheduler services | — |
-| POST | `/rpc/tango.system.v1.VersionService/Latest` | Get latest available version | planned — anonymous; falls back to the deployed build when the feed never answered | — |
+| POST | `/rpc/saka.system.v1.VersionService/Current` | Get current deployed version | planned — no proto yet; `system.proto` carries the health, configuration, queue, and scheduler services | — |
+| POST | `/rpc/saka.system.v1.VersionService/Latest` | Get latest available version | planned — anonymous; falls back to the deployed build when the feed never answered | — |
 
 ## Utilities
 
@@ -853,15 +853,15 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.notification.v1.NotificationService/CreateNotification` | [Tango] Create notification | done — Admin; publishes to `global`/`users`/`user_groups` audience, validates the named accounts and groups exist, refuses a system notice with a topic or a global audience; email pass gated by `mailer.notifications.announcement_email_enabled` | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/GetNotification` | [Tango] Get notification | done — Admin; full view with the audience junctions named | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/ListAllNotifications` | [Tango] List all notifications | done — Admin; page + `sort_by`/`sort_order` + `category` filter; cancelled stay listed | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/CancelNotification` | [Tango] Cancel notification | done — Admin; stamps `cancelled_at`, idempotent, the row survives | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/ListNotifications` | [Tango] List notifications | done — Authenticated; the caller's inbox resolved through the shared visibility predicate, `read_at` per row, `unread_only`/`category` filters, `sort_by`/`sort_order` | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/MarkNotificationRead` | [Tango] Mark notification read | done — Authenticated; receipt written once, `not_found` for what the caller is not targeted by | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead` | [Tango] Mark all notifications read | done — Authenticated; one INSERT..SELECT over the visibility predicate, answers how many it marked | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/UnreadCount` | [Tango] Unread count | done — Authenticated; the bell-badge number | `modules/notification` |
-| POST | `/rpc/tango.notification.v1.NotificationService/WatchNotifications` | [Tango] Watch notifications (stream) | done — Authenticated; server-streaming, in-process broker, ping keepalive (immediate + 25s), no history — catch-up via List; deadline exemption via `middleware.UnboundedFor` | `modules/notification` + `internal/transport/router_rpc.go` |
+| POST | `/rpc/saka.notification.v1.NotificationService/CreateNotification` | [Saka] Create notification | done — Admin; publishes to `global`/`users`/`user_groups` audience, validates the named accounts and groups exist, refuses a system notice with a topic or a global audience; email pass gated by `mailer.notifications.announcement_email_enabled` | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/GetNotification` | [Saka] Get notification | done — Admin; full view with the audience junctions named | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/ListAllNotifications` | [Saka] List all notifications | done — Admin; page + `sort_by`/`sort_order` + `category` filter; cancelled stay listed | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/CancelNotification` | [Saka] Cancel notification | done — Admin; stamps `cancelled_at`, idempotent, the row survives | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/ListNotifications` | [Saka] List notifications | done — Authenticated; the caller's inbox resolved through the shared visibility predicate, `read_at` per row, `unread_only`/`category` filters, `sort_by`/`sort_order` | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/MarkNotificationRead` | [Saka] Mark notification read | done — Authenticated; receipt written once, `not_found` for what the caller is not targeted by | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/MarkAllNotificationsRead` | [Saka] Mark all notifications read | done — Authenticated; one INSERT..SELECT over the visibility predicate, answers how many it marked | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/UnreadCount` | [Saka] Unread count | done — Authenticated; the bell-badge number | `modules/notification` |
+| POST | `/rpc/saka.notification.v1.NotificationService/WatchNotifications` | [Saka] Watch notifications (stream) | done — Authenticated; server-streaming, in-process broker, ping keepalive (immediate + 25s), no history — catch-up via List; deadline exemption via `middleware.UnboundedFor` | `modules/notification` + `internal/transport/router_rpc.go` |
 
 Identifiers are TypeIDs on the wire, the columns stay UUIDs: a notification is `ntf_…` (`modules/notification.IDFromUUID`/`UUIDFromWire`), the audience accounts and groups arrive and leave as `usr_…`/`ugrp_…`, and `created_by` renders in the account's wire form.
 
@@ -869,16 +869,16 @@ Identifiers are TypeIDs on the wire, the columns stay UUIDs: a notification is `
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListPermissions` | [Tango] List permissions | done — Admin; the code-declared catalog read-only (`perm_…` id, slug, description; search, resource filter, sort by slug/description); cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` + `internal/authz` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListRoles` | [Tango] List roles | done — Admin; page + `search` + `sort_by`/`sort_order` (name, slug, created_at) + `type` filter (system/custom), `permission_count` per row; cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/GetRole` | [Tango] Get role | done — Admin; the row plus the permission slugs it carries; cached by id, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/CreateRole` | [Tango] Create role | done — Admin; unique name and slug, born with no permissions | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/UpdateRole` | [Tango] Update role | done — Admin; name + description only; slug and type immutable; a system role refuses | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/DeleteRole` | [Tango] Delete role | done — Admin; custom roles only, refused while accounts hold it | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/SetRolePermissions` | [Tango] Set role permissions | done — Admin; replaces the set; every slug must be cataloged; a system role refuses | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListUserRoles` | [Tango] List user roles | done — Admin; the account's active roles | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/SetUserRoles` | [Tango] Set user roles | done — Admin; replaces the set; leaving grants are revoked (stamped, not deleted) | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/ListUserPermissions` | [Tango] List user permissions | done — Admin; the account's direct grants, outside any role | `modules/identity/authorization` |
-| POST | `/rpc/tango.authz.v1.AuthorizationService/SetUserPermissions` | [Tango] Set user permissions | done — Admin; replaces the direct grants; every slug must be cataloged | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/ListPermissions` | [Saka] List permissions | done — Admin; the code-declared catalog read-only (`perm_…` id, slug, description; search, resource filter, sort by slug/description); cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` + `internal/authz` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/ListRoles` | [Saka] List roles | done — Admin; page + `search` + `sort_by`/`sort_order` (name, slug, created_at) + `type` filter (system/custom), `permission_count` per row; cached under the query's fingerprint, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/GetRole` | [Saka] Get role | done — Admin; the row plus the permission slugs it carries; cached by id, a role write drops the family, `nocache` reads the source | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/CreateRole` | [Saka] Create role | done — Admin; unique name and slug, born with no permissions | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/UpdateRole` | [Saka] Update role | done — Admin; name + description only; slug and type immutable; a system role refuses | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/DeleteRole` | [Saka] Delete role | done — Admin; custom roles only, refused while accounts hold it | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/SetRolePermissions` | [Saka] Set role permissions | done — Admin; replaces the set; every slug must be cataloged; a system role refuses | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/ListUserRoles` | [Saka] List user roles | done — Admin; the account's active roles | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/SetUserRoles` | [Saka] Set user roles | done — Admin; replaces the set; leaving grants are revoked (stamped, not deleted) | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/ListUserPermissions` | [Saka] List user permissions | done — Admin; the account's direct grants, outside any role | `modules/identity/authorization` |
+| POST | `/rpc/saka.authz.v1.AuthorizationService/SetUserPermissions` | [Saka] Set user permissions | done — Admin; replaces the direct grants; every slug must be cataloged | `modules/identity/authorization` |
 
-Permissions are identified by slug everywhere (the catalog is code: `internal/authz`, `resource:id:action`, `*` in the instance position only); the catalog rows also carry a `perm_…` TypeID, which names the entry on the wire but never replaces the slug as the grant handle. Roles are `role_…` TypeIDs, accounts `usr_…`. The grants an access token carries are a snapshot taken at mint time — a change here lands at the next sign-in or refresh. `users.is_admin` is gone: an administrator is an account the `administrator` system role holds, and `tango initialize` bootstraps one on a fresh database (the system seed plus the first administrator, refused against a database that already holds an account); `tango admin:reset-password` recovers an administrator's access.
+Permissions are identified by slug everywhere (the catalog is code: `internal/authz`, `resource:id:action`, `*` in the instance position only); the catalog rows also carry a `perm_…` TypeID, which names the entry on the wire but never replaces the slug as the grant handle. Roles are `role_…` TypeIDs, accounts `usr_…`. The grants an access token carries are a snapshot taken at mint time — a change here lands at the next sign-in or refresh. `users.is_admin` is gone: an administrator is an account the `administrator` system role holds, and `saka initialize` bootstraps one on a fresh database (the system seed plus the first administrator, refused against a database that already holds an account); `saka admin:reset-password` recovers an administrator's access.

@@ -5,7 +5,7 @@ package main
 
 // issueOneTimeCode issues a code for one account and answers it.
 func issueOneTimeCode(client *rpcClient, adminToken, userWire string) string {
-	issued := client.mustRPC("tango.authn.v1.OneTimeAccessService/CreateToken", map[string]any{
+	issued := client.mustRPC("saka.authn.v1.OneTimeAccessService/CreateToken", map[string]any{
 		"id": userWire,
 	}, adminToken)
 	code := str(issued, "token")
@@ -17,7 +17,7 @@ func issueOneTimeCode(client *rpcClient, adminToken, userWire string) string {
 
 // settingsUpdate writes one setting through the admin surface.
 func settingsUpdate(client *rpcClient, adminToken, key, value string) {
-	client.mustRPC("tango.settings.v1.SettingsService/Update", map[string]any{
+	client.mustRPC("saka.settings.v1.SettingsService/Update", map[string]any{
 		"key":   key,
 		"value": value,
 	}, adminToken)

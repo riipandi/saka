@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Replaces the group's OIDC client allowlist — the group-side roll of which clients the group's members may be signed into, the mirror of the client surface's Update allowed user groups. The replace is whole: an empty list empties the roll, and one identifier that names no client refuses the replacement whole.
 
-  Tango procedure tango.identity.v1.UserGroupService/SetAllowedOidcClients. Guard: admin.
+  Saka procedure saka.identity.v1.UserGroupService/SetAllowedOidcClients. Guard: admin.
 
   Parameters:
   - id (body, required): the group, in its wire form (ugrp_...)
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update allowed OIDC clients (group side)'
 sortPriority: 5277.777777777778
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/SetAllowedOidcClients
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/SetAllowedOidcClients
 urlParameters: []
 settingSendCookies:
   enabled: false

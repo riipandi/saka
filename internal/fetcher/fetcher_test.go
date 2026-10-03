@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 func TestShutdownSatisfiesTheContainer(t *testing.T) {
@@ -374,7 +374,7 @@ func TestRedactStripsCredentials(t *testing.T) {
 
 func TestValidationRejectsARetryStorm(t *testing.T) {
 	cfg := config.Default()
-	cfg.Database.URL = "postgres://tango@localhost:5432/tango?sslmode=disable"
+	cfg.Database.URL = "postgres://saka@localhost:5432/saka?sslmode=disable"
 	cfg.Auth.SecretKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	cfg.Fetcher.RetryCount = 100
 	err := cfg.Validate()

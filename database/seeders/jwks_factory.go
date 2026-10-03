@@ -6,9 +6,9 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // JWKSKeyPairSeederName is the name this seeder reports under.

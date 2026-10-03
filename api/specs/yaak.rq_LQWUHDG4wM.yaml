@@ -28,9 +28,9 @@ headers:
   value: Bearer {{[ accessToken ]}}
   id: null
 method: POST
-name: '[Tango] Remove blocklist entry'
+name: '[Saka] Remove blocklist entry'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.BlocklistService/RemoveBlocklistEntry
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.BlocklistService/RemoveBlocklistEntry
 urlParameters: []
 settingSendCookies:
   enabled: false

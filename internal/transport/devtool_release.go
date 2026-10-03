@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 func mountDevtool(r chi.Router, _ do.Injector) {

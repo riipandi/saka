@@ -1,6 +1,6 @@
 # Database
 
-Database is tango's schema layer: the goose migrations embedded in the binary — the single
+Database is saka's schema layer: the goose migrations embedded in the binary — the single
 source of schema truth — plus the engine that applies them and the dump/restore tooling built
 on top. The application never creates tables at runtime and never embeds DDL anywhere else.
 
@@ -105,7 +105,7 @@ leaves the target untouched. The dump header records the server version and the 
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. `cmd/` builds the migrator
+The package lives inside the `saka` module and is not published. `cmd/` builds the migrator
 from the single-connection handle and the `database` config section, and the task targets wrap
 the commands one to one (`db:migrate` → `migrate:up`, `db:rollback` → `migrate:down`,
 `db:validate` → `migrate:validate`) — a renamed command silently breaks a task, so the pair
@@ -165,7 +165,7 @@ task db:export -- --output backup.sql --compression gzip
 task db:import -- --input backup.sql.gz --truncate --force
 ```
 
-The default output is `storage/backup/tango-<YYYYMMDD_hhmm>.sql` (UTC); a generated name that
+The default output is `storage/backup/saka-<YYYYMMDD_hhmm>.sql` (UTC); a generated name that
 already exists is not replaced without `--overwrite`, so a second export in the same minute
 cannot lose the first dump. `--schema-only` / `--data-only` select halves (a data-only dump
 restores onto a schema `migrate:up` has provided; the two are mutually exclusive). The

@@ -14,7 +14,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // The catalog keys the policy reads. The catalog owns the names; these

@@ -27,7 +27,7 @@ bodyType: application/json
 description: |-
   Replace an account's fields. Every field is specified: the names are mandatory, and an absent locale clears its column. The ban fields are one unit — ban_expires present applies the ban, absent lifts it.
 
-  Ported from Pocket ID `PUT /api/users/{id}` as the `tango.identity.v1.UserService/UpdateUser` procedure.
+  Ported from Pocket ID `PUT /api/users/{id}` as the `saka.identity.v1.UserService/UpdateUser` procedure.
 
   Parameters:
   - id (body, required): User ID
@@ -51,7 +51,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update user'
 sortPriority: 14000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/UpdateUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UpdateUser
 urlParameters:
 - enabled: true
   name: id

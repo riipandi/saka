@@ -12,9 +12,9 @@ import (
 
 // meterName is the instrumentation scope every fetcher instrument is
 // registered under, rendered into otel_scope_name by the bridge.
-const meterName = "github.com/riipandi/tango/internal/fetcher"
+const meterName = "github.com/riipandi/saka/internal/fetcher"
 
-// The outcomes one call carries on tango.fetch.requests. They follow the
+// The outcomes one call carries on saka.fetch.requests. They follow the
 // error classes the caller matches, so a dashboard's outcome and a caller's
 // errors.Is are the same taxonomy.
 const (
@@ -43,23 +43,23 @@ func newFetchMetrics() *fetchMetrics {
 	meter := otel.Meter(meterName)
 	m := &fetchMetrics{}
 	var err error
-	if m.requests, err = meter.Int64Counter("tango.fetch.requests",
+	if m.requests, err = meter.Int64Counter("saka.fetch.requests",
 		metric.WithDescription("Outbound calls by host and outcome class"),
 		metric.WithUnit("{request}")); err != nil {
 		panic("fetcher: " + err.Error())
 	}
-	if m.duration, err = meter.Float64Histogram("tango.fetch.request.duration",
+	if m.duration, err = meter.Float64Histogram("saka.fetch.request.duration",
 		metric.WithDescription("Time one call spent, retries included"),
 		metric.WithUnit("s")); err != nil {
 		panic("fetcher: " + err.Error())
 	}
-	if m.attempts, err = meter.Int64Histogram("tango.fetch.request.attempts",
+	if m.attempts, err = meter.Int64Histogram("saka.fetch.request.attempts",
 		metric.WithDescription("Attempts one call consumed"),
 		metric.WithUnit("{attempt}"),
 		metric.WithExplicitBucketBoundaries(1, 2, 3, 4, 5, 10)); err != nil {
 		panic("fetcher: " + err.Error())
 	}
-	if m.breaker, err = meter.Int64Counter("tango.fetch.breaker.opens",
+	if m.breaker, err = meter.Int64Counter("saka.fetch.breaker.opens",
 		metric.WithDescription("Times a host's circuit breaker opened"),
 		metric.WithUnit("{circuit}")); err != nil {
 		panic("fetcher: " + err.Error())

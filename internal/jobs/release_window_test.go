@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/jobs"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/jobs"
 )
 
 // TestEveryJobFitsTheDefaultReleaseWindow is the invariant the queue depends

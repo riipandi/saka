@@ -12,8 +12,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // ctxKeyClient stores the client in a processor's context, so a task can

@@ -15,7 +15,7 @@ description: |-
   Endpoint: `GET,POST /oidc/device[/{callback}]`
 headers: []
 method: GET
-name: '[Tango] Verify device code'
+name: '[Saka] Verify device code'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/device
 urlParameters: []

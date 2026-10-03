@@ -8,7 +8,7 @@ folderId: null
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
-description: 'Tango-only password authentication: session, password, MFA, OAuth extension flows'
+description: 'Saka-only password authentication: session, password, MFA, OAuth extension flows'
 headers: []
 name: Authentication
 sortPriority: 15000.0

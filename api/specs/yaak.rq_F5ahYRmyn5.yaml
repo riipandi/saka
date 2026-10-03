@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  Answer the session the access token names and the account it belongs to — the "who am I" a client asks when it resumes. A session that has ended answers `unauthenticated`. Tango-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+  Answer the session the access token names and the account it belongs to — the "who am I" a client asks when it resumes. A session that has ended answers `unauthenticated`. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
 
   Parameters: none.
 headers:
@@ -25,9 +25,9 @@ headers:
   value: '1'
   id: DvQrw2wgND
 method: POST
-name: '[Tango] Get session'
+name: '[Saka] Get session'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/GetSession
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/GetSession
 urlParameters: []
 settingSendCookies:
   enabled: false

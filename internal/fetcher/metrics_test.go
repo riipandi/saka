@@ -56,32 +56,32 @@ func TestTheFetcherInstrumentsReachTheReader(t *testing.T) {
 	for _, scope := range rm.ScopeMetrics {
 		for _, sm := range scope.Metrics {
 			switch sm.Name {
-			case "tango.fetch.requests":
+			case "saka.fetch.requests":
 				data := sm.Data.(metricdata.Sum[int64])
 				if len(data.DataPoints) != 1 {
-					t.Fatalf("tango.fetch.requests: %d points, want 1", len(data.DataPoints))
+					t.Fatalf("saka.fetch.requests: %d points, want 1", len(data.DataPoints))
 				}
 				dp := data.DataPoints[0]
 				host, _ := dp.Attributes.Value("host")
 				outcome, _ := dp.Attributes.Value("outcome")
 				if host.String() != "api.example.com" || outcome.String() != outcomeTimeout {
-					t.Errorf("tango.fetch.requests labels = host=%v outcome=%v", host.String(), outcome.String())
+					t.Errorf("saka.fetch.requests labels = host=%v outcome=%v", host.String(), outcome.String())
 				}
-			case "tango.fetch.request.duration":
+			case "saka.fetch.request.duration":
 				data := sm.Data.(metricdata.Histogram[float64])
 				if len(data.DataPoints) != 1 || data.DataPoints[0].Count != 1 {
-					t.Errorf("tango.fetch.request.duration: %d points, want 1 with one sample",
+					t.Errorf("saka.fetch.request.duration: %d points, want 1 with one sample",
 						len(data.DataPoints))
 				}
-			case "tango.fetch.breaker.opens":
+			case "saka.fetch.breaker.opens":
 				data := sm.Data.(metricdata.Sum[int64])
 				if data.DataPoints[0].Value != 1 {
-					t.Errorf("tango.fetch.breaker.opens = %v, want 1", data.DataPoints[0].Value)
+					t.Errorf("saka.fetch.breaker.opens = %v, want 1", data.DataPoints[0].Value)
 				}
-			case "tango.fetch.request.attempts":
+			case "saka.fetch.request.attempts":
 				data := sm.Data.(metricdata.Histogram[int64])
 				if data.DataPoints[0].Count != 1 {
-					t.Error("tango.fetch.request.attempts: expected one sample")
+					t.Error("saka.fetch.request.attempts: expected one sample")
 				}
 			default:
 				t.Errorf("unexpected instrument %s", sm.Name)

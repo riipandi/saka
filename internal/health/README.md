@@ -132,7 +132,7 @@ task run -- health --short  # one word: healthy
 The text report is a flat list, one fact per line, so it greps and pipes:
 
 ```
-name: tango
+name: saka
 version: 0.0.0
 uptime: 3 hours
 status: healthy

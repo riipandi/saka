@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Scheduler surface — enqueues a job's task immediately without advancing its schedule. An unknown name answers not_found.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,9 +27,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Run a scheduled job now (scheduler)'
+name: '[Saka] Run a scheduled job now (scheduler)'
 sortPriority: 5456.79012345679
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.SchedulerService/RunNow
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.SchedulerService/RunNow
 urlParameters: []
 settingSendCookies:
   enabled: false

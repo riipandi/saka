@@ -8,12 +8,12 @@ import (
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // clientStore is the goidc.DCRManager over the oidc_clients rows — the
 // lookup every protocol flow resolves clients by. The registration
-// endpoint the same interface serves stays unmounted: tango registers
+// endpoint the same interface serves stays unmounted: saka registers
 // clients through the management surface, never dynamically.
 type clientStore struct {
 	pool    *datastore.Postgres

@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/jobs"
-	"github.com/riipandi/tango/modules/identity/blocklist"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/jobs"
+	"github.com/riipandi/saka/modules/identity/blocklist"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 func emailChangeService(t *testing.T, pool *datastore.Postgres, noticesEnabled bool) *Service {

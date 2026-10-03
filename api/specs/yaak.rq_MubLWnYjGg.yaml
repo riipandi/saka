@@ -28,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Unlink OAuth connection'
+name: '[Saka] Unlink OAuth connection'
 sortPriority: 920.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/UnlinkConnection
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection
 urlParameters: []
 settingSendCookies:
   enabled: false

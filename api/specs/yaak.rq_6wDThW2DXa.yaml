@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Create a group. The name is unique.
 
-  Ported from Pocket ID `POST /api/user-groups` as the `tango.identity.v1.UserGroupService/CreateUserGroup` procedure.
+  Ported from Pocket ID `POST /api/user-groups` as the `saka.identity.v1.UserGroupService/CreateUserGroup` procedure.
 
   Parameters:
   - name (body, required): 2-255 characters, unique
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create user group'
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/CreateUserGroup
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/CreateUserGroup
 urlParameters: []
 settingSendCookies:
   enabled: false

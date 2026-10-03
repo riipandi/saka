@@ -29,7 +29,7 @@ headers:
 method: POST
 name: '[Pocket ID] Send test email'
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/TestEmail
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.AppConfigService/TestEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

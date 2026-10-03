@@ -10,13 +10,13 @@ authenticationType: null
 body:
   text: |-
     {
-      "app_name": "Tango"
+      "app_name": "Saka"
     }
 bodyType: application/json
 description: |-
   Mirror of Pocket ID PUT /api/application-configuration.
 
-  Excluded in Tango: the system configuration source is the JSON file, resolved once at startup - there is no write surface. The runtime-editable settings are tango.settings.v1.SettingsService.
+  Excluded in Saka: the system configuration source is the JSON file, resolved once at startup - there is no write surface. The runtime-editable settings are saka.settings.v1.SettingsService.
 headers:
 - enabled: true
   name: Content-Type
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update application configurations (excluded)'
 sortPriority: 7000.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.AppConfigService/Update
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.AppConfigService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

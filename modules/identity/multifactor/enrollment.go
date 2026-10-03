@@ -9,8 +9,8 @@ import (
 
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // ---- Enrollment ----
@@ -52,7 +52,7 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 		return BeginTotpEnrollmentResult{}, ErrEnrollmentLimit
 	}
 
-	// The label the authenticator renders — "Tango: user@example.com" — is
+	// The label the authenticator renders — "Saka: user@example.com" — is
 	// the account the ceremony is for. An account the issuer cannot read is
 	// a caller the guard should have refused, so the failure is internal.
 	account, err := s.issuer.FindAccountByIDAny(ctx, userID)

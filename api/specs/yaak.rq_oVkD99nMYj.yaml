@@ -15,7 +15,7 @@ body:
       "limit": 20
     }
 bodyType: application/json
-description: '[Tango] List one page of an endpoint deliveries, newest first, each carrying its latest attempt when one exists. Admin only.'
+description: '[Saka] List one page of an endpoint deliveries, newest first, each carrying its latest attempt when one exists. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: List Webhook Deliveries
 sortPriority: 4136.412132296906
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/ListDeliveries
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/ListDeliveries
 urlParameters: []
 settingSendCookies:
   enabled: false

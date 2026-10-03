@@ -15,7 +15,7 @@ body:
       "description": "Edits the content"
     }
 bodyType: application/json
-description: '[Tango] Replace a role name and description. The slug and the type do not move, and a system role refuses the change. Administrative: requires the admin role.'
+description: '[Saka] Replace a role name and description. The slug and the type do not move, and a system role refuses the change. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: Update Role
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/UpdateRole
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/UpdateRole
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -14,17 +14,17 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/blocklist"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/blocklist"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
 	"uuid"
 )
 
@@ -827,7 +827,7 @@ func NewRefreshToken() (TokenPair, error) {
 // password and the two failures are indistinguishable by timing.
 func (s *Service) verifyDummy(password string) {
 	hash, ok := s.dummyHash.get(func() (string, error) {
-		return s.hasher.Hash("tango-dummy-account")
+		return s.hasher.Hash("saka-dummy-account")
 	})
 	if ok {
 		match, _ := s.hasher.Verify(password, hash)

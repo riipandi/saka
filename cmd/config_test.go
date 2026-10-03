@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/envfile"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/envfile"
 )
 
 // testRoot builds the root command a test runs a subcommand through.
@@ -25,7 +25,7 @@ import (
 // exactly these two.
 func testRoot(out *bytes.Buffer, stdin string, commands ...*cli.Command) *cli.Command {
 	return &cli.Command{
-		Name:     "tango",
+		Name:     "saka",
 		Writer:   out,
 		Reader:   strings.NewReader(stdin),
 		Commands: commands,
@@ -82,7 +82,7 @@ func runConfigGenerateCmd(t *testing.T, args ...string) (string, error) {
 
 	var out bytes.Buffer
 	root := testRoot(&out, "", configGenerateCmd)
-	err := root.Run(context.Background(), append([]string{"tango", configGenerateCmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", configGenerateCmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -92,7 +92,7 @@ func runConfigValidateCmd(t *testing.T, args ...string) (string, error) {
 
 	var out bytes.Buffer
 	root := testRoot(&out, "", configValidateCmd)
-	err := root.Run(context.Background(), append([]string{"tango", configValidateCmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", configValidateCmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -102,7 +102,7 @@ func runConfigPrintCmd(t *testing.T, args ...string) (string, error) {
 
 	var out bytes.Buffer
 	root := testRoot(&out, "", configPrintCmd)
-	err := root.Run(context.Background(), append([]string{"tango", configPrintCmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", configPrintCmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -123,7 +123,7 @@ func TestConfigGenerateWritesEveryKey(t *testing.T) {
 	cfg, err := config.Load(config.Options{
 		ConfigFile: path,
 		Environ: []string{
-			"DATABASE_URL=postgresql://user:pass@localhost:5432/tango?sslmode=disable",
+			"DATABASE_URL=postgresql://user:pass@localhost:5432/saka?sslmode=disable",
 			"AUTH_SECRET_KEY=" + testSecret,
 			"APP_SECRET_KEY=" + testSecret,
 		},
@@ -204,14 +204,14 @@ func TestConfigValidateAcceptsAGoodFile(t *testing.T) {
 	  "database": {"url": "env:DATABASE_URL"},
 	  "auth": {"secret_key": "env:AUTH_SECRET_KEY"}
 	}`)
-	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 	t.Setenv("AUTH_SECRET_KEY", testSecret)
 
 	out, err := runConfigValidateCmd(t)
 	require.NoError(t, err)
 	assert.Contains(t, out, "valid")
 	assert.Contains(t, out, "status:")
-	assert.Contains(t, out, "localhost:5432/tango")
+	assert.Contains(t, out, "localhost:5432/saka")
 }
 
 func TestConfigValidateReportsEveryProblem(t *testing.T) {
@@ -221,7 +221,7 @@ func TestConfigValidateReportsEveryProblem(t *testing.T) {
 	  "server": {"port": 0},
 	  "log": {"level": "loud"}
 	}`)
-	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	_, err := runConfigValidateCmd(t)
 	require.ErrorIs(t, err, config.ErrInvalid)
@@ -251,7 +251,7 @@ func TestConfigValidateUsesTheConfigFileFlag(t *testing.T) {
 	  "database": {"url": "env:DATABASE_URL"},
 	  "auth": {"secret_key": "env:AUTH_SECRET_KEY"}
 	}`)
-	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 	t.Setenv("AUTH_SECRET_KEY", testSecret)
 
 	out, err := runConfigValidateCmd(t, "--config-file="+path)
@@ -290,7 +290,7 @@ func printedValue(t *testing.T, out, key string) string {
 
 func TestConfigPrintShowsResolvedValues(t *testing.T) {
 	useConfig(t, `{"database": {"url": "env:DATABASE_URL"}, "server": {"port": 7777}}`)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -316,7 +316,7 @@ func TestConfigPrintMasksSecrets(t *testing.T) {
 	}`)
 	t.Setenv("APP_SECRET_KEY", testSecret)
 	t.Setenv("AUTH_SECRET_KEY", testSecret)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:sup3rs3cret@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:sup3rs3cret@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -334,7 +334,7 @@ func TestConfigPrintMasksSecrets(t *testing.T) {
 	assert.Equal(t, "[redacted]", printedValue(t, out, "mailer.smtp_password"))
 
 	// The DSN is reduced rather than masked, so the target is still readable.
-	assert.Equal(t, "localhost:5432/tango", printedValue(t, out, "database.url"))
+	assert.Equal(t, "localhost:5432/saka", printedValue(t, out, "database.url"))
 
 	// A username is not a secret, so it stays readable.
 	assert.Equal(t, "bot", printedValue(t, out, "mailer.smtp_username"))
@@ -349,7 +349,7 @@ func TestConfigPrintMasksTheAuthSecret(t *testing.T) {
 		"database": {"url": "env:DATABASE_URL"}
 	}`)
 	t.Setenv("AUTH_SECRET_KEY", secret)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -363,7 +363,7 @@ func TestConfigPrintMasksAnEmptySecretAsEmpty(t *testing.T) {
 	// An unset secret must read as unset, not as a masked value: the difference
 	// is the whole answer when a key is missing.
 	useConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -374,7 +374,7 @@ func TestConfigPrintMasksAnEmptySecretAsEmpty(t *testing.T) {
 
 func TestConfigPrintCoversEveryKey(t *testing.T) {
 	useConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -386,7 +386,7 @@ func TestConfigPrintCoversEveryKey(t *testing.T) {
 
 func TestConfigPrintSourceFlag(t *testing.T) {
 	useConfig(t, `{"database": {"url": "env:DATABASE_URL"}, "server": {"port": 7777}}`)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t, "--source")
 	require.NoError(t, err)
@@ -415,7 +415,7 @@ func TestConfigPrintHasNoTrailingWhitespace(t *testing.T) {
 	// line would end in spaces. Invisible on a terminal, but it lands in a
 	// redirected file and in a diff.
 	useConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`)
-	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/tango?sslmode=disable")
+	t.Setenv(envfile.DatabaseURL, "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 
 	out, err := runConfigPrintCmd(t)
 	require.NoError(t, err)
@@ -444,5 +444,5 @@ func TestASubcommandFlagReachesTheConfiguration(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, root.Run(t.Context(), []string{"tango", "serve", "--port", "3191"}))
+	require.NoError(t, root.Run(t.Context(), []string{"saka", "serve", "--port", "3191"}))
 }

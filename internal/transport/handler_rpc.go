@@ -10,9 +10,9 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/queue"
+	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // rpcHealthService answers the readiness procedure over ConnectRPC.

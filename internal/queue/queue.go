@@ -1,4 +1,4 @@
-// Package queue is tango's embedded task queue: type-safe queues over the
+// Package queue is saka's embedded task queue: type-safe queues over the
 // shared Postgres pool, executed by an in-process worker pool. It is a port
 // of mikestefanello/backlite (MIT) adapted to this architecture — the schema
 // comes from the migrations, the queries from go-sqlbuilder, and the logs

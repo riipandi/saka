@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // testVerifier builds the verifier and the signer over one HMAC secret, so a

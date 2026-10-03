@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] Write the caller''s receipt for every live notification that targets them and is still unread. Authenticated: any caller.'
+description: '[Saka] Write the caller''s receipt for every live notification that targets them and is still unread. Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: Mark All Notifications Read
 sortPriority: 1031.0928212162785
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/MarkAllNotificationsRead
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/MarkAllNotificationsRead
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -3,7 +3,7 @@ package auditlog
 import (
 	"time"
 
-	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/saka/internal/audit"
 )
 
 // Table is the table records live in. The migration owns the schema; this is

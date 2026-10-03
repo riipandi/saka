@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 func TestRecovererAnswersAPanicWithAnEnvelope(t *testing.T) {

@@ -98,7 +98,7 @@ Prove tracing and metrics end to end:
 ```bash
 task metrics:up
 OTEL_TRACING_ENABLE=true OTEL_METRICS_ENABLE=true task metrics:smoke:otel
-task metrics:traces   # and the tango_otel_smoke_total query against OpenObserve
+task metrics:traces   # and the saka_otel_smoke_total query against OpenObserve
 ```
 
 ## Quick Start
@@ -122,7 +122,7 @@ The recording call enqueues and returns; the background processors carry it out.
 {
 	"otel": {
 		"endpoint": "http://localhost:4318",
-		"service_name": "tango",
+		"service_name": "saka",
 		"environment": "staging",
 		"compression": "gzip",
 		"tracing": { "enable": true, "sampler": "parent_ratio", "ratio": 0.1 },

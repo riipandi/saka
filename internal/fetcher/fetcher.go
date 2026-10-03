@@ -20,7 +20,7 @@ import (
 
 	"resty.dev/v3"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // Request is one outbound call. URL may be absolute, or relative to the

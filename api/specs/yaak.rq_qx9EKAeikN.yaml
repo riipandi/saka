@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Issue a key for the caller's own account. The raw key exists in the response alone; only its hash is stored.
 
-  Ported from Pocket ID `POST /api/api-keys` as the `tango.apikey.v1.ApiKeyService/CreateAPIKey` procedure.
+  Ported from Pocket ID `POST /api/api-keys` as the `saka.apikey.v1.ApiKeyService/CreateAPIKey` procedure.
 
   Parameters:
   - name (body, required): 3-64 characters, unique per owner
@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create API key'
 sortPriority: 222.2222222222222
-url: ${[ apiBaseURL ]}/rpc/tango.apikey.v1.ApiKeyService/CreateAPIKey
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey
 urlParameters: []
 settingSendCookies:
   enabled: false

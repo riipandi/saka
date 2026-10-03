@@ -1,4 +1,4 @@
-// The webhook contract: the outbound event surface tango carries and Pocket
+// The webhook contract: the outbound event surface saka carries and Pocket
 // ID does not.
 //
 // A webhook endpoint is a destination an administrator registers: a URL, a
@@ -15,13 +15,13 @@
 // response metadata, never a response body.
 syntax = "proto3";
 
-package tango.webhook.v1;
+package saka.webhook.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1;webhookv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1;webhookv1";
 
 // WebhookService manages the delivery endpoints and reads what they were
 // sent. Every procedure is administrative: an endpoint receives the
@@ -191,7 +191,10 @@ message HeaderSet {
       string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
     }
     values: {
-      string: {pattern: "^[ -~]*$", max_len: 512}
+      string: {
+        pattern: "^[ -~]*$"
+        max_len: 512
+      }
     }
   }];
 }
@@ -223,7 +226,7 @@ message ListWebhooksResponse {
   repeated Webhook webhooks = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -268,7 +271,10 @@ message CreateWebhookRequest {
       string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
     }
     values: {
-      string: {pattern: "^[ -~]*$", max_len: 512}
+      string: {
+        pattern: "^[ -~]*$"
+        max_len: 512
+      }
     }
   }];
 
@@ -451,7 +457,7 @@ message ListWebhookDeliveriesResponse {
   repeated WebhookDelivery deliveries = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -484,7 +490,7 @@ message ListAllWebhookDeliveriesResponse {
   repeated WebhookDelivery deliveries = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.

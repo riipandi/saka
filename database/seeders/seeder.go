@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // Seeder creates the default records of one kind.

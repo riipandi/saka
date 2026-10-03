@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The flow's fixed terms: the window one ceremony stays answerable, the

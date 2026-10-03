@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
 // githubProvider is the GitHub adapter: an OAuth2-only provider whose

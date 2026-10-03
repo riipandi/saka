@@ -6,8 +6,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // AuthorizationSeederName is the name this seeder reports under. The

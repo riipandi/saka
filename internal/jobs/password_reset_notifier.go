@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/password"
 )
 
 // PasswordResetNotifier is the adapter between the password service's

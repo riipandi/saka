@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Handler returns the REST endpoint that reports health. It answers 200 when

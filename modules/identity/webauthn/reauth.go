@@ -9,11 +9,11 @@ import (
 	"uuid"
 
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // ErrProofRefused is the one refusal a step-up proof earns: a wrong

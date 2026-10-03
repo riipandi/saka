@@ -14,8 +14,8 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // BackchannelLogoutEvent is the events member a logout token carries — the

@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // The failures the procedure reports. The handler maps them to connect

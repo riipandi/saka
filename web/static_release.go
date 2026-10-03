@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 //go:embed output
@@ -96,6 +96,7 @@ func spaHandler() http.HandlerFunc {
 			strings.HasPrefix(r.URL.Path, "/rpc") ||
 			strings.HasPrefix(r.URL.Path, "/metrics") ||
 			strings.HasPrefix(r.URL.Path, "/static") ||
+			strings.HasPrefix(r.URL.Path, "/oauth") ||
 			strings.HasPrefix(r.URL.Path, "/oidc") ||
 			strings.HasPrefix(r.URL.Path, "/debug") {
 			responder.NotFoundJSON(w, r)

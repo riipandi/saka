@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport"
-	"github.com/riipandi/tango/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/middleware"
 )
 
 // countingLimiter records every check the limiter is asked for, so a test can
@@ -180,7 +180,7 @@ func TestTheRPCHealthProcedureIsExcludedToo(t *testing.T) {
 		RateClassify: countAllEverywhere(),
 	})
 
-	router.ServeHTTP(httptest.NewRecorder(), rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
+	router.ServeHTTP(httptest.NewRecorder(), rpcRequest(t, "/saka.system.v1.HealthService/Check", "{}"))
 
 	assert.Zero(t, limiter.calls, "the RPC readiness reaches no check at all")
 }
@@ -202,7 +202,7 @@ func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
 
 	require.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
 

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
 )
 
 // storageResult runs the data directory check on dir and returns its detail.

@@ -14,7 +14,7 @@ bodyType: application/json
 description: |-
   One page of the groups, optionally filtered and sorted.
 
-  Ported from Pocket ID `GET /api/user-groups` as the `tango.identity.v1.UserGroupService/ListUserGroups` procedure.
+  Ported from Pocket ID `GET /api/user-groups` as the `saka.identity.v1.UserGroupService/ListUserGroups` procedure.
 
   Parameters:
   - page (body, optional): one-based page number
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] List user groups'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/ListUserGroups
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/ListUserGroups
 urlParameters:
 - enabled: false
   name: search

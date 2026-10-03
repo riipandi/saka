@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // The discovery read's fixed terms: one attempt within ten seconds, a

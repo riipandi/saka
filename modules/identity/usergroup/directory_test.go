@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The directory the account views read through: what one account belongs

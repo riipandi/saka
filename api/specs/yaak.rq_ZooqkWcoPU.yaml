@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Send the verification email to the currently authenticated user's address on record. An already-verified account is refused; the email itself is sent by the durable queue.
 
-  Ported from Pocket ID `POST /api/users/me/send-email-verification` as the `tango.identity.v1.EmailVerificationService/SendEmail` procedure.
+  Ported from Pocket ID `POST /api/users/me/send-email-verification` as the `saka.identity.v1.EmailVerificationService/SendEmail` procedure.
 headers:
 - enabled: true
   name: Content-Type
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: '[Pocket ID] Send email verification'
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.EmailVerificationService/SendEmail
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.EmailVerificationService/SendEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

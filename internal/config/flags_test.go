@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // runCommand builds the root command the CLI uses, runs it with args, and
@@ -28,7 +28,7 @@ func runCommand(t *testing.T, args []string) config.Options {
 	}
 
 	root := &cli.Command{
-		Name: "tango",
+		Name: "saka",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: config.FlagConfigFile},
 			&cli.StringFlag{Name: config.FlagEnvFile},
@@ -43,7 +43,7 @@ func runCommand(t *testing.T, args []string) config.Options {
 			Action: capture,
 		}},
 	}
-	require.NoError(t, root.Run(t.Context(), append([]string{"tango"}, args...)))
+	require.NoError(t, root.Run(t.Context(), append([]string{"saka"}, args...)))
 	return captured
 }
 
@@ -103,7 +103,7 @@ func TestResolveAppliesFlagOverEverything(t *testing.T) {
 
 	var cfg config.Config
 	root := &cli.Command{
-		Name: "tango",
+		Name: "saka",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: config.FlagConfigFile},
 		},
@@ -119,7 +119,7 @@ func TestResolveAppliesFlagOverEverything(t *testing.T) {
 	}
 
 	t.Setenv("SERVER_PORT", "2222")
-	err := root.Run(t.Context(), []string{"tango", "--config-file=" + path, "serve", "--port=3333"})
+	err := root.Run(t.Context(), []string{"saka", "--config-file=" + path, "serve", "--port=3333"})
 	require.NoError(t, err)
 
 	assert.Equal(t, 3333, cfg.Server.Port)

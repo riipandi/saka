@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/registry"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/registry"
+	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // reportsArea is an area a consumer wrote outside this repository. It owns one

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // recordingNotices is the notice channel a test inspects: every notice the

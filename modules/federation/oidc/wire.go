@@ -9,12 +9,12 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // wireClient maps the service view onto the wire message. The hashes never

@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/appconfig"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/appconfig"
 )
 
 // The catalog the settings seeder writes, in the order its report carries

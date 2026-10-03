@@ -3,14 +3,14 @@ package registry
 import (
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/modules/apikey"
-	"github.com/riipandi/tango/modules/appconfig"
-	"github.com/riipandi/tango/modules/auditlog"
-	"github.com/riipandi/tango/modules/federation"
-	"github.com/riipandi/tango/modules/identity"
-	"github.com/riipandi/tango/modules/notification"
-	"github.com/riipandi/tango/modules/webhook"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/modules/apikey"
+	"github.com/riipandi/saka/modules/appconfig"
+	"github.com/riipandi/saka/modules/auditlog"
+	"github.com/riipandi/saka/modules/federation"
+	"github.com/riipandi/saka/modules/identity"
+	"github.com/riipandi/saka/modules/notification"
+	"github.com/riipandi/saka/modules/webhook"
 )
 
 // Area is one area the application serves, together with the services it owns.

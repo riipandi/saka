@@ -8,7 +8,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
-	"github.com/riipandi/tango/internal/authz"
+	"github.com/riipandi/saka/internal/authz"
 )
 
 // AccessClaims are the private claims an access token carries. The subject is

@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // migratedClient applies the migrations to a fresh test database and returns

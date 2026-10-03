@@ -11,8 +11,8 @@ import (
 	"go.jetify.com/typeid"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // Repository implements the account view's group seam: what one account

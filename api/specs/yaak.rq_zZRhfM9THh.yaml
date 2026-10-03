@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Names one account's passkeys, aimed by the request's user_id.
 
-  Pocket ID's mirror is `GET /api/users/{id}/webauthn-credentials`; the surface is tango's `WebAuthnService` — the roll the account's own ListCredentials answers, no key material.
+  Pocket ID's mirror is `GET /api/users/{id}/webauthn-credentials`; the surface is saka's `WebAuthnService` — the roll the account's own ListCredentials answers, no key material.
 
   Guard: Admin.
 headers:
@@ -29,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List user passkeys (admin)'
+name: '[Saka] List user passkeys (admin)'
 sortPriority: 23000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/AdminListCredentials
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials
 urlParameters:
 - enabled: true
   name: id

@@ -12,7 +12,7 @@ import (
 )
 
 // tracerName is the instrumentation scope of the outbound spans.
-const tracerName = "github.com/riipandi/tango/internal/fetcher"
+const tracerName = "github.com/riipandi/saka/internal/fetcher"
 
 // w3cPropagator is what an outbound call injects. It matches the propagator
 // observer.SetGlobals installs. The SDK default carries no fields, so a call

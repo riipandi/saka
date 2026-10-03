@@ -13,7 +13,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // InfoUptime is the key Uptime reports under.
@@ -248,7 +248,7 @@ func countStyle(down int) printext.Style {
 // The shape is a flat list, one fact per line, so it greps and pipes without
 // column padding to strip:
 //
-//	name: tango
+//	name: saka
 //	version: 0.0.0
 //	uptime: 3 hours
 //	status: healthy

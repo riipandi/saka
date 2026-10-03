@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Replace the group's member set with the accounts the request names. An empty list empties the group.
 
-  Ported from Pocket ID `PUT /api/user-groups/{id}/users` as the `tango.identity.v1.UserGroupService/SetUserGroupMembers` procedure.
+  Ported from Pocket ID `PUT /api/user-groups/{id}/users` as the `saka.identity.v1.UserGroupService/SetUserGroupMembers` procedure.
 
   Parameters:
   - id (body, required): user group ID
@@ -38,7 +38,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update users in a group'
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/SetUserGroupMembers
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/SetUserGroupMembers
 urlParameters:
 - enabled: true
   name: ''

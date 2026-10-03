@@ -27,7 +27,7 @@ headers:
   value: application/x-www-form-urlencoded
   id: null
 method: POST
-name: '[Tango] Device authorization request'
+name: '[Saka] Device authorization request'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/device_authorization
 urlParameters: []

@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] Stream the notifications created while the stream stays open, those that target the caller. Connect server-streaming: the client sends one POST with content-type application/connect+json and reads enveloped messages until it closes. A ping event keeps the connection through idle proxies; the stream carries no history, so a reconnecting client catches up with List Notifications. Authenticated: any caller.'
+description: '[Saka] Stream the notifications created while the stream stays open, those that target the caller. Connect server-streaming: the client sends one POST with content-type application/connect+json and reads enveloped messages until it closes. A ping event keeps the connection through idle proxies; the stream carries no history, so a reconnecting client catches up with List Notifications. Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: Watch Notifications
 sortPriority: 1106.6910531931112
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/WatchNotifications
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/WatchNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

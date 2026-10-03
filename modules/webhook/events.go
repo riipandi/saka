@@ -3,7 +3,7 @@ package webhook
 import (
 	"slices"
 
-	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/saka/internal/audit"
 )
 
 // The webhook event catalog: the dot-named events a receiver subscribes to,

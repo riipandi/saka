@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/urfave/cli/v3"
 )
 
@@ -17,7 +17,7 @@ var jwksGenerateCmd = &cli.Command{
 	Description: `Generates an asymmetric signing key pair and stores it as an
 active row of public.jwks. The database is the application's only signing
 authority — the environment carries no key-pair material — so this command
-is how a rotation adds a key without touching the deployment. tango
+is how a rotation adds a key without touching the deployment. saka
 initialize provisions the first pair on a fresh database.
 
 Without --algorithm the pair uses ES256. The private half is sealed with

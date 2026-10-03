@@ -3,7 +3,7 @@ package webauthn
 import (
 	"testing"
 
-	"github.com/riipandi/tango/pkg/testutils/softauthn"
+	"github.com/riipandi/saka/pkg/testutils/softauthn"
 )
 
 // The soft authenticator is the test's device. The construction lives in

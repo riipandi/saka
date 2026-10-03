@@ -12,8 +12,8 @@ import (
 	"strings"
 	texttemplate "text/template"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/web"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/web"
 )
 
 // Body is the two renderings of one message. Both are produced for every

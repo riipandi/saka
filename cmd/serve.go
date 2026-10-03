@@ -14,8 +14,8 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/registry"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/registry"
 )
 
 var serveCmd = &cli.Command{

@@ -23,7 +23,7 @@ const (
 )
 
 // DefaultSignatureAlgorithm is the JWT algorithm the signing key pair
-// uses when none is given — the default tango initialize and
+// uses when none is given — the default saka initialize and
 // jwks:generate store with.
 const DefaultSignatureAlgorithm = "ES256"
 
@@ -56,7 +56,7 @@ func (k GeneratedKeys) Names() []string {
 
 // KeyGenerator creates the application secret keys. It emits
 // APP_SECRET_KEY and AUTH_SECRET_KEY: the signing key pair is the
-// database's (provisioned by tango initialize, rotated by jwks:generate),
+// database's (provisioned by saka initialize, rotated by jwks:generate),
 // so no key-pair material is written to the environment.
 type KeyGenerator struct {
 	secretAlgorithm string
@@ -80,7 +80,7 @@ func NewKeyGenerator(algorithm string) (*KeyGenerator, error) {
 	}
 	if !alg.IsSymmetric() {
 		return nil, fmt.Errorf(
-			"%w: %q signs the key pair's role, and the signing key pair lives in the database (tango jwks:generate)",
+			"%w: %q signs the key pair's role, and the signing key pair lives in the database (saka jwks:generate)",
 			ErrUnsupportedAlgorithm, algorithm)
 	}
 	if _, supported := hmacKeySize(algorithm); !supported {
@@ -118,7 +118,7 @@ func (g *KeyGenerator) Generate() (GeneratedKeys, error) {
 // database's public.jwks rows: the private half as sealable JWK JSON, the
 // public half as publishable JWK JSON, both carrying the algorithm and a
 // shared `jwk_` TypeID kid. This is the generator jwks:generate and
-// tango initialize store from — the environment never holds key-pair
+// saka initialize store from — the environment never holds key-pair
 // material.
 func GenerateKeyPair(algorithm string) (private, public string, err error) {
 	material, err := rawKeyPair(algorithm)

@@ -14,7 +14,7 @@ body:
       "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='always', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Administrator trigger for the password reset email on a named account. The administrator never sees or sets the password — the token goes to the account address, and its holder completes the reset through Reset Password. The same 60s cooldown applies. Requires Admin; an impersonating administrator is refused.'
+description: '[Saka] Administrator trigger for the password reset email on a named account. The administrator never sees or sets the password — the token goes to the account address, and its holder completes the reset through Reset Password. The same 60s cooldown applies. Requires Admin; an impersonating administrator is refused.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -25,9 +25,9 @@ headers:
   value: application/json
   id: DzCM2paJmW
 method: POST
-name: '[Tango] Reset user password (admin)'
+name: '[Saka] Reset user password (admin)'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.PasswordRecoveryService/AdminResetUserPassword
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

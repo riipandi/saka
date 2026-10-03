@@ -6,9 +6,9 @@ import (
 
 	"connectrpc.com/authn"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // Authenticate verifies the Bearer token a request carries and answers the

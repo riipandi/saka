@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // A buffer is never a terminal, so a test sees the plain rendering without

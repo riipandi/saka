@@ -14,10 +14,10 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pquerna/otp/totp"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -105,7 +105,7 @@ func mfaTestService(t *testing.T) (*Service, *fakeIssuer, uuid.UUID, func(code s
 
 	pool := migratedPool(t)
 	issuer := &fakeIssuer{}
-	service := NewService(pool, newTestCipher(t), issuer, audit.NewRecorder(nil), "Tango Test", nil)
+	service := NewService(pool, newTestCipher(t), issuer, audit.NewRecorder(nil), "Saka Test", nil)
 
 	// The account the ceremonies run on.
 	userID := uuid.NewV7()

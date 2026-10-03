@@ -65,14 +65,14 @@ const webauthnProbeIndexPage = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Tango passkey probe</title>
+<title>Saka passkey probe</title>
 <style>` + webauthnProbeStyle + `</style>
 </head>
 <body>
-<h2>Tango passkey probe</h2>
+<h2>Saka passkey probe</h2>
 <p>Development instrument — the simulation of the SPA surfaces the frontend work will replace.
 The token each page asks for is the access token a sign-in answers with:
-<code>scripts/curl-rpc.sh http://localhost:3080/rpc/tango.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
+<code>scripts/curl-rpc.sh http://localhost:3080/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
 <ul>
   <li><a href="/debug/passkey/enroll">/debug/passkey/enroll</a> — enroll a passkey on the authenticated session</li>
   <li><a href="/debug/passkey/signin">/debug/passkey/signin</a> — sign in passwordless</li>
@@ -86,7 +86,7 @@ const webauthnProbeEnrollPage = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Tango passkey probe — enroll</title>
+<title>Saka passkey probe — enroll</title>
 <style>` + webauthnProbeStyle + `</style>
 </head>
 <body>
@@ -101,9 +101,9 @@ const { startRegistration } = SimpleWebAuthnBrowser;` + webauthnProbeScript + `
 
 document.getElementById('enroll').onclick = async () => {
   try {
-    const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginRegistration', true);
+    const { options, sessionId } = await ceremony('saka.authn.v1.WebAuthnService/BeginRegistration', true);
     const credential = await startRegistration({ optionsJSON: options });
-    const answer = await rpc('tango.authn.v1.WebAuthnService/VerifyRegistration', {
+    const answer = await rpc('saka.authn.v1.WebAuthnService/VerifyRegistration', {
       session_id: sessionId,
       name: document.getElementById('name').value,
       // The contract carries the browser's JSON verbatim — a string field.
@@ -121,7 +121,7 @@ const webauthnProbeSigninPage = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Tango passkey probe — sign in</title>
+<title>Saka passkey probe — sign in</title>
 <style>` + webauthnProbeStyle + `</style>
 </head>
 <body>
@@ -134,9 +134,9 @@ const { startAuthentication } = SimpleWebAuthnBrowser;` + webauthnProbeScript + 
 
 document.getElementById('signin').onclick = async () => {
   try {
-    const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginLogin', false);
+    const { options, sessionId } = await ceremony('saka.authn.v1.WebAuthnService/BeginLogin', false);
     const assertion = await startAuthentication({ optionsJSON: options });
-    const answer = await rpc('tango.authn.v1.WebAuthnService/VerifyLogin', {
+    const answer = await rpc('saka.authn.v1.WebAuthnService/VerifyLogin', {
       session_id: sessionId,
       // The contract carries the browser's JSON verbatim — a string field.
       credential: JSON.stringify(assertion),
@@ -155,7 +155,7 @@ const webauthnProbeStepupPage = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Tango passkey probe — step-up</title>
+<title>Saka passkey probe — step-up</title>
 <style>` + webauthnProbeStyle + `</style>
 </head>
 <body>
@@ -169,9 +169,9 @@ const { startAuthentication } = SimpleWebAuthnBrowser;` + webauthnProbeScript + 
 
 document.getElementById('stepup').onclick = async () => {
   try {
-    const { options, sessionId } = await ceremony('tango.authn.v1.WebAuthnService/BeginLogin', true);
+    const { options, sessionId } = await ceremony('saka.authn.v1.WebAuthnService/BeginLogin', true);
     const assertion = await startAuthentication({ optionsJSON: options });
-    const answer = await rpc('tango.authn.v1.WebAuthnService/Reauthenticate', {
+    const answer = await rpc('saka.authn.v1.WebAuthnService/Reauthenticate', {
       passkey: {
         session_id: sessionId,
         // The contract carries the browser's JSON verbatim — a string field.

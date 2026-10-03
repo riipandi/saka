@@ -9,7 +9,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // Repository reads and writes the endpoint, delivery, and attempt rows.

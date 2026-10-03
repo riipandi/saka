@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Answers the request the presented code names: the code in its display form, the requesting browser's address and agent, and the instant the request dies. Guard: session.
 
-  Procedure: `tango.authn.v1.DeviceApprovalService/Inspect`
+  Procedure: `saka.authn.v1.DeviceApprovalService/Inspect`
 headers:
 - enabled: true
   name: Content-Type
@@ -28,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Inspect device login request'
+name: '[Saka] Inspect device login request'
 sortPriority: 555.5555555555555
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.DeviceApprovalService/Inspect
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.DeviceApprovalService/Inspect
 urlParameters: []
 settingSendCookies:
   enabled: false

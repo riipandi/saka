@@ -15,7 +15,7 @@ description: |-
 
   It is the one procedure an impersonated caller may call: the guard rule requires the delegation instead of refusing it, the way out of a borrowed identity must not be closed. The actor claims are checked against the session row's `impersonated_by` — a forged pair on a plain session answers `not_found`. A caller whose token carries no delegation answers `failed_precondition`. Both the ending and the new session are audited (`impersonation_stopped`, user_id naming the target so the started/stopped pair reads together).
 
-  Tango-only surface.
+  Saka-only surface.
 headers:
 - enabled: true
   name: Content-Type
@@ -26,9 +26,9 @@ headers:
   value: '1'
   id: DCYwXPzwRH
 method: POST
-name: '[Tango] Stop impersonating'
+name: '[Saka] Stop impersonating'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/StopImpersonating
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/StopImpersonating
 urlParameters: []
 settingSendCookies:
   enabled: false

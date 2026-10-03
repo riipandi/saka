@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Logger writes one line per request: method, path, status, duration, size,

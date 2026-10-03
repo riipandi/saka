@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // inspectTask is the task the scheduler inspection tests enqueue.

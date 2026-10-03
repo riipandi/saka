@@ -15,7 +15,7 @@ bodyType: application/json
 description: |-
   Retrieve information about the currently authenticated user.
 
-  Ported from Pocket ID `GET /api/users/me` as the `tango.identity.v1.UserService/GetCurrentUser` procedure. The target is the token's subject, never something the request names; a delegated session is refused.
+  Ported from Pocket ID `GET /api/users/me` as the `saka.identity.v1.UserService/GetCurrentUser` procedure. The target is the token's subject, never something the request names; a delegated session is refused.
 
   Parameters: none
 headers:
@@ -30,7 +30,7 @@ headers:
 method: POST
 name: '[Pocket ID] Get current user'
 sortPriority: 10000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/GetCurrentUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/GetCurrentUser
 urlParameters: []
 settingSendCookies:
   enabled: false

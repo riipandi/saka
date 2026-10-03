@@ -17,11 +17,11 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/modules/identity/signin"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/modules/identity/signin"
 )
 
 // Ceremony session and step-up token windows. The ceremony window is how
@@ -247,7 +247,7 @@ func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, i
 	}
 	engine, err := gowebauthn.New(&gowebauthn.Config{
 		RPID:          host,
-		RPDisplayName: "Tango",
+		RPDisplayName: "Saka",
 		RPOrigins:     []string{origin},
 		Timeouts: gowebauthn.TimeoutsConfig{
 			Login:        gowebauthn.TimeoutConfig{Timeout: ceremonyTTL, Enforce: true},

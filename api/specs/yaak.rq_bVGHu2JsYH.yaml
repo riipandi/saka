@@ -28,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Delete OAuth connection'
+name: '[Saka] Delete OAuth connection'
 sortPriority: 917.7777777777778
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/DeleteConnection
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/DeleteConnection
 urlParameters: []
 settingSendCookies:
   enabled: false

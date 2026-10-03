@@ -32,9 +32,9 @@ headers:
   value: '1'
   id: Vg23J4KItU
 method: POST
-name: '[Tango] Confirm TOTP enrollment'
+name: '[Saka] Confirm TOTP enrollment'
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/ConfirmTotpEnrollment
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/ConfirmTotpEnrollment
 urlParameters: []
 settingSendCookies:
   enabled: false

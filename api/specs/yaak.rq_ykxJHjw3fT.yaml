@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: null
 description: |-
-  Opens one pairing request for the passkey-less sign-in: the code renders on another device's screen, the pairing cookie stays with the creating browser. Tango-only; upstream's shape kept.
+  Opens one pairing request for the passkey-less sign-in: the code renders on another device's screen, the pairing cookie stays with the creating browser. Saka-only; upstream's shape kept.
 
   Endpoint: `POST /api/device-login/requests`
 headers:
@@ -25,7 +25,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Create device login request'
+name: '[Saka] Create device login request'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/api/device-login/requests
 urlParameters: []

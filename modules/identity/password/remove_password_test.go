@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"uuid"
 
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // stubAlternatives answers the chained check from a field, so the removal's

@@ -1,4 +1,4 @@
-// Package scheduler is tango's durable cron scheduler. robfig/cron owns the
+// Package scheduler is saka's durable cron scheduler. robfig/cron owns the
 // timing; Postgres owns the claim: every replica fires the cron time, and
 // the one that moves the job's next_due forward — one row locked FOR UPDATE
 // inside the same transaction as the enqueue — wins the tick. A process that
@@ -21,8 +21,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/robfig/cron/v3"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // jobsTable is the scheduler's own state table, created by

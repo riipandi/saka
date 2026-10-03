@@ -16,7 +16,7 @@ body:
       "sort_order": "desc"
     }
 bodyType: application/json
-description: '[Tango] Answer one page of every notification the deployment holds, newest first, cancelled ones included. page is one-based; limit is 1-100; sort_by is one of category, topic, title, created_at (absent orders by created_at, newest first); sort_order is asc or desc; category narrows the page to system or announcement. Administrative: requires the admin role.'
+description: '[Saka] Answer one page of every notification the deployment holds, newest first, cancelled ones included. page is one-based; limit is 1-100; sort_by is one of category, topic, title, created_at (absent orders by created_at, newest first); sort_order is asc or desc; category narrows the page to system or announcement. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Content-Type
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: List All Notifications
 sortPriority: 37.03703703703703
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/ListAllNotifications
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/ListAllNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

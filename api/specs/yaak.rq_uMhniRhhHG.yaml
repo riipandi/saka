@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Answers the claims one account carries, ordered by key.
 
-  Tango procedure tango.federation.v1.CustomClaimService/ListUserClaims. Guard: admin.
+  Saka procedure saka.federation.v1.CustomClaimService/ListUserClaims. Guard: admin.
 
   Parameters:
   - user_id (body, required): the account, in its wire form (user_...)
@@ -32,7 +32,7 @@ headers:
 method: POST
 name: '[Pocket ID] List user custom claims'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/ListUserClaims
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/ListUserClaims
 urlParameters: []
 settingSendCookies:
   enabled: false

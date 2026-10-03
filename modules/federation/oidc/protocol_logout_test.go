@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // hintToken mints a compact JWS the way the two token kinds differ: the
@@ -23,7 +23,7 @@ func hintToken(t *testing.T, typ string) string {
 	if typ != "" {
 		require.NoError(t, headers.Set(jws.TypeKey, typ))
 	}
-	token, err := jws.Sign([]byte(`{"iss":"https://tango.example"}`),
+	token, err := jws.Sign([]byte(`{"iss":"https://saka.example"}`),
 		jws.WithKey(jwa.HS256(), []byte("test-hint-key"), jws.WithProtectedHeaders(headers)))
 	require.NoError(t, err)
 	return string(token)

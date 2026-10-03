@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // BackchannelLogoutName is the queue the OIDC back-channel logout

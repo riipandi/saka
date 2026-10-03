@@ -39,7 +39,7 @@ headers:
   value: application/x-www-form-urlencoded
   id: null
 method: POST
-name: '[Tango] Push authorization request (PAR)'
+name: '[Saka] Push authorization request (PAR)'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/par
 urlParameters: []

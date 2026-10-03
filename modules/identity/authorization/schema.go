@@ -6,7 +6,7 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/tango/internal/authz"
+	"github.com/riipandi/saka/internal/authz"
 	"go.jetify.com/typeid"
 )
 

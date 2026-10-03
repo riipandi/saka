@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/webhook"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/webhook"
 )
 
 // WebhookRunner is the seam the delivery processor runs through: the webhook

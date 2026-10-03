@@ -14,7 +14,7 @@ body:
     }
 bodyType: application/json
 description: |-
-  [Tango] Read one role with the permission slugs it carries. id is the role TypeID (role_...). Administrative: requires the admin role.
+  [Saka] Read one role with the permission slugs it carries. id is the role TypeID (role_...). Administrative: requires the admin role.
 
   The detail is served from a cache; every role write drops the family. `nocache` true reads the source and leaves the cached answer alone.
 headers:
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: Get Role
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/GetRole
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/GetRole
 urlParameters: []
 settingSendCookies:
   enabled: false

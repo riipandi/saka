@@ -18,7 +18,7 @@ body:
       "event_types": ["user.created"]
     }
 bodyType: application/json
-description: '[Tango] Register an endpoint and mint its signing secret. The secret exists in this response alone. Admin only.'
+description: '[Saka] Register an endpoint and mint its signing secret. The secret exists in this response alone. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -31,7 +31,7 @@ headers:
 method: POST
 name: Create Webhook
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/Create
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/Create
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -28,7 +28,7 @@ bodyType: application/json
 description: |-
   Replaces a client's fields — the full replace, so a field the request leaves out falls back to empty. The secrets, the logo, and the group restriction are not fields of this call: each has its own procedure, because a rotation and an access change are happenings of their own.
 
-  Tango procedure tango.federation.v1.OidcClientService/UpdateClient. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/UpdateClient. Guard: admin.
 
   Parameters:
   - id (body, required): the client to rewrite
@@ -46,7 +46,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update OIDC client'
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UpdateClient
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/UpdateClient
 urlParameters:
 - enabled: true
   name: id

@@ -20,7 +20,7 @@ body:
     }
 bodyType: application/json
 description: |-
-  Update the currently authenticated user's information: the display surface, and the username while the change toggle admits it (absent keeps the current handle; a taken one answers already-exists). The email and the role are the administrative surface's (`UserService/UpdateUser`). Ported from Pocket ID `PUT /api/users/me` as the `tango.identity.v1.UserService/UpdateCurrentUser` procedure.
+  Update the currently authenticated user's information: the display surface, and the username while the change toggle admits it (absent keeps the current handle; a taken one answers already-exists). The email and the role are the administrative surface's (`UserService/UpdateUser`). Ported from Pocket ID `PUT /api/users/me` as the `saka.identity.v1.UserService/UpdateCurrentUser` procedure.
 
   Parameters:
   - username (body, optional): New handle; required shape enforced in the service
@@ -40,7 +40,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update current user'
 sortPriority: 11000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/UpdateCurrentUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UpdateCurrentUser
 urlParameters: []
 settingSendCookies:
   enabled: false

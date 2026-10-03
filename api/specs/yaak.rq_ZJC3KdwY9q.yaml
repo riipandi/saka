@@ -15,7 +15,7 @@ bodyType: null
 description: |-
   Reset the currently authenticated user's profile picture to the bundled default.
 
-  Ported from Pocket ID `DELETE /api/users/me/profile-picture`. Tango answers it at the same REST route, guarded by the authenticated caller itself. Resetting an account without a picture is a no-op.
+  Ported from Pocket ID `DELETE /api/users/me/profile-picture`. Saka answers it at the same REST route, guarded by the authenticated caller itself. Resetting an account without a picture is a no-op.
 
   Parameters: none
 headers:

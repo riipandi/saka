@@ -13,7 +13,7 @@ const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString()
 const BUILD_HASH = process.env.BUILD_HASH || 'dev'
 
 // Must match the module path in go.mod.
-const goModule = 'github.com/riipandi/tango'
+const goModule = 'github.com/riipandi/saka'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
 const goVersionLdflags = [

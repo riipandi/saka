@@ -14,20 +14,20 @@
 // what a revoked key had access to.
 syntax = "proto3";
 
-package tango.apikey.v1;
+package saka.apikey.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/apikey/v1;apikeyv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1;apikeyv1";
 
 // ApiKeyService issues and manages the machine credentials an account holds.
 //
 // The four management procedures are the owner's own surface, and they are
 // the one surface an API key is refused on — the `Session` guard rule, the
 // rule a browser session satisfies and a machine credential does not. The
-// fifth procedure is tango's own: an administrator's view over every key the
+// fifth procedure is saka's own: an administrator's view over every key the
 // deployment holds, which the upstream it ports has no equivalent of.
 service ApiKeyService {
   // CreateApiKey issues a key for the caller's own account. The raw key
@@ -49,7 +49,7 @@ service ApiKeyService {
   rpc RevokeAPIKey(RevokeAPIKeyRequest) returns (RevokeAPIKeyResponse);
 
   // ListAllApiKeys answers one page of every key the deployment holds,
-  // newest first. It is tango-only: upstream carries no administrative view
+  // newest first. It is saka-only: upstream carries no administrative view
   // over its keys.
   rpc ListAllAPIKeys(ListAllAPIKeysRequest) returns (ListAllAPIKeysResponse);
 }
@@ -91,7 +91,7 @@ message ApiKey {
   // expiration_email_sent says whether the expiry reminder went out.
   bool expiration_email_sent = 10;
 
-  // owner_id is the account the key acts as. It is tango's own field: the
+  // owner_id is the account the key acts as. It is saka's own field: the
   // administrative view over every key is meaningless without naming whose
   // key it is, and the owner's own list answers it with the caller.
   string owner_id = 11;
@@ -167,7 +167,7 @@ message ListAPIKeysResponse {
   repeated ApiKey api_keys = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -258,7 +258,7 @@ message ListAllAPIKeysResponse {
   repeated ApiKey api_keys = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.

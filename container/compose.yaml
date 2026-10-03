@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
 
-name: tango
+name: saka
 
 x-common: &common
   networks: ["intranet"]
@@ -18,20 +18,20 @@ include:
   - ./compose-sre.yaml
 
 #####################################################################
-# oidc-test-tango drives Tango's own OIDC/OAuth surface in E2E:
-# Tango answers on the host (dev :3080 or the disposable E2E port; the
+# oidc-test-saka drives Saka's own OIDC/OAuth surface in E2E:
+# Saka answers on the host (dev :3080 or the disposable E2E port; the
 # localhost extra_hosts mapping resolves it from inside the container).
-# Before the run, mint a client through Tango's admin RPC with callback
+# Before the run, mint a client through Saka's admin RPC with callback
 # http://localhost:9010/auth/callback (verify the callback path against
 # the image at first use) and pass the credentials:
-#   TANGO_TEST_CLIENT_ID=... TANGO_TEST_CLIENT_SECRET=... \
-#     docker compose -f container/compose-dev.yaml up -d oidc-test-tango
+#   SAKA_TEST_CLIENT_ID=... SAKA_TEST_CLIENT_SECRET=... \
+#     docker compose -f container/compose-dev.yaml up -d oidc-test-saka
 # Take the container down with the E2E artifacts. ngauth-google above
 # stays pointed at itself — it belongs to the future social sign-in work.
 #####################################################################
 
 # services:
-#   tango:
+#   saka:
 #     <<: *common
 #     build:
 #       context: .
@@ -41,7 +41,7 @@ include:
 #         NODE_VERSION: ${NODE_VERSION:-24.21}
 #         GO_VERSION: ${GO_VERSION:-1.27.1}
 #     # platform: linux/amd64
-#     hostname: tango
+#     hostname: saka
 #     expose: ["3080"]
 #     volumes: ["./storage:/srv/storage:rw"]
 #     env_file: "./.env.local"
@@ -50,7 +50,7 @@ include:
 #       STORAGE_S3_ENDPOINT_URL: http://silo:9100
 #       MAILER_SMTP_HOST: mailpit
 #     healthcheck:
-#       test: ["CMD", "/srv/tango", "health", "--short"]
+#       test: ["CMD", "/srv/saka", "health", "--short"]
 #       interval: 3s
 #       timeout: 5s
 #       retries: 3
@@ -60,24 +60,24 @@ include:
 #       mailpit: { condition: service_healthy }
 #       valkey: { condition: service_healthy }
 
-#   oidc-test-tango:
+#   oidc-test-saka:
 #     <<: *common
 #     image: ghcr.io/beryju/oidc-test-client:${OIDC_TEST_CLIENT_VERSION:-latest}
-#     hostname: oidc-test-tango
+#     hostname: oidc-test-saka
 #     ports: ["9010:9010"]
 #     environment:
 #       OIDC_BIND: 0.0.0.0:9010
-#       OIDC_CLIENT_ID: ${TANGO_TEST_CLIENT_ID:-change-me}
-#       OIDC_CLIENT_SECRET: ${TANGO_TEST_CLIENT_SECRET:-change-me}
+#       OIDC_CLIENT_ID: ${SAKA_TEST_CLIENT_ID:-change-me}
+#       OIDC_CLIENT_SECRET: ${SAKA_TEST_CLIENT_SECRET:-change-me}
 #       OIDC_ROOT_URL: http://localhost:9010
-#       OIDC_PROVIDER: ${TANGO_ISSUER:-http://localhost:3080}
+#       OIDC_PROVIDER: ${SAKA_ISSUER:-http://localhost:3080}
 #       OIDC_SCOPES: "openid,profile,email"
 #       OIDC_DO_REFRESH: true
 #       OIDC_DO_INTROSPECTION: true
 #       OIDC_DO_USER_INFO: true
 #       OIDC_TLS_VERIFY: true
 #     depends_on:
-#       tango: { condition: service_healthy }
+#       saka: { condition: service_healthy }
 
 networks:
   intranet:

@@ -3,7 +3,7 @@
 
 version: 2
 
-project_name: tango
+project_name: saka
 report_sizes: true
 dist: ./release
 
@@ -22,8 +22,8 @@ before:
     - pnpm install --ignore-scripts --frozen-lockfile
     - go tool buf generate
     - gofmt -w codegen/proto/go
-    - TANGO_SKIP_GO=1 pnpm exec vite build
-    # - swag init --output ./api -d cmd,internal,modules,pkg -g tango/main.go --quiet
+    - SAKA_SKIP_GO=1 pnpm exec vite build
+    # - swag init --output ./api -d cmd,internal,modules,pkg -g saka/main.go --quiet
     # - swag fmt --dir ./api
 
 builds:
@@ -39,9 +39,9 @@ builds:
     flags: ["-trimpath", "-buildvcs=false"]
     ldflags:
       - -w -s -extldflags '-static'
-      - -X 'github.com/riipandi/tango/internal/config.AppVersion={{.Tag}}'
-      - -X 'github.com/riipandi/tango/internal/config.BuildHash={{.ShortCommit}}'
-      - -X 'github.com/riipandi/tango/internal/config.BuildDate={{.Date}}'
+      - -X 'github.com/riipandi/saka/internal/config.AppVersion={{.Tag}}'
+      - -X 'github.com/riipandi/saka/internal/config.BuildHash={{.ShortCommit}}'
+      - -X 'github.com/riipandi/saka/internal/config.BuildDate={{.Date}}'
 
 archives:
   - formats: [tar.gz]
@@ -77,7 +77,7 @@ release:
 # dockers_v2:
 #   - id: distroless
 #     dockerfile: ./deploy/Dockerfile
-#     images: ['ghcr.io/riipandi/tango']
+#     images: ['ghcr.io/riipandi/saka']
 #     tags:
 #       - "v{{ .Version }}"
 #       - "{{ if .IsNightly }}nightly{{ end }}"
@@ -91,7 +91,7 @@ release:
 #       "org.opencontainers.image.licenses": "Proprietary"
 #     platforms: ['linux/amd64', 'linux/arm64']
 #     build_args:
-#       DOCKER_IMAGE: 'ghcr.io/riipandi/tango'
+#       DOCKER_IMAGE: 'ghcr.io/riipandi/saka'
 #       BUILD_VERSION: '{{.Version}}'
 #       BUILD_HASH: '{{.Commit}}'
 #       GO_VERSION: 1.26.1

@@ -18,11 +18,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/devicelogin"
-	"github.com/riipandi/tango/modules/identity/multifactor"
-	"github.com/riipandi/tango/modules/identity/webauthn"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/devicelogin"
+	"github.com/riipandi/saka/modules/identity/multifactor"
+	"github.com/riipandi/saka/modules/identity/webauthn"
 )
 
 // CleanupName is the queue the maintenance job runs on.

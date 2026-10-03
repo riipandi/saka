@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: dIi9zbj28h
 method: POST
-name: '[Tango] Send reauthentication code'
+name: '[Saka] Send reauthentication code'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/SendReauthenticationCode
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode
 urlParameters: []
 settingSendCookies:
   enabled: false

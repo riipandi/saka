@@ -48,7 +48,7 @@ field (`user_id`). `debug` is a reading aid, not a contract field: parse
 | Structured error    | a typed message attached as a connect error detail    | `error` in the error envelope            |
 | Request/trace id    | the `X-Request-Id` response header                    | `metadata.request_id` + the same header  |
 | Rate limit          | `X-RateLimit-*` headers; a limited call is refused with `resource_exhausted` (429) | `metadata.rate_limit` + the same headers; a limited request is refused with the envelope |
-| Pagination          | a `tango.common.v1.ListMetadata` block on the message | `metadata` pagination fields             |
+| Pagination          | a `saka.common.v1.ListMetadata` block on the message | `metadata` pagination fields             |
 | Payload             | the response message's own typed fields               | `data` in the envelope                   |
 | Links (HATEOAS)     | not modelled; a page token when a list needs one      | the `links` map                          |
 
@@ -189,7 +189,7 @@ ApiRateLimit:
 ## ConnectRPC surface
 
 A procedure answers its response message alone: typed payload fields, and the
-`tango.common.v1.ListMetadata` block on a list message. The facts around the
+`saka.common.v1.ListMetadata` block on a list message. The facts around the
 payload travel with the protocol, and a generated client reads them without
 parsing a body:
 

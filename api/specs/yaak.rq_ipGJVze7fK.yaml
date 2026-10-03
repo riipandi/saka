@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: '[Tango] Answer the permission catalog: every slug the application enforces, with the description a UI renders beside it. The catalog is code (internal/authz), seeded and served read-only - an administrator manages roles and grants, never the slugs. Administrative: requires the admin role.'
+description: '[Saka] Answer the permission catalog: every slug the application enforces, with the description a UI renders beside it. The catalog is code (internal/authz), seeded and served read-only - an administrator manages roles and grants, never the slugs. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: List Permissions
 sortPriority: 666.6666666666666
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/ListPermissions
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/ListPermissions
 urlParameters: []
 settingSendCookies:
   enabled: false

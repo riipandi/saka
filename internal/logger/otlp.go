@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/observer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/observer"
 )
 
 // otlpPath is the path the OTLP protocol serves logs on. An endpoint that names

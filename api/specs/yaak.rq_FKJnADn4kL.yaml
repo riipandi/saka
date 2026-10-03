@@ -31,9 +31,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List audit logs for a user'
+name: '[Saka] List audit logs for a user'
 sortPriority: 2000.0
-url: ${[ apiBaseURL ]}/rpc/tango.auditlog.v1.AuditLogService/ListForUser
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/ListForUser
 urlParameters: []
 settingSendCookies:
   enabled: false

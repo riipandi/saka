@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/storage"
 )
 
 // StorageUploadName is the queue the uploads run on.

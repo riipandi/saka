@@ -14,7 +14,7 @@ body:
     }
 bodyType: application/json
 description: |-
-  Sets the signed-in account's first password credential — the self-service an account created without one holds. The proof is the step-up token the guard consumes from the X-Tango-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent); an account that already holds a password is refused with failed_precondition. The password must meet the account's policy — min length, the character rules, and the breach corpus; the strength floor is the frontend's to show.
+  Sets the signed-in account's first password credential — the self-service an account created without one holds. The proof is the step-up token the guard consumes from the X-Saka-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent); an account that already holds a password is refused with failed_precondition. The password must meet the account's policy — min length, the character rules, and the breach corpus; the strength floor is the frontend's to show.
 
   Guard: Session + step-up.
 headers:
@@ -31,13 +31,13 @@ headers:
   value: Bearer {{[ accessToken ]}}
   id: null
 - enabled: true
-  name: X-Tango-Reauthentication
+  name: X-Saka-Reauthentication
   value: '{{[ reauthenticationToken ]}}'
   id: null
 method: POST
-name: '[Tango] Add password (first credential)'
+name: '[Saka] Add password (first credential)'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/AddPassword
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/AddPassword
 urlParameters: []
 settingSendCookies:
   enabled: false

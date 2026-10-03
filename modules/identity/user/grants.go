@@ -10,8 +10,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // LoadGrants reads one account's effective grants: the slugs of the roles

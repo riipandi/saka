@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // authStub answers the caller the request's token names, and refuses

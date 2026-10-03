@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Queue surface — removes every unclaimed task; claimed tasks finish their lifecycle.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Flush all waiting tasks (queue)'
+name: '[Saka] Flush all waiting tasks (queue)'
 sortPriority: 4135.802469135802
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/FlushPendingTasks
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/FlushPendingTasks
 urlParameters: []
 settingSendCookies:
   enabled: false

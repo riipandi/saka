@@ -8,9 +8,9 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/modules/notification"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/modules/notification"
 )
 
 // notificationEmailProcessor delivers one notification's email pass: the

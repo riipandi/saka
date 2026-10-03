@@ -9,13 +9,13 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +62,7 @@ func gateTestService(t *testing.T) (*signin.Service, *Service, uuid.UUID, *datas
 
 	signinService := signin.NewService(cfg, pool, signin.NewRepository(pool),
 		jwks.NewService(cfg, nil, nil, nil), recorder, nil)
-	mfaService := NewService(pool, newTestCipher(t), signinService, recorder, "Tango Test", nil)
+	mfaService := NewService(pool, newTestCipher(t), signinService, recorder, "Saka Test", nil)
 	signinService.WithMFAGate(mfaService).WithSessionSettings(gateSettings{})
 
 	// The account the fork runs on: a real password hash, the verification

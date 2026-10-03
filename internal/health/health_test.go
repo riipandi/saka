@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riipandi/tango/internal/health"
+	"github.com/riipandi/saka/internal/health"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

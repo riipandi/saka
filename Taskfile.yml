@@ -6,11 +6,11 @@ silent: true
 
 vars:
   APP_NAME:
-    sh: jq -r .name package.json 2>/dev/null || echo tango
+    sh: jq -r .name package.json 2>/dev/null || echo saka
   APP_VERSION:
     sh: jq -r .version package.json 2>/dev/null || echo 0.0.0
   IMAGE:
-    sh: jq -r .config.image package.json 2>/dev/null || echo ghcr.io/riipandi/tango
+    sh: jq -r .config.image package.json 2>/dev/null || echo ghcr.io/riipandi/saka
 
 # Every group lives in scripts/task-. Each include is flattened, so a task keeps
 # the name it had when this file held it. That also keeps one flat namespace,

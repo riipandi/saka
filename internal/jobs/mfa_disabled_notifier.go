@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/multifactor"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/multifactor"
 )
 
 // MfaDisabledNotifier is the adapter between the multifactor service's

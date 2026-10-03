@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: pzAbYB8C88
 method: POST
-name: '[Tango] Delete TOTP enrollment'
+name: '[Saka] Delete TOTP enrollment'
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/DeleteTotpEnrollment
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/DeleteTotpEnrollment
 urlParameters: []
 settingSendCookies:
   enabled: false

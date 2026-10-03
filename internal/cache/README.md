@@ -1,6 +1,6 @@
 # Cache
 
-Cache is tango's key-value cache layer: one `Cache` contract, three drivers — in-process
+Cache is saka's key-value cache layer: one `Cache` contract, three drivers — in-process
 memory, the optional Valkey backend, and the Noop that caches nothing. The composition root
 picks one from the configuration; a feature never checks whether caching is on.
 
@@ -30,7 +30,7 @@ picks one from the configuration; a feature never checks whether caching is on.
   growing without bound
 - **Remote-safe by contract** — every method carries the caller's context: the Valkey driver
   owns a network round trip, and a cancelled request must not pay for one
-- **Namespace prefix on the shared backend** — the Valkey driver keys under `tango:cache:`,
+- **Namespace prefix on the shared backend** — the Valkey driver keys under `saka:cache:`,
   so the same server can carry other data without a collision
 - **Off by default** — `cache.enable` is false, so a feature that has not decided to be
   cacheable cannot grow one by accident
@@ -42,7 +42,7 @@ flowchart TB
     F[Feature code] -->|Cache interface| N[New\nfrom config]
     N -->|cache.enable false| NO[Noop]
     N -->|driver memory| MEM[Memory\ndatastore-free]
-    N -->|driver kvstore| KV[Valkey\ntango:cache:*]
+    N -->|driver kvstore| KV[Valkey\nsaka:cache:*]
     KV -->|shared client| DS[datastore.Valkey]
     KV --> VK[(Valkey server)]
 ```
@@ -53,7 +53,7 @@ TTL of zero or less means the driver's configured default.
 
 **Memory** keeps entries in one large allocation with an index over them; expiry compares
 against a process-lifetime monotonic timestamp. **Valkey** maps each call onto one command
-(or one pipeline for a batch) under the `tango:cache:` prefix. **Noop** answers every read
+(or one pipeline for a batch) under the `saka:cache:` prefix. **Noop** answers every read
 with a miss and drops every write.
 
 ## Requirements
@@ -189,6 +189,6 @@ go test -bench . -benchmem ./internal/cache/
 | Batch operations on the interface | The remote driver's round trip is the cost worth batching; the memory driver loops |
 | Monotonic expiry in memory | A wall-clock adjustment (NTP, container migration) must not expire or resurrect entries |
 | Reset on budget exhaustion | Predictable bound instead of unbounded growth or an eviction heuristic to tune |
-| `tango:cache:` prefix | One shared backend may carry other data; the namespace is the collision answer |
+| `saka:cache:` prefix | One shared backend may carry other data; the namespace is the collision answer |
 | Off by default | A feature that has not decided to be cacheable cannot grow one by accident |
 | Context on every method | The remote driver owns a network round trip; a cancelled request must not pay for one |

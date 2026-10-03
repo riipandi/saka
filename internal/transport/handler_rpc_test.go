@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
-	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
-	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
-	"github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport"
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	"github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport"
 )
 
 // rpcRequest builds the POST a Connect client sends: the procedure path below
@@ -70,7 +70,7 @@ func TestRPCCheckAnswersTheReadinessDocument(t *testing.T) {
 	router := newRPCRouter(t)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Check", "{}"))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -101,7 +101,7 @@ func TestRPCFieldsAreSnakeCase(t *testing.T) {
 	router := newRPCRouter(t)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Check", "{}"))
 
 	body := rec.Body.String()
 	assert.Contains(t, body, `"took_ms"`, "the body must use the proto field name")
@@ -123,7 +123,7 @@ func TestRPCUnhealthyAnswersUnavailable(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Check", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Check", "{}"))
 
 	require.Equal(t, http.StatusServiceUnavailable, rec.Code, rec.Body.String())
 
@@ -148,7 +148,7 @@ func TestRPCUnknownProcedureAnswersConnectError(t *testing.T) {
 	router := newRPCRouter(t)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.system.v1.HealthService/Absent", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.HealthService/Absent", "{}"))
 
 	require.Equal(t, http.StatusNotImplemented, rec.Code, rec.Body.String())
 
@@ -167,7 +167,7 @@ func TestRPCRejectsGet(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		transport.RPCPath+"/tango.system.v1.HealthService/Check", nil))
+		transport.RPCPath+"/saka.system.v1.HealthService/Check", nil))
 
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code,
 		"a GET must not reach a unary procedure")
@@ -206,7 +206,7 @@ func (rpcFeature) Mount(chi.Router) {}
 
 func (f *rpcFeature) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	f.options = opts
-	r.Post("/tango.test.v1.FeatureService/Ping", func(w http.ResponseWriter, _ *http.Request) {
+	r.Post("/saka.test.v1.FeatureService/Ping", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"pong":true}`))
 	})
@@ -224,7 +224,7 @@ func TestAModuleProcedureMountsBelowThePrefix(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/tango.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.JSONEq(t, `{"pong":true}`, rec.Body.String())

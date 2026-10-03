@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Consume the pending change token and move the account to the address the token binds. The address moves with the account marked verified: the token proved control of the new address. Unknown, expired, and spent tokens answer the same failure, and the row is deleted, so the link works once. The success notice to the new address is gated by mailer.notifications.email_change_notice_enabled.
 
-  Tango-only surface: the tango.identity.v1.EmailVerificationService/ConfirmEmailChange procedure. Guard: Public (the token is the credential).
+  Saka-only surface: the saka.identity.v1.EmailVerificationService/ConfirmEmailChange procedure. Guard: Public (the token is the credential).
 
   Parameters:
   - token (body, required): The raw change token from the confirm link
@@ -30,9 +30,9 @@ headers:
   value: application/json
   id: 53ANMmkbZv
 method: POST
-name: '[Tango] Confirm email change'
+name: '[Saka] Confirm email change'
 sortPriority: 25500.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.EmailVerificationService/ConfirmEmailChange
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange
 urlParameters: []
 settingSendCookies:
   enabled: false

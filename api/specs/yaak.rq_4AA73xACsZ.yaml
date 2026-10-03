@@ -29,9 +29,9 @@ headers:
   value: '1'
   id: 5xi8gKaZsa
 method: POST
-name: '[Tango] Disable current user MFA'
+name: '[Saka] Disable current user MFA'
 sortPriority: 4880.658436213992
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/DisableMfa
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/DisableMfa
 urlParameters: []
 settingSendCookies:
   enabled: false

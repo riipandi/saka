@@ -15,7 +15,7 @@ body:
       "token": "REPLACE_SCIM_TOKEN"
     }
 bodyType: application/json
-description: 'Attach an outbound SCIM provisioning target to an OIDC client. Tango is the SCIM client here: one provider per client pushes the client''s visible accounts and groups out. The token is shown once in the response and sealed at rest.\n\nUpstream: Pocket ID has no direct equivalent — its POST /api/scim/service-provider takes oidcClientId in the body and returns the token persistently; tango names it clientId and answers it once.\n\nParameters:\n- clientId (body, required): the OIDC client the provider hangs on, raw UUID form\n- endpoint (body, required): SCIM base URL, https://…/scim/v2\n- token (body, optional): the bearer secret the sync presents; empty means the target answers unauthenticated'
+description: 'Attach an outbound SCIM provisioning target to an OIDC client. Saka is the SCIM client here: one provider per client pushes the client''s visible accounts and groups out. The token is shown once in the response and sealed at rest.\n\nUpstream: Pocket ID has no direct equivalent — its POST /api/scim/service-provider takes oidcClientId in the body and returns the token persistently; saka names it clientId and answers it once.\n\nParameters:\n- clientId (body, required): the OIDC client the provider hangs on, raw UUID form\n- endpoint (body, required): SCIM base URL, https://…/scim/v2\n- token (body, optional): the bearer secret the sync presents; empty means the target answers unauthenticated'
 headers:
 - enabled: true
   name: Content-Type
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create SCIM service provider'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Create
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/Create
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database/seeders"
+	"github.com/riipandi/saka/database/seeders"
 )
 
 // The announcement leads the report; the system notice, its audience

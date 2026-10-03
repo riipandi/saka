@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Queue surface — removes one unclaimed task. A claimed task answers failed_precondition, an unknown one not_found.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,9 +27,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Cancel a waiting task (queue)'
+name: '[Saka] Cancel a waiting task (queue)'
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/CancelTask
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/CancelTask
 urlParameters: []
 settingSendCookies:
   enabled: false

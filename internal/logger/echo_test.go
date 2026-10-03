@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
 )
 
 // TestConsolelessTransportsStillEchoWarnings pins the echo sink: a run whose

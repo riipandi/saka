@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Withdraws one secret of a client. A client left with none can still authenticate nothing new, and its public-client grants are untouched. An unknown secret is the not-found refusal.
 
-  Tango procedure tango.federation.v1.OidcClientService/DeleteSecret. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/DeleteSecret. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Delete client secret'
 sortPriority: 15000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/DeleteSecret
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/DeleteSecret
 urlParameters:
 - enabled: true
   name: id

@@ -18,7 +18,7 @@ body:
       "sort_order": "desc"
     }
 bodyType: application/json
-description: '[Tango] Answer one page of the caller''s inbox: the live notifications that target the caller, each carrying read_at once the caller read it. page is one-based; limit is 1-100; unread_only narrows the page to what the caller has not read; category narrows it to one category; sort_by orders the page against the contract''s whitelist. Authenticated: any caller.'
+description: '[Saka] Answer one page of the caller''s inbox: the live notifications that target the caller, each carrying read_at once the caller read it. page is one-based; limit is 1-100; unread_only narrows the page to what the caller has not read; category narrows it to one category; sort_by orders the page against the contract''s whitelist. Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -31,7 +31,7 @@ headers:
 method: POST
 name: List Notifications
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/ListNotifications
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/ListNotifications
 urlParameters: []
 settingSendCookies:
   enabled: false

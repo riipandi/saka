@@ -21,12 +21,12 @@
 // the source of truth, the claim its snapshot.
 syntax = "proto3";
 
-package tango.authz.v1;
+package saka.authz.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authz/v1;authzv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1;authzv1";
 
 // AuthorizationService is the administrative surface over roles,
 // permissions, and the grants that bind them to accounts. Every procedure
@@ -255,7 +255,7 @@ message ListRolesRequest {
 message ListRolesResponse {
   repeated Role roles = 1;
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
   // status and message are the envelope every response carries.
   string status = 98;
   string message = 99;

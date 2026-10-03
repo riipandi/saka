@@ -26,9 +26,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Begin passkey registration'
+name: '[Saka] Begin passkey registration'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/BeginRegistration
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/BeginRegistration
 urlParameters: []
 settingSendCookies:
   enabled: false

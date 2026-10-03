@@ -16,7 +16,7 @@ body:
       ]
     }
 bodyType: application/json
-description: '[Tango] Replace the set of roles one account holds. Every named role must exist; the ones it held and no longer does are revoked, not deleted. Administrative: requires the admin role.'
+description: '[Saka] Replace the set of roles one account holds. Every named role must exist; the ones it held and no longer does are revoked, not deleted. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: Set User Roles
 sortPriority: 8000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/SetUserRoles
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/SetUserRoles
 urlParameters: []
 settingSendCookies:
   enabled: false

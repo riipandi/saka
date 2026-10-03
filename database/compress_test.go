@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
+	"github.com/riipandi/saka/database"
 )
 
 // Every supported format round-trips: the file it writes reads back as the same

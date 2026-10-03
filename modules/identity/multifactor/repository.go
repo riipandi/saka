@@ -9,7 +9,7 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // ErrNoRows re-exports the datastore's sentinel so callers answer one

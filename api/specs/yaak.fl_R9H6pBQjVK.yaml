@@ -8,7 +8,7 @@ folderId: null
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
-description: '[Tango] The notification surface: what an administrator publishes and what an account reads.'
+description: '[Saka] The notification surface: what an administrator publishes and what an account reads.'
 headers: []
 name: Notifications
 sortPriority: 15555.555555555557

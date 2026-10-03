@@ -24,13 +24,13 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/cache"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/cache"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // Package registers the services this area owns.

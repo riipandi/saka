@@ -26,9 +26,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Verify OAuth sign-in email'
+name: '[Saka] Verify OAuth sign-in email'
 sortPriority: 912.5
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/VerifySignInEmail
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/VerifySignInEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

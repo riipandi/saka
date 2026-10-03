@@ -14,7 +14,7 @@
 // a TypeID, because it is the wire credential of a foreign client.
 syntax = "proto3";
 
-package tango.federation.v1;
+package saka.federation.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
@@ -22,7 +22,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "identity.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1;federationv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1;federationv1";
 
 // OidcClientService administers the OIDC clients the deployment federates to.
 //
@@ -196,7 +196,7 @@ message OidcClient {
 
   // allowed_user_groups are the groups the restriction names, resolved to
   // the group views the group surface answers with.
-  repeated tango.identity.v1.UserGroup allowed_user_groups = 30;
+  repeated saka.identity.v1.UserGroup allowed_user_groups = 30;
 
   // created_by_id is the account that defined the client, in its wire form.
   optional string created_by_id = 31;
@@ -274,7 +274,7 @@ message ListOidcClientsResponse {
   repeated OidcClient clients = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -1260,7 +1260,7 @@ message DeleteGroupCustomClaimResponse {
 // one per OIDC client, each an external application that receives the
 // client's visible accounts and groups over SCIM 2.0.
 //
-// Tango is the SCIM client here, not the server: the sync pushes the
+// Saka is the SCIM client here, not the server: the sync pushes the
 // deployment's data out, so a provider row is a deployment decision —
 // where to send, with which bearer token — and every procedure is
 // administrative, like the client surface above.

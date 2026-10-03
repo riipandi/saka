@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // EmailChangeRequestEmailName is the queue the confirm-link messages run on.

@@ -17,9 +17,9 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/kernel"
 )
 
 // ModuleName is the name the area reports under.

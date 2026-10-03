@@ -12,10 +12,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	webhookv1 "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1"
-	webhookv1connect "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1/webhookv1connect"
-	"github.com/riipandi/tango/pkg/responder"
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	webhookv1 "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1"
+	webhookv1connect "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1/webhookv1connect"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

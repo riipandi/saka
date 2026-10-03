@@ -1,7 +1,7 @@
 // Package scimsync provisions the deployment's accounts and groups to
 // external applications that speak SCIM 2.0.
 //
-// Tango is the SCIM client here, not the server: one provider row per OIDC
+// Saka is the SCIM client here, not the server: one provider row per OIDC
 // client names a remote base URL and the bearer token the sync presents,
 // and one pass pushes the client's visible accounts and groups out until
 // the remote matches the local snapshot. The visibility roll is the OIDC

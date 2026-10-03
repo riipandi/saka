@@ -27,7 +27,7 @@ func TestTheAuthorizationResponseCarriesTheIssParameter(t *testing.T) {
 		ScopeIDs:      "openid",
 	}
 	p, err := provider.New(provider.Config{
-		Issuer: "https://tango.example",
+		Issuer: "https://saka.example",
 		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
 			return goidc.JSONWebKeySet{}, nil
 		},
@@ -61,13 +61,13 @@ func TestTheAuthorizationResponseCarriesTheIssParameter(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, rec.Code)
 	location, err := url.Parse(rec.Header().Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, "https://tango.example", location.Query().Get("iss"),
+	assert.Equal(t, "https://saka.example", location.Query().Get("iss"),
 		"the redirect names the issuer, whatever the answer is")
 	assert.Equal(t, "xyz", location.Query().Get("state"))
 }
 
 func TestTheInteractionDocumentCarriesTheLoginHint(t *testing.T) {
-	hint := "sophie.neveu@tango.example"
+	hint := "sophie.neveu@saka.example"
 	session := &goidc.AuthnSession{
 		ID:       "sess_1",
 		ClientID: "client_1",

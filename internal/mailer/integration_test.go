@@ -16,9 +16,9 @@ import (
 
 	"encoding/json/v2"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // startMailer points the configuration at the shared Mailpit container and
@@ -57,7 +57,7 @@ func mailpitConfig(t *testing.T, server *testutils.Mailpit) config.Config {
 	cfg.Mailer.SMTPHost, cfg.Mailer.SMTPPort = mailpitHostPort(t, server)
 	cfg.Mailer.SMTPUsername = server.Username
 	cfg.Mailer.SMTPPassword = server.Password
-	cfg.Mailer.FromEmail = "no-reply@tango.test"
+	cfg.Mailer.FromEmail = "no-reply@saka.test"
 	cfg.Mailer.FromName = "Hogwarts Express"
 	return cfg
 }
@@ -67,7 +67,7 @@ func TestSendDeliversATemplatedMessage(t *testing.T) {
 	// and hand it to a real SMTP server.
 	service, server := startMailer(t)
 
-	recipient := "neveu@tango.test"
+	recipient := "neveu@saka.test"
 	subject := uniqueSubject("mailer smoke")
 	require.NoError(t, service.Send(t.Context(), mailer.Request{
 		To:       []string{recipient},
@@ -87,7 +87,7 @@ func TestSendDeliversATemplatedMessage(t *testing.T) {
 	// intact and the identity has to be there.
 	detail := fetchMessage(t, server, message.ID)
 	assert.Contains(t, detail.HTML, "expecto-patronum")
-	assert.Contains(t, detail.HTML, "Tango")
+	assert.Contains(t, detail.HTML, "Saka")
 	assert.NotContains(t, detail.HTML, "{{")
 }
 
@@ -96,24 +96,24 @@ func TestSendReachesBlindRecipientsWithoutShowingThem(t *testing.T) {
 
 	subject := uniqueSubject("mailer bcc")
 	require.NoError(t, service.Send(t.Context(), mailer.Request{
-		To:       []string{"primary@tango.test"},
-		Bcc:      []string{"blind@tango.test"},
+		To:       []string{"primary@saka.test"},
+		Bcc:      []string{"blind@saka.test"},
 		Subject:  subject,
 		Template: mailer.TemplateTestEmail,
-		View:     mailer.View{Email: "primary@tango.test"},
+		View:     mailer.View{Email: "primary@saka.test"},
 	}))
 
 	message := awaitMessage(t, server, subject)
-	assert.ElementsMatch(t, []string{"primary@tango.test", "blind@tango.test"}, message.Delivered(),
+	assert.ElementsMatch(t, []string{"primary@saka.test", "blind@saka.test"}, message.Delivered(),
 		"a blind recipient is still delivered to")
 
 	// Mailpit parses the message the way a receiving client does, so the
 	// headers it reports are the headers that were sent.
-	assert.Equal(t, []string{"primary@tango.test"}, message.Visible(),
+	assert.Equal(t, []string{"primary@saka.test"}, message.Visible(),
 		"a blind recipient must not appear in the headers")
 
 	detail := fetchMessage(t, server, message.ID)
-	assert.NotContains(t, detail.Text, "blind@tango.test",
+	assert.NotContains(t, detail.Text, "blind@saka.test",
 		"a blind recipient must not appear in the message")
 }
 
@@ -130,10 +130,10 @@ func TestSendReportsRejectedCredentials(t *testing.T) {
 	require.NoError(t, err)
 
 	err = mailer.NewService(client, templates).Send(t.Context(), mailer.Request{
-		To:       []string{"neveu@tango.test"},
+		To:       []string{"neveu@saka.test"},
 		Subject:  "should not arrive",
 		Template: mailer.TemplateTestEmail,
-		View:     mailer.View{Email: "neveu@tango.test"},
+		View:     mailer.View{Email: "neveu@saka.test"},
 	})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, mailer.ErrAuth)
@@ -155,7 +155,7 @@ func TestSendAllowsPlaintextCredentialsToALoopbackServer(t *testing.T) {
 
 	subject := uniqueSubject("mailer loopback plaintext")
 	require.NoError(t, client.Send(t.Context(), mailer.Message{
-		To:      []string{"neveu@tango.test"},
+		To:      []string{"neveu@saka.test"},
 		Subject: subject,
 		Text:    "Hello",
 	}))

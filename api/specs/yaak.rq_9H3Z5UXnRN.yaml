@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Queue surface — one page of the archive's failures, the replay's raw material.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List failed tasks in the archive (queue)'
+name: '[Saka] List failed tasks in the archive (queue)'
 sortPriority: 333.3333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/ListDeadTasks
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ListDeadTasks
 urlParameters: []
 settingSendCookies:
   enabled: false

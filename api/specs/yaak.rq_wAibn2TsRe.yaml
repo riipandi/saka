@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   One group with its members.
 
-  Ported from Pocket ID `GET /api/user-groups/{id}` as the `tango.identity.v1.UserGroupService/GetUserGroup` procedure.
+  Ported from Pocket ID `GET /api/user-groups/{id}` as the `saka.identity.v1.UserGroupService/GetUserGroup` procedure.
 
   Parameters:
   - id (body, required): user group ID in its wire TypeID form (`ugrp_...`), not the row's UUID — the UUID never leaves the server. Member ids stay the account's `user_` TypeID. An identifier that names no group — unknown or malformed — answers `not_found`.
@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] Get user group by ID'
 sortPriority: 4333.333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/GetUserGroup
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/GetUserGroup
 urlParameters:
 - enabled: true
   name: id

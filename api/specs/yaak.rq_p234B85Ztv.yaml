@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  One page of the account's sessions, newest first, ended ones included, the caller's own marked. Tango-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+  One page of the account's sessions, newest first, ended ones included, the caller's own marked. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
 
   Parameters:
   - page (body, optional): one-based page number
@@ -23,9 +23,9 @@ headers:
   value: application/json
   id: aKQQ2gYz8X
 method: POST
-name: '[Tango] List sessions'
+name: '[Saka] List sessions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/ListSessions
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/ListSessions
 urlParameters: []
 settingSendCookies:
   enabled: false

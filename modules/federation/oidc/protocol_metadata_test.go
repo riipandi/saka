@@ -22,7 +22,7 @@ func metadataProvider(t *testing.T) http.Handler {
 	t.Helper()
 
 	p, err := provider.New(provider.Config{
-		Issuer: "https://tango.example",
+		Issuer: "https://saka.example",
 		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
 			return goidc.JSONWebKeySet{}, nil
 		},
@@ -77,11 +77,11 @@ func TestTheRFC8414AliasServesTheDiscoveryDocument(t *testing.T) {
 		Scopes             []string `json:"scopes_supported"`
 	}
 	require.NoError(t, json.Unmarshal(aliasBody, &document))
-	assert.Equal(t, "https://tango.example", document.Issuer)
-	assert.Equal(t, "https://tango.example"+protocolPrefix+protocolRevokeEndpoint,
+	assert.Equal(t, "https://saka.example", document.Issuer)
+	assert.Equal(t, "https://saka.example"+protocolPrefix+protocolRevokeEndpoint,
 		document.RevocationEndpoint)
 	assert.NotEmpty(t, document.RevocationAuthn, "the revocation surface names its client authentication methods")
-	assert.Equal(t, "https://tango.example"+protocolPrefix+protocolIntrospectEndpoint,
+	assert.Equal(t, "https://saka.example"+protocolPrefix+protocolIntrospectEndpoint,
 		document.IntrospectEndpoint)
 	assert.NotEmpty(t, document.Scopes)
 }

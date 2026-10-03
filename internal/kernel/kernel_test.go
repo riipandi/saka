@@ -92,7 +92,7 @@ func TestMountRPCSkipsModulesWithoutProcedures(t *testing.T) {
 			mountingModule{name: "plain", methods: map[string]string{http.MethodGet: "/plain"}},
 			rpcMountingModule{
 				name:       "rpc",
-				procedures: []string{"/tango.test.v1.FeatureService/Ping"},
+				procedures: []string{"/saka.test.v1.FeatureService/Ping"},
 			},
 		)
 	})
@@ -105,16 +105,16 @@ func TestMountRPCFailsOnAClaimedTwiceProcedure(t *testing.T) {
 	r := chi.NewRouter()
 
 	assert.PanicsWithValue(t,
-		`kernel: module "b" claims procedure /tango.test.v1.FeatureService/Ping already claimed by module "a"`,
+		`kernel: module "b" claims procedure /saka.test.v1.FeatureService/Ping already claimed by module "a"`,
 		func() {
 			MountRPC(r, nil,
 				rpcMountingModule{
 					name:       "a",
-					procedures: []string{"/tango.test.v1.FeatureService/Ping"},
+					procedures: []string{"/saka.test.v1.FeatureService/Ping"},
 				},
 				rpcMountingModule{
 					name:       "b",
-					procedures: []string{"/tango.test.v1.FeatureService/Ping"},
+					procedures: []string{"/saka.test.v1.FeatureService/Ping"},
 				},
 			)
 		})

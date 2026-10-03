@@ -16,7 +16,7 @@ body:
       ]
     }
 bodyType: application/json
-description: '[Tango] Replace the direct grants one account carries. A direct grant is the exception: prefer a role. Administrative: requires the admin role.'
+description: '[Saka] Replace the direct grants one account carries. A direct grant is the exception: prefer a role. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: Set User Permissions
 sortPriority: 8444.444444444445
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/SetUserPermissions
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/SetUserPermissions
 urlParameters: []
 settingSendCookies:
   enabled: false

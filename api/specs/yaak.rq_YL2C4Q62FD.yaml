@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Scheduler surface — one entry per registered job: cron spec, next_due cursor, last_fired. Empty until a feature schedules a cron job.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -30,9 +30,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List scheduled cron jobs (scheduler)'
+name: '[Saka] List scheduled cron jobs (scheduler)'
 sortPriority: 4609.0534979423865
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.SchedulerService/ListJobs
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.SchedulerService/ListJobs
 urlParameters: []
 settingSendCookies:
   enabled: false

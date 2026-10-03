@@ -14,12 +14,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/transport"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,9 +31,9 @@ func TestRPCRefusesTheEngineProceduresWithoutAToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
 	for _, procedure := range []string{
-		"/tango.system.v1.QueueService/ListQueues",
-		"/tango.system.v1.QueueService/ListTasks",
-		"/tango.system.v1.SchedulerService/ListJobs",
+		"/saka.system.v1.QueueService/ListQueues",
+		"/saka.system.v1.QueueService/ListTasks",
+		"/saka.system.v1.SchedulerService/ListJobs",
 	} {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, rpcRequest(t, procedure, "{}"))
@@ -48,7 +48,7 @@ func TestRPCRefusesTheEngineProceduresWithoutAToken(t *testing.T) {
 func TestRPCQueueProceduresAnswerWithoutTheEngine(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
-	req := rpcRequest(t, "/tango.system.v1.QueueService/ListQueues", "{}")
+	req := rpcRequest(t, "/saka.system.v1.QueueService/ListQueues", "{}")
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -69,7 +69,7 @@ func TestRPCQueueProceduresAnswerWithoutTheEngine(t *testing.T) {
 func TestRPCSchedulerProceduresAnswerWithoutTheEngine(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
-	req := rpcRequest(t, "/tango.system.v1.SchedulerService/ListJobs", "{}")
+	req := rpcRequest(t, "/saka.system.v1.SchedulerService/ListJobs", "{}")
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -173,10 +173,10 @@ func TestADestructiveQueueActionLeavesAnAuditRecord(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	}
 
-	call("/tango.system.v1.QueueService/CancelTask", `{"id":"`+wire+`"}`)
-	call("/tango.system.v1.QueueService/ReplayDeadTasks", `{"queue":"admin_audit_probe"}`)
-	call("/tango.system.v1.QueueService/FlushPendingTasks", `{}`)
-	call("/tango.system.v1.QueueService/FlushCompletedTasks", `{}`)
+	call("/saka.system.v1.QueueService/CancelTask", `{"id":"`+wire+`"}`)
+	call("/saka.system.v1.QueueService/ReplayDeadTasks", `{"queue":"admin_audit_probe"}`)
+	call("/saka.system.v1.QueueService/FlushPendingTasks", `{}`)
+	call("/saka.system.v1.QueueService/FlushCompletedTasks", `{}`)
 
 	// The cancelled record names the task by the row's own identifier — the
 	// raw UUID, the form a UUID column holds — not the wire form.
@@ -237,7 +237,7 @@ func TestTheStaticInternalAnswerCarriesNoDriverText(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := rpcRequest(t, "/tango.system.v1.QueueService/ListQueues", "{}")
+	req := rpcRequest(t, "/saka.system.v1.QueueService/ListQueues", "{}")
 	req.Header.Set("Authorization", "Bearer secret")
 	router.ServeHTTP(rec, req)
 

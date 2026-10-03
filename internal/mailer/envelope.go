@@ -327,7 +327,7 @@ func newBoundary() (string, error) {
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", fmt.Errorf("mailer: boundary: %w", err)
 	}
-	return "tango-" + hex.EncodeToString(b[:]), nil
+	return "saka-" + hex.EncodeToString(b[:]), nil
 }
 
 // messageID builds the Message-ID a receiving server records. The domain is the

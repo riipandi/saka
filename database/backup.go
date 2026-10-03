@@ -76,7 +76,7 @@ func writeDumpHeader(ctx context.Context, w io.Writer, tx pgx.Tx) error {
 		server = strings.Join(fields[:2], " ")
 	}
 
-	_, err = fmt.Fprintf(w, "-- tango database dump\n-- server: %s\n-- database: %s\n-- generated: %s\n",
+	_, err = fmt.Fprintf(w, "-- saka database dump\n-- server: %s\n-- database: %s\n-- generated: %s\n",
 		server, database, time.Now().UTC().Format(time.RFC3339))
 	return err
 }

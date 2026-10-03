@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: YfsBqt3TxT
 method: POST
-name: '[Tango] List TOTP enrollments'
+name: '[Saka] List TOTP enrollments'
 sortPriority: 3111.1111111111113
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.MultifactorService/ListTotpEnrollments
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/ListTotpEnrollments
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // auditRecordAge writes one record and ages it. The column is written directly

@@ -11,11 +11,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/identity/usergroup"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/identity/usergroup"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Service carries the rules of the OIDC clients: how a client is defined,

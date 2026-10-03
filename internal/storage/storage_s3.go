@@ -14,7 +14,7 @@ import (
 	"github.com/aws/smithy-go"
 	awshttp "github.com/aws/smithy-go/transport/http"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // S3 is the object-store backend: every key is one object under the

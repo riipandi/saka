@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // TestEndpointPublishesAStoredKeyFromTheDatabase is the whole path: a row in
@@ -69,7 +69,7 @@ func TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet(t *testing.T) {
 	// The token is signed with the private half the provider holds.
 	signer, err := jwtutils.NewSigner[struct{}](privateKey, jwa.ES384())
 	require.NoError(t, err)
-	token, err := signer.WithIssuer("tango").Sign(struct{}{}, jwtutils.Standard{Subject: "usr_1"})
+	token, err := signer.WithIssuer("saka").Sign(struct{}{}, jwtutils.Standard{Subject: "usr_1"})
 	require.NoError(t, err)
 
 	// The set the endpoint publishes is what a verifier reads.
@@ -88,7 +88,7 @@ func TestATokenSignedByAStoredKeyVerifiesAgainstThePublishedSet(t *testing.T) {
 	// A verifier handed the published set accepts the token.
 	verifier, err := jwtutils.NewVerifier[struct{}](nil, jwa.ES384())
 	require.NoError(t, err)
-	verified, err := verifier.WithKeySet(set).WithIssuer("tango").Verify(token)
+	verified, err := verifier.WithKeySet(set).WithIssuer("saka").Verify(token)
 	require.NoError(t, err, "a token signed by a stored key must verify against the published set")
 	assert.Equal(t, "usr_1", verified.Subject)
 }

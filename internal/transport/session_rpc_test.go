@@ -13,24 +13,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/transport"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/identity/webauthn"
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/webauthn"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The fixture account, named after the test-copywriting convention.
@@ -311,7 +311,7 @@ func TestARevocationNamingNoSessionAnswersNotFound(t *testing.T) {
 			VALUES ($1, $2, 'reauthentication', now(), now() + interval '5 minutes')`,
 			hermioneSessionOwner, crypto.HashHexToken("step-up-"+t.Name()))
 		require.NoError(t, err)
-		return map[string]string{"X-Tango-Reauthentication": "step-up-" + t.Name()}
+		return map[string]string{"X-Saka-Reauthentication": "step-up-" + t.Name()}
 	}
 
 	for name, body := range map[string]string{

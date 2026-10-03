@@ -15,7 +15,7 @@ description: |-
   Endpoint: `GET /oidc/interactions/{id}`
 headers: []
 method: GET
-name: '[Tango] Read authorization interaction'
+name: '[Saka] Read authorization interaction'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID
 urlParameters: []

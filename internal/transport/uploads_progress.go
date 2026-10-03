@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // uploadProgress serves `GET /api/uploads/{key}` — the poll a client runs

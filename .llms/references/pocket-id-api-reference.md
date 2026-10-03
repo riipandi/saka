@@ -1,34 +1,34 @@
 # Pocket ID API Reference
 
-Upstream contract for the surfaces tango ports. Extracted from
+Upstream contract for the surfaces saka ports. Extracted from
 <https://pocket-id.org/swagger.yaml> (swagger 2.0, Pocket ID API v1.0) and
 reconciled against the upstream release **v2.16.0** (2026-09-20; local clone at
 `~/Developer/github.com/pocket-id/pocket-id`). The operation list matched the
 release exactly; the shape deltas this reconciliation found are recorded in
 `.llms/handover/handover-20260930_1337.md` and the per-area notes below.
 
-This file is a reference only. tango serves ConnectRPC below `/rpc` for these
+This file is a reference only. saka serves ConnectRPC below `/rpc` for these
 operations and keeps a small HTTP/REST surface for protocol endpoints; see
-`docs/api-endpoint.md` for what tango actually mounts.
+`docs/api-endpoint.md` for what saka actually mounts.
 
 ## Parity deltas (reconciled 2026-09-30, upstream v2.16.0)
 
 The operation lists matched exactly. The shape deltas below are what a caller
-porting from upstream will meet; each is a deliberate tango shape or a gap the
+porting from upstream will meet; each is a deliberate saka shape or a gap the
 backlog owns, not a drift to fix silently.
 
 - User views carry no `is_admin` (the role/permission system replaced it) and
-  no `ldapId` (tango has no LDAP). `email` stays required **by decision
-  (2026-09-30)**: tango signs in with passwords first, so the address is the
+  no `ldapId` (saka has no LDAP). `email` stays required **by decision
+  (2026-09-30)**: saka signs in with passwords first, so the address is the
   recovery and notification channel every account must have — the nullable
-  email upstream v2 carries is a passkey-first consequence tango does not
+  email upstream v2 carries is a passkey-first consequence saka does not
   share. Custom claims travel through `CustomClaimService` rather than
   riding the user views.
 - `UserGroupDetail` answers members and `allowed_oidc_clients` — the
   allowlist roll the Set procedure wrote, read back where upstream's group
   view embeds it (fixed 2026-09-30).
 - Signup tokens answer `raw_token` at create and never again; upstream's
-  token list echoes the raw value. Tango's sign-up mints a password
+  token list echoes the raw value. Saka's sign-up mints a password
   credential with the request; upstream's sign-up has no credential in it.
 - One-time access is identifier-based for the administrative half
   (`id` + `ttl_seconds`), not upstream's email + duration.
@@ -39,10 +39,10 @@ backlog owns, not a drift to fix silently.
   upstream shapes; nothing upstream carries is missing from them.
 
 Not ported, **by decision (2026-09-30)**: the upstream **APIs** entity and its
-client-grant/CIMD surface — tango is a general boilerplate, not an auth
-product, and the API-entity model has no tango counterpart. The Yaak
+client-grant/CIMD surface — saka is a general boilerplate, not an auth
+product, and the API-entity model has no saka counterpart. The Yaak
 collection keeps the 13 upstream requests as reference, marked `not planned`.
-Also not ported: LDAP and `/api/storage/sqlite-warning` (tango is
+Also not ported: LDAP and `/api/storage/sqlite-warning` (saka is
 Postgres-only). Passkey support **is** planned, positioned GitHub-style but
 with more flexibility (decisions 2026-09-30): password sign-in stays, and a
 passkey may also serve as a passwordless **first factor**; the email stays
@@ -52,7 +52,7 @@ step-up reauthentication. An assertion with user verification satisfies MFA
 fully — no second factor is demanded after a passkey sign-in. Enrollment and
 device limits come from the appconfig catalog (`mfa.max_enrollments`,
 `passkey.max_credentials`), enforced at enrollment only.
-`/api/version/*` is planned (`tango.system.v1.VersionService`).
+`/api/version/*` is planned (`saka.system.v1.VersionService`).
 
 ## Operations
 

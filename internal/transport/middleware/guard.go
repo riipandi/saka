@@ -7,8 +7,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // Guard is the authorization interceptor every procedure on the RPC surface

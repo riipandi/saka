@@ -5,14 +5,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/scheduler"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/notification"
-	"github.com/riipandi/tango/modules/webhook"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/scheduler"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/notification"
+	"github.com/riipandi/saka/modules/webhook"
 )
 
 // Register wires the task processors onto a client. It is pure wiring — no

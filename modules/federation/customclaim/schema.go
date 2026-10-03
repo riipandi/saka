@@ -108,7 +108,7 @@ var (
 )
 
 // reservedClaimKeys are the claim names the tokens own: the registered JWT
-// claim names, the standard OIDC profile claims tango emits, and the
+// claim names, the standard OIDC profile claims saka emits, and the
 // internal token-type discriminator. The comparison is exact — JSON object
 // keys are case-sensitive, so a differently cased variant cannot collide
 // with a protected claim and is deliberately not blocked.
@@ -117,7 +117,7 @@ var reservedClaimKeys = map[string]struct{}{
 	"auth_time": {}, "nonce": {}, "acr": {}, "amr": {}, "azp": {}, "client_id": {},
 	"given_name": {}, "family_name": {}, "name": {}, "email": {}, "email_verified": {},
 	"preferred_username": {}, "display_name": {}, "groups": {},
-	"tango:token_type": {},
+	"saka:token_type": {},
 }
 
 // IsReservedClaimKey answers whether a key may not be written as a custom

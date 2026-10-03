@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // PasswordResetEmailName is the queue the reset emails run on.

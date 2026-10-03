@@ -8,12 +8,12 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/pkg/responder"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
-	authnv1connect "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1/authnv1connect"
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

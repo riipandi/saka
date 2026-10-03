@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 func testConfig() config.Config {
@@ -25,7 +25,7 @@ func testConfig() config.Config {
 	cfg.Mailer.SMTPHost = "smtp.example.com"
 	cfg.Mailer.SMTPPort = 587
 	cfg.Mailer.FromEmail = "owl-post@example.com"
-	cfg.Mailer.FromName = "Tango"
+	cfg.Mailer.FromName = "Saka"
 	return cfg
 }
 

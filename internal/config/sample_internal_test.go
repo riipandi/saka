@@ -20,7 +20,7 @@ import (
 // A local copy of the two fixtures, because this file is in package config and
 // cannot see the external test package's helpers.
 const (
-	probeDSN    = "postgresql://user:pass@localhost:5432/tango?sslmode=disable"
+	probeDSN    = "postgresql://user:pass@localhost:5432/saka?sslmode=disable"
 	probeKVURL  = "redis://default:securedb@localhost:6379"
 	probeSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 )

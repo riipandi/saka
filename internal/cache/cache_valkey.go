@@ -6,14 +6,14 @@ import (
 
 	"github.com/valkey-io/valkey-go"
 
-	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/saka/internal/datastore"
 )
 
 // ValkeyKeyPrefix namespaces the keys the cache owns inside the shared
 // backend. Features sharing one server are isolated by prefix, not by
 // logical database index — which Valkey cluster does not support — so a
 // prefix is also what an operator scans or cleans per feature.
-const ValkeyKeyPrefix = "tango:cache:"
+const ValkeyKeyPrefix = "saka:cache:"
 
 // Valkey is the Cache driver over the shared key-value backend. It holds no
 // connection of its own: the backend client is the process-wide one, and the

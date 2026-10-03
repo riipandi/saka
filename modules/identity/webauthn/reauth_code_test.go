@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/mailer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/mailer"
 )
 
 // fakeCodeEnqueuer records the code deliveries the service hands over.

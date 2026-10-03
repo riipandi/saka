@@ -60,7 +60,7 @@ jobs:
       - name: Generate email template
         run: pnpm exec vite build
         env:
-          TANGO_SKIP_GO: 1
+          SAKA_SKIP_GO: 1
 
       # Code signing:
       # @ref: https://github.com/goreleaser/goreleaser-action?tab=readme-ov-file#signing

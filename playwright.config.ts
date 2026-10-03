@@ -15,8 +15,8 @@ import { resolve } from 'node:path'
 // identity derives from.
 const serverBaseURL = 'http://localhost:3080'
 const serverCommand = [
-  'go build -tags debug -o ./build/debug/tango ./cmd',
-  `./build/debug/tango --env-file=.env.local serve --base-url=${serverBaseURL}`
+  'go build -tags debug -o ./build/debug/saka ./cmd',
+  `./build/debug/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
 ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one

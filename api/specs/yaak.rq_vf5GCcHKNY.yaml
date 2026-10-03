@@ -34,7 +34,7 @@ headers:
 method: POST
 name: '[Pocket ID] List all audit logs'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.auditlog.v1.AuditLogService/ListAll
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/ListAll
 urlParameters:
 - enabled: false
   name: pagination[page]

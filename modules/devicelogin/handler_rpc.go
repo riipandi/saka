@@ -7,8 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	authnv1 "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // rpcHandler is the transport mapping of the approval procedures. The

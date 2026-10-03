@@ -4,7 +4,7 @@
 // The database is the one signing authority. Every asymmetric key — the one
 // the internal surfaces sign with and the ones the OAuth provider offers —
 // lives in public.jwks, its private half sealed with the application secret.
-// tango initialize provisions the first key pair; jwks:generate stages a
+// saka initialize provisions the first key pair; jwks:generate stages a
 // further one for rotation. The configuration carries no key-pair material.
 //
 // Signing stays dual stack. The HMAC secret (auth.secret_key) signs tokens
@@ -32,17 +32,17 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // ErrNoSigningKey reports a deployment whose signing material is missing. The
 // asymmetric half comes from the database and the symmetric half from the
-// configuration, so the message names both doors: tango initialize provisions
+// configuration, so the message names both doors: saka initialize provisions
 // the first key pair, key:generate writes the HMAC secret.
-var ErrNoSigningKey = errors.New("jwks: no signing key: run tango initialize to provision a signing key pair, or key:generate to write auth.secret_key")
+var ErrNoSigningKey = errors.New("jwks: no signing key: run saka initialize to provision a signing key pair, or key:generate to write auth.secret_key")
 
 // KeyCacheTTL is how long a built key set is reused before the source is read
 // again. It is short because the value is cheap to rebuild and a rotation
@@ -65,7 +65,7 @@ type PairSource interface {
 
 // ErrNoStoredKeys reports a source that carries no signing pairs, or no
 // source at all. Nothing in the process can mint a token without one.
-var ErrNoStoredKeys = errors.New("jwks: no signing key pair in the database; run tango initialize to provision one")
+var ErrNoStoredKeys = errors.New("jwks: no signing key pair in the database; run saka initialize to provision one")
 
 // Sealer is the write seam the auto-invalidation runs through. The
 // repository implements it; the interface keeps a test able to stand in.
@@ -625,7 +625,7 @@ func (s *Service) openSealedKey(ctx context.Context, row SigningKeyPair) (jwk.Ke
 			return nil, errRetryAfterInvalidation
 		}
 		return nil, fmt.Errorf(
-			"unseal private key: sealed by a previous AUTH_SECRET_KEY (seal_fp %s…) — run tango jwks:generate",
+			"unseal private key: sealed by a previous AUTH_SECRET_KEY (seal_fp %s…) — run saka jwks:generate",
 			row.SealFP[:min(8, len(row.SealFP))])
 	}
 	opened, err := s.cipher.Decrypt(string(row.PrivateKey))

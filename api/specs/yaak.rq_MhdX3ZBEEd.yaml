@@ -28,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Rename passkey'
+name: '[Saka] Rename passkey'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/UpdateCredential
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/UpdateCredential
 urlParameters: []
 settingSendCookies:
   enabled: false

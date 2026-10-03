@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Replace an expired key's secret and window. An unexpired key is refused; the answer carries the new raw key, shown once.
 
-  Ported from Pocket ID `POST /api/api-keys/{id}/renew` as the `tango.apikey.v1.ApiKeyService/RenewAPIKey` procedure.
+  Ported from Pocket ID `POST /api/api-keys/{id}/renew` as the `saka.apikey.v1.ApiKeyService/RenewAPIKey` procedure.
 
   Parameters:
   - id (body, required): the key row's ID
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Renew API key'
 sortPriority: 3222.222222222222
-url: ${[ apiBaseURL ]}/rpc/tango.apikey.v1.ApiKeyService/RenewAPIKey
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey
 urlParameters:
 - enabled: true
   name: id

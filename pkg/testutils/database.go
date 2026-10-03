@@ -82,11 +82,11 @@ func testDatabaseName(t testing.TB) string {
 
 	// Postgres identifiers are limited to 63 bytes. The prefix and the ordinal
 	// both have to fit, so the test name is trimmed last.
-	const maxName = 63 - len("tango_test_")
+	const maxName = 63 - len("saka_test_")
 	if len(sanitized) > maxName {
 		sanitized = sanitized[:maxName]
 	}
-	return "tango_test_" + sanitized
+	return "saka_test_" + sanitized
 }
 
 // replaceDatabase points dsn at another database, keeping credentials and

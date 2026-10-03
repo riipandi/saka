@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/cache"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/cache"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // defaultTestTTL is the lifetime the test cache's entries carry — the
@@ -57,7 +57,7 @@ func publicValue(settings []Setting, key string) string {
 // the moment it commits, because Update drops the entry the write touches.
 func TestAChangeDropsTheCachedPublicListing(t *testing.T) {
 	settings, kvCache, _ := cachedSettingsWith(t, []SettingDef{
-		{Key: "site.title", Default: "Tango", Public: true},
+		{Key: "site.title", Default: "Saka", Public: true},
 	})
 	ctx := t.Context()
 
@@ -78,7 +78,7 @@ func TestAChangeDropsTheCachedPublicListing(t *testing.T) {
 	require.NoError(t, settings.Reset(ctx, "site.title"))
 	listing, err = settings.ListPublic(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, "Tango", publicValue(listing, "site.title"),
+	assert.Equal(t, "Saka", publicValue(listing, "site.title"),
 		"the reset restored the catalog default, through a cache the reset also dropped")
 }
 

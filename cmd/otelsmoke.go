@@ -12,15 +12,15 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // otelSmokeMarker is the attribute and metric label the smoke test attaches to
 // what it emits. It is fixed so the command's own output can tell a reader which
 // query to run, and so a second run is distinguishable from the first only by
 // its timestamp.
-const otelSmokeMarker = "tango-otel-smoke"
+const otelSmokeMarker = "saka-otel-smoke"
 
 var otelSmokeCmd = &cli.Command{
 	Name:     "otel:smoke",
@@ -76,7 +76,7 @@ func runOTELSmoke(ctx context.Context, cmd *cli.Command) error {
 	// the instrument a service is most likely to record on a request path.
 	if obs.Metrics() {
 		counter, err := obs.Meter().Meter(config.AppIdentifier).Int64Counter(
-			"tango_otel_smoke_total",
+			"saka_otel_smoke_total",
 			metric.WithDescription("Measurements emitted by otel:smoke"),
 		)
 		if err != nil {

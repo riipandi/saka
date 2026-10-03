@@ -3,8 +3,8 @@ package transport
 import (
 	"net/http"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // apiRoot is the /api landing endpoint. It names what is served, so a probe

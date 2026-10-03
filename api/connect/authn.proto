@@ -12,13 +12,13 @@
 // `permission_denied`, both with the detail message naming the reason.
 syntax = "proto3";
 
-package tango.authn.v1;
+package saka.authn.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/authn/v1;authnv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1;authnv1";
 
 // AuthService issues the credentials a caller presents on every later call.
 service AuthService {
@@ -40,7 +40,7 @@ service AuthService {
 // frontend.
 //
 // Pocket ID has no password recovery at all — passkey-only accounts never
-// lose a password — so this service is tango-only. The flow is the
+// lose a password — so this service is saka-only. The flow is the
 // email-verification shape: the raw token exists once in the email and once
 // in the request, the database stores only its hash, and an unknown, expired,
 // spent, and refused token answer the same failure. The token travels through
@@ -478,7 +478,7 @@ message ListSessionsResponse {
   repeated Session sessions = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -935,7 +935,7 @@ message AdminDisableMfaResponse {
 // DeviceApprovalService is the approving side of the device login flow:
 // a browser that cannot sign itself in creates a pairing request over
 // REST, and the account holder — signed in on a device that can — reads
-// what the request names and answers it here. The service is tango-only;
+// what the request names and answers it here. The service is saka-only;
 // upstream Pocket ID has no passkey-less sign-in to approve.
 service DeviceApprovalService {
   // Inspect answers the request the presented user code names: the code
@@ -1013,7 +1013,7 @@ message DecideDeviceLoginResponse {
 
 // OAuthSSOService is the sign-in-with-a-provider surface: the builtin
 // Google and GitHub connections and the operator-configured custom OIDC
-// ones. The service is tango-only — upstream Pocket ID never signed an
+// ones. The service is saka-only — upstream Pocket ID never signed an
 // account in through an external identity provider.
 //
 // The flow is a browser round trip: BeginSignIn answers the provider's
@@ -1202,7 +1202,7 @@ message VerifyOAuthSignInEmailRequest {
   // code is the single-use code the account received by email. The
   // generated form is six or twelve characters.
   string code = 2 [(buf.validate.field).string = {
-    min_len: 6,
+    min_len: 6
     max_len: 12
   }];
 }

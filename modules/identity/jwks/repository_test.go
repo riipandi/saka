@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedPool opens a fresh database with the migrations applied, so the

@@ -11,9 +11,9 @@ import (
 
 // meterName is the instrumentation scope every scheduler instrument is
 // registered under, rendered into otel_scope_name by the bridge.
-const meterName = "github.com/riipandi/tango/internal/scheduler"
+const meterName = "github.com/riipandi/saka/internal/scheduler"
 
-// The outcomes a fire carries on tango.scheduler.ticks. A claimed tick
+// The outcomes a fire carries on saka.scheduler.ticks. A claimed tick
 // advanced next_due and enqueued its task; a skipped one was fired by another
 // replica first — that is the claim design working, not a miss.
 const (
@@ -36,17 +36,17 @@ func newSchedulerMetrics() *schedulerMetrics {
 	meter := otel.Meter(meterName)
 	m := &schedulerMetrics{}
 	var err error
-	if m.ticks, err = meter.Int64Counter("tango.scheduler.ticks",
+	if m.ticks, err = meter.Int64Counter("saka.scheduler.ticks",
 		metric.WithDescription("Cron ticks by outcome: claimed here, or already claimed by another replica"),
 		metric.WithUnit("{tick}")); err != nil {
 		panic("scheduler: " + err.Error())
 	}
-	if m.duration, err = meter.Float64Histogram("tango.scheduler.tick.duration",
+	if m.duration, err = meter.Float64Histogram("saka.scheduler.tick.duration",
 		metric.WithDescription("Time one fire spent claiming and enqueueing"),
 		metric.WithUnit("s")); err != nil {
 		panic("scheduler: " + err.Error())
 	}
-	if m.reseeds, err = meter.Int64Counter("tango.scheduler.reseeds",
+	if m.reseeds, err = meter.Int64Counter("saka.scheduler.reseeds",
 		metric.WithDescription("State rows rebuilt after being removed under the schedule"),
 		metric.WithUnit("{job}")); err != nil {
 		panic("scheduler: " + err.Error())

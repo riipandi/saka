@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // ProtocolCleanupName is the queue the OAuth/OIDC protocol state's

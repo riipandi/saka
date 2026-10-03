@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Remove a custom role. A system role is refused, as is any role accounts still hold - the grants must be lifted first. Administrative: requires the admin role.'
+description: '[Saka] Remove a custom role. A system role is refused, as is any role accounts still hold - the grants must be lifted first. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Delete Role
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/DeleteRole
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/DeleteRole
 urlParameters: []
 settingSendCookies:
   enabled: false

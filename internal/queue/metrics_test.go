@@ -82,21 +82,21 @@ func TestTheQueueInstrumentsReachTheReader(t *testing.T) {
 		return point{}, false
 	}
 
-	if _, ok := find("tango.queue.tasks.enqueued", map[string]string{"queue": "cleanup"}); !ok {
-		t.Error("tango.queue.tasks.enqueued{queue=cleanup} is missing")
+	if _, ok := find("saka.queue.tasks.enqueued", map[string]string{"queue": "cleanup"}); !ok {
+		t.Error("saka.queue.tasks.enqueued{queue=cleanup} is missing")
 	}
-	if _, ok := find("tango.queue.claims.failed", nil); !ok {
-		t.Error("tango.queue.claims.failed is missing")
+	if _, ok := find("saka.queue.claims.failed", nil); !ok {
+		t.Error("saka.queue.claims.failed is missing")
 	}
-	p, ok := find("tango.queue.task.duration", map[string]string{"queue": "cleanup"})
+	p, ok := find("saka.queue.task.duration", map[string]string{"queue": "cleanup"})
 	if !ok || !p.isHist || p.count != 2 {
-		t.Fatalf("tango.queue.task.duration: got %+v (found=%v)", p, ok)
+		t.Fatalf("saka.queue.task.duration: got %+v (found=%v)", p, ok)
 	}
 	if p.value < 1.4 || p.value > 1.5 {
-		t.Errorf("tango.queue.task.duration sum = %v, want 0.25+1.2", p.value)
+		t.Errorf("saka.queue.task.duration sum = %v, want 0.25+1.2", p.value)
 	}
-	if _, ok := find("tango.queue.task.attempts", map[string]string{"queue": "cleanup"}); !ok {
-		t.Error("tango.queue.task.attempts is missing")
+	if _, ok := find("saka.queue.task.attempts", map[string]string{"queue": "cleanup"}); !ok {
+		t.Error("saka.queue.task.attempts is missing")
 	}
 }
 

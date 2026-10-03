@@ -15,7 +15,7 @@ body:
       "description": "Edits the content"
     }
 bodyType: application/json
-description: '[Tango] Define a custom role. The slug is unique and immutable; the role is born with no permissions and is granted them by SetRolePermissions. Administrative: requires the admin role.'
+description: '[Saka] Define a custom role. The slug is unique and immutable; the role is born with no permissions and is granted them by SetRolePermissions. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -28,7 +28,7 @@ headers:
 method: POST
 name: Create Role
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/CreateRole
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/CreateRole
 urlParameters: []
 settingSendCookies:
   enabled: false

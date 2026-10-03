@@ -85,15 +85,15 @@ test.describe.serial('the passkey ladder', () => {
     expect(proof).not.toBe('')
 
     // The guarded call spends the header proof once.
-    const spent = await request.post('/rpc/tango.authn.v1.SessionService/RevokeSession', {
-      headers: { Authorization: `Bearer ${accessToken}`, 'X-Tango-Reauthentication': proof },
+    const spent = await request.post('/rpc/saka.authn.v1.SessionService/RevokeSession', {
+      headers: { Authorization: `Bearer ${accessToken}`, 'X-Saka-Reauthentication': proof },
       data: { id: sessionID }
     })
     expect(spent.status()).toBe(200)
 
     // The replay answers unauthenticated — the proof died with its spend.
-    const replay = await request.post('/rpc/tango.authn.v1.SessionService/RevokeSession', {
-      headers: { Authorization: `Bearer ${accessToken}`, 'X-Tango-Reauthentication': proof },
+    const replay = await request.post('/rpc/saka.authn.v1.SessionService/RevokeSession', {
+      headers: { Authorization: `Bearer ${accessToken}`, 'X-Saka-Reauthentication': proof },
       data: { id: sessionID }
     })
     expect(replay.status()).toBe(401)
@@ -106,7 +106,7 @@ test.describe.serial('the passkey ladder', () => {
   // ---- helpers ----
 
   async function signIn(request: APIRequestContext): Promise<string> {
-    const response = await request.post('/rpc/tango.authn.v1.AuthService/SignIn', {
+    const response = await request.post('/rpc/saka.authn.v1.AuthService/SignIn', {
       data: { identity, password }
     })
     expect(response.status()).toBe(200)

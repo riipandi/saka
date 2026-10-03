@@ -14,7 +14,7 @@ body:
     }
 bodyType: application/json
 description: |-
-  Proves the caller again — by password or by a passkey assertion over a ceremony BeginLogin answered — and answers a single-use reauthentication token. The token is hashed at rest and dies at its five-minute window; the next guarded call spends it through the X-Tango-Reauthentication header, and its replay answers unauthenticated.
+  Proves the caller again — by password or by a passkey assertion over a ceremony BeginLogin answered — and answers a single-use reauthentication token. The token is hashed at rest and dies at its five-minute window; the next guarded call spends it through the X-Saka-Reauthentication header, and its replay answers unauthenticated.
 
   The passkey form rides the oneof: {"passkey": {"session_id": "wcs_", "credential": "<assertion JSON>"}}.
 
@@ -29,9 +29,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Reauthenticate (step-up proof)'
+name: '[Saka] Reauthenticate (step-up proof)'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/Reauthenticate
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/Reauthenticate
 urlParameters: []
 settingSendCookies:
   enabled: false

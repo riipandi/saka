@@ -1,14 +1,14 @@
 {
-    "name": "tango",
+    "name": "saka",
     "version": "0.0.0",
     "private": true,
-    "homepage": "https://github.com/riipandi/tango#readme",
+    "homepage": "https://github.com/riipandi/saka#readme",
     "bugs": {
-        "url": "https://github.com/riipandi/tango/issues"
+        "url": "https://github.com/riipandi/saka/issues"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/riipandi/tango.git"
+        "url": "git+https://github.com/riipandi/saka.git"
     },
     "type": "module",
     "scripts": {

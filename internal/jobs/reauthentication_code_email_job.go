@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/webauthn"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/webauthn"
 )
 
 // ReauthenticationCodeEmailName is the queue the reauthentication-code

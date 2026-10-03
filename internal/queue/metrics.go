@@ -12,9 +12,9 @@ import (
 // meterName is the instrumentation scope every queue instrument is registered
 // under. The bridge renders it into otel_scope_name, so a scrape can tell this
 // package's series from another instrumentation's.
-const meterName = "github.com/riipandi/tango/internal/queue"
+const meterName = "github.com/riipandi/saka/internal/queue"
 
-// The outcomes a settled task carries on tango.queue.tasks.processed. A task
+// The outcomes a settled task carries on saka.queue.tasks.processed. A task
 // that succeeded left the queue, one still holding attempts went back for its
 // backoff, and one that exhausted them is dead — the archive's replay stock.
 const (
@@ -43,28 +43,28 @@ func newTaskMetrics() *taskMetrics {
 	meter := otel.Meter(meterName)
 	m := &taskMetrics{}
 	var err error
-	if m.enqueued, err = meter.Int64Counter("tango.queue.tasks.enqueued",
+	if m.enqueued, err = meter.Int64Counter("saka.queue.tasks.enqueued",
 		metric.WithDescription("Tasks inserted into the pending table"),
 		metric.WithUnit("{task}")); err != nil {
 		panic("queue: " + err.Error())
 	}
-	if m.processed, err = meter.Int64Counter("tango.queue.tasks.processed",
+	if m.processed, err = meter.Int64Counter("saka.queue.tasks.processed",
 		metric.WithDescription("Tasks settled by the dispatcher, by outcome"),
 		metric.WithUnit("{task}")); err != nil {
 		panic("queue: " + err.Error())
 	}
-	if m.duration, err = meter.Float64Histogram("tango.queue.task.duration",
+	if m.duration, err = meter.Float64Histogram("saka.queue.task.duration",
 		metric.WithDescription("Task execution duration"),
 		metric.WithUnit("s")); err != nil {
 		panic("queue: " + err.Error())
 	}
-	if m.attempts, err = meter.Int64Histogram("tango.queue.task.attempts",
+	if m.attempts, err = meter.Int64Histogram("saka.queue.task.attempts",
 		metric.WithDescription("Attempts a settled task consumed"),
 		metric.WithUnit("{attempt}"),
 		metric.WithExplicitBucketBoundaries(1, 2, 3, 4, 5, 10)); err != nil {
 		panic("queue: " + err.Error())
 	}
-	if m.claimErrs, err = meter.Int64Counter("tango.queue.claims.failed",
+	if m.claimErrs, err = meter.Int64Counter("saka.queue.claims.failed",
 		metric.WithDescription("Failed claims: the dispatcher could not read the pending table"),
 		metric.WithUnit("{error}")); err != nil {
 		panic("queue: " + err.Error())

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/riipandi/tango/internal/queue"
+	"github.com/riipandi/saka/internal/queue"
 )
 
 // SignupNotifier is the adapter between the sign-up service's

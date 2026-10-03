@@ -33,7 +33,7 @@ headers:
 method: POST
 name: '[Pocket ID] Sign up initial admin user (unplanned)'
 sortPriority: 25000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.SignupService/SetupInitialAdmin
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/SetupInitialAdmin
 urlParameters: []
 settingSendCookies:
   enabled: false

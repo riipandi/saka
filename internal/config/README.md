@@ -1,6 +1,6 @@
 # Config
 
-Config is tango's configuration system: one JSON config file as the source of truth, the
+Config is saka's configuration system: one JSON config file as the source of truth, the
 built-in defaults below it, command-line flags above it, and the environment as a value table
 the file references — never a layer of its own.
 
@@ -66,11 +66,11 @@ the loader applies.
 
 - Go >= 1.27 (`encoding/json/v2`, `maps`/`slices` idioms)
 - `github.com/knadh/koanf/v2` — the merge engine; the layers are flattened before they merge
-- `github.com/riipandi/tango/pkg/envfile` — the dotenv table the file's directives resolve from
+- `github.com/riipandi/saka/pkg/envfile` — the dotenv table the file's directives resolve from
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. Every command resolves
+The package lives inside the `saka` module and is not published. Every command resolves
 through `cmd/config.go`: `initConfig` runs before the action, stores the outcome on the
 context, and the action calls `configFrom` (or `fullConfigFrom` when it will validate) — a
 command that never reads the config never reports its errors.

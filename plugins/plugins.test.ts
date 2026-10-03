@@ -12,7 +12,7 @@ describe('vite plugins', () => {
   })
 
   test('go plugin exposes its name', () => {
-    expect(golangPlugin({ packageName: 'tango' }).name).toBe('vite-plugin-go')
+    expect(golangPlugin({ packageName: 'saka' }).name).toBe('vite-plugin-go')
   })
 })
 

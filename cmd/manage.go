@@ -13,13 +13,13 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/password"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 var adminResetPasswordCmd = &cli.Command{
@@ -67,7 +67,7 @@ func runAdminResetPassword(ctx context.Context, cmd *cli.Command) error {
 
 	email := cmd.Args().First()
 	if email == "" {
-		return errors.New("the account's email address is required: tango admin:reset-password EMAIL_ADDRESS")
+		return errors.New("the account's email address is required: saka admin:reset-password EMAIL_ADDRESS")
 	}
 	proposed := cmd.String("new-password")
 

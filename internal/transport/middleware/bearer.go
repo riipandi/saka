@@ -8,8 +8,8 @@ import (
 	"connectrpc.com/authn"
 	"connectrpc.com/connect"
 
-	"github.com/riipandi/tango/internal/guard"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Authenticator authenticates one request and answers the identity the

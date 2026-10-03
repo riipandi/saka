@@ -11,10 +11,10 @@ import (
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // openMigrator opens the single-connection migration handle and loads the
@@ -388,7 +388,7 @@ func runMigrateStatus(ctx context.Context, cmd *cli.Command) error {
 // highest applied migration. A database that has never been migrated reports 0.
 //
 // This command prints the bare number and nothing else: scripts read it
-// directly, so a target header would break `VERSION=$(tango migrate:version)`.
+// directly, so a target header would break `VERSION=$(saka migrate:version)`.
 // Every other migrate:* command announces the database it works on.
 func runMigrateVersion(ctx context.Context, cmd *cli.Command) error {
 	cfg, err := configFrom(ctx)

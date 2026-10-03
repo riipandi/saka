@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/envfile"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/envfile"
 )
 
 // runKeyGenerateCmd executes key:generate with args and returns stdout.
@@ -25,12 +25,12 @@ func runKeyGenerateCmd(t *testing.T, stdin string, args ...string) (string, erro
 	var out bytes.Buffer
 
 	root := &cli.Command{
-		Name:     "tango",
+		Name:     "saka",
 		Writer:   &out,
 		Reader:   strings.NewReader(stdin),
 		Commands: []*cli.Command{keyGenerateCmd},
 	}
-	err := root.Run(context.Background(), append([]string{"tango", "key:generate"}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", "key:generate"}, args...))
 	return out.String(), err
 }
 
@@ -75,7 +75,7 @@ func TestKeyGenerateIgnoresRootEnvFile(t *testing.T) {
 
 	var out bytes.Buffer
 	root := &cli.Command{
-		Name:     "tango",
+		Name:     "saka",
 		Writer:   &out,
 		Reader:   strings.NewReader(""),
 		Commands: []*cli.Command{keyGenerateCmd},
@@ -84,7 +84,7 @@ func TestKeyGenerateIgnoresRootEnvFile(t *testing.T) {
 		},
 	}
 	require.NoError(t, root.Run(context.Background(),
-		[]string{"tango", "--env-file=" + path, "key:generate"}))
+		[]string{"saka", "--env-file=" + path, "key:generate"}))
 
 	assert.NotContains(t, out.String(), "already exists")
 	assert.NotContains(t, out.String(), "wrote ")

@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Replaces the set of groups the client's restriction names. The replace, not a delta: an empty list empties the roll — with the restriction on, the client admits nobody — and one identifier that names no group refuses the replacement whole.
 
-  Tango procedure tango.federation.v1.OidcClientService/UpdateAllowedUserGroups. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/UpdateAllowedUserGroups. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update allowed user groups'
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UpdateAllowedUserGroups
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/UpdateAllowedUserGroups
 urlParameters:
 - enabled: true
   name: id

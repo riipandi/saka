@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] Reset user profile picture'
 sortPriority: 18000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/ResetProfilePicture
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/ResetProfilePicture
 urlParameters:
 - enabled: true
   name: id

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // plain is the palette a test uses. A bytes.Buffer is never a terminal, so the
@@ -126,9 +126,9 @@ func TestPrintDatabaseRedactsUnparsableDSN(t *testing.T) {
 func TestReportTargetOmitsCredentials(t *testing.T) {
 	var out bytes.Buffer
 	require.NoError(t, reportTarget(plain(&out),
-		"postgres://user:secret@db.example.com:5432/tango?sslmode=disable"))
+		"postgres://user:secret@db.example.com:5432/saka?sslmode=disable"))
 
-	assert.Equal(t, "database: db.example.com:5432/tango\n\n", out.String())
+	assert.Equal(t, "database: db.example.com:5432/saka\n\n", out.String())
 	assert.NotContains(t, out.String(), "secret")
 }
 

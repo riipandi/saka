@@ -15,8 +15,8 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
 )
 
 // newLogger builds a logger from the default configuration with the console

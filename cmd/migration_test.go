@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/envfile"
-	"github.com/riipandi/tango/pkg/printext"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/envfile"
+	"github.com/riipandi/saka/pkg/printext"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // embeddedFiles loads the migrations compiled into the test binary once. Every
@@ -108,7 +108,7 @@ func runMigrateCmdIn(
 
 	var out bytes.Buffer
 	root := testRoot(&out, stdin, cmd)
-	err := root.Run(context.Background(), append([]string{"tango", cmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", cmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -164,7 +164,7 @@ func resolveDatabaseURL(t *testing.T, envFile string) (string, error) {
 
 	var resolved string
 	cmd := &cli.Command{
-		Name:   "tango",
+		Name:   "saka",
 		Flags:  []cli.Flag{&cli.StringFlag{Name: config.FlagEnvFile}},
 		Before: initConfig,
 		Action: func(ctx context.Context, _ *cli.Command) error {
@@ -176,7 +176,7 @@ func resolveDatabaseURL(t *testing.T, envFile string) (string, error) {
 			return err
 		},
 	}
-	err := cmd.Run(t.Context(), []string{"tango", "--env-file=" + envFile})
+	err := cmd.Run(t.Context(), []string{"saka", "--env-file=" + envFile})
 	return resolved, err
 }
 
@@ -284,7 +284,7 @@ func TestConfirm(t *testing.T) {
 					tt.interactive, "apply 3 pending migrations?")
 				return nil
 			}
-			require.NoError(t, cmd.Run(t.Context(), append([]string{"tango"}, tt.args...)))
+			require.NoError(t, cmd.Run(t.Context(), append([]string{"saka"}, tt.args...)))
 			require.NoError(t, promptErr)
 			assert.Equal(t, tt.want, got)
 		})

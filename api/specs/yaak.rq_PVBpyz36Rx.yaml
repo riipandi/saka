@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create signup token'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.SignupService/CreateSignupToken
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/CreateSignupToken
 urlParameters: []
 settingSendCookies:
   enabled: false

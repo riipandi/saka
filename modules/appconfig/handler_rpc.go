@@ -7,14 +7,14 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	settingsv1 "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1"
-	settingsv1connect "github.com/riipandi/tango/codegen/proto/go/tango/settings/v1/settingsv1connect"
-	systemv1 "github.com/riipandi/tango/codegen/proto/go/tango/system/v1"
-	systemv1connect "github.com/riipandi/tango/codegen/proto/go/tango/system/v1/systemv1connect"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	settingsv1 "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1"
+	settingsv1connect "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1/settingsv1connect"
+	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

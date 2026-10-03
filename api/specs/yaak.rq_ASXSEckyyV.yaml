@@ -18,7 +18,7 @@ body:
       "send_email": true
     }
 bodyType: application/json
-description: '[Tango] Publish a notification to its audience. category is system or announcement; a system notice names its audience explicitly (users or user_groups, never global) and never carries a topic, an announcement defaults to the global audience and may carry a topic. user_ids and user_group_ids are UUID strings; the service refuses an audience that names an unknown account or group. send_email asks the email pass, gated by mailer.notifications.announcement_email_enabled. Administrative: requires the admin role.'
+description: '[Saka] Publish a notification to its audience. category is system or announcement; a system notice names its audience explicitly (users or user_groups, never global) and never carries a topic, an announcement defaults to the global audience and may carry a topic. user_ids and user_group_ids are UUID strings; the service refuses an audience that names an unknown account or group. send_email asks the email pass, gated by mailer.notifications.announcement_email_enabled. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Content-Type
@@ -31,7 +31,7 @@ headers:
 method: POST
 name: Create Notification
 sortPriority: 111.1111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/CreateNotification
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/CreateNotification
 urlParameters: []
 settingSendCookies:
   enabled: false

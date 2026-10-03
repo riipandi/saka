@@ -13,8 +13,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ErrJobUnknown reports a RunNow for an id no registered job answers. It is

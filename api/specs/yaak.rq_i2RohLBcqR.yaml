@@ -33,9 +33,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Create OAuth connection'
+name: '[Saka] Create OAuth connection'
 sortPriority: 915.5555555555557
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/CreateConnection
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/CreateConnection
 urlParameters: []
 settingSendCookies:
   enabled: false

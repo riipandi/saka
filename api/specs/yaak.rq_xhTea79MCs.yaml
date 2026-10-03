@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Answers the claims one group carries, ordered by key — the claims every member's tokens then carry.
 
-  Tango procedure tango.federation.v1.CustomClaimService/ListGroupClaims. Guard: admin.
+  Saka procedure saka.federation.v1.CustomClaimService/ListGroupClaims. Guard: admin.
 
   Parameters:
   - user_group_id (body, required): the group, in its wire form (ugrp_...)
@@ -32,7 +32,7 @@ headers:
 method: POST
 name: '[Pocket ID] List group custom claims'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/ListGroupClaims
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/ListGroupClaims
 urlParameters: []
 settingSendCookies:
   enabled: false

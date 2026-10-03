@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/pkg/validate"
+	"github.com/riipandi/saka/pkg/validate"
 )
 
 type createReq struct {

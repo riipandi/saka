@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Answers a client's secrets as their views — prefixes, windows, and whether each still authenticates. The values never travel: they exist only in the response that created them, and only their SHA-256 hashes are stored.
 
-  Tango procedure tango.federation.v1.OidcClientService/ListSecrets. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/ListSecrets. Guard: admin.
 
   Parameters:
   - id (body, required): the client
@@ -32,7 +32,7 @@ headers:
 method: POST
 name: '[Pocket ID] List client secrets'
 sortPriority: 13000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/ListSecrets
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/ListSecrets
 urlParameters:
 - enabled: true
   name: id

@@ -93,9 +93,9 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     go build -tags "release,noasm,nounsafe" -trimpath -buildvcs=false \
     -ldflags "-w -s \
-      -X github.com/riipandi/tango/internal/config.AppVersion=${BUILD_VERSION:-dev} \
-      -X github.com/riipandi/tango/internal/config.BuildHash=${BUILD_HASH} \
-      -X github.com/riipandi/tango/internal/config.BuildDate=${BUILD_DATE}" \
+      -X github.com/riipandi/saka/internal/config.AppVersion=${BUILD_VERSION:-dev} \
+      -X github.com/riipandi/saka/internal/config.BuildHash=${BUILD_HASH} \
+      -X github.com/riipandi/saka/internal/config.BuildDate=${BUILD_DATE}" \
     -o build/release/$(jq -r '.name' package.json) ./cmd \
     && strip build/release/$(jq -r '.name' package.json) \
     && chmod +x build/release/$(jq -r '.name' package.json)
@@ -110,7 +110,7 @@ COPY --from=builder /srv/build/release /srv
 
 # Create necessary data directories and set permissions
 RUN mkdir -p /srv/storage/{backup,certs,data,keys,logs,uploads} && \
-    chmod -R 0775 /srv/storage && /srv/tango config:generate
+    chmod -R 0775 /srv/storage && /srv/saka config:generate
 
 # ------------------------------------------------------------------------------
 # Production image, copy build output files and run the application.
@@ -147,8 +147,8 @@ EXPOSE $SERVER_PORT/tcp
 VOLUME /srv/storage
 
 # Healthcheck to monitor application status
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD /srv/tango hc
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD /srv/saka hc
 
 # SHELL: /busybox/sh
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/srv/tango", "serve"]
+CMD ["/srv/saka", "serve"]

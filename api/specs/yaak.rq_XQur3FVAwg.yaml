@@ -24,7 +24,7 @@ bodyType: application/json
 description: |-
   Create an account directly, without a signup token. The names are mandatory; the password is optional: an account created without one carries no credential until one is set.
 
-  Ported from Pocket ID `POST /api/users` as the `tango.identity.v1.UserService/CreateUser` procedure.
+  Ported from Pocket ID `POST /api/users` as the `saka.identity.v1.UserService/CreateUser` procedure.
 
   Parameters:
   - username (body, required): Account handle
@@ -45,7 +45,7 @@ headers:
 method: POST
 name: '[Pocket ID] Create user'
 sortPriority: 8000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/CreateUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/CreateUser
 urlParameters: []
 settingSendCookies:
   enabled: false

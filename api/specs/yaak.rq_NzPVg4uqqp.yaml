@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Send a one-time access code to one account's address. The code never passes through the caller: it travels by email alone. Refused while `auth.one_time_access_email_as_admin_enabled` is off.
 
-  Mirror of Pocket ID `POST /api/users/{id}/one-time-access-email`, ported as the RPC procedure `tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`.
+  Mirror of Pocket ID `POST /api/users/{id}/one-time-access-email`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`.
 
   Body:
   - id: the account's identifier (uuid)
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Request one-time access email (admin)'
 sortPriority: 21000.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OneTimeAccessService/RequestEmailAsAdmin
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin
 urlParameters:
 - enabled: true
   name: id

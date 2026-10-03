@@ -10,9 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // Repository reads and writes the key rows the credential procedures manage.

@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Update the groups a specific user belongs to. The replacement is whole: `groupIds` names every group the account belongs to after the call, and an empty list removes it from all of them. Every identifier must name an existing group.
 
-  Ported from Pocket ID `PUT /api/users/{id}/user-groups` as the `tango.identity.v1.UserGroupService/UpdateUserGroups` procedure. Administrative: the caller must name an administrator.
+  Ported from Pocket ID `PUT /api/users/{id}/user-groups` as the `saka.identity.v1.UserGroupService/UpdateUserGroups` procedure. Administrative: the caller must name an administrator.
 
   Parameters:
   - id (path, required): User ID
@@ -35,7 +35,7 @@ headers:
 method: POST
 name: '[Pocket ID] Update user groups'
 sortPriority: 6000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/UpdateUserGroups
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/UpdateUserGroups
 urlParameters:
 - enabled: true
   name: id

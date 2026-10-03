@@ -3,8 +3,8 @@ package appconfig
 import (
 	"net/http"
 
-	"github.com/riipandi/tango/pkg/jwtutils"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // serveConfiguration answers `GET /api/configuration`: the deployment's

@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Replaces one setting value. The write is an upsert over the catalog key; the flags (sealed, public) are the catalog, not the request.
 
-  Tango procedure tango.settings.v1.SettingsService/Update. Guard: admin.
+  Saka procedure saka.settings.v1.SettingsService/Update. Guard: admin.
 
   A sealed item (per the catalog) encrypts the value at rest (AES-256-GCM, enc: prefix).
 
@@ -36,9 +36,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Update setting'
+name: '[Saka] Update setting'
 sortPriority: 333.3333333333333
-url: ${[ apiBaseURL ]}/rpc/tango.settings.v1.SettingsService/Update
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

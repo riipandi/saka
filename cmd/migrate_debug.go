@@ -9,12 +9,12 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/database/seeders"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 var migrateCreateCmd = &cli.Command{

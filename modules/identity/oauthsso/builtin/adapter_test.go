@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
 // oidcFake is a token endpoint and a key set the adapter tests drive a

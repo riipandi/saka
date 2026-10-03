@@ -11,10 +11,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/health"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // exitUnhealthy is the exit code of a failed health check. It is distinct from

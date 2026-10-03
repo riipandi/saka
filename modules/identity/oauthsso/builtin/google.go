@@ -6,7 +6,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 
-	"github.com/riipandi/tango/modules/identity/oauthsso"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
 // googleProvider is the Google adapter: an OIDC provider whose id_token

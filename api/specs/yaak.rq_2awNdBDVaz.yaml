@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Lifts the named account's ban as a unit — start instant, expiry, and reason together — and queues a reinstatement notice to the account's address. An account that is not banned is the same success: the state the caller asked for is the state the row is in. An unknown or malformed identifier answers `not_found`.
 
-  Tango-only surface, modeled on Better Auth's `unban-user` admin operation.
+  Saka-only surface, modeled on Better Auth's `unban-user` admin operation.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,9 +27,9 @@ headers:
   value: '1'
   id: txS5q8CCP6
 method: POST
-name: '[Tango] Unban user'
+name: '[Saka] Unban user'
 sortPriority: 27000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/UnbanUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UnbanUser
 urlParameters: []
 settingSendCookies:
   enabled: false

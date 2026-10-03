@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Queue surface — removes every completed record, retention notwithstanding.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Flush the completed archive (queue)'
+name: '[Saka] Flush the completed archive (queue)'
 sortPriority: 4185.185185185185
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/FlushCompletedTasks
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/FlushCompletedTasks
 urlParameters: []
 settingSendCookies:
   enabled: false

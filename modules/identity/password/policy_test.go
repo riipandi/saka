@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/fetcher"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/fetcher"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,7 +172,7 @@ func serveCorpus(t *testing.T, answer func(prefix string) (int, string)) *corpus
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Shutdown(context.Background()) })
 
-	captured.checker = NewBreachChecker(client, "", "tango-test")
+	captured.checker = NewBreachChecker(client, "", "saka-test")
 	captured.checker.rangeURL = captured.server.URL + "/range/"
 	return captured
 }

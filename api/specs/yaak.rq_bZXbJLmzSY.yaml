@@ -24,9 +24,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] List passkeys'
+name: '[Saka] List passkeys'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.WebAuthnService/ListCredentials
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/ListCredentials
 urlParameters: []
 settingSendCookies:
   enabled: false

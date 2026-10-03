@@ -62,7 +62,7 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 
 	token, err := signer.Sign(
 		accessClaims{Roles: []string{"admin", "billing"}, Plan: "pro"},
-		Standard{Issuer: "tango", Subject: "user_123", Audience: []string{"api"}, JWTID: "jti-1"},
+		Standard{Issuer: "saka", Subject: "user_123", Audience: []string{"api"}, JWTID: "jti-1"},
 	)
 	require.NoError(t, err)
 	assert.True(t, strings.Count(token, ".") == 2)
@@ -72,7 +72,7 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 
 	verified, err := verifier.Verify(token)
 	require.NoError(t, err)
-	assert.Equal(t, "tango", verified.Issuer)
+	assert.Equal(t, "saka", verified.Issuer)
 	assert.Equal(t, "user_123", verified.Subject)
 	assert.Equal(t, []string{"api"}, verified.Audience)
 	assert.Equal(t, "jti-1", verified.JWTID)
@@ -96,7 +96,7 @@ func TestSignVerifyEd25519(t *testing.T) {
 
 func TestSignerAppliesDefaults(t *testing.T) {
 	signer := mustSigner[accessClaims](t, hmacKey(t, "secret-1"), jwa.HS256()).
-		WithIssuer("https://id.tango.test").
+		WithIssuer("https://id.saka.test").
 		WithAudience("api", "dashboard").
 		WithTTL(15 * time.Minute)
 
@@ -104,11 +104,11 @@ func TestSignerAppliesDefaults(t *testing.T) {
 	require.NoError(t, err)
 
 	verified, err := mustVerifier[accessClaims](t, hmacKey(t, "secret-1"), jwa.HS256()).
-		WithIssuer("https://id.tango.test").
+		WithIssuer("https://id.saka.test").
 		Verify(token)
 	require.NoError(t, err)
 
-	assert.Equal(t, "https://id.tango.test", verified.Issuer)
+	assert.Equal(t, "https://id.saka.test", verified.Issuer)
 	assert.Equal(t, []string{"api", "dashboard"}, verified.Audience)
 	assert.Equal(t, "user_9", verified.Subject)
 	assert.WithinDuration(t, time.Now().Add(15*time.Minute), verified.ExpiresAt, 30*time.Second)
@@ -157,7 +157,7 @@ func TestVerifyEnforcesIssuerAndAudience(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = mustVerifier[accessClaims](t, hmacKey(t, "secret-1"), jwa.HS256()).
-		WithIssuer("tango-issuer").
+		WithIssuer("saka-issuer").
 		WithAudience("api").
 		Verify(token)
 	assert.Error(t, err)

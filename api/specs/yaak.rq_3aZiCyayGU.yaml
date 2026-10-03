@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Answers one page of the OIDC clients, newest first unless the caller sorts otherwise (sort_by: id, name, created_at). search narrows by name. Every client carries its secrets' views — prefixes and windows, never the values — and the groups its restriction names.
 
-  Tango procedure tango.federation.v1.OidcClientService/ListClients. Guard: admin.
+  Saka procedure saka.federation.v1.OidcClientService/ListClients. Guard: admin.
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: '[Pocket ID] List OIDC clients'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/ListClients
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/ListClients
 urlParameters:
 - enabled: false
   name: search

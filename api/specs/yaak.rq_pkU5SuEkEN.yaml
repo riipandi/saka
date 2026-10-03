@@ -26,7 +26,7 @@ headers:
 method: POST
 name: '[Pocket ID] Delete SCIM service provider'
 sortPriority: 1000.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Delete
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/Delete
 urlParameters:
 - enabled: true
   name: id

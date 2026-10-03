@@ -5,15 +5,15 @@ import (
 	"errors"
 	"uuid"
 
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

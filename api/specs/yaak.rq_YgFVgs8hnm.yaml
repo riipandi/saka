@@ -17,7 +17,7 @@ body:
       ]
     }
 bodyType: application/json
-description: '[Tango] Replace the permission set one role carries. Every slug must be cataloged; a system role set is the seed and refuses the change. Administrative: requires the admin role.'
+description: '[Saka] Replace the permission set one role carries. Every slug must be cataloged; a system role set is the seed and refuses the change. Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Connect-Protocol-Version
@@ -30,7 +30,7 @@ headers:
 method: POST
 name: Set Role Permissions
 sortPriority: 7111.111111111111
-url: ${[ apiBaseURL ]}/rpc/tango.authz.v1.AuthorizationService/SetRolePermissions
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/SetRolePermissions
 urlParameters: []
 settingSendCookies:
   enabled: false

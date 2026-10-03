@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/authz"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // runInitializeCmd runs one command against the test root, so the flags and
@@ -24,7 +24,7 @@ func runInitializeCmd(t *testing.T, cmd *cli.Command, args ...string) (string, e
 
 	var out bytes.Buffer
 	root := testRoot(&out, "", cmd)
-	err := root.Run(context.Background(), append([]string{"tango", cmd.Name}, args...))
+	err := root.Run(context.Background(), append([]string{"saka", cmd.Name}, args...))
 	return out.String(), err
 }
 
@@ -106,7 +106,7 @@ func TestInitializeRefusesAnInitializedDatabase(t *testing.T) {
 	assert.Contains(t, out, "status: refused",
 		"the refusal is an outcome in the shape every outcome answers in")
 	assert.Contains(t, out, "already holds 1 account")
-	assert.Contains(t, out, "tango admin:reset-password")
+	assert.Contains(t, out, "saka admin:reset-password")
 
 	// The refusal is the whole of the run: no second account exists.
 	row := readAccountRow(t, testPool(t, db.dsn), "second@example.com")

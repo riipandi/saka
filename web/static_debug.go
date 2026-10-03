@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/tango/pkg/responder"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // viteDevServer is where `task dev` runs the Vite dev server — the
@@ -103,7 +103,7 @@ func isDocumentRequest(r *http.Request) bool {
 // isSurfacePrefix lists the protocol and API prefixes the JSON envelope
 // answers; the shell and the proxy never claim them.
 func isSurfacePrefix(path string) bool {
-	for _, prefix := range []string{"/.well-known", "/api", "/rpc", "/metrics", "/static", "/oidc", "/debug"} {
+	for _, prefix := range []string{"/.well-known", "/api", "/rpc", "/metrics", "/static", "oauth", "/oidc", "/debug"} {
 		if len(path) >= len(prefix) && path[:len(prefix)] == prefix {
 			return true
 		}

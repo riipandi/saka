@@ -16,7 +16,7 @@ body:
       "event_types": {"event_types": ["*"]}
     }
 bodyType: application/json
-description: '[Tango] Rewrite an endpoint. Every field is optional; an absent field keeps its stored value, a present one replaces it. Admin only.'
+description: '[Saka] Rewrite an endpoint. Every field is optional; an absent field keeps its stored value, a present one replaces it. Admin only.'
 headers:
 - enabled: true
   name: Content-Type
@@ -29,7 +29,7 @@ headers:
 method: POST
 name: Update Webhook
 sortPriority: 3000.0
-url: ${[ apiBaseURL ]}/rpc/tango.webhook.v1.WebhookService/Update
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -16,18 +16,18 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/jwtutils"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // The two authentication policies the authorization endpoint walks: the
 // sign-in policy answers the browser's first visit, the interaction policy
 // answers the SPA's callback with the credential and the consent decision.
 const (
-	policySignInID       = "tango-sign-in"
-	policyInteractionID  = "tango-interaction"
-	policyDeviceID       = "tango-device"
+	policySignInID       = "saka-sign-in"
+	policyInteractionID  = "saka-interaction"
+	policyDeviceID       = "saka-device"
 	consentBodyByteLimit = 8192
 )
 

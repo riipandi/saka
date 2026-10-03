@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   The clients the calling account may authorize: every client whose allowed-groups roll is empty, plus the restricted ones the account's groups admit it to.
 
-  Procedure: `tango.federation.v1.OidcConsentService/ListMyClients`
+  Procedure: `saka.federation.v1.OidcConsentService/ListMyClients`
 
   Mirror of Pocket ID `GET /api/oidc/users/me/clients`.
 
@@ -39,7 +39,7 @@ headers:
 method: POST
 name: '[Pocket ID] List accessible OIDC clients for current user'
 sortPriority: 16333.333333333334
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListMyClients
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListMyClients
 urlParameters:
 - enabled: false
   name: pagination[page]

@@ -6,7 +6,7 @@ import (
 
 	corslib "github.com/rs/cors"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // CORS returns the cross-origin middleware the configuration asks for. The

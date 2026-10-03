@@ -25,9 +25,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Begin OAuth sign in'
+name: '[Saka] Begin OAuth sign in'
 sortPriority: 911.1111111111112
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.OAuthSSOService/BeginSignIn
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/BeginSignIn
 urlParameters: []
 settingSendCookies:
   enabled: false

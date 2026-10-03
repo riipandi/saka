@@ -6,10 +6,10 @@ import (
 
 	"connectrpc.com/connect"
 
-	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
-	federationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1/federationv1connect"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/responder"
+	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
+	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/responder"
 )
 
 // consentHandler is the transport mapping of the consent procedures. It

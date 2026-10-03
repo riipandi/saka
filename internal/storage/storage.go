@@ -25,7 +25,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // ErrNotFound is what a read of an unknown key answers with.

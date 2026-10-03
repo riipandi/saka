@@ -16,7 +16,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/riipandi/tango/database"
+	"github.com/riipandi/saka/database"
 )
 
 // runDBExportCmd runs db:export with the given stdin and arguments.
@@ -60,7 +60,7 @@ func runDBCmdIn(
 
 	var out bytes.Buffer
 	root := testRoot(&out, stdin, dbExportCmd, dbImportCmd)
-	err := root.Run(t.Context(), append([]string{"tango", command.Name}, args...))
+	err := root.Run(t.Context(), append([]string{"saka", command.Name}, args...))
 	return out.String(), err
 }
 
@@ -92,7 +92,7 @@ func TestDBExportWritesToTheDataDirectory(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 	assert.True(t, strings.HasSuffix(entries[0].Name(), ".sql"))
-	assert.Regexp(t, `^tango-\d{8}_\d{4}\.sql$`, entries[0].Name())
+	assert.Regexp(t, `^saka-\d{8}_\d{4}\.sql$`, entries[0].Name())
 }
 
 // The generated name is readable to the minute, so two exports inside one minute
@@ -123,7 +123,7 @@ func TestDBExportHonorsOutput(t *testing.T) {
 
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "-- tango database dump")
+	assert.Contains(t, string(content), "-- saka database dump")
 }
 
 // A missing parent directory must fail rather than be created: the path came
@@ -389,7 +389,7 @@ func TestDBExportGeneratedNameCarriesTheSuffixOnce(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(dataDir, backupDir))
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
-	assert.Regexp(t, `^tango-\d{8}_\d{4}\.sql\.gz$`, entries[0].Name(), "the suffix must appear once")
+	assert.Regexp(t, `^saka-\d{8}_\d{4}\.sql\.gz$`, entries[0].Name(), "the suffix must appear once")
 	assert.Contains(t, out, entries[0].Name())
 }
 

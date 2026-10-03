@@ -25,7 +25,7 @@ headers:
   value: application/json
   id: C05UhbX8cI
 method: POST
-name: '[Tango] Exchange device login request'
+name: '[Saka] Exchange device login request'
 sortPriority: 333.3333333333333
 url: ${[ apiBaseURL ]}/api/device-login/requests/:id/exchange
 urlParameters:

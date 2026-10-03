@@ -108,7 +108,7 @@ which is `internal/fetcher`'s job, not this one's.
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. The composition root wires
+The package lives inside the `saka` module and is not published. The composition root wires
 it in `internal/registry`: the pool from the `database` config section, the Valkey client only
 when `kvstore.enable` is set, both as `samber/do` providers every other provider takes from.
 

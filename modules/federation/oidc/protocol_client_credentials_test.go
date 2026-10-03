@@ -44,10 +44,10 @@ func clientCredentialsProvider(t *testing.T, pool *revokePool) http.Handler {
 	clients := clientStore{
 		pool:    pool.Postgres,
 		repo:    NewRepository(),
-		baseURL: "https://tango.example",
+		baseURL: "https://saka.example",
 	}
 	p, err := provider.New(provider.Config{
-		Issuer: "https://tango.example",
+		Issuer: "https://saka.example",
 		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
 			document, docErr := json.Marshal(keys)
 			require.NoError(t, docErr)

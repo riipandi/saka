@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  End every live session of the account, the one the access token names included. The access token itself keeps working until its own expiry — the statelessness the protocol settles — so a client that means to discard its credential should drop the token pair too. Tango-only.
+  End every live session of the account, the one the access token names included. The access token itself keeps working until its own expiry — the statelessness the protocol settles — so a client that means to discard its credential should drop the token pair too. Saka-only.
 
   Parameters: none (the account is the claims' sub).
 headers:
@@ -25,9 +25,9 @@ headers:
   value: application/json
   id: null
 method: POST
-name: '[Tango] Sign out all sessions'
+name: '[Saka] Sign out all sessions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/SignOutAllSessions
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/SignOutAllSessions
 urlParameters: []
 settingSendCookies:
   enabled: false

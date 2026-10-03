@@ -11,9 +11,9 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/printext"
 	"github.com/urfave/cli/v3"
 )
 
@@ -24,7 +24,7 @@ const backupDir = "backup"
 // backupFilePattern names a generated dump. Minute granularity keeps the name
 // readable, and UTC keeps it consistent with every other timestamp the CLI
 // prints.
-const backupFilePattern = "tango-20060102_1504.sql"
+const backupFilePattern = "saka-20060102_1504.sql"
 
 var dbExportCmd = &cli.Command{
 	Name:     "db:export",
@@ -34,7 +34,7 @@ var dbExportCmd = &cli.Command{
 block per table. The file is text, so it can be read, diffed, and
 reviewed.
 
-The default output is storage/backup/tango-<YYYYMMDD_hhmm>.sql, in
+The default output is storage/backup/saka-<YYYYMMDD_hhmm>.sql, in
 UTC. Pass --output to write somewhere else. A generated name that
 already exists is not replaced unless --overwrite is given, so a
 second export inside the same minute cannot lose the first dump.

@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // ClientTable is the OIDC clients table. The migrations own the schema; this

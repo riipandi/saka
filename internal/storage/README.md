@@ -1,6 +1,6 @@
 # Storage
 
-Storage is tango's file engine: whole-file uploads over a local filesystem or an S3-compatible
+Storage is saka's file engine: whole-file uploads over a local filesystem or an S3-compatible
 object store, with the manifest in PostgreSQL. The request path is one local disk write,
 everything else runs on the durable queue.
 
@@ -101,7 +101,7 @@ targets) is a deployment ceiling, not a code path.
 
 ## Wiring
 
-The package lives inside the `tango` module and is not published. The composition root wires
+The package lives inside the `saka` module and is not published. The composition root wires
 it in `internal/registry`: the manager is built from the shared `datastore.Postgres` pool, the
 configured backend, and the `storage` config section; the watcher is built over the manager's
 staging directory and enqueues `ChunkUploadTask` through the queue client. The storage jobs

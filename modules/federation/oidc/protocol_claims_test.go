@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // The issuance-side defense against legacy reserved keys: the write side

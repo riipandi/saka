@@ -11,13 +11,13 @@
 // protovalidate constraints produce.
 syntax = "proto3";
 
-package tango.identity.v1;
+package saka.identity.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1;identityv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1;identityv1";
 
 // SignupService creates accounts and administers the tokens sign-up requires.
 service SignupService {
@@ -117,7 +117,7 @@ service UserService {
 
   // AddPassword sets the signed-in account's first password credential —
   // the self-service an account created without one holds. The proof is
-  // the step-up token the guard consumes from the X-Tango-Reauthentication
+  // the step-up token the guard consumes from the X-Saka-Reauthentication
   // header; an account that already holds a password is refused, because
   // changing one is a different procedure with its own proof. The password
   // must meet the account's policy; the strength floor is the frontend's
@@ -127,7 +127,7 @@ service UserService {
   // RemovePassword deletes the signed-in account's password credential —
   // the self-service counterpart of AddPassword, for an account moving to
   // passkey-only sign-in. The proof is the step-up token the guard consumes
-  // from the X-Tango-Reauthentication header, the same shape the addition
+  // from the X-Saka-Reauthentication header, the same shape the addition
   // demands. The removal is refused while the account keeps no other live
   // credential (passkey or binding): an account that cannot sign in again is
   // a state the self-service never writes. Live sessions ride the queue's
@@ -554,7 +554,7 @@ message ListSignupTokensResponse {
   repeated SignupToken tokens = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -623,7 +623,7 @@ message ListUsersResponse {
   repeated User users = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -943,8 +943,7 @@ message UpdateCurrentUserRequest {
 
 // DeleteMyAccountRequest carries nothing: the target is the token's subject,
 // never something the request names.
-message DeleteMyAccountRequest {
-}
+message DeleteMyAccountRequest {}
 
 // DeleteMyAccountResponse answers the removal the caller asked for.
 message DeleteMyAccountResponse {
@@ -969,9 +968,8 @@ message AddPasswordResponse {
 }
 
 // RemovePasswordRequest carries nothing: the proof rode the
-// X-Tango-Reauthentication header, and the account is the token's subject.
-message RemovePasswordRequest {
-}
+// X-Saka-Reauthentication header, and the account is the token's subject.
+message RemovePasswordRequest {}
 
 // RemovePasswordResponse answers the removal the caller asked for.
 message RemovePasswordResponse {
@@ -1092,7 +1090,7 @@ message ListUserGroupsResponse {
   repeated UserGroup groups = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.
@@ -1406,7 +1404,7 @@ message ListBlocklistEntriesResponse {
   repeated BlocklistEntry entries = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.

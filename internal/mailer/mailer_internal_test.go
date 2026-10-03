@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 func TestStartTLSUnsupportedMatchesTheLibraryMessage(t *testing.T) {
@@ -47,7 +47,7 @@ func TestAuthenticateRefusesAPlaintextSessionToARemoteHost(t *testing.T) {
 	defer conn.Close()
 
 	session := smtp.NewClient(conn)
-	require.NoError(t, session.Hello("tango.test"))
+	require.NoError(t, session.Hello("saka.test"))
 	_, encrypted := session.TLSConnectionState()
 	require.False(t, encrypted, "the container must serve a plaintext session for this test to mean anything")
 

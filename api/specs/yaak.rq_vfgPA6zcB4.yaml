@@ -14,7 +14,7 @@ bodyType: binary
 description: |-
   Update the currently authenticated user's profile picture. The body is the raw image bytes — PNG, JPEG, or WebP, at most 2 MiB.
 
-  Ported from Pocket ID `PUT /api/users/me/profile-picture`. Tango answers it at the same REST route, guarded by the authenticated caller itself.
+  Ported from Pocket ID `PUT /api/users/me/profile-picture`. Saka answers it at the same REST route, guarded by the authenticated caller itself.
 
   Parameters: none
 headers: []

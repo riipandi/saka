@@ -9,15 +9,15 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/logger"
-	"github.com/riipandi/tango/pkg/printext"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/logger"
+	"github.com/riipandi/saka/pkg/printext"
 )
 
 // smokeMarker is the field the smoke test attaches to the line it emits. It is
 // fixed so the command's own output can tell a reader which query to run, and so
 // a second run is distinguishable from the first only by its timestamp.
-const smokeMarker = "tango-logger-smoke"
+const smokeMarker = "saka-logger-smoke"
 
 var loggerSmokeCmd = &cli.Command{
 	Name:     "logger:smoke",

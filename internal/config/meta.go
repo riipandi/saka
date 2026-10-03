@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	AppName       = "Tango"
-	AppIdentifier = "tango"
+	AppName       = "Saka"
+	AppIdentifier = "saka"
 	AppVersion    = "0.0.0"
 	BuildHash     = "unknown"
 	BuildDate     = "0000-00-00T00:00:00Z"
 	Platform      = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
-	Description   = "Modular monolith Go application"
+	Description   = "The foundation for what's next"
 )

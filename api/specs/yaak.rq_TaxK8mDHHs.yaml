@@ -16,7 +16,7 @@ bodyType: application/json
 description: |-
   Queue surface — one task's state across both tables plus its decoded payload.
 
-  Admin only. tango built-in; no Pocket ID counterpart.
+  Admin only. saka built-in; no Pocket ID counterpart.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,9 +27,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Get task detail with payload (queue)'
+name: '[Saka] Get task detail with payload (queue)'
 sortPriority: 1555.5555555555554
-url: ${[ apiBaseURL ]}/rpc/tango.system.v1.QueueService/GetTask
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/GetTask
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -12,7 +12,7 @@ bodyType: null
 description: |-
   Read one stored file's upload progress: the manifest's own state — a status word (pending while the bytes travel, ready once the backend holds them, failed when a round gave up), the byte size, and nothing pretending to be a percentage; the engine stages whole files, so there is no per-chunk distance to report. The key is the storage key the upload used, slashes included. A key nothing stored answers not_found. Signed-in read: any authenticated caller may poll a key it holds.
 
-  Tango-only: the ConnectRPC surface never carried it, so there is no upstream endpoint to port.
+  Saka-only: the ConnectRPC surface never carried it, so there is no upstream endpoint to port.
 
   Parameters:
   - key (path): Storage key of the file, slashes included
@@ -22,7 +22,7 @@ headers:
   value: application/json
   id: byRYuBfdev
 method: GET
-name: '[Tango] Get upload progress'
+name: '[Saka] Get upload progress'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/api/uploads/:storageKey
 urlParameters:

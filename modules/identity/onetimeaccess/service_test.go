@@ -16,18 +16,18 @@ import (
 	"log/slog"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/jobs"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/modules/identity/jwks"
-	"github.com/riipandi/tango/modules/identity/multifactor"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/jobs"
+	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/multifactor"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // testSecretHex is the HMAC secret the tests sign with: any 32-byte hex
@@ -99,7 +99,7 @@ func testServiceWithMfa(t *testing.T, pool *datastore.Postgres) (*Service, *mult
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
 		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	mfa := multifactor.NewService(pool, testSealer(t), issuer,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), "Tango", nil)
+		audit.NewRecorder(slog.New(slog.DiscardHandler)), "Saka", nil)
 	issuer.WithMFAGate(mfa)
 	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil), mfa, issuer
 }

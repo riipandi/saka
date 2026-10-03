@@ -18,7 +18,7 @@ bodyType: application/json
 description: |-
   Remove a group. Membership rows die with it by the foreign keys' cascade; the accounts are untouched.
 
-  Ported from Pocket ID `DELETE /api/user-groups/{id}` as the `tango.identity.v1.UserGroupService/DeleteUserGroup` procedure.
+  Ported from Pocket ID `DELETE /api/user-groups/{id}` as the `saka.identity.v1.UserGroupService/DeleteUserGroup` procedure.
 
   Parameters:
   - id (body, required): user group ID
@@ -36,7 +36,7 @@ headers:
 method: POST
 name: '[Pocket ID] Delete user group'
 sortPriority: 4000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/DeleteUserGroup
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/DeleteUserGroup
 urlParameters:
 - enabled: true
   name: id

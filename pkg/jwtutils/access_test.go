@@ -53,7 +53,7 @@ func TestAccessVerifierRoundTripsTheClaims(t *testing.T) {
 	source := keySource{secret: "0123456789abcdeffedcba9876543210", algorithm: jwa.HS256()}
 	signer, err := NewSigner[AccessClaims](mustHMACKey(t, source.secret), jwa.HS256())
 	require.NoError(t, err)
-	signer = signer.WithIssuer("https://tango.example").WithTTL(time.Hour)
+	signer = signer.WithIssuer("https://saka.example").WithTTL(time.Hour)
 
 	token, err := signer.Sign(AccessClaims{
 		Email:     "hermione@example.com",
@@ -63,7 +63,7 @@ func TestAccessVerifierRoundTripsTheClaims(t *testing.T) {
 	}, Standard{Subject: "0197abc", IssuedAt: time.Now()})
 	require.NoError(t, err)
 
-	verified, err := NewAccessVerifier(source, "https://tango.example").Verify(t.Context(), token)
+	verified, err := NewAccessVerifier(source, "https://saka.example").Verify(t.Context(), token)
 	require.NoError(t, err)
 
 	caller, err := NewCaller(verified)
@@ -85,7 +85,7 @@ func TestAccessVerifierRoundTripsADelegatedToken(t *testing.T) {
 	source := keySource{secret: "0123456789abcdeffedcba9876543210", algorithm: jwa.HS256()}
 	signer, err := NewSigner[AccessClaims](mustHMACKey(t, source.secret), jwa.HS256())
 	require.NoError(t, err)
-	signer = signer.WithIssuer("https://tango.example").WithTTL(time.Hour)
+	signer = signer.WithIssuer("https://saka.example").WithTTL(time.Hour)
 
 	token, err := signer.Sign(AccessClaims{
 		Email:         "hermione@example.com",
@@ -96,7 +96,7 @@ func TestAccessVerifierRoundTripsADelegatedToken(t *testing.T) {
 	}, Standard{Subject: "0197abc", IssuedAt: time.Now()})
 	require.NoError(t, err)
 
-	caller, err := NewAccessVerifier(source, "https://tango.example").VerifyCaller(t.Context(), token)
+	caller, err := NewAccessVerifier(source, "https://saka.example").VerifyCaller(t.Context(), token)
 	require.NoError(t, err)
 
 	// The subject is the account the request runs as; the actor is who is
@@ -120,13 +120,13 @@ func TestAnUndelegatedTokenCarriesNoActorClaim(t *testing.T) {
 	source := keySource{secret: "0123456789abcdeffedcba9876543210", algorithm: jwa.HS256()}
 	signer, err := NewSigner[AccessClaims](mustHMACKey(t, source.secret), jwa.HS256())
 	require.NoError(t, err)
-	signer = signer.WithIssuer("https://tango.example").WithTTL(time.Hour)
+	signer = signer.WithIssuer("https://saka.example").WithTTL(time.Hour)
 
 	token, err := signer.Sign(AccessClaims{Username: "hermione"},
 		Standard{Subject: "0197abc", IssuedAt: time.Now()})
 	require.NoError(t, err)
 
-	caller, err := NewAccessVerifier(source, "https://tango.example").VerifyCaller(t.Context(), token)
+	caller, err := NewAccessVerifier(source, "https://saka.example").VerifyCaller(t.Context(), token)
 	require.NoError(t, err)
 
 	assert.False(t, caller.IsImpersonating())
@@ -178,7 +178,7 @@ func TestAccessVerifierRejectsAnotherIssuer(t *testing.T) {
 	token, err := signer.Sign(AccessClaims{}, Standard{Subject: "0197abc", IssuedAt: time.Now()})
 	require.NoError(t, err)
 
-	_, err = NewAccessVerifier(source, "https://tango.example").Verify(t.Context(), token)
+	_, err = NewAccessVerifier(source, "https://saka.example").Verify(t.Context(), token)
 	assert.Error(t, err)
 }
 
@@ -197,7 +197,7 @@ func TestAccessVerifierPinsTheAlgorithm(t *testing.T) {
 	token, err := signer.Sign(AccessClaims{}, Standard{IssuedAt: time.Now()})
 	require.NoError(t, err)
 
-	_, err = NewAccessVerifier(source, "https://tango.example").Verify(t.Context(), token)
+	_, err = NewAccessVerifier(source, "https://saka.example").Verify(t.Context(), token)
 	assert.Error(t, err, "an HS384 token must not verify under an HS256-only verifier")
 }
 

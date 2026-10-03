@@ -6,10 +6,10 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/signin"
-	"github.com/riipandi/tango/pkg/crypto"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/signin"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
 // ---- The pending bridge and the challenge ----

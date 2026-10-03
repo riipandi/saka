@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/mailer"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/mailer"
 )
 
 func benchView() mailer.View {

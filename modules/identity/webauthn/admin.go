@@ -3,8 +3,8 @@ package webauthn
 import (
 	"context"
 
-	"github.com/riipandi/tango/internal/audit"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // The administrative door over the credential roll. It holds the same rules

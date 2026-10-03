@@ -17,7 +17,7 @@ bodyType: application/json
 description: |-
   Mark the account the token names as verified. The procedure is public: the token is the credential the email linked to, forwarded by the frontend.
 
-  Ported from Pocket ID `POST /api/users/me/verify-email` as the `tango.identity.v1.EmailVerificationService/VerifyEmail` procedure.
+  Ported from Pocket ID `POST /api/users/me/verify-email` as the `saka.identity.v1.EmailVerificationService/VerifyEmail` procedure.
 
   Parameters:
   - token (body, required): The raw verification token
@@ -33,7 +33,7 @@ headers:
 method: POST
 name: '[Pocket ID] Verify email'
 sortPriority: 5000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.EmailVerificationService/VerifyEmail
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

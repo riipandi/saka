@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_kgrwkQQuFE', behavior='smart', ttl='0', result='first', join=', ', path='$.notifications[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Withdraw a notification: it stops being visible to every account and no email goes out for it afterwards. The row survives, named by its cancellation instant; a second cancellation is the same success. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
+description: '[Saka] Withdraw a notification: it stops being visible to every account and no email goes out for it afterwards. The row survives, named by its cancellation instant; a second cancellation is the same success. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Cancel Notification
 sortPriority: 407.4074074074074
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/CancelNotification
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/CancelNotification
 urlParameters: []
 settingSendCookies:
   enabled: false

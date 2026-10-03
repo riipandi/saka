@@ -5,13 +5,13 @@
 // to a client that speaks ConnectRPC.
 syntax = "proto3";
 
-package tango.system.v1;
+package saka.system.v1;
 
 import "buf/validate/validate.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/system/v1;systemv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/system/v1;systemv1";
 
 // HealthService reports the availability of the dependencies the process runs
 // on.
@@ -43,7 +43,7 @@ message CheckResponse {
 
 // AppConfigService is the administrative surface over the deployment's
 // application configuration. Pocket ID keeps the surface behind
-// `/api/application-configuration`; Tango serves the configuration reads
+// `/api/application-configuration`; Saka serves the configuration reads
 // over REST at `GET /api/configuration` — public subset without a
 // credential, the full document to an administrator — and keeps the
 // interactive procedures here.
@@ -166,7 +166,7 @@ message ListQueuesResponse {
   repeated QueueSummary queues = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -243,7 +243,7 @@ message ListTasksResponse {
   repeated PendingTask tasks = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -376,7 +376,7 @@ message ListDeadTasksResponse {
   repeated DeadTask tasks = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.
@@ -542,7 +542,7 @@ message ListSchedulerJobsResponse {
   repeated SchedulerJob jobs = 1;
 
   // metadata is the pagination block the list responses carry.
-  tango.common.v1.ListMetadata metadata = 2;
+  saka.common.v1.ListMetadata metadata = 2;
 
   // status is the outcome word the client checks — success; a failure never
   // reaches this body, it is a connect error.

@@ -12,7 +12,7 @@ bodyType: null
 description: 'The browser flow''s first hop: writes the pending flow row — state hash, sealed PKCE verifier, nonce — and answers the provider''s authorize URL as a 302 redirect. The provider slug is the connection''s own word (google, github, or a custom connection''s slug); an unknown or disabled connection answers the same not_found-shaped redirect, so the endpoint is not a connection enumerator. The browser walks the URL; a client only inspects the Location header. Guard: public.'
 headers: []
 method: GET
-name: '[Tango] Start OAuth flow (REST)'
+name: '[Saka] Start OAuth flow (REST)'
 sortPriority: 912.1
 url: ${[ apiBaseURL ]}/oauth/google/start
 urlParameters: []

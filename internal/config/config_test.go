@@ -10,12 +10,12 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // dsn is a valid Postgres connection string, so a test that only exercises
 // precedence does not fail validation for an unrelated reason.
-const dsn = "postgresql://user:pass@localhost:5432/tango?sslmode=disable"
+const dsn = "postgresql://user:pass@localhost:5432/saka?sslmode=disable"
 
 // secret is a 64-character hex string, the shape of APP_SECRET_KEY.
 const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

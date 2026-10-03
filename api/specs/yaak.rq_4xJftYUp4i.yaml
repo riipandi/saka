@@ -19,7 +19,7 @@ bodyType: application/json
 description: |-
   Retrieve one account by its identifier.
 
-  Ported from Pocket ID `GET /api/users/{id}` as the `tango.identity.v1.UserService/GetUser` procedure.
+  Ported from Pocket ID `GET /api/users/{id}` as the `saka.identity.v1.UserService/GetUser` procedure.
 
   Parameters:
   - id (body, required): User ID
@@ -37,7 +37,7 @@ headers:
 method: POST
 name: '[Pocket ID] Get user by ID'
 sortPriority: 9000.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserService/GetUser
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/GetUser
 urlParameters:
 - enabled: true
   name: id

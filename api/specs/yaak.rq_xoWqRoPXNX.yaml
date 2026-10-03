@@ -14,7 +14,7 @@ bodyType: application/json
 description: |-
   The deployment-wide ledger: every consent with its account named in the wire form. Administrative.
 
-  Procedure: `tango.federation.v1.OidcConsentService/ListAllAuthorizedClients`
+  Procedure: `saka.federation.v1.OidcConsentService/ListAllAuthorizedClients`
 headers:
 - enabled: true
   name: Content-Type
@@ -23,7 +23,7 @@ headers:
 method: POST
 name: '[Pocket ID] List every authorized client'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListAllAuthorizedClients
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients
 urlParameters: []
 settingSendCookies:
   enabled: false

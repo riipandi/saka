@@ -13,7 +13,7 @@ tasks:
     cmd: go run -tags debug ./cmd --env-file=.env.local {{.CLI_ARGS}}
 
   serve:
-    desc: Run the Tango server (debug build)
+    desc: Run the Saka server (debug build)
     cmd: go run -tags debug ./cmd --env-file=.env.local serve {{.CLI_ARGS}}
 
   email:dev:
@@ -22,7 +22,7 @@ tasks:
 
   email:build:
     desc: Compile email templates (one Vite pass, no Go binary)
-    cmd: TANGO_SKIP_GO=1 pnpm exec vite build
+    cmd: SAKA_SKIP_GO=1 pnpm exec vite build
 
   deps:
     desc: Install Go toolchain binaries (golangci-lint, goose, etc)

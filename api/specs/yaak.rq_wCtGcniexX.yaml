@@ -13,7 +13,7 @@ bodyType: application/json
 description: |-
   Answers the custom-claim keys already in use, ordered by how often they carry — the autocomplete list a claim form offers.
 
-  Tango procedure tango.federation.v1.CustomClaimService/Suggest. Guard: admin.
+  Saka procedure saka.federation.v1.CustomClaimService/Suggest. Guard: admin.
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: '[Pocket ID] Get custom claim suggestions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.CustomClaimService/Suggest
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/Suggest
 urlParameters: []
 settingSendCookies:
   enabled: false

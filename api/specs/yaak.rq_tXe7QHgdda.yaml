@@ -13,7 +13,7 @@ body:
       "id": "${[ response.body.path(request='rq_qECPoeLNRH', behavior='smart', ttl='0', result='first', join=', ', path='$.notifications[0].id') ]}"
     }
 bodyType: application/json
-description: '[Tango] Write the caller''s receipt for one notification. Marking an already-read notification is the same success; a notification the caller is not targeted by answers not_found. id is the notification''s TypeID (ntf_...). Authenticated: any caller.'
+description: '[Saka] Write the caller''s receipt for one notification. Marking an already-read notification is the same success; a notification the caller is not targeted by answers not_found. id is the notification''s TypeID (ntf_...). Authenticated: any caller.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,7 +26,7 @@ headers:
 method: POST
 name: Mark Notification Read
 sortPriority: 917.695473251029
-url: ${[ apiBaseURL ]}/rpc/tango.notification.v1.NotificationService/MarkNotificationRead
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/MarkNotificationRead
 urlParameters: []
 settingSendCookies:
   enabled: false

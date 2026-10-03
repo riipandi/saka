@@ -12,7 +12,7 @@ body:
   text: '{}'
 bodyType: application/json
 description: |-
-  End every live session of the account except the one the access token names. Each ended row is stamped and recorded; the response counts what the call actually ended. Tango-only.
+  End every live session of the account except the one the access token names. Each ended row is stamped and recorded; the response counts what the call actually ended. Saka-only.
 
   Parameters: none (the account is the claims' sub; the kept session is the claims' sid).
 headers:
@@ -25,9 +25,9 @@ headers:
   value: application/json
   id: null
 method: POST
-name: '[Tango] Sign out other sessions'
+name: '[Saka] Sign out other sessions'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.authn.v1.SessionService/SignOutOtherSessions
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/SignOutOtherSessions
 urlParameters: []
 settingSendCookies:
   enabled: false

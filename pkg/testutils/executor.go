@@ -10,9 +10,9 @@ import (
 
 // Paths used inside the container for dump/restore/import file exchange.
 const (
-	containerDumpOutPath   = "/tmp/tango-dump.out"
-	containerRestoreInPath = "/tmp/tango-restore.dump"
-	containerSQLInPath     = "/tmp/tango-import.sql"
+	containerDumpOutPath   = "/tmp/saka-dump.out"
+	containerRestoreInPath = "/tmp/saka-restore.dump"
+	containerSQLInPath     = "/tmp/saka-import.sql"
 )
 
 // ContainerExecutor runs the PostgreSQL client tools inside the test

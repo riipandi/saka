@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"slices"
 
-	"github.com/riipandi/tango/internal/audit"
+	"github.com/riipandi/saka/internal/audit"
 )
 
 // The consent ledger: user_authorized_oidc_clients answers the question

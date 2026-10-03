@@ -23,11 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awshttp "github.com/aws/smithy-go/transport/http"
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/storage"
-	"github.com/riipandi/tango/modules/identity/restrictions"
-	"github.com/riipandi/tango/pkg/testutils"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 )
@@ -794,11 +794,11 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	store, err := storage.NewS3(config.S3{
 		AccessKey:      backend.AccessKey,
 		SecretKey:      backend.Secret,
-		BucketName:     "tango-user-test",
+		BucketName:     "saka-user-test",
 		EndpointURL:    backend.Endpoint,
 		ForcePathStyle: true,
 		Region:         "us-east-1",
-		PathPrefix:     "tango-user-test/",
+		PathPrefix:     "saka-user-test/",
 	})
 	require.NoError(t, err)
 	// The shared container starts empty: the bucket is this test's to make,
@@ -811,7 +811,7 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	require.NoError(t, err)
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) { o.UsePathStyle = true })
 	if _, bucketErr := client.CreateBucket(t.Context(), &s3.CreateBucketInput{
-		Bucket: awssdk.String("tango-user-test"),
+		Bucket: awssdk.String("saka-user-test"),
 	}); bucketErr != nil {
 		var apiErr *awshttp.ResponseError
 		if !errors.As(bucketErr, &apiErr) || apiErr.HTTPStatusCode() != 409 {
@@ -845,8 +845,8 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	// driver keeps — and nothing else: no chunk-shaped object ever lands
 	// beside it.
 	listed, err := client.ListObjectsV2(t.Context(), &s3.ListObjectsV2Input{
-		Bucket: awssdk.String("tango-user-test"),
-		Prefix: awssdk.String("tango-user-test/"),
+		Bucket: awssdk.String("saka-user-test"),
+		Prefix: awssdk.String("saka-user-test/"),
 	})
 	require.NoError(t, err)
 	var keys []string
@@ -854,14 +854,14 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 		keys = append(keys, awssdk.ToString(item.Key))
 	}
 	assert.Equal(t,
-		[]string{"tango-user-test/avatars/" + rowID(t, created.ID) + ".png"}, keys)
+		[]string{"saka-user-test/avatars/" + rowID(t, created.ID) + ".png"}, keys)
 
 	// The object carries the feature's content type: a direct read of the
 	// bucket — a presigned URL, a console preview — answers what the
 	// bytes are without consulting the manifest.
 	headed, err := client.HeadObject(t.Context(), &s3.HeadObjectInput{
-		Bucket: awssdk.String("tango-user-test"),
-		Key:    awssdk.String("tango-user-test/avatars/" + rowID(t, created.ID) + ".png"),
+		Bucket: awssdk.String("saka-user-test"),
+		Key:    awssdk.String("saka-user-test/avatars/" + rowID(t, created.ID) + ".png"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "image/png", awssdk.ToString(headed.ContentType))
@@ -877,8 +877,8 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	// The reset emptied the bucket: the object left with the account's
 	// key, the same state a local reset lands in.
 	listed, err = client.ListObjectsV2(t.Context(), &s3.ListObjectsV2Input{
-		Bucket: awssdk.String("tango-user-test"),
-		Prefix: awssdk.String("tango-user-test/"),
+		Bucket: awssdk.String("saka-user-test"),
+		Prefix: awssdk.String("saka-user-test/"),
 	})
 	require.NoError(t, err)
 	assert.Empty(t, listed.Contents)

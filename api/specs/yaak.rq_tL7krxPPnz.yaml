@@ -25,7 +25,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Tango] Encode Type ID'
+name: '[Saka] Encode Type ID'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/debug/encode-id
 urlParameters: []

@@ -7,7 +7,7 @@ import (
 	"go.loglayer.dev/transports/structured/v3"
 	"go.loglayer.dev/v3"
 
-	"github.com/riipandi/tango/internal/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
 // consoleSink builds the sink a human reads: the colourised renderer on a

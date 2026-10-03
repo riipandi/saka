@@ -1,6 +1,6 @@
 # Mailer
 
-Mailer is tango's outbound email path. One `*Service` pairs an SMTP client with the React Email
+Mailer is saka's outbound email path. One `*Service` pairs an SMTP client with the React Email
 templates compiled into the binary; the composition root builds it from `config.Mailer` and the
 process logger.
 
@@ -93,7 +93,7 @@ content that is already in the binary.
 | Key | Default |
 | --- | --- |
 | `mailer.from_email` | `mailer@example.com` |
-| `mailer.from_name` | `Tango Mailer` |
+| `mailer.from_name` | `Saka Mailer` |
 | `mailer.smtp_host` | empty — the mailer is off |
 | `mailer.smtp_port` | `587` |
 | `mailer.smtp_secure` | `false` (STARTTLS when offered) |
