@@ -13,8 +13,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luikyv/go-oidc/pkg/goidc"
 	"uuid"
+
+	"github.com/luikyv/go-oidc/pkg/goidc"
 
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"

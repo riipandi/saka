@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"strings"
 
+	"uuid"
+
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"uuid"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"

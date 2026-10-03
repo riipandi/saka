@@ -11,8 +11,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
@@ -145,7 +145,7 @@ func insertAPIKey(ctx context.Context, q datastore.Querier, ownerID uuid.UUID, k
 	description := key.description
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.api_keys")
+	ib.InsertInto(entity.TableAPIKeys)
 	ib.Cols("id", "user_id", "name", "prefix", "key_hash", "description", "expires_at", "created_at", "revoked_at")
 	ib.Values(uuid.NewV7(), ownerID, key.name, apiKeyPrefixOf(raw), crypto.HashTokenBytes(raw),
 		description, expiresAt, now, revokedAt)
@@ -196,7 +196,7 @@ func apiKeyPrefixOf(presented string) string {
 // the same uniqueness the `(name, owner)` index enforces.
 func apiKeyExists(ctx context.Context, q datastore.Querier, ownerID uuid.UUID, name string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From("public.api_keys").
+	sb.Select("1").From(entity.TableAPIKeys).
 		Where(sb.Equal("user_id", ownerID), sb.Equal("name", name))
 
 	query, args := sb.Build()
@@ -212,7 +212,7 @@ func apiKeyExists(ctx context.Context, q datastore.Querier, ownerID uuid.UUID, n
 // zero UUID when no account answers.
 func userIDByEmail(ctx context.Context, q datastore.Querier, email string) (uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id").From(user.UserTable).Where(sb.Equal("email", email))
+	sb.Select("id").From(entity.TableUsers).Where(sb.Equal("email", email))
 
 	query, args := sb.Build()
 	var rawID string

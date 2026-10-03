@@ -14,6 +14,8 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"go.jetify.com/typeid"
 
+	"uuid"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
@@ -25,7 +27,6 @@ import (
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"uuid"
 )
 
 // The failures a sign-in reports. The handler maps them to connect codes, so

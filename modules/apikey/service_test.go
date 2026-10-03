@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -65,7 +66,7 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -385,7 +386,7 @@ func auditCount(t *testing.T, pool *datastore.Postgres, event, keyID string) int
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.audit_logs")
+	sb.From(entity.TableAuditLogs)
 	sb.Where(sb.Equal("event", event), sb.Equal("resource_id", keyID))
 
 	query, args := sb.Build()

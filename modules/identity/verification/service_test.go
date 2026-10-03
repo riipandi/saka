@@ -19,6 +19,7 @@ import (
 	"connectrpc.com/connect"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/jobs"
@@ -40,7 +41,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string, ve
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	if verified {
 		ib.Cols("username", "email", "display_name", "email_verified_at")
 		ib.Values(username, email, username, time.Now())
@@ -61,7 +62,7 @@ func seedToken(t *testing.T, pool *datastore.Postgres, userID, raw string, expir
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at")
 	ib.Values(userID, crypto.HashHexToken(raw), PurposeEmailVerification, expiresAt)
 
@@ -151,7 +152,7 @@ func TestSendEmailIssuesOneTokenPerAccount(t *testing.T) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(sb.Equal("purpose", PurposeEmailVerification))
 	query, args := sb.Build()
 	var rows int
@@ -176,7 +177,7 @@ func TestVerifyEmailConsumesTheToken(t *testing.T) {
 	var verifiedAt *time.Time
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", "hermione"))
 	query, args := sb.Build()
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&verifiedAt))
@@ -249,7 +250,7 @@ func TestTheFlowEndToEnd(t *testing.T) {
 	var verifiedAt *time.Time
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", "hermione"))
 	query, args := sb.Build()
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&verifiedAt))

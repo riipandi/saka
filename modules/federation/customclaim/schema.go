@@ -9,10 +9,6 @@ import (
 	"go.jetify.com/typeid"
 )
 
-// ClaimTable is the custom claims table. The migrations own the schema; this
-// constant is how Go code names it, so a table rename touches one line.
-const ClaimTable = "public.custom_claims"
-
 // ResourceCustomClaim is the resource type an audit record names when the
 // change is about a claim.
 const ResourceCustomClaim = "custom_claim"
@@ -25,7 +21,7 @@ type ClaimIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (ClaimIDPrefix) Prefix() string { return "cclm" }
 
-// ClaimID is the typed identifier of one row of ClaimTable, in its wire
+// ClaimID is the typed identifier of one row of entity.TableCustomClaims, in its wire
 // form. The column stays a UUID; the conversion lives here and nowhere else.
 type ClaimID = typeid.TypeID[ClaimIDPrefix]
 
@@ -127,7 +123,7 @@ func IsReservedClaimKey(key string) bool {
 	return reserved
 }
 
-// ClaimSchema is one row of ClaimTable. Exactly one of UserID and
+// ClaimSchema is one row of entity.TableCustomClaims. Exactly one of UserID and
 // GroupID is set — the schema's check constraint holds the pair — and the
 // unique index on (key, user_id, user_group_id) is the storage of the
 // per-subject key rule: NULLS NOT DISTINCT makes one NULL behave like a

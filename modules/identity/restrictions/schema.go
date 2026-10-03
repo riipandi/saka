@@ -5,16 +5,6 @@ import (
 	"uuid"
 )
 
-// RestrictionTable is the account_restrictions table. The migrations own the
-// schema; this constant is how Go code names it, so a table rename touches
-// one line.
-const RestrictionTable = "public.account_restrictions"
-
-// usersTable is the account row's table — the failed-streak counter's
-// storage. The literal is this package's spelling of it; the migrations own
-// the schema.
-const usersTable = "public.users"
-
 // The restriction kinds the column's check admits. Ban is the
 // administrator-applied term; lockout is the failed-attempt policy's
 // automated one.
@@ -23,7 +13,7 @@ const (
 	KindLockout = "lockout"
 )
 
-// Schema is one row of RestrictionTable. The active predicate every check
+// Schema is one row of entity.TableAccountRestrictions. The active predicate every check
 // shares lives in the queries: `lifted_at IS NULL AND (expires_at IS NULL
 // OR expires_at > now())`. A NULL expires_at is indefinite.
 type Schema struct {

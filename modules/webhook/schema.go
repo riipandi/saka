@@ -5,18 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // The tables the webhook feature owns. The migrations own the schema; these
 // constants are how Go code names it, so a table rename touches one line.
-const (
-	EndpointTable = "public.webhook_endpoints"
-	DeliveryTable = "public.webhook_deliveries"
-	AttemptTable  = "public.webhook_delivery_attempts"
-)
-
 // ResourceWebhook is the resource type an audit record names when the change
 // is about an endpoint.
 const ResourceWebhook = "webhook"
@@ -74,7 +69,7 @@ type EndpointIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (EndpointIDPrefix) Prefix() string { return "whk" }
 
-// EndpointID is the typed identifier of one row of EndpointTable, in its wire
+// EndpointID is the typed identifier of one row of entity.TableWebhookEndpoints, in its wire
 // form. The column stays a UUID; the conversion lives here and nowhere else.
 type EndpointID = typeid.TypeID[EndpointIDPrefix]
 
@@ -84,7 +79,7 @@ type DeliveryIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (DeliveryIDPrefix) Prefix() string { return "whd" }
 
-// DeliveryID is the typed identifier of one row of DeliveryTable, in its wire
+// DeliveryID is the typed identifier of one row of entity.TableWebhookDeliveries, in its wire
 // form.
 type DeliveryID = typeid.TypeID[DeliveryIDPrefix]
 
@@ -94,7 +89,7 @@ type AttemptIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (AttemptIDPrefix) Prefix() string { return "wha" }
 
-// AttemptID is the typed identifier of one row of AttemptTable, in its wire
+// AttemptID is the typed identifier of one row of entity.TableWebhookDeliveryAttempts, in its wire
 // form.
 type AttemptID = typeid.TypeID[AttemptIDPrefix]
 
@@ -138,7 +133,7 @@ func FormatAttemptID(raw uuid.UUID) string {
 	return id.String()
 }
 
-// EndpointSchema is one row of EndpointTable. The secret lives sealed: its
+// EndpointSchema is one row of entity.TableWebhookEndpoints. The secret lives sealed: its
 // plaintext exists in exactly one response (the create and the rotation),
 // and a nil column is an endpoint that predates a signing requirement.
 type EndpointSchema struct {
@@ -155,7 +150,7 @@ type EndpointSchema struct {
 	UpdatedAt  *time.Time
 }
 
-// DeliverySchema is one row of DeliveryTable. The body is the exact canonical
+// DeliverySchema is one row of entity.TableWebhookDeliveries. The body is the exact canonical
 // bytes every attempt signs and sends; a retry never re-encodes it.
 type DeliverySchema struct {
 	ID           uuid.UUID
@@ -168,7 +163,7 @@ type DeliverySchema struct {
 	DeliveredAt  *time.Time
 }
 
-// AttemptSchema is one row of AttemptTable: one try's redacted record. The
+// AttemptSchema is one row of entity.TableWebhookDeliveryAttempts: one try's redacted record. The
 // response body is never stored — the metadata an operator needs is.
 type AttemptSchema struct {
 	ID             uuid.UUID

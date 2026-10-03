@@ -1,9 +1,11 @@
 package entity
 
-// TODO: reworks: centralize table name references
-
+// The single source of every application table's schema-qualified name.
+// SQL builders reference these constants; raw SQL (backtick queries)
+// spells the name itself.
 const (
 	TableAPIKeys                      = "public.api_keys"
+	TableAccountRestrictions          = "public.account_restrictions"
 	TableAppMigration                 = "public.app_migration"
 	TableAppSettings                  = "public.app_settings"
 	TableAuditLogs                    = "public.audit_logs"
@@ -21,7 +23,10 @@ const (
 	TableNotificationUserGroups       = "public.notification_user_groups"
 	TableNotificationUsers            = "public.notification_users"
 	TableNotifications                = "public.notifications"
+	TableOAuthConnections             = "public.oauth_connections"
+	TableOAuthFlows                   = "public.oauth_flows"
 	TableOAuthJtis                    = "public.oauth_jtis"
+	TableOAuthLinkedAccounts          = "public.oauth_linked_accounts"
 	TableOAuthSessions                = "public.oauth_sessions"
 	TableOIDCClients                  = "public.oidc_clients"
 	TableOIDCClientsAllowedUserGroups = "public.oidc_clients_allowed_user_groups"

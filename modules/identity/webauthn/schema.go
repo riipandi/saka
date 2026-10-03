@@ -8,14 +8,6 @@ import (
 	"go.jetify.com/typeid"
 )
 
-// CredentialsTable is the table holding one row per enrolled passkey.
-const CredentialsTable = "public.webauthn_credentials"
-
-// SessionsTable is the table holding one row per live ceremony — a challenge
-// the browser is currently answering. A spent or expired row is deleted, so
-// the table only ever carries live state.
-const SessionsTable = "public.webauthn_sessions"
-
 // ChallengeTypeRegistration and ChallengeTypeAuthentication name the two
 // ceremony kinds the sessions table's check constraint admits.
 const (
@@ -40,7 +32,7 @@ type CredentialPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (CredentialPrefix) Prefix() string { return "psk" }
 
-// CredentialID is the typed identifier of one row of CredentialsTable.
+// CredentialID is the typed identifier of one row of entity.TableWebauthnCredentials.
 type CredentialID = typeid.TypeID[CredentialPrefix]
 
 // SessionPrefix is the TypeID prefix of a live ceremony's handle. The client
@@ -51,7 +43,7 @@ type SessionPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (SessionPrefix) Prefix() string { return "wcs" }
 
-// SessionID is the typed identifier of one row of SessionsTable.
+// SessionID is the typed identifier of one row of entity.TableWebauthnSessions.
 type SessionID = typeid.TypeID[SessionPrefix]
 
 // IDFromUUID wraps a row's UUID into the credential's wire form. It is the

@@ -6,11 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/modules/identity/blocklist"
@@ -52,7 +54,7 @@ func pendingChangeToken(t *testing.T, pool *datastore.Postgres, userID string) E
 	t.Helper()
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "payload", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(sb.Equal("user_id", userID), sb.Equal("purpose", PurposeEmailChange))
 
 	query, args := sb.Build()
@@ -404,7 +406,7 @@ func pendingChangeCount(t *testing.T, pool *datastore.Postgres, userID string) i
 	t.Helper()
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(sb.Equal("user_id", userID), sb.Equal("purpose", PurposeEmailChange))
 
 	query, args := sb.Build()

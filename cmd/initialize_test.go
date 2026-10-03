@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -233,8 +234,8 @@ func isAdmin(t *testing.T, pool *datastore.Postgres, userID string) bool {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(authz.UserRolesTable + " ur")
-	sb.JoinWithOption(sqlbuilder.InnerJoin, authz.RolesTable+" r", "r.id = ur.role_id")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableRoles+" r", "r.id = ur.role_id")
 	sb.Where(sb.Equal("ur.user_id", userID), sb.Equal("r.slug", authz.AdministratorRole), sb.IsNull("ur.revoked_at"))
 
 	query, args := sb.Build()
@@ -248,7 +249,7 @@ func permissionCount(t *testing.T, pool *datastore.Postgres) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(authz.PermissionsTable)
+	sb.From(entity.TablePermissions)
 
 	query, args := sb.Build()
 	var count int

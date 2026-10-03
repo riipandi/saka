@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"

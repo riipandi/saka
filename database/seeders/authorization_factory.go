@@ -6,6 +6,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/datastore"
 )
@@ -73,7 +74,7 @@ func applyAuthorization(
 
 	for _, role := range scenarioRoles {
 		if dryRun {
-			if slugExists(ctx, q, authz.RolesTable, "slug", role.slug) {
+			if slugExists(ctx, q, entity.TableRoles, "slug", role.slug) {
 				skipped = append(skipped, role.slug)
 			} else {
 				created = append(created, role.slug)
@@ -157,11 +158,11 @@ type scenarioRole struct {
 // run created it. Under a dry run it answers the same without writing.
 func insertPermission(ctx context.Context, q datastore.Querier, permission authz.Permission, dryRun bool) (bool, error) {
 	if dryRun {
-		return !slugExists(ctx, q, authz.PermissionsTable, "slug", permission.Slug), nil
+		return !slugExists(ctx, q, entity.TablePermissions, "slug", permission.Slug), nil
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.PermissionsTable)
+	ib.InsertInto(entity.TablePermissions)
 	ib.Cols("slug", "description")
 	ib.Values(permission.Slug, permission.Description)
 	ib.SQL("ON CONFLICT (slug) DO NOTHING")
@@ -183,7 +184,7 @@ func insertSystemRole(ctx context.Context, q datastore.Querier, name, slug, desc
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.RolesTable)
+	ib.InsertInto(entity.TableRoles)
 	ib.Cols("name", "slug", "description", "type")
 	ib.Values(name, slug, nullable(description), roleType)
 	ib.SQL("ON CONFLICT (slug) DO NOTHING")
@@ -195,7 +196,7 @@ func insertSystemRole(ctx context.Context, q datastore.Querier, name, slug, desc
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(authz.RolesTable)
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("slug", slug))
 
 	query, args = sb.Build()
@@ -220,7 +221,7 @@ func grantRolePermissions(ctx context.Context, q datastore.Querier, roleID strin
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(authz.PermissionsTable)
+	sb.From(entity.TablePermissions)
 	sb.Where(sb.In("slug", toSeedAny(slugs)...))
 
 	query, args := sb.Build()
@@ -246,7 +247,7 @@ func grantRolePermissions(ctx context.Context, q datastore.Querier, roleID strin
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.RolePermissionsTable)
+	ib.InsertInto(entity.TableRolePermissions)
 	ib.Cols("role_id", "permission_id")
 	for _, id := range ids {
 		ib.Values(roleID, id)

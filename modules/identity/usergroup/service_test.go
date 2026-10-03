@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -53,7 +54,7 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string) string
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -69,7 +70,7 @@ func membershipCount(t *testing.T, pool *datastore.Postgres, groupID string) int
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(GroupMemberTable)
+	sb.From(entity.TableUserGroupsUsers)
 	sb.Where(sb.Equal("user_group_id", groupID))
 
 	query, args := sb.Build()
@@ -291,7 +292,7 @@ func userAuditCount(t *testing.T, pool *datastore.Postgres, event, userID string
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.audit_logs")
+	sb.From(entity.TableAuditLogs)
 	sb.Where(sb.Equal("event", event), sb.Equal("user_id", userID))
 
 	query, args := sb.Build()
@@ -392,7 +393,7 @@ func auditCount(t *testing.T, pool *datastore.Postgres, event, groupID string) i
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.audit_logs")
+	sb.From(entity.TableAuditLogs)
 	sb.Where(sb.Equal("event", event), sb.Equal("resource_id", groupID))
 
 	query, args := sb.Build()

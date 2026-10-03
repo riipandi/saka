@@ -6,23 +6,22 @@ import (
 	"fmt"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 	"go.jetify.com/typeid"
-	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/password"
-	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/modules/identity/session"
-	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // activeRestrictionJoin arms the restriction read model: the account's one
 // active row — ban or lockout — joined beside the account read, its kind
 // the state switch's question answered. The `ar` alias is the join's own.
 func activeRestrictionJoin(sb *sqlbuilder.SelectBuilder) {
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 }
 
@@ -74,8 +73,8 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 		"u.disabled", "p.password_hash",
 		"u.email_verified_at", "coalesce(ar.kind, '') AS restriction_kind",
 	)
-	sb.From(user.UserTable + " u")
-	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
+	sb.From(entity.TableUsers + " u")
+	sb.Join(entity.TableUserPasswords + " p ON p.user_id = u.id")
 	activeRestrictionJoin(sb)
 	sb.Where(
 		sb.Or(
@@ -109,8 +108,8 @@ func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Accoun
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "p.password_hash", "coalesce(ar.kind, '') AS restriction_kind",
 	)
-	sb.From(user.UserTable + " u")
-	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
+	sb.From(entity.TableUsers + " u")
+	sb.Join(entity.TableUserPasswords + " p ON p.user_id = u.id")
 	activeRestrictionJoin(sb)
 	sb.Where(sb.Equal("u.id", id))
 
@@ -140,8 +139,8 @@ func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Acc
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
 		"u.disabled", "p.password_hash", "coalesce(ar.kind, '') AS restriction_kind",
 	)
-	sb.From(user.UserTable + " u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, password.UserPasswordTable+" p ON p.user_id = u.id")
+	sb.From(entity.TableUsers + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" p ON p.user_id = u.id")
 	activeRestrictionJoin(sb)
 	sb.Where(sb.Equal("u.id", id))
 
@@ -173,7 +172,7 @@ func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Acc
 // form is what a client and a log line read.
 func (r *Repository) CreateSession(ctx context.Context, row session.SessionSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(session.SessionTable)
+	ib.InsertInto(entity.TableSessions)
 	ib.Cols("id", "user_id", "provider", "token_hash", "user_agent", "device_fingerprint", "ip_address", "remember", "created_at", "expires_at")
 	ib.Values(row.ID.UUID(), row.UserID, row.Provider, row.TokenHash, row.UserAgent, row.DeviceFingerprint, row.IPAddress, row.Remember, row.CreatedAt, row.ExpiresAt)
 
@@ -187,7 +186,7 @@ func (r *Repository) CreateSession(ctx context.Context, row session.SessionSchem
 // TouchLastLogin records the successful sign-in on the account.
 func (r *Repository) TouchLastLogin(ctx context.Context, userID uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(user.UserTable)
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("last_login_at", at))
 	ub.Where(ub.Equal("id", userID))
 
@@ -213,7 +212,7 @@ func (r *Repository) MarkDeviceSeen(ctx context.Context, db datastore.Querier, u
 		return false, fmt.Errorf("signin: known device id: %w", err)
 	}
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(KnownDeviceTable)
+	ib.InsertInto(entity.TableKnownDevices)
 	ib.Cols("id", "user_id", "device_fingerprint", "first_seen_at", "last_seen_at")
 	ib.Values(id.UUID(), userID, fingerprint, at, at)
 	ib.SQL("ON CONFLICT (user_id, device_fingerprint) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at RETURNING (xmax = 0) AS inserted")

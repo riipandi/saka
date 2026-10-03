@@ -8,6 +8,7 @@ import (
 
 	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -315,7 +316,7 @@ func (s *Service) GetUserGroups(ctx context.Context, id string) ([]GroupSchema, 
 // and an unknown one are the same refusal, the way the group procedures
 // answer a group the database does not hold.
 func (s *Service) accountExists(ctx context.Context, userID uuid.UUID) error {
-	row := s.pool.QueryRow(ctx, "SELECT 1 FROM "+user.UserTable+" WHERE id = $1", userID)
+	row := s.pool.QueryRow(ctx, "SELECT 1 FROM "+entity.TableUsers+" WHERE id = $1", userID)
 	var one int
 	if err := row.Scan(&one); errors.Is(err, datastore.ErrNoRows) {
 		return ErrMemberNotFound

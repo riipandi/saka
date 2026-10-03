@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/datastore"
@@ -55,7 +56,7 @@ func seedCatalog(t *testing.T, pool *datastore.Postgres) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.roles")
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("slug", authz.AdministratorRole))
 
 	query, args := sb.Build()
@@ -84,7 +85,7 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string) string
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -106,7 +107,7 @@ func seedRole(t *testing.T, pool *datastore.Postgres, name, slug string) string 
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.roles")
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("slug", slug))
 
 	query, args := sb.Build()
@@ -215,7 +216,7 @@ func TestUpdateAndDeleteRefuseASystemRole(t *testing.T) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.roles")
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("slug", authz.AdministratorRole))
 
 	query, args := sb.Build()

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/database/seeders"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -124,7 +125,7 @@ func TestAPIKeySeederCreatesTheScenarioKeys(t *testing.T) {
 	// test copies off the seed report authenticates.
 	var stored []byte
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("key_hash").From("public.api_keys").
+	sb.Select("key_hash").From(entity.TableAPIKeys).
 		Where(sb.Equal("name", "Development Key"), sb.Equal("prefix", parts[0]))
 	query, args := sb.Build()
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&stored))

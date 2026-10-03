@@ -23,12 +23,6 @@ import (
 
 // The tables the feature's rows live in. The migrations own the schema;
 // these constants are how Go code names them, so a rename touches one line.
-const (
-	connectionTable    = "public.oauth_connections"
-	linkedAccountTable = "public.oauth_linked_accounts"
-	flowTable          = "public.oauth_flows"
-)
-
 // ConnectionKind is what a connection's endpoints come from: a builtin
 // kind's endpoints are the code's own (the provider slug must name one),
 // a custom kind's ride a discovery document or manual endpoints.
@@ -76,7 +70,7 @@ type ConnectionIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (ConnectionIDPrefix) Prefix() string { return "oconn" }
 
-// ConnectionID is the typed identifier of one row of connectionTable, in
+// ConnectionID is the typed identifier of one row of entity.TableOAuthConnections, in
 // its wire form. The column stays a UUID; the conversion lives here and
 // nowhere else.
 type ConnectionID = typeid.TypeID[ConnectionIDPrefix]
@@ -88,7 +82,7 @@ type LinkedAccountIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (LinkedAccountIDPrefix) Prefix() string { return "olink" }
 
-// LinkedAccountID is the typed identifier of one row of linkedAccountTable.
+// LinkedAccountID is the typed identifier of one row of entity.TableOAuthLinkedAccounts.
 type LinkedAccountID = typeid.TypeID[LinkedAccountIDPrefix]
 
 // IDFromUUID wraps the connection row's UUID into the wire form. It is
@@ -189,7 +183,7 @@ type AttributeMapping struct {
 	FamilyName string
 }
 
-// Connection is one row of connectionTable. The client secret is carried
+// Connection is one row of entity.TableOAuthConnections. The client secret is carried
 // exactly as the row stores it — sealed, with the enc: prefix — and is
 // unsealed only on the path that presents it to a provider. Every read
 // the surface serves drops the field.
@@ -212,7 +206,7 @@ type Connection struct {
 // BuiltIn reports whether the connection's endpoints are the code's own.
 func (c Connection) BuiltIn() bool { return c.Kind == KindBuiltin }
 
-// LinkedAccount is one row of linkedAccountTable: a provider identity
+// LinkedAccount is one row of entity.TableOAuthLinkedAccounts: a provider identity
 // bound to an account. The tokens rest sealed exactly as the flow row
 // carried them — an empty value is the provider that answered none.
 type LinkedAccount struct {
@@ -229,7 +223,7 @@ type LinkedAccount struct {
 	UpdatedAt         *time.Time
 }
 
-// Flow is one row of flowTable: an authorization-code ceremony in
+// Flow is one row of entity.TableOAuthFlows: an authorization-code ceremony in
 // flight. The state and the flow token rest hashed — the raw values
 // travel only with the browser — and the PKCE verifier and the provider
 // tokens rest sealed.

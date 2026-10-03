@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+
 	apikeyv1 "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1"
 	apikeyv1connect "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1/apikeyv1connect"
 	auditlogv1 "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1"
@@ -26,9 +29,8 @@ import (
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
 	webhookv1 "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1"
 	webhookv1connect "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1/webhookv1connect"
+
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Entry declares the rule one procedure gets, and — for a self rule — the

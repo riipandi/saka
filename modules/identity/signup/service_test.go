@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
 	"connectrpc.com/connect"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/blocklist"
@@ -44,7 +46,7 @@ func insertToken(t *testing.T, pool *datastore.Postgres, raw string, usageLimit,
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(SignupTokenTable)
+	ib.InsertInto(entity.TableSignupTokens)
 	ib.Cols("token_hash", "usage_limit", "usage_count", "expires_at")
 	ib.Values(crypto.HashHexToken(raw), usageLimit, usageCount, time.Now().Add(time.Hour))
 
@@ -58,7 +60,7 @@ func tokenUsageCount(t *testing.T, pool *datastore.Postgres, raw string) int32 {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("usage_count")
-	sb.From(SignupTokenTable)
+	sb.From(entity.TableSignupTokens)
 	sb.Where(sb.Equal("token_hash", crypto.HashHexToken(raw)))
 
 	query, args := sb.Build()
@@ -72,7 +74,7 @@ func userCount(t *testing.T, pool *datastore.Postgres) int {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 
 	query, args := sb.Build()
 	var count int
@@ -116,7 +118,7 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 	// no-gate policy writes beside it.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email", "display_name", "email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", "hermione"))
 	query, args := sb.Build()
 	var email, displayName string
@@ -129,7 +131,7 @@ func TestSignupCreatesTheAccount(t *testing.T) {
 	// the clear.
 	pb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	pb.Select("password_hash")
-	pb.From("public.user_passwords")
+	pb.From(entity.TableUserPasswords)
 	pb.Where(pb.Equal("user_id", rowID(t, user.ID)))
 	query, args = pb.Build()
 	var passwordHash string
@@ -392,7 +394,7 @@ func TestOpenModeIssuesTheVerificationCode(t *testing.T) {
 	// outstanding.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("id", rowID(t, account.ID)))
 	query, args := sb.Build()
 	var verifiedAt *time.Time
@@ -569,7 +571,7 @@ func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {
 	// from anything the database holds.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("token_hash", "usage_limit", "usage_count", "expires_at")
-	sb.From(SignupTokenTable)
+	sb.From(entity.TableSignupTokens)
 	sb.Where(sb.Equal("id", created.Token.ID))
 	query, args := sb.Build()
 	var tokenHash string
@@ -639,7 +641,7 @@ func insertGroup(t *testing.T, pool *datastore.Postgres, name, displayName strin
 
 	id := uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(usergroup.GroupTable)
+	ib.InsertInto(entity.TableUserGroups)
 	ib.Cols("id", "name", "display_name")
 	ib.Values(id, name, displayName)
 
@@ -686,7 +688,7 @@ func TestSignupJoinsTheGroupsTheTokenCarried(t *testing.T) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("user_group_id")
-	sb.From(usergroup.GroupMemberTable)
+	sb.From(entity.TableUserGroupsUsers)
 	sb.Where(sb.Equal("user_id", userID))
 	query, args := sb.Build()
 	rows, err := pool.Query(t.Context(), query, args...)

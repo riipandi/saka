@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -41,7 +43,7 @@ func scanEntry(scan func(dest ...any) error) (EntrySchema, error) {
 func (r *Repository) GetEntry(ctx context.Context, db datastore.Querier, id uuid.UUID) (EntrySchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(entryColumns...)
-	sb.From(EntryTable)
+	sb.From(entity.TableBlocklistEntries)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -62,7 +64,7 @@ func (r *Repository) GetEntry(ctx context.Context, db datastore.Querier, id uuid
 func (r *Repository) GetEntryByPattern(ctx context.Context, db datastore.Querier, pattern string) (EntrySchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(entryColumns...)
-	sb.From(EntryTable)
+	sb.From(entity.TableBlocklistEntries)
 	sb.Where(sb.Equal("pattern", pattern))
 
 	query, args := sb.Build()
@@ -90,7 +92,7 @@ var entrySortColumns = map[string]string{
 func (r *Repository) ListEntries(ctx context.Context, db datastore.Querier, sortBy string, ascending bool, offset, limit int) ([]EntrySchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(entryColumns...)
-	sb.From(EntryTable)
+	sb.From(entity.TableBlocklistEntries)
 	sb.OrderBy(datastore.ListOrder(entrySortColumns, sortBy, "created_at", ascending), "id")
 	sb.Limit(limit).Offset(offset)
 
@@ -115,7 +117,7 @@ func (r *Repository) ListEntries(ctx context.Context, db datastore.Querier, sort
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(EntryTable)
+	cb.From(entity.TableBlocklistEntries)
 	query, args = cb.Build()
 	var total int
 	if err := db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
@@ -130,7 +132,7 @@ func (r *Repository) ListEntries(ctx context.Context, db datastore.Querier, sort
 // is one.
 func (r *Repository) InsertEntry(ctx context.Context, db datastore.Querier, row EntrySchema) (bool, error) {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(EntryTable)
+	ib.InsertInto(entity.TableBlocklistEntries)
 	ib.Cols("id", "pattern", "created_by")
 	ib.Values(row.ID, row.Pattern, row.CreatedBy)
 	ib.SQL("ON CONFLICT (pattern) DO NOTHING")
@@ -147,7 +149,7 @@ func (r *Repository) InsertEntry(ctx context.Context, db datastore.Querier, row 
 // answers false — the state the entry is already in.
 func (r *Repository) DeleteEntry(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(EntryTable)
+	dbb.DeleteFrom(entity.TableBlocklistEntries)
 	dbb.Where(dbb.Equal("id", id))
 
 	query, args := dbb.Build()
@@ -165,7 +167,7 @@ func (r *Repository) DeleteEntry(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) EmailsAtDomain(ctx context.Context, db datastore.Querier, domain string) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("lower(email)")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Like("lower(email)", "%@"+domain))
 
 	query, args := sb.Build()
@@ -195,7 +197,7 @@ func (r *Repository) EmailsAtDomain(ctx context.Context, db datastore.Querier, d
 func (r *Repository) Patterns(ctx context.Context, db datastore.Querier) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("pattern")
-	sb.From(EntryTable)
+	sb.From(entity.TableBlocklistEntries)
 
 	query, args := sb.Build()
 	rows, err := db.Query(ctx, query, args...)

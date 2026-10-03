@@ -13,9 +13,9 @@ import (
 
 	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/fetcher"
-	"github.com/riipandi/saka/modules/federation/oidc"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -48,7 +48,7 @@ func testService(t *testing.T, pool *datastore.Postgres, remote HTTPClient) *Ser
 func seedClient(t *testing.T, pool *datastore.Postgres, id string, restricted bool) {
 	t.Helper()
 	ib := sqlb.NewInsertBuilder()
-	ib.InsertInto(oidc.ClientTable)
+	ib.InsertInto(entity.TableOIDCClients)
 	ib.Cols("id", "name", "is_group_restricted")
 	ib.Values(id, "Test "+id, restricted)
 	query, args := ib.Build()
@@ -61,7 +61,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username string) Provision
 	t.Helper()
 	id := uuid.NewV7()
 	ib := sqlb.NewInsertBuilder()
-	ib.InsertInto(UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "display_name")
 	ib.Values(id, username, username+"@example.test", username)
 	query, args := ib.Build()
@@ -74,7 +74,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username string) Provision
 func seedGroup(t *testing.T, pool *datastore.Postgres, id, displayName string) {
 	t.Helper()
 	ib := sqlb.NewInsertBuilder()
-	ib.InsertInto(GroupTable)
+	ib.InsertInto(entity.TableUserGroups)
 	ib.Cols("id", "name", "display_name")
 	ib.Values(id, "group-"+id, displayName)
 	query, args := ib.Build()
@@ -86,7 +86,7 @@ func seedGroup(t *testing.T, pool *datastore.Postgres, id, displayName string) {
 func seedMembership(t *testing.T, pool *datastore.Postgres, groupID, userID uuid.UUID) {
 	t.Helper()
 	ib := sqlb.NewInsertBuilder()
-	ib.InsertInto(GroupMemberTable)
+	ib.InsertInto(entity.TableUserGroupsUsers)
 	ib.Cols("user_group_id", "user_id")
 	ib.Values(groupID, userID)
 	query, args := ib.Build()
@@ -344,7 +344,7 @@ func TestSyncDeactivatesABannedAccount(t *testing.T) {
 	// The ban's storage is the restriction row; the directory's Active rule
 	// reads the anti-joined ban.
 	ib := sqlb.NewInsertBuilder()
-	ib.InsertInto(UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "display_name")
 	ib.Values(uuid.NewV7(), "Silas", "Silas@example.test", "Silas")
 	query, args := ib.Build()

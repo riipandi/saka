@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"uuid"
+
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"uuid"
 
 	"github.com/riipandi/saka/modules/identity/user"
 )

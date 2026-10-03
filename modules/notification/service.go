@@ -10,10 +10,9 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/pkg/responder"
 )
 
@@ -263,7 +262,7 @@ func (s *Service) resolveAudience(params CreateParams) (string, error) {
 // deployment does not hold. The read is the validation: one count against
 // the distinct identifiers the request named.
 func (s *Service) ensureUsersExist(ctx context.Context, ids []uuid.UUID) error {
-	ok, err := s.countMatches(ctx, user.UserTable, ids)
+	ok, err := s.countMatches(ctx, entity.TableUsers, ids)
 	if err != nil {
 		return err
 	}
@@ -276,7 +275,7 @@ func (s *Service) ensureUsersExist(ctx context.Context, ids []uuid.UUID) error {
 // ensureGroupsExist refuses an audience that names a group the deployment
 // does not hold.
 func (s *Service) ensureGroupsExist(ctx context.Context, ids []uuid.UUID) error {
-	ok, err := s.countMatches(ctx, usergroup.GroupTable, ids)
+	ok, err := s.countMatches(ctx, entity.TableUserGroups, ids)
 	if err != nil {
 		return err
 	}

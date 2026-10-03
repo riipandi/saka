@@ -9,6 +9,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -28,7 +29,7 @@ func NewRepository() *Repository {
 // and reads no further.
 func (r *Repository) ExpireLifted(ctx context.Context, db datastore.Querier, userID uuid.UUID, now time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(RestrictionTable)
+	ub.Update(entity.TableAccountRestrictions)
 	ub.Set("lifted_at = expires_at")
 	ub.Where(ub.Equal("user_id", userID), ub.IsNull("lifted_at"),
 		ub.IsNotNull("expires_at"), ub.LTE("expires_at", now))
@@ -46,7 +47,7 @@ func (r *Repository) ExpireLifted(ctx context.Context, db datastore.Querier, use
 func (r *Repository) ActiveRow(ctx context.Context, db datastore.Querier, userID uuid.UUID, now time.Time) (*Schema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "kind", "reason", "started_at", "expires_at", "lifted_at", "lifted_by")
-	sb.From(RestrictionTable)
+	sb.From(entity.TableAccountRestrictions)
 	sb.Where(sb.Equal("user_id", userID), sb.IsNull("lifted_at"),
 		sb.Or(sb.IsNull("expires_at"), sb.GT("expires_at", now)))
 	sb.OrderBy("started_at DESC")
@@ -77,7 +78,7 @@ func (r *Repository) ActiveRow(ctx context.Context, db datastore.Querier, userID
 // instant answers "since when", so the replace keeps it.
 func (r *Repository) ApplyBan(ctx context.Context, db datastore.Querier, userID uuid.UUID, reason string, expiresAt *time.Time, now time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(RestrictionTable)
+	ub.Update(entity.TableAccountRestrictions)
 	ub.Set(ub.Assign("reason", reason), ub.Assign("expires_at", expiresAt))
 	ub.Where(ub.Equal("user_id", userID), ub.Equal("kind", KindBan), ub.IsNull("lifted_at"))
 
@@ -91,7 +92,7 @@ func (r *Repository) ApplyBan(ctx context.Context, db datastore.Querier, userID 
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(RestrictionTable)
+	ib.InsertInto(entity.TableAccountRestrictions)
 	ib.Cols("user_id", "kind", "reason", "started_at", "expires_at")
 	ib.Values(userID, KindBan, reason, now, expiresAt)
 
@@ -107,7 +108,7 @@ func (r *Repository) ApplyBan(ctx context.Context, db datastore.Querier, userID 
 // changed nothing answers false, not an error.
 func (r *Repository) LiftBans(ctx context.Context, db datastore.Querier, userID uuid.UUID, liftedBy *uuid.UUID, now time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(RestrictionTable)
+	ub.Update(entity.TableAccountRestrictions)
 	ub.Set(ub.Assign("lifted_at", now), ub.Assign("lifted_by", liftedBy))
 	ub.Where(ub.Equal("user_id", userID), ub.Equal("kind", KindBan), ub.IsNull("lifted_at"))
 
@@ -123,7 +124,7 @@ func (r *Repository) LiftBans(ctx context.Context, db datastore.Querier, userID 
 // admin's unlock or the policy's own expiry read.
 func (r *Repository) LiftLockouts(ctx context.Context, db datastore.Querier, userID uuid.UUID, liftedBy *uuid.UUID, now time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(RestrictionTable)
+	ub.Update(entity.TableAccountRestrictions)
 	ub.Set(ub.Assign("lifted_at", now), ub.Assign("lifted_by", liftedBy))
 	ub.Where(ub.Equal("user_id", userID), ub.Equal("kind", KindLockout), ub.IsNull("lifted_at"))
 
@@ -140,7 +141,7 @@ func (r *Repository) LiftLockouts(ctx context.Context, db datastore.Querier, use
 // deployment locked without an end.
 func (r *Repository) ApplyLockout(ctx context.Context, db datastore.Querier, userID uuid.UUID, expiresAt *time.Time, now time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(RestrictionTable)
+	ib.InsertInto(entity.TableAccountRestrictions)
 	ib.Cols("user_id", "kind", "reason", "started_at", "expires_at")
 	ib.Values(userID, KindLockout, nil, now, expiresAt)
 
@@ -157,7 +158,7 @@ func (r *Repository) ApplyLockout(ctx context.Context, db datastore.Querier, use
 // the lockout's own state — the streak is its story.
 func (r *Repository) BumpFailures(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(usersTable)
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Incr("failed_attempts"))
 	ub.Where(ub.Equal("id", userID))
 	ub.Returning("failed_attempts")
@@ -178,7 +179,7 @@ func (r *Repository) BumpFailures(ctx context.Context, db datastore.Querier, use
 // lifetime tally.
 func (r *Repository) ZeroFailures(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(usersTable)
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("failed_attempts", 0))
 	ub.Where(ub.Equal("id", userID), ub.NotEqual("failed_attempts", 0))
 

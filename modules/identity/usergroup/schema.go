@@ -4,18 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
-
-// GroupTable is the user groups table. The migrations own the schema; this
-// constant is how Go code names it, so a table rename touches one line.
-const GroupTable = "public.user_groups"
-
-// GroupMemberTable is the junction that makes an account a member of a group.
-// Both foreign keys cascade, so a group's removal takes its membership rows
-// with it and an account's removal takes its memberships.
-const GroupMemberTable = "public.user_groups_users"
 
 // ResourceGroup is the resource type an audit record names when the change is
 // about a group. The record's user_id stays empty — a group is not an account
@@ -31,7 +23,7 @@ type GroupIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (GroupIDPrefix) Prefix() string { return "ugrp" }
 
-// GroupID is the typed identifier of one row of GroupTable, in its wire
+// GroupID is the typed identifier of one row of entity.TableUserGroups, in its wire
 // form. The column stays a UUID; the conversion lives here and nowhere else.
 type GroupID = typeid.TypeID[GroupIDPrefix]
 
@@ -78,7 +70,7 @@ func UUIDFromWire(wire string) (uuid.UUID, error) {
 	return IDToUUID(id), nil
 }
 
-// GroupSchema is one row of GroupTable. The updated column is nullable by
+// GroupSchema is one row of entity.TableUserGroups. The updated column is nullable by
 // construction: the trigger fills it on the first update, so a row never
 // updated reads as nil, not as a zero instant.
 type GroupSchema struct {

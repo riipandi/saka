@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/riipandi/saka/database/seeders"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/urfave/cli/v3"
 )
 
 var jwksGenerateCmd = &cli.Command{

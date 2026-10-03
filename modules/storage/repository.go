@@ -9,6 +9,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -38,7 +39,7 @@ func scanBucket(scan func(dest ...any) error) (BucketSchema, error) {
 // Insert writes one bucket row and answers its identifier.
 func (r *Repository) Insert(ctx context.Context, db datastore.Querier, name string, sizeLimit *int64, mimeTypes []string) (uuid.UUID, error) {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(BucketTable)
+	ib.InsertInto(entity.TableStorageBuckets)
 	ib.Cols("id", "name", "file_size_limit", "allowed_mime_types")
 	ib.Values(uuid.NewV7(), name, sizeLimit, mimeTypes)
 	ib.SQL("RETURNING id")
@@ -56,7 +57,7 @@ func (r *Repository) Insert(ctx context.Context, db datastore.Querier, name stri
 func (r *Repository) GetByName(ctx context.Context, db datastore.Querier, name string) (BucketSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(bucketColumns...)
-	sb.From(BucketTable)
+	sb.From(entity.TableStorageBuckets)
 	sb.Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
@@ -77,7 +78,7 @@ func (r *Repository) GetByName(ctx context.Context, db datastore.Querier, name s
 func (r *Repository) List(ctx context.Context, db datastore.Querier) ([]BucketSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(bucketColumns...)
-	sb.From(BucketTable)
+	sb.From(entity.TableStorageBuckets)
 	sb.OrderBy("created_at")
 
 	query, args := sb.Build()
@@ -102,7 +103,7 @@ func (r *Repository) List(ctx context.Context, db datastore.Querier) ([]BucketSc
 // its stored value. The write answers whether a row matched.
 func (r *Repository) Update(ctx context.Context, db datastore.Querier, name string, sizeLimit *int64, mimeTypes *[]string) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(BucketTable)
+	ub.Update(entity.TableStorageBuckets)
 	assignments := []string{}
 	if sizeLimit != nil {
 		assignments = append(assignments, ub.Assign("file_size_limit", *sizeLimit))
@@ -132,7 +133,7 @@ func (r *Repository) Update(ctx context.Context, db datastore.Querier, name stri
 // whether a row was removed.
 func (r *Repository) Delete(ctx context.Context, db datastore.Querier, name string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom(BucketTable)
+	sb.DeleteFrom(entity.TableStorageBuckets)
 	sb.Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
@@ -148,7 +149,7 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, name stri
 func (r *Repository) CountObjects(ctx context.Context, db datastore.Querier, bucketID uuid.UUID) (int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(ObjectTable)
+	sb.From(entity.TableStorageObjects)
 	sb.Where(sb.Equal("bucket_id", bucketID))
 
 	query, args := sb.Build()

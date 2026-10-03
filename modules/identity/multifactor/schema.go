@@ -8,18 +8,6 @@ import (
 	"go.jetify.com/typeid"
 )
 
-// TotpTable is the table holding one row per enrolled TOTP authenticator. The
-// migrations own the schema; this constant is how Go code names it, so a table
-// rename touches one line.
-const TotpTable = "public.mfa_totp"
-
-// RecoveryTable is the table holding the hashed single-use recovery codes.
-const RecoveryTable = "public.mfa_recovery_codes"
-
-// PendingTable is the table holding the short-lived bridges a successful
-// password check writes between the first factor and the full session.
-const PendingTable = "public.mfa_pending"
-
 // TotpPrefix is the TypeID prefix of an enrolled authenticator's identifier.
 // The id leaves the server in API responses, so a support ticket can tell
 // which device the reader is looking at without a lookup.
@@ -28,7 +16,7 @@ type TotpPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (TotpPrefix) Prefix() string { return "totp" }
 
-// TotpID is the typed identifier of one row of TotpTable.
+// TotpID is the typed identifier of one row of entity.TableMFATOTP.
 type TotpID = typeid.TypeID[TotpPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form. It is the one direction

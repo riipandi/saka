@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -54,7 +56,7 @@ func (r *Repository) CreateEndpoint(ctx context.Context, db datastore.Querier, r
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(EndpointTable)
+	ib.InsertInto(entity.TableWebhookEndpoints)
 	ib.Cols("id", "name", "description", "endpoint", "method", "headers", "enabled", "secret_enc", "event_types")
 	if row.EventTypes == nil {
 		// An empty subscription list is a real state — every event — and the
@@ -78,7 +80,7 @@ func (r *Repository) CreateEndpoint(ctx context.Context, db datastore.Querier, r
 func (r *Repository) GetEndpoint(ctx context.Context, db datastore.Querier, id uuid.UUID) (EndpointSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(endpointColumns...)
-	sb.From(EndpointTable)
+	sb.From(entity.TableWebhookEndpoints)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -101,7 +103,7 @@ func (r *Repository) GetEndpoint(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) ListEndpoints(ctx context.Context, db datastore.Querier, enabled *bool, event string, offset, limit int) ([]EndpointSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(endpointColumns...)
-	sb.From(EndpointTable)
+	sb.From(entity.TableWebhookEndpoints)
 	sb.Where(endpointFilters(sb, enabled, event))
 	sb.OrderBy("created_at DESC", "id DESC")
 	sb.Limit(limit).Offset(offset)
@@ -127,7 +129,7 @@ func (r *Repository) ListEndpoints(ctx context.Context, db datastore.Querier, en
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(EndpointTable)
+	cb.From(entity.TableWebhookEndpoints)
 	cb.Where(endpointFilters(cb, enabled, event))
 	query, args = cb.Build()
 	var total int
@@ -165,7 +167,7 @@ func endpointFilters(sb *sqlbuilder.SelectBuilder, enabled *bool, event string) 
 // between the read and the write answers the read-back's not-found.
 func (r *Repository) UpdateEndpoint(ctx context.Context, db datastore.Querier, id uuid.UUID, update EndpointUpdate, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(EndpointTable)
+	ub.Update(entity.TableWebhookEndpoints)
 	assignments := []string{ub.Assign("updated_at", at)}
 	if update.Descr != nil {
 		assignments = append(assignments, ub.Assign("description", *update.Descr))
@@ -211,7 +213,7 @@ type EndpointUpdate struct {
 // key is ON DELETE SET NULL, so the history outlives the destination.
 func (r *Repository) DeleteEndpoint(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(EndpointTable)
+	dbt.DeleteFrom(entity.TableWebhookEndpoints)
 	dbt.Where(dbt.Equal("id", id))
 
 	query, args := dbt.Build()
@@ -227,7 +229,7 @@ func (r *Repository) DeleteEndpoint(ctx context.Context, db datastore.Querier, i
 // stops working, and keeping the old half would keep the leak alive.
 func (r *Repository) RotateSecret(ctx context.Context, db datastore.Querier, id uuid.UUID, sealed string, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(EndpointTable)
+	ub.Update(entity.TableWebhookEndpoints)
 	ub.Set(ub.Assign("secret_enc", sealed), ub.Assign("updated_at", at))
 	ub.Where(ub.Equal("id", id))
 
@@ -247,7 +249,7 @@ func (r *Repository) RotateSecret(ctx context.Context, db datastore.Querier, id 
 func (r *Repository) MatchEndpointIDs(ctx context.Context, db datastore.Querier, event string) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(EndpointTable)
+	sb.From(entity.TableWebhookEndpoints)
 	sb.Where(sb.Equal("enabled", true), endpointSubscription(sb, event))
 
 	query, args := sb.Build()
@@ -286,7 +288,7 @@ func (r *Repository) CreateDelivery(ctx context.Context, db datastore.Querier, r
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(DeliveryTable)
+	ib.InsertInto(entity.TableWebhookDeliveries)
 	ib.Cols("id", "webhook_id", "event", "body", "status")
 	ib.Values(row.ID, row.WebhookID, row.Event, row.Body, StatusPending)
 
@@ -301,7 +303,7 @@ func (r *Repository) CreateDelivery(ctx context.Context, db datastore.Querier, r
 func (r *Repository) GetDelivery(ctx context.Context, db datastore.Querier, id uuid.UUID) (DeliverySchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(deliveryColumns)
-	sb.From(DeliveryTable)
+	sb.From(entity.TableWebhookDeliveries)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -351,7 +353,7 @@ func (r *Repository) ListDeliveries(ctx context.Context, db datastore.Querier, w
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(deliveryColumns)
-	sb.From(DeliveryTable)
+	sb.From(entity.TableWebhookDeliveries)
 	sb.Where(conditions(sb)...)
 	sb.OrderBy("created_at DESC", "id DESC")
 	sb.Limit(limit).Offset(offset)
@@ -377,7 +379,7 @@ func (r *Repository) ListDeliveries(ctx context.Context, db datastore.Querier, w
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(DeliveryTable)
+	cb.From(entity.TableWebhookDeliveries)
 	cb.Where(conditions(cb)...)
 	query, args = cb.Build()
 	var total int
@@ -394,12 +396,12 @@ func (r *Repository) CreateAttempt(ctx context.Context, db datastore.Querier, ro
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AttemptTable)
+	ib.InsertInto(entity.TableWebhookDeliveryAttempts)
 	ib.Cols("id", "delivery_id", "attempt_number", "response_status", "error", "duration_ms", "response")
 	ib.Values(row.ID, row.DeliveryID, row.AttemptNumber, row.ResponseStatus, row.Error, row.DurationMS, row.Response)
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(DeliveryTable)
+	ub.Update(entity.TableWebhookDeliveries)
 	ub.Set(ub.Assign("attempt_count", row.AttemptNumber))
 	ub.Where(ub.Equal("id", row.DeliveryID))
 
@@ -432,7 +434,7 @@ func (r *Repository) FailDelivery(ctx context.Context, db datastore.Querier, id 
 // zero rows answered is the same success, not a failure.
 func updateDelivery(ctx context.Context, db datastore.Querier, id uuid.UUID, status string, attemptNumber int, deliveredAt *time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(DeliveryTable)
+	ub.Update(entity.TableWebhookDeliveries)
 	ub.Set(ub.Assign("status", status), ub.Assign("attempt_count", attemptNumber), ub.Assign("delivered_at", deliveredAt))
 	ub.Where(ub.Equal("id", id), ub.Equal("status", StatusPending))
 
@@ -457,7 +459,7 @@ func (r *Repository) LatestAttempts(ctx context.Context, db datastore.Querier, d
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "delivery_id", "attempt_number", "response_status", "error", "duration_ms", "response", "created_at")
-	sb.From(AttemptTable)
+	sb.From(entity.TableWebhookDeliveryAttempts)
 	sb.Where(sb.In("delivery_id", toAny(deliveryIDs)...))
 	sb.OrderBy("delivery_id", "attempt_number")
 
@@ -496,7 +498,7 @@ func toAny(ids []uuid.UUID) []any {
 // pruning, so the page a reader sees stays truthful about what happened.
 func (r *Repository) PruneAttempts(ctx context.Context, db datastore.Querier, before time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(AttemptTable)
+	dbt.DeleteFrom(entity.TableWebhookDeliveryAttempts)
 	dbt.Where(dbt.LessThan("created_at", before))
 
 	query, args := dbt.Build()
@@ -513,7 +515,7 @@ func (r *Repository) PruneAttempts(ctx context.Context, db datastore.Querier, be
 // reaches its terminal state during the sweep is simply not this run's row.
 func (r *Repository) PruneDeliveries(ctx context.Context, db datastore.Querier, before time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(DeliveryTable)
+	dbt.DeleteFrom(entity.TableWebhookDeliveries)
 	dbt.Where(dbt.LessThan("created_at", before), "status <> "+dbt.Var(StatusPending))
 
 	query, args := dbt.Build()

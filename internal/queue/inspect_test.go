@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"uuid"
+
+	"github.com/stretchr/testify/require"
 )
 
 // inspectTask is the queue the inspection tests enqueue through.

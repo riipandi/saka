@@ -9,13 +9,14 @@ import (
 
 	"uuid"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

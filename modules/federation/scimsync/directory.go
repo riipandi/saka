@@ -9,9 +9,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/federation/oidc"
-	"github.com/riipandi/saka/modules/identity/restrictions"
 )
 
 // The visibility roll the sync applies is the OIDC authorization's own: a
@@ -38,16 +37,16 @@ func (directory) UsersForClient(ctx context.Context, db datastore.Querier, clien
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("u.id", "u.username", "u.email", "u.first_name", "u.last_name",
 		"u.display_name", "u.disabled", "ar.started_at AS banned_at", "u.updated_at")
-	sb.From(UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	// The ban fields are the active ban restriction's read model — the
 	// SCIM surface's suspended state answers from the row, not a column.
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	if restriction.IsGroupRestricted {
 		if len(restriction.AllowedGroupIDs) == 0 {
 			return nil, nil
 		}
-		sb.JoinWithOption(sqlbuilder.LeftJoin, GroupMemberTable+" m", "m.user_id = u.id")
+		sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserGroupsUsers+" m", "m.user_id = u.id")
 		sb.Where(sb.In("m.user_group_id", toAny(restriction.AllowedGroupIDs)...))
 	}
 	sb.OrderBy("u.id")
@@ -109,7 +108,7 @@ func (groupDirectory) GroupsForClient(ctx context.Context, db datastore.Querier,
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("g.id", "g.display_name", "g.updated_at")
-	sb.From(GroupTable + " g")
+	sb.From(entity.TableUserGroups + " g")
 	if restriction.IsGroupRestricted {
 		if len(restriction.AllowedGroupIDs) == 0 {
 			return nil, nil
@@ -153,7 +152,7 @@ func (groupDirectory) GroupsForClient(ctx context.Context, db datastore.Querier,
 func groupMembers(ctx context.Context, db datastore.Querier, groupID uuid.UUID, restriction ClientRestriction) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("m.user_id")
-	sb.From(GroupMemberTable + " m")
+	sb.From(entity.TableUserGroupsUsers + " m")
 	sb.Where(sb.Equal("m.user_group_id", groupID))
 	query, args := sb.Build()
 
@@ -183,7 +182,7 @@ func groupMembers(ctx context.Context, db datastore.Querier, groupID uuid.UUID, 
 func clientRestriction(ctx context.Context, db datastore.Querier, clientID string) (ClientRestriction, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("c.is_group_restricted")
-	sb.From(oidc.ClientTable + " c")
+	sb.From(entity.TableOIDCClients + " c")
 	sb.Where(sb.Equal("c.id", clientID))
 	query, args := sb.Build()
 
@@ -198,7 +197,7 @@ func clientRestriction(ctx context.Context, db datastore.Querier, clientID strin
 
 	gb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	gb.Select("j.user_group_id")
-	gb.From(oidc.AllowedGroupsTable + " j")
+	gb.From(entity.TableOIDCClientsAllowedUserGroups + " j")
 	gb.Where(gb.Equal("j.oidc_client_id", clientID))
 	gq, gargs := gb.Build()
 

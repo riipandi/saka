@@ -6,12 +6,6 @@ import (
 	"uuid"
 )
 
-// AuthTokenTable is the shared token table. The migration owns the schema;
-// this constant is how Go code names it. The purpose check allows
-// `password_reset` among the four, so the recovery flow needs no table of
-// its own.
-const AuthTokenTable = "public.auth_tokens"
-
 // PurposePasswordReset is the purpose value the reset rows carry. The
 // column's check allows it; a second purpose here would fail the insert.
 const PurposePasswordReset = "password_reset"

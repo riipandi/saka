@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/riipandi/saka/database/entity"
 )
 
 // dumpSchemas lists the application schemas in the order a restore needs them.
@@ -30,7 +32,7 @@ const copyTerminator = `\.`
 // migration files by migrate:up, so carrying them in a dump would either
 // duplicate the version table or, worse, claim a schema state the target does
 // not have.
-var excludedTables = []string{"public.app_migration"}
+var excludedTables = []string{entity.TableAppMigration}
 
 // isExcludedTable reports whether a table is left out of a dump.
 func isExcludedTable(table Table) bool {

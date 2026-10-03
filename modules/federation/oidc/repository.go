@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/huandu/go-sqlbuilder"
-	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 )
@@ -108,7 +110,7 @@ func jsonText(value any) (string, error) {
 func (r *Repository) GetClient(ctx context.Context, db datastore.Querier, id string) (ClientSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(clientColumns...)
-	sb.From(ClientTable)
+	sb.From(entity.TableOIDCClients)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -131,7 +133,7 @@ func (r *Repository) GetClient(ctx context.Context, db datastore.Querier, id str
 func (r *Repository) GetClientForUpdate(ctx context.Context, db datastore.Querier, id string) (ClientSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(clientColumns...)
-	sb.From(ClientTable)
+	sb.From(entity.TableOIDCClients)
 	sb.Where(sb.Equal("id", id))
 	sb.ForUpdate()
 
@@ -153,7 +155,7 @@ func (r *Repository) GetClientForUpdate(ctx context.Context, db datastore.Querie
 func (r *Repository) ListClients(ctx context.Context, db datastore.Querier, search, sortBy string, ascending bool, offset, limit int) ([]ClientSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(clientColumns...)
-	sb.From(ClientTable)
+	sb.From(entity.TableOIDCClients)
 	if search != "" {
 		sb.Where(sb.ILike("name", "%"+search+"%"))
 	}
@@ -181,7 +183,7 @@ func (r *Repository) ListClients(ctx context.Context, db datastore.Querier, sear
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(ClientTable)
+	cb.From(entity.TableOIDCClients)
 	if search != "" {
 		cb.Where(cb.ILike("name", "%"+search+"%"))
 	}
@@ -219,7 +221,7 @@ func (r *Repository) CreateClient(ctx context.Context, db datastore.Querier, row
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(ClientTable)
+	ib.InsertInto(entity.TableOIDCClients)
 	ib.Cols(
 		"id", "name", "description", "callback_urls", "logout_callback_urls",
 		"launch_url", "credentials", "is_public", "pkce_enabled", "pkce_supported",
@@ -268,7 +270,7 @@ func (r *Repository) UpdateCIMDClient(ctx context.Context, db datastore.Querier,
 	}
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ClientTable)
+	ub.Update(entity.TableOIDCClients)
 	ub.Set(
 		ub.Assign("name", row.Name),
 		ub.Assign("callback_urls", callbacks),
@@ -306,7 +308,7 @@ func (r *Repository) UpdateClient(ctx context.Context, db datastore.Querier, row
 	}
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ClientTable)
+	ub.Update(entity.TableOIDCClients)
 	ub.Set(
 		ub.Assign("name", row.Name),
 		ub.Assign("description", row.Description),
@@ -340,7 +342,7 @@ func (r *Repository) UpdateClient(ctx context.Context, db datastore.Querier, row
 // restrictions that name it die with it, by the schema's cascades.
 func (r *Repository) DeleteClient(ctx context.Context, db datastore.Querier, id string) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(ClientTable)
+	dbb.DeleteFrom(entity.TableOIDCClients)
 	dbb.Where(dbb.Equal("id", id))
 
 	query, args := dbb.Build()
@@ -356,7 +358,7 @@ func (r *Repository) DeleteClient(ctx context.Context, db datastore.Querier, id 
 // the write answers unchanged.
 func (r *Repository) SetLogoPath(ctx context.Context, db datastore.Querier, id string, path *string) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ClientTable)
+	ub.Update(entity.TableOIDCClients)
 	ub.Set(ub.Assign("logo_path", path))
 	ub.Where(ub.Equal("id", id))
 
@@ -378,7 +380,7 @@ func (r *Repository) writeCredentials(ctx context.Context, db datastore.Querier,
 	}
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ClientTable)
+	ub.Update(entity.TableOIDCClients)
 	ub.Set(ub.Assign("credentials", document))
 	ub.Where(ub.Equal("id", id))
 
@@ -399,7 +401,7 @@ func (r *Repository) writeCredentials(ctx context.Context, db datastore.Querier,
 // the refusal the service maps, keeping the set it held.
 func (r *Repository) SetAllowedGroups(ctx context.Context, db datastore.Querier, clientID string, ids []uuid.UUID) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(AllowedGroupsTable)
+	dbb.DeleteFrom(entity.TableOIDCClientsAllowedUserGroups)
 	dbb.Where(dbb.Equal("oidc_client_id", clientID))
 	query, args := dbb.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
@@ -411,7 +413,7 @@ func (r *Repository) SetAllowedGroups(ctx context.Context, db datastore.Querier,
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AllowedGroupsTable)
+	ib.InsertInto(entity.TableOIDCClientsAllowedUserGroups)
 	ib.Cols("oidc_client_id", "user_group_id")
 	for _, id := range ids {
 		ib.Values(clientID, id)
@@ -456,8 +458,8 @@ func (r *Repository) GroupsOfClients(ctx context.Context, db datastore.Querier, 
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("j.oidc_client_id", "g.id", "g.name", "g.display_name")
-	sb.From(AllowedGroupsTable + " j")
-	sb.JoinWithOption(sqlbuilder.InnerJoin, "public.user_groups g", "g.id = j.user_group_id")
+	sb.From(entity.TableOIDCClientsAllowedUserGroups + " j")
+	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableUserGroups+" g", "g.id = j.user_group_id")
 	sb.Where(sb.In("j.oidc_client_id", sqlbuilder.List(clientIDs)))
 	sb.OrderBy("j.oidc_client_id", "lower(g.display_name)", "g.id")
 

@@ -8,9 +8,10 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/responder"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"

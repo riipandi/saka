@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -37,7 +38,7 @@ func insertAdmin(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 	t.Helper()
 	id := uuid.NewV7()
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.users")
+	sb.InsertInto(entity.TableUsers)
 	sb.Cols("id", "username", "email", "display_name")
 	sb.Values(id, username, username+"@example.com", username)
 
@@ -209,7 +210,7 @@ func TestCollisionTakenPinsTheScan(t *testing.T) {
 func insertAccount(t *testing.T, pool *datastore.Postgres, username, email string) {
 	t.Helper()
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.users")
+	sb.InsertInto(entity.TableUsers)
 	sb.Cols("id", "username", "email", "display_name")
 	sb.Values(uuid.NewV7(), username, email, username)
 

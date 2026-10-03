@@ -8,6 +8,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -49,7 +50,7 @@ func applyDefaultBucket(ctx context.Context, q datastore.Querier, dryRun bool) (
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.storage_buckets")
+	ib.InsertInto(entity.TableStorageBuckets)
 	ib.Cols("name")
 	ib.Values(DefaultBucketName)
 	ib.SQL("ON CONFLICT (name) DO NOTHING RETURNING name")
@@ -72,7 +73,7 @@ func applyDefaultBucket(ctx context.Context, q datastore.Querier, dryRun bool) (
 // run's stand-in for the conflict the live insert resolves.
 func bucketRests(ctx context.Context, q datastore.Querier, name string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From("public.storage_buckets").Where(sb.Equal("name", name))
+	sb.Select("1").From(entity.TableStorageBuckets).Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
 	var one int

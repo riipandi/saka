@@ -12,6 +12,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/cache"
 	"github.com/riipandi/saka/internal/datastore"
@@ -640,7 +641,7 @@ func (s *Settings) GetSetting(ctx context.Context, key string) (Setting, error) 
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key", "value", "created_at", "updated_at")
-	sb.From(SettingTable)
+	sb.From(entity.TableAppSettings)
 	sb.Where(sb.Equal("key", key))
 
 	query, args := sb.Build()
@@ -680,7 +681,7 @@ func (s *Settings) Reset(ctx context.Context, key string) error {
 	}
 
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(SettingTable)
+	db.DeleteFrom(entity.TableAppSettings)
 	db.Where(db.Equal("key", key))
 
 	query, args := db.Build()
@@ -827,7 +828,7 @@ func (s *Settings) ResetFor(ctx context.Context, callerID, key string) (Setting,
 	var setting Setting
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-		db.DeleteFrom(SettingTable)
+		db.DeleteFrom(entity.TableAppSettings)
 		db.Where(db.Equal("key", key))
 
 		query, args := db.Build()
@@ -875,7 +876,7 @@ func (s *Settings) atDefault(def SettingDef) Setting {
 func (s *Settings) overrides(ctx context.Context, publicOnly bool) (map[string]SettingSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key", "value", "created_at", "updated_at")
-	sb.From(SettingTable)
+	sb.From(entity.TableAppSettings)
 	if publicOnly {
 		// The catalog is code, so the public keys are a fixed list the SQL
 		// can filter on.
@@ -951,7 +952,7 @@ func (s *Settings) store(ctx context.Context, q datastore.Querier, key, value st
 	}
 
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(SettingTable)
+	sb.InsertInto(entity.TableAppSettings)
 	sb.Cols("key", "value")
 	sb.Values(key, stored)
 	sb.SQL("ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value")

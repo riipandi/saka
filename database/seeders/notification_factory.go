@@ -11,6 +11,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/modules/notification"
@@ -170,7 +171,7 @@ func insertNotification(ctx context.Context, q datastore.Querier, notice scenari
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(notification.NotificationTable)
+	ib.InsertInto(entity.TableNotifications)
 	ib.Cols("id", "category", "topic", "title", "body", "audience_kind", "created_by", "created_at")
 	ib.Values(uuid.NewV7(), notice.typ, nullable(topic), notice.title, notice.body, notice.kind, author, time.Now().UTC())
 	ib.Returning("id")
@@ -200,7 +201,7 @@ func insertGroupAudience(ctx context.Context, q datastore.Querier, noticeID noti
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(notification.GroupAudienceTable)
+	ib.InsertInto(entity.TableNotificationUserGroups)
 	ib.Cols("notification_id", "user_group_id")
 	ib.Values(uuid.UUID(noticeID.UUIDBytes()), usergroup.IDToUUID(groupID))
 	ib.SQL("ON CONFLICT DO NOTHING")
@@ -233,7 +234,7 @@ func insertReadReceipt(ctx context.Context, q datastore.Querier, noticeID notifi
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(notification.ReadTable)
+	ib.InsertInto(entity.TableNotificationReads)
 	ib.Cols("notification_id", "user_id", "read_at")
 	ib.Values(uuid.UUID(noticeID.UUIDBytes()), userID, time.Now().UTC())
 	ib.SQL("ON CONFLICT DO NOTHING")
@@ -251,7 +252,7 @@ func insertReadReceipt(ctx context.Context, q datastore.Querier, noticeID notifi
 // not carry.
 func notificationExists(ctx context.Context, q datastore.Querier, title string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From(notification.NotificationTable).Where(sb.Equal("title", title))
+	sb.Select("1").From(entity.TableNotifications).Where(sb.Equal("title", title))
 
 	query, args := sb.Build()
 	var one int
@@ -265,7 +266,7 @@ func notificationExists(ctx context.Context, q datastore.Querier, title string) 
 // notificationIDByTitle reads the identifier of the notice the title names.
 func notificationIDByTitle(ctx context.Context, q datastore.Querier, title string) (notification.NotificationID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id").From(notification.NotificationTable).Where(sb.Equal("title", title))
+	sb.Select("id").From(entity.TableNotifications).Where(sb.Equal("title", title))
 
 	query, args := sb.Build()
 	var rawID string
@@ -286,7 +287,7 @@ func notificationIDByTitle(ctx context.Context, q datastore.Querier, title strin
 // readReceiptExists reports whether the pair is already stamped.
 func readReceiptExists(ctx context.Context, q datastore.Querier, noticeID notification.NotificationID, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From(notification.ReadTable).
+	sb.Select("1").From(entity.TableNotificationReads).
 		Where(sb.Equal("notification_id", uuid.UUID(noticeID.UUIDBytes())), sb.Equal("user_id", userID))
 
 	query, args := sb.Build()

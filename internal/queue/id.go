@@ -3,8 +3,9 @@ package queue
 import (
 	"fmt"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // TaskIDPrefix is the TypeID prefix of a task's identifier. The id leaves

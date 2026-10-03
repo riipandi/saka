@@ -10,10 +10,11 @@ import (
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/responder"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	"github.com/riipandi/saka/modules/identity/jwks"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

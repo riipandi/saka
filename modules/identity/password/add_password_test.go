@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -22,7 +23,7 @@ func seedPasswordless(t *testing.T, pool *datastore.Postgres, username, email st
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("username", "email", "display_name")
 	ib.Values(username, email, username)
 	ib.SQL("RETURNING id")

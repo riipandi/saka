@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
 	"connectrpc.com/connect"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/mailer"
@@ -32,7 +34,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string) st
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("username", "email", "display_name")
 	ib.Values(username, email, username)
 	ib.SQL("RETURNING id")
@@ -44,7 +46,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string) st
 	hash, err := defaultHasher("Griffindor!9")
 	require.NoError(t, err)
 	pib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	pib.InsertInto(UserPasswordTable)
+	pib.InsertInto(entity.TableUserPasswords)
 	pib.Cols("user_id", "password_hash")
 	pib.Values(id, hash)
 	pquery, pargs := pib.Build()
@@ -58,7 +60,7 @@ func seedResetToken(t *testing.T, pool *datastore.Postgres, userID, raw string, 
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at")
 	ib.Values(userID, crypto.HashHexToken(raw), PurposePasswordReset, expiresAt)
 

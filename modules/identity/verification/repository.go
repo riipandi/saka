@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -37,7 +39,7 @@ type Account struct {
 // moves the window, and stamps the send time over the row it conflicts with.
 func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, PurposeEmailVerification, expiresAt, sentAt)
 	// The conflict target carries the partial index's predicate: the unique
@@ -59,7 +61,7 @@ func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, user
 func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (VerificationToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("token_hash", tokenHash),
 		sb.Equal("purpose", PurposeEmailVerification),
@@ -82,7 +84,7 @@ func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (VerificationToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", PurposeEmailVerification),
@@ -107,7 +109,7 @@ func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, 
 // way.
 func (r *Repository) MarkVerified(ctx context.Context, db datastore.Querier, userID uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update("public.users")
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("email_verified_at", at))
 	ub.Where(ub.Equal("id", userID), ub.IsNull("email_verified_at"))
 
@@ -124,7 +126,7 @@ func (r *Repository) MarkVerified(ctx context.Context, db datastore.Querier, use
 // the transaction rather than applying the payload it read from the old row.
 func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, tokenHash string, purpose string) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(AuthTokenTable)
+	dbl.DeleteFrom(entity.TableAuthTokens)
 	dbl.Where(dbl.Equal("id", id), dbl.Equal("token_hash", tokenHash), dbl.Equal("purpose", purpose))
 
 	query, args := dbl.Build()
@@ -141,7 +143,7 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "username", "email", "display_name", "email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -164,7 +166,7 @@ func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, id 
 // and stamps the send time over the row it conflicts with.
 func (r *Repository) UpsertEmailChangeToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash, payload string, expiresAt, sentAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "purpose", "payload", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, PurposeEmailChange, payload, expiresAt, sentAt)
 	// The conflict target carries the partial index's predicate: the unique
@@ -188,7 +190,7 @@ func (r *Repository) UpsertEmailChangeToken(ctx context.Context, db datastore.Qu
 func (r *Repository) FindEmailChangeTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (EmailChangeToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "payload", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("token_hash", tokenHash),
 		sb.Equal("purpose", PurposeEmailChange),
@@ -211,7 +213,7 @@ func (r *Repository) FindEmailChangeTokenByHash(ctx context.Context, db datastor
 func (r *Repository) FindEmailChangeTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (EmailChangeToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "payload", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", PurposeEmailChange),
@@ -235,7 +237,7 @@ func (r *Repository) FindEmailChangeTokenByUser(ctx context.Context, db datastor
 func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "username", "email", "display_name", "email_verified_at")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("email", email))
 
 	query, args := sb.Build()
@@ -257,7 +259,7 @@ func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, 
 // the old address carried moves with the account and the fresh one applies.
 func (r *Repository) SetEmail(ctx context.Context, db datastore.Querier, userID uuid.UUID, email string, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update("public.users")
+	ub.Update(entity.TableUsers)
 	ub.Set(
 		ub.Assign("email", email),
 		ub.Assign("email_verified_at", at),

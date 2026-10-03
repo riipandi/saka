@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"encoding/json/v2"
-	sqlbuilder "github.com/huandu/go-sqlbuilder"
-	"github.com/jackc/pgx/v5"
 	"slices"
 
+	sqlbuilder "github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 )
 
@@ -45,7 +47,7 @@ func (s *Service) accountAdmitted(ctx context.Context, userID, clientID string, 
 // authorizedScopes reads the scopes an earlier consent stored.
 func (s *Service) authorizedScopes(ctx context.Context, userID, clientID string) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("scope").From("public.user_authorized_oidc_clients").
+	sb.Select("scope").From(entity.TableUserAuthorizedOIDCClients).
 		Where(sb.Equal("user_id", userID), sb.Equal("client_id", clientID))
 	sql, args := sb.Build()
 
@@ -74,7 +76,7 @@ func (s *Service) recordAuthorization(ctx context.Context, userID, clientID stri
 	}
 	now := time.Now().UTC()
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.user_authorized_oidc_clients")
+	sb.InsertInto(entity.TableUserAuthorizedOIDCClients)
 	sb.Cols("user_id", "client_id", "scope", "last_used_at")
 	sb.Values(userID, clientID, encodeScopeJSON(known), now)
 	query, args := sb.Build()

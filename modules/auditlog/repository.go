@@ -7,8 +7,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/user"
 )
 
 // Repository reads the audit records. It writes nothing: a record is written
@@ -45,8 +45,8 @@ type Filter struct {
 func listQuery() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(columns...)
-	sb.From(Table + " a")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, user.UserTable+" u", "u.id = a.user_id")
+	sb.From(entity.TableAuditLogs + " a")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUsers+" u", "u.id = a.user_id")
 	return sb
 }
 
@@ -126,12 +126,12 @@ func (r *Repository) List(ctx context.Context, db datastore.Querier, filter Filt
 func (r *Repository) count(ctx context.Context, db datastore.Querier, filter Filter) (int, error) {
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(Table + " a")
+	cb.From(entity.TableAuditLogs + " a")
 	// The join is present only when the filter needs it, and it is a LEFT
 	// join for the same reason the page's is: a count that dropped the
 	// records with no account would describe a set the caller cannot page to.
 	if filter.Search != "" {
-		cb.JoinWithOption(sqlbuilder.LeftJoin, user.UserTable+" u", "u.id = a.user_id")
+		cb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUsers+" u", "u.id = a.user_id")
 	}
 	applyFilter(cb, filter)
 
@@ -168,7 +168,7 @@ func (r *Repository) FindByID(ctx context.Context, db datastore.Querier, id stri
 func (r *Repository) Events(ctx context.Context, db datastore.Querier) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("DISTINCT event")
-	sb.From(Table)
+	sb.From(entity.TableAuditLogs)
 	sb.OrderBy("event")
 
 	query, args := sb.Build()
@@ -201,10 +201,10 @@ func (r *Repository) Events(ctx context.Context, db datastore.Querier) ([]string
 func (r *Repository) Users(ctx context.Context, db datastore.Querier) ([]UserOption, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("DISTINCT u.id::text", "u.username")
-	sb.From(Table + " a")
+	sb.From(entity.TableAuditLogs + " a")
 	// An INNER join is right here, unlike the list: an option is a selectable
 	// account, so a record with no account contributes none.
-	sb.Join(user.UserTable+" u", "u.id = a.user_id")
+	sb.Join(entity.TableUsers+" u", "u.id = a.user_id")
 	sb.OrderBy("u.username")
 
 	query, args := sb.Build()

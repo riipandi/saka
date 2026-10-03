@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/health"
 	"github.com/riipandi/saka/pkg/testutils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // stubKV is a KVPinger whose answer the test controls.

@@ -19,10 +19,11 @@ import (
 	"fmt"
 	"log/slog"
 
+	"uuid"
+
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
-	"uuid"
 
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/cache"

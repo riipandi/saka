@@ -9,6 +9,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -64,7 +65,7 @@ func (r *Repository) CreateWithinLimit(ctx context.Context, userCodeHash, device
 // caller's transaction carries it.
 func (r *Repository) insert(ctx context.Context, db datastore.Querier, userCodeHash, deviceTokenHash, ipAddress, userAgent string, expiresAt time.Time) (Request, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(requestTable)
+	sb.InsertInto(entity.TableDeviceLoginRequests)
 	sb.Cols("user_code_hash", "device_token_hash", "ip_address", "user_agent", "expires_at")
 	sb.Values(userCodeHash, deviceTokenHash, ipAddress, userAgent, expiresAt)
 	sb.SQL("RETURNING id, created_at")
@@ -110,7 +111,7 @@ const requestColumns = `id, user_code_hash, device_token_hash, user_id, status,
 func (r *Repository) ByUserCode(ctx context.Context, userCodeHash string) (Request, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(requestColumns)
-	sb.From(requestTable)
+	sb.From(entity.TableDeviceLoginRequests)
 	sb.Where(sb.Equal("user_code_hash", userCodeHash), sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()
 	return scanRequest(r.pool.QueryRow(ctx, query, args...))
@@ -121,7 +122,7 @@ func (r *Repository) ByUserCode(ctx context.Context, userCodeHash string) (Reque
 func (r *Repository) ByID(ctx context.Context, id string) (Request, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(requestColumns)
-	sb.From(requestTable)
+	sb.From(entity.TableDeviceLoginRequests)
 	sb.Where(sb.Equal("id", id), sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()
 	return scanRequest(r.pool.QueryRow(ctx, query, args...))
@@ -132,7 +133,7 @@ func (r *Repository) ByID(ctx context.Context, id string) (Request, error) {
 // unreachable before this sweep removes it.
 func (r *Repository) DeleteExpiredTokens(ctx context.Context, now time.Time) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(requestTable)
+	dbb.DeleteFrom(entity.TableDeviceLoginRequests)
 	dbb.Where(dbb.LT("expires_at", now))
 
 	query, args := dbb.Build()
@@ -149,7 +150,7 @@ func (r *Repository) DeleteExpiredTokens(ctx context.Context, now time.Time) (in
 func (r *Repository) Decide(ctx context.Context, userCodeHash string, userID *string, decision Decision) (bool, error) {
 	now := time.Now().UTC()
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(requestTable)
+	sb.Update(entity.TableDeviceLoginRequests)
 	// One Set call: a second replaces the clause rather than joining it.
 	if decision == DecisionApprove {
 		sb.Set(sb.Assign("status", string(statusFor(decision))), sb.Assign("decided_at", now), sb.Assign("user_id", *userID))
@@ -177,7 +178,7 @@ func statusFor(decision Decision) RequestStatus {
 // zero rows — the code is single-use.
 func (r *Repository) Consume(ctx context.Context, id string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(requestTable)
+	sb.Update(entity.TableDeviceLoginRequests)
 	sb.Set(sb.Assign("status", string(StatusConsumed)))
 	sb.Where(sb.Equal("id", id), sb.Equal("status", string(StatusApproved)))
 	query, args := sb.Build()
@@ -200,7 +201,7 @@ func (r *Repository) CountLiveForToken(ctx context.Context, db datastore.Querier
 func (r *Repository) countLiveForToken(ctx context.Context, db datastore.Querier, deviceTokenHash string) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(requestTable)
+	sb.From(entity.TableDeviceLoginRequests)
 	sb.Where(sb.Equal("device_token_hash", deviceTokenHash), sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()
 	var count int
@@ -221,7 +222,7 @@ type PollState struct {
 func (r *Repository) PollStateByID(ctx context.Context, id, deviceTokenHash string) (PollState, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("status", "user_id")
-	sb.From(requestTable)
+	sb.From(entity.TableDeviceLoginRequests)
 	sb.Where(sb.Equal("id", id), sb.Equal("device_token_hash", deviceTokenHash),
 		sb.GreaterThan("expires_at", time.Now().UTC()))
 	query, args := sb.Build()

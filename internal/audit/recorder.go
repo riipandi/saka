@@ -9,13 +9,10 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
-
-// Table is the table records live in. The migration owns the schema; this is
-// how Go code names it.
-const Table = "public.audit_logs"
 
 // The payload keys this package writes itself, beside whatever a feature
 // supplies. They are part of the record's vocabulary, so the reader that
@@ -161,7 +158,7 @@ func (r *Recorder) Record(ctx context.Context, db datastore.Querier, entry Entry
 
 	err := datastore.WithSavepoint(ctx, db, func(ctx context.Context, q datastore.Querier) error {
 		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		ib.InsertInto(Table)
+		ib.InsertInto(entity.TableAuditLogs)
 		ib.Cols(
 			"event", "trigger_type", "action_status", "payload",
 			"ip_address", "user_agent", "device_fingerprint",

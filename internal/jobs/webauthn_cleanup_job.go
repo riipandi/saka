@@ -8,6 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -20,12 +21,6 @@ const WebauthnCleanupName = "webauthn_cleanup"
 // held it is gone — so an hourly sweep trades an hour of dead rows for a
 // quiet delete, the trade the audit retention makes at a day.
 const DefaultWebauthnCleanupInterval = time.Hour
-
-// webauthnSessionsTable is the table the sweep deletes from. The schema
-// belongs to the migrations and the queries to the webauthn feature; the
-// sweep runs on the pool like the other maintenance jobs, because it deletes
-// rows nothing reads back and needs no feature to own it.
-const webauthnSessionsTable = "public.webauthn_sessions"
 
 // WebauthnCleanupTask deletes the ceremony sessions past their expiry and
 // re-enqueues itself. The interval rides the payload, so a run that changes
@@ -91,7 +86,7 @@ func webauthnCleanupProcessor(ctx context.Context, task WebauthnCleanupTask, poo
 // and answers how many went.
 func deleteExpiredWebauthnSessions(ctx context.Context, pool *datastore.Postgres, now time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(webauthnSessionsTable)
+	dbt.DeleteFrom(entity.TableWebauthnSessions)
 	dbt.Where(dbt.LessThan("expires_at", now))
 
 	query, args := dbt.Build()

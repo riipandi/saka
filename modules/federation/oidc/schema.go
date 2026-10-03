@@ -9,14 +9,6 @@ import (
 	"github.com/riipandi/saka/modules/identity/user"
 )
 
-// ClientTable is the OIDC clients table. The migrations own the schema; this
-// constant is how Go code names it, so a table rename touches one line.
-const ClientTable = "public.oidc_clients"
-
-// AllowedGroupsTable is the client-side group restriction: the junction that
-// names the groups an account must belong to for the client to admit it.
-const AllowedGroupsTable = "public.oidc_clients_allowed_user_groups"
-
 // ResourceOidcClient is the resource type an audit record names when the
 // change is about a client. The client's id — the relying party's client_id,
 // not a row UUID — is what a reader of the record matches against, through
@@ -128,7 +120,7 @@ var (
 	ErrLogosUnavailable = errors.New("oidc: logo storage is not available")
 )
 
-// ClientSchema is one row of ClientTable. The identifier is the relying
+// ClientSchema is one row of entity.TableOIDCClients. The identifier is the relying
 // party's client_id, an operator's word rather than a row UUID — it is the
 // credential a foreign client presents, so it travels as it is stored.
 //

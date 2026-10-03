@@ -12,7 +12,6 @@ import (
 // own purpose — the purpose column is what keeps the two apart, and the
 // unique index on (user_id, purpose) keeps an account to one code at a time:
 // a new code replaces the old, so no cleanup job ever has rows to sweep.
-const tokenTable = "public.auth_tokens"
 
 // PurposeOneTimeAccess is the purpose value the rows this feature writes
 // carry.

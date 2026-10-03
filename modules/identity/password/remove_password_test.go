@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"uuid"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
 	"github.com/riipandi/saka/pkg/testutils"
 )

@@ -13,6 +13,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/datastore"
@@ -176,7 +177,7 @@ func requireAdministrator(ctx context.Context, db datastore.Querier, userID uuid
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("1")
-	sb.From(authz.UserRolesTable)
+	sb.From(entity.TableUserRoles)
 	sb.Where(
 		sb.Equal("user_id", userID.String()),
 		sb.Equal("role_id", roleID),

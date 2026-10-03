@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
@@ -33,7 +34,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string) uu
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("username", "email", "display_name")
 	ib.Values(username, email, username)
 	ib.SQL("RETURNING id")

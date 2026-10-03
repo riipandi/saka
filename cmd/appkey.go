@@ -10,10 +10,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/envfile"
 	"github.com/riipandi/saka/pkg/printext"
-	"github.com/urfave/cli/v3"
 )
 
 var keyGenerateCmd = &cli.Command{

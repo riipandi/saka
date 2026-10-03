@@ -6,8 +6,9 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/saka/internal/authz"
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/internal/authz"
 )
 
 // ResourceRole is the resource type an audit record names when the change is

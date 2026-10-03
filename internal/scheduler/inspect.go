@@ -13,6 +13,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/responder"
 )
@@ -63,7 +64,7 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "name", "spec", "next_due", "last_fired", "updated_at")
-	sb.From(jobsTable)
+	sb.From(entity.TableSchedulerJobs)
 	condition(sb)
 	sb.OrderBy(datastore.ListOrder(jobSortColumns, sortBy, "name", ascending))
 	sb.Limit(limit).Offset(responder.Offset(page, limit))
@@ -89,7 +90,7 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(jobsTable)
+	cb.From(entity.TableSchedulerJobs)
 	condition(cb)
 	query, args = cb.Build()
 	var total int64
@@ -113,7 +114,7 @@ func (s *Scheduler) RunNow(ctx context.Context, wire string) error {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("name")
-	sb.From(jobsTable)
+	sb.From(entity.TableSchedulerJobs)
 	sb.Where(sb.Equal("id", raw))
 
 	query, args := sb.Build()

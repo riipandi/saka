@@ -8,16 +8,12 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The queue's own tables, created by database/migrations/00008. The engine
 // reads and writes them, and nothing else in the process names them.
-const (
-	tasksTable     = "public.queue_tasks"
-	completedTable = "public.queue_tasks_completed"
-)
-
 // Store is the database the queue runs on: the shared Postgres pool. The
 // transaction callback receives the shared Querier surface, so the engine
 // never opens a connection and never names a driver type.
@@ -59,7 +55,7 @@ type completedRow struct {
 // transaction, so a batch is all-or-nothing with whatever else it runs beside.
 func insertTasks(ctx context.Context, q datastore.Querier, tasks []*taskRow) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(tasksTable)
+	ib.InsertInto(entity.TableQueueTasks)
 	ib.Cols("id", "queue", "task", "attempts", "priority", "wait_until", "created_at")
 	for _, t := range tasks {
 		ib.Values(t.ID, t.Queue, t.Payload, t.Attempts, t.Priority, t.WaitUntil, t.CreatedAt)
@@ -80,7 +76,7 @@ func insertTasks(ctx context.Context, q datastore.Querier, tasks []*taskRow) err
 func claimReady(ctx context.Context, q datastore.Querier, at time.Time, reclaimBefore time.Time, limit int) ([]*taskRow, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	sb.Where(
 		sb.Or(sb.IsNull("claimed_at"), sb.LT("claimed_at", reclaimBefore)),
 		sb.Or(sb.IsNull("wait_until"), sb.LE("wait_until", at)),
@@ -91,7 +87,7 @@ func claimReady(ctx context.Context, q datastore.Querier, at time.Time, reclaimB
 	sb.SkipLocked()
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(tasksTable)
+	ub.Update(entity.TableQueueTasks)
 	ub.Set(ub.Assign("claimed_at", at), ub.Incr("attempts"))
 	ub.Where(ub.In("id", sb))
 	ub.Returning("id", "queue", "task", "attempts", "priority", "wait_until", "created_at", "last_executed_at")
@@ -122,7 +118,7 @@ func claimReady(ctx context.Context, q datastore.Querier, at time.Time, reclaimB
 func peekNext(ctx context.Context, q datastore.Querier, deadline time.Time) (bool, *time.Time, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("wait_until")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	sb.Where(sb.Or(sb.IsNull("claimed_at"), sb.LT("claimed_at", deadline)))
 	sb.OrderBy("wait_until ASC NULLS FIRST", "id ASC")
 	sb.Limit(1)
@@ -144,7 +140,7 @@ func peekNext(ctx context.Context, q datastore.Querier, deadline time.Time) (boo
 // its next look.
 func requeueTask(ctx context.Context, q datastore.Querier, id uuid.UUID, waitUntil time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(tasksTable)
+	ub.Update(entity.TableQueueTasks)
 	ub.Set(
 		ub.Assign("claimed_at", nil),
 		ub.Assign("wait_until", waitUntil),
@@ -160,7 +156,7 @@ func requeueTask(ctx context.Context, q datastore.Querier, id uuid.UUID, waitUnt
 // deleteTask removes a task from the pending table.
 func deleteTask(ctx context.Context, q datastore.Querier, id uuid.UUID) error {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(tasksTable)
+	db.DeleteFrom(entity.TableQueueTasks)
 	db.Where(db.Equal("id", id))
 
 	query, args := db.Build()
@@ -174,7 +170,7 @@ func deleteTask(ctx context.Context, q datastore.Querier, id uuid.UUID) error {
 // reports it as too late rather than pretending it was stopped.
 func cancelTask(ctx context.Context, q datastore.Querier, id uuid.UUID) (bool, error) {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(tasksTable)
+	db.DeleteFrom(entity.TableQueueTasks)
 	db.Where(db.Equal("id", id), db.IsNull("claimed_at"))
 
 	query, args := db.Build()
@@ -189,7 +185,7 @@ func cancelTask(ctx context.Context, q datastore.Querier, id uuid.UUID) (bool, e
 // so a task never leaves the pending table without arriving in this one.
 func insertCompleted(ctx context.Context, q datastore.Querier, c *completedRow) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(completedTable)
+	ib.InsertInto(entity.TableQueueTasksCompleted)
 	ib.Cols(
 		"id", "queue", "task", "attempts", "last_duration_micro", "succeeded",
 		"error", "expires_at", "last_executed_at", "created_at")
@@ -207,7 +203,7 @@ func insertCompleted(ctx context.Context, q datastore.Querier, c *completedRow) 
 // expired and reports how many went.
 func deleteExpiredCompleted(ctx context.Context, q datastore.Querier, now time.Time) (int64, error) {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(completedTable)
+	db.DeleteFrom(entity.TableQueueTasksCompleted)
 	db.Where(db.IsNotNull("expires_at"), db.LE("expires_at", now))
 
 	query, args := db.Build()
@@ -223,7 +219,7 @@ func deleteExpiredCompleted(ctx context.Context, q datastore.Querier, now time.T
 func countPending(ctx context.Context, q datastore.Querier, queue string) (int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	sb.Where(sb.Equal("queue", queue), sb.IsNull("claimed_at"))
 
 	query, args := sb.Build()
@@ -237,7 +233,7 @@ func countPending(ctx context.Context, q datastore.Querier, queue string) (int64
 // lifecycle instead of vanishing under a worker.
 func flushPending(ctx context.Context, q datastore.Querier) (int64, error) {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(tasksTable)
+	db.DeleteFrom(entity.TableQueueTasks)
 	db.Where(db.IsNull("claimed_at"))
 
 	query, args := db.Build()
@@ -251,7 +247,7 @@ func flushPending(ctx context.Context, q datastore.Querier) (int64, error) {
 // flushCompleted removes every completed record, retention notwithstanding.
 func flushCompleted(ctx context.Context, q datastore.Querier) (int64, error) {
 	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db.DeleteFrom(completedTable)
+	db.DeleteFrom(entity.TableQueueTasksCompleted)
 
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
@@ -268,7 +264,7 @@ func flushCompleted(ctx context.Context, q datastore.Querier) (int64, error) {
 func deadRows(ctx context.Context, q datastore.Querier, at time.Time, queue string) ([]*completedRow, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "task", "attempts", "last_duration_micro", "succeeded", "error", "expires_at", "last_executed_at", "created_at")
-	sb.From(completedTable)
+	sb.From(entity.TableQueueTasksCompleted)
 	sb.Where(
 		sb.Equal("succeeded", false),
 		sb.IsNotNull("task"),
@@ -303,7 +299,7 @@ func deadRows(ctx context.Context, q datastore.Querier, at time.Time, queue stri
 func countDead(ctx context.Context, q datastore.Querier, queue string) (int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(completedTable)
+	sb.From(entity.TableQueueTasksCompleted)
 	sb.Where(sb.Equal("queue", queue), sb.Equal("succeeded", false))
 
 	query, args := sb.Build()
@@ -329,7 +325,7 @@ var pendingSortColumns = map[string]string{
 func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string, ascending bool, offset, limit int) ([]*taskRow, int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "task", "attempts", "priority", "wait_until", "claimed_at", "created_at", "last_executed_at")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	if queue != "" {
 		sb.Where(sb.Equal("queue", queue))
 	}
@@ -358,7 +354,7 @@ func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string,
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(tasksTable)
+	cb.From(entity.TableQueueTasks)
 	if queue != "" {
 		cb.Where(cb.Equal("queue", queue))
 	}
@@ -384,7 +380,7 @@ var deadSortColumns = map[string]string{
 func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, ascending bool, offset, limit int, at time.Time) ([]*completedRow, int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "attempts", "error", "expires_at", "last_executed_at", "created_at")
-	sb.From(completedTable)
+	sb.From(entity.TableQueueTasksCompleted)
 	sb.Where(
 		sb.Equal("succeeded", false),
 		sb.Or(sb.IsNull("expires_at"), sb.GT("expires_at", at)),
@@ -417,7 +413,7 @@ func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, as
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(completedTable)
+	cb.From(entity.TableQueueTasksCompleted)
 	cb.Where(
 		cb.Equal("succeeded", false),
 		cb.Or(cb.IsNull("expires_at"), cb.GT("expires_at", at)),
@@ -439,7 +435,7 @@ func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, as
 func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending *taskRow, completed *completedRow, exists bool, err error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "queue", "task", "attempts", "priority", "wait_until", "claimed_at", "created_at", "last_executed_at")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -462,7 +458,7 @@ func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("id", "queue", "task", "attempts", "succeeded", "last_duration_micro", "error", "expires_at", "created_at", "last_executed_at")
-	cb.From(completedTable)
+	cb.From(entity.TableQueueTasksCompleted)
 	cb.Where(cb.Equal("id", id))
 
 	query, args = cb.Build()
@@ -487,7 +483,7 @@ func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending
 func deleteCompletedByIDs(ctx context.Context, q datastore.Querier, ids []uuid.UUID) error {
 	for _, id := range ids {
 		db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-		db.DeleteFrom(completedTable)
+		db.DeleteFrom(entity.TableQueueTasksCompleted)
 		db.Where(db.Equal("id", id))
 
 		query, args := db.Build()
@@ -504,7 +500,7 @@ func deleteCompletedByIDs(ctx context.Context, q datastore.Querier, ids []uuid.U
 func taskStatus(ctx context.Context, q datastore.Querier, id uuid.UUID) (TaskStatus, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("claimed_at")
-	sb.From(tasksTable)
+	sb.From(entity.TableQueueTasks)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -522,7 +518,7 @@ func taskStatus(ctx context.Context, q datastore.Querier, id uuid.UUID) (TaskSta
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("succeeded")
-	cb.From(completedTable)
+	cb.From(entity.TableQueueTasksCompleted)
 	cb.Where(cb.Equal("id", id))
 
 	query, args = cb.Build()

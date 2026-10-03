@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
-	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )
@@ -55,8 +57,8 @@ func (r *Repository) GroupsOfUsers(ctx context.Context, db datastore.Querier, us
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("m.user_id", "g.id", "g.name", "g.display_name", "g.created_at", "g.updated_at")
-	sb.From(GroupTable + " g")
-	sb.JoinWithOption(sqlbuilder.InnerJoin, GroupMemberTable+" m", "m.user_group_id = g.id")
+	sb.From(entity.TableUserGroups + " g")
+	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableUserGroupsUsers+" m", "m.user_group_id = g.id")
 	sb.Where(sb.In("m.user_id", toList(userIDs)...))
 	sb.OrderBy("m.user_id", "lower(g.display_name)", "g.id")
 
@@ -113,7 +115,7 @@ func (r *Repository) AttachGroups(ctx context.Context, db datastore.Querier, use
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(GroupMemberTable)
+	ib.InsertInto(entity.TableUserGroupsUsers)
 	ib.Cols("user_id", "user_group_id")
 	for _, id := range ids {
 		ib.Values(userID, id)

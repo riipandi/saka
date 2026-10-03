@@ -1,18 +1,6 @@
 package auditlog
 
-import (
-	"time"
-
-	"github.com/riipandi/saka/internal/audit"
-)
-
-// Table is the table records live in. The migration owns the schema; this is
-// how Go code names it.
-//
-// It is the same constant the writer uses, because a reader and a writer that
-// disagreed about the table name would be a defect nothing catches until a
-// query ran.
-const Table = audit.Table
+import "time"
 
 // The columns a record is read back through, in scan order.
 //

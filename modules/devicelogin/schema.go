@@ -6,10 +6,6 @@ import (
 	"uuid"
 )
 
-// The table the pairing requests live in. The migrations own the schema;
-// these constants are how Go code names it, so a rename touches one line.
-const requestTable = "public.device_login_requests"
-
 // The pairing lifetime and the exchange rhythm. A request lives five
 // minutes, the long poll holds the device for twenty-five seconds before
 // answering pending, and the device waits the interval the create answer

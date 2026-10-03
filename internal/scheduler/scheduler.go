@@ -21,14 +21,10 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/robfig/cron/v3"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 )
-
-// jobsTable is the scheduler's own state table, created by
-// database/migrations/00008_create_scheduler_tables.sql. The engine reads
-// and writes it, and nothing else in the process names it.
-const jobsTable = "public.scheduler_jobs"
 
 // now returns the current time in a way tests can override.
 var now = func() time.Time { return time.Now() }
@@ -200,7 +196,7 @@ func (s *Scheduler) seed(ctx context.Context, job *registeredJob) error {
 	due := job.schedule.Next(now().In(s.location))
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(jobsTable)
+	ib.InsertInto(entity.TableSchedulerJobs)
 	ib.Cols("name", "spec", "next_due")
 	ib.Values(job.Name, job.Spec, due)
 	ib.SQL("ON CONFLICT (name) DO NOTHING")
@@ -251,7 +247,7 @@ func (s *Scheduler) claimOutcome(ctx context.Context, job *registeredJob) (strin
 func (s *Scheduler) claim(ctx context.Context, tx datastore.Querier, job *registeredJob) (string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("next_due", "now()")
-	sb.From(jobsTable)
+	sb.From(entity.TableSchedulerJobs)
 	sb.Where(sb.Equal("name", job.Name))
 	sb.ForUpdate()
 
@@ -278,7 +274,7 @@ func (s *Scheduler) claim(ctx context.Context, tx datastore.Querier, job *regist
 	next := job.schedule.Next(due)
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(jobsTable)
+	ub.Update(entity.TableSchedulerJobs)
 	ub.Set(
 		ub.Assign("next_due", next),
 		ub.Assign("last_fired", dbNow),
@@ -307,7 +303,7 @@ func (s *Scheduler) reseed(ctx context.Context, tx datastore.Querier, job *regis
 	due := job.schedule.Next(now().In(s.location))
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(jobsTable)
+	ib.InsertInto(entity.TableSchedulerJobs)
 	ib.Cols("name", "spec", "next_due")
 	ib.Values(job.Name, job.Spec, due)
 	ib.SQL("ON CONFLICT (name) DO NOTHING")

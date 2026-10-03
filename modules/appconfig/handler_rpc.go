@@ -7,6 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	settingsv1 "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1"
 	settingsv1connect "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1/settingsv1connect"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
@@ -15,7 +17,6 @@ import (
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/riipandi/saka/pkg/responder"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to

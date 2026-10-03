@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
-	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
 // Repository writes the account a sign-up creates and consumes the token it
@@ -34,7 +35,7 @@ func NewRepository() *Repository {
 // sweep retires the dead rows.
 func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Querier, now time.Time) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(SignupTokenTable)
+	dbb.DeleteFrom(entity.TableSignupTokens)
 	dbb.Where(dbb.LT("expires_at", now))
 
 	query, args := dbb.Build()
@@ -48,7 +49,7 @@ func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Queri
 func (r *Repository) FindSignupTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (*SignupToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "usage_limit", "usage_count", "created_at", "expires_at")
-	sb.From(SignupTokenTable)
+	sb.From(entity.TableSignupTokens)
 	sb.Where(sb.Equal("token_hash", tokenHash))
 
 	query, args := sb.Build()
@@ -74,8 +75,8 @@ func (r *Repository) FindSignupTokenByHash(ctx context.Context, db datastore.Que
 func (r *Repository) TokenGroups(ctx context.Context, db datastore.Querier, tokenID uuid.UUID) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("j.user_group_id")
-	sb.From(SignupTokenGroupTable + " j")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, usergroup.GroupTable+" g", "g.id = j.user_group_id")
+	sb.From(entity.TableSignupTokensUserGroups + " j")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserGroups+" g", "g.id = j.user_group_id")
 	sb.Where(sb.Equal("j.signup_token_id", tokenID))
 	sb.OrderBy("lower(g.name)", "g.id")
 
@@ -106,7 +107,7 @@ func (r *Repository) TokenGroups(ctx context.Context, db datastore.Querier, toke
 func (r *Repository) CreateTokenGroups(ctx context.Context, db datastore.Querier, tokenID uuid.UUID, groupIDs []uuid.UUID) error {
 	for _, groupID := range groupIDs {
 		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		ib.InsertInto(SignupTokenGroupTable)
+		ib.InsertInto(entity.TableSignupTokensUserGroups)
 		ib.Cols("signup_token_id", "user_group_id")
 		ib.Values(tokenID, groupID)
 
@@ -125,7 +126,7 @@ func (r *Repository) CreateTokenGroups(ctx context.Context, db datastore.Querier
 func (r *Repository) AddUserToGroups(ctx context.Context, db datastore.Querier, userID uuid.UUID, groupIDs []uuid.UUID) error {
 	for _, groupID := range groupIDs {
 		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		ib.InsertInto(usergroup.GroupMemberTable)
+		ib.InsertInto(entity.TableUserGroupsUsers)
 		ib.Cols("user_id", "user_group_id")
 		ib.Values(userID, groupID)
 
@@ -145,7 +146,7 @@ func (r *Repository) AddUserToGroups(ctx context.Context, db datastore.Querier, 
 func (r *Repository) EmailsAtDomain(ctx context.Context, db datastore.Querier, domain string) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("lower(email)")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Like("lower(email)", "%@"+domain))
 
 	query, args := sb.Build()
@@ -174,7 +175,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row u
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(user.UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name", "email_verified_at")
 	// The name columns are nullable and an absent name is NULL, not the
 	// empty string the struct's zero value carries; the username is the
@@ -210,7 +211,7 @@ type userEmailAccount struct {
 func (r *Repository) FindUserEmailAccount(ctx context.Context, db datastore.Querier, email string) (userEmailAccount, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("email", "display_name")
-	sb.From(user.UserTable)
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("email", email))
 
 	query, args := sb.Build()
@@ -225,7 +226,7 @@ func (r *Repository) FindUserEmailAccount(ctx context.Context, db datastore.Quer
 // CreatePassword stores the account's primary credential.
 func (r *Repository) CreatePassword(ctx context.Context, db datastore.Querier, row password.UserPasswordSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(password.UserPasswordTable)
+	ib.InsertInto(entity.TableUserPasswords)
 	ib.Cols("user_id", "password_hash")
 	ib.Values(row.UserID, row.PasswordHash)
 
@@ -241,7 +242,7 @@ func (r *Repository) CreatePassword(ctx context.Context, db datastore.Querier, r
 // read and this statement bumps no row, and the caller refuses the signup.
 func (r *Repository) ConsumeSignupToken(ctx context.Context, db datastore.Querier, tokenID uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(SignupTokenTable)
+	ub.Update(entity.TableSignupTokens)
 	ub.Set(ub.Assign("usage_count", sqlbuilder.Raw("usage_count + 1")))
 	ub.Where(
 		ub.Equal("id", tokenID),
@@ -280,7 +281,7 @@ func uniqueViolationOn(err error, constraint string) bool {
 func (r *Repository) AssertGroupsExist(ctx context.Context, db datastore.Querier, groupIDs []uuid.UUID) error {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(usergroup.GroupTable)
+	sb.From(entity.TableUserGroups)
 	sb.Where(sb.In("id", groupIDArgs(groupIDs)...))
 
 	query, args := sb.Build()
@@ -301,7 +302,7 @@ func (r *Repository) CreateSignupToken(ctx context.Context, db datastore.Querier
 	id := uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(SignupTokenTable)
+	ib.InsertInto(entity.TableSignupTokens)
 	ib.Cols("id", "token_hash", "usage_limit", "expires_at")
 	ib.Values(id, tokenHash, usageLimit, expiresAt)
 
@@ -331,7 +332,7 @@ var tokenSortColumns = map[string]string{
 func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier, sortBy string, ascending bool, offset, limit int) ([]SignupToken, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "usage_limit", "usage_count", "created_at", "expires_at")
-	sb.From(SignupTokenTable)
+	sb.From(entity.TableSignupTokens)
 	sb.OrderBy(datastore.ListOrder(tokenSortColumns, sortBy, "created_at", ascending), "id")
 	sb.Limit(limit).Offset(offset)
 
@@ -366,7 +367,7 @@ func (r *Repository) ListSignupTokens(ctx context.Context, db datastore.Querier,
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(SignupTokenTable)
+	cb.From(entity.TableSignupTokens)
 	query, args = cb.Build()
 	var total int
 	if err := db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
@@ -384,8 +385,8 @@ func (r *Repository) attachGroups(ctx context.Context, db datastore.Querier, tok
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("j.signup_token_id", "j.user_group_id")
-	sb.From(SignupTokenGroupTable + " j")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, usergroup.GroupTable+" g", "g.id = j.user_group_id")
+	sb.From(entity.TableSignupTokensUserGroups + " j")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserGroups+" g", "g.id = j.user_group_id")
 	sb.Where(sb.In("j.signup_token_id", tokenIDs(tokens)...))
 	sb.OrderBy("lower(g.name)", "g.id")
 
@@ -439,7 +440,7 @@ func groupIDArgs(groupIDs []uuid.UUID) []any {
 // removed, so the caller refuses an id that names nothing.
 func (r *Repository) DeleteSignupToken(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	db2 := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db2.DeleteFrom(SignupTokenTable)
+	db2.DeleteFrom(entity.TableSignupTokens)
 	db2.Where(db2.Equal("id", id))
 
 	query, args := db2.Build()

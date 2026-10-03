@@ -9,7 +9,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -102,7 +102,7 @@ func auditCleanupProcessor(ctx context.Context, task AuditCleanupTask, pool *dat
 // the vocabulary package so a rename touches one line.
 func deleteExpiredAuditRecords(ctx context.Context, pool *datastore.Postgres, cutoff time.Time) (int64, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(audit.Table)
+	dbl.DeleteFrom(entity.TableAuditLogs)
 	dbl.Where(dbl.LessThan("created_at", cutoff))
 
 	query, args := dbl.Build()

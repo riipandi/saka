@@ -11,6 +11,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/password"
@@ -320,7 +321,7 @@ func insertBan(ctx context.Context, q datastore.Querier, userID uuid.UUID, reaso
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(restrictions.RestrictionTable)
+	ib.InsertInto(entity.TableAccountRestrictions)
 	ib.Cols("user_id", "kind", "reason", "started_at", "expires_at")
 	ib.Values(userID, restrictions.KindBan, reason, now.Add(-24*time.Hour), expiresAt)
 
@@ -360,7 +361,7 @@ func plannedDefaultUser(
 // email would do anyway.
 func userExists(ctx context.Context, q datastore.Querier, email string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id").From(user.UserTable).Where(sb.Equal("email", email))
+	sb.Select("id").From(entity.TableUsers).Where(sb.Equal("email", email))
 
 	query, args := sb.Build()
 	var id uuid.UUID
@@ -387,7 +388,7 @@ func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug s
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("u.id")
-	sb.From(user.UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	sb.Where(sb.Equal("u.email", email))
 
 	query, args := sb.Build()
@@ -398,7 +399,7 @@ func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug s
 
 	rb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	rb.Select("r.id")
-	rb.From(authz.RolesTable + " r")
+	rb.From(entity.TableRoles + " r")
 	rb.Where(rb.Equal("r.slug", roleSlug))
 
 	query, args = rb.Build()
@@ -409,7 +410,7 @@ func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug s
 
 	active := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	active.Select("1")
-	active.From(authz.UserRolesTable)
+	active.From(entity.TableUserRoles)
 	active.Where(active.Equal("user_id", userID), active.Equal("role_id", roleID), active.IsNull("revoked_at"))
 
 	query, args = active.Build()
@@ -419,7 +420,7 @@ func ensureRoleGrant(ctx context.Context, q datastore.Querier, email, roleSlug s
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.UserRolesTable)
+	ib.InsertInto(entity.TableUserRoles)
 	ib.Cols("user_id", "role_id")
 	ib.Values(userID, roleID)
 
@@ -442,7 +443,7 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("u.id")
-	sb.From(user.UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	sb.Where(sb.Equal("u.email", email))
 
 	query, args := sb.Build()
@@ -453,7 +454,7 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 
 	pb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	pb.Select("p.id")
-	pb.From(authz.PermissionsTable + " p")
+	pb.From(entity.TablePermissions + " p")
 	pb.Where(pb.Equal("p.slug", slug))
 
 	query, args = pb.Build()
@@ -464,7 +465,7 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 
 	active := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	active.Select("1")
-	active.From(authz.UserPermissionsTable)
+	active.From(entity.TableUserPermissions)
 	active.Where(active.Equal("user_id", userID), active.Equal("permission_id", permissionID), active.IsNull("revoked_at"))
 
 	query, args = active.Build()
@@ -474,7 +475,7 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.UserPermissionsTable)
+	ib.InsertInto(entity.TableUserPermissions)
 	ib.Cols("user_id", "permission_id")
 	ib.Values(userID, permissionID)
 
@@ -492,7 +493,7 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 // generated insert would name columns no table has.
 func insertUser(ctx context.Context, q datastore.Querier, row user.UserSchema) (bool, error) {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(user.UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
 		"metadata", "disabled", "email_verified_at", "created_at")
 	ib.Values(row.ID, row.Username, row.Email, row.FirstName, row.LastName, row.DisplayName,
@@ -517,7 +518,7 @@ func insertUser(ctx context.Context, q datastore.Querier, row user.UserSchema) (
 // rather than something to skip.
 func insertPassword(ctx context.Context, q datastore.Querier, userID uuid.UUID, hash string) error {
 	ib := sqlbuilder.NewStruct(password.UserPasswordSchema{}).For(sqlbuilder.PostgreSQL).
-		InsertInto(password.UserPasswordTable, password.UserPasswordSchema{
+		InsertInto(entity.TableUserPasswords, password.UserPasswordSchema{
 			UserID:       userID,
 			PasswordHash: hash,
 		})

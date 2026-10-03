@@ -5,15 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
-// UserTable is the users table. The migrations own the schema; this constant is
-// how Go code names it, so a table rename touches one line.
-const UserTable = "public.users"
-
-// UserSchema is one row of UserTable. It lists only the columns the application
+// UserSchema is one row of entity.TableUsers. It lists only the columns the application
 // writes and the account procedures read, so a migration can add a column with
 // a default without touching this struct. The db tags are the column names the
 // query builder uses.

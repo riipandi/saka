@@ -9,6 +9,10 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
@@ -16,8 +20,6 @@ import (
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // The `mfa.required` composition: the real sign-in issuer and the real
@@ -74,7 +76,7 @@ func gateTestService(t *testing.T) (*signin.Service, *Service, uuid.UUID, *datas
 	hash, err := crypto.NewPasswordHasher().Hash("expecto-patronum")
 	require.NoError(t, err)
 	pb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	pb.InsertInto("public.user_passwords")
+	pb.InsertInto(entity.TableUserPasswords)
 	pb.Cols("user_id", "password_hash")
 	pb.Values(userID, hash)
 	passwordQuery, passwordArgs := pb.Build()
@@ -88,7 +90,7 @@ func gateTestService(t *testing.T) (*signin.Service, *Service, uuid.UUID, *datas
 // it — the columns the sign-in's own gates read before the fork runs.
 func gateUserBuilder(userID uuid.UUID) (string, []any) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.users")
+	sb.InsertInto(entity.TableUsers)
 	sb.Cols("id", "username", "email", "display_name", "disabled", "email_verified_at")
 	sb.Values(userID, "langdon", "langdon@example.com", "Robert Langdon", false, time.Now())
 	return sb.Build()

@@ -14,12 +14,14 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pquerna/otp/totp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/pkg/testutils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // testCipher is the sealing a test runs: a real AES-256-GCM over a key the
@@ -425,7 +427,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 // its own package and the test needs exactly one row.
 func insertUserBuilder(userID uuid.UUID, username string) (string, []any) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.users")
+	sb.InsertInto(entity.TableUsers)
 	sb.Cols("id", "username", "email", "display_name", "first_name", "last_name", "disabled", "created_at", "updated_at")
 	sb.Values(userID, username, "langdon@example.com", "Robert Langdon", "Robert", "Langdon", false, time.Now(), time.Now())
 	return sb.Build()

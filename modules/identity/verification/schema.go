@@ -10,9 +10,6 @@ import (
 // own the schema; these constants are how Go code names it, so a table rename
 // touches one line.
 
-// AuthTokenTable is the one-time-token table the verification row lives in.
-const AuthTokenTable = "public.auth_tokens"
-
 // PurposeEmailVerification is the purpose value the verification rows carry.
 // The column's check allows it alone among the four; a second purpose here
 // would need its own migration first.
@@ -22,7 +19,7 @@ const PurposeEmailVerification = "email_verification"
 // pending token a change request writes and the confirmation consumes.
 const PurposeEmailChange = "email_change"
 
-// VerificationToken is one row of AuthTokenTable under the verification
+// VerificationToken is one row of entity.TableAuthTokens under the verification
 // purpose. The raw value is never stored: the caller's hash is.
 type VerificationToken struct {
 	ID         uuid.UUID
@@ -31,7 +28,7 @@ type VerificationToken struct {
 	LastSentAt *time.Time
 }
 
-// EmailChangeToken is one row of AuthTokenTable under the email-change
+// EmailChangeToken is one row of entity.TableAuthTokens under the email-change
 // purpose. Payload is the pending address the token is bound to: the
 // confirmation moves the account to the row's address, never to one the
 // confirm request could name, so a token stolen in transit cannot point the

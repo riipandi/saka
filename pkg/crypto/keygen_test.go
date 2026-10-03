@@ -9,10 +9,11 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 func TestNewKeyGeneratorDefaults(t *testing.T) {

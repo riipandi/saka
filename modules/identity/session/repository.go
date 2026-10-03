@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
-	"go.jetify.com/typeid"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -78,7 +80,7 @@ func scanSession(scan func(dest ...any) error) (SessionSchema, error) {
 // writes the same columns. The caller owns the transaction.
 func (r *Repository) Create(ctx context.Context, db datastore.Querier, row SessionSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(SessionTable)
+	ib.InsertInto(entity.TableSessions)
 	ib.Cols("id", "user_id", "provider", "token_hash", "user_agent", "device_fingerprint", "ip_address", "remember", "created_at", "expires_at", "impersonated_by")
 	ib.Values(row.ID.UUID(), row.UserID, row.Provider, row.TokenHash, row.UserAgent, row.DeviceFingerprint, row.IPAddress, row.Remember, row.CreatedAt, row.ExpiresAt, row.ImpersonatedBy)
 
@@ -93,7 +95,7 @@ func (r *Repository) Create(ctx context.Context, db datastore.Querier, row Sessi
 func (r *Repository) GetSession(ctx context.Context, db datastore.Querier, id SessionID) (SessionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(sessionColumns...)
-	sb.From(SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("id", id.UUID()))
 
 	query, args := sb.Build()
@@ -116,7 +118,7 @@ func (r *Repository) GetSession(ctx context.Context, db datastore.Querier, id Se
 func (r *Repository) FindActiveByTokenHash(ctx context.Context, db datastore.Querier, hash string, now time.Time) (SessionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(sessionColumns...)
-	sb.From(SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("token_hash", hash), sb.IsNull("revoked_at"), sb.GT("expires_at", now))
 
 	query, args := sb.Build()
@@ -142,7 +144,7 @@ func (r *Repository) FindActiveByTokenHash(ctx context.Context, db datastore.Que
 func (r *Repository) LockByRefreshHash(ctx context.Context, db datastore.Querier, hash string) (SessionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(sessionColumns...)
-	sb.From(SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Or(sb.Equal("token_hash", hash), sb.Equal("rotated_token_hash", hash)))
 	sb.ForUpdate()
 
@@ -167,7 +169,7 @@ func (r *Repository) LockByRefreshHash(ctx context.Context, db datastore.Querier
 // settles.
 func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id SessionID, by *uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(SessionTable)
+	ub.Update(entity.TableSessions)
 	ub.Set(
 		ub.Assign("revoked_at", at),
 		// A system revocation names no ender: the NULL is the row's way of
@@ -192,7 +194,7 @@ func (r *Repository) Revoke(ctx context.Context, db datastore.Querier, id Sessio
 // renewal matches nothing rather than overwriting the winner's secret.
 func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id SessionID, hash, previousHash string, refreshedAt, expiresAt time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(SessionTable)
+	ub.Update(entity.TableSessions)
 	ub.Set(
 		ub.Assign("token_hash", hash),
 		// The hash being replaced is kept beside the row: a caller who
@@ -222,7 +224,7 @@ func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id Sessio
 func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID, keep *SessionID, by uuid.UUID, at time.Time) ([]SessionSchema, error) {
 	lb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	lb.Select(sessionColumns...)
-	lb.From(SessionTable)
+	lb.From(entity.TableSessions)
 	lb.Where(lb.Equal("user_id", userID), lb.IsNull("revoked_at"))
 	if keep != nil {
 		lb.Where(lb.NE("id", keep.UUID()))
@@ -254,7 +256,7 @@ func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier
 	}
 
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(SessionTable)
+	ub.Update(entity.TableSessions)
 	ub.Set(
 		ub.Assign("revoked_at", at),
 		ub.Assign("revoked_by", by),
@@ -274,7 +276,7 @@ func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier
 func (r *Repository) ListOwn(ctx context.Context, db datastore.Querier, userID uuid.UUID, offset, limit int) ([]SessionSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(sessionColumns...)
-	sb.From(SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("user_id", userID))
 	sb.OrderBy("created_at DESC", "id DESC")
 	sb.Limit(limit).Offset(offset)
@@ -300,7 +302,7 @@ func (r *Repository) ListOwn(ctx context.Context, db datastore.Querier, userID u
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(SessionTable)
+	cb.From(entity.TableSessions)
 	cb.Where(cb.Equal("user_id", userID))
 	query, args = cb.Build()
 	var total int

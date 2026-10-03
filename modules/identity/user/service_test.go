@@ -20,6 +20,8 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/storage"
@@ -90,7 +92,7 @@ func passwordCount(t *testing.T, pool *datastore.Postgres, userID string) int {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.user_passwords")
+	sb.From(entity.TableUserPasswords)
 	sb.Where(sb.Equal("user_id", id))
 
 	query, args := sb.Build()
@@ -640,9 +642,9 @@ func storedPictureReference(t *testing.T, pool *datastore.Postgres, userID strin
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("b.name", "so.key")
-	sb.From(UserTable + " u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.storage_objects so", "so.id = u.picture_file_id")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.storage_buckets b", "b.id = so.bucket_id")
+	sb.From(entity.TableUsers + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageObjects+" so", "so.id = u.picture_file_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageBuckets+" b", "b.id = so.bucket_id")
 	sb.Where(sb.Equal("u.id", rowID(t, userID)))
 	query, args := sb.Build()
 
@@ -710,7 +712,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 	var pictureFileID *string
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("picture_file_id")
-	sb.From(UserTable)
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("id", rowID(t, created.ID)))
 	query, args := sb.Build()
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&pictureFileID))

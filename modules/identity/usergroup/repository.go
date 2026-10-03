@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )
@@ -67,8 +68,8 @@ func scanGroup(scan func(dest ...any) error) (GroupSchema, error) {
 func (r *Repository) ListGroups(ctx context.Context, db datastore.Querier, search, sortBy string, ascending bool, offset, limit int) ([]GroupRow, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(append(groupColumns, "count(m.user_id)")...)
-	sb.From(GroupTable + " g")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, GroupMemberTable+" m", "m.user_group_id = g.id")
+	sb.From(entity.TableUserGroups + " g")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserGroupsUsers+" m", "m.user_group_id = g.id")
 	sb.GroupBy("g.id")
 	applySearch(sb, search)
 	order := datastore.ListOrder(sortColumns, sortBy, "display_name", ascending)
@@ -98,7 +99,7 @@ func (r *Repository) ListGroups(ctx context.Context, db datastore.Querier, searc
 	// member count belongs to the page's rows, not to the pagination.
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(GroupTable + " g")
+	cb.From(entity.TableUserGroups + " g")
 	applySearch(cb, search)
 	query, args = cb.Build()
 	var total int
@@ -151,7 +152,7 @@ func scanListRow(scan func(dest ...any) error) (GroupRow, error) {
 func (r *Repository) GetGroup(ctx context.Context, db datastore.Querier, id GroupID) (GroupSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "name", "display_name", "created_at", "updated_at")
-	sb.From(GroupTable)
+	sb.From(entity.TableUserGroups)
 	sb.Where(sb.Equal("id", id.UUID()))
 
 	query, args := sb.Build()
@@ -178,7 +179,7 @@ func (r *Repository) CreateGroup(ctx context.Context, db datastore.Querier, row 
 	row.ID = id
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(GroupTable)
+	ib.InsertInto(entity.TableUserGroups)
 	ib.Cols("id", "name", "display_name")
 	ib.Values(row.ID.UUID(), row.Name, row.DisplayName)
 
@@ -193,7 +194,7 @@ func (r *Repository) CreateGroup(ctx context.Context, db datastore.Querier, row 
 // named a row. The updated instant is the trigger's job, not this query's.
 func (r *Repository) UpdateGroup(ctx context.Context, db datastore.Querier, row GroupSchema) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(GroupTable)
+	ub.Update(entity.TableUserGroups)
 	ub.Set(
 		ub.Assign("name", row.Name),
 		ub.Assign("display_name", row.DisplayName),
@@ -212,7 +213,7 @@ func (r *Repository) UpdateGroup(ctx context.Context, db datastore.Querier, row 
 // The membership rows die with the group by the foreign keys' cascade.
 func (r *Repository) DeleteGroup(ctx context.Context, db datastore.Querier, id GroupID) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(GroupTable)
+	dbl.DeleteFrom(entity.TableUserGroups)
 	dbl.Where(dbl.Equal("id", id.UUID()))
 
 	query, args := dbl.Build()
@@ -230,9 +231,9 @@ func (r *Repository) DeleteGroup(ctx context.Context, db datastore.Querier, id G
 func (r *Repository) ListMembers(ctx context.Context, db datastore.Querier, groupID GroupID) ([]user.UserSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(user.UserColumns...)
-	sb.From(user.UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	user.ActiveBanJoin(sb)
-	sb.Join(GroupMemberTable+" m", "m.user_id = u.id")
+	sb.Join(entity.TableUserGroupsUsers+" m", "m.user_id = u.id")
 	sb.Where(sb.Equal("m.user_group_id", groupID.UUID()))
 	sb.OrderBy("u.username", "u.id")
 
@@ -269,7 +270,7 @@ func (r *Repository) SetMembers(ctx context.Context, db datastore.Querier, group
 	if len(userIDs) > 0 {
 		cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 		cb.Select("count(*)")
-		cb.From(user.UserTable)
+		cb.From(entity.TableUsers)
 		cb.Where(cb.In("id", toList(userIDs)...))
 
 		query, args := cb.Build()
@@ -283,7 +284,7 @@ func (r *Repository) SetMembers(ctx context.Context, db datastore.Querier, group
 	}
 
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(GroupMemberTable)
+	dbl.DeleteFrom(entity.TableUserGroupsUsers)
 	dbl.Where(dbl.Equal("user_group_id", groupID.UUID()))
 
 	query, args := dbl.Build()
@@ -296,7 +297,7 @@ func (r *Repository) SetMembers(ctx context.Context, db datastore.Querier, group
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(GroupMemberTable)
+	ib.InsertInto(entity.TableUserGroupsUsers)
 	ib.Cols("user_id", "user_group_id")
 	for _, userID := range userIDs {
 		ib.Values(userID, groupID.UUID())
@@ -315,8 +316,8 @@ func (r *Repository) SetMembers(ctx context.Context, db datastore.Querier, group
 func (r *Repository) ListGroupsOfUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]GroupSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("g.id", "g.name", "g.display_name", "g.created_at", "g.updated_at")
-	sb.From(GroupTable + " g")
-	sb.Join(GroupMemberTable+" m", "m.user_group_id = g.id")
+	sb.From(entity.TableUserGroups + " g")
+	sb.Join(entity.TableUserGroupsUsers+" m", "m.user_group_id = g.id")
 	sb.Where(sb.Equal("m.user_id", userID))
 	sb.OrderBy("lower(g.display_name)", "g.id")
 
@@ -356,7 +357,7 @@ func (r *Repository) SetUserGroups(ctx context.Context, db datastore.Querier, us
 		}
 		cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 		cb.Select("count(*)")
-		cb.From(GroupTable)
+		cb.From(entity.TableUserGroups)
 		cb.Where(cb.In("id", keys...))
 
 		query, args := cb.Build()
@@ -370,7 +371,7 @@ func (r *Repository) SetUserGroups(ctx context.Context, db datastore.Querier, us
 	}
 
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(GroupMemberTable)
+	dbl.DeleteFrom(entity.TableUserGroupsUsers)
 	dbl.Where(dbl.Equal("user_id", userID))
 
 	query, args := dbl.Build()
@@ -383,7 +384,7 @@ func (r *Repository) SetUserGroups(ctx context.Context, db datastore.Querier, us
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(GroupMemberTable)
+	ib.InsertInto(entity.TableUserGroupsUsers)
 	ib.Cols("user_id", "user_group_id")
 	for _, groupID := range groupIDs {
 		ib.Values(userID, groupID.UUID())

@@ -22,10 +22,11 @@ import (
 	"net/http"
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/internal/transport/middleware"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // The paths the limiter never counts, one list per transport: the namespaces

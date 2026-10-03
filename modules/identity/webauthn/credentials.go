@@ -6,9 +6,10 @@ import (
 
 	"uuid"
 
+	"go.jetify.com/typeid"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
-	"go.jetify.com/typeid"
 )
 
 // typeidParseCredential reads a credential's wire form back into its UUID.

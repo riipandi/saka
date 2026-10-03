@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
-	"uuid"
 
 	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/password"
-	"github.com/riipandi/saka/modules/identity/restrictions"
 )
 
 // Repository reads and writes the account rows the administration procedures
@@ -47,7 +46,7 @@ var UserColumns = []string{
 // scan UserColumns call it; a caller that does not must answer the ban and
 // picture fields some other way.
 func ActiveBanJoin(sb *sqlbuilder.SelectBuilder) {
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageObjects+" so", "so.id = u.picture_file_id")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageBuckets+" b", "b.id = so.bucket_id")
@@ -94,7 +93,7 @@ func deref(value *string) string {
 func (r *Repository) GetUser(ctx context.Context, db datastore.Querier, id uuid.UUID) (UserSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(UserColumns...)
-	sb.From(UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	ActiveBanJoin(sb)
 	sb.Where(sb.Equal("u.id", id))
 
@@ -132,7 +131,7 @@ var userSortColumns = map[string]string{
 func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search, sortBy string, ascending bool, offset, limit int) ([]UserSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(UserColumns...)
-	sb.From(UserTable + " u")
+	sb.From(entity.TableUsers + " u")
 	ActiveBanJoin(sb)
 	if search != "" {
 		pattern := "%" + search + "%"
@@ -166,7 +165,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(UserTable)
+	cb.From(entity.TableUsers)
 	if search != "" {
 		pattern := "%" + search + "%"
 		cb.Where(cb.Or(
@@ -190,7 +189,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
 		"metadata", "disabled", "email_verified_at")
 	ib.Values(
@@ -211,7 +210,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 // storage is the restrictions feature's row.
 func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row UserSchema) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(UserTable)
+	ub.Update(entity.TableUsers)
 	ub.Set(
 		ub.Assign("username", row.Username),
 		ub.Assign("email", row.Email),
@@ -236,7 +235,7 @@ func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row U
 // identifier named a row, so the caller refuses one that names nothing.
 func (r *Repository) DeleteUser(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(UserTable)
+	dbl.DeleteFrom(entity.TableUsers)
 	dbl.Where(dbl.Equal("id", id))
 
 	query, args := dbl.Build()
@@ -250,7 +249,7 @@ func (r *Repository) DeleteUser(ctx context.Context, db datastore.Querier, id uu
 // CreatePassword stores the account's primary credential.
 func (r *Repository) CreatePassword(ctx context.Context, db datastore.Querier, userID uuid.UUID, passwordHash string) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(password.UserPasswordTable)
+	ib.InsertInto(entity.TableUserPasswords)
 	ib.Cols("user_id", "password_hash")
 	ib.Values(userID, passwordHash)
 
@@ -287,7 +286,7 @@ func nullJSON(value []byte) any {
 // crosses into a query.
 func (r *Repository) SetPictureFileID(ctx context.Context, db datastore.Querier, id uuid.UUID, fileID string) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(UserTable)
+	ub.Update(entity.TableUsers)
 	ub.SetMore(ub.Assign("picture_file_id", nullIfEmpty(fileID)))
 	ub.Where(ub.Equal("id", id))
 

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 )
@@ -51,9 +53,9 @@ func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, 
 		"u.disabled", "coalesce(ar.kind, '') AS banned",
 		"p.password_hash IS NOT NULL",
 	)
-	sb.From("public.users AS u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.email", email))
 
@@ -81,9 +83,9 @@ func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, use
 		"u.disabled", "coalesce(ar.kind, '') AS banned",
 		"p.password_hash IS NOT NULL",
 	)
-	sb.From("public.users AS u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.id", userID))
 
@@ -108,7 +110,7 @@ func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, use
 // with.
 func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, PurposePasswordReset, expiresAt, sentAt)
 	// The conflict target carries the partial index's predicate: the unique
@@ -130,7 +132,7 @@ func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, user
 func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (ResetTokenSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("token_hash", tokenHash),
 		sb.Equal("purpose", PurposePasswordReset),
@@ -153,7 +155,7 @@ func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (ResetTokenSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "last_sent_at")
-	sb.From(AuthTokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", PurposePasswordReset),
@@ -176,7 +178,7 @@ func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, 
 // answers false, and the password write it was about to make never happens.
 func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, hash string) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(AuthTokenTable)
+	dbl.DeleteFrom(entity.TableAuthTokens)
 	dbl.Where(dbl.Equal("id", id), dbl.Equal("token_hash", hash), dbl.Equal("purpose", PurposePasswordReset))
 
 	query, args := dbl.Build()
@@ -193,8 +195,8 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) FindPasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) (string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.password_hash")
-	sb.From("public.users AS u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
 	sb.Where(sb.Equal("u.id", userID))
 
 	query, args := sb.Build()
@@ -217,7 +219,7 @@ func (r *Repository) FindPasswordHash(ctx context.Context, db datastore.Querier,
 // the row to mean something.
 func (r *Repository) DeletePasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
 	dbn := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbn.DeleteFrom(UserPasswordTable)
+	dbn.DeleteFrom(entity.TableUserPasswords)
 	dbn.Where(dbn.Equal("user_id", userID))
 	query, args := dbn.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
@@ -231,7 +233,7 @@ func (r *Repository) DeletePasswordHash(ctx context.Context, db datastore.Querie
 // added one).
 func (r *Repository) SetPasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID, hash string) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(UserPasswordTable)
+	ib.InsertInto(entity.TableUserPasswords)
 	ib.Cols("user_id", "password_hash")
 	ib.Values(userID, hash)
 	ib.SQL("ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash")

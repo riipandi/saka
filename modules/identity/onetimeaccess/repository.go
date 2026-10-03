@@ -9,9 +9,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/restrictions"
-	"github.com/riipandi/saka/modules/identity/user"
 
 	"uuid"
 )
@@ -48,8 +47,8 @@ func scanAccount(scan func(dest ...any) error) (Account, error) {
 func (r *Repository) FindAccountByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(accountColumns...)
-	sb.From(user.UserTable + " u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.From(entity.TableUsers + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.id", id))
 
@@ -73,8 +72,8 @@ func (r *Repository) FindAccountByID(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindAccountByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(accountColumns...)
-	sb.From(user.UserTable + " u")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.From(entity.TableUsers + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.email", email))
 
@@ -98,7 +97,7 @@ func (r *Repository) FindAccountByEmail(ctx context.Context, db datastore.Querie
 // the code when the email path issued one, and stays unset otherwise.
 func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, deviceToken *string, expiresAt, sentAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(tokenTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("user_id", "token_hash", "device_token", "purpose", "expires_at", "last_sent_at")
 	ib.Values(userID, tokenHash, deviceToken, PurposeOneTimeAccess, expiresAt, sentAt)
 	// The conflict target carries the partial index's predicate: the unique
@@ -121,7 +120,7 @@ func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, user
 func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (OneTimeToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "device_token", "last_sent_at")
-	sb.From(tokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("token_hash", tokenHash),
 		sb.Equal("purpose", PurposeOneTimeAccess),
@@ -146,7 +145,7 @@ func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (OneTimeToken, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "expires_at", "device_token", "last_sent_at")
-	sb.From(tokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", PurposeOneTimeAccess),
@@ -175,7 +174,7 @@ func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, 
 // left.
 func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Querier, id uuid.UUID, max int) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(tokenTable)
+	ub.Update(entity.TableAuthTokens)
 	ub.Set(ub.Add("wrong_attempts", 1))
 	ub.Where(ub.Equal("id", id), ub.LT("wrong_attempts", max))
 	ub.Returning("wrong_attempts")
@@ -203,7 +202,7 @@ func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Quer
 func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, tokenHash, purpose string) (int64, error) { // pgconn's CommandTag counts the rows the statement touched; a second
 	// caller that lost the race sees zero, which is the code already spent.
 	db2 := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	db2.DeleteFrom(tokenTable)
+	db2.DeleteFrom(entity.TableAuthTokens)
 	db2.Where(db2.Equal("id", id), db2.Equal("token_hash", tokenHash), db2.Equal("purpose", purpose))
 
 	query, args := db2.Build()

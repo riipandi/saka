@@ -19,6 +19,7 @@ import (
 	"connectrpc.com/connect"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
@@ -87,7 +88,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 
 	id := uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "display_name", "disabled", "email_verified_at")
 	var verifiedAt any = time.Now().UTC()
 	if fixture.unverified {
@@ -108,7 +109,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	// force.
 	if fixture.bannedAt != nil {
 		rb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		rb.InsertInto("public.account_restrictions")
+		rb.InsertInto(entity.TableAccountRestrictions)
 		rb.Cols("user_id", "kind", "started_at", "expires_at")
 		rb.Values(id, "ban", *fixture.bannedAt, fixture.banExpires)
 		query, args = rb.Build()
@@ -117,7 +118,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	}
 
 	pb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	pb.InsertInto("public.user_passwords")
+	pb.InsertInto(entity.TableUserPasswords)
 	pb.Cols("user_id", "password_hash")
 	pb.Values(id, fixture.passwordHash)
 	query, args = pb.Build()
@@ -216,7 +217,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	// names the credential kind.
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("token_hash", "user_agent", "remember", "provider", "host(ip_address)", "id")
-	sb.From(session.SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("user_id", userID))
 	query, args := sb.Build()
 	var tokenHash, userAgent, provider string
@@ -235,7 +236,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	// The account records the sign-in.
 	lb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	lb.Select("last_login_at")
-	lb.From("public.users")
+	lb.From(entity.TableUsers)
 	lb.Where(lb.Equal("id", userID))
 	query, args = lb.Build()
 	var lastLogin *time.Time
@@ -351,7 +352,7 @@ func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("ip_address")
-	sb.From(session.SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("id", sid.UUID()))
 	query, args := sb.Build()
 	var ip *string
@@ -387,7 +388,7 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 
 			sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 			sb.Select("remember", "created_at", "expires_at")
-			sb.From(session.SessionTable)
+			sb.From(entity.TableSessions)
 			sb.Where(sb.Equal("id", sid.UUID()))
 			query, args := sb.Build()
 			var remember bool

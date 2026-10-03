@@ -9,6 +9,8 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -54,7 +56,7 @@ func scanTotp(scan func(dest ...any) error) (TotpSchema, error) {
 // CreateTotp writes an unconfirmed enrollment row.
 func (r *Repository) CreateTotp(ctx context.Context, db datastore.Querier, row TotpSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(TotpTable)
+	ib.InsertInto(entity.TableMFATOTP)
 	ib.Cols("id", "user_id", "name", "secret", "digits", "period", "algorithm", "confirmed_at", "created_at", "updated_at")
 	ib.Values(row.ID, row.UserID, row.Name, row.Secret, row.Digits, row.Period, row.Algorithm, row.ConfirmedAt, row.CreatedAt, row.UpdatedAt)
 
@@ -70,7 +72,7 @@ func (r *Repository) CreateTotp(ctx context.Context, db datastore.Querier, row T
 func (r *Repository) GetTotp(ctx context.Context, db datastore.Querier, id uuid.UUID) (TotpSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(totpColumns...)
-	sb.From(TotpTable)
+	sb.From(entity.TableMFATOTP)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -89,7 +91,7 @@ func (r *Repository) GetTotp(ctx context.Context, db datastore.Querier, id uuid.
 func (r *Repository) ListTotp(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]TotpSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(totpColumns...)
-	sb.From(TotpTable)
+	sb.From(entity.TableMFATOTP)
 	sb.Where(sb.Equal("user_id", userID))
 	sb.OrderBy("created_at")
 
@@ -120,7 +122,7 @@ func (r *Repository) ListTotp(ctx context.Context, db datastore.Querier, userID 
 func (r *Repository) CountConfirmedTotp(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(TotpTable)
+	sb.From(entity.TableMFATOTP)
 	sb.Where(sb.Equal("user_id", userID), sb.IsNotNull("confirmed_at"))
 
 	query, args := sb.Build()
@@ -136,7 +138,7 @@ func (r *Repository) CountConfirmedTotp(ctx context.Context, db datastore.Querie
 // agree even if a caller skips it.
 func (r *Repository) ConfirmTotp(ctx context.Context, db datastore.Querier, id, userID uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(TotpTable)
+	ub.Update(entity.TableMFATOTP)
 	ub.Set(ub.Assign("confirmed_at", at), ub.Assign("updated_at", at))
 	ub.Where(ub.Equal("id", id), ub.Equal("user_id", userID), ub.IsNull("confirmed_at"))
 
@@ -154,7 +156,7 @@ func (r *Repository) ConfirmTotp(ctx context.Context, db datastore.Querier, id, 
 // DeleteTotp removes one enrollment. The WHERE clause is the ownership check.
 func (r *Repository) DeleteTotp(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(TotpTable)
+	dbb.DeleteFrom(entity.TableMFATOTP)
 	dbb.Where(dbb.Equal("id", id), dbb.Equal("user_id", userID))
 
 	query, args := dbb.Build()
@@ -173,7 +175,7 @@ func (r *Repository) DeleteTotp(ctx context.Context, db datastore.Querier, id, u
 // secret sits sealed in the table.
 func (r *Repository) DeleteUnconfirmedTotpBefore(ctx context.Context, db datastore.Querier, cutoff time.Time) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(TotpTable)
+	dbb.DeleteFrom(entity.TableMFATOTP)
 	dbb.Where(dbb.IsNull("confirmed_at"), dbb.LT("created_at", cutoff))
 
 	query, args := dbb.Build()
@@ -190,7 +192,7 @@ func (r *Repository) DeleteUnconfirmedTotpBefore(ctx context.Context, db datasto
 // challenges with one code answer exactly one winner.
 func (r *Repository) TouchTotpUsage(ctx context.Context, db datastore.Querier, id uuid.UUID, step int64, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(TotpTable)
+	ub.Update(entity.TableMFATOTP)
 	ub.Set(ub.Assign("last_used_step", step), ub.Assign("last_used_at", at), ub.Assign("updated_at", at))
 	ub.Where(ub.Equal("id", id), ub.Or(ub.IsNull("last_used_step"), ub.LT("last_used_step", step)))
 
@@ -206,7 +208,7 @@ func (r *Repository) TouchTotpUsage(ctx context.Context, db datastore.Querier, i
 // write, and the sweep a recovery flow may ask for.
 func (r *Repository) DeleteAllTotpForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(TotpTable)
+	dbb.DeleteFrom(entity.TableMFATOTP)
 	dbb.Where(dbb.Equal("user_id", userID))
 
 	query, args := dbb.Build()
@@ -224,7 +226,7 @@ func (r *Repository) DeleteAllTotpForUser(ctx context.Context, db datastore.Quer
 // holds, so a regenerate that rolls back keeps the old set.
 func (r *Repository) ReplaceRecoveryCodes(ctx context.Context, db datastore.Querier, userID uuid.UUID, hashes []string, at time.Time) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(RecoveryTable)
+	dbb.DeleteFrom(entity.TableMFARecoveryCodes)
 	dbb.Where(dbb.Equal("user_id", userID))
 
 	query, args := dbb.Build()
@@ -234,7 +236,7 @@ func (r *Repository) ReplaceRecoveryCodes(ctx context.Context, db datastore.Quer
 
 	for _, hash := range hashes {
 		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		ib.InsertInto(RecoveryTable)
+		ib.InsertInto(entity.TableMFARecoveryCodes)
 		ib.Cols("user_id", "code_hash", "created_at")
 		ib.Values(userID, hash, at)
 
@@ -251,7 +253,7 @@ func (r *Repository) ReplaceRecoveryCodes(ctx context.Context, db datastore.Quer
 // racing one code answer exactly one winner, and a used code matches nothing.
 func (r *Repository) ConsumeRecoveryCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, hash string, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(RecoveryTable)
+	ub.Update(entity.TableMFARecoveryCodes)
 	ub.Set(ub.Assign("used_at", at))
 	ub.Where(ub.Equal("user_id", userID), ub.Equal("code_hash", hash), ub.IsNull("used_at"))
 
@@ -268,7 +270,7 @@ func (r *Repository) ConsumeRecoveryCode(ctx context.Context, db datastore.Queri
 func (r *Repository) CountRecoveryCodes(ctx context.Context, db datastore.Querier, userID uuid.UUID) (total, used int, err error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)", "count(used_at)")
-	sb.From(RecoveryTable)
+	sb.From(entity.TableMFARecoveryCodes)
 	sb.Where(sb.Equal("user_id", userID))
 
 	query, args := sb.Build()
@@ -281,7 +283,7 @@ func (r *Repository) CountRecoveryCodes(ctx context.Context, db datastore.Querie
 // DeleteAllRecoveryForUser clears the account's set — disable's write.
 func (r *Repository) DeleteAllRecoveryForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(RecoveryTable)
+	dbb.DeleteFrom(entity.TableMFARecoveryCodes)
 	dbb.Where(dbb.Equal("user_id", userID))
 
 	query, args := dbb.Build()
@@ -297,7 +299,7 @@ func (r *Repository) DeleteAllRecoveryForUser(ctx context.Context, db datastore.
 // the pending row and whatever minted it commit together.
 func (r *Repository) CreatePending(ctx context.Context, db datastore.Querier, row PendingSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(PendingTable)
+	ib.InsertInto(entity.TableMFAPending)
 	ib.Cols("id", "user_id", "token_hash", "remember", "purpose", "expires_at", "created_at")
 	ib.Values(row.ID, row.UserID, row.TokenHash, row.Remember, row.Purpose, row.ExpiresAt, row.CreatedAt)
 
@@ -317,7 +319,7 @@ var pendingColumns = []string{"id", "user_id", "token_hash", "remember", "purpos
 func (r *Repository) FindLivePending(ctx context.Context, db datastore.Querier, hash string, now time.Time) (PendingSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(pendingColumns...)
-	sb.From(PendingTable)
+	sb.From(entity.TableMFAPending)
 	sb.Where(sb.Equal("token_hash", hash), sb.GT("expires_at", now))
 
 	query, args := sb.Build()
@@ -346,7 +348,7 @@ func (r *Repository) FindLivePending(ctx context.Context, db datastore.Querier, 
 // false, and the session it was about to open never opens.
 func (r *Repository) DeletePending(ctx context.Context, db datastore.Querier, id uuid.UUID, hash string) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(PendingTable)
+	dbb.DeleteFrom(entity.TableMFAPending)
 	dbb.Where(dbb.Equal("id", id), dbb.Equal("token_hash", hash))
 
 	query, args := dbb.Build()
@@ -363,7 +365,7 @@ func (r *Repository) DeletePending(ctx context.Context, db datastore.Querier, id
 // caller ends the bridge when it was.
 func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Querier, id uuid.UUID, max int) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(PendingTable)
+	ub.Update(entity.TableMFAPending)
 	ub.Set(ub.Add("wrong_attempts", 1))
 	ub.Where(ub.Equal("id", id), ub.LT("wrong_attempts", max))
 	ub.Returning("wrong_attempts")
@@ -385,7 +387,7 @@ func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Quer
 // DeleteExpiredPending purges bridges past their life — the sweeper's delete.
 func (r *Repository) DeleteExpiredPending(ctx context.Context, db datastore.Querier, now time.Time) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(PendingTable)
+	dbb.DeleteFrom(entity.TableMFAPending)
 	dbb.Where(dbb.LT("expires_at", now))
 
 	query, args := dbb.Build()

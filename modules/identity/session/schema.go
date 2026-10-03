@@ -4,14 +4,10 @@ import (
 	"net/netip"
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
-)
 
-// SessionTable is the table holding the server-side credential rows: today the
-// refresh tokens sign-in issues. The migrations own the schema; this constant
-// is how Go code names it, so a table rename touches one line.
-const SessionTable = "public.sessions"
+	"go.jetify.com/typeid"
+)
 
 // SessionPrefix is the TypeID prefix of a session's identifier. A session id
 // leaves the server in a token claim and an API response, so the reader of a
@@ -21,7 +17,7 @@ type SessionPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (SessionPrefix) Prefix() string { return "sess" }
 
-// SessionID is the typed identifier of one row of SessionTable.
+// SessionID is the typed identifier of one row of entity.TableSessions.
 type SessionID = typeid.TypeID[SessionPrefix]
 
 // ResourceSession is the resource type an audit record names when the change
@@ -29,7 +25,7 @@ type SessionID = typeid.TypeID[SessionPrefix]
 // belongs to, and the session is named in resource_type and resource_id.
 const ResourceSession = "session"
 
-// SessionSchema is one row of SessionTable. It lists only the columns the
+// SessionSchema is one row of entity.TableSessions. It lists only the columns the
 // application writes, so a migration can add a column with a default without
 // touching this struct. The db tags are the column names the query builder
 // uses.

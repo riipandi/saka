@@ -15,19 +15,9 @@ import (
 	"uuid"
 )
 
-// ProviderTable is the scim_service_providers table. Migration 00004 owns
-// the schema; the feature ships against it.
-const ProviderTable = "public.scim_service_providers"
-
 // The identity tables the visibility roll reads. The constants live in the
 // identity packages, but the adapters here take the columns directly — the
 // roll is one query, not the user package's CRUD.
-const (
-	UserTable        = "public.users"
-	GroupTable       = "public.user_groups"
-	GroupMemberTable = "public.user_groups_users"
-)
-
 // ResourceProvider is the resource type an audit record names when the
 // change is about a provider row.
 const ResourceProvider = "scim_service_provider"

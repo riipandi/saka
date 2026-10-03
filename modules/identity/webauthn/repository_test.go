@@ -7,10 +7,12 @@ import (
 	"uuid"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/riipandi/saka/database/entity"
+	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // webauthnTestPool runs the migrations over a fresh container database. The
@@ -25,7 +27,7 @@ func webauthnTestPool(t *testing.T) *datastore.Postgres {
 func insertUser(t *testing.T, db datastore.Querier, userID uuid.UUID) {
 	t.Helper()
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto("public.users")
+	sb.InsertInto(entity.TableUsers)
 	sb.Cols("id", "username", "email", "display_name", "first_name", "last_name", "disabled", "created_at", "updated_at")
 	sb.Values(userID, "langdon", "langdon@example.com", "Robert Langdon", "Robert", "Langdon", false, time.Now(), time.Now())
 	query, args := sb.Build()

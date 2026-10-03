@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )
@@ -49,7 +50,7 @@ func NewRepository(pool *datastore.Postgres) *Repository {
 // database's uuidv7 default.
 func (r *Repository) Insert(ctx context.Context, db datastore.Querier, conn Connection) (uuid.UUID, time.Time, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(connectionTable)
+	sb.InsertInto(entity.TableOAuthConnections)
 	sb.Cols("kind", "provider", "display_name", "discovery_url", "endpoints",
 		"client_id", "client_secret", "scopes", "attribute_mapping", "enabled")
 	sb.Values(
@@ -80,7 +81,7 @@ func (r *Repository) Insert(ctx context.Context, db datastore.Querier, conn Conn
 func (r *Repository) List(ctx context.Context) ([]Connection, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(connectionColumns)
-	sb.From(connectionTable)
+	sb.From(entity.TableOAuthConnections)
 	sb.OrderBy("provider")
 	query, args := sb.Build()
 
@@ -106,7 +107,7 @@ func (r *Repository) List(ctx context.Context) ([]Connection, error) {
 func (r *Repository) ByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Connection, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(connectionColumns)
-	sb.From(connectionTable)
+	sb.From(entity.TableOAuthConnections)
 	sb.Where(sb.Equal("id", id))
 	query, args := sb.Build()
 	return scanConnection(db.QueryRow(ctx, query, args...))
@@ -117,7 +118,7 @@ func (r *Repository) ByID(ctx context.Context, db datastore.Querier, id uuid.UUI
 func (r *Repository) ByProvider(ctx context.Context, db datastore.Querier, provider string) (Connection, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(connectionColumns)
-	sb.From(connectionTable)
+	sb.From(entity.TableOAuthConnections)
 	sb.Where(sb.Equal("provider", provider))
 	query, args := sb.Build()
 	return scanConnection(db.QueryRow(ctx, query, args...))
@@ -129,7 +130,7 @@ func (r *Repository) ByProvider(ctx context.Context, db datastore.Querier, provi
 // the id alone, because the connection is not single-use state.
 func (r *Repository) Update(ctx context.Context, db datastore.Querier, id uuid.UUID, conn Connection) (time.Time, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(connectionTable)
+	sb.Update(entity.TableOAuthConnections)
 	sb.Set(
 		sb.Assign("display_name", conn.DisplayName),
 		sb.Assign("discovery_url", nullIfEmpty(conn.DiscoveryURL)),
@@ -167,7 +168,7 @@ func (r *Repository) Update(ctx context.Context, db datastore.Querier, id uuid.U
 // linked accounts and the live flows with it.
 func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(connectionTable)
+	dbb.DeleteFrom(entity.TableOAuthConnections)
 	dbb.Where(dbb.Equal("id", id))
 	query, args := dbb.Build()
 	tag, err := db.Exec(ctx, query, args...)
@@ -196,7 +197,7 @@ const maxWrongCodes = 3
 // moment the SPA first carries it.
 func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connID uuid.UUID, stateHash, nonce, sealedVerifier string, expiresAt time.Time) (uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(flowTable)
+	sb.InsertInto(entity.TableOAuthFlows)
 	sb.Cols("connection_id", "state_hash", "nonce", "code_verifier", "stage", "expires_at")
 	sb.Values(connID, stateHash, nonce, sealedVerifier, string(StagePending), expiresAt)
 	sb.SQL("RETURNING id")
@@ -221,7 +222,7 @@ func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connI
 func (r *Repository) PendingByState(ctx context.Context, stateHash string) (Flow, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(flowColumns)
-	sb.From(flowTable)
+	sb.From(entity.TableOAuthFlows)
 	sb.Where(
 		sb.Equal("state_hash", stateHash),
 		sb.Equal("stage", string(StagePending)),
@@ -239,7 +240,7 @@ func (r *Repository) PendingByState(ctx context.Context, stateHash string) (Flow
 // at the moment the SPA first carries it.
 func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, id uuid.UUID, resolution FlowResolution) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(
 		sb.Assign("stage", string(StageResolved)),
 		sb.Assign("flow_token_hash", resolution.FlowTokenHash),
@@ -267,7 +268,7 @@ func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, i
 func (r *Repository) LiveByFlowToken(ctx context.Context, db datastore.Querier, tokenHash string, stages ...FlowStage) (Flow, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(flowColumns)
-	sb.From(flowTable)
+	sb.From(entity.TableOAuthFlows)
 	sb.Where(sb.Equal("flow_token_hash", tokenHash), sb.GreaterThan("expires_at", time.Now().UTC()))
 	if len(stages) > 0 {
 		words := make([]any, 0, len(stages))
@@ -285,7 +286,7 @@ func (r *Repository) LiveByFlowToken(ctx context.Context, db datastore.Querier, 
 // is unreachable before this sweep removes it.
 func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(flowTable)
+	dbt.DeleteFrom(entity.TableOAuthFlows)
 	dbt.Where(dbt.LessThan("expires_at", now))
 	query, args := dbt.Build()
 	tag, err := r.pool.Exec(ctx, query, args...)
@@ -304,7 +305,7 @@ func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int
 func (r *Repository) LinkedAccountByProvider(ctx context.Context, db datastore.Querier, connectionID uuid.UUID, providerAccountID string) (LinkedAccount, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountColumns)
-	sb.From(linkedAccountTable)
+	sb.From(entity.TableOAuthLinkedAccounts)
 	sb.Where(sb.Equal("connection_id", connectionID), sb.Equal("provider_account_id", providerAccountID))
 	query, args := sb.Build()
 	return scanLinkedAccount(db.QueryRow(ctx, query, args...))
@@ -317,7 +318,7 @@ func (r *Repository) LinkedAccountByProvider(ctx context.Context, db datastore.Q
 func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Querier, row LinkedAccount) error {
 	row.ID = uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(linkedAccountTable)
+	ib.InsertInto(entity.TableOAuthLinkedAccounts)
 	ib.Cols("id", "user_id", "connection_id", "provider_account_id", "email", "email_verified", "profile", "access_token", "refresh_token")
 	ib.Values(row.ID, row.UserID, row.ConnectionID, row.ProviderAccountID, row.Email,
 		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken)
@@ -335,7 +336,7 @@ func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Queri
 func (r *Repository) AccountIDByEmail(ctx context.Context, db datastore.Querier, email string) (uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(user.UserTable)
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("email", email))
 	query, args := sb.Build()
 	var id uuid.UUID
@@ -355,7 +356,7 @@ func (r *Repository) AccountIDByEmail(ctx context.Context, db datastore.Querier,
 func (r *Repository) CreateAccount(ctx context.Context, db datastore.Querier, row user.UserSchema) (uuid.UUID, error) {
 	row.ID = uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(user.UserTable)
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name", "email_verified_at")
 	ib.Values(row.ID, nullIfEmpty(row.Username), row.Email, nullIfEmpty(row.FirstName),
 		nullIfEmpty(row.LastName), row.DisplayName, row.EmailVerifiedAt)
@@ -372,7 +373,7 @@ func (r *Repository) CreateAccount(ctx context.Context, db datastore.Querier, ro
 // ceremony is actively driven now, not idling since its begin.
 func (r *Repository) MoveToVerifyEmail(ctx context.Context, db datastore.Querier, id uuid.UUID, codeHash string, at time.Time) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(
 		sb.Assign("stage", string(StageVerifyEmail)),
 		sb.Assign("email_code_hash", codeHash),
@@ -388,7 +389,7 @@ func (r *Repository) MoveToVerifyEmail(ctx context.Context, db datastore.Querier
 // supply, the same guarded flip the verify stage keeps.
 func (r *Repository) MoveToRequireNames(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(sb.Assign("stage", string(StageRequireNames)))
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageResolved)))
 	query, args := sb.Build()
@@ -399,7 +400,7 @@ func (r *Repository) MoveToRequireNames(ctx context.Context, db datastore.Querie
 // stage. The guarded update answers whether the flow still rests there.
 func (r *Repository) UpdateFlowNames(ctx context.Context, db datastore.Querier, id uuid.UUID, given, family string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(sb.Assign("given_name", given), sb.Assign("family_name", family))
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageRequireNames)))
 	query, args := sb.Build()
@@ -413,7 +414,7 @@ func (r *Repository) UpdateFlowNames(ctx context.Context, db datastore.Querier, 
 // the flow returns to the stage the resolution reads.
 func (r *Repository) SpendEmailCode(ctx context.Context, db datastore.Querier, id uuid.UUID, codeHash string, next FlowStage) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(
 		sb.Assign("stage", string(next)),
 		sb.Assign("email_verified", true),
@@ -432,7 +433,7 @@ func (r *Repository) SpendEmailCode(ctx context.Context, db datastore.Querier, i
 // same strike, and a loser's answer is the same "not spent".
 func (r *Repository) StrikeEmailCode(ctx context.Context, db datastore.Querier, id uuid.UUID, strikes int) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(sb.Assign("wrong_codes", strikes+1))
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageVerifyEmail)), sb.Equal("wrong_codes", strikes))
 	query, args := sb.Build()
@@ -447,7 +448,7 @@ func (r *Repository) StrikeEmailCode(ctx context.Context, db datastore.Querier, 
 // row stays for the sweep to collect, unreachable by every read.
 func (r *Repository) FailFlow(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("email_code_hash", ""))
 	sb.Where(sb.Equal("id", id))
 	query, args := sb.Build()
@@ -460,7 +461,7 @@ func (r *Repository) FailFlow(ctx context.Context, db datastore.Querier, id uuid
 // guarded update answers whether this continue was the winner.
 func (r *Repository) CompleteFlow(ctx context.Context, db datastore.Querier, id uuid.UUID, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	sb.Update(flowTable)
+	sb.Update(entity.TableOAuthFlows)
 	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("user_id", userID))
 	sb.Where(sb.Equal("id", id), sb.In("stage", string(StageResolved), string(StageRequireNames)))
 	query, args := sb.Build()
@@ -530,8 +531,8 @@ const linkedAccountViewColumns = `l.id, l.user_id, l.connection_id, l.provider_a
 func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]LinkedAccountView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountViewColumns)
-	sb.From(linkedAccountTable + " l")
-	sb.Join(connectionTable+" c", "c.id = l.connection_id")
+	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
 	sb.Where(sb.Equal("l.user_id", userID))
 	sb.OrderBy("l.created_at")
 	query, args := sb.Build()
@@ -555,8 +556,8 @@ func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Quer
 func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (LinkedAccountView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountViewColumns)
-	sb.From(linkedAccountTable + " l")
-	sb.Join(connectionTable+" c", "c.id = l.connection_id")
+	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
 	sb.Where(sb.Equal("l.id", id))
 	query, args := sb.Build()
 	view, err := scanLinkedAccountView(db.QueryRow(ctx, query, args...))
@@ -609,7 +610,7 @@ func (r *Repository) HoldsAlternativeCredential(ctx context.Context, db datastor
 // the unlink removed.
 func (r *Repository) DeleteLinkedAccount(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom(linkedAccountTable)
+	sb.DeleteFrom(entity.TableOAuthLinkedAccounts)
 	sb.Where(sb.Equal("id", id), sb.Equal("user_id", userID))
 	query, args := sb.Build()
 	return execAffected(ctx, db, query, args...)

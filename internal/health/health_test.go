@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riipandi/saka/internal/health"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/riipandi/saka/internal/health"
 )
 
 // passing and failing are the two check functions most tests need.

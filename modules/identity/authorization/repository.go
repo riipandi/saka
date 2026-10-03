@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -76,8 +76,8 @@ func scanRole(scan func(dest ...any) error) (RoleSchema, error) {
 func (r *Repository) ListRoles(ctx context.Context, db datastore.Querier, search, roleType, sortBy string, ascending bool, offset, limit int) ([]RoleRow, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(append(qualifiedRoleColumns(), "count(rp.permission_id)")...)
-	sb.From(authz.RolesTable + " r")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, authz.RolePermissionsTable+" rp", "rp.role_id = r.id")
+	sb.From(entity.TableRoles + " r")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableRolePermissions+" rp", "rp.role_id = r.id")
 	sb.GroupBy("r.id")
 	applyRoleSearch(sb, search)
 	applyRoleType(sb, roleType)
@@ -107,7 +107,7 @@ func (r *Repository) ListRoles(ctx context.Context, db datastore.Querier, search
 	// permission count belongs to the page's rows, not to the pagination.
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(authz.RolesTable + " r")
+	cb.From(entity.TableRoles + " r")
 	applyRoleSearch(cb, search)
 	applyRoleType(cb, roleType)
 	query, args = cb.Build()
@@ -171,7 +171,7 @@ func applyRoleType(sb *sqlbuilder.SelectBuilder, roleType string) {
 func (r *Repository) ListPermissions(ctx context.Context, db datastore.Querier, search, resource, sortBy string, ascending bool) ([]PermissionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "slug", "description")
-	sb.From(authz.PermissionsTable)
+	sb.From(entity.TablePermissions)
 	applyPermissionFilter(sb, search, resource)
 	sb.OrderBy(datastore.ListOrder(permissionSortColumns, sortBy, "resource", ascending), "slug")
 
@@ -223,7 +223,7 @@ func applyPermissionFilter(sb *sqlbuilder.SelectBuilder, search, resource string
 func (r *Repository) GetRole(ctx context.Context, db datastore.Querier, id RoleID) (RoleSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(roleColumns...)
-	sb.From(authz.RolesTable)
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("id", id.UUID()))
 
 	query, args := sb.Build()
@@ -244,7 +244,7 @@ func (r *Repository) GetRole(ctx context.Context, db datastore.Querier, id RoleI
 func (r *Repository) GetRoleBySlug(ctx context.Context, db datastore.Querier, slug string) (RoleSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(roleColumns...)
-	sb.From(authz.RolesTable)
+	sb.From(entity.TableRoles)
 	sb.Where(sb.Equal("slug", slug))
 
 	query, args := sb.Build()
@@ -271,7 +271,7 @@ func (r *Repository) CreateRole(ctx context.Context, db datastore.Querier, row R
 	row.ID = id
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.RolesTable)
+	ib.InsertInto(entity.TableRoles)
 	ib.Cols("id", "name", "slug", "description", "type")
 	ib.Values(id.UUID(), row.Name, row.Slug, row.Description, row.Type)
 
@@ -286,7 +286,7 @@ func (r *Repository) CreateRole(ctx context.Context, db datastore.Querier, row R
 // identifier named a row. The updated instant is the trigger's job.
 func (r *Repository) UpdateRole(ctx context.Context, db datastore.Querier, row RoleSchema) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(authz.RolesTable)
+	ub.Update(entity.TableRoles)
 	ub.Set(
 		ub.Assign("name", row.Name),
 		ub.Assign("description", row.Description),
@@ -307,7 +307,7 @@ func (r *Repository) UpdateRole(ctx context.Context, db datastore.Querier, row R
 // strips nothing silently.
 func (r *Repository) DeleteRole(ctx context.Context, db datastore.Querier, id RoleID) (bool, error) {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(authz.RolesTable)
+	dbl.DeleteFrom(entity.TableRoles)
 	dbl.Where(dbl.Equal("id", id.UUID()))
 
 	query, args := dbl.Build()
@@ -324,7 +324,7 @@ func (r *Repository) DeleteRole(ctx context.Context, db datastore.Querier, id Ro
 func (r *Repository) CountActiveHolders(ctx context.Context, db datastore.Querier, id RoleID) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(authz.UserRolesTable)
+	sb.From(entity.TableUserRoles)
 	sb.Where(sb.Equal("role_id", id.UUID()), sb.IsNull("revoked_at"))
 
 	query, args := sb.Build()
@@ -339,8 +339,8 @@ func (r *Repository) CountActiveHolders(ctx context.Context, db datastore.Querie
 func (r *Repository) ListRolePermissions(ctx context.Context, db datastore.Querier, id RoleID) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
-	sb.From(authz.RolePermissionsTable + " rp")
-	sb.Join(authz.PermissionsTable + " p ON p.id = rp.permission_id")
+	sb.From(entity.TableRolePermissions + " rp")
+	sb.Join(entity.TablePermissions + " p ON p.id = rp.permission_id")
 	sb.Where(sb.Equal("rp.role_id", id.UUID()))
 	sb.OrderBy("p.slug")
 
@@ -372,7 +372,7 @@ func (r *Repository) ResolvePermissionIDs(ctx context.Context, db datastore.Quer
 	}
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(authz.PermissionsTable)
+	sb.From(entity.TablePermissions)
 	sb.Where(sb.In("slug", toAny(slugs)...))
 
 	query, args := sb.Build()
@@ -405,7 +405,7 @@ func (r *Repository) ResolvePermissionIDs(ctx context.Context, db datastore.Quer
 // insert, one statement pair inside the caller's transaction.
 func (r *Repository) SetRolePermissions(ctx context.Context, db datastore.Querier, id RoleID, permissionIDs []uuid.UUID) error {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(authz.RolePermissionsTable)
+	dbl.DeleteFrom(entity.TableRolePermissions)
 	dbl.Where(dbl.Equal("role_id", id.UUID()))
 
 	query, args := dbl.Build()
@@ -418,7 +418,7 @@ func (r *Repository) SetRolePermissions(ctx context.Context, db datastore.Querie
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.RolePermissionsTable)
+	ib.InsertInto(entity.TableRolePermissions)
 	ib.Cols("role_id", "permission_id")
 	for _, permissionID := range permissionIDs {
 		ib.Values(id.UUID(), permissionID)
@@ -436,7 +436,7 @@ func (r *Repository) SetRolePermissions(ctx context.Context, db datastore.Querie
 func (r *Repository) ListActiveRoleIDs(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("role_id")
-	sb.From(authz.UserRolesTable)
+	sb.From(entity.TableUserRoles)
 	sb.Where(sb.Equal("user_id", userID), sb.IsNull("revoked_at"))
 
 	query, args := sb.Build()
@@ -466,7 +466,7 @@ func (r *Repository) RevokeRoles(ctx context.Context, db datastore.Querier, user
 		return nil
 	}
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(authz.UserRolesTable)
+	ub.Update(entity.TableUserRoles)
 	ub.Set(
 		ub.Assign("revoked_at", now),
 		ub.Assign("revoked_by", revokedBy),
@@ -492,7 +492,7 @@ func (r *Repository) GrantRoles(ctx context.Context, db datastore.Querier, userI
 		return nil
 	}
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.UserRolesTable)
+	ib.InsertInto(entity.TableUserRoles)
 	ib.Cols("user_id", "role_id", "granted_by")
 	for _, roleID := range roleIDs {
 		ib.Values(userID, roleID, grantedBy)
@@ -511,8 +511,8 @@ func (r *Repository) GrantRoles(ctx context.Context, db datastore.Querier, userI
 func (r *Repository) ListRolesOfUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]RoleSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedRoleColumns()...)
-	sb.From(authz.RolesTable + " r")
-	sb.Join(authz.UserRolesTable + " ur ON ur.role_id = r.id")
+	sb.From(entity.TableRoles + " r")
+	sb.Join(entity.TableUserRoles + " ur ON ur.role_id = r.id")
 	sb.Where(sb.Equal("ur.user_id", userID), sb.IsNull("ur.revoked_at"))
 	sb.OrderBy("lower(r.name)", "r.id")
 
@@ -543,7 +543,7 @@ func (r *Repository) ListRolesOfUser(ctx context.Context, db datastore.Querier, 
 func (r *Repository) ListActivePermissionIDs(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("permission_id")
-	sb.From(authz.UserPermissionsTable)
+	sb.From(entity.TableUserPermissions)
 	sb.Where(sb.Equal("user_id", userID), sb.IsNull("revoked_at"))
 
 	query, args := sb.Build()
@@ -571,7 +571,7 @@ func (r *Repository) RevokePermissions(ctx context.Context, db datastore.Querier
 		return nil
 	}
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(authz.UserPermissionsTable)
+	ub.Update(entity.TableUserPermissions)
 	ub.Set(
 		ub.Assign("revoked_at", now),
 		ub.Assign("revoked_by", revokedBy),
@@ -596,7 +596,7 @@ func (r *Repository) GrantPermissions(ctx context.Context, db datastore.Querier,
 		return nil
 	}
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.UserPermissionsTable)
+	ib.InsertInto(entity.TableUserPermissions)
 	ib.Cols("user_id", "permission_id", "granted_by")
 	for _, permissionID := range permissionIDs {
 		ib.Values(userID, permissionID, grantedBy)
@@ -614,8 +614,8 @@ func (r *Repository) GrantPermissions(ctx context.Context, db datastore.Querier,
 func (r *Repository) ListPermissionsOfUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
-	sb.From(authz.UserPermissionsTable + " up")
-	sb.Join(authz.PermissionsTable + " p ON p.id = up.permission_id")
+	sb.From(entity.TableUserPermissions + " up")
+	sb.Join(entity.TablePermissions + " p ON p.id = up.permission_id")
 	sb.Where(sb.Equal("up.user_id", userID), sb.IsNull("up.revoked_at"))
 	sb.OrderBy("p.slug")
 

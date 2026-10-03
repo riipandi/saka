@@ -7,7 +7,8 @@ import (
 	"io"
 
 	"encoding/json/jsontext"
-	"github.com/go-ozzo/ozzo-validation/v4"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
 // FieldError locates one failed rule on the request payload.

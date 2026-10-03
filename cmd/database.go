@@ -11,10 +11,11 @@ import (
 
 	"github.com/dustin/go-humanize"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/riipandi/saka/database"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/printext"
-	"github.com/urfave/cli/v3"
 )
 
 // backupDir is where a dump lands when --output is not given. It sits inside the

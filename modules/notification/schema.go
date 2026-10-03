@@ -22,24 +22,6 @@ import (
 	"go.jetify.com/typeid"
 )
 
-// The tables the migrations own. These constants are how Go code names
-// them, so a table rename touches one line.
-const (
-	// NotificationTable is the notifications table.
-	NotificationTable = "public.notifications"
-
-	// UserAudienceTable is the junction naming the accounts a `users`
-	// audience targets.
-	UserAudienceTable = "public.notification_users"
-
-	// GroupAudienceTable is the junction naming the groups a
-	// `user_groups` audience targets.
-	GroupAudienceTable = "public.notification_user_groups"
-
-	// ReadTable is the per-account read receipts.
-	ReadTable = "public.notification_reads"
-)
-
 // ResourceNotification is the resource type an audit record names when the
 // change is about a notification. The record's user_id names the
 // administrator who made the change.
@@ -53,7 +35,7 @@ type NotificationIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (NotificationIDPrefix) Prefix() string { return "ntf" }
 
-// NotificationID is the typed identifier of one row of NotificationTable,
+// NotificationID is the typed identifier of one row of entity.TableNotifications,
 // in its wire form. The column stays a UUID; the conversion lives here and
 // nowhere else.
 type NotificationID = typeid.TypeID[NotificationIDPrefix]
@@ -107,7 +89,7 @@ const (
 	AudienceGroups = "user_groups"
 )
 
-// Notification is one row of NotificationTable. The nullable instants are
+// Notification is one row of entity.TableNotifications. The nullable instants are
 // nullable by construction — the trigger fills updated_at on the first
 // update, and a live notification carries neither a cancellation nor an
 // email stamp.

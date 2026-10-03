@@ -11,9 +11,10 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
+	"go.jetify.com/typeid"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
-	"go.jetify.com/typeid"
 )
 
 // typeidParseSession reads a ceremony handle back into its UUID. A handle

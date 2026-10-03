@@ -10,7 +10,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -61,8 +61,8 @@ func LoadGrants(ctx context.Context, db datastore.Querier, userID uuid.UUID) (ro
 func loadRoleSlugs(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("r.slug")
-	sb.From(authz.UserRolesTable + " ur")
-	sb.Join(authz.RolesTable + " r ON r.id = ur.role_id")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.Join(entity.TableRoles + " r ON r.id = ur.role_id")
 	sb.Where(sb.Equal("ur.user_id", userID.String()), sb.IsNull("ur.revoked_at"))
 	sb.OrderBy("r.slug")
 
@@ -79,9 +79,9 @@ func loadRoleSlugs(ctx context.Context, db datastore.Querier, userID uuid.UUID) 
 func loadRolePermissions(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
-	sb.From(authz.UserRolesTable + " ur")
-	sb.Join(authz.RolePermissionsTable + " rp ON rp.role_id = ur.role_id")
-	sb.Join(authz.PermissionsTable + " p ON p.id = rp.permission_id")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.Join(entity.TableRolePermissions + " rp ON rp.role_id = ur.role_id")
+	sb.Join(entity.TablePermissions + " p ON p.id = rp.permission_id")
 	sb.Where(sb.Equal("ur.user_id", userID.String()), sb.IsNull("ur.revoked_at"))
 
 	query, args := sb.Build()
@@ -97,8 +97,8 @@ func loadRolePermissions(ctx context.Context, db datastore.Querier, userID uuid.
 func loadDirectPermissions(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("p.slug")
-	sb.From(authz.UserPermissionsTable + " up")
-	sb.Join(authz.PermissionsTable + " p ON p.id = up.permission_id")
+	sb.From(entity.TableUserPermissions + " up")
+	sb.Join(entity.TablePermissions + " p ON p.id = up.permission_id")
 	sb.Where(sb.Equal("up.user_id", userID.String()), sb.IsNull("up.revoked_at"))
 
 	query, args := sb.Build()

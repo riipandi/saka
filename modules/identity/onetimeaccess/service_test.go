@@ -9,13 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
@@ -163,7 +165,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string) st
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("username", "email", "display_name")
 	ib.Values(username, email, username)
 	ib.SQL("RETURNING id")
@@ -197,7 +199,7 @@ func countTokens(t *testing.T, pool *datastore.Postgres, userID string) int {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(tokenTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", PurposeOneTimeAccess),
@@ -458,7 +460,7 @@ func TestExchangeRefusesADisabledOrBannedAccount(t *testing.T) {
 
 	disabled := seedUser(t, pool, "langdon", "langdon@example.com")
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update("public.users")
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("disabled", true))
 	ub.Where(ub.Equal("id", disabled))
 	query, args := ub.Build()
@@ -473,7 +475,7 @@ func TestExchangeRefusesADisabledOrBannedAccount(t *testing.T) {
 	// The refusal rolled the spend back with the session it refused to open:
 	// the code still works once the account is fit to sign in again.
 	ub = sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update("public.users")
+	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("disabled", false))
 	ub.Where(ub.Equal("id", disabled))
 	query, args = ub.Build()
@@ -493,7 +495,7 @@ func pendingOneTimeAccessTask(t *testing.T, pool *datastore.Postgres, client *qu
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("task")
-	sb.From("public.queue_tasks")
+	sb.From(entity.TableQueueTasks)
 	sb.Where(sb.Equal("queue", jobs.OneTimeAccessEmailName))
 	query, args := sb.Build()
 
@@ -570,7 +572,7 @@ func readUserID(t *testing.T, pool *datastore.Postgres, email string) string {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("email", email))
 	query, args := sb.Build()
 

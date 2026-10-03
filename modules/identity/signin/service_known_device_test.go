@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
 	"github.com/riipandi/saka/modules/identity/user"
 )

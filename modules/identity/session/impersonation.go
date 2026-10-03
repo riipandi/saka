@@ -7,12 +7,13 @@ import (
 	"slices"
 	"time"
 
+	"go.jetify.com/typeid"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"go.jetify.com/typeid"
 )
 
 // ImpersonationTTL is the fixed window a delegated session lives. It does

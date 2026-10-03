@@ -6,8 +6,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/riipandi/saka/internal/config"
 	"github.com/urfave/cli/v3"
+
+	"github.com/riipandi/saka/internal/config"
 )
 
 var rootCmd = &cli.Command{

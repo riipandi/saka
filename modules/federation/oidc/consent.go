@@ -8,6 +8,7 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -72,8 +73,8 @@ func scanLedgerRow(scan func(dest ...any) error) (ClientSchema, []string, *time.
 func (s *Service) authorizedClientsFor(ctx context.Context, db datastore.Querier, userID string) ([]AuthorizedClientView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(append(ledgerClientColumns, "l.scope", "l.last_used_at")...)
-	sb.From("public.user_authorized_oidc_clients l")
-	sb.JoinWithOption(sqlbuilder.InnerJoin, "public.oidc_clients c ON c.id = l.client_id")
+	sb.From(entity.TableUserAuthorizedOIDCClients + " l")
+	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableOIDCClients+" c ON c.id = l.client_id")
 	sb.Where(sb.Equal("l.user_id", userID))
 	sb.OrderBy("l.last_used_at DESC")
 	query, args := sb.Build()
@@ -116,9 +117,9 @@ func (s *Service) UserAuthorizedClients(ctx context.Context, userID string) ([]A
 func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(append(ledgerClientColumns, "l.scope", "l.last_used_at", "u.id")...)
-	sb.From("public.user_authorized_oidc_clients l")
-	sb.JoinWithOption(sqlbuilder.InnerJoin, "public.oidc_clients c ON c.id = l.client_id")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.users u ON u.id = l.user_id")
+	sb.From(entity.TableUserAuthorizedOIDCClients + " l")
+	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableOIDCClients+" c ON c.id = l.client_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUsers+" u ON u.id = l.user_id")
 	sb.OrderBy("l.last_used_at DESC")
 	query, args := sb.Build()
 
@@ -160,7 +161,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, erro
 func (s *Service) MyClients(ctx context.Context, userID string) ([]ClientView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedClientColumns("c")...)
-	sb.From("public.oidc_clients c")
+	sb.From(entity.TableOIDCClients + " c")
 	sb.Where(
 		sb.Or(
 			sb.And(
@@ -284,7 +285,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 	}
 	if len(grants) > 0 {
 		sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-		sb.DeleteFrom("public.oauth_sessions")
+		sb.DeleteFrom(entity.TableOAuthSessions)
 		sb.Where(
 			sb.In("request_data->>'grant_id'", toAny(grants)...),
 			sb.In("kind", sessionKindAuthCode, sessionKindRefresh),
@@ -295,7 +296,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 		}
 	}
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom("public.oauth_sessions")
+	sb.DeleteFrom(entity.TableOAuthSessions)
 	sb.Where(
 		sb.Equal("kind", sessionKindGrant),
 		sb.Equal("client_id", clientID),
@@ -313,7 +314,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 // withdrawal is idempotent, the way a DELETE already answered is.
 func (s *Service) removeAuthorization(ctx context.Context, db datastore.Querier, userID, clientID string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom("public.user_authorized_oidc_clients")
+	sb.DeleteFrom(entity.TableUserAuthorizedOIDCClients)
 	sb.Where(sb.Equal("user_id", userID), sb.Equal("client_id", clientID))
 	query, args := sb.Build()
 	tag, err := db.Exec(ctx, query, args...)
@@ -327,7 +328,7 @@ func (s *Service) removeAuthorization(ctx context.Context, db datastore.Querier,
 func (s *Service) grantKeysFor(ctx context.Context, db datastore.Querier, userID, clientID string) ([]string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key")
-	sb.From("public.oauth_sessions")
+	sb.From(entity.TableOAuthSessions)
 	sb.Where(
 		sb.Equal("kind", sessionKindGrant),
 		sb.Equal("client_id", clientID),

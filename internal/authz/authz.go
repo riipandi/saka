@@ -35,14 +35,6 @@ const Wildcard = "*"
 // the grants an access token carries are loaded from here by several
 // features, so the names live beside the vocabulary rather than inside one
 // feature's schema file.
-const (
-	RolesTable           = "public.roles"
-	PermissionsTable     = "public.permissions"
-	RolePermissionsTable = "public.role_permissions"
-	UserRolesTable       = "public.user_roles"
-	UserPermissionsTable = "public.user_permissions"
-)
-
 // Permission is one catalog entry: the slug the server enforces and the
 // client renders, and the description a UI shows beside it.
 type Permission struct {

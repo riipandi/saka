@@ -3,8 +3,9 @@
 package kernel
 
 import (
-	"connectrpc.com/connect"
 	"fmt"
+
+	"connectrpc.com/connect"
 
 	"github.com/go-chi/chi/v5"
 )

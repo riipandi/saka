@@ -2,9 +2,9 @@ package scheduler
 
 import (
 	"fmt"
+	"uuid"
 
 	"go.jetify.com/typeid"
-	"uuid"
 )
 
 // JobIDPrefix is the TypeID prefix of a scheduler job's identifier. The id

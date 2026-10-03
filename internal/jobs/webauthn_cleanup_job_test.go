@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/webauthn"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -22,7 +23,7 @@ func ceremonySession(t *testing.T, pool *datastore.Postgres, ttl time.Duration) 
 	t.Helper()
 
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(webauthnSessionsTable)
+	sb.InsertInto(entity.TableWebauthnSessions)
 	sb.Cols("id", "challenge", "challenge_type", "user_verification", "credential_params", "extensions", "created_at", "expires_at")
 	sb.Values(
 		uuid.NewV7(),
@@ -46,7 +47,7 @@ func countCeremonySessions(t *testing.T, pool *datastore.Postgres) int {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM `+webauthnSessionsTable).Scan(&count))
+		`SELECT count(*) FROM `+entity.TableWebauthnSessions).Scan(&count))
 	return count
 }
 

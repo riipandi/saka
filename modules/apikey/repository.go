@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
-	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 
@@ -63,7 +64,7 @@ func scanKey(scan func(dest ...any) error) (KeySchema, error) {
 func (r *Repository) GetKey(ctx context.Context, db datastore.Querier, id uuid.UUID) (KeySchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(keyColumns...)
-	sb.From(KeyTable)
+	sb.From(entity.TableAPIKeys)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -95,7 +96,7 @@ var keySortColumns = map[string]string{
 func (r *Repository) ListKeys(ctx context.Context, db datastore.Querier, owner uuid.UUID, sortBy string, ascending bool, offset, limit int) ([]KeySchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(keyColumns...)
-	sb.From(KeyTable)
+	sb.From(entity.TableAPIKeys)
 	if owner != uuid.Nil() {
 		sb.Where(sb.Equal("user_id", owner))
 	}
@@ -109,7 +110,7 @@ func (r *Repository) ListKeys(ctx context.Context, db datastore.Querier, owner u
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(KeyTable)
+	cb.From(entity.TableAPIKeys)
 	if owner != uuid.Nil() {
 		cb.Where(cb.Equal("user_id", owner))
 	}
@@ -151,7 +152,7 @@ func (r *Repository) CreateKey(ctx context.Context, db datastore.Querier, row Ke
 	row.ID = uuid.NewV7()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(KeyTable)
+	ib.InsertInto(entity.TableAPIKeys)
 	ib.Cols("id", "user_id", "name", "prefix", "key_hash", "description", "expires_at")
 	ib.Values(
 		row.ID, row.UserID, row.Name, row.Prefix, row.KeyHash, row.Descr, row.ExpiresAt,
@@ -171,7 +172,7 @@ func (r *Repository) CreateKey(ctx context.Context, db datastore.Querier, row Ke
 // not handed a secret the row no longer stores.
 func (r *Repository) RenewKey(ctx context.Context, db datastore.Querier, id, owner uuid.UUID, hash []byte, expiresAt, now time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(KeyTable)
+	ub.Update(entity.TableAPIKeys)
 	ub.Set(
 		ub.Assign("key_hash", hash),
 		ub.Assign("expires_at", expiresAt),
@@ -198,7 +199,7 @@ func (r *Repository) RenewKey(ctx context.Context, db datastore.Querier, id, own
 // treats that as the success it is.
 func (r *Repository) RevokeKey(ctx context.Context, db datastore.Querier, id, owner uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(KeyTable)
+	ub.Update(entity.TableAPIKeys)
 	ub.Set(ub.Assign("revoked_at", at))
 	ub.Where(ub.Equal("id", id), ub.Equal("user_id", owner), ub.IsNull("revoked_at"))
 
@@ -224,14 +225,14 @@ func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, ha
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedKeyColumns("k")...)
 	sb.SelectMore("u.id", "u.username", "u.email", "u.display_name")
-	sb.From(KeyTable + " k")
-	sb.Join(user.UserTable+" u", "u.id = k.user_id")
+	sb.From(entity.TableAPIKeys + " k")
+	sb.Join(entity.TableUsers+" u", "u.id = k.user_id")
 	// A restricted owner's keys open nothing: the ban and the lockout are
 	// the account-level refusal every credential answers, and a machine
 	// credential is the one that would otherwise outlive the judgement
 	// entirely. The anti-join keeps the key whose account no active
 	// restriction stands against.
-	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = k.user_id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("k.key_hash", hash), sb.IsNull("k.revoked_at"), sb.GT("k.expires_at", now), sb.Equal("u.disabled", false),
 		sb.IsNull("ar.user_id"))
@@ -255,7 +256,7 @@ func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, ha
 // TouchLastUsed records that the key just authenticated a request.
 func (r *Repository) TouchLastUsed(ctx context.Context, db datastore.Querier, id uuid.UUID, at time.Time) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(KeyTable)
+	ub.Update(entity.TableAPIKeys)
 	ub.Set(ub.Assign("last_used_at", at))
 	ub.Where(ub.Equal("id", id))
 
@@ -276,8 +277,8 @@ func (r *Repository) ListExpiring(ctx context.Context, db datastore.Querier, now
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedKeyColumns("k")...)
 	sb.SelectMore("u.email", "u.display_name")
-	sb.From(KeyTable + " k")
-	sb.Join(user.UserTable+" u", "u.id = k.user_id")
+	sb.From(entity.TableAPIKeys + " k")
+	sb.Join(entity.TableUsers+" u", "u.id = k.user_id")
 	sb.Where(
 		sb.GT("k.expires_at", now),
 		sb.LE("k.expires_at", cutoff),
@@ -308,7 +309,7 @@ func (r *Repository) ListExpiring(ctx context.Context, db datastore.Querier, now
 // window does not repeat it.
 func (r *Repository) MarkEmailSent(ctx context.Context, db datastore.Querier, id uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(KeyTable)
+	ub.Update(entity.TableAPIKeys)
 	ub.Set(ub.Assign("expiration_email_sent_at", at))
 	ub.Where(ub.Equal("id", id), ub.IsNull("expiration_email_sent_at"))
 

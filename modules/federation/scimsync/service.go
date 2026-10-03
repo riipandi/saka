@@ -11,10 +11,10 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/fetcher"
-	"github.com/riipandi/saka/modules/federation/oidc"
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
@@ -314,7 +314,7 @@ func (s *Service) loadSnapshot(ctx context.Context, id uuid.UUID) (snapshot, err
 func (s *Service) clientExists(ctx context.Context, clientID string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("1")
-	sb.From(oidc.ClientTable)
+	sb.From(entity.TableOIDCClients)
 	sb.Where(sb.Equal("id", clientID))
 	query, args := sb.Build()
 

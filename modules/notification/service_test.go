@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -46,7 +47,7 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string, disabl
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -67,7 +68,7 @@ func seedGroup(t *testing.T, pool *datastore.Postgres, name string, member uuid.
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.user_groups")
+	sb.From(entity.TableUserGroups)
 	sb.Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
@@ -75,7 +76,7 @@ func seedGroup(t *testing.T, pool *datastore.Postgres, name string, member uuid.
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&id))
 
 	mb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	mb.InsertInto("public.user_groups_users")
+	mb.InsertInto(entity.TableUserGroupsUsers)
 	mb.Cols("user_group_id", "user_id")
 	mb.Values(id, member)
 

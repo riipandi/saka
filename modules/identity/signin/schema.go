@@ -3,8 +3,9 @@ package signin
 import (
 	"time"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // ProviderPassword is the `provider` value a session row carries when the
@@ -33,13 +34,7 @@ const ProviderWebauthn = "webauthn"
 // bridge.
 const ProviderOAuthSSO = "oauth_sso"
 
-// KnownDeviceTable is the table remembering every browser fingerprint an
-// account has signed in from. A session row is a poor record of a device —
-// it expires and gets cleaned up — so the first-seen judgement needs a row
-// that outlives the sessions.
-const KnownDeviceTable = "public.known_devices"
-
-// KnownDeviceID is the typed identifier of one row of KnownDeviceTable. The
+// KnownDeviceID is the typed identifier of one row of entity.TableKnownDevices. The
 // identifier never leaves the server: the notice carries the device's
 // fingerprint and the session's address, not this row's id.
 type KnownDeviceID = typeid.TypeID[KnownDevicePrefix]
@@ -50,7 +45,7 @@ type KnownDevicePrefix struct{}
 // Prefix reports the TypeID prefix.
 func (KnownDevicePrefix) Prefix() string { return "kdev" }
 
-// KnownDeviceSchema is one row of KnownDeviceTable. LastSeenAt rides along so
+// KnownDeviceSchema is one row of entity.TableKnownDevices. LastSeenAt rides along so
 // the row says when its fingerprint was last presented; the notice decision
 // reads only whether the insert inserted.
 type KnownDeviceSchema struct {

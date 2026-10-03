@@ -10,6 +10,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -61,7 +63,7 @@ func scanCredential(scan func(dest ...any) error) (CredentialSchema, error) {
 // failure.
 func (r *Repository) CreateCredential(ctx context.Context, db datastore.Querier, row CredentialSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(CredentialsTable)
+	ib.InsertInto(entity.TableWebauthnCredentials)
 	ib.Cols("id", "user_id", "name", "credential_id", "public_key", "sign_count",
 		"attestation_type", "transport", "backup_eligible", "backup_state", "aaguid", "created_at")
 	ib.Values(row.ID, row.UserID, row.Name, row.CredentialID, row.PublicKey, row.SignCount,
@@ -84,7 +86,7 @@ func (r *Repository) CreateCredential(ctx context.Context, db datastore.Querier,
 func (r *Repository) GetCredentialByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (CredentialSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(credentialColumns...)
-	sb.From(CredentialsTable)
+	sb.From(entity.TableWebauthnCredentials)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -103,7 +105,7 @@ func (r *Repository) GetCredentialByID(ctx context.Context, db datastore.Querier
 func (r *Repository) GetCredentialByCredentialID(ctx context.Context, db datastore.Querier, credentialID []byte) (CredentialSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(credentialColumns...)
-	sb.From(CredentialsTable)
+	sb.From(entity.TableWebauthnCredentials)
 	sb.Where(sb.Equal("credential_id", credentialID))
 
 	query, args := sb.Build()
@@ -122,7 +124,7 @@ func (r *Repository) GetCredentialByCredentialID(ctx context.Context, db datasto
 func (r *Repository) ListCredentials(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]CredentialSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(credentialColumns...)
-	sb.From(CredentialsTable)
+	sb.From(entity.TableWebauthnCredentials)
 	sb.Where(sb.Equal("user_id", userID))
 	sb.OrderBy("created_at")
 
@@ -152,7 +154,7 @@ func (r *Repository) ListCredentials(ctx context.Context, db datastore.Querier, 
 func (r *Repository) CountCredentials(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(CredentialsTable)
+	sb.From(entity.TableWebauthnCredentials)
 	sb.Where(sb.Equal("user_id", userID))
 
 	query, args := sb.Build()
@@ -166,7 +168,7 @@ func (r *Repository) CountCredentials(ctx context.Context, db datastore.Querier,
 // RenameCredential replaces a credential's display name.
 func (r *Repository) RenameCredential(ctx context.Context, db datastore.Querier, id uuid.UUID, name string) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(CredentialsTable)
+	ub.Update(entity.TableWebauthnCredentials)
 	ub.Set(ub.Assign("name", name))
 	ub.Where(ub.Equal("id", id))
 
@@ -187,7 +189,7 @@ func (r *Repository) RenameCredential(ctx context.Context, db datastore.Querier,
 // where one exists.
 func (r *Repository) RecordAssertion(ctx context.Context, db datastore.Querier, id uuid.UUID, signCount int64, backupState bool, usedAt time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(CredentialsTable)
+	ub.Update(entity.TableWebauthnCredentials)
 	ub.Set(
 		ub.Assign("sign_count", signCount),
 		ub.Assign("backup_state", backupState),
@@ -200,7 +202,7 @@ func (r *Repository) RecordAssertion(ctx context.Context, db datastore.Querier, 
 	}
 
 	ub = sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(CredentialsTable)
+	ub.Update(entity.TableWebauthnCredentials)
 	ub.Set(
 		ub.Assign("backup_state", backupState),
 		ub.Assign("last_used_at", usedAt),
@@ -218,7 +220,7 @@ func (r *Repository) RecordAssertion(ctx context.Context, db datastore.Querier, 
 // foreign one.
 func (r *Repository) DeleteCredential(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(CredentialsTable)
+	dbt.DeleteFrom(entity.TableWebauthnCredentials)
 	dbt.Where(dbt.Equal("id", id))
 
 	query, args := dbt.Build()
@@ -235,7 +237,7 @@ func (r *Repository) DeleteCredential(ctx context.Context, db datastore.Querier,
 // keeping the refused rows forever, whatever purpose minted them.
 func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Querier, now time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(AuthTokensTable)
+	dbt.DeleteFrom(entity.TableAuthTokens)
 	dbt.Where(dbt.LessThan("expires_at", now))
 
 	query, args := dbt.Build()
@@ -252,7 +254,7 @@ func (r *Repository) DeleteExpiredTokens(ctx context.Context, db datastore.Queri
 // identifier, the challenge, and every parsed option.
 func (r *Repository) CreateSession(ctx context.Context, db datastore.Querier, row SessionSchema) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(SessionsTable)
+	ib.InsertInto(entity.TableWebauthnSessions)
 	ib.Cols("id", "user_id", "challenge", "challenge_type", "user_verification", "credential_params", "extensions", "created_at", "expires_at")
 	ib.Values(row.ID, row.UserID, row.Challenge, row.ChallengeType, row.UserVerification, row.CredentialParams, row.Extensions, row.CreatedAt, row.ExpiresAt)
 
@@ -269,7 +271,7 @@ func (r *Repository) CreateSession(ctx context.Context, db datastore.Querier, ro
 func (r *Repository) GetSession(ctx context.Context, db datastore.Querier, id uuid.UUID) (SessionSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id", "user_id", "challenge", "challenge_type", "user_verification", "credential_params", "extensions", "created_at", "expires_at")
-	sb.From(SessionsTable)
+	sb.From(entity.TableWebauthnSessions)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -289,7 +291,7 @@ func (r *Repository) GetSession(ctx context.Context, db datastore.Querier, id uu
 // whether the row was live.
 func (r *Repository) ConsumeSession(ctx context.Context, db datastore.Querier, id uuid.UUID, now time.Time) (bool, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(SessionsTable)
+	dbt.DeleteFrom(entity.TableWebauthnSessions)
 	dbt.Where(dbt.Equal("id", id), dbt.GreaterThan("expires_at", now))
 
 	query, args := dbt.Build()
@@ -305,7 +307,7 @@ func (r *Repository) ConsumeSession(ctx context.Context, db datastore.Querier, i
 // schedule.
 func (r *Repository) DeleteExpiredSessions(ctx context.Context, db datastore.Querier, now time.Time) (int64, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(SessionsTable)
+	dbt.DeleteFrom(entity.TableWebauthnSessions)
 	dbt.Where(dbt.LessThan("expires_at", now))
 
 	query, args := dbt.Build()
@@ -336,19 +338,13 @@ func scanSession(scan func(dest ...any) error) (SessionSchema, error) {
 
 // ---- Step-up tokens ----
 
-// AuthTokensTable is the token table the step-up proofs rest in — the same
-// hashed rows the one-time codes and the reset tokens use, under their own
-// purpose. The schema belongs to the migrations; this constant is how this
-// package names it.
-const AuthTokensTable = "public.auth_tokens"
-
 // CreateReauthenticationToken writes one hashed step-up token. Several live
 // tokens per account are legitimate — the unique index excludes this
 // purpose — and consumption is the single-use UPDATE below. The clock is
 // the caller's: the service owns the time a test can pin.
 func (r *Repository) CreateReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, createdAt, expiresAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokensTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("id", "user_id", "token_hash", "purpose", "created_at", "expires_at")
 	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication", createdAt, expiresAt)
 
@@ -366,7 +362,7 @@ func (r *Repository) CreateReauthenticationToken(ctx context.Context, db datasto
 // transaction, not this write.
 func (r *Repository) ConsumeReauthenticationToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, now time.Time) (bool, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(AuthTokensTable)
+	dbt.DeleteFrom(entity.TableAuthTokens)
 	dbt.Where(
 		dbt.Equal("token_hash", tokenHash),
 		dbt.Equal("user_id", userID),
@@ -387,7 +383,7 @@ func (r *Repository) ConsumeReauthenticationToken(ctx context.Context, db datast
 // newest code is the only one that works. The clock is the caller's.
 func (r *Repository) UpsertReauthenticationCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AuthTokensTable)
+	ib.InsertInto(entity.TableAuthTokens)
 	ib.Cols("id", "user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
 	ib.Values(uuid.NewV7(), userID, tokenHash, "reauthentication_code", expiresAt, sentAt)
 	// The conflict target carries the partial index's predicate: the unique
@@ -409,7 +405,7 @@ func (r *Repository) UpsertReauthenticationCode(ctx context.Context, db datastor
 // foreign, or expired code deletes nothing and answers false.
 func (r *Repository) ConsumeReauthenticationCode(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, now time.Time) (bool, error) {
 	dbt := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbt.DeleteFrom(AuthTokensTable)
+	dbt.DeleteFrom(entity.TableAuthTokens)
 	dbt.Where(
 		dbt.Equal("token_hash", tokenHash),
 		dbt.Equal("user_id", userID),
@@ -430,7 +426,7 @@ func (r *Repository) ConsumeReauthenticationCode(ctx context.Context, db datasto
 func (r *Repository) ReauthenticationCodeSentAt(ctx context.Context, db datastore.Querier, userID uuid.UUID) (*time.Time, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("last_sent_at")
-	sb.From(AuthTokensTable)
+	sb.From(entity.TableAuthTokens)
 	sb.Where(
 		sb.Equal("user_id", userID),
 		sb.Equal("purpose", "reauthentication_code"),

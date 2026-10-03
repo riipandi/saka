@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"uuid"
 
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
 // Repository reads and writes the notification rows the procedures manage.
@@ -75,7 +75,7 @@ func (r *Repository) Create(ctx context.Context, db datastore.Querier, row Notif
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(NotificationTable)
+	ib.InsertInto(entity.TableNotifications)
 	ib.Cols("id", "category", "topic", "title", "body", "audience_kind", "created_by")
 	ib.Values(row.ID, row.Category, row.Topic, row.Title, row.Body, row.AudienceKind, row.CreatedBy)
 
@@ -84,10 +84,10 @@ func (r *Repository) Create(ctx context.Context, db datastore.Querier, row Notif
 		return fmt.Errorf("notification: create: %w", err)
 	}
 
-	if err := r.insertAudience(ctx, db, UserAudienceTable, "user_id", row.ID, userIDs); err != nil {
+	if err := r.insertAudience(ctx, db, entity.TableNotificationUsers, "user_id", row.ID, userIDs); err != nil {
 		return err
 	}
-	return r.insertAudience(ctx, db, GroupAudienceTable, "user_group_id", row.ID, groupIDs)
+	return r.insertAudience(ctx, db, entity.TableNotificationUserGroups, "user_group_id", row.ID, groupIDs)
 }
 
 // insertAudience writes one junction's rows. An empty list writes nothing —
@@ -117,7 +117,7 @@ func (r *Repository) insertAudience(ctx context.Context, db datastore.Querier, t
 func (r *Repository) Get(ctx context.Context, db datastore.Querier, id uuid.UUID) (Notification, []uuid.UUID, []uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(notificationColumns...)
-	sb.From(NotificationTable)
+	sb.From(entity.TableNotifications)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()
@@ -131,11 +131,11 @@ func (r *Repository) Get(ctx context.Context, db datastore.Querier, id uuid.UUID
 		return Notification{}, nil, nil, fmt.Errorf("notification: get: %w", err)
 	}
 
-	userIDs, err := r.audienceIDs(ctx, db, UserAudienceTable, "user_id", id)
+	userIDs, err := r.audienceIDs(ctx, db, entity.TableNotificationUsers, "user_id", id)
 	if err != nil {
 		return Notification{}, nil, nil, err
 	}
-	groupIDs, err := r.audienceIDs(ctx, db, GroupAudienceTable, "user_group_id", id)
+	groupIDs, err := r.audienceIDs(ctx, db, entity.TableNotificationUserGroups, "user_group_id", id)
 	if err != nil {
 		return Notification{}, nil, nil, err
 	}
@@ -176,7 +176,7 @@ func (r *Repository) audienceIDs(ctx context.Context, db datastore.Querier, tabl
 func (r *Repository) ListAll(ctx context.Context, db datastore.Querier, category, sortBy string, ascending bool, offset, limit int) ([]Notification, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(notificationColumns...)
-	sb.From(NotificationTable)
+	sb.From(entity.TableNotifications)
 	if category != "" {
 		sb.Where(sb.Equal("category", category))
 	}
@@ -190,7 +190,7 @@ func (r *Repository) ListAll(ctx context.Context, db datastore.Querier, category
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(NotificationTable)
+	cb.From(entity.TableNotifications)
 	if category != "" {
 		cb.Where(cb.Equal("category", category))
 	}
@@ -207,7 +207,7 @@ func (r *Repository) ListAll(ctx context.Context, db datastore.Querier, category
 // false — the state it names is the one the notification is already in.
 func (r *Repository) Cancel(ctx context.Context, db datastore.Querier, id uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(NotificationTable)
+	ub.Update(entity.TableNotifications)
 	ub.Set(ub.Assign("cancelled_at", at))
 	ub.Where(ub.Equal("id", id), ub.IsNull("cancelled_at"))
 
@@ -223,7 +223,7 @@ func (r *Repository) Cancel(ctx context.Context, db datastore.Querier, id uuid.U
 // retry never repeats it.
 func (r *Repository) MarkEmailSent(ctx context.Context, db datastore.Querier, id uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(NotificationTable)
+	ub.Update(entity.TableNotifications)
 	ub.Set(ub.Assign("email_sent_at", at))
 	ub.Where(ub.Equal("id", id), ub.IsNull("email_sent_at"))
 
@@ -241,13 +241,13 @@ func (r *Repository) MarkEmailSent(ctx context.Context, db datastore.Querier, id
 func visibleWhere(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) {
 	userSub := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	userSub.Select("1")
-	userSub.From(UserAudienceTable + " nu")
+	userSub.From(entity.TableNotificationUsers + " nu")
 	userSub.Where(userSub.Equal("nu.user_id", userID), "nu.notification_id = n.id")
 
 	groupSub := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	groupSub.Select("1")
-	groupSub.From(GroupAudienceTable + " ng")
-	groupSub.Join(usergroup.GroupMemberTable+" ug", "ug.user_group_id = ng.user_group_id")
+	groupSub.From(entity.TableNotificationUserGroups + " ng")
+	groupSub.Join(entity.TableUserGroupsUsers+" ug", "ug.user_group_id = ng.user_group_id")
 	groupSub.Where(groupSub.Equal("ug.user_id", userID), "ng.notification_id = n.id")
 
 	sb.Where(
@@ -265,7 +265,7 @@ func visibleWhere(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) {
 // outer builder's variable, so the placeholder order follows the statement's
 // compile order — the select clause before the where clause.
 func readAtExpression(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) string {
-	return "(SELECT r.read_at FROM " + ReadTable + " r" +
+	return "(SELECT r.read_at FROM " + entity.TableNotificationReads + " r" +
 		" WHERE r.notification_id = n.id AND r.user_id = " + sb.Var(userID) + ")"
 }
 
@@ -276,7 +276,7 @@ func readAtExpression(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) string {
 func unreadCondition(sb *sqlbuilder.SelectBuilder, userID uuid.UUID) string {
 	sub := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sub.Select("1")
-	sub.From(ReadTable + " r")
+	sub.From(entity.TableNotificationReads + " r")
 	sub.Where(sub.Equal("r.user_id", userID), "r.notification_id = n.id")
 	return "NOT " + sb.Exists(sub)
 }
@@ -298,7 +298,7 @@ func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(qualifiedColumns()...)
 	sb.SelectMore(readAtExpression(sb, userID) + " AS read_at")
-	sb.From(NotificationTable + " n")
+	sb.From(entity.TableNotifications + " n")
 	visibleWhere(sb, userID)
 	if unreadOnly {
 		sb.Where(unreadCondition(sb, userID))
@@ -316,7 +316,7 @@ func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(NotificationTable + " n")
+	cb.From(entity.TableNotifications + " n")
 	visibleWhere(cb, userID)
 	if unreadOnly {
 		cb.Where(unreadCondition(cb, userID))
@@ -337,7 +337,7 @@ func (r *Repository) ListInbox(ctx context.Context, db datastore.Querier, userID
 func (r *Repository) UnreadCount(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int, error) {
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	cb.Select("count(*)")
-	cb.From(NotificationTable + " n")
+	cb.From(entity.TableNotifications + " n")
 	visibleWhere(cb, userID)
 	cb.Where(unreadCondition(cb, userID))
 
@@ -355,7 +355,7 @@ func (r *Repository) UnreadCount(ctx context.Context, db datastore.Querier, user
 func (r *Repository) IsVisible(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("1")
-	sb.From(NotificationTable + " n")
+	sb.From(entity.TableNotifications + " n")
 	sb.Where(sb.Equal("n.id", id))
 	visibleWhere(sb, userID)
 
@@ -375,7 +375,7 @@ func (r *Repository) IsVisible(ctx context.Context, db datastore.Querier, id, us
 // instant it was read does not move.
 func (r *Repository) InsertRead(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) error {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(ReadTable)
+	ib.InsertInto(entity.TableNotificationReads)
 	ib.Cols("notification_id", "user_id")
 	ib.Values(id, userID)
 
@@ -395,12 +395,12 @@ func (r *Repository) InsertRead(ctx context.Context, db datastore.Querier, id, u
 func (r *Repository) MarkAllRead(ctx context.Context, db datastore.Querier, userID uuid.UUID) (int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("n.id", sb.Var(userID))
-	sb.From(NotificationTable + " n")
+	sb.From(entity.TableNotifications + " n")
 	visibleWhere(sb, userID)
 	sb.Where(unreadCondition(sb, userID))
 
 	selectQuery, selectArgs := sb.Build()
-	query := "INSERT INTO " + ReadTable + " (notification_id, user_id) " +
+	query := "INSERT INTO " + entity.TableNotificationReads + " (notification_id, user_id) " +
 		selectQuery + " ON CONFLICT DO NOTHING"
 
 	tag, err := db.Exec(ctx, query, selectArgs...)
@@ -420,8 +420,8 @@ func (r *Repository) MarkAllRead(ctx context.Context, db datastore.Querier, user
 func (r *Repository) Recipients(ctx context.Context, db datastore.Querier, id, after uuid.UUID, limit int) ([]Recipient, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("u.id", "u.email", "u.display_name")
-	sb.From(user.UserTable + " u")
-	sb.Join(NotificationTable+" n", "n.id = "+sb.Var(id))
+	sb.From(entity.TableUsers + " u")
+	sb.Join(entity.TableNotifications+" n", "n.id = "+sb.Var(id))
 	sb.Where(sb.Equal("u.disabled", false), sb.GT("u.id", after))
 	visibleWhereFor(sb, id)
 	sb.OrderBy("u.id")
@@ -451,13 +451,13 @@ func (r *Repository) Recipients(ctx context.Context, db datastore.Querier, id, a
 func visibleWhereFor(sb *sqlbuilder.SelectBuilder, id uuid.UUID) {
 	userSub := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	userSub.Select("1")
-	userSub.From(UserAudienceTable + " nu")
+	userSub.From(entity.TableNotificationUsers + " nu")
 	userSub.Where(userSub.Equal("nu.notification_id", id), "nu.user_id = u.id")
 
 	groupSub := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	groupSub.Select("1")
-	groupSub.From(GroupAudienceTable + " ng")
-	groupSub.Join(usergroup.GroupMemberTable+" ug", "ug.user_group_id = ng.user_group_id")
+	groupSub.From(entity.TableNotificationUserGroups + " ng")
+	groupSub.Join(entity.TableUserGroupsUsers+" ug", "ug.user_group_id = ng.user_group_id")
 	groupSub.Where(groupSub.Equal("ng.notification_id", id), "ug.user_id = u.id")
 
 	sb.Where(
@@ -487,7 +487,7 @@ func (r *Repository) GroupMemberUserIDs(ctx context.Context, db datastore.Querie
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("DISTINCT ug.user_id")
-	sb.From(usergroup.GroupMemberTable + " ug")
+	sb.From(entity.TableUserGroupsUsers + " ug")
 	sb.Where(sb.In("ug.user_group_id", members...))
 
 	query, args := sb.Build()

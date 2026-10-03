@@ -16,8 +16,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/cache"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -505,7 +505,7 @@ func (s *Service) replaceUserRoles(ctx context.Context, tx datastore.Querier, us
 		}
 		cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 		cb.Select("count(*)")
-		cb.From(authz.RolesTable)
+		cb.From(entity.TableRoles)
 		cb.Where(cb.In("id", keys...))
 
 		query, args := cb.Build()
@@ -657,7 +657,7 @@ func (s *Service) readDetail(ctx context.Context, db datastore.Querier, roleID R
 // procedures answer theirs.
 func (s *Service) accountExists(ctx context.Context, userID uuid.UUID) error {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From(user.UserTable).Where(sb.Equal("id", userID))
+	sb.Select("1").From(entity.TableUsers).Where(sb.Equal("id", userID))
 
 	query, args := sb.Build()
 	var one int

@@ -11,9 +11,10 @@ import (
 	"connectrpc.com/validate"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/saka/internal/guard"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/riipandi/saka/internal/guard"
 
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"

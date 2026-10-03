@@ -6,11 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"uuid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -61,7 +63,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres) uuid.UUID {
 	t.Helper()
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto("public.users")
+	ib.InsertInto(entity.TableUsers)
 	ib.Cols("username", "email", "display_name", "email_verified_at")
 	ib.Values("rlangdon", "langdon@example.com", "Robert Langdon", time.Now().UTC()).
 		Returning("id")
@@ -78,7 +80,7 @@ func failures(t *testing.T, pool *datastore.Postgres, id uuid.UUID) int {
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("failed_attempts")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()

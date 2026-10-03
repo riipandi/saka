@@ -23,11 +23,12 @@ import (
 
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	"go.jetify.com/typeid"
+
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/pkg/crypto"
-	"go.jetify.com/typeid"
 )
 
 // The fixed parameters the enrollments carry. The service decides them rather

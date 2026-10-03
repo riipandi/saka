@@ -11,8 +11,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 )
 
@@ -114,7 +114,7 @@ func insertGroup(ctx context.Context, q datastore.Querier, group scenarioGroup, 
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(usergroup.GroupTable)
+	ib.InsertInto(entity.TableUserGroups)
 	ib.Cols("name", "display_name", "created_at")
 	ib.Values(group.name, group.displayName, time.Now().UTC())
 	// No conflict target: the group must not be created when its name is
@@ -168,7 +168,7 @@ func insertMembership(ctx context.Context, q datastore.Querier, groupID usergrou
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(usergroup.GroupMemberTable)
+	ib.InsertInto(entity.TableUserGroupsUsers)
 	ib.Cols("user_id", "user_group_id")
 	ib.Values(userID, usergroup.IDToUUID(groupID))
 	ib.SQL("ON CONFLICT DO NOTHING")
@@ -184,7 +184,7 @@ func insertMembership(ctx context.Context, q datastore.Querier, groupID usergrou
 // groupExists reports whether a group already carries the name.
 func groupExists(ctx context.Context, q datastore.Querier, name string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From(usergroup.GroupTable).Where(sb.Equal("name", name))
+	sb.Select("1").From(entity.TableUserGroups).Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
 	var one int
@@ -198,7 +198,7 @@ func groupExists(ctx context.Context, q datastore.Querier, name string) (bool, e
 // groupIDByName reads the identifier of the group the name names.
 func groupIDByName(ctx context.Context, q datastore.Querier, name string) (usergroup.GroupID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id").From(usergroup.GroupTable).Where(sb.Equal("name", name))
+	sb.Select("id").From(entity.TableUserGroups).Where(sb.Equal("name", name))
 
 	query, args := sb.Build()
 	var rawID string
@@ -221,7 +221,7 @@ func groupIDByName(ctx context.Context, q datastore.Querier, name string) (userg
 // treats as "nothing to join".
 func userIDByName(ctx context.Context, q datastore.Querier, username string) (uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("id").From(user.UserTable).Where(sb.Equal("username", username))
+	sb.Select("id").From(entity.TableUsers).Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
 	var rawID string
@@ -242,7 +242,7 @@ func userIDByName(ctx context.Context, q datastore.Querier, username string) (uu
 // membershipExists reports whether the pair is already joined.
 func membershipExists(ctx context.Context, q datastore.Querier, userID uuid.UUID, groupID usergroup.GroupID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
-	sb.Select("1").From(usergroup.GroupMemberTable).
+	sb.Select("1").From(entity.TableUserGroupsUsers).
 		Where(sb.Equal("user_id", userID), sb.Equal("user_group_id", usergroup.IDToUUID(groupID)))
 
 	query, args := sb.Build()

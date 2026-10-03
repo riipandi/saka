@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/database/seeders"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
@@ -269,7 +270,7 @@ var emailPattern = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-
 func countAccounts(ctx context.Context, pool *datastore.Postgres) (int64, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(user.UserTable)
+	sb.From(entity.TableUsers)
 
 	query, args := sb.Build()
 	var total int64
@@ -290,7 +291,7 @@ func grantAdministrator(ctx context.Context, db datastore.Querier, userID string
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(authz.UserRolesTable)
+	ib.InsertInto(entity.TableUserRoles)
 	ib.Cols("user_id", "role_id")
 	ib.Values(userID, roleID)
 
@@ -311,7 +312,7 @@ func grantAdministrator(ctx context.Context, db datastore.Querier, userID string
 func administratorRoleID(ctx context.Context, db datastore.Querier) (string, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("r.id")
-	sb.From(authz.RolesTable + " r")
+	sb.From(entity.TableRoles + " r")
 	sb.Where(sb.Equal("r.slug", authz.AdministratorRole))
 
 	query, args := sb.Build()

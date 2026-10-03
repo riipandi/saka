@@ -9,14 +9,10 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 )
-
-// AllowedClientsTable is the group-side client allowlist — the inverse of
-// the client feature's own restriction junction. The migrations own the
-// schema; this constant is how Go code names it.
-const AllowedClientsTable = "public.user_groups_allowed_oidc_clients"
 
 // ErrClientUnknown is an allowlist replacement naming a client that does
 // not exist. The replacement is refused whole, so the group keeps the roll
@@ -41,7 +37,7 @@ type ClientRef struct {
 // time; neither feature imports the other.
 func (r *Repository) SetAllowedClients(ctx context.Context, db datastore.Querier, groupID uuid.UUID, clientIDs []string) error {
 	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbl.DeleteFrom(AllowedClientsTable)
+	dbl.DeleteFrom(entity.TableUserGroupsAllowedOIDCClients)
 	dbl.Where(dbl.Equal("user_group_id", groupID))
 
 	query, args := dbl.Build()
@@ -54,7 +50,7 @@ func (r *Repository) SetAllowedClients(ctx context.Context, db datastore.Querier
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(AllowedClientsTable)
+	ib.InsertInto(entity.TableUserGroupsAllowedOIDCClients)
 	ib.Cols("user_group_id", "oidc_client_id")
 	for _, clientID := range clientIDs {
 		ib.Values(groupID, clientID)
@@ -76,8 +72,8 @@ func (r *Repository) SetAllowedClients(ctx context.Context, db datastore.Querier
 func (r *Repository) ListAllowedClients(ctx context.Context, db datastore.Querier, groupID uuid.UUID) ([]ClientRef, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("j.oidc_client_id", "c.name")
-	sb.From(AllowedClientsTable + " j")
-	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.oidc_clients c", "c.id = j.oidc_client_id")
+	sb.From(entity.TableUserGroupsAllowedOIDCClients + " j")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableOIDCClients+" c", "c.id = j.oidc_client_id")
 	sb.Where(sb.Equal("j.user_group_id", groupID))
 	sb.OrderBy("lower(c.name)", "j.oidc_client_id")
 

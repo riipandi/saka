@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -46,7 +47,7 @@ func (r *Repository) ListByGroups(ctx context.Context, db datastore.Querier, gro
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(claimColumns...)
-	sb.From(ClaimTable)
+	sb.From(entity.TableCustomClaims)
 	sb.Where(sb.In("user_group_id", toList(groupIDs)...))
 	sb.OrderBy("key")
 	return r.list(ctx, db, sb, "customclaim: list group claims")
@@ -66,7 +67,7 @@ func toList(ids []uuid.UUID) []any {
 func (r *Repository) Suggest(ctx context.Context, db datastore.Querier) ([]SuggestedKey, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key", "count(*) AS usage_count")
-	sb.From(ClaimTable)
+	sb.From(entity.TableCustomClaims)
 	sb.GroupBy("key")
 	sb.OrderBy("usage_count DESC", "key")
 
@@ -94,7 +95,7 @@ func (r *Repository) Suggest(ctx context.Context, db datastore.Querier) ([]Sugge
 func (r *Repository) ListByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]ClaimSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(claimColumns...)
-	sb.From(ClaimTable)
+	sb.From(entity.TableCustomClaims)
 	sb.Where(sb.Equal("user_id", userID))
 	sb.OrderBy("key")
 	return r.list(ctx, db, sb, "customclaim: list user claims")
@@ -104,7 +105,7 @@ func (r *Repository) ListByUser(ctx context.Context, db datastore.Querier, userI
 func (r *Repository) ListByGroup(ctx context.Context, db datastore.Querier, groupID uuid.UUID) ([]ClaimSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(claimColumns...)
-	sb.From(ClaimTable)
+	sb.From(entity.TableCustomClaims)
 	sb.Where(sb.Equal("user_group_id", groupID))
 	sb.OrderBy("key")
 	return r.list(ctx, db, sb, "customclaim: list group claims")
@@ -154,7 +155,7 @@ func (r *Repository) insert(ctx context.Context, db datastore.Querier, groupID, 
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(ClaimTable)
+	ib.InsertInto(entity.TableCustomClaims)
 	ib.Cols("id", "key", "value", "user_id", "user_group_id")
 	ib.Values(wire.UUID(), key, value, userID, groupID)
 
@@ -177,7 +178,7 @@ func (r *Repository) insert(ctx context.Context, db datastore.Querier, groupID, 
 // unchanged.
 func (r *Repository) UpdateClaim(ctx context.Context, db datastore.Querier, id uuid.UUID, key, value string) (ClaimSchema, bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ClaimTable)
+	ub.Update(entity.TableCustomClaims)
 	ub.Set(ub.Assign("key", key), ub.Assign("value", value))
 	ub.Where(ub.Equal("id", id))
 
@@ -199,7 +200,7 @@ func (r *Repository) UpdateClaim(ctx context.Context, db datastore.Querier, id u
 // row is in.
 func (r *Repository) DeleteClaim(ctx context.Context, db datastore.Querier, id uuid.UUID) (bool, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(ClaimTable)
+	dbb.DeleteFrom(entity.TableCustomClaims)
 	dbb.Where(dbb.Equal("id", id))
 
 	query, args := dbb.Build()
@@ -215,7 +216,7 @@ func (r *Repository) DeleteClaim(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) GetClaim(ctx context.Context, db datastore.Querier, id uuid.UUID) (ClaimSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(claimColumns...)
-	sb.From(ClaimTable)
+	sb.From(entity.TableCustomClaims)
 	sb.Where(sb.Equal("id", id))
 
 	query, args := sb.Build()

@@ -16,16 +16,12 @@ import (
 	"uuid"
 )
 
-// EntryTable is the blocklist table. The migration owns the schema; this
-// constant is how Go code names it, so a table rename touches one line.
-const EntryTable = "public.blocklist_entries"
-
 // ResourceBlocklistEntry is the resource type an audit record names when the
 // change is about an entry. The record's user_id names the administrator who
 // made the change.
 const ResourceBlocklistEntry = "blocklist_entry"
 
-// EntrySchema is one row of EntryTable. The pattern is stored lowercased —
+// EntrySchema is one row of entity.TableBlocklistEntries. The pattern is stored lowercased —
 // the match is case-insensitive, so the row normalizes once at the write
 // instead of at every read.
 type EntrySchema struct {

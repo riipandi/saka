@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -19,8 +20,9 @@ import (
 	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/riipandi/saka/pkg/testutils"
 
-	"go.jetify.com/typeid"
 	"uuid"
+
+	"go.jetify.com/typeid"
 )
 
 // migratedPool opens a database the migrations have built, so the session
@@ -85,7 +87,7 @@ func seedAccount(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -104,7 +106,7 @@ func seedSession(t *testing.T, pool *datastore.Postgres, userID uuid.UUID, name,
 	token := "refresh-token-" + name
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(SessionTable)
+	ib.InsertInto(entity.TableSessions)
 	ib.Cols("user_id", "provider", "token_hash", "user_agent", "remember", "created_at", "expires_at")
 	ib.Values(userID, provider, crypto.HashRefreshToken(token), "test-agent/1.0", remember,
 		time.Now().Add(-time.Minute), time.Now().Add(24*time.Hour))
@@ -115,7 +117,7 @@ func seedSession(t *testing.T, pool *datastore.Postgres, userID uuid.UUID, name,
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From(SessionTable)
+	sb.From(entity.TableSessions)
 	sb.Where(sb.Equal("token_hash", crypto.HashRefreshToken(token)))
 
 	query, args = sb.Build()
@@ -141,7 +143,7 @@ func seedAdmin(t *testing.T, pool *datastore.Postgres, username string) uuid.UUI
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("id")
-	sb.From("public.users")
+	sb.From(entity.TableUsers)
 	sb.Where(sb.Equal("username", username))
 
 	query, args := sb.Build()
@@ -179,7 +181,7 @@ func auditCount(t *testing.T, pool *datastore.Postgres, event, sessionID string)
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From("public.audit_logs")
+	sb.From(entity.TableAuditLogs)
 	sb.Where(sb.Equal("event", event), sb.Equal("resource_id", sessionID))
 
 	query, args := sb.Build()

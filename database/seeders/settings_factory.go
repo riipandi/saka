@@ -7,6 +7,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/appconfig"
 )
@@ -59,7 +60,7 @@ func applySettings(ctx context.Context, q datastore.Querier, dryRun bool) (creat
 		}
 
 		ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-		ib.InsertInto(appconfig.SettingTable)
+		ib.InsertInto(entity.TableAppSettings)
 		ib.Cols("key", "value")
 		ib.Values(def.Key, def.Default)
 		ib.SQL("ON CONFLICT (key) DO NOTHING RETURNING key")
@@ -84,7 +85,7 @@ func applySettings(ctx context.Context, q datastore.Querier, dryRun bool) (creat
 func settingRests(ctx context.Context, q datastore.Querier, key string) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("key")
-	sb.From(appconfig.SettingTable)
+	sb.From(entity.TableAppSettings)
 	sb.Where(sb.Equal("key", key))
 
 	query, args := sb.Build()

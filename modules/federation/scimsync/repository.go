@@ -10,6 +10,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 
@@ -38,7 +39,7 @@ var providerColumns = []string{"id", "oidc_client_id", "endpoint", "token", "cre
 // client into a refused insert.
 func (r *Repository) Create(ctx context.Context, db datastore.Querier, p Provider) (Provider, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	sb.InsertInto(ProviderTable)
+	sb.InsertInto(entity.TableScimServiceProviders)
 	sb.Cols("id", "oidc_client_id", "endpoint", "token")
 	sb.Values(p.ID, p.ClientID, p.Endpoint, p.SealedToken)
 	sb.SQL("RETURNING " + joinCols(providerColumns))
@@ -65,7 +66,7 @@ func isUniqueViolation(err error) bool {
 func (r *Repository) ByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Provider, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(providerColumns...)
-	sb.From(ProviderTable)
+	sb.From(entity.TableScimServiceProviders)
 	sb.Where(sb.Equal("id", id))
 	query, args := sb.Build()
 
@@ -85,7 +86,7 @@ func (r *Repository) ByID(ctx context.Context, db datastore.Querier, id uuid.UUI
 func (r *Repository) ByClient(ctx context.Context, db datastore.Querier, clientID string) (Provider, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(providerColumns...)
-	sb.From(ProviderTable)
+	sb.From(entity.TableScimServiceProviders)
 	sb.Where(sb.Equal("oidc_client_id", clientID))
 	query, args := sb.Build()
 
@@ -104,7 +105,7 @@ func (r *Repository) ByClient(ctx context.Context, db datastore.Querier, clientI
 // row. Zero rows affected is the not-found.
 func (r *Repository) Update(ctx context.Context, db datastore.Querier, p Provider) (Provider, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ProviderTable)
+	ub.Update(entity.TableScimServiceProviders)
 	ub.Set(
 		ub.Assign("endpoint", p.Endpoint),
 		ub.Assign("token", p.SealedToken),
@@ -125,7 +126,7 @@ func (r *Repository) Update(ctx context.Context, db datastore.Querier, p Provide
 // Delete removes one row. Zero rows affected is the not-found.
 func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	dbb.DeleteFrom(ProviderTable)
+	dbb.DeleteFrom(entity.TableScimServiceProviders)
 	dbb.Where(dbb.Equal("id", id))
 	query, args := dbb.Build()
 
@@ -144,7 +145,7 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 // with a timestamp.
 func (r *Repository) StampSynced(ctx context.Context, db datastore.Querier, id uuid.UUID, at time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(ProviderTable)
+	ub.Update(entity.TableScimServiceProviders)
 	ub.Set(ub.Assign("last_synced_at", at))
 	ub.Where(ub.Equal("id", id))
 	query, args := ub.Build()
@@ -164,7 +165,7 @@ func (r *Repository) StampSynced(ctx context.Context, db datastore.Querier, id u
 func (r *Repository) All(ctx context.Context, db datastore.Querier) ([]Provider, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(providerColumns...)
-	sb.From(ProviderTable)
+	sb.From(entity.TableScimServiceProviders)
 	sb.OrderBy("id")
 	query, args := sb.Build()
 

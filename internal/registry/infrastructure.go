@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"time"
+	"uuid"
 
 	"github.com/samber/do/v2"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/riipandi/saka/modules/notification"
 	"github.com/riipandi/saka/modules/webhook"
 	"github.com/riipandi/saka/pkg/crypto"
-	"uuid"
 )
 
 // infrastructure registers what the process runs on: the pool, the cache, the
