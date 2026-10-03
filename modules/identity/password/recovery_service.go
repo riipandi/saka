@@ -89,6 +89,7 @@ type ResetEmail struct {
 type resetEnqueuer interface {
 	EnqueuePasswordResetEmail(ctx context.Context, email ResetEmail) error
 	EnqueuePasswordChangedNotice(ctx context.Context, notice ChangedNotice) error
+	EnqueuePasswordRemovedNotice(ctx context.Context, notice ChangedNotice) error
 }
 
 // ChangedNotice is the receipt a completed reset sends. It carries no
@@ -141,6 +142,11 @@ type Service struct {
 	// policy is the credential check's runtime source. Nil keeps the
 	// static policy.
 	policy *Validator
+	// alternatives is the chained check's seam: the sources of a way in
+	// beside the password — the passkey roll and the SSO bindings —
+	// answer through it. Nil keeps every account eligible to remove,
+	// the state a bare wiring is in; the area wires the read.
+	alternatives AlternativeCredentials
 }
 
 // WithPasswordPolicy wires the settings-driven validator. Nil keeps the
@@ -203,6 +209,22 @@ func (s *Service) WithUUIDDecoder(decoder UUIDDecoder) *Service {
 // sits above this package.
 func (s *Service) WithEnqueuer(enqueuer resetEnqueuer) *Service {
 	s.enqueuer = enqueuer
+	return s
+}
+
+// AlternativeCredentials is the chained check's seam: whether the account
+// keeps a way in once its password leaves. The SSO feature's repository
+// answers it — the bindings and the passkey roll live in tables its
+// stranding rule already reads — and the area wires it after construction,
+// because the password package must not import the feature back.
+type AlternativeCredentials interface {
+	HasAlternative(ctx context.Context, userID uuid.UUID) (bool, error)
+}
+
+// WithAlternatives wires the chained check's read. Nil keeps every account
+// eligible — the state a test or a bare wiring is in.
+func (s *Service) WithAlternatives(alternatives AlternativeCredentials) *Service {
+	s.alternatives = alternatives
 	return s
 }
 
@@ -487,6 +509,76 @@ func (s *Service) AddPassword(ctx context.Context, userID uuid.UUID, newPassword
 	// rolled back would be a lie. The enqueue is best-effort, the way the
 	// reset's receipt is.
 	return s.enqueuer.EnqueuePasswordChangedNotice(ctx, ChangedNotice{
+		UserID:      userID.String(),
+		Email:       account.Email,
+		DisplayName: account.DisplayName,
+	})
+}
+
+// ErrLastCredential is the chained check's refusal: the password is the
+// account's last live way in, and removing it would strand the holder
+// outside every recovery path the surface keeps.
+var ErrLastCredential = errors.New("password: the account keeps no other live credential")
+
+// RemovePassword deletes an account's password credential. The proof is the
+// step-up token the guard consumed before this ran; the chained check reads
+// the other ways in first — an account whose password is its last live
+// credential keeps it, whatever the caller asks. The removal, the record,
+// and the receipt follow the add's own mechanics.
+func (s *Service) RemovePassword(ctx context.Context, userID uuid.UUID) error {
+	// The precondition reads before anything writes: an account with no
+	// credential learns the refusal cheaply.
+	current, err := s.repo.FindPasswordHash(ctx, s.pool, userID)
+	if err != nil {
+		return err
+	}
+	if current == "" {
+		return ErrNoPassword
+	}
+
+	account, err := s.repo.FindUserByID(ctx, s.pool, userID)
+	if err != nil {
+		return err
+	}
+	if account.Disabled || account.BannedNow() {
+		return ErrAccountForbidden
+	}
+
+	// The chained check runs after the account read so a missing account
+	// answers before the alternatives' query runs. A nil seam (a bare
+	// wiring) keeps the account eligible — the composition root always
+	// wires the read, so production never sees the nil.
+	if s.alternatives != nil {
+		kept, altErr := s.alternatives.HasAlternative(ctx, userID)
+		if altErr != nil {
+			return altErr
+		}
+		if !kept {
+			return ErrLastCredential
+		}
+	}
+
+	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if delErr := s.repo.DeletePasswordHash(ctx, tx, userID); delErr != nil {
+			return delErr
+		}
+		// The removal and the record commit together: a credential that
+		// reads as removed has a record saying so.
+		s.audit.Record(ctx, tx, audit.Entry{
+			Event:  audit.EventPasswordRemoved,
+			Status: audit.StatusSuccess,
+			UserID: userID.String(),
+		})
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// The receipt goes out after the commit — a notice about a removal
+	// that rolled back would be a lie. The enqueue is best-effort, the
+	// way the reset's receipt is.
+	return s.enqueuer.EnqueuePasswordRemovedNotice(ctx, ChangedNotice{
 		UserID:      userID.String(),
 		Email:       account.Email,
 		DisplayName: account.DisplayName,

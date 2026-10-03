@@ -456,6 +456,14 @@ type MailerNotifications struct {
 	// PasswordChangedNoticeEnabled gates the "your password was changed"
 	// receipt a completed reset sends.
 	PasswordChangedNoticeEnabled bool `koanf:"password_changed_notice_enabled" json:"password_changed_notice_enabled"`
+	// PasswordRemovedNoticeEnabled gates the "your password was removed"
+	// receipt a completed removal sends.
+	PasswordRemovedNoticeEnabled bool `koanf:"password_removed_notice_enabled" json:"password_removed_notice_enabled"`
+	// PasskeyAddedNoticeEnabled gates the receipt an enrollment sends.
+	PasskeyAddedNoticeEnabled bool `koanf:"passkey_added_notice_enabled" json:"passkey_added_notice_enabled"`
+	// PasskeyRemovedNoticeEnabled gates the receipt a passkey removal
+	// sends — the holder's own removal and the administrator's alike.
+	PasskeyRemovedNoticeEnabled bool `koanf:"passkey_removed_notice_enabled" json:"passkey_removed_notice_enabled"`
 	// MfaDisabledNoticeEnabled gates the notice an administrative MFA removal
 	// sends.
 	MfaDisabledNoticeEnabled bool `koanf:"mfa_disabled_notice_enabled" json:"mfa_disabled_notice_enabled"`

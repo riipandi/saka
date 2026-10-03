@@ -102,6 +102,15 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 		client.Register(queue.NewQueue[PasswordChangedNoticeTask](func(ctx context.Context, task PasswordChangedNoticeTask) error {
 			return passwordChangedNoticeProcessor(ctx, task, mail)
 		}))
+		client.Register(queue.NewQueue[PasswordRemovedNoticeTask](func(ctx context.Context, task PasswordRemovedNoticeTask) error {
+			return passwordRemovedNoticeProcessor(ctx, task, mail)
+		}))
+		client.Register(queue.NewQueue[PasskeyAddedNoticeTask](func(ctx context.Context, task PasskeyAddedNoticeTask) error {
+			return passkeyAddedNoticeProcessor(ctx, task, mail)
+		}))
+		client.Register(queue.NewQueue[PasskeyRemovedNoticeTask](func(ctx context.Context, task PasskeyRemovedNoticeTask) error {
+			return passkeyRemovedNoticeProcessor(ctx, task, mail)
+		}))
 		client.Register(queue.NewQueue[SignupAttemptNoticeTask](func(ctx context.Context, task SignupAttemptNoticeTask) error {
 			return signupAttemptNoticeProcessor(ctx, task, mail)
 		}))

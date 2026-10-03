@@ -240,7 +240,10 @@ var ProcedureRules = map[string]Entry{
 	// account, the step-up proof names the holder — an email code when no
 	// password and no passkey stands, else the credential itself — and the
 	// impersonating administrator is refused by the handler's own rule.
-	identityv1connect.UserServiceAddPasswordProcedure: {Rule: Session, StepUp: true},
+	// Removing the credential is the same sensitivity: the proof stands
+	// before the chained check runs, not instead of it.
+	identityv1connect.UserServiceAddPasswordProcedure:    {Rule: Session, StepUp: true},
+	identityv1connect.UserServiceRemovePasswordProcedure: {Rule: Session, StepUp: true},
 
 	// Administrative, declared explicitly rather than left to the default so
 	// the table reads as the complete policy of the surface. Upstream guards

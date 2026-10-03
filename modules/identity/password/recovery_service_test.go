@@ -73,6 +73,7 @@ type countingEnqueuer struct {
 	calls      int
 	last       ResetEmail
 	noticeSent bool
+	removed    bool
 }
 
 func (e *countingEnqueuer) EnqueuePasswordResetEmail(_ context.Context, email ResetEmail) error {
@@ -83,6 +84,11 @@ func (e *countingEnqueuer) EnqueuePasswordResetEmail(_ context.Context, email Re
 
 func (e *countingEnqueuer) EnqueuePasswordChangedNotice(_ context.Context, _ ChangedNotice) error {
 	e.noticeSent = true
+	return nil
+}
+
+func (e *countingEnqueuer) EnqueuePasswordRemovedNotice(_ context.Context, _ ChangedNotice) error {
+	e.removed = true
 	return nil
 }
 

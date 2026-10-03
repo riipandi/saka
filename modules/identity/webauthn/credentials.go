@@ -157,5 +157,18 @@ func (s *Service) deleteCredential(ctx context.Context, userID uuid.UUID, creden
 		ResourceID:   row.ID.String(),
 		Payload:      map[string]string{"credential": credentialWire, "name": row.Name},
 	})
+
+	// The receipt rides the same best-effort enqueue the other security
+	// notices keep — the holder's removal and the administrator's both
+	// tell the account its roll changed. A read failure answers an empty
+	// notice: the address is the receipt's, not the removal's burden.
+	if s.passkeyNotices != nil {
+		account, accountErr := s.issuer.FindAccountByIDAny(ctx, userID)
+		if accountErr == nil {
+			if noticeErr := s.passkeyNotices.EnqueuePasskeyRemovedNotice(ctx, s.passkeyNoticeFrom(account, userID, row.Name)); noticeErr != nil {
+				s.log.WarnContext(ctx, "webauthn: passkey removed notice was not queued", "error", noticeErr, "user_id", userID.String())
+			}
+		}
+	}
 	return nil
 }

@@ -619,12 +619,13 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	return filled, nil
 }
 
-// passwordSetter is the credential side's seam: the add-password procedure
-// is the credential feature's write — the hash, the policy judgment, the
-// receipt — mounted on the account surface the caller speaks to. The
-// password package satisfies it; a direct import back would cycle.
+// passwordSetter is the credential side's seam: the add and remove
+// procedures are the credential feature's writes — the hash, the policy
+// judgment, the receipt — mounted on the account surface the caller speaks
+// to. The password package satisfies it; a direct import back would cycle.
 type passwordSetter interface {
 	AddPassword(ctx context.Context, userID uuid.UUID, clearText string) error
+	RemovePassword(ctx context.Context, userID uuid.UUID) error
 }
 
 // WithPasswordSetter wires the credential side's seam. Called after
@@ -700,6 +701,21 @@ func (s *Service) AddPassword(ctx context.Context, subject, clearText string) er
 		return ErrUserNotFound
 	}
 	return s.passwords.AddPassword(ctx, userID, clearText)
+}
+
+// RemovePassword deletes the signed-in account's password credential. The
+// proof is the step-up header the guard consumed; the chained check — the
+// account keeps another live way in — is the credential feature's
+// judgement, through the seam the area wired.
+func (s *Service) RemovePassword(ctx context.Context, subject string) error {
+	if s.passwords == nil {
+		return ErrCredentialUnwired
+	}
+	userID, err := parseWire(subject)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	return s.passwords.RemovePassword(ctx, userID)
 }
 
 // ListUsers answers one page of the accounts, newest first, optionally

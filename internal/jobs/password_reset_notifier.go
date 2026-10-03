@@ -24,16 +24,19 @@ type PasswordResetNotifier struct {
 	// and never gated. A switched-off notice is a no-op here rather than a
 	// dropped task, so the queue never carries mail nobody asked for.
 	changedNoticeEnabled bool
+
+	// removedNoticeEnabled gates the removal receipt the same way.
+	removedNoticeEnabled bool
 }
 
 // NewPasswordResetNotifier builds the adapter over the queue client.
-// changedNoticeEnabled gates the change receipt; a nil logger is answered
-// with the discard handler.
-func NewPasswordResetNotifier(client *queue.Client, log *slog.Logger, changedNoticeEnabled bool) *PasswordResetNotifier {
+// changedNoticeEnabled gates the change receipt, removedNoticeEnabled the
+// removal receipt; a nil logger is answered with the discard handler.
+func NewPasswordResetNotifier(client *queue.Client, log *slog.Logger, changedNoticeEnabled, removedNoticeEnabled bool) *PasswordResetNotifier {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &PasswordResetNotifier{client: client, log: log, changedNoticeEnabled: changedNoticeEnabled}
+	return &PasswordResetNotifier{client: client, log: log, changedNoticeEnabled: changedNoticeEnabled, removedNoticeEnabled: removedNoticeEnabled}
 }
 
 // EnqueuePasswordResetEmail queues the message the trigger produced.
@@ -63,6 +66,24 @@ func (n *PasswordResetNotifier) EnqueuePasswordChangedNotice(ctx context.Context
 		DisplayName: notice.DisplayName,
 	}).Save(); err != nil {
 		n.log.Warn("password: change notice was not queued", "error", err, "user_id", notice.UserID)
+		return nil
+	}
+	return nil
+}
+
+// EnqueuePasswordRemovedNotice queues the receipt a completed removal
+// sends. Best-effort like the change receipt: the removal has committed,
+// and the audit record already says so.
+func (n *PasswordResetNotifier) EnqueuePasswordRemovedNotice(ctx context.Context, notice password.ChangedNotice) error {
+	if !n.removedNoticeEnabled {
+		return nil
+	}
+	if _, err := n.client.Add(PasswordRemovedNoticeTask{
+		UserID:      notice.UserID,
+		Email:       notice.Email,
+		DisplayName: notice.DisplayName,
+	}).Save(); err != nil {
+		n.log.Warn("password: removal notice was not queued", "error", err, "user_id", notice.UserID)
 		return nil
 	}
 	return nil

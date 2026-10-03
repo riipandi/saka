@@ -345,12 +345,27 @@ func (h *rpcHandler) AddPassword(ctx context.Context, req *connect.Request[ident
 	}), nil
 }
 
-// RemovePassword deletes the caller's password credential. The removal and
-// its last-credential refusal ship with the security-notices change; until
-// then the procedure is scaffold and answers unimplemented — the Yaak row
-// carries the (unimplemented) marker and no guard rule names it.
+// RemovePassword deletes the caller's password credential. The proof rode
+// the X-Tango-Reauthentication header the guard consumed; the impersonating
+// administrator is refused at the boundary — the account's credential is
+// not a delegate's choice. The chained refusal and the no-credential state
+// are failed preconditions: the caller is authenticated and named, the
+// account's state is what refuses.
 func (h *rpcHandler) RemovePassword(ctx context.Context, req *connect.Request[identityv1.RemovePasswordRequest]) (*connect.Response[identityv1.RemovePasswordResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("not yet implemented"))
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
+	}
+	if err := h.service.RemovePassword(ctx, caller.UserID); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.RemovePasswordResponse{
+		Status:  responder.StatusSuccess,
+		Message: "the password was removed",
+	}), nil
 }
 
 // listMetadata maps the responder's pagination onto the shared block. The
@@ -403,6 +418,10 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeUnavailable, errors.New("picture storage is not available"))
 	case errors.Is(err, password.ErrPasswordSet):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account already holds a password"))
+	case errors.Is(err, password.ErrNoPassword):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account holds no password"))
+	case errors.Is(err, password.ErrLastCredential):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("another way in is required before the password is removed"))
 	case errors.Is(err, ErrCredentialUnwired):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the credential side is not available"))
 	case isPasswordPolicy(err):

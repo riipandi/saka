@@ -211,6 +211,21 @@ func (r *Repository) FindPasswordHash(ctx context.Context, db datastore.Querier,
 	return string(hash), nil
 }
 
+// DeletePasswordHash removes the account's credential row. The removal is
+// the honest write: a row with an empty hash would read as "no password" to
+// FindPasswordHash while still counting the account into joins that expect
+// the row to mean something.
+func (r *Repository) DeletePasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	dbn := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbn.DeleteFrom(UserPasswordTable)
+	dbn.Where(dbn.Equal("user_id", userID))
+	query, args := dbn.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("password: delete password hash: %w", err)
+	}
+	return nil
+}
+
 // SetPasswordHash writes the new credential. The row is upserted because a
 // reset may be the account's first password (a passkey-created account that
 // added one).

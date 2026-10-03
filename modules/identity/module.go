@@ -14,6 +14,7 @@
 package identity
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -21,6 +22,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
+	"uuid"
 
 	"github.com/riipandi/tango/internal/audit"
 	"github.com/riipandi/tango/internal/cache"
@@ -510,6 +512,14 @@ var Package = do.Package(
 			service.WithDelivery(mail, jobs.NewReauthenticationCodeNotifier(
 				do.MustInvoke[*queue.Client](i), log))
 		}
+		// The passkey receipts ride the same post-construction seam: the
+		// enrollment's and the removal's notices are the deployment's cost
+		// decisions, and the ceremonies run with or without the channel.
+		if queueClient := do.MustInvoke[*queue.Client](i); queueClient != nil {
+			service.WithPasskeyNotifier(jobs.NewPasskeyNoticeNotifier(queueClient, log,
+				c.Mailer.Notifications.PasskeyAddedNoticeEnabled,
+				c.Mailer.Notifications.PasskeyRemovedNoticeEnabled))
+		}
 		return service, nil
 	}),
 
@@ -534,9 +544,18 @@ var Package = do.Package(
 		client := do.MustInvoke[*queue.Client](i)
 		sessions := do.MustInvoke[*session.Service](i)
 		service := password.NewService(pool, mail, recorder, c.App.BaseURL, log).
-			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log, c.Mailer.Notifications.PasswordChangedNoticeEnabled)).
+			WithEnqueuer(jobs.NewPasswordResetNotifier(client, log,
+				c.Mailer.Notifications.PasswordChangedNoticeEnabled,
+				c.Mailer.Notifications.PasswordRemovedNoticeEnabled)).
 			WithSessionEnder(sessions).
 			WithUUIDDecoder(user.UUIDFromWire)
+		// The chained check rides the post-construction seam like the
+		// other cross-feature reads: the SSO feature's repository answers
+		// whether the account keeps a way in beside its password, and the
+		// password package must not import the feature back.
+		if pool != nil {
+			service.WithAlternatives(passwordAlternatives{repo: oauthsso.NewRepository(pool), pool: pool})
+		}
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
 		}
@@ -783,4 +802,18 @@ func resolvedAlgorithmSource(c *config.Config) string {
 		return "secret length"
 	}
 	return "database row"
+}
+
+// passwordAlternatives is the chained check's adapter: the SSO feature's
+// repository answers whether the account keeps a way in beside its
+// password, behind the interface the password package defines. The
+// repository reads the passkey table too — its stranding rule already owns
+// that query — so one type satisfies the seam.
+type passwordAlternatives struct {
+	repo *oauthsso.Repository
+	pool *datastore.Postgres
+}
+
+func (a passwordAlternatives) HasAlternative(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return a.repo.HoldsAlternativeCredential(ctx, a.pool, userID)
 }

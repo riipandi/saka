@@ -586,6 +586,23 @@ func (r *Repository) KeepsAnotherCredential(ctx context.Context, db datastore.Qu
 	return others > 0, nil
 }
 
+// HoldsAlternativeCredential answers whether the account keeps a way in
+// beside its password: an SSO binding or a passkey. The remove-password
+// procedure's chained check asks through it — the same three-table rule
+// KeepsAnotherCredential holds for the bindings, minus the password the
+// removal is spending.
+func (r *Repository) HoldsAlternativeCredential(ctx context.Context, db datastore.Querier, userID uuid.UUID) (bool, error) {
+	var others int
+	err := db.QueryRow(ctx, `SELECT
+		    (SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1)
+		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID).
+		Scan(&others)
+	if err != nil {
+		return false, err
+	}
+	return others > 0, nil
+}
+
 // DeleteLinkedAccount removes one binding. The guard carries the owner,
 // so a raced or foreign delete answers "not removed" instead of
 // touching someone else's row; the soft-delete trigger captures what

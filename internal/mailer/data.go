@@ -17,6 +17,9 @@ const (
 	TemplateOneTimeAccess         = "one-time-access"
 	TemplatePasswordReset         = "password-reset"
 	TemplatePasswordChangedNotice = "password-changed-notice"
+	TemplatePasswordRemovedNotice = "password-removed-notice"
+	TemplatePasskeyAddedNotice    = "passkey-added-notice"
+	TemplatePasskeyRemovedNotice  = "passkey-removed-notice"
 	TemplateReauthenticationCode  = "reauthentication-code"
 	TemplateSignupAttemptNotice   = "signup-attempt-existing-email"
 	TemplateTestEmail             = "test-email"
@@ -116,6 +119,20 @@ type (
 		Name      string
 		Email     string
 		ExpiresAt string
+	}
+	// PasswordRemovedNoticeData renders TemplatePasswordRemovedNotice —
+	// the "your password was removed" receipt a completed removal sends.
+	PasswordRemovedNoticeData struct {
+		Name  string
+		Email string
+	}
+	// PasskeyNoticeData renders TemplatePasskeyAddedNotice and
+	// TemplatePasskeyRemovedNotice — the receipts a passkey ceremony
+	// sends. CredentialName is the holder's own name for the credential.
+	PasskeyNoticeData struct {
+		Name           string
+		Email          string
+		CredentialName string
 	}
 	// ReauthenticationCodeData renders TemplateReauthenticationCode — the
 	// reverification code a sensitive action asked for. The code is the

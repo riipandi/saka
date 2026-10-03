@@ -364,6 +364,9 @@ func Default() Config {
 			Notifications: MailerNotifications{
 				NewDeviceNoticeEnabled:       true,
 				PasswordChangedNoticeEnabled: true,
+				PasswordRemovedNoticeEnabled: true,
+				PasskeyAddedNoticeEnabled:    true,
+				PasskeyRemovedNoticeEnabled:  true,
 				MfaDisabledNoticeEnabled:     true,
 				UserBannedNoticeEnabled:      true,
 				UserUnbannedNoticeEnabled:    true,

@@ -118,3 +118,56 @@ func passwordChangedNoticeProcessor(ctx context.Context, task PasswordChangedNot
 	slog.DebugContext(ctx, "queue: password changed notice sent", "user_id", task.UserID)
 	return nil
 }
+
+// PasswordRemovedNoticeName is the queue the removal receipts run on.
+const PasswordRemovedNoticeName = "password_removed_notice"
+
+// PasswordRemovedNoticeTask renders the "your password was removed"
+// receipt and submits one message. Like the change receipt it carries no
+// token: the removal has already completed when this is queued.
+type PasswordRemovedNoticeTask struct {
+	// UserID is the account whose credential was deleted.
+	UserID string `json:"user_id"`
+
+	// Email is the address the receipt goes to.
+	Email string `json:"email"`
+
+	// DisplayName is the name the template greets.
+	DisplayName string `json:"display_name"`
+}
+
+// Config returns the queue the removal receipts run on.
+func (t PasswordRemovedNoticeTask) Config() queue.QueueConfig {
+	return queue.QueueConfig{
+		Name:        PasswordRemovedNoticeName,
+		MaxAttempts: 5,
+		Timeout:     time.Minute,
+		Backoff:     time.Minute,
+		Retention:   queue.DeadLetter(),
+	}
+}
+
+// passwordRemovedNoticeProcessor renders the template and submits one
+// message.
+func passwordRemovedNoticeProcessor(ctx context.Context, task PasswordRemovedNoticeTask, mail *mailer.Service) error {
+	if task.Email == "" {
+		return errors.New("password_removed_notice: task carries no address")
+	}
+	err := mail.Send(ctx, mailer.Request{
+		To:       []string{task.Email},
+		Subject:  "Your password was removed",
+		Template: mailer.TemplatePasswordRemovedNotice,
+		View: mailer.View{
+			Email: task.Email,
+			Data: mailer.PasswordRemovedNoticeData{
+				Name:  task.DisplayName,
+				Email: task.Email,
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	slog.DebugContext(ctx, "queue: password removed notice sent", "user_id", task.UserID)
+	return nil
+}

@@ -160,6 +160,14 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 				"name":       stored.Name,
 			},
 		})
+		// The receipt rides the same best-effort enqueue the other
+		// security notices keep: the enrollment committed, and a lost
+		// notice must not fail the ceremony that succeeded.
+		if s.passkeyNotices != nil {
+			if noticeErr := s.passkeyNotices.EnqueuePasskeyAddedNotice(ctx, s.passkeyNoticeFrom(account, userID, stored.Name)); noticeErr != nil {
+				s.log.WarnContext(ctx, "webauthn: passkey added notice was not queued", "error", noticeErr, "user_id", userID.String())
+			}
+		}
 	}
 
 	return view(stored)

@@ -168,6 +168,56 @@ type Service struct {
 	// own enrollment count. Nil until the area wires it; a nil counter
 	// counts zero TOTP devices.
 	totpEnrollments TotpEnrollmentCounter
+
+	// passkeyNotices is the security-notice seam: an enrollment and a
+	// removal enqueue their receipt through it. Nil until the area wires
+	// it; a nil notifier keeps the ceremonies working — the notice is a
+	// courtesy, never a contract.
+	passkeyNotices PasskeyNotifier
+}
+
+// PasskeyNotice is the receipt a passkey ceremony sends. It carries no
+// secret: the credential is bound to the account, never a way into it.
+type PasskeyNotice struct {
+	// UserID is the account whose roll changed.
+	UserID string
+	// Email is the address the receipt goes to.
+	Email string
+	// DisplayName is the name the receipt greets.
+	DisplayName string
+	// CredentialName is the holder's own name for the credential.
+	CredentialName string
+}
+
+// PasskeyNotifier accepts the receipts the passkey ceremonies produce.
+// internal/jobs satisfies it with the durable queue; a lost notice must
+// not fail a ceremony that committed.
+type PasskeyNotifier interface {
+	EnqueuePasskeyAddedNotice(ctx context.Context, notice PasskeyNotice) error
+	EnqueuePasskeyRemovedNotice(ctx context.Context, notice PasskeyNotice) error
+}
+
+// WithPasskeyNotifier wires the notice seam. Called after construction for
+// the same reason the other seams are: internal/jobs sits above this
+// package.
+func (s *Service) WithPasskeyNotifier(notifier PasskeyNotifier) *Service {
+	s.passkeyNotices = notifier
+	return s
+}
+
+// passkeyNoticeFrom builds the receipt from the account the ceremony read.
+// A missing account (the ceremony's own refusal came first) never reaches
+// here — the callers enqueue after the commit.
+func (s *Service) passkeyNoticeFrom(account *signin.Account, userID uuid.UUID, credentialName string) PasskeyNotice {
+	if account == nil {
+		return PasskeyNotice{UserID: userID.String(), CredentialName: credentialName}
+	}
+	return PasskeyNotice{
+		UserID:         userID.String(),
+		Email:          account.Email,
+		DisplayName:    account.DisplayName,
+		CredentialName: credentialName,
+	}
 }
 
 // WithDelivery wires the email-code proof's send pair: the mailer renders
