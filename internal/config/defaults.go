@@ -16,18 +16,6 @@ const LogDir = "logs"
 // files take a timestamp suffix from it.
 const LogFileName = "saka.log"
 
-// UploadsDir is the subdirectory of Storage.LocalPath the /static route serves:
-// files a feature wrote there whole, such as an avatar or an exported report.
-// It is a subdirectory rather than the data directory itself so an upload never
-// collides with the chunk store, the staging area, or the logs, and so the
-// served tree holds only what is meant to be served.
-//
-// It is deliberately not where the chunk engine writes: a stored file is cut
-// into content-addressed chunks under chunks/, which is not a browsable tree
-// and is never served. A feature that wants a file reachable by URL writes a
-// whole copy here.
-const UploadsDir = "uploads"
-
 // DefaultS3Region is the signing region a deployment that never sets one gets.
 //
 // A region cannot be empty: the S3 client refuses to resolve an endpoint without

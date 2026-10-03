@@ -325,7 +325,7 @@ transaction, with the key in the payload and never the value.
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------- | -------------------- | ------ | -------- |
-| DELETE, GET, PUT | `/api/application-images/*` | Bundled application images | excluded — served from `public/images` through `/static/*` | — |
+| DELETE, GET, PUT | `/api/application-images/*` | Bundled application images | excluded — served from `public/images` through `/storage/*` | — |
 | GET | `/api/storage/sqlite-warning` | SQLite storage warning | excluded — Postgres is the only supported database | — |
 
 ## Audit Logs

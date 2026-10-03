@@ -186,6 +186,43 @@ device limits come from the appconfig catalog (`mfa.max_enrollments`,
 | --- | --- | --- | --- |
 | GET | `/api/storage/sqlite-warning` | Get whether the SQLite storage warning should be shown | 200 |
 
+The upstream surface is the one row above (not ported — saka is Postgres-only).
+Saka's own bucket management and resumable-upload surface, `[Saka]`-marked in
+the Yaak collection:
+
+| Method | Path | Summary | Guard | Success |
+| --- | --- | --- | --- | --- |
+| POST | `/rpc/saka.storage.v1.BucketService/CreateBucket` | Create a storage bucket | Admin | 200 |
+| POST | `/rpc/saka.storage.v1.BucketService/UpdateBucket` | Partially update a storage bucket | Admin | 200 |
+| POST | `/rpc/saka.storage.v1.BucketService/DeleteBucket` | Delete an empty storage bucket | Admin | 204 |
+| POST | `/rpc/saka.storage.v1.BucketService/ListBuckets` | List storage buckets | Admin | 200 |
+| POST | `/rpc/saka.storage.v1.BucketService/GetBucket` | Get a storage bucket by id | Admin | 200 |
+
+A bucket carries `name` (unique, one path segment, ≤ 100 characters), nullable
+`file_size_limit` and `allowed_mime_types` (NULL = unlimited / any), and ids
+travel as `bkt_` TypeIDs. Deletion refuses a non-empty bucket and the bucket
+the `storage.default_bucket` setting names. Files are served publicly at
+`GET /storage/{bucket}/{key}` (immutable cache headers; a missing bucket,
+key, or object is 404, never the SPA document).
+
+The resumable-upload protocol (tus 1.0.0, in-house; `[Saka]` requests in the
+Storage folder) at `/api/uploads`:
+
+| Method | Path | Summary | Guard | Success |
+| --- | --- | --- | --- | --- |
+| OPTIONS | `/api/uploads` | Discovery: version and extensions | Public | 204 |
+| POST | `/api/uploads` | Create a session (body = first chunk) | Authenticated | 201 |
+| HEAD | `/api/uploads/{bucket}/{key}` | Read the current offset | Authenticated | 200 |
+| PATCH | `/api/uploads/{bucket}/{key}` | Append one chunk at the claimed offset | Authenticated | 204 |
+| DELETE | `/api/uploads/{bucket}/{key}` | Terminate the session | Authenticated | 204 |
+
+The creation's `Upload-Metadata` names the bucket, the key, and the file's
+content type; the bucket's size limit and mime list are checked before any
+byte travels. When an append reaches the declared length, the completion
+fires inside the same PATCH and the queue carries the file to its backend.
+The old `GET /api/uploads/{key}` progress reader is gone — the HEAD is the
+offset read.
+
 ### User Groups
 
 | Method | Path | Summary | Success |

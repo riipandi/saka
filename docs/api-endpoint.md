@@ -396,6 +396,37 @@ only as SHA-256 hashes; decisions are single-use.
 | POST     | `/rpc/saka.authn.v1.DeviceApprovalService/Inspect`           | ConnectRPC   | Read the request the code names (authenticated) |
 | POST     | `/rpc/saka.authn.v1.DeviceApprovalService/Decide`            | ConnectRPC   | Approve or deny (authenticated; single decision) |
 
+## Storage Buckets (saka-only)
+
+The administrative surface over the buckets files are namespaced by. Every procedure is
+administrative; deletion refuses a non-empty bucket and the bucket the `storage.default_bucket`
+setting names. Bucket ids travel as `bkt_` TypeIDs, file objects as `file_`.
+
+| Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
+| -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| POST     | `/rpc/saka.storage.v1.BucketService/CreateBucket`            | ConnectRPC   | Create a bucket (name, optional size limit and mime allowlist) |
+| POST     | `/rpc/saka.storage.v1.BucketService/UpdateBucket`            | ConnectRPC   | Partial update (absent fields keep their stored value) |
+| POST     | `/rpc/saka.storage.v1.BucketService/DeleteBucket`            | ConnectRPC   | Delete an empty bucket (204) |
+| POST     | `/rpc/saka.storage.v1.BucketService/ListBuckets`             | ConnectRPC   | List buckets (paginated, search) |
+| POST     | `/rpc/saka.storage.v1.BucketService/GetBucket`               | ConnectRPC   | Get one bucket by id |
+
+## Resumable Uploads (tus, saka-only)
+
+The storage engine's upload protocol, tus 1.0.0, implemented in-house: a client streams a file in
+chunks, probes the offset it needs to resume from, and terminates a session it abandons. The
+creation's `Upload-Metadata` names the bucket, the key, and the file's content type; the bucket's
+size limit and mime allowlist are checked before any byte travels. When an append reaches the
+declared length, the completion fires inside the same request and the queue carries the file to
+its backend. The paths are lifted off the request deadlines; the discovery needs no credential.
+
+| Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
+| -------- | ------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| OPTIONS  | `/api/uploads`                                                | HTTP/REST    | Discovery: version and extensions (204)    |
+| POST     | `/api/uploads`                                                | HTTP/REST    | Create a session; a body is the first chunk (201, `Location` + `Upload-Offset`) |
+| HEAD     | `/api/uploads/{bucket}/{key}`                                 | HTTP/REST    | Read the current offset (`Upload-Offset`)  |
+| PATCH    | `/api/uploads/{bucket}/{key}`                                 | HTTP/REST    | Append one chunk at the claimed offset (409 on a mismatched offset) |
+| DELETE   | `/api/uploads/{bucket}/{key}`                                 | HTTP/REST    | Terminate the session (204)                |
+
 ## Health Check
 
 | Method   | Procedure / Endpoint                               | Protocol     | Summary                    |
@@ -420,8 +451,7 @@ contract.
 | -------- | ----------------------- | ---------- | ------------------------------------------ |
 | GET      | `/`                     | HTTP/REST  | SPA document; every unmatched path falls back to it |
 | GET      | `/api/`                 | HTTP/REST  | API root document (name, version, platform) |
-| GET      | `/static/*`             | HTTP/REST  | Embedded static assets, plus served uploads |
-| GET      | `/api/uploads/{key}`    | HTTP/REST  | Upload progress (authenticated): the manifest's `status` and `size` for one storage key |
+| GET      | `/storage/{bucket}/{key}` | HTTP/REST  | Served file: the engine resolves the bucket and streams the object (public, immutable cache headers; a miss is 404, never the SPA document) |
 
 Debug-build-only utilities (`/debug/do`, `/debug/encode-id`, `/debug/decode-id`) answer `404` in
 a release build.
