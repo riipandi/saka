@@ -76,7 +76,7 @@ func seedGroup(t *testing.T, pool *datastore.Postgres, name string) string {
 func testStorage(t *testing.T, pool *datastore.Postgres) *storage.Manager {
 	t.Helper()
 	if _, err := pool.Exec(t.Context(),
-		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); err != nil {
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
 	return storage.NewManager(storage.NewFS(t.TempDir()), pool, t.TempDir(), slog.New(slog.DiscardHandler))

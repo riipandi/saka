@@ -63,24 +63,19 @@ func TestValidateBucketNameRejectsTheShapesANamespaceCannotCarry(t *testing.T) {
 		"/absolute",
 		"Docs",
 		"docs/.hidden",
-		"staging",
-		"logs",
-		"backup",
-		"config",
-		"files",
 		"",
 	} {
 		assert.Error(t, ValidateBucketName(name), "bucket name %q must be refused", name)
 	}
-	for _, name := range []string{"default", "user-files", "avatars_2"} {
+	for _, name := range []string{"devbucket", "user-files", "avatars_2", "staging"} {
 		assert.NoError(t, ValidateBucketName(name), "bucket name %q must be accepted", name)
 	}
 }
 
 func TestSplitRefParsesABucketScopedReference(t *testing.T) {
-	bucket, key, err := SplitRef("default/avatars/usr_1.png")
+	bucket, key, err := SplitRef("devbucket/avatars/usr_1.png")
 	require.NoError(t, err)
-	assert.Equal(t, "default", bucket)
+	assert.Equal(t, "devbucket", bucket)
 	assert.Equal(t, "avatars/usr_1.png", key)
 
 	_, _, err = SplitRef("nokey")
@@ -213,7 +208,7 @@ func TestStorageObjectsRefuseAnUnknownStatus(t *testing.T) {
 
 	_, err := pool.Exec(ctx,
 		`INSERT INTO storage_objects (bucket_id, key, content_hash, status)
-		 VALUES ((SELECT id FROM storage_buckets WHERE name = 'default'), 'k', '', 'archived')`)
+		 VALUES ((SELECT id FROM storage_buckets WHERE name = 'devbucket'), 'k', '', 'archived')`)
 	require.Error(t, err, "a status outside the CHECK list must be refused")
 	assert.Contains(t, err.Error(), "chk_storage_objects_status")
 }

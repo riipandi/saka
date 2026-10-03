@@ -45,7 +45,7 @@ func ptrInt64(v int64) *int64 { return &v }
 // bucket's id leaves the server carrying the bkt TypeID's prefix, and the
 // wire form parses back to the UUID the column stores.
 func TestTheWireIdCarriesTheBucketPrefix(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	created, err := service.Create(ctx, "admin", CreateParams{Name: "gryffindor"})
@@ -63,7 +63,7 @@ func TestTheWireIdCarriesTheBucketPrefix(t *testing.T) {
 // back by name with the limits it was created with, and the list answers it
 // beside the ones already there.
 func TestCreateGetAndListBuckets(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	created, err := service.Create(ctx, "admin", CreateParams{
@@ -92,7 +92,7 @@ func TestCreateGetAndListBuckets(t *testing.T) {
 // TestCreateRefusesADuplicateName pins the unique-name rule: a second bucket
 // named like the first is refused, not silently accepted.
 func TestCreateRefusesADuplicateName(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Create(ctx, "admin", CreateParams{Name: "hogwarts"})
@@ -102,16 +102,17 @@ func TestCreateRefusesADuplicateName(t *testing.T) {
 	assert.ErrorIs(t, err, ErrBucketExists)
 }
 
-// TestCreateRefusesAReservedName pins the name rule's engine half: the
-// data-directory names the engine owns on disk are refused at the service
-// boundary, the same way the engine's stage path refuses them.
-func TestCreateRefusesAReservedName(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+// TestCreateAcceptsAnySlugName pins the name rule's engine half: the name
+// is one path segment, and the buckets live inside the engine's uploads
+// container, so no slug collides with a data directory anymore — any
+// lowercase slug a creation passes names a bucket.
+func TestCreateAcceptsAnySlugName(t *testing.T) {
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	for _, name := range []string{"staging", "logs", "backup", "config", "files"} {
 		_, err := service.Create(ctx, "admin", CreateParams{Name: name})
-		assert.ErrorIs(t, err, ErrInvalidBucketName, "the reserved name %q is refused", name)
+		assert.NoError(t, err, "the slug %q is a bucket like any other", name)
 	}
 }
 
@@ -119,7 +120,7 @@ func TestCreateRefusesAReservedName(t *testing.T) {
 // bucket name is the first segment of a public URL, and the serving route
 // resolves it lowercase.
 func TestCreateRefusesAnUppercaseName(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Create(ctx, "admin", CreateParams{Name: "Gryffindor"})
@@ -129,7 +130,7 @@ func TestCreateRefusesAnUppercaseName(t *testing.T) {
 // TestGetRefusesAnUnknownName pins the not-found answer for a name the
 // buckets table does not hold.
 func TestGetRefusesAnUnknownName(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Get(ctx, "nowhere")
@@ -140,7 +141,7 @@ func TestGetRefusesAnUnknownName(t *testing.T) {
 // present field replaces its stored value, an absent one keeps it, and the
 // name itself is never rewritten.
 func TestUpdateChangesTheLimitsAndKeepsAbsentFields(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Create(ctx, "admin", CreateParams{
@@ -169,7 +170,7 @@ func TestUpdateChangesTheLimitsAndKeepsAbsentFields(t *testing.T) {
 // TestUpdateRefusesAnUnknownName pins the not-found answer for an update
 // that names no bucket.
 func TestUpdateRefusesAnUnknownName(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Update(ctx, "admin", "nowhere", UpdateParams{})
@@ -180,7 +181,7 @@ func TestUpdateRefusesAnUnknownName(t *testing.T) {
 // objects table still holds rows is refused, and a staging intent row
 // counts as much as a final — the caller empties the bucket first.
 func TestDeleteRefusesANonEmptyBucket(t *testing.T) {
-	service, pool := bucketService(t, &fakeSettings{value: "default"})
+	service, pool := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	created, err := service.Create(ctx, "admin", CreateParams{Name: "gryffindor"})
@@ -218,17 +219,17 @@ func TestDeleteFallsBackToTheEngineDefaultWithoutSettings(t *testing.T) {
 	// The migrated database carries no seed, so the guard answers on the
 	// name alone: creating it is refused as the default the deletion would
 	// leave the stage path without.
-	_, err := service.Create(ctx, "admin", CreateParams{Name: "default"})
+	_, err := service.Create(ctx, "admin", CreateParams{Name: "devbucket"})
 	require.NoError(t, err)
 
-	err = service.Delete(ctx, "admin", "default")
+	err = service.Delete(ctx, "admin", "devbucket")
 	assert.ErrorIs(t, err, ErrBucketIsDefault)
 }
 
 // TestDeleteRemovesAnEmptyBucket pins the happy path: an empty bucket that
 // no setting names is removed and reads back as not found.
 func TestDeleteRemovesAnEmptyBucket(t *testing.T) {
-	service, _ := bucketService(t, &fakeSettings{value: "default"})
+	service, _ := bucketService(t, &fakeSettings{value: "devbucket"})
 	ctx := t.Context()
 
 	_, err := service.Create(ctx, "admin", CreateParams{Name: "gryffindor"})

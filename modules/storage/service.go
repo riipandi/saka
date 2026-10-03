@@ -30,8 +30,7 @@ var (
 	// stage.
 	ErrBucketIsDefault = errors.New("storage: bucket is the default bucket")
 
-	// ErrInvalidBucketName is a name that fails the one-segment slug rule or
-	// names a data directory the engine reserves for itself.
+	// ErrInvalidBucketName is a name that fails the one-segment slug rule.
 	ErrInvalidBucketName = errors.New("storage: invalid bucket name")
 )
 
@@ -41,6 +40,15 @@ var (
 // feature out of this one's import graph.
 type settingsReader interface {
 	GetString(ctx context.Context, key string) (string, error)
+}
+
+// bucketEnsurer is the engine's container seam: on an object store, the
+// bucket's name is the physical bucket the engine addresses the file by, so
+// a creation provisions it before the row is written. *storage.Manager
+// satisfies it; the interface keeps the engine package's broader surface
+// out of this one's import graph.
+type bucketEnsurer interface {
+	EnsureBucket(ctx context.Context, bucket string) error
 }
 
 // SettingStorageDefaultBucket is the catalog key the deletion guard reads.
@@ -61,6 +69,10 @@ type Service struct {
 	// settings reads the default-bucket setting at call time. Nil keeps the
 	// engine's built-in default — the state a bare wiring is in.
 	settings settingsReader
+	// engine provisions the bucket's physical container at creation. Nil —
+	// a bare wiring — skips it: the row is created, and the container is
+	// whatever the engine's driver makes of the name.
+	engine bucketEnsurer
 }
 
 // NewService builds the service over the shared pool.
@@ -77,6 +89,14 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Lo
 // the engine's built-in default.
 func (s *Service) WithSettings(settings settingsReader) *Service {
 	s.settings = settings
+	return s
+}
+
+// WithEngine wires the container seam a creation provisions through. Nil
+// skips the provisioning — the row exists, the container follows the
+// driver's own laziness.
+func (s *Service) WithEngine(engine bucketEnsurer) *Service {
+	s.engine = engine
 	return s
 }
 
@@ -109,12 +129,21 @@ type UpdateParams struct {
 }
 
 // Create registers a new bucket. The name rule is the engine's own — one
-// path segment, lowercase, none of the data-directory names — because a
-// bucket that fails it would either break the `/storage` URL or hide a
-// subtree the engine owns on disk.
+// path segment — because the name is the container the backend addresses
+// the file by and the first segment of every `/storage` URL.
 func (s *Service) Create(ctx context.Context, actor string, params CreateParams) (BucketSchema, error) {
 	if err := storage.ValidateBucketName(params.Name); err != nil {
 		return BucketSchema{}, ErrInvalidBucketName
+	}
+
+	// The container exists before the row: the name is the object store's
+	// bucket, and a row whose first upload fails on a missing container is
+	// a defect the provisioning prevents. Idempotent, so a replay of a
+	// creation that then failed its insert does not fail here.
+	if s.engine != nil {
+		if ensureErr := s.engine.EnsureBucket(ctx, params.Name); ensureErr != nil {
+			return BucketSchema{}, ensureErr
+		}
 	}
 
 	var created BucketSchema

@@ -349,7 +349,7 @@ func (m *Manager) sync(ctx context.Context, ref string) (string, int64, error) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	if err := m.store.Put(ctx, storePath(bucket, key), f, fingerprint.size, contentType); err != nil {
+	if err := m.store.Put(ctx, bucket, key, f, fingerprint.size, contentType); err != nil {
 		return uploadError, 0, err
 	}
 
@@ -388,7 +388,7 @@ func (m *Manager) Open(ctx context.Context, bucket, key string) (io.ReadCloser, 
 	if _, err := m.Manifest(ctx, bucket, key); err != nil {
 		return nil, err
 	}
-	body, err := m.store.Get(ctx, storePath(bucket, key))
+	body, err := m.store.Get(ctx, bucket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (m *Manager) Delete(ctx context.Context, bucket, key string) error {
 	if err := m.manifests.Delete(ctx, m.db, bucketID, key); err != nil {
 		return err
 	}
-	if err := m.store.Delete(ctx, storePath(bucket, key)); err != nil {
+	if err := m.store.Delete(ctx, bucket, key); err != nil {
 		return fmt.Errorf("storage: delete file %s/%s: %w", bucket, key, err)
 	}
 
@@ -426,34 +426,57 @@ func (m *Manager) Delete(ctx context.Context, bucket, key string) error {
 
 // CollectGarbage removes every object the backend holds that no manifest
 // names. It is the drain of the paths a crash can leave: a delete that
-// finished its rows but not its object removal. A listed name that is not
-// a valid bucket-scoped reference is skipped, not deleted — the prefix that
-// carries the deployment's own strays is never swept by the engine's
-// vocabulary. Returns the number of objects removed.
+// finished its rows but not its object removal. The sweep walks each
+// bucket's container — the buckets table is the list of containers the
+// engine created — and a listed name that is not a valid key is skipped,
+// not deleted: the prefix's own directory entries and a deployment's stray
+// objects are never swept by the engine's vocabulary. Returns the number of
+// objects removed.
 func (m *Manager) CollectGarbage(ctx context.Context) (int, error) {
 	keep, err := m.manifests.StoredRefs(ctx, m.db)
 	if err != nil {
 		return 0, err
 	}
+	buckets, err := m.buckets.Names(ctx, m.db)
+	if err != nil {
+		return 0, err
+	}
 
 	var removed int
-	err = m.store.List(ctx, func(key string) error {
-		if _, ok := keep[key]; ok {
+	for _, bucket := range buckets {
+		listErr := m.store.List(ctx, bucket, func(key string) error {
+			if _, ok := keep[bucket+"/"+key]; ok {
+				return nil
+			}
+			if invalid := ValidateKey(key); invalid != nil {
+				return nil
+			}
+			if delErr := m.store.Delete(ctx, bucket, key); delErr != nil {
+				return delErr
+			}
+			removed++
 			return nil
+		})
+		if listErr != nil {
+			return removed, fmt.Errorf("storage: garbage collection: %w", listErr)
 		}
-		if invalid := ValidateKey(key); invalid != nil {
-			return nil
-		}
-		if delErr := m.store.Delete(ctx, key); delErr != nil {
-			return delErr
-		}
-		removed++
-		return nil
-	})
-	if err != nil {
-		return removed, fmt.Errorf("storage: garbage collection: %w", err)
 	}
 	return removed, nil
+}
+
+// EnsureBucket makes the bucket's physical container exist before the row
+// is written: the object store's bucket is the container the row's name
+// addresses, and a row whose container does not exist would fail its first
+// upload. The name is validated here, and the store's own idempotence — an
+// existing container is success — makes a replay safe.
+func (m *Manager) EnsureBucket(ctx context.Context, bucket string) error {
+	if err := ValidateBucketName(bucket); err != nil {
+		return err
+	}
+	if err := m.store.EnsureBucket(ctx, bucket); err != nil {
+		return fmt.Errorf("storage: ensure bucket %q: %w", bucket, err)
+	}
+	return nil
 }
 
 // resolveBucket maps a bucket name onto its row id, refusing unknown
@@ -468,13 +491,6 @@ func (m *Manager) resolveBucket(ctx context.Context, bucket string) (string, err
 		return "", err
 	}
 	return b.ID, nil
-}
-
-// storePath is the physical backend path for a bucket-scoped file: the
-// bucket name, then the key. Both drivers use it unchanged, so the local
-// tree and the S3 prefix mirror the public `/storage/{bucket}/{key}` path.
-func storePath(bucket, key string) string {
-	return bucket + "/" + key
 }
 
 // sameHash compares two content hashes in constant time: a hash is an

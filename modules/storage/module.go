@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/appconfig"
 )
 
@@ -41,6 +42,11 @@ var Package = do.Package(
 		// the catalog.
 		if settings, err := do.Invoke[*appconfig.Settings](i); err == nil && settings != nil {
 			service.WithSettings(settings)
+		}
+		// The engine is infrastructure: the container provisioning rides it,
+		// and a wiring without one creates the row alone.
+		if manager, err := do.Invoke[*storage.Manager](i); err == nil && manager != nil {
+			service.WithEngine(manager)
 		}
 		return service, nil
 	}),

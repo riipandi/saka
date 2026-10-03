@@ -249,6 +249,11 @@ const (
 	// into when a feature names none. A deletion of the bucket this setting
 	// names is refused, so changing the selection is the way out.
 	SettingStorageDefaultBucket = "storage.default_bucket"
+
+	// SettingStorageSignedURLExpires is how many seconds a presigned link
+	// to a stored object stays valid, when a deployment fronts the object
+	// store with links instead of the served path.
+	SettingStorageSignedURLExpires = "storage.signed_url_expires"
 )
 
 // Catalog declares every setting this deployment knows. It is the contract
@@ -468,8 +473,13 @@ func Catalog() []SettingDef {
 		},
 		{
 			Key:         SettingStorageDefaultBucket,
-			Default:     "default",
+			Default:     "devbucket",
 			Description: "The bucket the stage path writes into when a feature names none. A deletion of the bucket this setting names is refused, so changing the selection is the way out of it.",
+		},
+		{
+			Key:         SettingStorageSignedURLExpires,
+			Default:     "3600",
+			Description: "How many seconds a presigned link to a stored object stays valid, when a deployment fronts the object store with links instead of the served path.",
 		},
 	}
 }

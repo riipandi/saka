@@ -29,7 +29,7 @@ const fileUploadProbePage = `<!doctype html>
 The token is the access token a sign-in answers with:
 <code>scripts/curl-rpc.sh http://localhost:3080/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
 <field><input id="token" size="80" placeholder="access token"></field>
-<field><input id="bucket" size="30" value="default"></field>
+<field><input id="bucket" size="30" value="devbucket"></field>
 <field><input id="key" size="40" placeholder="object key, e.g. logo.png"></field>
 <field><input id="file" type="file"></field>
 <button id="upload" data-testid="upload">Upload</button>

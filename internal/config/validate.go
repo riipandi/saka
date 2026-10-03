@@ -295,8 +295,6 @@ func (c Config) Validate() error {
 	// run at all.
 	if c.Storage.Driver == StorageS3 {
 		s3 := c.Storage.S3
-		check(s3.BucketName != "", "storage.s3.bucket_name: %s",
-			c.unsetNote("storage.s3.bucket_name", "must not be empty when storage.driver is s3"))
 		check(s3.Region != "", "storage.s3.region: %s",
 			c.unsetNote("storage.s3.region", "must not be empty when storage.driver is s3"))
 		check(s3.AccessKey != "", "storage.s3.access_key: %s",
@@ -305,13 +303,6 @@ func (c Config) Validate() error {
 			c.unsetNote("storage.s3.secret_key", "must not be empty when storage.driver is s3"))
 		check(s3.EndpointURL == "" || isHTTPURL(s3.EndpointURL),
 			"storage.s3.endpoint_url: %q must be an absolute http or https URL", s3.EndpointURL)
-		// The protocol caps a signed link at seven days, and the client takes a
-		// zero as "use my own fifteen-minute default" rather than as a
-		// lifetime, so both ends are held here instead of failing at signing
-		// time.
-		check(s3.SignedURLExpires > 0 && s3.SignedURLExpires <= maxS3SignedURLExpires,
-			"storage.s3.signed_url_expires: %s must be between 1s and %s",
-			s3.SignedURLExpires, maxS3SignedURLExpires)
 	}
 
 	checkAuth(&c, check)
@@ -456,11 +447,6 @@ func (c Config) kvStoreDrivers() []string {
 	return keys
 }
 
-// maxS3SignedURLExpires is the longest lifetime a presigned URL may carry. The
-// S3 protocol caps a signed link at seven days; a client that asked for longer
-// would be refused by the server at signing time, so the limit is enforced where
-// the value is read.
-const maxS3SignedURLExpires = 7 * 24 * time.Hour
 
 // JWTAlgorithmMaterialError reports a named auth.jwt_algorithm whose signing
 // material is missing. nil means the algorithm is unset (the material then

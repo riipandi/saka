@@ -13,7 +13,7 @@ import (
 
 // DefaultBucketName is the bucket every storage feature writes into until an
 // administrator changes the default selection in the settings.
-const DefaultBucketName = "default"
+const DefaultBucketName = "devbucket"
 
 // ErrNoBucket is what Resolve answers for a bucket name that does not exist.
 var ErrNoBucket = errors.New("storage: no bucket")
@@ -57,8 +57,10 @@ func (Buckets) Resolve(ctx context.Context, q datastore.Querier, name string) (B
 
 // ValidateBucketName checks a bucket name against the one path-segment rule
 // a bucket name must satisfy: a lowercase slug of letters, digits, dash, and
-// underscore, and not one of the data-directory names the engine reserves
-// for itself — those live beside the bucket directories on disk.
+// underscore. The name is the container the backend addresses the file by —
+// a directory under the uploads subtree on disk, a bucket on the object
+// store — and the first segment of every `/storage` URL, so nothing outside
+// one segment can be a name.
 func ValidateBucketName(name string) error {
 	if err := ValidateKey(name); err != nil {
 		return fmt.Errorf("storage: invalid bucket name %q: %w", name, ErrInvalidKey)
@@ -66,11 +68,34 @@ func ValidateBucketName(name string) error {
 	if name != strings.ToLower(name) {
 		return fmt.Errorf("storage: bucket name %q must be lowercase", name)
 	}
-	switch name {
-	case "staging", "logs", "backup", "config", "files":
-		return fmt.Errorf("storage: bucket name %q is reserved", name)
-	}
 	return nil
+}
+
+// Names answers every bucket's name, oldest first. It is the list of
+// containers the garbage collection walks — the rows are the record of
+// which containers the engine created.
+func (Buckets) Names(ctx context.Context, q datastore.Querier) ([]string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("name")
+	sb.From(bucketsTable)
+	sb.OrderBy("created_at")
+
+	query, args := sb.Build()
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list bucket names: %w", err)
+	}
+	defer rows.Close()
+
+	names := []string{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("storage: scan bucket name: %w", err)
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
 }
 
 // SplitRef splits a bucket-scoped reference (`bucket/key`) into its bucket

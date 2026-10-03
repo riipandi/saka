@@ -408,9 +408,8 @@ func Default() Config {
 				// Disabled by default along with the driver, but the values
 				// point at the service compose starts, so switching the driver
 				// is the only step needed.
-				ForcePathStyle:   true,
-				Region:           DefaultS3Region,
-				SignedURLExpires: time.Hour,
+				ForcePathStyle: true,
+				Region:         DefaultS3Region,
 			},
 		},
 		Webhook: Webhook{

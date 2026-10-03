@@ -406,36 +406,14 @@ func TestSampleWritesTheS3KeysAsDirectives(t *testing.T) {
 	// Every S3 key a deployment sets is written as a directive naming its
 	// conventional variable, so the file carries no credential and a deployment
 	// fills the section without editing it. The two secrets are covered by the
-	// secret test; this is the rest of the section.
+	// secret test; this is the rest of the section. The bucket's name is not
+	// here — the storage_buckets rows are the buckets, so the section carries
+	// no bucket key.
 	flat := sampleDoc(t)
 
-	assert.Equal(t, "env:STORAGE_S3_BUCKET_NAME", flat["storage.s3.bucket_name"])
+	assert.NotContains(t, flat, "storage.s3.bucket_name")
 	assert.Equal(t, "env:STORAGE_S3_ENDPOINT_URL", flat["storage.s3.endpoint_url"])
 	assert.Equal(t, "env:STORAGE_S3_REGION", flat["storage.s3.region"])
-}
-
-func TestSampleWritesThePathPrefixAsAnEmptyString(t *testing.T) {
-	// An empty prefix means "no prefix", and the empty string says so without
-	// a second JSON shape: a null in the file would be a type the schema and
-	// every editor have to special-case for one key's sake.
-	raw, err := Sample()
-	require.NoError(t, err)
-
-	var doc map[string]any
-	require.NoError(t, json.Unmarshal(raw, &doc))
-
-	storage, ok := doc["storage"].(map[string]any)
-	require.True(t, ok)
-	s3, ok := storage["s3"].(map[string]any)
-	require.True(t, ok)
-
-	value, present := s3["path_prefix"]
-	assert.True(t, present, "the key must be discoverable in the file")
-	assert.Equal(t, "", value, "an empty prefix is written as an empty string")
-
-	// The empty value must not disturb the keys around it.
-	assert.Equal(t, true, s3["force_path_style"])
-	assert.Equal(t, float64(3600), s3["signed_url_expires"])
 }
 
 func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
@@ -453,7 +431,6 @@ func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
 			"DATABASE_URL=" + probeDSN,
 			"AUTH_SECRET_KEY=" + probeSecret,
 			"APP_SECRET_KEY=" + probeSecret,
-			"STORAGE_S3_BUCKET_NAME=devbucket",
 			"STORAGE_S3_ENDPOINT_URL=http://localhost:9100",
 			"STORAGE_S3_REGION=us-east-1",
 			"STORAGE_S3_ACCESS_KEY=s3admin",
@@ -464,10 +441,7 @@ func TestSampleS3SectionResolvesToTheDefaults(t *testing.T) {
 
 	defaults := Default()
 	assert.Equal(t, defaults.Storage.S3.ForcePathStyle, cfg.Storage.S3.ForcePathStyle)
-	assert.Equal(t, defaults.Storage.S3.SignedURLExpires, cfg.Storage.S3.SignedURLExpires)
-	assert.Equal(t, "", cfg.Storage.S3.PathPrefix, "a null leaves the default")
 
-	assert.Equal(t, "devbucket", cfg.Storage.S3.BucketName)
 	assert.Equal(t, "http://localhost:9100", cfg.Storage.S3.EndpointURL)
 	assert.Equal(t, "us-east-1", cfg.Storage.S3.Region)
 	assert.Equal(t, "s3admin", cfg.Storage.S3.AccessKey)

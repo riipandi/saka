@@ -378,7 +378,7 @@ func TestValidationLeavesTheS3SectionAloneOnTheLocalDriver(t *testing.T) {
 
 	// Even a value that would be refused on the S3 driver is ignored.
 	require.NoError(t, resolveFile(t, `"storage": {"driver": "local",
-		"s3": {"bucket_name": "", "endpoint_url": "not-a-url", "signed_url_expires": 0}}`))
+		"s3": {"endpoint_url": "not-a-url"}}`))
 }
 
 func TestValidationRequiresTheS3SettingsWhenTheDriverIsS3(t *testing.T) {
@@ -386,12 +386,13 @@ func TestValidationRequiresTheS3SettingsWhenTheDriverIsS3(t *testing.T) {
 	// request cannot be made without are then required.
 	//
 	// The region is not among them: it has a concrete default, so an unset
-	// variable leaves a usable value rather than an empty one.
+	// variable leaves a usable value rather than an empty one. Neither is
+	// the bucket: the buckets table is the bucket list, and the section
+	// carries no bucket key at all.
 	err := resolveFile(t, `"storage": {"driver": "s3"}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 
 	for _, key := range []string{
-		"storage.s3.bucket_name",
 		"storage.s3.access_key",
 		"storage.s3.secret_key",
 	} {
@@ -410,8 +411,7 @@ func TestValidationFallsBackToARegionTheClientWillAccept(t *testing.T) {
 			"database": {"url": "env:DATABASE_URL"},
 			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
 			"storage": {"driver": "s3",
-				"s3": {"bucket_name": "devbucket",
-					"region": "env:STORAGE_S3_REGION",
+				"s3": {"region": "env:STORAGE_S3_REGION",
 					"access_key": "s3admin", "secret_key": "s3passw0rd"}}
 		}`),
 		Environ: baseEnv(),
@@ -421,7 +421,7 @@ func TestValidationFallsBackToARegionTheClientWillAccept(t *testing.T) {
 	// An explicitly empty region is a different matter: the user named the key
 	// and gave it no value, which the client would reject at request time.
 	err = resolveFile(t, `"storage": {"driver": "s3",
-		"s3": {"bucket_name": "b", "region": "",
+		"s3": {"region": "",
 			"access_key": "k", "secret_key": "s"}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "storage.s3.region")
@@ -435,21 +435,19 @@ func TestValidationNamesTheUnsetS3Variable(t *testing.T) {
 			"database": {"url": "env:DATABASE_URL"},
 			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
 			"storage": {"driver": "s3",
-				"s3": {"bucket_name": "env:STORAGE_S3_BUCKET_NAME",
-					"region": "us-east-1",
+				"s3": {"region": "us-east-1",
 					"access_key": "env:STORAGE_S3_ACCESS_KEY",
 					"secret_key": "env:STORAGE_S3_SECRET_KEY"}}
 		}`),
 		Environ: baseEnv(),
 	})
 	require.ErrorIs(t, err, config.ErrInvalid)
-	assert.Contains(t, err.Error(), "STORAGE_S3_BUCKET_NAME variable is not set")
 	assert.Contains(t, err.Error(), "STORAGE_S3_ACCESS_KEY variable is not set")
 }
 
 func TestValidationAcceptsAnS3Deployment(t *testing.T) {
 	err := resolveFile(t, `"storage": {"driver": "s3",
-		"s3": {"bucket_name": "devbucket", "region": "us-east-1",
+		"s3": {"region": "us-east-1",
 			"access_key": "s3admin", "secret_key": "s3passw0rd"}}`)
 	assert.NoError(t, err)
 }
@@ -458,7 +456,7 @@ func TestValidationAcceptsAnAWSStyleDeploymentWithoutAnEndpoint(t *testing.T) {
 	// An empty endpoint means AWS, reached through the region alone; that is a
 	// complete configuration, not a missing one.
 	err := resolveFile(t, `"storage": {"driver": "s3",
-		"s3": {"bucket_name": "devbucket", "region": "eu-west-1",
+		"s3": {"region": "eu-west-1",
 			"access_key": "AKIAEXAMPLE", "secret_key": "s3passw0rd",
 			"force_path_style": false}}`)
 	assert.NoError(t, err)
@@ -466,35 +464,11 @@ func TestValidationAcceptsAnAWSStyleDeploymentWithoutAnEndpoint(t *testing.T) {
 
 func TestValidationRejectsAnS3EndpointThatIsNotAURL(t *testing.T) {
 	err := resolveFile(t, `"storage": {"driver": "s3",
-		"s3": {"bucket_name": "b", "region": "us-east-1",
+		"s3": {"region": "us-east-1",
 			"access_key": "k", "secret_key": "s",
 			"endpoint_url": "localhost:9100"}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "storage.s3.endpoint_url")
-}
-
-func TestValidationHoldsTheSignedURLLifetimeInsideSevenDays(t *testing.T) {
-	// The client takes a zero as "use my own default" rather than as a
-	// lifetime, and the protocol caps a link at seven days, so both ends are
-	// rejected here instead of failing at signing time.
-	for _, seconds := range []int{-1, 0, 604801} {
-		body := `"storage": {"driver": "s3",
-			"s3": {"bucket_name": "b", "region": "us-east-1",
-				"access_key": "k", "secret_key": "s",
-				"signed_url_expires": ` + strconv.Itoa(seconds) + `}}`
-		err := resolveFile(t, body)
-		require.ErrorIs(t, err, config.ErrInvalid, "signed_url_expires=%d", seconds)
-		assert.Contains(t, err.Error(), "storage.s3.signed_url_expires")
-	}
-
-	// The boundaries themselves are valid.
-	for _, seconds := range []int{1, 3600, 604800} {
-		body := `"storage": {"driver": "s3",
-			"s3": {"bucket_name": "b", "region": "us-east-1",
-				"access_key": "k", "secret_key": "s",
-				"signed_url_expires": ` + strconv.Itoa(seconds) + `}}`
-		assert.NoError(t, resolveFile(t, body), "signed_url_expires=%d", seconds)
-	}
 }
 
 func TestValidationLeavesTheFileSinkAloneUntilTheTransportNamesIt(t *testing.T) {
@@ -737,9 +711,8 @@ func TestRedactedHidesTheS3Credentials(t *testing.T) {
 	}
 	assert.NotContains(t, cfg.String(), "wJalrXUtnFEMI")
 
-	// The bucket and the endpoint are not secrets: a report that hid them could
-	// not say which bucket it was describing.
-	assert.Equal(t, cfg.Storage.S3.BucketName, cfg.Redacted().Storage.S3.BucketName)
+	// The endpoint is not a secret: a report that hid it could not say which
+	// store it was describing.
 	assert.Equal(t, cfg.Storage.S3.EndpointURL, cfg.Redacted().Storage.S3.EndpointURL)
 }
 
@@ -811,3 +784,4 @@ func TestTheAlgorithmMaterialRuleIsShared(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), `auth.jwt_algorithm: "HS256" requires auth.secret_key`)
 }
+

@@ -15,17 +15,23 @@ implemented in-house) is the engine's client surface.
 
 A **bucket** is a row in `storage_buckets`: a unique name (one path segment, ≤ 100 characters,
 validated in Go), a nullable `file_size_limit`, and a nullable `allowed_mime_types` list (NULL
-= unlimited / any). Every file lives inside one bucket — the local backend writes
-`storage.local_path/{bucket}/{key}`, the S3 driver writes `{path_prefix}/{bucket}/{key}`, and
-staging is `staging/{bucket}/{key}`. The seeded `default` bucket is where a feature that does
-not care about buckets lands; the `storage.default_bucket` appconfig setting can name another.
+= unlimited / any). Every file lives inside one bucket — the name is the container the backend
+addresses the file by: the local backend writes `storage.local_path/uploads/{bucket}/{key}`
+(the engine's own subtrees `staging/`, `logs/`, `backup/`, `config/` sit beside `uploads/` at
+the top level), the S3 driver writes into the bucket of the same name — the logical bucket and
+the physical one are the same, so `{endpoint}/{bucket}/{key}` is the object's own URL under
+path style. The seeded `devbucket` bucket is where a feature that does not care about buckets
+lands; the `storage.default_bucket` appconfig setting can name another.
 `modules/storage` (`saka.storage.v1.BucketService`) is the Admin-gated CRUD over the rows;
-deletion refuses a non-empty bucket and the setting-named one.
+a creation provisions the physical container through `EnsureBucket` before the row is written,
+and deletion refuses a non-empty bucket and the setting-named one.
 
 ## Features
 
 - **Whole-file storage** — a staged file is hashed (SHA-256 of the whole file) and stored
-  under its bucket-scoped key; both drivers keep the same `/{bucket}/{key}` tree
+  under its bucket-scoped key; both drivers keep the same `/{bucket}/{key}` tree, the local
+  one under `storage.local_path/uploads/{bucket}/{key}`, the S3 one in the bucket the row
+  names
 - **Manifest in PostgreSQL** — `storage_objects` (migration `00009`, `UNIQUE (bucket_id, key)`,
   FK ON DELETE RESTRICT) is the durable record; the content hash is the one-value "the backend
   already holds these bytes" check
@@ -244,13 +250,16 @@ removed, err := manager.CollectGarbage(ctx)
 | Key                  | Default   | Description                                                                     |
 | -------------------- | --------- | ------------------------------------------------------------------------------- |
 | `storage.driver`     | `local`   | `local` or `s3`; only the selected backend's client is built                     |
-| `storage.local_path` | `storage` | The one data directory: the buckets, `staging/`, and the log sink live under it |
-| `storage.s3.*`       | —         | `access_key`, `secret_key` (both secrets), `bucket_name`, `endpoint_url`, `force_path_style`, `path_prefix`, `region` |
+| `storage.local_path` | `storage` | The one data directory: `uploads/` (the buckets), `staging/`, and the log sink live under it |
+| `storage.s3.*`       | —         | `access_key`, `secret_key` (both secrets), `endpoint_url`, `force_path_style`, `region` |
 
 There is no watcher section — the settle mechanisms are the deterministic enqueue, the boot
-sweep, and the expiry job. The local path needs no flag and no variable of its own — a
-deployment sets it in the config file. Postgres plus local storage are enough; no backend is
-required.
+sweep, and the expiry job. There is no bucket key either: the `storage_buckets` rows are the
+buckets, and the object store's containers are created (idempotently) through `EnsureBucket`
+when the management surface creates a row. The presigned-link lifetime is the
+`storage.signed_url_expires` appconfig setting, not a config-file key. The local path needs no
+flag and no variable of its own — a deployment sets it in the config file. Postgres plus local
+storage are enough; no backend is required.
 
 ### Manager construction
 
@@ -323,10 +332,11 @@ composite the queue and the logs carry.
 
 ### `Store`
 
-The backend contract: `Get`, `Put` (whole, with the byte size), `Delete`, `List`.
-`storage.New(cfg)` builds the one the `storage.driver` section names (`FS` over
-`storage.local_path`, `S3` over `storage.s3.*`); both translate their protocol's not-found
-shape into `ErrNotFound` at the edge.
+The backend contract: `EnsureBucket` (the container, idempotent), `Get`, `Put` (whole, with
+the byte size), `Delete`, `List` (one bucket's keys). Every method carries the bucket the
+file belongs to — the storage_buckets row's own name. `storage.New(cfg)` builds the one the
+`storage.driver` section names (`FS` over `storage.local_path`, `S3` over `storage.s3.*`);
+both translate their protocol's not-found shape into `ErrNotFound` at the edge.
 
 ## Database Schema
 

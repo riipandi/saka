@@ -115,7 +115,6 @@ var envKeys = map[string]string{
 	"otel.tracing.enable":              "OTEL_TRACING_ENABLE",
 	"server.host":                      "SERVER_HOST",
 	"server.port":                      "SERVER_PORT",
-	"storage.s3.bucket_name":           "STORAGE_S3_BUCKET_NAME",
 	"storage.s3.endpoint_url":          "STORAGE_S3_ENDPOINT_URL",
 	"storage.s3.region":                "STORAGE_S3_REGION",
 }
@@ -142,7 +141,6 @@ var envExampleValues = map[string]string{
 	"mailer.smtp_username":             "maileruser1",
 	"otel.headers":                     "Authorization=Basic YWRtaW5AZXhhbXBsZS5jb206QGRtaW4xMjM=",
 	"storage.s3.access_key":            "s3admin",
-	"storage.s3.bucket_name":           "devbucket",
 	"storage.s3.endpoint_url":          "http://localhost:9100",
 	"storage.s3.region":                "auto",
 	"storage.s3.secret_key":            "s3passw0rd",

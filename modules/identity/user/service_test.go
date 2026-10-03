@@ -19,10 +19,7 @@ import (
 	"log/slog"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	awshttp "github.com/aws/smithy-go/transport/http"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/storage"
@@ -65,7 +62,7 @@ func testPictureService(t *testing.T, pool *datastore.Postgres) (*Service, *stor
 	t.Helper()
 
 	if _, err := pool.Exec(t.Context(),
-		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); err != nil {
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
 	manager := storage.NewManager(storage.NewFS(t.TempDir()), pool,
@@ -570,7 +567,7 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 
 	// The engine holds the file whole under the key the row names — the
 	// same tree of keys both drivers keep.
-	stored, err := pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
+	stored, err := pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err)
 	storedBody, err := io.ReadAll(stored)
 	require.NoError(t, err)
@@ -587,7 +584,7 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&storedPath))
 	require.NotNil(t, storedPath)
 	// The row names the bucket-scoped reference the engine stores under.
-	assert.Equal(t, "default/avatars/"+rowID(t, created.ID)+".png", *storedPath)
+	assert.Equal(t, "devbucket/avatars/"+rowID(t, created.ID)+".png", *storedPath)
 }
 
 // TestPictureUpdateMovesTheKeyWhenTheKindChanges pins the naming contract: the
@@ -607,18 +604,18 @@ func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
 
 	png := append([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, []byte("first")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, png))
-	pngKey := "default/avatars/" + rowID(t, created.ID) + ".png"
+	pngKey := "devbucket/avatars/" + rowID(t, created.ID) + ".png"
 	assert.Equal(t, pngKey, storedPictureKey(t, pool, created.ID))
 
 	// The second upload is another kind, so it lands under another key.
 	jpeg := append([]byte{0xff, 0xd8, 0xff}, []byte("second")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, jpeg))
-	jpegKey := "default/avatars/" + rowID(t, created.ID) + ".jpg"
+	jpegKey := "devbucket/avatars/" + rowID(t, created.ID) + ".jpg"
 	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
 
 	// The replaced picture left the engine whole: no object answers its key,
 	// and no manifest row keeps the garbage collection from ever sweeping it.
-	_, err = pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
+	_, err = pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 	// The manifest row left with the object: a row without a file is what
 	// the garbage collection keeps a key for, so one that lingered would
@@ -714,7 +711,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 	assert.Nil(t, storedPath)
 
 	// The file left the engine: no read answers the key anymore.
-	_, err = pictures.Open(t.Context(), "default", "avatars/"+rowID(t, created.ID)+".png")
+	_, err = pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -743,7 +740,7 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	// from underneath the engine — the state another driver's tree leaves.
 	root := t.TempDir()
 	if _, seedErr := pool.Exec(t.Context(),
-		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
 		t.Fatal(seedErr)
 	}
 	manager := storage.NewManager(storage.NewFS(root), pool,
@@ -759,12 +756,13 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, picture))
 
 	// The object leaves the backend while the manifest row stays: exactly
-	// the state another driver's tree produces.
+	// the state another driver's tree produces. The file lives under the
+	// uploads container, `uploads/{bucket}/{key}`.
 	key := storedPictureKey(t, pool, created.ID)
-	require.NoError(t, os.Remove(filepath.Join(root, filepath.FromSlash(key))))
+	require.NoError(t, os.Remove(filepath.Join(root, "uploads", filepath.FromSlash(key))))
 	var bucketID string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT id FROM storage_buckets WHERE name = 'default'`).Scan(&bucketID))
+		`SELECT id FROM storage_buckets WHERE name = 'devbucket'`).Scan(&bucketID))
 	_, err = storage.NewManifests().Load(t.Context(), pool, bucketID, "avatars/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err, "the manifest row outlives the object")
 
@@ -797,7 +795,8 @@ func TestPictureRefusesAnUnknownAccount(t *testing.T) {
 // TestThePictureFlowLandsOnS3 runs the same update through the S3-compatible
 // backend — the local driver's twin — and reads the bytes back through the
 // engine, so the picture procedures are indifferent to the store they are
-// given.
+// given. The picture feature writes into the engine's default bucket, so
+// the physical bucket the container gets is that row's own name.
 func TestThePictureFlowLandsOnS3(t *testing.T) {
 	testutils.SkipWithoutDocker(t)
 
@@ -806,36 +805,17 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	store, err := storage.NewS3(config.S3{
 		AccessKey:      backend.AccessKey,
 		SecretKey:      backend.Secret,
-		BucketName:     "saka-user-test",
 		EndpointURL:    backend.Endpoint,
 		ForcePathStyle: true,
 		Region:         "us-east-1",
-		PathPrefix:     "saka-user-test/",
 	})
 	require.NoError(t, err)
-	// The shared container starts empty: the bucket is this test's to make,
-	// and an existing one is fine. The client is built over the same
-	// endpoint the store addresses — the store itself owns no bucket.
-	awsCfg, err := awsconfig.LoadDefaultConfig(t.Context(), awsconfig.WithRegion("us-east-1"),
-		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			backend.AccessKey, backend.Secret, "")),
-		awsconfig.WithBaseEndpoint(backend.Endpoint))
-	require.NoError(t, err)
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) { o.UsePathStyle = true })
-	if _, bucketErr := client.CreateBucket(t.Context(), &s3.CreateBucketInput{
-		Bucket: awssdk.String("saka-user-test"),
-	}); bucketErr != nil {
-		var apiErr *awshttp.ResponseError
-		if !errors.As(bucketErr, &apiErr) || apiErr.HTTPStatusCode() != 409 {
-			require.NoError(t, bucketErr)
-		}
-	}
-
 	if _, seedErr := pool.Exec(t.Context(),
-		`INSERT INTO storage_buckets (name) VALUES ('default') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
 		t.Fatal(seedErr)
 	}
 	manager := storage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
+	require.NoError(t, manager.EnsureBucket(t.Context(), "devbucket"))
 	service := NewService(pool, nil, nil, manager)
 
 	created, err := service.CreateUser(t.Context(), CreateParams{
@@ -859,26 +839,16 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 
 	// The bucket holds the final file at the key — the same tree the local
 	// driver keeps — and nothing else: no chunk-shaped object ever lands
-	// beside it.
-	listed, err := client.ListObjectsV2(t.Context(), &s3.ListObjectsV2Input{
-		Bucket: awssdk.String("saka-user-test"),
-		Prefix: awssdk.String("saka-user-test/"),
-	})
+	// beside it. The object key carries no prefix: the bucket is the
+	// namespace the row names.
+	listed, err := storeList(t.Context(), backend, "devbucket", "")
 	require.NoError(t, err)
-	var keys []string
-	for _, item := range listed.Contents {
-		keys = append(keys, awssdk.ToString(item.Key))
-	}
-	assert.Equal(t,
-		[]string{"saka-user-test/default/avatars/" + rowID(t, created.ID) + ".png"}, keys)
+	assert.Equal(t, []string{"avatars/" + rowID(t, created.ID) + ".png"}, listed)
 
 	// The object carries the feature's content type: a direct read of the
 	// bucket — a presigned URL, a console preview — answers what the
 	// bytes are without consulting the manifest.
-	headed, err := client.HeadObject(t.Context(), &s3.HeadObjectInput{
-		Bucket: awssdk.String("saka-user-test"),
-		Key:    awssdk.String("saka-user-test/default/avatars/" + rowID(t, created.ID) + ".png"),
-	})
+	headed, err := storeHead(t.Context(), backend, "devbucket", "avatars/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err)
 	assert.Equal(t, "image/png", awssdk.ToString(headed.ContentType))
 
@@ -892,12 +862,42 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 
 	// The reset emptied the bucket: the object left with the account's
 	// key, the same state a local reset lands in.
-	listed, err = client.ListObjectsV2(t.Context(), &s3.ListObjectsV2Input{
-		Bucket: awssdk.String("saka-user-test"),
-		Prefix: awssdk.String("saka-user-test/"),
-	})
+	listed, err = storeList(t.Context(), backend, "devbucket", "")
 	require.NoError(t, err)
-	assert.Empty(t, listed.Contents)
+	assert.Empty(t, listed)
+}
+
+// storeList lists one physical bucket through the raw S3 client, the view
+// the engine's driver answers to.
+func storeList(ctx context.Context, backend *testutils.MinIO, bucket, prefix string) ([]string, error) {
+	client, err := backend.Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	listed, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: awssdk.String(bucket),
+		Prefix: awssdk.String(prefix),
+	})
+	if err != nil {
+		return nil, err
+	}
+	keys := []string{}
+	for _, item := range listed.Contents {
+		keys = append(keys, awssdk.ToString(item.Key))
+	}
+	return keys, nil
+}
+
+// storeHead reads one object's headers through the raw S3 client.
+func storeHead(ctx context.Context, backend *testutils.MinIO, bucket, key string) (*s3.HeadObjectOutput, error) {
+	client, err := backend.Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: awssdk.String(bucket),
+		Key:    awssdk.String(key),
+	})
 }
 
 // TestPictureProceduresRefuseARunWithoutTheEngine covers the deployment that

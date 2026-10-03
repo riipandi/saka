@@ -283,14 +283,11 @@ type PublishedWebhook struct {
 // PublishedS3 is the object-storage settings. Both credentials are
 // published only as their redactions.
 type PublishedS3 struct {
-	AccessKey        string   `json:"access_key,omitzero"`
-	SecretKey        string   `json:"secret_key,omitzero"`
-	BucketName       string   `json:"bucket_name,omitzero"`
-	EndpointURL      string   `json:"endpoint_url,omitzero"`
-	ForcePathStyle   bool     `json:"force_path_style,omitzero"`
-	PathPrefix       string   `json:"path_prefix,omitzero"`
-	Region           string   `json:"region,omitzero"`
-	SignedURLExpires Duration `json:"signed_url_expires,omitzero"`
+	AccessKey      string `json:"access_key,omitzero"`
+	SecretKey      string `json:"secret_key,omitzero"`
+	EndpointURL    string `json:"endpoint_url,omitzero"`
+	ForcePathStyle bool   `json:"force_path_style,omitzero"`
+	Region         string `json:"region,omitzero"`
 }
 
 // publishedSecretRender renders a secret for the published document. An
@@ -482,14 +479,11 @@ func (c Config) Published(full bool) Published {
 		Driver:    c.Storage.Driver,
 		LocalPath: c.Storage.LocalPath,
 		S3: PublishedS3{
-			AccessKey:        sealed.Storage.S3.AccessKey,
-			SecretKey:        sealed.Storage.S3.SecretKey,
-			BucketName:       c.Storage.S3.BucketName,
-			EndpointURL:      c.Storage.S3.EndpointURL,
-			ForcePathStyle:   c.Storage.S3.ForcePathStyle,
-			PathPrefix:       c.Storage.S3.PathPrefix,
-			Region:           c.Storage.S3.Region,
-			SignedURLExpires: seconds(c.Storage.S3.SignedURLExpires),
+			AccessKey:      sealed.Storage.S3.AccessKey,
+			SecretKey:      sealed.Storage.S3.SecretKey,
+			EndpointURL:    c.Storage.S3.EndpointURL,
+			ForcePathStyle: c.Storage.S3.ForcePathStyle,
+			Region:         c.Storage.S3.Region,
 		},
 	}
 	public.Webhook = PublishedWebhook{

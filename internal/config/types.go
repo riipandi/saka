@@ -633,8 +633,6 @@ type S3 struct {
 	// so Redacted hides them and Sample writes them as directives.
 	AccessKey string `koanf:"access_key" json:"access_key"`
 	SecretKey string `koanf:"secret_key" json:"secret_key"`
-	// BucketName is the bucket objects are written to.
-	BucketName string `koanf:"bucket_name" json:"bucket_name"`
 	// EndpointURL is the base URL of a service other than AWS, such as
 	// http://localhost:9100. Empty means AWS, addressed through Region.
 	EndpointURL string `koanf:"endpoint_url" json:"endpoint_url"`
@@ -643,15 +641,10 @@ type S3 struct {
 	// client does not fall back on its own, and bucket.localhost does not
 	// resolve.
 	ForcePathStyle bool `koanf:"force_path_style" json:"force_path_style"`
-	// PathPrefix is the key prefix objects are stored under. Empty means the
-	// bucket root.
-	PathPrefix string `koanf:"path_prefix" json:"path_prefix"`
 	// Region is the signing region. It is required even when EndpointURL is
 	// set, because the client refuses to resolve an endpoint without one, so
 	// the default is a usable value rather than an empty string.
 	Region string `koanf:"region" json:"region"`
-	// SignedURLExpires is how long a presigned link stays valid.
-	SignedURLExpires time.Duration `koanf:"signed_url_expires" json:"signed_url_expires"`
 }
 
 // Webhook holds the outbound webhook delivery settings.

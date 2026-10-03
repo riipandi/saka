@@ -64,7 +64,7 @@ func TestDefaultBucketSeedsWithTheRest(t *testing.T) {
 	// The literal pins the seeded name itself: a constant renamed without the
 	// row would fail loudly here.
 	assert.Equal(t, 1, countRows(t, pool,
-		`SELECT count(*) FROM public.storage_buckets WHERE name = 'default'`))
+		`SELECT count(*) FROM public.storage_buckets WHERE name = 'devbucket'`))
 }
 
 // TestDefaultBucketSeederDryRunReportsWithoutWriting pins the dry run: the

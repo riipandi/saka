@@ -23,7 +23,7 @@ import (
 
 // testBucket is the bucket every manager test stages into; newManager seeds
 // its row, so the manifest's bucket foreign key is satisfied.
-const testBucket = "default"
+const testBucket = "devbucket"
 
 // migratedPool applies the migrations to a fresh test database and returns
 // the pool the manager's manifest reads and writes go through.
@@ -105,9 +105,9 @@ func TestManagerSyncStoresTheManifestAndDropsTheStagingFile(t *testing.T) {
 	require.NoError(t, reader.Close())
 	assert.Equal(t, data, got)
 
-	paths, err := listedKeys(ctx, store)
+	keys, err := listedKeys(ctx, store, testBucket)
 	require.NoError(t, err)
-	assert.Equal(t, []string{testBucket + "/docs/report.txt"}, paths)
+	assert.Equal(t, []string{"docs/report.txt"}, keys)
 }
 
 // TestTheManifestAnswersTheObjectIdInItsWireForm pins the identifier's wire
@@ -158,9 +158,9 @@ func TestManagerSyncOfTheSameBytesIsAShortCircuit(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, reader.Close())
 	assert.Equal(t, data, got)
-	paths, err := listedKeys(ctx, store)
+	keys, err := listedKeys(ctx, store, testBucket)
 	require.NoError(t, err)
-	assert.Equal(t, []string{testBucket + "/k"}, paths)
+	assert.Equal(t, []string{"k"}, keys)
 }
 
 func TestManagerReuploadReplacesTheObjectWhole(t *testing.T) {
@@ -192,9 +192,9 @@ func TestManagerReuploadReplacesTheObjectWhole(t *testing.T) {
 
 	// Exactly one object answers the key tree — the old version did not
 	// survive under a second name.
-	paths, err := listedKeys(ctx, store)
+	keys, err := listedKeys(ctx, store, testBucket)
 	require.NoError(t, err)
-	assert.Equal(t, []string{testBucket + "/k"}, paths)
+	assert.Equal(t, []string{"k"}, keys)
 }
 
 func TestManagerDeleteRemovesTheObjectAndTheRow(t *testing.T) {
@@ -210,9 +210,9 @@ func TestManagerDeleteRemovesTheObjectAndTheRow(t *testing.T) {
 	_, err := manager.Open(ctx, testBucket, "left")
 	assert.ErrorIs(t, err, ErrNotFound)
 
-	paths, err := listedKeys(ctx, store)
+	keys, err := listedKeys(ctx, store, testBucket)
 	require.NoError(t, err)
-	assert.Empty(t, paths)
+	assert.Empty(t, keys)
 
 	_, err = manager.manifests.Load(ctx, manager.db, manager.mustBucketID(ctx, testBucket), "left")
 	assert.ErrorIs(t, err, ErrNoManifest)
@@ -234,23 +234,30 @@ func TestManagerCollectGarbageRemovesOnlyUnreferencedObjects(t *testing.T) {
 	require.NoError(t, manager.Sync(ctx, testBucket+"/k"))
 
 	// A delete that finished its manifest rows but not its object removal:
-	// the bytes are in the backend, no manifest names them.
+	// the bytes are in the bucket's container, no manifest names them.
 	orphan := []byte("orphaned object bytes")
-	require.NoError(t, store.Put(ctx, "orphans/lost", bytes.NewReader(orphan), int64(len(orphan)), "image/png"))
+	require.NoError(t, store.Put(ctx, testBucket, "lost", bytes.NewReader(orphan), int64(len(orphan)), "image/png"))
 
-	// A foreign object the engine's key vocabulary cannot name: a bucket
-	// shared with another tenant, or the deployment's own stray, is not
-	// the garbage collection's to sweep.
+	// A name the engine's key vocabulary cannot name — the deployment's own
+	// stray inside the bucket — is not the garbage collection's to sweep.
 	foreign := []byte("not the engine's object")
-	require.NoError(t, store.Put(ctx, "Not a key/with spaces", bytes.NewReader(foreign), int64(len(foreign)), "image/png"))
+	require.NoError(t, store.Put(ctx, testBucket, "not a key", bytes.NewReader(foreign), int64(len(foreign)), "image/png"))
+
+	// A container the buckets table does not name is never walked: an
+	// object left in a retired bucket is not the sweep's to find.
+	ghost := []byte("no bucket row names this container")
+	require.NoError(t, store.Put(ctx, "ghost", "lost", bytes.NewReader(ghost), int64(len(ghost)), "image/png"))
 
 	removed, err := manager.CollectGarbage(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 1, removed)
 
-	paths, err := listedKeys(ctx, store)
+	keys, err := listedKeys(ctx, store, testBucket)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"Not a key/with spaces", testBucket + "/k"}, paths)
+	assert.Equal(t, []string{"k", "not a key"}, keys)
+	keys, err = listedKeys(ctx, store, "ghost")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"lost"}, keys)
 }
 
 func TestManagerSyncWithoutAStagingFileIsQuiet(t *testing.T) {
@@ -291,11 +298,11 @@ func (m *Manager) mustBucketID(ctx context.Context, name string) string {
 	return id
 }
 
-// listedKeys reads the backend's own listing, the view the garbage
+// listedKeys reads one bucket's own listing, the view the garbage
 // collection walks.
-func listedKeys(ctx context.Context, store *FS) ([]string, error) {
+func listedKeys(ctx context.Context, store *FS, bucket string) ([]string, error) {
 	var keys []string
-	err := store.List(ctx, func(key string) error {
+	err := store.List(ctx, bucket, func(key string) error {
 		keys = append(keys, key)
 		return nil
 	})

@@ -5,6 +5,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
 )
@@ -17,6 +21,24 @@ type MinIO struct {
 	// AccessKey and Secret are the root credentials.
 	AccessKey string
 	Secret    string
+}
+
+// Client builds a path-style S3 client over the container's endpoint, the
+// same shape the storage driver addresses it with — a test's raw reads and
+// listings speak the protocol, not the engine.
+func (m *MinIO) Client(ctx context.Context) (*s3.Client, error) {
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion("auto"),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			m.AccessKey, m.Secret, "")),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(m.Endpoint)
+		o.UsePathStyle = true
+	}), nil
 }
 
 // minioImage is the S3-compatible object store used by integration tests.

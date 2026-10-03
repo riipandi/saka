@@ -17,7 +17,7 @@ const DefaultBucketSeederName = "DefaultBucketSeeder"
 // DefaultBucketName is the bucket every storage feature writes into until an
 // administrator moves the default selection: the avatar and OIDC-logo keys
 // the engine carries today live under it.
-const DefaultBucketName = "default"
+const DefaultBucketName = "devbucket"
 
 // DefaultBucket returns the seeder that creates the default storage bucket.
 // It runs with the rest of the seed so a fresh database answers the

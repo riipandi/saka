@@ -41,7 +41,6 @@ var durationKeys = []string{
 	"server.read_timeout",
 	"server.shutdown_timeout",
 	"server.write_timeout",
-	"storage.s3.signed_url_expires",
 }
 
 // normalizeDurations reads every duration key of a layer as seconds when it
