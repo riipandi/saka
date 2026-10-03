@@ -1,8 +1,9 @@
 # Architecture
 
 Design notes for the implemented packages. `AGENTS.md` keeps the normative
-rules; this file keeps the reasoning behind them, so a settled decision is not
-re-litigated. Read the section for the package you are changing.
+general rules and `.llms/rules.md` the detailed ones; this file keeps the
+reasoning behind them, so a settled decision is not re-litigated. Read the
+section for the package you are changing.
 
 ## database
 
