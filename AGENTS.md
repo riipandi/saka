@@ -131,10 +131,28 @@ The pinned source of truth is the module cache (`go env GOMODCACHE`). When docs 
 
 - Documents checked into the tree are English: `.llms/` (architecture, audits, handovers), `docs/`, and the rest. `.llms/` is for agents. `docs/` is for people. Chat may follow the user's language. Files do not.
 - Before writing or rewriting that prose, use skill `clarity`. An existing draft is rewrite mode. A new document still carries only claims the tree or the user supplied. Skill `handoff` picks the handover filename and sections. `clarity` is the pass over the sentences. Keep paths, counts, conditions, and rejected alternatives. A reference stays scannable. It does not become an essay.
-- A plan document (`.llms/plan-*.md`) always opens with YAML frontmatter: `status` (`awaiting-approval` until the owner says go, then the phases' own statuses carry progress), `updated` (last revision, timestamp with UTC offset), and `phases` (one entry per phase with `id`, `title`, `status`, and a `note` that carries the decisions and corrections the phase settled; add `commits` once it ships). The frontmatter is the plan's state — update it as phases land, never let the prose and the frontmatter disagree.
-- A plan is executed only on the owner's explicit instruction: never start, resume, or continue a plan automatically, and never run one because it exists. Once running, each independently validated phase commits as it lands — do not wait for the whole plan, and keep each commit limited to that phase's files. The plan's execution-rules section states this authorization and every phase names its suggested commit message.
-- When a plan's phases have all landed, the agent does not commit the closing state on its own: it stops, reports the outcome, and recommends the commit message (with the paths) for the owner to approve. The same holds for any change a plan did not pre-authorize.
-- Every plan carries a test matrix (what is validated, how, and what counts as green — unit, container, wire-level probes, lint) and a final phase that closes the work: comprehensive E2E over the real binary, the three-way docs sync, and a handover document. Frontmatter, test matrix, final validation, comprehensive E2E, docs sync, and handover are mandatory — a plan missing any of them is not ready for approval.
+### Plan documents
+
+A plan (`.llms/plan-<date>_<time>.md`) is a contract with one fixed shape. A plan missing any part is not ready for approval — the owner rejects it rather than repairs it. The mandatory sections, in order:
+
+1. YAML frontmatter: `status` (`awaiting-approval` until the owner says go; the phases' own statuses carry progress; `shipped`/`done` when everything lands), `updated` (last revision, timestamp with UTC offset), and `phases` (one entry per phase: `id`, `title`, `status`, `note` — the decisions and corrections the phase settled; `commits` once they land).
+2. Objective — what the work closes, naming the design-doc rows.
+3. Current state — every claim verified in the code with file and line, never taken from a document. A config key or a doc checkbox is not evidence of an implementation (the HIBP lesson: the key existed, the feature was shipped, the docs said otherwise).
+4. Decisions — dated, binding, each carrying its rejected alternatives.
+5. Shape and enforcement points — tables, keys, seams, and the surfaces each change lands on.
+6. Execution rules — the binding block: atomic commit per phase is authorized, each phase's heading names its suggested commit message, the standing commit rule resumes when the plan completes, migration and dev-DB-reset authorization, Yaak updates ride the same change as the contract, per-phase validation runs before each commit.
+7. Phases — numbered, each with a validation line.
+8. Test matrix — what is validated, how, and what counts as green (unit, container, wire-level probes, lint, `rpc:stale`).
+9. Explicitly out of scope — the owner-settled refusals, so they are not re-proposed.
+
+Hard rules:
+
+- The frontmatter and the body never disagree. Any status or phase update moves both in the same commit. A body that still reads as future work while the frontmatter says landed/shipped is a defect to fix on sight — not a note for later.
+- Enumerate the full surface the plan ships: every procedure, REST route, job, email, audit event, guard rule, settings key, and each one's Yaak row. A shipped surface without its Yaak row is an incomplete phase; so is an email with no trigger.
+- Name the flow reference (the product and the docs' read date) and follow its flow as the primary source. Deltas from it are decisions with recorded reasons, not silent deviations. An agent recommendation the owner accepts that contradicts the reference is also a recorded delta — re-check it against the reference before writing it in.
+- A plan is executed only on the owner's explicit instruction: never start, resume, or continue automatically, and never run one because it exists. Once running, each independently validated phase commits as it lands — do not wait for the whole plan — and each commit is limited to that phase's files.
+- When the phases have all landed, the agent does not commit the closing state on its own: it stops, reports the outcome, and recommends the commit message (with the paths) for the owner to approve. The same holds for any change a plan did not pre-authorize.
+- The closing phase owns the docs sync — architecture, endpoint reference, api docs, auth-design checkboxes, the Yaak collection, and the handover document. A design-doc checkbox left unchecked over shipped code is a defect of that phase.
 - Comments say what the code cannot: invariants, security rules, protocol requirements, side effects. Do not restate code, narrate control flow, or repeat a name. No phase markers (`phase *`, `Step N`, `TODO(plan)`). A real rework gets a `TODO` or `FIXME` that says what and why. Do not write "owned by" — describe the invariant. One point per comment. If half the words still carry it, it was too long.
 - Test fixtures (usernames, emails, display names, tokens, placeholder text) come from Dan Brown (Robert Langdon, Sophie Neveu, Vittoria Vetra, Inferno, Digital Fortress) and Harry Potter (Hermione Granger, Hogwarts, Gryffindor, Horcrux, Expecto Patronum). Ordinal signup tokens follow the book order (`philosophers-stone`, `chamber-of-secrets`, …). Test names stay behavioral (`TestSignupRejectsADuplicateAccount`).
 
