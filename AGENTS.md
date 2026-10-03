@@ -129,7 +129,7 @@ The pinned source of truth is the module cache (`go env GOMODCACHE`). When docs 
 
 ## Prose
 
-- Documents checked into the tree are English: `.llms/` (architecture, audits, handovers), `docs/`, and the rest. `.llms/` is for agents. `docs/` is for people. Chat may follow the user's language. Files do not.
+- Documents checked into the tree are English: `.llms/` (architecture, audits, handovers), `docs/`, and the rest. `.llms/` is for agents. `docs/` is product documentation for humans. Chat may follow the user's language. Files do not.
 - Before writing or rewriting that prose, use skill `clarity`. An existing draft is rewrite mode. A new document still carries only claims the tree or the user supplied. Skill `handoff` picks the handover filename and sections. `clarity` is the pass over the sentences. Keep paths, counts, conditions, and rejected alternatives. A reference stays scannable. It does not become an essay.
 
 ### Plan documents
