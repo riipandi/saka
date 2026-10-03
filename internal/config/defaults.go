@@ -370,6 +370,7 @@ func Default() Config {
 				APIKeyExpiringNoticeEnabled:  true,
 				EmailChangeNoticeEnabled:     true,
 				SignupAttemptNoticeEnabled:   true,
+				UserLockedNoticeEnabled:      true,
 				AnnouncementEmailEnabled:     true,
 			},
 		},

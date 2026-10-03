@@ -245,16 +245,20 @@ var ProcedureRules = map[string]Entry{
 	// Administrative, declared explicitly rather than left to the default so
 	// the table reads as the complete policy of the surface. Upstream guards
 	// every one of these with its admin-required middleware.
-	identityv1connect.SignupServiceCreateSignupTokenProcedure:       {Rule: Admin},
-	identityv1connect.SignupServiceListSignupTokensProcedure:        {Rule: Admin},
-	identityv1connect.SignupServiceDeleteSignupTokenProcedure:       {Rule: Admin},
-	identityv1connect.UserServiceListUsersProcedure:                 {Rule: Admin},
-	identityv1connect.UserServiceGetUserProcedure:                   {Rule: Admin},
-	identityv1connect.UserServiceCreateUserProcedure:                {Rule: Admin},
-	identityv1connect.UserServiceUpdateUserProcedure:                {Rule: Admin},
-	identityv1connect.UserServiceDeleteUserProcedure:                {Rule: Admin},
-	identityv1connect.UserServiceBanUserProcedure:                   {Rule: Admin},
-	identityv1connect.UserServiceUnbanUserProcedure:                 {Rule: Admin},
+	identityv1connect.SignupServiceCreateSignupTokenProcedure: {Rule: Admin},
+	identityv1connect.SignupServiceListSignupTokensProcedure:  {Rule: Admin},
+	identityv1connect.SignupServiceDeleteSignupTokenProcedure: {Rule: Admin},
+	identityv1connect.UserServiceListUsersProcedure:           {Rule: Admin},
+	identityv1connect.UserServiceGetUserProcedure:             {Rule: Admin},
+	identityv1connect.UserServiceCreateUserProcedure:          {Rule: Admin},
+	identityv1connect.UserServiceUpdateUserProcedure:          {Rule: Admin},
+	identityv1connect.UserServiceDeleteUserProcedure:          {Rule: Admin},
+	identityv1connect.UserServiceBanUserProcedure:             {Rule: Admin},
+	identityv1connect.UserServiceUnbanUserProcedure:           {Rule: Admin},
+	// UnlockUser is the lockout's administrative lift — the ban's own
+	// refusal keeps its answer, the lockout keeps its streak-fresh
+	// unlock.
+	identityv1connect.UserServiceUnlockUserProcedure:                {Rule: Admin},
 	identityv1connect.UserGroupServiceListUserGroupsProcedure:       {Rule: Admin},
 	identityv1connect.UserGroupServiceGetUserGroupProcedure:         {Rule: Admin},
 	identityv1connect.UserGroupServiceCreateUserGroupProcedure:      {Rule: Admin},

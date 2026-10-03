@@ -56,8 +56,10 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(identityv1connect.UserServiceUpdateCurrentUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceDeleteMyAccountProcedure, handler)
 	r.Handle(identityv1connect.UserServiceAddPasswordProcedure, handler)
+	r.Handle(identityv1connect.UserServiceRemovePasswordProcedure, handler)
 	r.Handle(identityv1connect.UserServiceBanUserProcedure, handler)
 	r.Handle(identityv1connect.UserServiceUnbanUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceUnlockUserProcedure, handler)
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -191,12 +193,21 @@ func (h *rpcHandler) UnbanUser(ctx context.Context, req *connect.Request[identit
 	}), nil
 }
 
-// UnlockUser lifts one account's open lockout. The restrictions feature it
-// belongs to ships with the unified-restrictions change; until then the
-// procedure is scaffold and answers unimplemented — the Yaak row carries the
-// (unimplemented) marker and no guard rule names it.
+// UnlockUser lifts one account's open lockout — the automated restriction
+// the failed-attempt policy writes. The administrative counterpart of the
+// sign-in's own expiry: the row lifts, the streak it answered for starts
+// fresh, and the audit record names the account. A ban is not a lockout;
+// UnbanUser owns that.
 func (h *rpcHandler) UnlockUser(ctx context.Context, req *connect.Request[identityv1.UnlockUserRequest]) (*connect.Response[identityv1.UnlockUserResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("not yet implemented"))
+	outcome, err := h.service.UnlockUser(ctx, req.Msg.Id)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.UnlockUserResponse{
+		User:    WireView(outcome),
+		Status:  responder.StatusSuccess,
+		Message: "the lockout was lifted",
+	}), nil
 }
 
 // banMessage answers the sentence the response carries: the expiry names

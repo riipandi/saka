@@ -305,8 +305,9 @@ func TestRunStopsAtTheFailingSeeder(t *testing.T) {
 }
 
 // The scenario accounts are the ban surface's test bench: one of each state
-// the schema can hold, so a local database exercises every path the ban and
-// unban procedures answer.
+// the restriction table can hold, so a local database exercises every path
+// the ban and unban procedures answer. The ban's storage is the
+// account_restrictions row; the account read model is its join.
 func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 	pool := newSeededPool(t)
 
@@ -315,10 +316,12 @@ func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 	var free, bannedLive, bannedPast int
 	require.NoError(t, pool.QueryRow(t.Context(), `
 		SELECT
-			count(*) FILTER (WHERE banned_at IS NULL),
-			count(*) FILTER (WHERE banned_at IS NOT NULL AND (ban_expires IS NULL OR ban_expires > now())),
-			count(*) FILTER (WHERE banned_at IS NOT NULL AND ban_expires IS NOT NULL AND ban_expires <= now())
-		FROM public.users WHERE email <> $1`,
+			count(*) FILTER (WHERE ar.user_id IS NULL),
+			count(*) FILTER (WHERE ar.user_id IS NOT NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())),
+			count(*) FILTER (WHERE ar.user_id IS NOT NULL AND ar.expires_at IS NOT NULL AND ar.expires_at <= now())
+		FROM public.users u LEFT JOIN public.account_restrictions ar
+			ON ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL
+		WHERE u.email <> $1`,
 		seeders.DefaultUser.Email).Scan(&free, &bannedLive, &bannedPast))
 
 	assert.Equal(t, 2, free, "two scenarios hold no ban at all")
@@ -332,20 +335,21 @@ func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 	var states int
 	require.NoError(t, pool.QueryRow(t.Context(), `
 		SELECT count(*) FROM (
-			SELECT 1 FROM public.users
-			WHERE username = 'hermione_granger' AND ban_expires > now()
+			SELECT 1 FROM public.users u
+			JOIN public.account_restrictions ar ON ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL
+			WHERE u.username = 'hermione_granger' AND ar.expires_at > now()
 			UNION ALL
-			SELECT 1 FROM public.users
-			WHERE username = 'vittoria_vetra' AND ban_expires IS NOT NULL AND ban_expires <= now()
+			SELECT 1 FROM public.users u
+			JOIN public.account_restrictions ar ON ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL
+			WHERE u.username = 'vittoria_vetra' AND ar.expires_at IS NOT NULL AND ar.expires_at <= now()
 		) matched`).Scan(&states))
 	assert.Equal(t, 2, states, "hermione's window is open and vittoria's has passed")
 
-	// Every banned row carries a reason: the column and the notification
-	// read from it, and a ban without one is the kind an audit cannot
-	// explain.
+	// Every banned row carries a reason: the notification reads from it,
+	// and a ban without one is the kind an audit cannot explain.
 	var missing int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		"SELECT count(*) FROM public.users WHERE banned_at IS NOT NULL AND ban_reason IS NULL").
+		"SELECT count(*) FROM public.account_restrictions WHERE kind = 'ban' AND reason IS NULL").
 		Scan(&missing))
 	assert.Zero(t, missing)
 }

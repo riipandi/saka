@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 )
 
 // Repository reads and writes the reset token and the account state it
@@ -30,10 +31,15 @@ type Account struct {
 	Email       string
 	DisplayName string
 	Disabled    bool
-	BannedAt    *time.Time
-	BanExpires  *time.Time
+	// RestrictionKind is the account's active ban — the account_restrictions
+	// join answers it. Empty, no ban stands.
+	Banned      string
 	PasswordSet bool
 }
+
+// BannedNow reports whether the account's active restriction is a ban —
+// the same judgement the sign-in issuer keeps.
+func (a Account) BannedNow() bool { return a.Banned == restrictions.KindBan }
 
 // FindUserByEmail reads the account an address names. The email is TEXT
 // matched exactly, the way its unique index does — the same match the
@@ -42,18 +48,20 @@ func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
-		"u.disabled", "u.banned_at", "u.ban_expires",
+		"u.disabled", "coalesce(ar.kind, '') AS banned",
 		"p.password_hash IS NOT NULL",
 	)
 	sb.From("public.users AS u")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.email", email))
 
 	query, args := sb.Build()
 	var row Account
 	err := db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordSet,
+		&row.Disabled, &row.Banned, &row.PasswordSet,
 	)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return Account{}, datastore.ErrNoRows
@@ -70,18 +78,20 @@ func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, use
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
-		"u.disabled", "u.banned_at", "u.ban_expires",
+		"u.disabled", "coalesce(ar.kind, '') AS banned",
 		"p.password_hash IS NOT NULL",
 	)
 	sb.From("public.users AS u")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, "public.user_passwords AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("u.id", userID))
 
 	query, args := sb.Build()
 	var row Account
 	err := db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordSet,
+		&row.Disabled, &row.Banned, &row.PasswordSet,
 	)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return Account{}, datastore.ErrNoRows

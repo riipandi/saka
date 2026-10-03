@@ -93,7 +93,7 @@ func runAdminResetPassword(ctx context.Context, cmd *cli.Command) error {
 	if account.Disabled {
 		return fmt.Errorf("the account %q is disabled; enable it before recovering its access", account.Username)
 	}
-	if bannedNowAt(account, timeNow()) {
+	if account.BannedNow() {
 		return fmt.Errorf("the account %q is banned; the ban is this refusal's answer", account.Username)
 	}
 
@@ -192,15 +192,6 @@ func requireAdministrator(ctx context.Context, db datastore.Querier, userID uuid
 	}
 	return nil
 }
-
-// bannedNowAt reads the live ban window the sign-in checks, so the refusal
-// agrees with every other surface on when a ban is in force.
-func bannedNowAt(account password.Account, at time.Time) bool {
-	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
-}
-
-// timeNow is the clock the ban window is judged against.
-func timeNow() time.Time { return time.Now() }
 
 // generateCredential draws a password the policy accepts from the crypto
 // source: an alphabet without ambiguous characters, at least one of every

@@ -252,13 +252,12 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 		}
 
 		result, err = s.signin.IssueSession(ctx, tx, &signin.Account{
-			ID:          account.ID,
-			Username:    account.Username,
-			Email:       account.Email,
-			DisplayName: account.DisplayName,
-			Disabled:    account.Disabled,
-			BannedAt:    account.BannedAt,
-			BanExpires:  account.BanExpires,
+			ID:              account.ID,
+			Username:        account.Username,
+			Email:           account.Email,
+			DisplayName:     account.DisplayName,
+			Disabled:        account.Disabled,
+			RestrictionKind: account.RestrictionKind,
 		}, signin.ProviderOneTimeAccess, audit.EventOneTimeAccessSignIn, signin.SessionParams{
 			UserAgent:   client.UserAgent,
 			IPAddress:   client.IPAddress,

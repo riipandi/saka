@@ -39,6 +39,7 @@ type Account struct {
 	Email       string
 	DisplayName string
 	Disabled    bool
-	BannedAt    *time.Time
-	BanExpires  *time.Time
+	// RestrictionKind is the account's active restriction — ban or lockout
+	// — the account_restrictions join answers.
+	RestrictionKind string
 }

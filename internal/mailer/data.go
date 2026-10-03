@@ -21,6 +21,7 @@ const (
 	TemplateSignupAttemptNotice   = "signup-attempt-existing-email"
 	TemplateTestEmail             = "test-email"
 	TemplateUserBanned            = "user-banned"
+	TemplateUserLocked            = "user-locked"
 	TemplateUserUnbanned          = "user-unbanned"
 )
 
@@ -106,6 +107,15 @@ type (
 	SignupAttemptNoticeData struct {
 		Name  string
 		Email string
+	}
+	// UserLockedData renders TemplateUserLocked — the lockout notice the
+	// failed-attempt policy sends. ExpiresAt is empty for a lockout that
+	// never lifts by itself — the template renders its own case rather
+	// than naming no date.
+	UserLockedData struct {
+		Name      string
+		Email     string
+		ExpiresAt string
 	}
 	// ReauthenticationCodeData renders TemplateReauthenticationCode — the
 	// reverification code a sensitive action asked for. The code is the

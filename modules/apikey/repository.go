@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/user"
 )
 
@@ -225,11 +226,15 @@ func (r *Repository) FindActiveKey(ctx context.Context, db datastore.Querier, ha
 	sb.SelectMore("u.id", "u.username", "u.email", "u.display_name")
 	sb.From(KeyTable + " k")
 	sb.Join(user.UserTable+" u", "u.id = k.user_id")
+	// A restricted owner's keys open nothing: the ban and the lockout are
+	// the account-level refusal every credential answers, and a machine
+	// credential is the one that would otherwise outlive the judgement
+	// entirely. The anti-join keeps the key whose account no active
+	// restriction stands against.
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = k.user_id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.Where(sb.Equal("k.key_hash", hash), sb.IsNull("k.revoked_at"), sb.GT("k.expires_at", now), sb.Equal("u.disabled", false),
-		// A banned owner's keys open nothing: the ban is the account-level
-		// refusal every credential answers, and a machine credential is the
-		// one that would otherwise outlive the judgement entirely.
-		sb.Or(sb.IsNull("u.banned_at"), sb.And(sb.IsNotNull("u.ban_expires"), sb.LE("u.ban_expires", now))))
+		sb.IsNull("ar.user_id"))
 
 	query, args := sb.Build()
 	var key KeySchema

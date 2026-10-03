@@ -11,6 +11,7 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 )
 
 // Repository reads and writes the account rows the administration procedures
@@ -24,11 +25,25 @@ func NewRepository() *Repository {
 }
 
 // userColumns are the columns the account procedures read, in scan order.
+// The main table rides the `u` alias — the active-ban join needs it — and
+// the ban trio is the read model the join provides: the restriction row is
+// the ban's storage, these columns are its view.
 var UserColumns = []string{
-	"id", "username", "email", "first_name", "last_name", "display_name",
-	"metadata", "disabled", "email_verified_at", "created_at",
-	"banned_at", "ban_expires", "ban_reason", "avatar_url",
-	"self_delete_override",
+	"u.id", "u.username", "u.email", "u.first_name", "u.last_name", "u.display_name",
+	"u.metadata", "u.disabled", "u.email_verified_at", "u.created_at",
+	"ar.started_at AS banned_at", "ar.expires_at AS ban_expires", "ar.reason AS ban_reason",
+	"u.avatar_url",
+	"u.self_delete_override",
+}
+
+// ActiveBanJoin arms the ban read model: the account's active ban
+// restriction, one row at most (a re-ban replaces the open row's terms), as
+// the three columns the account views answer from. The reads that scan
+// UserColumns call it; a caller that does not must answer the ban fields
+// some other way.
+func ActiveBanJoin(sb *sqlbuilder.SelectBuilder) {
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 }
 
 // ScanSchema reads one row into the schema. The nullable columns scan through
@@ -71,8 +86,9 @@ func deref(value *string) string {
 func (r *Repository) GetUser(ctx context.Context, db datastore.Querier, id uuid.UUID) (UserSchema, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(UserColumns...)
-	sb.From(UserTable)
-	sb.Where(sb.Equal("id", id))
+	sb.From(UserTable + " u")
+	ActiveBanJoin(sb)
+	sb.Where(sb.Equal("u.id", id))
 
 	query, args := sb.Build()
 	row, err := ScanSchema(func(dest ...any) error {
@@ -108,16 +124,17 @@ var userSortColumns = map[string]string{
 func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search, sortBy string, ascending bool, offset, limit int) ([]UserSchema, int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(UserColumns...)
-	sb.From(UserTable)
+	sb.From(UserTable + " u")
+	ActiveBanJoin(sb)
 	if search != "" {
 		pattern := "%" + search + "%"
 		sb.Where(sb.Or(
-			sb.ILike("username", pattern),
-			sb.ILike("email", pattern),
-			sb.ILike("display_name", pattern),
+			sb.ILike("u.username", pattern),
+			sb.ILike("u.email", pattern),
+			sb.ILike("u.display_name", pattern),
 		))
 	}
-	sb.OrderBy(datastore.ListOrder(userSortColumns, sortBy, "created_at", ascending), "id")
+	sb.OrderBy(datastore.ListOrder(userSortColumns, sortBy, "created_at", ascending), "u.id")
 	sb.Limit(limit).Offset(offset)
 
 	query, args := sb.Build()
@@ -182,9 +199,8 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 }
 
 // UpdateUser replaces an account's writable fields and answers whether the
-// identifier named a row. The ban columns arrive as the service computed
-// them: an expiry present keeps an earlier start instant, absent clears the
-// ban as a unit.
+// identifier named a row. The ban read model is nobody's write: the ban's
+// storage is the restrictions feature's row.
 func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row UserSchema) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(UserTable)
@@ -196,9 +212,6 @@ func (r *Repository) UpdateUser(ctx context.Context, db datastore.Querier, row U
 		ub.Assign("display_name", row.DisplayName),
 		ub.Assign("metadata", nullJSON(row.Metadata)),
 		ub.Assign("disabled", row.Disabled),
-		ub.Assign("banned_at", row.BannedAt),
-		ub.Assign("ban_expires", row.BanExpires),
-		ub.Assign("ban_reason", row.BanReason),
 	)
 	ub.Where(ub.Equal("id", row.ID))
 

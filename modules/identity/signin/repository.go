@@ -13,9 +13,18 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/user"
 )
+
+// activeRestrictionJoin arms the restriction read model: the account's one
+// active row — ban or lockout — joined beside the account read, its kind
+// the state switch's question answered. The `ar` alias is the join's own.
+func activeRestrictionJoin(sb *sqlbuilder.SelectBuilder) {
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+}
 
 // Repository reads the account a sign-in names and writes the session row its
 // refresh token is stored under.
@@ -38,14 +47,17 @@ func (r *Repository) WithQuerier(db datastore.Querier) *Repository {
 // Account is the sign-in's view of a user row and its password. The hash
 // leaves this package only into the verifier, never into a response.
 type Account struct {
-	ID              uuid.UUID
-	Username        string
-	Email           string
-	DisplayName     string
-	Disabled        bool
-	BannedAt        *time.Time
-	BanExpires      *time.Time
-	PasswordHash    string
+	ID           uuid.UUID
+	Username     string
+	Email        string
+	DisplayName  string
+	Disabled     bool
+	PasswordHash string
+	// RestrictionKind is the account's active restriction — the ban and
+	// lockout question the account_restrictions join answers. Empty, no
+	// restriction stands; the package's kinds are the restrictions
+	// feature's.
+	RestrictionKind string
 	EmailVerifiedAt *time.Time
 }
 
@@ -59,11 +71,12 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
-		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
-		"u.email_verified_at",
+		"u.disabled", "p.password_hash",
+		"u.email_verified_at", "coalesce(ar.kind, '') AS restriction_kind",
 	)
 	sb.From(user.UserTable + " u")
 	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
+	activeRestrictionJoin(sb)
 	sb.Where(
 		sb.Or(
 			sb.Equal("u.username", identity),
@@ -75,8 +88,8 @@ func (r *Repository) FindAccountByIdentity(ctx context.Context, identity string)
 	var row Account
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
-		&row.EmailVerifiedAt,
+		&row.Disabled, &row.PasswordHash,
+		&row.EmailVerifiedAt, &row.RestrictionKind,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, datastore.ErrNoRows
@@ -94,17 +107,18 @@ func (r *Repository) FindAccountByID(ctx context.Context, id uuid.UUID) (*Accoun
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
-		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
+		"u.disabled", "p.password_hash", "coalesce(ar.kind, '') AS restriction_kind",
 	)
 	sb.From(user.UserTable + " u")
 	sb.Join(password.UserPasswordTable + " p ON p.user_id = u.id")
+	activeRestrictionJoin(sb)
 	sb.Where(sb.Equal("u.id", id))
 
 	query, args := sb.Build()
 	var row Account
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash,
+		&row.Disabled, &row.PasswordHash, &row.RestrictionKind,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, datastore.ErrNoRows
@@ -124,10 +138,11 @@ func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Acc
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
-		"u.disabled", "u.banned_at", "u.ban_expires", "p.password_hash",
+		"u.disabled", "p.password_hash", "coalesce(ar.kind, '') AS restriction_kind",
 	)
 	sb.From(user.UserTable + " u")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, password.UserPasswordTable+" p ON p.user_id = u.id")
+	activeRestrictionJoin(sb)
 	sb.Where(sb.Equal("u.id", id))
 
 	query, args := sb.Build()
@@ -138,7 +153,7 @@ func (r *Repository) FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*Acc
 	var hash *string
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&row.ID, &row.Username, &row.Email, &row.DisplayName,
-		&row.Disabled, &row.BannedAt, &row.BanExpires, &hash,
+		&row.Disabled, &hash, &row.RestrictionKind,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, datastore.ErrNoRows

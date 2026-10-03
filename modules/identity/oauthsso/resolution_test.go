@@ -29,11 +29,15 @@ type stubIssuer struct {
 func (s *stubIssuer) FindAccountByIDAny(_ context.Context, id uuid.UUID) (*signin.Account, error) {
 	var row signin.Account
 	err := s.pool.QueryRow(context.Background(),
-		`SELECT id, coalesce(username, ''), email, coalesce(display_name, ''),
-		        disabled, banned_at, ban_expires, '', email_verified_at
-		 FROM public.users WHERE id = $1`, id).
+		`SELECT u.id, coalesce(u.username, ''), u.email, coalesce(u.display_name, ''),
+		        u.disabled, coalesce(ar.kind, ''), '', u.email_verified_at
+		 FROM public.users u
+		 LEFT JOIN public.account_restrictions ar
+		        ON ar.user_id = u.id AND ar.lifted_at IS NULL
+		       AND (ar.expires_at IS NULL OR ar.expires_at > now())
+		 WHERE u.id = $1`, id).
 		Scan(&row.ID, &row.Username, &row.Email, &row.DisplayName,
-			&row.Disabled, &row.BannedAt, &row.BanExpires, &row.PasswordHash, &row.EmailVerifiedAt)
+			&row.Disabled, &row.RestrictionKind, &row.PasswordHash, &row.EmailVerifiedAt)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return nil, datastore.ErrNoRows
 	}

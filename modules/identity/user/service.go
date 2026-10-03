@@ -16,6 +16,7 @@ import (
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/storage"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/pkg/crypto"
 	"github.com/riipandi/tango/pkg/responder"
 )
@@ -82,6 +83,13 @@ type Service struct {
 	// notify queues the ban notifications. It is nil where the queue is
 	// absent — a ban still writes, only without a message.
 	notify banNotifier
+
+	// restrictions is the account-restriction feature the ban writes move
+	// through: the row in public.account_restrictions is the ban's
+	// storage, and the reads answer it through the active-ban join. Nil in
+	// the tests that exercise the account procedures only — a ban then
+	// writes nothing, and the read model answers unbanned.
+	restrictions *restrictions.Service
 
 	// policy is the credential check's runtime source. Nil keeps the
 	// static policy.
@@ -198,6 +206,14 @@ func (s *Service) withGroups(ctx context.Context, views []UserView) ([]UserView,
 func (s *Service) WithBanSideEffects(sessions sessionEnder, notify banNotifier) *Service {
 	s.sessions = sessions
 	s.notify = notify
+	return s
+}
+
+// WithRestrictions wires the account-restriction feature the ban writes
+// move through. Nil keeps the ban read model empty — the state a test or a
+// bare wiring is in.
+func (s *Service) WithRestrictions(service *restrictions.Service) *Service {
+	s.restrictions = service
 	return s
 }
 
@@ -739,26 +755,14 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		Disabled:    params.Disabled,
 		// The creation instant is immutable; the update statement leaves the
 		// column alone, and the answer carries the value as it stood.
-		CreatedAt:  existing.CreatedAt,
-		BannedAt:   existing.BannedAt,
-		BanExpires: params.BanExpiresAt,
-		BanReason:  params.BanReason,
-	}
-	if params.BanExpiresAt != nil {
-		// The ban is applied now unless an earlier one is on record: the
-		// start instant answers "since when", so a re-ban does not move it.
-		if existing.BannedAt == nil {
-			at := s.now()
-			row.BannedAt = &at
-		}
-	} else {
-		// Absent expiry lifts the ban as a unit, reason included.
-		row.BannedAt = nil
-		row.BanReason = nil
+		CreatedAt: existing.CreatedAt,
 	}
 
 	// The update and its record commit together, so the log cannot name a
-	// change the database refused.
+	// change the database refused. The ban unit rides the same transaction:
+	// an expiry present applies the ban — the start instant answers "since
+	// when", so a re-ban does not move it — and an absent expiry lifts the
+	// ban as a unit, reason included.
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
 		if errUniqueViolation(updateErr) {
@@ -769,6 +773,23 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 		}
 		if !updated {
 			return ErrUserNotFound
+		}
+		if s.restrictions != nil {
+			if params.BanExpiresAt != nil {
+				reason := ""
+				if params.BanReason != nil {
+					reason = *params.BanReason
+				}
+				banErr := s.restrictions.ApplyBanAndLift(ctx, tx, userID, reason, params.BanExpiresAt, nil, s.now())
+				if banErr != nil {
+					return banErr
+				}
+			} else {
+				banErr := s.restrictions.LiftBans(ctx, tx, userID, nil, s.now())
+				if banErr != nil {
+					return banErr
+				}
+			}
 		}
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventAccountUpdated,
@@ -784,7 +805,13 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, view(row))
+	// The answer is the row read back: the ban read model comes from the
+	// join, not from the request.
+	answer, err := s.repo.GetUser(ctx, s.pool, userID)
+	if err != nil {
+		return UserView{}, err
+	}
+	filled, err := s.withGroup(ctx, s.pool, view(answer))
 	if err != nil {
 		return UserView{}, err
 	}

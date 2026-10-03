@@ -40,8 +40,10 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 		mailer.TemplatePasswordChangedNotice,
 		mailer.TemplatePasswordReset,
 		mailer.TemplateReauthenticationCode,
+		mailer.TemplateSignupAttemptNotice,
 		mailer.TemplateTestEmail,
 		mailer.TemplateUserBanned,
+		mailer.TemplateUserLocked,
 		mailer.TemplateUserUnbanned,
 	}, templates.Names())
 }
@@ -91,6 +93,12 @@ func fixtures() map[string]mailer.View {
 		}},
 		mailer.TemplatePasswordChangedNotice: {Data: mailer.PasswordChangedNoticeData{
 			Name: "Neveu", Email: "neveu@example.com",
+		}},
+		mailer.TemplateSignupAttemptNotice: {Data: mailer.SignupAttemptNoticeData{
+			Name: "Neveu", Email: "neveu@example.com",
+		}},
+		mailer.TemplateUserLocked: {Data: mailer.UserLockedData{
+			Name: "Neveu", Email: "neveu@example.com", ExpiresAt: "2 January 2026 15:04 UTC",
 		}},
 		mailer.TemplateTestEmail: {Email: "neveu@example.com", Data: mailer.TestEmailData{
 			Email: "neveu@example.com",

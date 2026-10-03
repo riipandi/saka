@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/riipandi/tango/internal/datastore"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/user"
 
 	"uuid"
@@ -24,17 +25,19 @@ type Repository struct{}
 // NewRepository builds the repository.
 func NewRepository() *Repository { return &Repository{} }
 
-// accountColumns are the columns the account reads name, in scan order.
+// accountColumns are the columns the account reads name, in scan order. The
+// main table rides the `u` alias — the restriction join needs it — and the
+// restriction kind is the state check the issuer runs.
 var accountColumns = []string{
-	"id", "coalesce(username, '') AS username", "email", "display_name",
-	"disabled", "banned_at", "ban_expires",
+	"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
+	"u.disabled", "coalesce(ar.kind, '') AS restriction_kind",
 }
 
 // scanAccount reads one account row.
 func scanAccount(scan func(dest ...any) error) (Account, error) {
 	var account Account
 	err := scan(&account.ID, &account.Username, &account.Email, &account.DisplayName,
-		&account.Disabled, &account.BannedAt, &account.BanExpires)
+		&account.Disabled, &account.RestrictionKind)
 	if err != nil {
 		return Account{}, err
 	}
@@ -45,8 +48,10 @@ func scanAccount(scan func(dest ...any) error) (Account, error) {
 func (r *Repository) FindAccountByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(accountColumns...)
-	sb.From(user.UserTable)
-	sb.Where(sb.Equal("id", id))
+	sb.From(user.UserTable + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+	sb.Where(sb.Equal("u.id", id))
 
 	query, args := sb.Build()
 	account, err := scanAccount(func(dest ...any) error {
@@ -68,8 +73,10 @@ func (r *Repository) FindAccountByID(ctx context.Context, db datastore.Querier, 
 func (r *Repository) FindAccountByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(accountColumns...)
-	sb.From(user.UserTable)
-	sb.Where(sb.Equal("email", email))
+	sb.From(user.UserTable + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+	sb.Where(sb.Equal("u.email", email))
 
 	query, args := sb.Build()
 	account, err := scanAccount(func(dest ...any) error {

@@ -231,6 +231,7 @@ func (r *Repository) ListMembers(ctx context.Context, db datastore.Querier, grou
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(user.UserColumns...)
 	sb.From(user.UserTable + " u")
+	user.ActiveBanJoin(sb)
 	sb.Join(GroupMemberTable+" m", "m.user_id = u.id")
 	sb.Where(sb.Equal("m.user_group_id", groupID.UUID()))
 	sb.OrderBy("u.username", "u.id")

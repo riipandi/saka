@@ -14,6 +14,7 @@ import (
 	"github.com/riipandi/tango/internal/authz"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
 )
@@ -268,9 +269,9 @@ func applyDefaultUser(
 }
 
 // applyScenarioUser writes one scenario account and answers its email plus
-// whether this run created it. The ban state rides the same insert: the
-// columns exist on the row, and a scenario is a row shape, not a second
-// write.
+// whether this run created it. The ban state rides as its own restriction
+// row — the ban's storage is public.account_restrictions, not a users
+// column — so a scenario is one account write plus the row its state needs.
 func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser, hash string) (string, bool, error) {
 	now := time.Now().UTC()
 	row := user.UserSchema{
@@ -285,21 +286,6 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 		// to exercise the ban states, not the verification gate.
 		EmailVerifiedAt: &now,
 	}
-	if s.bannedAt {
-		// The start instant sits a day back, so the two expiry scenarios
-		// read honestly: one window is open (25h from a day ago, an hour
-		// ahead), one has passed (23h from a day ago, an hour back).
-		at := now.Add(-24 * time.Hour)
-		row.BannedAt = &at
-		row.BanReason = &s.banReason
-		if s.banExpires {
-			expires := at.Add(25 * time.Hour)
-			if s.banExpired {
-				expires = at.Add(23 * time.Hour)
-			}
-			row.BanExpires = &expires
-		}
-	}
 
 	inserted, err := insertUser(ctx, q, row)
 	if err != nil {
@@ -311,7 +297,38 @@ func applyScenarioUser(ctx context.Context, q datastore.Querier, s scenarioUser,
 	if err := insertPassword(ctx, q, row.ID, hash); err != nil {
 		return "", false, err
 	}
+	if s.bannedAt {
+		if err := insertBan(ctx, q, row.ID, s.banReason, s.banExpires, s.banExpired, now); err != nil {
+			return "", false, err
+		}
+	}
 	return s.credentials.Email, true, nil
+}
+
+// insertBan writes the scenario's ban restriction. The start instant sits a
+// day back, so the two expiry scenarios read honestly: one window is open
+// (25h from a day ago, an hour ahead), one has passed (23h from a day ago,
+// an hour back).
+func insertBan(ctx context.Context, q datastore.Querier, userID uuid.UUID, reason string, withExpiry, expired bool, now time.Time) error {
+	var expiresAt *time.Time
+	if withExpiry {
+		at := now.Add(-24 * time.Hour).Add(25 * time.Hour)
+		if expired {
+			at = now.Add(-24 * time.Hour).Add(23 * time.Hour)
+		}
+		expiresAt = &at
+	}
+
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(restrictions.RestrictionTable)
+	ib.Cols("user_id", "kind", "reason", "started_at", "expires_at")
+	ib.Values(userID, restrictions.KindBan, reason, now.Add(-24*time.Hour), expiresAt)
+
+	query, args := ib.Build()
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("seed ban restriction: %w", err)
+	}
+	return nil
 }
 
 // plannedDefaultUser reports what a real run would do, without writing
@@ -470,12 +487,16 @@ func ensurePermissionGrant(ctx context.Context, q datastore.Querier, email, slug
 
 // insertUser inserts the account and reports whether it was this run that
 // created it. A conflict on any unique column leaves the existing row alone and
-// returns no row, which is what makes a repeated seed safe.
+// returns no row, which is what makes a repeated seed safe. The columns are
+// explicit — the schema struct carries the ban read model's tags, and a
+// generated insert would name columns no table has.
 func insertUser(ctx context.Context, q datastore.Querier, row user.UserSchema) (bool, error) {
-	ib := sqlbuilder.NewStruct(user.UserSchema{}).For(sqlbuilder.PostgreSQL).
-		InsertInto(user.UserTable, row).
-		// No conflict target: the account must not be created when any of its
-		// unique columns is already taken.
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(user.UserTable)
+	ib.Cols("id", "username", "email", "first_name", "last_name", "display_name",
+		"metadata", "disabled", "email_verified_at", "created_at")
+	ib.Values(row.ID, row.Username, row.Email, row.FirstName, row.LastName, row.DisplayName,
+		row.Metadata, row.Disabled, row.EmailVerifiedAt, row.CreatedAt).
 		SQL("ON CONFLICT DO NOTHING").
 		Returning("id")
 

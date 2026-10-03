@@ -351,7 +351,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 	if err != nil {
 		return err
 	}
-	if account.Disabled || bannedNow(account, s.now()) {
+	if account.Disabled || account.BannedNow() {
 		// The state refusal is not the invalid-token one: the caller who
 		// holds the token learns the real reason, the convention the
 		// sign-in keeps for account state.
@@ -457,7 +457,7 @@ func (s *Service) AddPassword(ctx context.Context, userID uuid.UUID, newPassword
 	if err != nil {
 		return err
 	}
-	if account.Disabled || bannedNow(account, s.now()) {
+	if account.Disabled || account.BannedNow() {
 		return ErrAccountForbidden
 	}
 
@@ -500,10 +500,4 @@ func (s *Service) revokeInTx(ctx context.Context, tx datastore.Querier, userID u
 		return 0, nil
 	}
 	return s.sessions.RevokeAllForUser(ctx, tx, userID)
-}
-
-// bannedNow reads the live ban window the sign-in checks, so the two
-// refusals agree on when a ban is in force.
-func bannedNow(account Account, at time.Time) bool {
-	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
 }

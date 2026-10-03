@@ -44,6 +44,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/oauthsso/custom"
 	"github.com/riipandi/tango/modules/identity/onetimeaccess"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/signin"
 	"github.com/riipandi/tango/modules/identity/signup"
@@ -268,6 +269,9 @@ var Package = do.Package(
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
 			service.WithPasswordPolicy(policy)
 		}
+		if gates := do.MustInvoke[*restrictions.Service](i); gates != nil {
+			service.WithRestrictions(gates)
+		}
 		return service, nil
 	}),
 	// The session lifecycle builds over the sign-in issuer through the
@@ -350,6 +354,28 @@ var Package = do.Package(
 		return blocklist.NewService(pool, recorder, log), nil
 	}),
 
+	// The account restrictions build over the pool and the recorder — the
+	// ban's rows and the lockout policy's. The failed-streak counter is
+	// the account feature's write (the counter lives on the account row),
+	// the locked notice rides the queue the infrastructure registers, and
+	// the policy reads the catalog at call time. The area's consumers —
+	// the account procedures, the sign-in — wire the service after
+	// construction; the package imports nothing back.
+	do.Lazy(func(i do.Injector) (*restrictions.Service, error) {
+		log := do.MustInvoke[*slog.Logger](i)
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*audit.Recorder](i)
+		client := do.MustInvoke[*queue.Client](i)
+		service := restrictions.NewService(pool, recorder, log)
+		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
+			service.WithSettings(settings)
+		}
+		if client != nil {
+			service.WithLockedNotice(jobs.NewRestrictionNotifier(client, log, do.MustInvoke[*config.Config](i).Mailer.Notifications.UserLockedNoticeEnabled))
+		}
+		return service, nil
+	}),
+
 	do.Lazy(func(i do.Injector) (*user.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
@@ -361,6 +387,9 @@ var Package = do.Package(
 		}
 		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
 			service.WithSettings(settings)
+		}
+		if gates := do.MustInvoke[*restrictions.Service](i); gates != nil {
+			service.WithRestrictions(gates)
 		}
 		return service, nil
 	}),

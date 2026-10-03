@@ -29,9 +29,6 @@ CREATE TABLE IF NOT EXISTS public.users (
     -- it stays a counter on the account row while the durable restriction
     -- (ban or lockout) lives in its own table.
     failed_attempts INT NOT NULL DEFAULT 0,
-    banned_at TIMESTAMPTZ DEFAULT NULL,
-    ban_expires TIMESTAMPTZ DEFAULT NULL,
-    ban_reason TEXT DEFAULT NULL,
     -- The self-delete override is the per-account answer the global setting
     -- defers to: NULL follows `users.self_delete_enabled`, TRUE admits the
     -- account even when the global gate is off, FALSE refuses it even when

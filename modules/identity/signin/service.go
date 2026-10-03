@@ -20,6 +20,7 @@ import (
 	"github.com/riipandi/tango/modules/identity/blocklist"
 	"github.com/riipandi/tango/modules/identity/jwks"
 	"github.com/riipandi/tango/modules/identity/password"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
@@ -91,6 +92,10 @@ type Service struct {
 	// blocklist is the access lists' sign-in gate. Nil leaves the gate
 	// out — the state a test or a bare wiring is in.
 	blocklist BlocklistChecker
+
+	// restrictions is the failed-streak ledger and the lockout policy's
+	// owner. Nil counts nothing — the state a test or a bare wiring is in.
+	restrictions *restrictions.Service
 
 	// notices is the new-device notification channel. Nil until wired; a
 	// service without one skips the mail, never the sign-in.
@@ -217,10 +222,19 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 		// sign in; the answer to the caller is the same as a mismatch, and
 		// the log carries the difference.
 		s.log.ErrorContext(ctx, "signin: unreadable password hash", "error", verifyErr)
+		s.registerFailure(ctx, account, verifyErr)
 		return Result{}, ErrInvalidCredentials
 	}
 	if !match {
+		s.registerFailure(ctx, account, nil)
 		return Result{}, ErrInvalidCredentials
+	}
+	// The verification succeeded: the streak it belonged to is over — the
+	// counter is never a lifetime tally.
+	if s.restrictions != nil {
+		if resetErr := s.restrictions.ResetStreak(ctx, s.pool, account.ID); resetErr != nil {
+			return Result{}, resetErr
+		}
 	}
 
 	// The verification gate runs before the second factor's fork: an
@@ -305,6 +319,26 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	return result, nil
 }
 
+// registerFailure advances the account's failed-password streak and lands
+// the lockout when the policy's bound trips. The answer never changes:
+// whatever the ledger did, the caller earned the credential error already
+// returned — a lockout that reports itself is the oracle the mode exists
+// to close.
+func (s *Service) registerFailure(ctx context.Context, account *Account, cause error) {
+	if s.restrictions == nil {
+		return
+	}
+	locked, err := s.restrictions.RegisterFailure(ctx, account.ID, account.Email, account.DisplayName)
+	if err != nil {
+		s.log.ErrorContext(ctx, "signin: the failure ledger refused the write", "error", err, "user_id", account.ID.String())
+		return
+	}
+	if locked {
+		s.log.WarnContext(ctx, "signin: the failed-attempt policy locked the account",
+			"user_id", account.ID.String(), "cause", cause)
+	}
+}
+
 // SessionParams carries what a session records about the request that opened
 // it. IPAddress is the caller's address as the transport read it, empty when
 // it is unknown; Fingerprint is the browser fingerprint the transport read
@@ -338,8 +372,15 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 	switch {
 	case account.Disabled:
 		return Result{}, ErrAccountDisabled
-	case bannedAt(account, now):
+	// The restriction the join answered decides the refusal's shape: a ban
+	// keeps its own answer — the account-blind refusal the correct
+	// credential earns — and a lockout answers the same generic credential
+	// error a wrong password does, so the lockout never becomes the
+	// oracle its trip would otherwise hand the attacker.
+	case account.RestrictionKind == restrictions.KindBan:
 		return Result{}, ErrAccountBanned
+	case account.RestrictionKind == restrictions.KindLockout:
+		return Result{}, ErrInvalidCredentials
 	case s.signinRestricted(ctx, account.Email):
 		return Result{}, ErrSigninRestricted
 	}
@@ -431,17 +472,19 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 	}, nil
 }
 
-// bannedAt reports whether the account sits inside its ban window. A ban
-// without an expiry never lifts by itself.
-func bannedAt(account *Account, at time.Time) bool {
-	return account.BannedAt != nil && (account.BanExpires == nil || account.BanExpires.After(at))
-}
-
 // WithMFAGate arms the second factor's fork. The gate is wired after both
 // services construct — the sign-in cannot import the multifactor package
 // without a cycle, and the gate's interface keeps the seam one-shaped.
 func (s *Service) WithMFAGate(gate mfaGate) *Service {
 	s.mfa = gate
+	return s
+}
+
+// WithRestrictions wires the account-restriction feature: the failed
+// streak's ledger and the lockout policy's owner. Nil keeps the sign-in
+// counting nothing — the state a test or a bare wiring is in.
+func (s *Service) WithRestrictions(service *restrictions.Service) *Service {
+	s.restrictions = service
 	return s
 }
 
@@ -507,7 +550,19 @@ func (s *Service) VerifyPassword(ctx context.Context, id uuid.UUID, password str
 	if verifyErr != nil {
 		return false, fmt.Errorf("signin: verify password: %w", verifyErr)
 	}
-	return match, nil
+	// The step-up proof is the same credential the sign-in judges, so the
+	// streak answers to it the same way: a failed proof counts, a proven
+	// one closes the account's streak.
+	if !match {
+		s.registerFailure(ctx, account, nil)
+		return false, nil
+	}
+	if s.restrictions != nil {
+		if err := s.restrictions.ResetStreak(ctx, s.pool, id); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // Challenge mints the pending bridge an account keeping a confirmed

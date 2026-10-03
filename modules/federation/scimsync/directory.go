@@ -11,6 +11,7 @@ import (
 
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/federation/oidc"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 )
 
 // The visibility roll the sync applies is the OIDC authorization's own: a
@@ -36,8 +37,12 @@ func (directory) UsersForClient(ctx context.Context, db datastore.Querier, clien
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("u.id", "u.username", "u.email", "u.first_name", "u.last_name",
-		"u.display_name", "u.disabled", "u.banned_at", "u.ban_expires", "u.updated_at")
+		"u.display_name", "u.disabled", "ar.started_at AS banned_at", "u.updated_at")
 	sb.From(UserTable + " u")
+	// The ban fields are the active ban restriction's read model — the
+	// SCIM surface's suspended state answers from the row, not a column.
+	sb.JoinWithOption(sqlbuilder.LeftJoin, restrictions.RestrictionTable+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	if restriction.IsGroupRestricted {
 		if len(restriction.AllowedGroupIDs) == 0 {
 			return nil, nil
@@ -57,16 +62,15 @@ func (directory) UsersForClient(ctx context.Context, db datastore.Querier, clien
 	var users []ProvisionedUser
 	for rows.Next() {
 		var (
-			u          ProvisionedUser
-			disabled   bool
-			bannedAt   *time.Time
-			banExpires *time.Time
+			u        ProvisionedUser
+			disabled bool
+			bannedAt *time.Time
 		)
 		// first_name and last_name are nullable columns; the SCIM name is
 		// optional, so a NULL reads as the empty half.
 		var first, last *string
 		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &first, &last,
-			&u.DisplayName, &disabled, &bannedAt, &banExpires, &u.UpdatedAt); err != nil {
+			&u.DisplayName, &disabled, &bannedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scimsync: scan account: %w", err)
 		}
 		if first != nil {
@@ -77,8 +81,9 @@ func (directory) UsersForClient(ctx context.Context, db datastore.Querier, clien
 		}
 		// A banned account is as absent as a disabled one: the remote
 		// should not keep a working sign-in the local side has refused.
-		u.Active = !disabled && bannedAt == nil &&
-			(banExpires == nil || banExpires.Before(time.Now()))
+		// The join answers only the active ban, so a present row is the
+		// whole question.
+		u.Active = !disabled && bannedAt == nil
 		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {

@@ -26,6 +26,7 @@ import (
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/internal/storage"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/pkg/testutils"
 
 	"uuid"
@@ -49,7 +50,11 @@ func (s *Service) readPicture(ctx context.Context, id string) (io.ReadCloser, st
 
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(pool, nil, nil, nil)
+
+	// The ban writes move through the restrictions feature. The audit
+	// recorder is nil-safe.
+	return NewService(pool, nil, nil, nil).
+		WithRestrictions(restrictions.NewService(pool, nil, nil))
 }
 
 // testPictureService builds the service over the real storage engine — the

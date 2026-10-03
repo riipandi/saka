@@ -67,31 +67,25 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 	if err != nil {
 		return BanOutcome{}, err
 	}
-
-	// The ban is applied now unless an earlier one is on record: the start
-	// instant answers "since when", so a re-ban does not move it.
-	bannedAt := now
-	if existing.BannedAt != nil {
-		bannedAt = *existing.BannedAt
+	if s.restrictions == nil {
+		return BanOutcome{}, ErrUserNotFound
 	}
-	row := existing
-	row.BannedAt = &bannedAt
-	row.BanExpires = params.ExpiresAt
-	row.BanReason = &params.Reason
 
+	// The ban is a restriction row now: an open row's reason and expiry
+	// are replaced — the write is the caller's intent, not a comparison —
+	// and the start instant answers "since when", so a re-ban does not
+	// move it. A lockout the ban supersedes lifts with it.
 	var ended int
+	var banView UserView
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
-		if updateErr != nil {
-			return updateErr
-		}
-		if !updated {
-			return ErrUserNotFound
+		if banErr := s.restrictions.ApplyBanAndLift(ctx, tx, userID, params.Reason, params.ExpiresAt, nil, s.now()); banErr != nil {
+			return banErr
 		}
 		if s.sessions != nil {
-			ended, updateErr = s.sessions.RevokeAllForUser(ctx, tx, userID)
-			if updateErr != nil {
-				return updateErr
+			var sessionErr error
+			ended, sessionErr = s.sessions.RevokeAllForUser(ctx, tx, userID)
+			if sessionErr != nil {
+				return sessionErr
 			}
 		}
 		s.audit.Record(ctx, tx, audit.Entry{
@@ -99,11 +93,18 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 			Status: audit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
-				"username":       row.Username,
+				"username":       existing.Username,
 				"reason":         params.Reason,
 				"ended_sessions": fmt.Sprint(ended),
 			},
 		})
+		// The read-back answers the view the wire carries, ban fields
+		// included: the join sees the row this transaction wrote.
+		read, readErr := s.repo.GetUser(ctx, tx, userID)
+		if readErr != nil {
+			return readErr
+		}
+		banView = view(read)
 		return nil
 	})
 	if err != nil {
@@ -111,9 +112,9 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 	}
 
 	if s.notify != nil {
-		s.notify.UserBanned(ctx, row.Email, view(row), params.ExpiresAt)
+		s.notify.UserBanned(ctx, existing.Email, banView, params.ExpiresAt)
 	}
-	filled, fillErr := s.withGroup(ctx, s.pool, view(row))
+	filled, fillErr := s.withGroup(ctx, s.pool, banView)
 	if fillErr != nil {
 		return BanOutcome{}, fillErr
 	}
@@ -137,28 +138,28 @@ func (s *Service) UnbanUser(ctx context.Context, id string) (BanOutcome, error) 
 	if err != nil {
 		return BanOutcome{}, err
 	}
+	if s.restrictions == nil {
+		return BanOutcome{}, ErrUserNotFound
+	}
 
-	row := existing
-	row.BannedAt = nil
-	row.BanExpires = nil
-	row.BanReason = nil
-
+	var unbanView UserView
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
-		if updateErr != nil {
-			return updateErr
-		}
-		if !updated {
-			return ErrUserNotFound
+		if liftErr := s.restrictions.LiftBans(ctx, tx, userID, nil, s.now()); liftErr != nil {
+			return liftErr
 		}
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventUserUnbanned,
 			Status: audit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
-				"username": row.Username,
+				"username": existing.Username,
 			},
 		})
+		read, readErr := s.repo.GetUser(ctx, tx, userID)
+		if readErr != nil {
+			return readErr
+		}
+		unbanView = view(read)
 		return nil
 	})
 	if err != nil {
@@ -166,11 +167,38 @@ func (s *Service) UnbanUser(ctx context.Context, id string) (BanOutcome, error) 
 	}
 
 	if s.notify != nil {
-		s.notify.UserUnbanned(ctx, row.Email, view(row))
+		s.notify.UserUnbanned(ctx, existing.Email, unbanView)
 	}
-	filled, fillErr := s.withGroup(ctx, s.pool, view(row))
+	filled, fillErr := s.withGroup(ctx, s.pool, unbanView)
 	if fillErr != nil {
 		return BanOutcome{}, fillErr
 	}
 	return BanOutcome{User: filled}, nil
+}
+
+// UnlockUser lifts the account's open lockout — the automated restriction
+// the failed-attempt policy writes — and zeroes the streak it answered for.
+// An account with no open lockout is the same success. A ban is not a
+// lockout and the procedure does not touch one; UnbanUser owns that.
+func (s *Service) UnlockUser(ctx context.Context, id string) (UserView, error) {
+	userID, err := parseWire(id)
+	if err != nil {
+		return UserView{}, ErrUserNotFound
+	}
+	if s.restrictions == nil {
+		return UserView{}, ErrUserNotFound
+	}
+
+	existing, err := s.repo.GetUser(ctx, s.pool, userID)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return UserView{}, ErrUserNotFound
+	}
+	if err != nil {
+		return UserView{}, err
+	}
+
+	if _, err := s.restrictions.Unlock(ctx, userID, nil); err != nil {
+		return UserView{}, err
+	}
+	return view(existing), nil
 }

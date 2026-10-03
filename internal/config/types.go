@@ -474,6 +474,9 @@ type MailerNotifications struct {
 	// receives when the strict enumeration mode answers a taken-email
 	// sign-up for it.
 	SignupAttemptNoticeEnabled bool `koanf:"signup_attempt_notice_enabled" json:"signup_attempt_notice_enabled"`
+	// UserLockedNoticeEnabled gates the notice the failed-attempt policy's
+	// lockout sends.
+	UserLockedNoticeEnabled bool `koanf:"user_locked_notice_enabled" json:"user_locked_notice_enabled"`
 	// AnnouncementEmailEnabled gates the email pass a published notification
 	// asks for. The notice itself is always written — this gate is only the
 	// mail the pass would duplicate it with.

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
@@ -342,12 +341,17 @@ func TestSyncDeactivatesABannedAccount(t *testing.T) {
 	clientID := "44444444-4444-5444-8444-444444444444"
 	seedClient(t, pool, clientID, false)
 
+	// The ban's storage is the restriction row; the directory's Active rule
+	// reads the anti-joined ban.
 	ib := sqlb.NewInsertBuilder()
 	ib.InsertInto(UserTable)
-	ib.Cols("id", "username", "email", "display_name", "banned_at")
-	ib.Values(uuid.NewV7(), "Silas", "Silas@example.test", "Silas", time.Now())
+	ib.Cols("id", "username", "email", "display_name")
+	ib.Values(uuid.NewV7(), "Silas", "Silas@example.test", "Silas")
 	query, args := ib.Build()
 	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+	_, err = pool.Exec(t.Context(), `INSERT INTO public.account_restrictions (user_id, kind, reason, started_at)
+		SELECT id, 'ban', 'the test bans its account', now() FROM public.users WHERE username = 'Silas'`)
 	require.NoError(t, err)
 
 	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList())

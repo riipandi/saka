@@ -29,10 +29,14 @@ type UserSchema struct {
 	// is a code change and not a migration. The readers and the writers go
 	// through the metadata helpers in the service; nothing touches the raw
 	// bytes elsewhere.
-	Metadata           []byte     `db:"metadata"`
-	Disabled           bool       `db:"disabled"`
-	EmailVerifiedAt    *time.Time `db:"email_verified_at"`
-	CreatedAt          time.Time  `db:"created_at"`
+	Metadata        []byte     `db:"metadata"`
+	Disabled        bool       `db:"disabled"`
+	EmailVerifiedAt *time.Time `db:"email_verified_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	// The ban read-model: the active ban restriction's view, joined from
+	// public.account_restrictions by the reads that answer it. No insert
+	// or update writes these — the ban's storage is the restriction row,
+	// and the writes go through the restrictions feature.
 	BannedAt           *time.Time `db:"banned_at"`
 	BanExpires         *time.Time `db:"ban_expires"`
 	BanReason          *string    `db:"ban_reason"`

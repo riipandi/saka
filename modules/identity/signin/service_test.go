@@ -23,6 +23,7 @@ import (
 	"github.com/riipandi/tango/internal/config"
 	"github.com/riipandi/tango/internal/datastore"
 	"github.com/riipandi/tango/modules/identity/jwks"
+	"github.com/riipandi/tango/modules/identity/restrictions"
 	"github.com/riipandi/tango/modules/identity/session"
 	"github.com/riipandi/tango/modules/identity/user"
 	"github.com/riipandi/tango/pkg/crypto"
@@ -87,7 +88,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	id := uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto("public.users")
-	ib.Cols("id", "username", "email", "display_name", "disabled", "banned_at", "ban_expires", "email_verified_at")
+	ib.Cols("id", "username", "email", "display_name", "disabled", "email_verified_at")
 	var verifiedAt any = time.Now().UTC()
 	if fixture.unverified {
 		verifiedAt = nil
@@ -96,10 +97,24 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 	if fixture.noUsername {
 		usernameValue = nil
 	}
-	ib.Values(id, usernameValue, fixture.email, "Hogwarts Student", fixture.disabled, fixture.bannedAt, fixture.banExpires, verifiedAt)
+	ib.Values(id, usernameValue, fixture.email, "Hogwarts Student", fixture.disabled, verifiedAt)
 	query, args := ib.Build()
 	_, err = pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
+
+	// The ban state is a restriction row — the storage the sign-in's join
+	// reads. The fixture's instants carry the window: a past expiry is the
+	// expired lift the read answers, a future or absent one the ban in
+	// force.
+	if fixture.bannedAt != nil {
+		rb := sqlbuilder.PostgreSQL.NewInsertBuilder()
+		rb.InsertInto("public.account_restrictions")
+		rb.Cols("user_id", "kind", "started_at", "expires_at")
+		rb.Values(id, "ban", *fixture.bannedAt, fixture.banExpires)
+		query, args = rb.Build()
+		_, err = pool.Exec(t.Context(), query, args...)
+		require.NoError(t, err)
+	}
 
 	pb := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	pb.InsertInto("public.user_passwords")
@@ -550,4 +565,59 @@ func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
 		SettingAccessBlocklistAppliesToSignins: true,
 	}})
 	assert.NoError(t, issue(unwired))
+}
+
+// lockoutSettings is the restrictions feature's policy stub: five attempts
+// — the reader's floor — and a one-hour window.
+type lockoutSettings struct{}
+
+func (lockoutSettings) GetBool(_ context.Context, key string) (bool, error) {
+	return key == "lockout.enabled", nil
+}
+
+func (lockoutSettings) GetString(_ context.Context, key string) (string, error) {
+	switch key {
+	case "lockout.max_attempts":
+		return "5", nil
+	case "lockout.duration":
+		return "1h", nil
+	}
+	return "", errors.New("unreadable setting")
+}
+
+// TestTheLockoutAnswersTheCredentialError pins the lockout's refusal
+// shape: the account the failed-attempt policy locked answers the same
+// generic credential error a wrong password does — never the ban's answer,
+// never a success — so the lockout cannot become the oracle its trip would
+// hand the attacker. The account's address learns of the lock through the
+// notice, not the response.
+func TestTheLockoutAnswersTheCredentialError(t *testing.T) {
+	testutils.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	const password = "expecto-patronum"
+	id := createAccount(t, pool, "rlangdon", "langdon@example.com", password, nil)
+	service := testService(t, pool).WithRestrictions(
+		restrictions.NewService(pool, nil, nil).WithSettings(lockoutSettings{}))
+
+	// The streak trips the bound: five wrong passwords lock the account.
+	for range 5 {
+		_, err := service.SignIn(t.Context(), Params{
+			Identity: "langdon@example.com", Password: "wrong-password-1",
+		})
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+	}
+
+	// The correct credential earns the same refusal — and nothing else.
+	_, err := service.SignIn(t.Context(), Params{
+		Identity: "langdon@example.com", Password: password,
+	})
+	assert.ErrorIs(t, err, ErrInvalidCredentials,
+		"the locked account's answer is the credential error, not the ban's, not a success")
+
+	// The lockout row is the response the wire never carries.
+	row, err := restrictions.NewRepository().ActiveRow(t.Context(), pool, id, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, row)
+	assert.Equal(t, restrictions.KindLockout, row.Kind)
 }
