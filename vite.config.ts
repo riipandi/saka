@@ -118,7 +118,10 @@ export default defineConfig({
     ignorePatterns: ignoredPatterns
   },
   run: {
-    cache: true
+    cache: true,
+    tasks: {
+      typecheck: 'pnpm exec tsc -b --noEmit'
+    }
   },
   plugins: [
     embedManifest(),

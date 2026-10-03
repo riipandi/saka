@@ -27,7 +27,7 @@ export default function App() {
         Monolith Go, React, and TanStack application. The surfaces land here.
       </p>
       <p className='s-card__hint'>
-        served by Go · <code>task dev</code>
+        served by Go · <code>v0.0.0</code>
       </p>
     </main>
   )

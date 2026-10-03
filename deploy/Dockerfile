@@ -10,11 +10,15 @@ ARG GO_VERSION=1.27
 # Base image Go + Node.js with pnpm package manager.
 # ------------------------------------------------------------------------------
 FROM golang:${GO_VERSION}-trixie AS base
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_INTEGRITY_KEYS=0 DO_NOT_TRACK=1
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true CI=true
-ENV FNM_PATH=/usr/bin PNPM_HOME=/pnpm HOME=/root
-ENV PATH="$HOME/.local/share/fnm:$PNPM_HOME:$PATH"
+ENV DO_NOT_TRACK=1 CI=true PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true
+ENV VP_HOME=/opt/vite-plus PNPM_HOME=/pnpm
+ENV PATH="/opt/vite-plus/bin:$PNPM_HOME:$PATH"
+ENV VP_NODE_MANAGER=yes VP_PM_MANAGER=yes
+
+# Keep in sync with `devEngines.packageManager` in package.json.
 ARG NODE_VERSION=24.21
+ARG PNPM_VERSION=12.8.1
+ARG VP_VERSION=1.0.0
 
 # Install system dependencies (optional tools for building and debugging)
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
@@ -25,14 +29,14 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
        inotify-tools pkg-config libssl-dev git unzip ca-certificates jq \
     && update-ca-certificates
 
-# Install Node.js and PNPM (we need to use bash as the default shell to load fnm function)
+# Install the Vite+ global CLI; it manages both the Node.js runtime and pnpm
+# (shims live in $VP_HOME/bin). The explicit specs keep the base layer
+# deterministic instead of relying on `engines.node` (an open range) to
+# auto-resolve. CI=true keeps the installer non-interactive.
 SHELL ["/usr/bin/bash", "-c"]
-RUN echo -e "Installing Node.js $NODE_VERSION" && touch $HOME/.bashrc \
-    && curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell --install-dir $FNM_PATH \
-    && echo 'eval "$(fnm env --use-on-cd --shell bash)"' >> $HOME/.bashrc && . $HOME/.bashrc \
-    && fnm install ${NODE_VERSION} --corepack-enabled \
-    && fnm default ${NODE_VERSION} --corepack-enabled \
-    && corepack enable pnpm
+RUN curl -fsSL https://vite.plus | VP_VERSION=${VP_VERSION} bash \
+    && vp env install ${NODE_VERSION} pnpm@${PNPM_VERSION} \
+    && vp env current
 
 # Add tini for signal handling and zombie reaping
 RUN set -eux; \
@@ -65,10 +69,16 @@ ARG BUILD_DATE
 # rejects the frozen lockfile.
 COPY --link package.json pnpm-lock.yaml pnpm-workspace.yaml go.mod go.sum ./
 
-# Bash will load fnm function via .bashrc. Since we're starting non-interactive
-# shell, we wil need to tell bash to load .bashrc manually.
+# pnpm-lock.yaml records every workspace importer, so each packages/*/package.json
+# must exist before `pnpm install --frozen-lockfile` runs.
+COPY --link packages/e2e-tests/package.json packages/e2e-tests/
+COPY --link packages/email/package.json packages/email/
+COPY --link packages/plugins/package.json packages/plugins/
+COPY --link packages/webapp/package.json packages/webapp/
+
+# The Vite+ shims resolve node and pnpm without shell setup, so the default
+# RUN environment is enough from here on.
 SHELL ["/usr/bin/bash", "-c"]
-ENV BASH_ENV=$HOME/.bashrc
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install \
     --ignore-scripts --frozen-lockfile --stream
@@ -86,7 +96,7 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
 
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     NODE_ENV=production pnpm exec tsc -b --noEmit \
-    && NODE_ENV=production SAKA_SKIP_GO=1 pnpm exec vite build
+    && NODE_ENV=production SKIP_GO_BUILD=1 pnpm exec vp build
 
 # The embed is compile-time: the SPA bundle and the derived assets.json the
 # Vite build wrote above must exist before the Go binary compiles.
@@ -149,7 +159,7 @@ EXPOSE $SERVER_PORT/tcp
 VOLUME /srv/storage
 
 # Healthcheck to monitor application status
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD /srv/saka hc
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD ["/srv/saka", "hc"]
 
 # SHELL: /busybox/sh
 ENTRYPOINT ["/usr/bin/tini", "--"]

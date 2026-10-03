@@ -22,7 +22,7 @@ before:
     - pnpm install --ignore-scripts --frozen-lockfile
     - go tool buf generate
     - gofmt -w codegen/proto/go
-    - SAKA_SKIP_GO=1 pnpm exec vite build
+    - SKIP_GO_BUILD=1 pnpm exec vite build
     # - swag init --output ./api -d cmd,internal,modules,pkg -g saka/main.go --quiet
     # - swag fmt --dir ./api
 

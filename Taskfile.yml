@@ -10,7 +10,7 @@ vars:
   APP_VERSION:
     sh: jq -r .version package.json 2>/dev/null || echo 0.0.0
   IMAGE:
-    sh: jq -r .config.image package.json 2>/dev/null || echo ghcr.io/riipandi/saka
+    sh: jq -r '.config.image // "ghcr.io/riipandi/saka"' package.json
 
 # Every group lives in scripts/task-. Each include is flattened, so a task keeps
 # the name it had when this file held it. That also keeps one flat namespace,

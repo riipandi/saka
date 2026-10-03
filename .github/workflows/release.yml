@@ -57,9 +57,9 @@ jobs:
           gofmt -w codegen/proto/go
 
       - name: Generate email template
-        run: pnpm exec vite build
+        run: pnpm exec vp build
         env:
-          SAKA_SKIP_GO: 1
+          SKIP_GO_BUILD: 1
 
       # Code signing:
       # @ref: https://github.com/goreleaser/goreleaser-action?tab=readme-ov-file#signing
@@ -112,6 +112,12 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
+      - name: Derive build metadata
+        id: build-meta
+        run: |
+          echo "hash=$(git rev-parse --short=10 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
@@ -120,10 +126,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # TODO: use short git hash
           build-args: |
-            BUILD_HASH=${{ github.sha }}
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            BUILD_HASH=${{ steps.build-meta.outputs.hash }}
+            BUILD_DATE=${{ steps.build-meta.outputs.date }}
             BUILD_VERSION=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

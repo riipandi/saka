@@ -137,7 +137,7 @@ mounted beside it, the way every other chi mount is.
 ### 3. Build for Release
 
 ```bash
-SAKA_SKIP_GO=1 pnpm exec vite build   # assets + manifest into web/output
+SKIP_GO_BUILD=1 pnpm exec vite build   # assets + manifest into web/output
 task build                             # both Go targets embed it
 ```
 
