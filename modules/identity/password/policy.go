@@ -22,7 +22,6 @@ import (
 const (
 	SettingMinLength         = "password.min_length"
 	SettingRejectCompromised = "password.reject_compromised"
-	SettingMinStrength       = "password.min_strength"
 	SettingRuleLowercase     = "password.rule_lowercase"
 	SettingRuleUppercase     = "password.rule_uppercase"
 	SettingRuleNumber        = "password.rule_number"
@@ -115,21 +114,6 @@ func (v *Validator) resolve(ctx context.Context) rules {
 		}
 	}
 	return r
-}
-
-// TODO(strength): the strength floor is deferred — password.min_strength
-// rests unenforced until the meter lands. The key stays in the catalog so
-// the operator's surface does not change under them. deferredStrength is the
-// test's view of that state: the value is read, nothing is enforced.
-func (v *Validator) deferredStrength(settings SettingsReader) string {
-	if settings == nil {
-		return "normal"
-	}
-	if value, err := settings.GetString(context.Background(), SettingMinStrength); err != nil || value == "" {
-		return "normal"
-	} else {
-		return value
-	}
 }
 
 // Validate judges a clear-text password against the settings' policy.

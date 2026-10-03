@@ -35,7 +35,6 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 	}
 	enums := map[string][]string{
 		SettingAccessMode:                    {"open", "invite"},
-		SettingPasswordMinStrength:           {"off", "normal"},
 		SettingAuthUserEnumerationProtection: {"bulk", "strict"},
 	}
 
@@ -93,7 +92,7 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 		SettingAuthSigninEmailCodeEnabled, SettingAuthSignupUsernameEnabled,
 		SettingAuthRequireUsername, SettingAuthSignupPasswordEnabled,
 		SettingPasswordMinLength, SettingPasswordRejectCompromised,
-		SettingPasswordMinStrength, SettingPasswordRuleLowercase,
+		SettingPasswordRuleLowercase,
 		SettingPasswordRuleUppercase, SettingPasswordRuleNumber,
 		SettingPasswordRuleSpecial, SettingMFARequired,
 		SettingAuthUserEnumerationProtection,

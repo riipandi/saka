@@ -28,12 +28,15 @@ Keep this document as simple as possible!
 
 - Minimum password length: Passwords must contain N or more characters (default: 8 characters)
 - Reject compromised passwords: Passwords that are compromised will be rejected upon sign-up, sign-in, and password changes. Powered by HaveIBeenPwned (default: true)
-- Enforce minimum password strength: Options: weak|normal|strong. Powered by zxcvbn. (default: true/normal)
 - Password rules: default None
   - Require at least 1 lowercase character (default: false)
   - Require at least 1 uppercase character (default: false)
   - Require at least 1 number (default: false)
   - Require at least 1 special character (default: false)
+
+No strength meter: the verifier duties are the length floor and the breach
+corpus (NIST 800-63B posture) — the zxcvbn requirement above was dropped
+2026-10-03 rather than ported.
 
 ### Passkeys & Biometrics
 

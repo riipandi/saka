@@ -200,10 +200,6 @@ const (
 	// and password change, and flagged at sign-in.
 	SettingPasswordRejectCompromised = "password.reject_compromised"
 
-	// SettingPasswordMinStrength is the strength floor a new password must
-	// clear: off or normal. Sign-in never runs the strength meter.
-	SettingPasswordMinStrength = "password.min_strength"
-
 	// SettingPasswordRuleLowercase requires at least one lowercase letter
 	// in a new password.
 	SettingPasswordRuleLowercase = "password.rule_lowercase"
@@ -409,11 +405,6 @@ func Catalog() []SettingDef {
 			Key:         SettingPasswordRejectCompromised,
 			Default:     "true",
 			Description: "Whether a password that appears in the breach corpus is refused at sign-up and password change, and flagged at sign-in.",
-		},
-		{
-			Key:         SettingPasswordMinStrength,
-			Default:     "normal",
-			Description: "The strength floor a new password must clear: off or normal. Sign-in never runs the strength meter; the compromised check covers that path.",
 		},
 		{
 			Key:         SettingPasswordRuleLowercase,

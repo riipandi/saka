@@ -102,16 +102,6 @@ func TestValidatorKeepsTheLegacyFloorWithoutExplicitRules(t *testing.T) {
 	assert.NoError(t, validator.Validate(t.Context(), "one-of-each-9"))
 }
 
-func TestValidatorMarksTheStrengthFloorAsDeferred(t *testing.T) {
-	// The deferred meter: the key stays readable, the gate stays closed to
-	// nothing — any level accepts what the other rules accept. The marker
-	// is the rework debt the owner named.
-	validator := NewValidator(stubPolicySettings{
-		SettingMinStrength: "strict",
-	}, nil, nil)
-	assert.Equal(t, "strict", validator.deferredStrength(validator.settings))
-}
-
 func TestScanRangeAnswersTheSuffixCount(t *testing.T) {
 	body := strings.Join([]string{
 		"0018A45C4D1DEF836AAD78E7B34E1F5DD33:3",
