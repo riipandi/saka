@@ -86,7 +86,7 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
 
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     NODE_ENV=production pnpm exec tsc -b --noEmit \
-    && NODE_ENV=production pnpm exec vite build
+    && NODE_ENV=production SAKA_SKIP_GO=1 pnpm exec vite build
 
 # The embed is compile-time: the SPA bundle and the derived assets.json the
 # Vite build wrote above must exist before the Go binary compiles.
@@ -108,9 +108,11 @@ FROM base AS pruner
 # Copy only necessary files from builder stage
 COPY --from=builder /srv/build/release /srv
 
+# Generate default application config and env example
+RUN /srv/saka config:generate --overwrite --env-example
+
 # Create necessary data directories and set permissions
-RUN mkdir -p /srv/storage/{backup,certs,data,keys,logs,uploads} && \
-    chmod -R 0775 /srv/storage && /srv/saka config:generate
+RUN mkdir -p /srv/storage/{backup,config,logs,uploads} && chmod -R 0775 /srv/storage
 
 # ------------------------------------------------------------------------------
 # Production image, copy build output files and run the application.
