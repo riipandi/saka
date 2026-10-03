@@ -8,7 +8,7 @@ re-litigated. Read the section for the package you are changing.
 
 ### migrations/ (`database/migrations/`)
 
-Goose SQL migrations, the single source of schema truth (15 files, `00001`–`00015`, grouped by topic — identity, authorization, multifactor, webauthn, settings, rate limits, scheduler, filestore, notification, webhook, api keys, jwks, blocklist, with the federation surface last). Never embed DDL or create tables at runtime. Editing an applied migration does not re-run it — roll back with `migrate:down` and re-apply. `app_migration` also carries goose's `tstamp` (when a version was recorded), which `migrate:status` reads, so run times need no separate audit table.
+Goose SQL migrations, the single source of schema truth (16 files, `00001`–`00016`, grouped by topic — identity, authorization, multifactor, webauthn, settings, rate limits, scheduler, filestore, notification, webhook, api keys, jwks, blocklist, the federation surface, and the OAuth SSO surface last). Never embed DDL or create tables at runtime. Editing an applied migration does not re-run it — roll back with `migrate:down` and re-apply. `app_migration` also carries goose's `tstamp` (when a version was recorded), which `migrate:status` reads, so run times need no separate audit table.
 
 ### migrator.go
 
@@ -333,7 +333,7 @@ The sign-in feature, the first password credential on the RPC surface: `tango.au
 
 The answer is the token pair the protocol section settles: a stateless access token (signed through the area's `jwks.Service`, so the dual stack is the deployment's decision — the service resolves algorithm and key per call, symmetric to `HMACKey`, asymmetric to `SignKey`) and a refresh token whose only server-side trace is a hashed row in `public.sessions` (SHA-256, 256 bits of base64url randomness). The session window reads the settings database, not the configuration file: `session.max_lifetime` is the one bound — the remembered and the non-remembered path share it, read fresh at every mint (`signin.Service.sessionLifetime`, bounds 5 minutes–10 years, an unreadable value falls back to the catalog default) — and the renewal refuses a session whose last activity rests older than `session.inactivity_timeout` (bounds 5 minutes–1 year), revoking the row on the spot so a stolen refresh token cannot wait the gate out. The `remember` flag selects only a lifetime, not a kind of token. The session row is the feature's one write-side coupling: the table constants live in the `session` package (`session.SessionTable`, `session.SessionID`), the row is written where the credential is verified, and the id leaves the server as a TypeID (`sess_…`) — the UUID column stores the typed id's UUID, the prefixed form is for clients and log lines. `sid` in the access claims is the same id, so a later rotation or revocation names exactly the row.
 
-Account state is refused after the credential verifies: `disabled` and a live ban window are `permission_denied` details, not `unauthenticated`, so the caller who owns the password learns the real reason; the ban reason text never leaves the database. The `last_login_at` touch commits with the session row, both through the shared `Querier`. The caller's address, agent, and fingerprint are the transport's capture: one middleware read them from the request before the procedure ran, and the handler carries them into the session and the audit record through `audit.ClientFromContext`, so every record of a sign-in names the same address the rate limit keyed on.
+Account state is refused after the credential verifies: `disabled` and a live ban window are `permission_denied` details, not `unauthenticated`, so the caller who owns the password learns the real reason; the ban reason text never leaves the database. An account inside a lockout window is the exception, and deliberately: the lockout's refusal is the same generic credential error a wrong password earns, so the lockout never becomes an account enumerator — the bound's row is the database's answer, the wire's shape unchanged. The failed-password streak is the account's in-place counter, the lockout write and its audit the restrictions feature's (see that section). The `last_login_at` touch commits with the session row, both through the shared `Querier`. The caller's address, agent, and fingerprint are the transport's capture: one middleware read them from the request before the procedure ran, and the handler carries them into the session and the audit record through `audit.ClientFromContext`, so every record of a sign-in names the same address the rate limit keyed on.
 
 Opening the session is `IssueSession`, the issuer the one-time access exchange and the MFA bridge share: it takes the query surface its writes run on, so a caller holding a transaction passes its tx and the session and whatever caused it commit together, and it carries the account-state checks every issuer owes. When the verified account keeps a confirmed TOTP factor, the sign-in forks before any issue: the `mfaGate` (see multifactor) is asked whether a challenge is owed and mints the pending bridge, and the response carries the challenge instead of the pair. The password verification stays here; the session's shape and the audit record do not.
 
@@ -398,11 +398,13 @@ hash in `public.signup_tokens`. An unknown, expired, and spent token answer one 
 
 The signup-token administration is the feature's second half, and the first consumer of the Bearer seam: `CreateSignupToken` draws the raw value (256 bits of base64url, the refresh token's shape), shows it once in the answer, and stores the hash with the requested window and budget — `ttl_seconds` between one hour and thirty days, a `usage_limit` that defaults to the single invitation and caps at a thousand, both validated through the same ozzo vocabulary. `ListSignupTokens` answers the counters and window through the shared `ListMetadata` block, never the raw values; `DeleteSignupToken` revokes an issued token, answering `not_found` for an id that names nothing. The three procedures are administrative: the transport-wide bearer middleware authenticated the caller, and the handler reads `jwtutils.AccessClaims` out of the context and refuses a non-admin with `permission_denied` — authorization lives at the feature because only it knows which procedures are administrative, while authentication is the transport's uniform default. The raw token's lifetime is request-driven, not configuration: an invitation's window is the operator's decision per issue.
 
+The strict enumeration mode (`auth.user_enumeration_protection` = `strict`, `bulk` the default) rewrites the taken-email answer: a signup whose email another account holds answers the same success shape an honest creation earns — the account id a freshly minted decoy TypeID (`user.FormatID(uuid.NewV7())`, so a zero id cannot oracle the real one), the caller's own field values, the gate's stamps — and writes nothing. The address on file learns of the attempt through the `signup-attempt-existing-email` notice behind `mailer.notifications.signup_attempt_notice_enabled`; the token count the response carries is the honest path's only, so the shape comparison holds. The username refusal stays honest under strict — the username is not a verified contact channel, so a decoy would tell nobody anything true.
+
 ### modules/identity/user
 
 The account administration feature: the CRUD surface over `public.users` an operator drives. Every procedure is administrative, and the handler holds no check of its own: the procedure is declared `Admin` in `internal/guard`'s table and a caller without the role is refused there with `not_found`, so the account never learns the endpoint exists. The shape follows the upstream it ports: **CreateUser** creates an account without a signup token, its password optional (absent, the account carries no credential row until a later procedure sets one, so an invitation-less account is not silently signable); **UpdateUser** is a *full replace*, every field specified and an empty name part or locale clearing its value, because the upstream endpoint is a `PUT`; **DeleteUser** refuses the account the caller is signed in with (`failed_precondition`) — the caller's username travels from the claims and compares case-insensitively, the way the CITEXT column matches — and the removal is soft by construction — the `fn_soft_delete` trigger archives the row, never a flag the service writes. The same archive answers every operator delete: the account, its group, the OIDC client, the custom claim, the webhook endpoint, and the signup token each carry the trigger, so `public.deleted_records` is the one place a deleted row is readable (the deleted-record insert — the row is moved, not flagged; see the archive's own section under initialization).
 
-The ban fields are the one place the shape leaves the upstream: the schema carries `banned_at`/`ban_expires`/`ban_reason` and the upstream does not, so `UpdateUser` treats them as a unit — a `ban_expires` timestamp present applies the ban and records `banned_at` automatically (`now`, or the start already on record: the field answers *since when*, so a re-ban does not move it), an absent expiry lifts the ban, reason included. The contract expresses the format through the wire type itself: `ban_expires` is a `google.protobuf.Timestamp`, so a malformed instant is refused at decode, not by a duplicated rule.
+The ban fields are the one place the shape leaves the upstream: the upstream carries no ban, and tango's ban is a row in `public.account_restrictions` (the restrictions feature's table; see that section) — the `User` wire message keeps its `banned_at`/`ban_expires`/`ban_reason` fields, answered by the active-ban join the reads carry (`user.ActiveBanJoin`, the same join the group directory and the scimsync directory reuse). `UpdateUser` still treats the ban as a unit — a `ban_expires` timestamp present applies the ban (writing the row through the restrictions service, the start instant answering *since when*, so a re-ban does not move it), an absent expiry lifts it — and answers with a re-read row so the join populates the ban fields. The contract expresses the format through the wire type itself: `ban_expires` is a `google.protobuf.Timestamp`, so a malformed instant is refused at decode, not by a duplicated rule.
 
 The `User` wire message is the canonical account view the account procedures answer with, mapped once in `user.WireView`: sign-up and the CRUD fill the same shape. The nullable columns are optional on the wire, so an account without a name part or a ban reads as absent rather than as an empty string, and the account's preferences travel as one typed block — `User.metadata`, the `UserMetadata` message — instead of loose fields. `DisplayName` — the given and family names joined — lives here because both creators share it; the list's search term matches the username, the email, and the display name through ILIKE, the columns the trigram indexes exist for.
 
@@ -411,6 +413,42 @@ Timezone is a presentation preference, never a storage format: every instant the
 The account views carry the account's group memberships (`user_groups`, the full group view the group procedures answer with, ordered by display name): the shape the upstream user DTO sets, and the data a client renders beside the account — the group names are what a deployment's clients match a group-based claim against. The memberships read through a seam, `user.GroupDirectory`: the group feature's repository implements it, and the area wires it post-construction, because `usergroup` imports `user` and the import may not run the other way. The list fills its page in one batch read; a creation that names groups attaches them inside the account's own transaction, so an unknown group id rolls the whole creation back. The profile picture is the account's one file: the write is a REST route — a raw-body `PUT`, because a file upload is a browser's form job, not a protocol procedure — that stages the bytes into the storage engine, sniffed off their magic bytes, never a declared type, and syncs in the request, so the read that follows sees them; the reset is an RPC procedure (it carries no file) that deletes the file and clears the row. Both doors are the account owner's.
 
 The picture's key is `avatars/<account-id>.<ext>`: the extension comes from the sniffed bytes, so the object names what it holds wherever it is listed — a bucket browser, a presigned URL, the local deployment's file tree — with no lookup and no dependence on the file name the client sent. That makes the kind part of the identity: an upload of another kind lands under another key, so the replaced picture is deleted **before** the new one is stored. The other order is the one that cannot be repaired — the replaced file would keep its manifest row, and the row is exactly what the garbage collection keeps an object for, so the orphan would never be swept — while losing the race the first order can lose costs nothing visible: the row names the key it always named, and a picture whose object is missing already answers the bundled default, the state a reset produces. The key is recomposed on every update, so no path migration exists and none is needed. The read is the feature's other REST route, because an `<img>` tag fetches a URL rather than speaking the protocol: a stored picture streams with the content type the update recorded, an account without one answers the bundled default by redirect to `/images/default-avatar.png` — a frontend asset under `public/images/`, shipped in the compiled SPA — and the row naming a key the engine has lost lands on the same default rather than an error. The self-service profile edit (`/users/me`) and the group join stay planned: they need the self-service shape; the passkey procedures shipped as `tango.authn.v1.WebAuthnService` (see the endpoint reference).
+
+### modules/identity/restrictions
+
+The account-restriction feature: the one table both kinds of barred access read and write —
+`public.account_restrictions`, a row per restriction with a `kind` CHECK (`ban` | `lockout`), an
+open-row predicate of `lifted_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, and
+`lifted_by` naming the account that lifted it. The normalization is the design: a ban and a lockout
+answer the same questions (since when, until when, why), so they share one schema, one expiry
+rule, and one read, and a new kind is a CHECK value plus its policy, not a second table.
+
+The reads are the feature's other half. The auth paths do not ask the feature whether an account
+is barred — they join the active row beside the account they already read (the sign-in issuer's
+three account reads, the one-time access exchange, the password recovery's reads, each selecting
+`coalesce(ar.kind,'') AS restriction_kind`) and switch on the kind. The account reads that surface
+ban fields join the active ban row (`user.ActiveBanJoin`), and the API key's validation is an
+anti-join — a restricted owner's machine credential opens nothing. An expired lockout lifts on the
+read that finds it: `Active` runs `ExpireLifted` first, so the row is lifted and the streak it
+answered for starts fresh.
+
+The writes are the feature's own: the failed-password streak lives on `users.failed_attempts` in
+place (the hot path's counter, one `UPDATE ... RETURNING`), and it is a **streak, never a tally** —
+a successful sign-in zeroes it, a lift zeroes it, an expiry's read zeroes it. The lockout lands
+when the streak reaches `lockout.max_attempts` (floor 5, default 100): the row, the `user_locked`
+audit, and the locked notice behind `mailer.notifications.user_locked_notice_enabled`. The policy
+reads the settings catalog at call time; an unreadable key keeps its default. `Unlock` (the
+`UnlockUser` procedure, guard `Admin`) lifts the open lockout rows, zeroes the streak, and audits
+`user_unlocked`. A ban's write stays the user feature's (`BanUser`/`UnbanUser`/`UpdateUser`'s ban
+unit) because its side effects — the session revocation, the audit, the notices — run in that
+feature's transaction; the row write itself is this feature's `ApplyBanAndLift`, taking the
+caller's own clock as an argument so a test's frozen time stays the truth.
+
+The lockout's refusal keeps the generic credential error on the wire — a locked account and a
+wrong password are indistinguishable to the caller, because a distinct answer would make the
+lockout an account enumerator. The lockout does not end the holder's sessions: ending the session
+of a legitimate holder serves only the attacker who guessed the password; the ban, whose subject
+earned it, does end them.
 
 ### modules/identity/usergroup
 
@@ -560,6 +598,11 @@ The traps the ladder bought:
   "the last credential of an account whose password row is gone", so every delete door
   (holder's, administrator's) runs the same check: held ≤ 1 and the inner-join account read
   answers not-found → `failed_precondition`.
+- **The security receipts ride the `PasskeyNotifier` seam**: an enrollment
+  (`VerifyRegistration`) and a removal (`deleteCredential`, the administrator's door included)
+  enqueue their receipt through it after the commit, best-effort — a lost notice must not fail
+  a ceremony that succeeded. The toggles are `mailer.notifications.passkey_added_notice_enabled`
+  and `passkey_removed_notice_enabled`; a nil notifier keeps the ceremonies working.
 - **Each procedure registers at its own path** in the module's `MountRPC` — a handler added to
   the generated service without an `r.Handle` line answers the router's `unimplemented` 501, and
   no Go compile error names it. The area's forwarding test pins the claims.
@@ -918,11 +961,12 @@ The application sends two kinds of email, and only one of them is configurable. 
 emails carry the flow itself — a verification code, a password-reset code, a one-time access code,
 an email-change confirm code, each single-use and typed on its screen — so no switch exists for them: turning one off would break the flow,
 not save the cost. **Notices** are receipts a committed fact sends — a new-device sign-in, a changed
-password, an administrative MFA removal, a ban and its lift, an expiring API key, the email-change
-pending notice and its success confirmation — and every one of them is gated per flow under
-`mailer.notifications.*` (default on). The gate sits at the **enqueue** site, in the jobs adapter,
-not in the queue processor: a switched-off flow is a no-op before the task exists, so the queue
-never carries mail nobody asked for.
+password, a removed password, an added passkey and a removed one, an administrative MFA removal, a
+ban and its lift, an account lockout, a sign-up attempt against a taken address, an expiring API
+key, the email-change pending notice and its success confirmation — and every one of them is gated
+per flow under `mailer.notifications.*` (default on). The gate sits at the **enqueue** site, in the
+jobs adapter, not in the queue processor: a switched-off flow is a no-op before the task exists, so
+the queue never carries mail nobody asked for.
 
 The new-device notice is the one notice with state of its own: `public.known_devices` remembers
 every browser fingerprint an account has signed in from, and the first-seen judgement rides the
@@ -1127,10 +1171,6 @@ Outcomes of library comparisons, kept so the comparison does not get re-run. Rec
 ## Also implemented today (one line each)
 
 - `api/connect/*.proto` — ConnectRPC contracts (`tango.common.v1`, `tango.system.v1`), generated into `codegen/proto/{go,ts}` by `task rpc:generate`.
-- `email/templates` — React Email sources compiled into `web/email`.
-- `internal/mailer` — SMTP submission (`go-smtp` + `go-sasl`) and the compiled React Email templates, behind one `*mailer.Service`.
-- `web` — SPA embed and static serving (debug/release variants).
-tem.v1`), generated into `codegen/proto/{go,ts}` by `task rpc:generate`.
 - `email/templates` — React Email sources compiled into `web/email`.
 - `internal/mailer` — SMTP submission (`go-smtp` + `go-sasl`) and the compiled React Email templates, behind one `*mailer.Service`.
 - `web` — SPA embed and static serving (debug/release variants).

@@ -23,6 +23,7 @@ Keep this document as simple as possible!
 
 - [x] **Sign-up with password**: Require users to sign up with a password (default: true)
 - [x] **Add password to account**: Allow users to add a password to their account (default: true) - related to Device Trust
+- [x] **Remove password from account**: Allow users to remove their password, moving the account to passkey-only sign-in (the chained check refuses while the account keeps no other live credential — passkey or linked provider; step-up proof required)
 
 #### Password requirements
 
@@ -108,14 +109,14 @@ corpus (NIST 800-63B posture) — the zxcvbn requirement above was dropped
 
 ## Advanced Features
 
-### User & Authentication Rules (deferred)
+### User & Authentication Rules
 
-- [ ] **Lockout policy**: Configure how many login attempts are allowed before an account is locked. (default: enabled)
+- [x] **Lockout policy**: Configure how many login attempts are allowed before an account is locked. (default: enabled) — shipped as the restrictions feature (`modules/identity/restrictions`, the `account_restrictions` table): the failed-password streak is in place on `users.failed_attempts`, a streak rather than a tally (success, lift, and expiry zero it), and the bound writes the lockout row with the `user_locked` audit and notice. The refusal is the generic credential error — the lockout must not become an account enumerator. Settings: `lockout.enabled`, `lockout.max_attempts` (default 100, floor 5), `lockout.duration` (default 1h, empty = indefinite until an administrator's `UnlockUser`, which lifts the rows and zeroes the streak). A lockout does not end the holder's sessions — ending a legitimate holder's session serves the attacker.
   - Maximum attempt limit: The number of consecutive failed login attempts before protection is activated. (default: 100)
   - Lockout duration: (indefinite|timelimit) The amount of time a user is locked out from their account after 100 failed attempts. (default: timelimit 1 hour)
 - [ ] **Device Trust**: Helps protect against credential stuffing by treating new devices as untrusted for password sign-ins. (default: false)
 - [ ] **Bot sign-up protection**: New sign-ups will include a browser verification step powered by Cloudflare Turnstile. (default: false)
-- [ ] **User enumeration protection**: Prevent attackers from determining if even a single email address or phone number has an account. (default: bulk)
+- [x] **User enumeration protection**: Prevent attackers from determining if even a single email address or phone number has an account. (default: bulk) — shipped as `auth.user_enumeration_protection` (`bulk` | `strict`): strict answers a taken-email sign-up with the success shape (a decoy id, the caller's own fields), notices the address on file, and answers a taken-address email change with silent success; the username refusal stays honest (it is not a verified contact channel).
   - Bulk user enumeration protection: Less private, more common - rate limits prevent determining which email addresses and phone numbers are registered in bulk, but targeted attacks are still feasible.
   - Strict user enumeration protection: More private - logical changes prevent attackers from determining if even a single email address or phone number has an account.
 

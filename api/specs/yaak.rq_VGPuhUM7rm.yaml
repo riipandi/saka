@@ -32,7 +32,7 @@ headers:
   value: '1'
   id: null
 method: POST
-name: '[Pocket ID] Get user groups (unimplemented)'
+name: '[Pocket ID] Get user groups'
 sortPriority: 5055.555555555556
 url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/GetUserGroups
 urlParameters:

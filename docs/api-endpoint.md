@@ -173,11 +173,13 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 | POST     | `/rpc/tango.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
 | POST     | `/rpc/tango.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
 | POST     | `/rpc/tango.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
-| POST     | `/rpc/tango.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin)                              |
+| POST     | `/rpc/tango.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin; the ban is a row in `account_restrictions`, ends the live sessions) |
 | POST     | `/rpc/tango.identity.v1.UserService/UnbanUser`                               | ConnectRPC   | Unban a user (admin)                            |
+| POST     | `/rpc/tango.identity.v1.UserService/UnlockUser`                              | ConnectRPC   | Lift an account's lockout (admin; zeroes the failed-attempt streak) |
 | POST     | `/rpc/tango.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
 | POST     | `/rpc/tango.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (self-service; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
 | POST     | `/rpc/tango.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Tango-Reauthentication`; refused when a password already stands) |
+| POST     | `/rpc/tango.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
 | PUT      | `/api/users/me/profile-picture`                                              | HTTP/REST    | Update own profile picture (raw-body upload)    |
 | DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
 | PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
