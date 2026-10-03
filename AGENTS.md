@@ -1,4 +1,4 @@
-# AGENTS.md
+# Agents Instructions
 
 One binary: HTTP/ConnectRPC API, embedded SPA, CLI. This file holds the general
 instructions; the detail lives in `.llms/`. Read in this order:
