@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/saka/database/seeders"
+	"github.com/riipandi/saka/internal/database/seeders"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/pkg/crypto"
 )

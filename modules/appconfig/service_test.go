@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/pkg/testutils"

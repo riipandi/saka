@@ -83,7 +83,7 @@ pool and the queue client, and its job list comes from `jobs.Scheduled()` in
 `internal/jobs/register.go` — the same one place the application's job lists are spelled
 out.
 
-Schema is owned by the migration (`database/migrations/00008_create_scheduler_tables.sql`,
+Schema is owned by the migration (`internal/database/migrations/00008_create_scheduler_tables.sql`,
 shared with the queue's tables) — run `task db:migrate`; the scheduler never creates tables
 itself.
 
@@ -203,7 +203,7 @@ closes when they do. Returns `true` when every fire finished in time.
 
 ## Database Schema
 
-One table, created by migration `database/migrations/00008_create_scheduler_tables.sql`
+One table, created by migration `internal/database/migrations/00008_create_scheduler_tables.sql`
 (shared with the queue's two tables):
 
 ### `scheduler_jobs`

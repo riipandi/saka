@@ -12,8 +12,8 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/database/entity"
 )
 
 // The consent ledger: user_authorized_oidc_clients answers the question

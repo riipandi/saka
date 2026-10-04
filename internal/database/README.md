@@ -152,7 +152,7 @@ task run -- migrate:seed               # the idempotent default records
 task run -- migrate:seed --dry-run     # what it would create, writes nothing
 ```
 
-A seeder is a factory file in `database/seeders/`, named `<Entity>Seeder`, appended to `All()`
+A seeder is a factory file in `internal/database/seeders/`, named `<Entity>Seeder`, appended to `All()`
 in dependency order. `Apply` receives the shared `datastore.Querier` — **the command owns the
 transaction**, which keeps a failed seeder from leaving a partial seed behind and lets a dry
 run pass the pool directly. Every insert is guarded with `ON CONFLICT DO NOTHING`, and

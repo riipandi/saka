@@ -17,7 +17,7 @@ import (
 // MigrationsPath is where migration files live on disk, relative to the module
 // root. The embedded copy that ships in a binary is built from this directory,
 // so a new file only reaches the migrator after a rebuild.
-const MigrationsPath = "database/" + migrationsDir
+const MigrationsPath = "internal/database/" + migrationsDir
 
 // migrationFileMode is the mode of a generated migration. Git records only the
 // executable bit, so this does not leak into a clone.

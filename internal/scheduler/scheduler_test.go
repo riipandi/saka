@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/testutils"

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/database"
 )
 
 // validMigration is the shape every file in database/migrations must have.

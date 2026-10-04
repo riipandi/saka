@@ -8,7 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/saka/database/entity"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 )

@@ -13,11 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/saka/database/entity"
-	"github.com/riipandi/saka/database/seeders"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/database/seeders"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/user"

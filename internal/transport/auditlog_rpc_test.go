@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	auditlogv1connect "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1/auditlogv1connect"
-	"github.com/riipandi/saka/database"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/health"
 	"github.com/riipandi/saka/internal/kernel"

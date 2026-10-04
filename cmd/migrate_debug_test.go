@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/envfile"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -386,7 +386,7 @@ func TestMigrateCreateFailsWhenDirectoryMissing(t *testing.T) {
 	assert.NoDirExists(t, missing)
 }
 
-// The command writes into database/migrations unless --dir says otherwise,
+// The command writes into internal/database/migrations unless --dir says otherwise,
 // which is the directory the binary embeds.
 func TestMigrateCreateDefaultsToEmbeddedDirectory(t *testing.T) {
 	assert.Equal(t, database.MigrationsPath, migrateCreateCmd.Flags[0].(*cli.StringFlag).Value)

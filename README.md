@@ -69,12 +69,12 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
   defaults → config file → CLI flags. The environment is not a layer: a variable reaches a key
   only where the file references it (`env:NAME` or `${NAME}`), and secrets are never written
   literally. Details: [`internal/config/README.md`](./internal/config/README.md).
-- **Database** — goose migrations embedded in the binary (`database/migrations/`), tracked in
+- **Database** — goose migrations embedded in the binary (`internal/database/migrations/`), tracked in
   `app_migration`, applied over a single locked connection. Migrate, seed, and inspect with the
-  `db:*` / `migrate:*` commands. Details: [`database/README.md`](./database/README.md).
+  `db:*` / `migrate:*` commands. Details: [`internal/database/README.md`](./internal/database/README.md).
 - **Dump and restore** — `task db:export` writes a readable SQL dump (`COPY` blocks, PK-ordered,
   optional `--compression`); `task db:import` loads it back in one transaction, reordered by
-  foreign keys. See `database/README.md` for the flags.
+  foreign keys. See `internal/database/README.md` for the flags.
 - **Logging** — `log/slog` is the only frontend; `log.transport` names the sinks (console,
   rotating file, OTLP collector). Details: [`internal/logger/README.md`](./internal/logger/README.md).
 - **Tracing and metrics** — OpenTelemetry, opt-in per signal, one collector address

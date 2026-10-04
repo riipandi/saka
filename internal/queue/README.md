@@ -99,7 +99,7 @@ it in `internal/registry`: the client is built from the shared `datastore.Postgr
 the `queue` config section, and `internal/jobs.Register` lists the application's job queues
 and seeds the recurring ones.
 
-Schema is owned by the migrations (`database/migrations/00008_create_scheduler_tables.sql`,
+Schema is owned by the migrations (`internal/database/migrations/00008_create_scheduler_tables.sql`,
 shared with the scheduler's state table) — run `task db:migrate`; the client never creates
 tables itself.
 
@@ -390,7 +390,7 @@ tasks. See "Process Tasks from Another Task".
 
 ## Database Schema
 
-Three tables, created by migration `database/migrations/00008_create_scheduler_tables.sql`:
+Three tables, created by migration `internal/database/migrations/00008_create_scheduler_tables.sql`:
 
 ### `queue_tasks`
 

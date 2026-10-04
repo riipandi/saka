@@ -12,9 +12,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/cache"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
 )

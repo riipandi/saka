@@ -11,7 +11,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/database/entity"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 )
 

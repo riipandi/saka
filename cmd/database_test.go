@@ -16,7 +16,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/riipandi/saka/database"
+	"github.com/riipandi/saka/internal/database"
 )
 
 // runDBExportCmd runs db:export with the given stdin and arguments.

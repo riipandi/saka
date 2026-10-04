@@ -7,7 +7,7 @@ section for the package you are changing.
 
 ## database
 
-### migrations/ (`database/migrations/`)
+### migrations/ (`internal/database/migrations/`)
 
 Goose SQL migrations, the single source of schema truth (16 files, `00001`–`00016`, grouped by topic — identity, authorization, multifactor, webauthn, settings, rate limits, scheduler, filestore, notification, webhook, api keys, jwks, blocklist, the federation surface, and the OAuth SSO surface last). Never embed DDL or create tables at runtime. Editing an applied migration does not re-run it — roll back with `migrate:down` and re-apply. `app_migration` also carries goose's `tstamp` (when a version was recorded), which `migrate:status` reads, so run times need no separate audit table.
 
@@ -52,7 +52,7 @@ The deployment bootstrap, carried by the release build. `initialize` applies the
 
 ### migrate_debug.go
 
-Debug-only commands (`migrate:create|reset|seed|validate`). The actions live here rather than in `cmd/migration.go` because a release build would otherwise compile them into `unused`. `migrate:reset` rolls back everything and, with `--up`, re-applies in one run; on a database with nothing applied, `--up` alone applies the migrations, so `reset --up` also builds a schema from scratch. `migrate:create` takes a `--dir` flag defaulting to `database/migrations` and needs no database. `migrate:seed` first proves the schema is current by asking the migrator for pending migrations, so it refuses with the count and `run migrate:up first` rather than failing halfway on a missing column. A dry run needs no confirmation; a real run asks (unless `--force` or a non-terminal stdin) and runs in one transaction.
+Debug-only commands (`migrate:create|reset|seed|validate`). The actions live here rather than in `cmd/migration.go` because a release build would otherwise compile them into `unused`. `migrate:reset` rolls back everything and, with `--up`, re-applies in one run; on a database with nothing applied, `--up` alone applies the migrations, so `reset --up` also builds a schema from scratch. `migrate:create` takes a `--dir` flag defaulting to `internal/database/migrations` and needs no database. `migrate:seed` first proves the schema is current by asking the migrator for pending migrations, so it refuses with the count and `run migrate:up first` rather than failing halfway on a missing column. A dry run needs no confirmation; a real run asks (unless `--force` or a non-terminal stdin) and runs in one transaction.
 
 The smoke probes (`mailer:smoke`, `logger:smoke`, `otel:smoke`) follow the same split at the registration: their command files carry no build tag, but `cli_release.go` lists no smoke command. A release binary must not hand out an unauthenticated outbound-mail primitive, inject probe lines into the production log store, or fabricate spans and a permanent `saka_otel_smoke_total` series into the production time series; the probes exist to prove wiring before a deployment depends on it, so they belong to the side that also carries `migrate:seed`.
 

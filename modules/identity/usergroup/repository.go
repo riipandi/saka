@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/database/entity"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )

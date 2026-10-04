@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/riipandi/saka/database/entity"
+	"github.com/riipandi/saka/internal/database/entity"
 )
 
 // dumpSchemas lists the application schemas in the order a restore needs them.

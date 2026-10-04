@@ -155,7 +155,7 @@ the provider builds. The storage jobs are registered in `internal/jobs/register.
 (`Register` skips them when the manager is absent, so a build without storage runs the rest
 unchanged); the sweep is the `upload sweep` entry in the registry's runners.
 
-Schema is owned by the migration (`database/migrations/00009_create_filestore_tables.sql`) —
+Schema is owned by the migration (`internal/database/migrations/00009_create_filestore_tables.sql`) —
 run `task db:migrate`; the engine never creates tables itself.
 
 The engine logs through `log/slog` — the process logger `serve` hands over — so storage lines
@@ -352,7 +352,7 @@ run without a signer fails every private read closed; public files are untouched
 
 ## Database Schema
 
-Two tables, created by migration `database/migrations/00009_create_filestore_tables.sql`:
+Two tables, created by migration `internal/database/migrations/00009_create_filestore_tables.sql`:
 
 ### `storage_buckets`
 

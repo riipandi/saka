@@ -15,9 +15,9 @@ import (
 
 	notificationv1 "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1"
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
-	"github.com/riipandi/saka/database"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/health"
 	"github.com/riipandi/saka/internal/kernel"

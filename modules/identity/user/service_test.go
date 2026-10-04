@@ -21,8 +21,8 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/identity/restrictions"

@@ -8,8 +8,8 @@ import (
 
 	"github.com/briandowns/spinner"
 
-	"github.com/riipandi/saka/database"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/printext"
 )
 
