@@ -1,12 +1,13 @@
-// The shell is the HTML document the Go binary renders for every SPA page:
+// The shell is the HTML document the binary renders for every SPA page:
 // the head with its meta and the Vite fragment, and the body with the
 // loading state the application replaces. There is no separate index.html
 // for Vite to own — the build's input is the application entry, and every
 // document the server answers comes from here. A page is one entry point
 // plus the meta it carries; a multi-page build registers further pages and
 // the router hands each route the page it names, the way the Vite backend
-// integration guide's multi-page section describes.
-package web
+// integration guide's multi-page section describes. The documents are the
+// caller's vocabulary: the engine knows the shape, the caller the titles.
+package bundler
 
 import (
 	"bytes"
@@ -27,14 +28,6 @@ type Page struct {
 	// public page a later phase adds turns it off and gains the meta the
 	// preview needs.
 	Noindex bool
-}
-
-// DefaultPage is the application document every unmatched GET renders.
-var DefaultPage = Page{
-	Entry:       "src/main.tsx",
-	Title:       "Monolith Go React",
-	Description: "Monolith Go, React, and TanStack application template",
-	Noindex:     true,
 }
 
 // RenderPage executes the document for one page with one Vite fragment —

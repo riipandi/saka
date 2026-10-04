@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/riipandi/saka/framework/bundler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,12 +20,8 @@ func TestTheNonDocumentRequestsRideTheCompiler(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	old := viteDevServer
-	viteDevServer = upstream.URL
-	defer func() { viteDevServer = old }()
-
 	r := chi.NewRouter()
-	SetupStatic(r)
+	bundler.MountDev(r, upstream.URL, DefaultPage, surfacePrefixes...)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/src/main.tsx", nil))

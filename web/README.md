@@ -1,20 +1,20 @@
 # Web
 
-Web is the SPA surface the Go binary serves: the application document is rendered by Go
-(`shell.go`), the assets are built by Vite, and the head tags that bridge the two come from
-a fragment engine ported from olivere/vite. There is no `index.html` — the build's input is
-the application entry, and every path the routes above it did not claim renders the shell.
+Web is the SPA surface's app binding: the document every page renders as, the embedded build
+output the release mount serves, and the build-tagged file that picks the bundler's mode. The
+engine — the shell, the fragment resolver, and the two static mounts — lives in
+`framework/bundler`; this package carries what is the application's own.
 
 > **Origin:** the fragment engine is based on [olivere/vite](https://github.com/olivere/vite)
-> (MIT), ported and reduced to what saka serves: one fragment per entry point, resolved
+> (MIT), ported and reduced to what the app serves: one fragment per entry point, resolved
 > from the build manifest in release and from the dev server in debug. The handler and
 > metadata layers upstream carries were not ported — serving the assets stays with the
-> `SetupStatic` seam and the HTML document stays with the shell. Upstream is no longer
-> tracked: the engine is owned and evolved by saka.
+> static mounts and the HTML document stays with the shell. Upstream is no longer
+> tracked: the engine is owned and evolved here.
 
 ## Features
 
-- **Go-owned document** — `web/shell.go` renders the whole HTML document; the head a
+- **Go-owned document** — the bundler's shell renders the whole HTML document; the head a
   crawler reads is served, not fetched around
 - **Manifest-driven tags** — the release build resolves every script, stylesheet, and
   modulepreload link from a derived `assets.json` embedded with the binary; Vite's own
@@ -41,9 +41,10 @@ flowchart TB
 
     subgraph Go binary
         R[router_http.NewRouter]
-        S[web.SetupStatic]
-        SH[web.renderShell]
-        F[web.ViteHTMLFragment]
+        S[web.SetupStatic picks the mode]
+        M[framework/bundler.MountDev / MountRelease]
+        SH[bundler shell]
+        F[bundler.ViteHTMLFragment]
     end
 
     subgraph Debug build
@@ -51,18 +52,19 @@ flowchart TB
     end
 
     subgraph Release build
-        M[(embedded assets.json)]
+        MM[(embedded assets.json)]
         A[(embedded hashed assets)]
     end
 
     B --> R
     R -->|unclaimed GET| S
-    S -->|navigation: Accept text/html| SH
+    S --> M
+    M -->|navigation: Accept text/html| SH
     SH -->|one fragment per entry| F
     F -->|IsDev: same-origin paths| V
-    F -->|release| M
-    S -->|module, asset, HMR socket| V
-    S -->|/assets/... file hit| A
+    F -->|release| MM
+    M -->|module, asset, HMR socket| V
+    M -->|/assets/... file hit| A
 ```
 
 | Build    | Fragment source                      | Assets served from          |

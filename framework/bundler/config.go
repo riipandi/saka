@@ -9,7 +9,7 @@
 // One entry point owns one fragment: a multi-page build passes a different
 // ViteEntry per document and gets that page's module, its stylesheets, and
 // its preload links — never another page's.
-package web
+package bundler
 
 import "io/fs"
 

@@ -1,4 +1,4 @@
-package web
+package bundler
 
 import (
 	"html/template"
@@ -11,7 +11,7 @@ import (
 func TestTheShellRendersThePageAndTheFragment(t *testing.T) {
 	html, err := RenderPage(Page{
 		Entry:       "src/main.tsx",
-		Title:       "Sign in — Saka",
+		Title:       "Sign in — Hogwarts",
 		Description: "Sign in to your account",
 		Noindex:     true,
 	}, template.HTML(`<script type="module" src="/assets/app.js"></script>`))
@@ -19,7 +19,7 @@ func TestTheShellRendersThePageAndTheFragment(t *testing.T) {
 
 	doc := string(html)
 	assert.Contains(t, doc, "<!doctype html>")
-	assert.Contains(t, doc, "<title>Sign in — Saka</title>")
+	assert.Contains(t, doc, "<title>Sign in — Hogwarts</title>")
 	assert.Contains(t, doc, `content="Sign in to your account"`)
 	assert.Contains(t, doc, `name="robots" content="noindex`)
 	assert.Contains(t, doc, `<script type="module" src="/assets/app.js"></script>`)
