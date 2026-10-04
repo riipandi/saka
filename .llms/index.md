@@ -45,6 +45,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261003_0258.md` | OAuth SSO sign-in (Google, GitHub, custom OIDC) |
 | `plan-20261003_0700.md` | Hardening: enumeration, lockout, security notifications |
 | `plan-20261003_2359.md` | Storage revamp: buckets, `/storage` mount, tus, signed links — the decisions list (esp. 17–21) is the binding record for the storage engine |
+| `plan-20261004_1800.md` | Framework extraction: the reusable engines into `framework/`, composable behind typed Options, `database/` into `internal/`, per-package migration sets — the decisions list (D1–D18) is the binding record for the framework boundary |
 
 ## Handovers (`.llms/handover/`)
 
