@@ -30,6 +30,7 @@
         "happy-dom": "^20.14.5",
         "kill-port-process-cli": "^1.0.16",
         "npm-check-updates": "^23.1.0",
+        "otpauth": "catalog:",
         "typescript": "^7.0.2",
         "vite": "^8.3.2",
         "vite-plus": "catalog:",

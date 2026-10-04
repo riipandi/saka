@@ -64,6 +64,7 @@ corpus (NIST 800-63B posture) — the zxcvbn requirement above was dropped
 ## SSO Connections
 
 - [x] **Account linking**: Allow users to link their account with an external SSO provider (default: true)
+- [x] **Custom attribute mapping**: Map provider claims onto the account — subject, email and its verified flag, names, username, avatar — plus free-form custom attributes stored on the user, refreshed on every sign-in (2026-10-04, Clerk custom-provider parity)
 
 ---
 

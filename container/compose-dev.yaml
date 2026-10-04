@@ -132,7 +132,7 @@ services:
     image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-otel}
     hostname: nginx
     ports: ["9180:9180", "3443:3443", "3220:3220"]
-    volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw"]
+    volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw", "./mock-assets:/srv/mock:ro"]
     configs: [{ source: nginx_config, target: /etc/nginx/templates/default.conf.template }]
     shm_size: 32m # set shared memory limit
     mem_limit: 64m # set memory limit

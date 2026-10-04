@@ -100,7 +100,10 @@ Saka-only; upstream Pocket ID has no SSO. Sign in with Google, GitHub, or a cust
 connection. The browser flow rides two REST routes that answer 302 redirects only; the
 completion procedures run over ConnectRPC with the flow token as the credential (guarded
 `Public`). A resolved account keeping a confirmed second factor answers with the MFA bridge,
-which `CompleteSignIn` spends.
+which `CompleteSignIn` spends. A custom connection carries the claim mapping (subject,
+email and its verified flag, names, username, avatar) and a custom attribute set; the
+mapping applies on every sign-in, the username only at the JIT creation, and the
+avatar is downloaded to storage.
 
 | Method | Procedure / Endpoint                                          | Protocol     | Summary |
 | ------ | ------------------------------------------------------------- | ------------ | ------- |

@@ -162,8 +162,8 @@ second factor answers `ContinueSignIn` with the MFA bridge, and `CompleteSignIn`
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/VerifySignInEmail` | Verify OAuth sign-in email | done — guard `Public` (auth bucket); spends the single-use email code a `verify_email` flow waits for; three wrong answers end the flow; the answer names the stage the flow moved to | `modules/identity/oauthsso.TestVerifySignInEmailSpendsTheCodeAndTheFlowCompletes`, `modules/identity/oauthsso.TestThreeWrongCodesEndTheFlow` |
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/ListConnections` | List OAuth connections | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/GetConnection` | Get OAuth connection | done — guard `Admin`; secrets never answered | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/saka.authn.v1.OAuthSSOService/CreateConnection` | Create OAuth connection | done — guard `Admin`; custom connections resolve their discovery document once at write time; builtin slugs are reserved | `modules/identity/oauthsso` service tests |
-| POST | `/rpc/saka.authn.v1.OAuthSSOService/UpdateConnection` | Update OAuth connection | done — guard `Admin`; optional fields keep their stored value when unset | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/CreateConnection` | Create OAuth connection | done — guard `Admin`; custom connections resolve their discovery document once at write time; builtin slugs are reserved; the write carries the extended claim mapping (subject, email + verified flag, names, username, avatar) and the custom attribute set (`key`/`claim`, unique keys, non-empty both halves) | `modules/identity/oauthsso` service tests |
+| POST | `/rpc/saka.authn.v1.OAuthSSOService/UpdateConnection` | Update OAuth connection | done — guard `Admin`; optional fields keep their stored value when unset; the mapping and custom attributes are one column each — unset keeps, empty replaces wholesale (a nil custom-attribute list keeps the stored set, an empty one clears it) | `modules/identity/oauthsso` service tests |
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/DeleteConnection` | Delete OAuth connection | done — guard `Admin`; the bindings cascade | `modules/identity/oauthsso.TestDeleteRemovesTheRowAndRecordsTheChange` |
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/ListLinkedConnections` | List linked OAuth connections | done — guard `Session`; the caller's own bindings, oldest first, never a secret | `modules/identity/oauthsso.TestListLinkedAnswersOnlyTheCallerRowsOldestFirst` |
 | POST | `/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection` | Unlink OAuth connection | done — guard `Session` + step-up; a foreign or unknown binding answers `not_found`; the last credential of an account with no password and no passkey answers `failed_precondition` — set a password first | `modules/identity/oauthsso/accounts_test.go` |
@@ -172,7 +172,12 @@ second factor answers `ContinueSignIn` with the MFA bridge, and `CompleteSignIn`
 
 Connection settings live in `public.settings` through `modules/appconfig`: secrets sealed `enc:`
 with the application cipher, `oauthsso.account_linking_enabled` gates the email-match link
-(default true), and JIT creation follows `access.mode` — no second toggle.
+(default true), and JIT creation follows `access.mode` — no second toggle. A custom
+connection's claim mapping names what the provider answers — subject, email and its
+verified flag (`email_verified_default` answers when the claim is absent), names,
+username, avatar — and its custom attribute set merges onto `users.custom_attributes`
+at every sign-in; the mapped username writes once, at the JIT creation, and the avatar
+is downloaded and stored, a failed download never failing the sign-in.
 
 ## Webhooks (saka-only)
 
