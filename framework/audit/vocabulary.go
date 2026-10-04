@@ -5,6 +5,10 @@ package audit
 // it (Schema()), so the constant and the DDL travel together.
 const TableAuditLogs = "public.audit_logs"
 
+// TableAuditMigrations is the audit set's version table. It is migrator
+// bookkeeping, never data a dump carries.
+const TableAuditMigrations = "public.audit_migrations"
+
 // The trigger and status values the record's columns accept, and the payload
 // keys a delegated record carries. A caller matches these with constants,
 // never with string literals.

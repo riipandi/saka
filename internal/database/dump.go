@@ -9,6 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
+	fwqueue "github.com/riipandi/saka/framework/queue"
+	fwscheduler "github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/internal/database/entity"
 )
 
@@ -32,7 +35,16 @@ const copyTerminator = `\.`
 // migration files by migrate:up, so carrying them in a dump would either
 // duplicate the version table or, worse, claim a schema state the target does
 // not have.
-var excludedTables = []string{entity.TableAppMigration}
+// excludedTables lists the tables a data dump never carries: the version
+// tables of every migration set the binary composes are migrator
+// bookkeeping — `migrate:up` re-records them on the fresh database the dump
+// restores into, and a dumped version row would collide with the recording.
+var excludedTables = []string{
+	entity.TableAppMigration,
+	fwqueue.TableQueueMigrations,
+	fwscheduler.TableSchedulerMigrations,
+	fwaudit.TableAuditMigrations,
+}
 
 // isExcludedTable reports whether a table is left out of a dump.
 func isExcludedTable(table Table) bool {

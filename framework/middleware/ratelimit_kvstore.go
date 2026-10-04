@@ -12,7 +12,7 @@ import (
 // RateLimitKeyPrefix namespaces the limiter's keys on a shared backend, the
 // way the cache prefixes its own: features that share one server are isolated
 // by prefix, not by logical database index.
-const RateLimitKeyPrefix = "saka:ratelimit:"
+const RateLimitKeyPrefix = "ratelimit:"
 
 // The fixed-window check, run server-side: the count and its expiry move in
 // one script, so a client cannot wedge a key that was never given a window.

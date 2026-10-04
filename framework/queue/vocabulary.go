@@ -9,4 +9,8 @@ const (
 	// TableQueueTasksCompleted is the archive: the settled tasks, the
 	// replay stock of which is the dead letters.
 	TableQueueTasksCompleted = "public.queue_tasks_completed"
+
+	// TableQueueMigrations is the queue set's version table. It is migrator
+	// bookkeeping, never data a dump carries.
+	TableQueueMigrations = "public.queue_migrations"
 )

@@ -128,7 +128,7 @@ func TestCORSNamesTheExposedResponseHeaders(t *testing.T) {
 		MaxAge:         time.Hour,
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/rpc/saka.system.v1.HealthService/Check", nil)
+	req := httptest.NewRequest(http.MethodPost, "/rpc/hogwarts.system.v1.HealthService/Check", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	rec := httptest.NewRecorder()
 

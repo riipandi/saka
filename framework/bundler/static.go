@@ -27,8 +27,6 @@ import (
 // assets — is proxied to the dev server named by viteURL, which never
 // faces the network.
 func MountDev(r chi.Router, viteURL string, page Page, reserved ...string) {
-	refuseWrites(r)
-
 	target, err := url.Parse(viteURL)
 	if err != nil {
 		// The caller's constant, so a parse failure is a programming error.
@@ -43,7 +41,15 @@ func MountDev(r chi.Router, viteURL string, page Page, reserved ...string) {
 			"the vite dev server is not reachable — run task dev")
 	}
 
+	// One not-found handler for the whole surface: the read-only rule, the
+	// reserved prefixes, and the shell's answer compose in one body, because
+	// chi keeps the not-found handler registered first — a second NotFound
+	// call would never run, and a write that names no claimed route would
+	// be answered with silence.
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		if refuseWrite(w, r) {
+			return
+		}
 		if reservedPath(r.URL.Path, reserved) {
 			webutil.NotFoundJSON(w, r)
 			return
@@ -63,6 +69,9 @@ func MountDev(r chi.Router, viteURL string, page Page, reserved ...string) {
 		}
 		renderShell(w, r, page, tags.Tags)
 	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		refuseWrite(w, r)
+	})
 }
 
 // MountRelease mounts the SPA surface for a built binary: the assets come
@@ -72,7 +81,6 @@ func MountDev(r chi.Router, viteURL string, page Page, reserved ...string) {
 // manifest is a build-order error — Vite must run before Go — and the
 // surface answers the envelope's failure rather than a half-shell.
 func MountRelease(r chi.Router, assets fs.FS, page Page, reserved ...string) {
-	refuseWrites(r)
 
 	var (
 		once  sync.Once
@@ -95,6 +103,9 @@ func MountRelease(r chi.Router, assets fs.FS, page Page, reserved ...string) {
 	}
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		if refuseWrite(w, r) {
+			return
+		}
 		if reservedPath(r.URL.Path, reserved) {
 			webutil.NotFoundJSON(w, r)
 			return
@@ -127,24 +138,18 @@ func documentRequest(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 
-// refuseWrites keeps the surface read-only: a write method that names no
+// refuseWrite keeps the surface read-only: a write method that names no
 // claimed route is refused here rather than passed to the not-found
 // boundary, and TRACE in particular must never echo a request back to
-// whoever asked.
-func refuseWrites(r chi.Router) {
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			w.Header().Set("Allow", "GET, HEAD")
-			webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
-			return
-		}
-	})
-	// A method on a path another route claimed is refused by chi's own
-	// boundary; the shape here keeps it consistent with the SPA's.
-	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+// whoever asked. The not-found handlers call it first — the method rule is
+// the surface's first answer, not a competing registration.
+func refuseWrite(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
-	})
+		return true
+	}
+	return false
 }
 
 // reservedPath answers whether the path is one of the API and protocol

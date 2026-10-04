@@ -233,8 +233,9 @@ func TestTheAddressIsStoredWithoutItsMask(t *testing.T) {
 }
 
 // TestTheUsernameIsEmptyOnceTheAccountIsGone pins the join's left side: a
-// record outlives its account — the column is `ON DELETE SET NULL` — so it
-// stays in the list with no name rather than disappearing with the account.
+// record outlives its account — the column carries no foreign key on
+// purpose, so the delete touches nothing — and it stays in the list with no
+// name while keeping the identifier the account had.
 func TestTheUsernameIsEmptyOnceTheAccountIsGone(t *testing.T) {
 	pool := migratedPool(t)
 	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: vetraID})
@@ -247,7 +248,8 @@ func TestTheUsernameIsEmptyOnceTheAccountIsGone(t *testing.T) {
 
 	require.Len(t, logs, 1, "the record must survive its account")
 	assert.Empty(t, logs[0].Username)
-	assert.Empty(t, logs[0].UserID, "the column was set to NULL, so the record names no account")
+	assert.Equal(t, vetraID, logs[0].UserID,
+		"the column keeps the identifier: a record that loses who it was about when the account goes away is not an audit trail")
 }
 
 // TestFilterOptionsAnswersWhatTheTableHolds is the facets' contract: the

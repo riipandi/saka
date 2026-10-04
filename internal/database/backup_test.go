@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
+	fwqueue "github.com/riipandi/saka/framework/queue"
+	fwscheduler "github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -94,12 +97,19 @@ func TestSchemaOnlyDumpRebuildsTheSchema(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	// The restored database must carry exactly the tables the migrated source
-	// has, whatever that set is. The dump leaves the migrator's own version
-	// table out — the target's migrator owns it — so it is filtered here too.
+	// has, whatever that set is. The dump leaves every set's version table
+	// out — the target's migrator owns them — so they are filtered here too.
 	restored := applicationTables(t, pool)
 	require.NotEmpty(t, restored, "every application table must be recreated")
 	expected := slices.DeleteFunc(applicationTables(t, source), func(name string) bool {
-		return name == database.VersionTable
+		switch name {
+		case strings.TrimPrefix(database.VersionTable, "public."),
+			strings.TrimPrefix(fwqueue.TableQueueMigrations, "public."),
+			strings.TrimPrefix(fwscheduler.TableSchedulerMigrations, "public."),
+			strings.TrimPrefix(fwaudit.TableAuditMigrations, "public."):
+			return true
+		}
+		return false
 	})
 	assert.Equal(t, expected, restored)
 }
