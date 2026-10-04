@@ -21,6 +21,8 @@ import { run as preclean } from './steps/preclean.mjs'
 import { run as basics } from './steps/basics.mjs'
 import { run as guard } from './steps/guard.mjs'
 import { run as mapping } from './steps/mapping.mjs'
+import { run as retrieval } from './steps/retrieval.mjs'
+import { run as offboarding } from './steps/offboarding.mjs'
 import { run as cleanup } from './steps/cleanup.mjs'
 
 console.log('0. The admin credential the ladder runs on')
@@ -47,6 +49,8 @@ state.mapped = (connections.body.connections ?? []).find((c) => c.provider === '
 await basics()
 await guard()
 await mapping()
+await retrieval()
+await offboarding()
 await cleanup()
 
 finish()

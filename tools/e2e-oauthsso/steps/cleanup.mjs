@@ -1,4 +1,4 @@
-// Step 13 — the rows the ladder created leave in the same turn: the
+// Step 15 — the rows the ladder created leave in the same turn: the
 // accounts, then the connections its ensure step wrote.
 import { rpc } from '../lib/rpc.mjs'
 import { check } from '../lib/check.mjs'
@@ -6,7 +6,7 @@ import { getUser, deleteConnections } from '../lib/admin.mjs'
 import { state } from '../lib/state.mjs'
 
 export async function run() {
-  console.log('13. Cleanup: the rows the ladder created leave in the same turn')
+  console.log('15. Cleanup: the rows the ladder created leave in the same turn')
   {
     const { body } = await rpc('saka.identity.v1.UserService/ListUsers', {}, state.admin)
     for (const user of body.users ?? []) {

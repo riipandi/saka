@@ -3,6 +3,7 @@ package oauthsso
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -151,7 +152,11 @@ func (f TokenPosterFunc) PostForm(ctx context.Context, url string, form url.Valu
 // FormPostAdapter adapts the shared fetcher client onto the token POST
 // seam: the form encodes as the body string, the content type names it,
 // and the client's policy — timeouts, body bound, no credential logged —
-// is the one every outbound call shares.
+// is the one every outbound call shares. A classified answer still
+// carries the response: the token endpoint's refusal is the protocol's
+// own answer (the RFC 6749 error code rides the 4xx body the caller
+// parses), so the response wins over the fetcher's verdict — only a
+// call that never answered is a transport failure.
 func FormPostAdapter(client *fetcher.Client) TokenPoster {
 	return TokenPosterFunc(func(ctx context.Context, rawurl string, form url.Values) (int, []byte, error) {
 		res, err := client.Do(ctx, fetcher.Request{
@@ -160,9 +165,12 @@ func FormPostAdapter(client *fetcher.Client) TokenPoster {
 			Headers: http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}},
 			Body:    form.Encode(),
 		})
+		if res != nil {
+			return res.StatusCode, res.Body, nil
+		}
 		if err != nil {
 			return 0, nil, err
 		}
-		return res.StatusCode, res.Body, nil
+		return 0, nil, fmt.Errorf("fetcher: the token endpoint answered no response")
 	})
 }
