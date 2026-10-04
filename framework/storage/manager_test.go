@@ -17,7 +17,6 @@ import (
 	"go.jetify.com/typeid"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -25,8 +24,12 @@ import (
 // its row, so the manifest's bucket foreign key is satisfied.
 const testBucket = "devbucket"
 
-// migratedPool applies the migrations to a fresh test database and returns
-// the pool the manager's manifest reads and writes go through.
+// migratedPool stands a fresh database up over the manifest schema the
+// engine's tests touch, and returns the pool the manager reads and writes
+// through. The DDL is the fixture below, not the application's migration:
+// a framework test constructs what it needs alone (decision 16), and the
+// fixture's agreement with the real schema is pinned by the app-side
+// round-trip tests, which run over the migrations themselves.
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
@@ -35,9 +38,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
+	_, err = migrationDB.Exec(manifestSchema)
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
 
@@ -49,6 +50,59 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Cleanup(func() { pool.Shutdown(context.Background()) })
 	return pool
 }
+
+// manifestSchema is the manifest store's shape: the two tables the engine's
+// reads and writes name, the indexes the manifest scan walks, and the
+// updated-at triggers the rows carry.
+const manifestSchema = `
+CREATE TABLE IF NOT EXISTS public.storage_buckets (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    name TEXT NOT NULL,
+    file_size_limit BIGINT,
+    allowed_mime_types TEXT[],
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (name),
+    CONSTRAINT chk_storage_buckets_file_size_limit CHECK (file_size_limit IS NULL OR file_size_limit >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS public.storage_objects (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    bucket_id UUID NOT NULL REFERENCES public.storage_buckets (id) ON DELETE RESTRICT,
+    key TEXT NOT NULL,
+    size BIGINT NOT NULL DEFAULT 0,
+    content_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    is_private BOOLEAN NOT NULL DEFAULT false,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    staging_size BIGINT NOT NULL DEFAULT 0,
+    staging_mtime TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (bucket_id, key),
+    CONSTRAINT chk_storage_objects_status CHECK (status IN ('pending', 'ready', 'failed')),
+    CONSTRAINT chk_storage_objects_size CHECK (size >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_storage_objects_bucket_id ON public.storage_objects (bucket_id);
+CREATE INDEX IF NOT EXISTS idx_storage_objects_status ON public.storage_objects (status);
+CREATE INDEX IF NOT EXISTS idx_storage_objects_content_hash ON public.storage_objects (content_hash);
+
+CREATE OR REPLACE FUNCTION fn_update_storage_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = clock_timestamp(); RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_storage_buckets_updated_at
+    BEFORE UPDATE ON public.storage_buckets
+    FOR EACH ROW EXECUTE FUNCTION fn_update_storage_updated_at();
+
+CREATE TRIGGER trg_storage_objects_updated_at
+    BEFORE UPDATE ON public.storage_objects
+    FOR EACH ROW EXECUTE FUNCTION fn_update_storage_updated_at();
+`
 
 // seedBucket writes a bucket row a test's manifests can scope to.
 func seedBucket(t *testing.T, pool *datastore.Postgres, name string) {
