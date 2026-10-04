@@ -1259,8 +1259,13 @@ message OAuthConnection {
   string scopes = 9;
 
   // attribute_mapping is the custom connection's claim mapping — which
-  // userinfo or id_token claim answers the account's email and names.
+  // userinfo or id_token claim answers the account's identity, address,
+  // verified flag, username, and picture.
   OAuthAttributeMapping attribute_mapping = 10;
+
+  // custom_attributes are the operator-defined attributes the custom
+  // connection reads off the claims and lands on the account.
+  repeated OAuthCustomAttribute custom_attributes = 13;
 
   // created_at is when the connection was registered.
   google.protobuf.Timestamp created_at = 11;
@@ -1302,6 +1307,44 @@ message OAuthAttributeMapping {
   // family_name is the claim the account's family name is read from. The
   // default is `family_name`.
   string family_name = 3;
+
+  // subject is the claim the provider identity is read from. The default
+  // is `sub`, the standard's identifier.
+  string subject = 4;
+
+  // email_verified is the claim the address's proven flag is read from.
+  // The default is `email_verified`.
+  string email_verified = 5;
+
+  // email_verified_default is the proven flag a provider that answers no
+  // verified claim is held to. The default is false.
+  optional bool email_verified_default = 6;
+
+  // username is the claim the account's username is read from at the
+  // first sign-in. The default is `preferred_username`.
+  string username = 7;
+
+  // avatar_url is the claim the account's picture is read from. The
+  // default is `picture`.
+  string avatar_url = 8;
+}
+
+// OAuthCustomAttribute is one operator-defined attribute a custom
+// connection reads off the claims and lands on the account: the claim
+// the provider answers under `claim`, stored under `key`. An attribute
+// whose claim the provider does not answer lands nothing.
+message OAuthCustomAttribute {
+  // key is the stored word the attribute is read back by.
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 64
+  }];
+
+  // claim is the claim the value is read from.
+  string claim = 2 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 128
+  }];
 }
 
 // ListOAuthConnectionsRequest is empty: the listing answers every
@@ -1392,8 +1435,12 @@ message CreateOAuthConnectionRequest {
   // attribute_mapping is the custom connection's claim mapping.
   OAuthAttributeMapping attribute_mapping = 9;
 
+  // custom_attributes are the operator-defined attributes the custom
+  // connection reads off the claims and lands on the account.
+  repeated OAuthCustomAttribute custom_attributes = 10;
+
   // enabled registers the connection live; the default is false.
-  optional bool enabled = 10;
+  optional bool enabled = 11;
 }
 
 // CreateOAuthConnectionResponse is the stored connection, secrets never
@@ -1439,8 +1486,12 @@ message UpdateOAuthConnectionRequest {
   // attribute_mapping is the custom connection's claim mapping.
   OAuthAttributeMapping attribute_mapping = 8;
 
+  // custom_attributes rewrite the operator-defined attribute set as a
+  // whole; unset keeps the stored set.
+  repeated OAuthCustomAttribute custom_attributes = 9;
+
   // enabled turns the connection's sign-ins on or off.
-  optional bool enabled = 9;
+  optional bool enabled = 10;
 }
 
 // UpdateOAuthConnectionResponse is the connection as the row now holds it,

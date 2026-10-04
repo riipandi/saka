@@ -56,7 +56,7 @@ func (r *Repository) Insert(ctx context.Context, db datastore.Querier, conn Conn
 	sb.Values(
 		string(conn.Kind), conn.Provider, conn.DisplayName, nullIfEmpty(conn.DiscoveryURL),
 		endpointsJSON(conn.Endpoints), conn.ClientID, conn.ClientSecret,
-		scopesJSON(conn.Scopes), mappingJSON(conn.AttributeMapping), conn.Enabled,
+		scopesJSON(conn.Scopes), mappingJSON(conn.AttributeMapping, conn.CustomAttributes), conn.Enabled,
 	)
 	sb.SQL("RETURNING id, created_at")
 	query, args := sb.Build()
@@ -138,7 +138,7 @@ func (r *Repository) Update(ctx context.Context, db datastore.Querier, id uuid.U
 		sb.Assign("client_id", conn.ClientID),
 		sb.Assign("client_secret", conn.ClientSecret),
 		sb.Assign("scopes", scopesJSON(conn.Scopes)),
-		sb.Assign("attribute_mapping", mappingJSON(conn.AttributeMapping)),
+		sb.Assign("attribute_mapping", mappingJSON(conn.AttributeMapping, conn.CustomAttributes)),
 		sb.Assign("enabled", conn.Enabled),
 	)
 	sb.Where(sb.Equal("id", id))
@@ -678,9 +678,12 @@ func scanConnection(row pgx.Row) (Connection, error) {
 		}
 	}
 	if len(mapping) > 0 {
-		if err := json.Unmarshal(mapping, &conn.AttributeMapping); err != nil {
+		var doc connectionMapping
+		if err := json.Unmarshal(mapping, &doc); err != nil {
 			return Connection{}, fmt.Errorf("oauthsso: stored attribute mapping: %w", err)
 		}
+		conn.AttributeMapping = doc.AttributeMapping
+		conn.CustomAttributes = doc.CustomAttributes
 	}
 	return conn, nil
 }
@@ -720,9 +723,17 @@ func scopesJSON(scopes []string) any {
 	return raw
 }
 
+// connectionMapping is the attribute_mapping column's document: the
+// mapping's own fields and the operator-defined attribute set together,
+// so one JSONB column carries the whole mapping.
+type connectionMapping struct {
+	AttributeMapping
+	CustomAttributes []CustomAttribute `json:"CustomAttributes,omitempty"`
+}
+
 // mappingJSON renders the attribute mapping for its JSONB column.
-func mappingJSON(m AttributeMapping) any {
-	raw, err := json.Marshal(m)
+func mappingJSON(m AttributeMapping, attrs []CustomAttribute) any {
+	raw, err := json.Marshal(connectionMapping{AttributeMapping: m, CustomAttributes: attrs})
 	if err != nil {
 		return []byte(`{}`)
 	}

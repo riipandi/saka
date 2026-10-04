@@ -181,6 +181,28 @@ type AttributeMapping struct {
 	Email      string
 	GivenName  string
 	FamilyName string
+	// Subject names the claim the provider identity is read from; the
+	// empty field keeps the standard's `sub`.
+	Subject string
+	// EmailVerified names the claim the address's proven flag is read
+	// from; the empty field keeps `email_verified`.
+	EmailVerified string
+	// EmailVerifiedDefault is the proven flag a provider that answers no
+	// verified claim is held to.
+	EmailVerifiedDefault bool
+	// Username names the claim the account's username is read from at the
+	// first sign-in; the empty field keeps `preferred_username`.
+	Username string
+	// AvatarURL names the claim the account's picture is read from; the
+	// empty field keeps `picture`.
+	AvatarURL string
+}
+
+// CustomAttribute is one operator-defined attribute a custom connection
+// reads off the claims and lands on the account under Key.
+type CustomAttribute struct {
+	Key   string
+	Claim string
 }
 
 // Connection is one row of entity.TableOAuthConnections. The client secret is carried
@@ -198,6 +220,10 @@ type Connection struct {
 	ClientSecret     string
 	Scopes           []string
 	AttributeMapping AttributeMapping
+	// CustomAttributes are the operator-defined attributes the row's
+	// claims land on the account as; empty is the connection that
+	// defines none.
+	CustomAttributes []CustomAttribute
 	Enabled          bool
 	CreatedAt        time.Time
 	UpdatedAt        *time.Time

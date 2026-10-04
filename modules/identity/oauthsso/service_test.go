@@ -324,3 +324,98 @@ func TestOneConnectionPerProviderSlug(t *testing.T) {
 	_, err = service.Create(t.Context(), params)
 	require.ErrorIs(t, err, ErrProviderTaken)
 }
+
+func TestCreateStoresTheExtendedMappingAndCustomAttributes(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	params := customParams()
+	params.AttributeMapping = AttributeMapping{
+		Email:                "mail",
+		Subject:              "uuid",
+		EmailVerified:        "mail_verified",
+		EmailVerifiedDefault: true,
+		Username:             "user_name",
+		AvatarURL:            "portrait",
+	}
+	params.CustomAttributes = []CustomAttribute{
+		{Key: "house", Claim: "hogwarts_house"},
+		{Key: "patronus", Claim: "patronus"},
+	}
+
+	created, err := service.Create(t.Context(), params)
+	require.NoError(t, err)
+
+	// The round trip the surface serves: read the row back and find the
+	// same mapping and attribute set the create carried.
+	stored, err := service.Get(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, params.AttributeMapping, stored.AttributeMapping)
+	assert.Equal(t, params.CustomAttributes, stored.CustomAttributes)
+}
+
+func TestUpdateKeepsStoredClaimNamesAndReplacesTheAttributeSet(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	params := customParams()
+	params.AttributeMapping = AttributeMapping{Email: "mail", GivenName: "first"}
+	params.CustomAttributes = []CustomAttribute{{Key: "house", Claim: "hogwarts_house"}}
+	created, err := service.Create(t.Context(), params)
+	require.NoError(t, err)
+
+	// An empty mapping field keeps the stored claim name; the attribute
+	// set is rewritten as a whole.
+	updated, err := service.Update(t.Context(), created.ID, ConnectionUpdate{
+		AttributeMapping: &AttributeMapping{GivenName: "given"},
+		CustomAttributes: &[]CustomAttribute{{Key: "patronus", Claim: "patronus"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "mail", updated.AttributeMapping.Email)
+	assert.Equal(t, "given", updated.AttributeMapping.GivenName)
+	assert.Equal(t, []CustomAttribute{{Key: "patronus", Claim: "patronus"}}, updated.CustomAttributes)
+
+	// A nil attribute set keeps the stored one.
+	kept, err := service.Update(t.Context(), created.ID, ConnectionUpdate{})
+	require.NoError(t, err)
+	assert.Equal(t, []CustomAttribute{{Key: "patronus", Claim: "patronus"}}, kept.CustomAttributes)
+
+	// An empty set clears it.
+	cleared := []CustomAttribute{}
+	emptied, err := service.Update(t.Context(), created.ID, ConnectionUpdate{CustomAttributes: &cleared})
+	require.NoError(t, err)
+	assert.Empty(t, emptied.CustomAttributes)
+}
+
+func TestCreateRefusesCustomAttributesThatDoNotCompose(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	params := customParams()
+	params.CustomAttributes = []CustomAttribute{{Key: "house", Claim: ""}}
+	_, err := service.Create(t.Context(), params)
+	require.ErrorIs(t, err, ErrInvalidConnection)
+
+	params.CustomAttributes = []CustomAttribute{
+		{Key: "house", Claim: "hogwarts_house"},
+		{Key: "house", Claim: "patronus"},
+	}
+	_, err = service.Create(t.Context(), params)
+	require.ErrorIs(t, err, ErrInvalidConnection)
+}
+
+func TestBuiltinConnectionStoresNoMappingOrCustomAttributes(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	params := builtinParams()
+	params.AttributeMapping = AttributeMapping{Email: "mail"}
+	params.CustomAttributes = []CustomAttribute{{Key: "house", Claim: "hogwarts_house"}}
+
+	created, err := service.Create(t.Context(), params)
+	require.NoError(t, err)
+	// The builtin adapters read fixed claims — a create cannot name a
+	// mapping or attributes for them.
+	assert.Empty(t, created.AttributeMapping)
+	assert.Empty(t, created.CustomAttributes)
+}

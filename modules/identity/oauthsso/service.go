@@ -45,6 +45,7 @@ type ConnectionParams struct {
 	ClientSecret     string
 	Scopes           string
 	AttributeMapping AttributeMapping
+	CustomAttributes []CustomAttribute
 	Enabled          bool
 }
 
@@ -60,6 +61,9 @@ type ConnectionUpdate struct {
 	ClientSecret     *string
 	Scopes           *string
 	AttributeMapping *AttributeMapping
+	// CustomAttributes rewrite the operator-defined attribute set as a
+	// whole; a nil keeps the stored set, an empty slice clears it.
+	CustomAttributes *[]CustomAttribute
 	Enabled          *bool
 }
 
@@ -244,6 +248,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, update ConnectionUpd
 	if update.AttributeMapping != nil {
 		merged.AttributeMapping = mergeMapping(current.AttributeMapping, *update.AttributeMapping)
 	}
+	if update.CustomAttributes != nil {
+		merged.CustomAttributes = *update.CustomAttributes
+	}
 	if update.Enabled != nil {
 		merged.Enabled = *update.Enabled
 	}
@@ -319,6 +326,7 @@ func (s *Service) build(ctx context.Context, params ConnectionParams) (Connectio
 		ClientID:         params.ClientID,
 		Scopes:           splitScopes(params.Scopes),
 		AttributeMapping: params.AttributeMapping,
+		CustomAttributes: params.CustomAttributes,
 		Enabled:          params.Enabled,
 	}
 
@@ -336,6 +344,7 @@ func (s *Service) build(ctx context.Context, params ConnectionParams) (Connectio
 		// An empty scope list is the adapter's own default set, read at
 		// the authorize request — the definition owns it, not the row.
 		conn.AttributeMapping = AttributeMapping{}
+		conn.CustomAttributes = nil
 	case KindCustom:
 		// The builtin slugs are reserved: a custom connection named
 		// `google` would answer BeginSignIn with the operator's endpoints
@@ -404,6 +413,27 @@ func validateStored(conn Connection) error {
 		if err := validateManualEndpoints(conn.Endpoints); err != nil {
 			return fmt.Errorf("%w: %v", ErrInvalidConnection, err)
 		}
+	}
+	if err := validateCustomAttributes(conn.CustomAttributes); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateCustomAttributes holds the operator-defined attribute set to
+// what a connection may store: every entry names its key and its claim,
+// and no key repeats — a repeated key would make one of the values
+// unreadable.
+func validateCustomAttributes(attrs []CustomAttribute) error {
+	seen := make(map[string]struct{}, len(attrs))
+	for _, attr := range attrs {
+		if attr.Key == "" || attr.Claim == "" {
+			return fmt.Errorf("%w: every custom attribute names its key and its claim", ErrInvalidConnection)
+		}
+		if _, dup := seen[attr.Key]; dup {
+			return fmt.Errorf("%w: the custom attribute key %q repeats", ErrInvalidConnection, attr.Key)
+		}
+		seen[attr.Key] = struct{}{}
 	}
 	return nil
 }

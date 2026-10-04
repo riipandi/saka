@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     -- absent key answers its default. The readers and writers live in the
     -- user module's metadata helpers — no query filters on the document.
     metadata JSONB DEFAULT NULL,
+    -- The attributes an identity source wrote onto the account: each entry
+    -- a key and the value the source answered, stored as the JSON it
+    -- arrived in (a scalar or an array of scalars; blanks are dropped and
+    -- structured values refuse the write). Read and written whole through
+    -- the user module's seam, never queried. NULL is the account no source
+    -- has written.
+    custom_attributes JSONB DEFAULT NULL,
     email_verified_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT NULL,

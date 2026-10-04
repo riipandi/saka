@@ -407,6 +407,9 @@ func paramsOf(msg *authnv1.CreateOAuthConnectionRequest) ConnectionParams {
 	if msg.AttributeMapping != nil {
 		params.AttributeMapping = wireMapping(msg.AttributeMapping)
 	}
+	if msg.CustomAttributes != nil {
+		params.CustomAttributes = wireCustomAttributes(msg.CustomAttributes)
+	}
 	return params
 }
 
@@ -437,6 +440,10 @@ func updateOf(msg *authnv1.UpdateOAuthConnectionRequest) ConnectionUpdate {
 		mapping := wireMapping(msg.AttributeMapping)
 		update.AttributeMapping = &mapping
 	}
+	if msg.CustomAttributes != nil {
+		attrs := wireCustomAttributes(msg.CustomAttributes)
+		update.CustomAttributes = &attrs
+	}
 	if msg.Enabled != nil {
 		update.Enabled = msg.Enabled
 	}
@@ -456,10 +463,24 @@ func wireEndpoints(msg *authnv1.OAuthEndpoints) Endpoints {
 // wireMapping maps the wire attribute mapping onto the service's.
 func wireMapping(msg *authnv1.OAuthAttributeMapping) AttributeMapping {
 	return AttributeMapping{
-		Email:      msg.Email,
-		GivenName:  msg.GivenName,
-		FamilyName: msg.FamilyName,
+		Email:                msg.Email,
+		GivenName:            msg.GivenName,
+		FamilyName:           msg.FamilyName,
+		Subject:              msg.Subject,
+		EmailVerified:        msg.EmailVerified,
+		EmailVerifiedDefault: msg.GetEmailVerifiedDefault(),
+		Username:             msg.Username,
+		AvatarURL:            msg.AvatarUrl,
 	}
+}
+
+// wireCustomAttributes maps the wire attribute set onto the service's.
+func wireCustomAttributes(msgs []*authnv1.OAuthCustomAttribute) []CustomAttribute {
+	attrs := make([]CustomAttribute, 0, len(msgs))
+	for _, msg := range msgs {
+		attrs = append(attrs, CustomAttribute{Key: msg.Key, Claim: msg.Claim})
+	}
+	return attrs
 }
 
 // wireConnection renders the row's wire form. The client secret is
@@ -488,12 +509,26 @@ func wireConnection(conn Connection) *authnv1.OAuthConnection {
 		out.Scopes = strings.Join(conn.Scopes, " ")
 	}
 	if conn.AttributeMapping.Email != "" || conn.AttributeMapping.GivenName != "" ||
-		conn.AttributeMapping.FamilyName != "" {
+		conn.AttributeMapping.FamilyName != "" || conn.AttributeMapping.Subject != "" ||
+		conn.AttributeMapping.EmailVerified != "" || conn.AttributeMapping.EmailVerifiedDefault ||
+		conn.AttributeMapping.Username != "" || conn.AttributeMapping.AvatarURL != "" {
 		out.AttributeMapping = &authnv1.OAuthAttributeMapping{
-			Email:      conn.AttributeMapping.Email,
-			GivenName:  conn.AttributeMapping.GivenName,
-			FamilyName: conn.AttributeMapping.FamilyName,
+			Email:                conn.AttributeMapping.Email,
+			GivenName:            conn.AttributeMapping.GivenName,
+			FamilyName:           conn.AttributeMapping.FamilyName,
+			Subject:              conn.AttributeMapping.Subject,
+			EmailVerified:        conn.AttributeMapping.EmailVerified,
+			EmailVerifiedDefault: &conn.AttributeMapping.EmailVerifiedDefault,
+			Username:             conn.AttributeMapping.Username,
+			AvatarUrl:            conn.AttributeMapping.AvatarURL,
 		}
+	}
+	if len(conn.CustomAttributes) > 0 {
+		attrs := make([]*authnv1.OAuthCustomAttribute, 0, len(conn.CustomAttributes))
+		for _, attr := range conn.CustomAttributes {
+			attrs = append(attrs, &authnv1.OAuthCustomAttribute{Key: attr.Key, Claim: attr.Claim})
+		}
+		out.CustomAttributes = attrs
 	}
 	if !conn.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(conn.CreatedAt)
