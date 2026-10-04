@@ -22,9 +22,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/config"
+	fstorage "github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 	conttest "github.com/riipandi/saka/pkg/testutils"
@@ -61,14 +60,14 @@ func testService(t *testing.T, pool *datastore.Postgres) *Service {
 // local driver in a throwaway directory — so a picture procedure runs the
 // stage, sync, and read the production path runs. The engine and its
 // directory travel with the test through the returned cleanup.
-func testPictureService(t *testing.T, pool *datastore.Postgres) (*Service, *storage.Manager) {
+func testPictureService(t *testing.T, pool *datastore.Postgres) (*Service, *fstorage.Manager) {
 	t.Helper()
 
 	if _, err := pool.Exec(t.Context(),
 		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
-	manager := storage.NewManager(storage.NewFS(t.TempDir()), pool,
+	manager := fstorage.NewManager(fstorage.NewFS(t.TempDir()), pool,
 		t.TempDir(), slog.New(slog.DiscardHandler))
 	return NewService(pool, nil, nil, manager), manager
 }
@@ -613,12 +612,12 @@ func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
 	// The replaced picture left the engine whole: no object answers its key,
 	// and no manifest row keeps the garbage collection from ever sweeping it.
 	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
-	assert.ErrorIs(t, err, storage.ErrNotFound)
+	assert.ErrorIs(t, err, fstorage.ErrNotFound)
 	// The manifest row left with the object: a row without a file is what
 	// the garbage collection keeps a key for, so one that lingered would
 	// make the old name unsweepable forever.
-	_, err = storage.NewManifests().Load(t.Context(), pool, "00000000-0000-0000-0000-000000000000", pngKey)
-	assert.ErrorIs(t, err, storage.ErrNoManifest)
+	_, err = fstorage.NewManifests().Load(t.Context(), pool, "00000000-0000-0000-0000-000000000000", pngKey)
+	assert.ErrorIs(t, err, fstorage.ErrNoManifest)
 
 	// The read answers the picture the row now names.
 	body, mime, err := service.readPicture(t.Context(), created.ID)
@@ -721,7 +720,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 
 	// The file left the engine: no read answers the key anymore.
 	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
-	assert.ErrorIs(t, err, storage.ErrNotFound)
+	assert.ErrorIs(t, err, fstorage.ErrNotFound)
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
 	require.NoError(t, err)
@@ -752,7 +751,7 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
 		t.Fatal(seedErr)
 	}
-	manager := storage.NewManager(storage.NewFS(root), pool,
+	manager := fstorage.NewManager(fstorage.NewFS(root), pool,
 		t.TempDir(), slog.New(slog.DiscardHandler))
 	service := NewService(pool, nil, nil, manager)
 	created, err := service.CreateUser(t.Context(), CreateParams{
@@ -772,7 +771,7 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	var bucketID string
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT id FROM storage_buckets WHERE name = 'devbucket'`).Scan(&bucketID))
-	_, err = storage.NewManifests().Load(t.Context(), pool, bucketID, "pictures/"+rowID(t, created.ID)+".png")
+	_, err = fstorage.NewManifests().Load(t.Context(), pool, bucketID, "pictures/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err, "the manifest row outlives the object")
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -811,7 +810,7 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 
 	pool := migratedPool(t)
 	backend := conttest.StartMinIO(t.Context(), t)
-	store, err := storage.NewS3(config.S3{
+	store, err := fstorage.NewS3(fstorage.S3Options{
 		AccessKey:      backend.AccessKey,
 		SecretKey:      backend.Secret,
 		EndpointURL:    backend.Endpoint,
@@ -823,7 +822,7 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
 		t.Fatal(seedErr)
 	}
-	manager := storage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
+	manager := fstorage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
 	require.NoError(t, manager.EnsureBucket(t.Context(), "devbucket"))
 	service := NewService(pool, nil, nil, manager)
 

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 

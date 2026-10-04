@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/framework/storage"
 )
 
 // stubPublisher records the notices the processor delivers.

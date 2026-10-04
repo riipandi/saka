@@ -9,6 +9,7 @@ import (
 	flogger "github.com/riipandi/saka/framework/logger"
 	fmailer "github.com/riipandi/saka/framework/mailer"
 	fobserver "github.com/riipandi/saka/framework/observer"
+	fstorage "github.com/riipandi/saka/framework/storage"
 )
 
 // The adapters are the only place the schema meets the framework options: a
@@ -152,5 +153,22 @@ func (c Config) MailerOptions() fmailer.Options {
 		SMTPSecure:             c.Mailer.SMTPSecure,
 		SMTPAllowPlaintextAuth: c.Mailer.SMTPAllowPlaintextAuth,
 		Timeout:                c.Mailer.Timeout,
+	}
+}
+
+// StorageOptions maps the storage section onto the object engine's options.
+// The buckets stay registered from the modules; the engine knows only drivers.
+func (c Config) StorageOptions() fstorage.Options {
+	return fstorage.Options{
+		Driver:    c.Storage.Driver,
+		LocalPath: c.Storage.LocalPath,
+		S3: fstorage.S3Options{
+			Region:         c.Storage.S3.Region,
+			AccessKey:      c.Storage.S3.AccessKey,
+			SecretKey:      c.Storage.S3.SecretKey,
+			EndpointURL:    c.Storage.S3.EndpointURL,
+			ForcePathStyle: c.Storage.S3.ForcePathStyle,
+		},
+		TelemetryNamespace: AppIdentifier,
 	}
 }

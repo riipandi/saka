@@ -92,7 +92,7 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
   [`internal/mailer/README.md`](./internal/mailer/README.md).
 - **File storage** — chunked, content-addressed uploads over the local data directory or S3,
   manifest in Postgres, uploads on the durable queue. Details:
-  [`internal/storage/README.md`](./internal/storage/README.md).
+  [`framework/storage/README.md`](./framework/storage/README.md).
 - **Queue & scheduler** — a durable Postgres task queue with retries and a dead-letter archive
   ([`internal/queue/README.md`](./internal/queue/README.md)), driven by a cron scheduler whose
   claimed tick and enqueued task share one transaction

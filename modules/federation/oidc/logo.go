@@ -8,8 +8,8 @@ import (
 	"io"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/storage"
 )
 
 // ErrLogoMissing is a logo read for a client that has none.

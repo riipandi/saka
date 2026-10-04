@@ -11,8 +11,8 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/storage"
 )
 
 // The bundled default picture answers for every account that has none. It is

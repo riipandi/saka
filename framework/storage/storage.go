@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
 // ErrNotFound is what a read of an unknown key answers with.
@@ -75,12 +73,12 @@ type Store interface {
 // New hands back the driver the configuration names. The composition root
 // calls it; a driver the configuration selects is the only one constructed,
 // so a local deployment never opens an object-store client.
-func New(cfg config.Config) (Store, error) {
-	switch cfg.Storage.Driver {
-	case config.StorageS3:
-		return NewS3(cfg.Storage.S3)
+func New(opts Options) (Store, error) {
+	switch opts.Driver {
+	case DriverS3:
+		return NewS3(opts.S3)
 	default:
-		return NewFS(cfg.Storage.LocalPath), nil
+		return NewFS(opts.LocalPath), nil
 	}
 }
 

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/storage"
 )
 
 // The failures the service defines. The handler maps them onto the codes

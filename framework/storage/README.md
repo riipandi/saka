@@ -1,9 +1,11 @@
 # Storage
 
-Storage is saka's file engine: bucket-scoped, whole-file uploads over a local filesystem or an
+Storage is the file engine: bucket-scoped, whole-file uploads over a local filesystem or an
 S3-compatible object store, with the manifest in PostgreSQL. The request path is one local disk
 write; everything else runs on the durable queue. The resumable-upload protocol (tus 1.0.0,
-implemented in-house) is the engine's client surface.
+implemented in-house) is the engine's client surface. The engine takes typed options (driver,
+local path, S3 connection, telemetry namespace, link path prefix) and reads nothing itself; the
+schema mapping lives in `internal/config`'s adapter and the buckets are the app's rows.
 
 > **Relation to the queue:** storage is the payload; the queue (`internal/queue`) is the
 > executor. The code that finished a write — a `Stage` caller or the tus completion — enqueues
@@ -109,7 +111,7 @@ targets) is a deployment ceiling, not a code path.
 
 ## The tus protocol
 
-`internal/storage/tus.go` (engine) and `tus_handler.go` (protocol) speak tus 1.0.0 in-house:
+`tus.go` (engine) and `tus_handler.go` (protocol) speak tus 1.0.0 in-house:
 core methods plus `creation-with-upload`, `termination`, and `expiration`. There is no
 progress route — the client reads the offset it needs from the protocol's own `HEAD`.
 
@@ -147,10 +149,11 @@ flow with `tus-js-client`'s UMD bundle from the CDN.
 
 ## Wiring
 
-The package lives inside the `saka` module and is not published. The composition root wires it
+The package is a directory of the main module and is not published. The composition root wires it
 in `internal/registry`: the manager is built from the shared `datastore.Postgres` pool, the
-configured backend, and the `storage` config section; the queue provider hands the manager its
-`UploadEnqueuer` (`WithUploadEnqueuer`) and its after-sync hook, both adapted over the client
+engine's options (`Config.StorageOptions()`), and the staging directory; the queue provider hands
+the manager its `UploadEnqueuer` (`WithUploadEnqueuer`) and its after-sync hook, both adapted over
+the client
 the provider builds. The storage jobs are registered in `internal/jobs/register.go`
 (`Register` skips them when the manager is absent, so a build without storage runs the rest
 unchanged); the sweep is the `upload sweep` entry in the registry's runners.
@@ -274,10 +277,11 @@ tus completion's door to the queue).
 
 ## API Reference
 
-### `NewManager(store Store, db DB, staging string, log) *Manager`
+### `NewManager(store Store, db DB, staging string, log, opts ...Options) *Manager`
 
 Builds the engine: the manifest store, the staging directory. Nothing touches the backend or
-the database yet.
+the database yet. The options carry the telemetry identity (scope, namespace); zero values
+take the package's own.
 
 ### `(*Manager).Stage(ctx, bucket, key, r io.Reader, metadata map[string]any) error`
 
@@ -334,7 +338,7 @@ composite the queue and the logs carry.
 
 The backend contract: `EnsureBucket` (the container, idempotent), `Get`, `Put` (whole, with
 the byte size), `Delete`, `List` (one bucket's keys). Every method carries the bucket the
-file belongs to — the storage_buckets row's own name. `storage.New(cfg)` builds the one the
+file belongs to — the storage_buckets row's own name. `New(Options)` builds the one the
 `storage.driver` section names (`FS` over `storage.local_path`, `S3` over `storage.s3.*`);
 both translate their protocol's not-found shape into `ErrNotFound` at the edge.
 
@@ -406,8 +410,8 @@ fixture uses topic vocabulary (Dan Brown, Harry Potter), so two tests — or two
 one bucket cannot answer each other's probes.
 
 ```bash
-go test ./internal/storage/
-go test -race ./internal/storage/
+go test ./framework/storage/
+go test -race ./framework/storage/
 ```
 
 ## Design Decisions

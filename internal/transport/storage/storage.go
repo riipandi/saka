@@ -26,7 +26,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	engine "github.com/riipandi/saka/internal/storage"
+	engine "github.com/riipandi/saka/framework/storage"
 )
 
 // Path is the route prefix the stored files are served under. It is the path

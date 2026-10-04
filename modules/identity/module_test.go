@@ -19,10 +19,10 @@ import (
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/identity/jwks"
 )

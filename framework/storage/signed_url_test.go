@@ -14,7 +14,7 @@ const signedURLSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456
 
 func testEngineSigner(t *testing.T) *Signer {
 	t.Helper()
-	signer, err := NewSigner(signedURLSecret)
+	signer, err := NewSigner(signedURLSecret, "")
 	require.NoError(t, err)
 	return signer
 }
@@ -33,7 +33,7 @@ func TestTheSignerVerifiesItsOwnSignatureAndNothingElse(t *testing.T) {
 
 func TestASignatureNeverSurvivesASecretRotation(t *testing.T) {
 	rotated := testEngineSigner(t)
-	other, err := NewSigner("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+	other, err := NewSigner("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", "")
 	require.NoError(t, err)
 
 	exp := time.Now().Add(time.Hour)
@@ -41,9 +41,9 @@ func TestASignatureNeverSurvivesASecretRotation(t *testing.T) {
 }
 
 func TestNewSignerRefusesAWeakSecret(t *testing.T) {
-	_, err := NewSigner("616263")
+	_, err := NewSigner("616263", "")
 	assert.Error(t, err)
-	_, err = NewSigner("")
+	_, err = NewSigner("", "")
 	assert.Error(t, err)
 }
 

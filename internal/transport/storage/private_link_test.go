@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	engine "github.com/riipandi/saka/internal/storage"
+	engine "github.com/riipandi/saka/framework/storage"
 )
 
 // discardLogger is the logger the tests' managers run under.
@@ -48,7 +48,7 @@ func (f *fakeSource) Open(context.Context, string, string) (io.ReadCloser, error
 
 func testSigner(t *testing.T) *engine.Signer {
 	t.Helper()
-	signer, err := engine.NewSigner(testSecretHex)
+	signer, err := engine.NewSigner(testSecretHex, "")
 	require.NoError(t, err)
 	return signer
 }

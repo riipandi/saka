@@ -14,11 +14,6 @@ import (
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
-// linkPathPrefix is the mount the signed links compose against: the engine
-// names the surface its links answer on, and the transport mounts the
-// handler there.
-const linkPathPrefix = "/storage"
-
 // SignedURLTTLFunc is the expiry source a SignedURL without an explicit
 // ttl reads. The registry wires it over the `storage.signed_url_expires`
 // appconfig setting, so an operator's change takes effect at the next
@@ -27,7 +22,7 @@ type SignedURLTTLFunc func(ctx context.Context) (time.Duration, error)
 
 // linkDomain separates the signed-link payload from any other HMAC use of
 // the same secret: a signature over one purpose never verifies as another.
-const linkDomain = "saka-storage-signed-link"
+const linkDomain = "signed-link"
 
 // Signer mints and verifies the signed links a private object is read
 // over. The link is the query string `?exp=<unix>&sig=<hex>`: the expiry is
@@ -38,17 +33,25 @@ const linkDomain = "saka-storage-signed-link"
 // links already issued; a rotation is a rare, deliberate act.
 type Signer struct {
 	key []byte
+	// linkPathPrefix is the mount the links compose against; the transport
+	// mounts the serving handler there.
+	linkPathPrefix string
 	// now is the clock the expiry compares against; tests move it.
 	now func() time.Time
 }
 
-// NewSigner builds the signer over the application secret's hex form.
-func NewSigner(secretHex string) (*Signer, error) {
+// NewSigner builds the signer over the application secret's hex form. The
+// link path prefix is the mount the links compose against; empty takes the
+// engine's default.
+func NewSigner(secretHex, linkPathPrefix string) (*Signer, error) {
 	key, err := crypto.ParseHMACKeyHex(secretHex)
 	if err != nil {
 		return nil, fmt.Errorf("storage: signed links: %w", err)
 	}
-	return &Signer{key: key, now: time.Now}, nil
+	if linkPathPrefix == "" {
+		linkPathPrefix = defaultLinkPathPrefix
+	}
+	return &Signer{key: key, linkPathPrefix: linkPathPrefix, now: time.Now}, nil
 }
 
 // Sign answers the signature over the bucket/key pair with the expiry
@@ -81,7 +84,7 @@ func (s *Signer) SignedURL(base, bucket, key string, exp time.Time) (string, err
 		return "", fmt.Errorf("storage: signed link base %q: %w", base, err)
 	}
 	if parsed.Path == "" {
-		parsed.Path = linkPathPrefix
+		parsed.Path = s.linkPathPrefix
 	}
 	parsed.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + bucket + "/" + key
 

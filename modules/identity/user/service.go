@@ -13,9 +13,9 @@ import (
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/pkg/crypto"

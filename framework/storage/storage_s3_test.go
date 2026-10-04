@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -29,7 +28,7 @@ func newS3Manager(t *testing.T) *Manager {
 	pool := migratedPool(t)
 	seedBucket(t, pool, s3TestBucket)
 
-	driver, err := NewS3(config.S3{
+	driver, err := NewS3(S3Options{
 		AccessKey:      store4.AccessKey,
 		SecretKey:      store4.Secret,
 		EndpointURL:    store4.Endpoint,

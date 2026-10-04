@@ -76,10 +76,16 @@ type Manager struct {
 }
 
 // NewManager builds the engine. staging is the directory a caller writes the
-// next file into; each file lands at staging/{bucket}/{key}.
-func NewManager(store Store, db DB, staging string, log *slog.Logger) *Manager {
+// next file into; each file lands at staging/{bucket}/{key}. The options carry
+// the telemetry identity (scope, namespace); zero values take the package's
+// own.
+func NewManager(store Store, db DB, staging string, log *slog.Logger, opts ...Options) *Manager {
+	var engineOptions Options
+	if len(opts) > 0 {
+		engineOptions = opts[0]
+	}
 	return &Manager{
-		metrics:   newStorageMetrics(),
+		metrics:   newStorageMetrics(engineOptions),
 		store:     store,
 		db:        db,
 		manifests: NewManifests(),

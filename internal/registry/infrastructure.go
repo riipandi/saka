@@ -16,13 +16,13 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"
-	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/apikey"
 	"github.com/riipandi/saka/modules/appconfig"
@@ -246,7 +246,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 
 		do.Lazy(func(i do.Injector) (storage.Store, error) {
 			c := do.MustInvoke[*config.Config](i)
-			return storage.New(*c)
+			return storage.New(c.StorageOptions())
 		}),
 
 		do.Lazy(func(i do.Injector) (*storage.Signer, error) {
@@ -256,7 +256,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 				// files, and a private one fails closed at the handler.
 				return nil, nil
 			}
-			return storage.NewSigner(c.App.SecretKey)
+			return storage.NewSigner(c.App.SecretKey, "")
 		}),
 
 		do.Lazy(func(i do.Injector) (*storage.Manager, error) {

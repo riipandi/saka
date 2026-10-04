@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/storage"
 )
 
 // UploadEnqueuer is the storage engine's completion seam, adapted over the

@@ -13,8 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	awshttp "github.com/aws/smithy-go/transport/http"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
 // S3 is the object-store backend: every file is one object in the bucket
@@ -30,7 +28,7 @@ type S3 struct {
 // NewS3 builds the backend from the storage.s3 settings. The client is
 // opened here because it names the endpoint the driver alone reads: unlike
 // the shared Valkey client, no second feature ever borrows it.
-func NewS3(cfg config.S3) (*S3, error) {
+func NewS3(cfg S3Options) (*S3, error) {
 	opts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.Region),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(

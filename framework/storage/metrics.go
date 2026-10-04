@@ -9,11 +9,12 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// meterName is the instrumentation scope every storage instrument is
-// registered under, rendered into otel_scope_name by the bridge.
-const meterName = "github.com/riipandi/saka/internal/storage"
+// defaultScope is the instrumentation scope a caller that names none gets: a
+// scope identifies the instrumenting code, and this package's word is the
+// honest default.
+const defaultScope = "storage"
 
-// The outcomes one sync carries on saka.storage.uploads. A skipped sync
+// The outcomes one sync carries on the uploads instrument. A skipped sync
 // found no staging file — the retry that arrived after another attempt
 // finished, which is the idempotence contract working.
 const (
@@ -34,31 +35,45 @@ type storageMetrics struct {
 	settled  metric.Int64Counter
 }
 
-func newStorageMetrics() *storageMetrics {
-	meter := otel.Meter(meterName)
+// instrumentName prefixes a bare instrument name with the options' telemetry
+// namespace. An empty namespace leaves the domain name bare: the series name
+// is the caller's identity decision, not the framework's.
+func instrumentName(opts Options, name string) string {
+	if opts.TelemetryNamespace == "" {
+		return name
+	}
+	return opts.TelemetryNamespace + "." + name
+}
+
+func newStorageMetrics(opts Options) *storageMetrics {
+	scope := opts.Scope
+	if scope == "" {
+		scope = defaultScope
+	}
+	meter := otel.Meter(scope)
 	m := &storageMetrics{}
 	var err error
-	if m.staged, err = meter.Int64Counter("saka.storage.files.staged",
+	if m.staged, err = meter.Int64Counter(instrumentName(opts, "storage.files.staged"),
 		metric.WithDescription("Files written into the staging directory"),
 		metric.WithUnit("{file}")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.uploads, err = meter.Int64Counter("saka.storage.uploads",
+	if m.uploads, err = meter.Int64Counter(instrumentName(opts, "storage.uploads"),
 		metric.WithDescription("Sync rounds by outcome: uploaded, skipped as already done, or failed"),
 		metric.WithUnit("{upload}")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.duration, err = meter.Float64Histogram("saka.storage.upload.duration",
+	if m.duration, err = meter.Float64Histogram(instrumentName(opts, "storage.upload.duration"),
 		metric.WithDescription("Time one sync round spent hashing and uploading"),
 		metric.WithUnit("s")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.bytes, err = meter.Int64Counter("saka.storage.bytes.uploaded",
+	if m.bytes, err = meter.Int64Counter(instrumentName(opts, "storage.bytes.uploaded"),
 		metric.WithDescription("Staging bytes that reached the backend"),
 		metric.WithUnit("By")); err != nil {
 		panic("storage: " + err.Error())
 	}
-	if m.settled, err = meter.Int64Counter("saka.storage.staging.settled",
+	if m.settled, err = meter.Int64Counter(instrumentName(opts, "storage.staging.settled"),
 		metric.WithDescription("Staging files that went quiet and had their upload enqueued"),
 		metric.WithUnit("{file}")); err != nil {
 		panic("storage: " + err.Error())
