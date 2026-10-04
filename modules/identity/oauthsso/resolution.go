@@ -43,33 +43,45 @@ const (
 	signInCodeLifetime = flowLifetime
 )
 
-// usernameCandidate derives the JIT username from the address's local
-// part, clipped and padded to the users column's check — 3-32 ASCII
-// letters, digits, and underscores — with a numeric suffix once the
-// plain name is taken.
-func usernameCandidate(email string, attempt int) string {
-	local := email
-	if at := strings.IndexByte(email, '@'); at > 0 {
-		local = email[:at]
+// usernameCandidate derives the JIT username: the mapped username claim
+// when the provider answered one — cleaned to the users column's shape —
+// and the address's local part as the fallback, clipped and padded to
+// the column's check — 3-32 ASCII letters, digits, and underscores —
+// with a numeric suffix once the plain name is taken.
+func usernameCandidate(claim, email string, attempt int) string {
+	base := cleanUsername(claim)
+	if base == "" {
+		local := email
+		if at := strings.IndexByte(email, '@'); at > 0 {
+			local = email[:at]
+		}
+		base = cleanUsername(local)
 	}
+	if base == "" {
+		base = "user"
+	}
+	if attempt > 0 {
+		base = fmt.Sprintf("%s_%d", base, attempt)
+	}
+	for len(base) < 3 {
+		base += "_"
+	}
+	return base
+}
+
+// cleanUsername reduces a candidate to the users column's shape: lower
+// case, ASCII letters, digits, and underscores, clipped to the length a
+// suffix still fits. An answer that cleans to nothing names no username.
+func cleanUsername(raw string) string {
 	var cleaned strings.Builder
-	for _, r := range strings.ToLower(local) {
+	for _, r := range strings.ToLower(raw) {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
 			cleaned.WriteRune(r)
 		}
 	}
 	name := cleaned.String()
-	if name == "" {
-		name = "user"
-	}
 	if len(name) > 29 {
 		name = name[:29]
-	}
-	if attempt > 0 {
-		name = fmt.Sprintf("%s_%d", name, attempt)
-	}
-	for len(name) < 3 {
-		name += "_"
 	}
 	return name
 }
@@ -353,6 +365,9 @@ func (s *Service) linkAndOpen(ctx context.Context, flow Flow, conn Connection, a
 		if bindErr := s.bindIdentity(ctx, tx, flow, conn, account.ID); bindErr != nil {
 			return bindErr
 		}
+		if profileErr := s.applyResolutionProfile(ctx, tx, flow, conn, account.ID); profileErr != nil {
+			return profileErr
+		}
 		var openErr error
 		result, openErr = s.finish(ctx, tx, flow, account, conn, params)
 		return openErr
@@ -360,6 +375,7 @@ func (s *Service) linkAndOpen(ctx context.Context, flow Flow, conn Connection, a
 	if err != nil {
 		return ContinueResult{}, err
 	}
+	s.refreshAvatar(ctx, flow, account.ID)
 	return result, nil
 }
 
@@ -387,11 +403,13 @@ func (s *Service) provisionJIT(ctx context.Context, flow Flow, conn Connection, 
 	}
 
 	var result ContinueResult
+	var created uuid.UUID
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		userID, username, createErr := s.createJITAccount(ctx, tx, flow)
 		if createErr != nil {
 			return createErr
 		}
+		created = userID
 		s.audit.Record(ctx, tx, audit.Entry{
 			Event:  audit.EventOauthSsoAccountCreated,
 			Status: audit.StatusSuccess,
@@ -403,6 +421,11 @@ func (s *Service) provisionJIT(ctx context.Context, flow Flow, conn Connection, 
 		})
 		if bindErr := s.bindIdentity(ctx, tx, flow, conn, userID); bindErr != nil {
 			return bindErr
+		}
+		// The mapping applies at the creation too: the custom attributes
+		// land with the row that carries them, one transaction for all.
+		if profileErr := s.applyResolutionProfile(ctx, tx, flow, conn, userID); profileErr != nil {
+			return profileErr
 		}
 		// The account is the row this transaction just wrote: the read
 		// back would go through the pool and miss it until the commit,
@@ -420,6 +443,7 @@ func (s *Service) provisionJIT(ctx context.Context, flow Flow, conn Connection, 
 	if err != nil {
 		return ContinueResult{}, err
 	}
+	s.refreshAvatar(ctx, flow, created)
 	return result, nil
 }
 
@@ -492,14 +516,21 @@ func (s *Service) linkingEnabled(ctx context.Context) (bool, error) {
 
 // createJITAccount writes the account row: the address, the names, and
 // the verified stamp — the provider's mark or the spent code, the row
-// already carries which. The username derives from the address's local
-// part, and a taken name retries with a suffix: a JIT creation must not
-// fail because an earlier account claimed the same local part.
+// already carries which. The username is written once, here: the mapped
+// claim is the first word, the address's local part the fallback, and a
+// taken name retries with a suffix — a JIT creation must not fail
+// because an earlier account claimed the same word.
 func (s *Service) createJITAccount(ctx context.Context, tx datastore.Querier, flow Flow) (uuid.UUID, string, error) {
 	name := displayName(flow.GivenName, flow.FamilyName)
 	verifiedAt := s.now()
-	attempt := usernameCandidate(flow.Email, 0)
+	attempt := usernameCandidate(flow.Username, flow.Email, 0)
 	for tries := 0; tries < 3; tries++ {
+		// The taken name's retry runs inside the caller's transaction,
+		// where one failed statement would poison every later one — the
+		// savepoint rolls back exactly the refused insert.
+		if _, err := tx.Exec(ctx, "SAVEPOINT jit_username_attempt"); err != nil {
+			return uuid.Nil(), "", fmt.Errorf("oauthsso: create account: %w", err)
+		}
 		userID, err := s.repo.CreateAccount(ctx, tx, user.UserSchema{
 			Username:        attempt,
 			Email:           flow.Email,
@@ -509,12 +540,18 @@ func (s *Service) createJITAccount(ctx context.Context, tx datastore.Querier, fl
 			EmailVerifiedAt: &verifiedAt,
 		})
 		if err == nil {
+			if _, spErr := tx.Exec(ctx, "RELEASE SAVEPOINT jit_username_attempt"); spErr != nil {
+				return uuid.Nil(), "", fmt.Errorf("oauthsso: create account: %w", spErr)
+			}
 			return userID, attempt, nil
+		}
+		if _, rbErr := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT jit_username_attempt"); rbErr != nil {
+			return uuid.Nil(), "", fmt.Errorf("oauthsso: create account: %w", rbErr)
 		}
 		if !uniqueViolation(err) {
 			return uuid.Nil(), "", fmt.Errorf("oauthsso: create account: %w", err)
 		}
-		attempt = usernameCandidate(flow.Email, tries+1)
+		attempt = usernameCandidate(flow.Username, flow.Email, tries+1)
 	}
 	return uuid.Nil(), "", fmt.Errorf("oauthsso: create account: every derived username is taken")
 }
@@ -627,6 +664,12 @@ func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, u
 	}
 	var result ContinueResult
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// The mapping applies on every sign-in: the profile the flow
+		// resolved lands on the bound account before the session it
+		// earns, one transaction for both.
+		if profileErr := s.applyResolutionProfile(ctx, tx, flow, conn, account.ID); profileErr != nil {
+			return profileErr
+		}
 		var openErr error
 		result, openErr = s.finish(ctx, tx, flow, account, conn, params)
 		return openErr
@@ -634,6 +677,7 @@ func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, u
 	if err != nil {
 		return ContinueResult{}, err
 	}
+	s.refreshAvatar(ctx, flow, account.ID)
 	return result, nil
 }
 

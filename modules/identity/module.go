@@ -657,6 +657,9 @@ var Package = do.Package(
 		if client := do.MustInvoke[*queue.Client](i); client != nil {
 			service = service.WithCodeNotifier(jobs.NewOAuthSignInCodeNotifier(client, log))
 		}
+		if profiles := do.MustInvoke[*user.Service](i); profiles != nil {
+			service = service.WithProfiles(profiles)
+		}
 		return service.WithProviders(oauthsso.ProviderSet{
 			Builtin: map[string]oauthsso.Provider{
 				builtin.Google.Slug: builtin.NewGoogle(),

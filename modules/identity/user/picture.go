@@ -130,6 +130,13 @@ func (s *Service) UpdateProfilePicture(ctx context.Context, id string, data []by
 		}
 		return fmt.Errorf("user: read for picture update: %w", err)
 	}
+	return s.storePicture(ctx, userID, row, data)
+}
+
+// storePicture is the write pipeline both picture writers share: sniff
+// the bytes, delete the replaced object, stage and sync the new one, and
+// point the account's reference at it.
+func (s *Service) storePicture(ctx context.Context, userID uuid.UUID, row UserSchema, data []byte) error {
 	mime, ext, ok := sniffPictureType(data)
 	if !ok {
 		return ErrUnsupportedPicture

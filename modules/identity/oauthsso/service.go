@@ -96,6 +96,9 @@ type Service struct {
 	settings  settingsReader
 	blocklist blocklistChecker
 	codes     CodeNotifier
+	// profiles is the account-write seam the mapping's refresh runs
+	// through — the user module owns the row. Nil skips the refresh.
+	profiles profileApplier
 
 	// baseURL is the origin the redirect URI and the SPA redirect are
 	// built from, wired after construction with the base URL.

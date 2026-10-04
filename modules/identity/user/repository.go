@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"uuid"
 
@@ -296,6 +298,45 @@ func (r *Repository) SetPictureFileID(ctx context.Context, db datastore.Querier,
 		return false, fmt.Errorf("user: set picture reference: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// MergeCustomAttributes folds one identity source's answer onto the
+// account's document: the stored document — or an empty one, for an
+// account no source has written — is read, the incoming keys overwrite
+// theirs, and the merged document is written back. The read and the
+// write share the caller's transaction, so the merge sees its own view;
+// the row the read locks against a racing merge is the same row the
+// update rewrites.
+func (r *Repository) MergeCustomAttributes(ctx context.Context, db datastore.Querier, id uuid.UUID, attrs map[string]any) error {
+	var stored []byte
+	err := db.QueryRow(ctx,
+		`SELECT COALESCE(custom_attributes, '{}'::jsonb) FROM `+entity.TableUsers+` WHERE id = $1 FOR UPDATE`,
+		id).Scan(&stored)
+	if err != nil {
+		return fmt.Errorf("user: read custom attributes: %w", err)
+	}
+
+	document := map[string]any{}
+	if len(stored) > 0 {
+		if unmarshalErr := json.Unmarshal(stored, &document); unmarshalErr != nil {
+			return fmt.Errorf("user: stored custom attributes: %w", unmarshalErr)
+		}
+	}
+	maps.Copy(document, attrs)
+	merged, err := json.Marshal(document)
+	if err != nil {
+		return fmt.Errorf("user: custom attributes: %w", err)
+	}
+
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(entity.TableUsers)
+	ub.Set(ub.Assign("custom_attributes", merged))
+	ub.Where(ub.Equal("id", id))
+	query, args := ub.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("user: merge custom attributes: %w", err)
+	}
+	return nil
 }
 
 // errUniqueViolation reports whether the write failed on a unique index, the
