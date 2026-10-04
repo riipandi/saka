@@ -4,7 +4,7 @@
 // is refused with the envelope protocol rather than answered by the SPA, but
 // nothing is served (devtool_debug.go holds the debug build's surface).
 
-package transport
+package devtools
 
 import (
 	"net/http"
@@ -15,7 +15,7 @@ import (
 	"github.com/riipandi/saka/framework/webutil"
 )
 
-func mountDevtool(r chi.Router, _ do.Injector) {
+func Mount(r chi.Router, _ do.Injector) {
 	r.Get(devtoolUIPath, devtoolUnavailable)
 	r.Get(devtoolUIPath+"/*", devtoolUnavailable)
 	r.Post("/debug/encode-id", devtoolUnavailable)

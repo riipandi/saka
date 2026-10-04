@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -21,7 +21,8 @@ import (
 	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/transport"
+	conttest "github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/onetimeaccess"
 	"github.com/riipandi/saka/modules/identity/signin"
@@ -40,8 +41,7 @@ func oneTimeAccessPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := openTestMigrators(t, migrationDB)
-	require.NoError(t, err)
+	migrator := conttest.TestMigrator(t, migrationDB)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
@@ -65,7 +65,7 @@ func oneTimeAccessPool(t *testing.T) *datastore.Postgres {
 // exchange signs in through the real sign-in issuer, so the procedure answers
 // with a token pair — over the transport's guard, with the caller the test
 // asks for.
-func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *datastore.Postgres) http.Handler {
+func newOneTimeAccessRouter(t *testing.T, auth router.Authenticator, pool *datastore.Postgres) http.Handler {
 	t.Helper()
 
 	cfg := config.Default()
@@ -94,7 +94,7 @@ func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *da
 	service := onetimeaccess.NewService(cfg, pool, issuer,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        cfg,
 		Checker:       health.NewChecker(),
 		Authenticator: auth,
@@ -112,7 +112,7 @@ func TestTheOneTimeAccessGuardIsDeclared(t *testing.T) {
 	for name, tc := range map[string]struct {
 		procedure string
 		body      string
-		auth      transport.Authenticator
+		auth      router.Authenticator
 		status    int
 		code      string
 	}{

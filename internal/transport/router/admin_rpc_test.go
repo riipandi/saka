@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -108,7 +108,7 @@ func adminAuditRouter(t *testing.T) (http.Handler, *datastore.Postgres, *queue.C
 	})
 	require.NoError(t, err)
 
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Logger:        slog.Default(),
 		Authenticator: callerAuthenticator(wireID(t, langdonAccount), true, false),
@@ -231,7 +231,7 @@ func TestTheStaticInternalAnswerCarriesNoDriverText(t *testing.T) {
 		return nil
 	}))
 
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Authenticator: callerAuthenticator(wireID(t, langdonAccount), true, false),
 		QueueClient:   client,

@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/identity/session"
 	"github.com/riipandi/saka/modules/identity/signup"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -26,7 +26,7 @@ import (
 // can present any principal without minting a token: the subject is the
 // account the request runs as, and `impersonated` adds the delegation an
 // administrator's session carries.
-func callerAuthenticator(subject string, admin, impersonated bool) transport.Authenticator {
+func callerAuthenticator(subject string, admin, impersonated bool) router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if subject == "" {
 			return nil, authn.Errorf("authentication required")
@@ -42,10 +42,10 @@ func callerAuthenticator(subject string, admin, impersonated bool) transport.Aut
 
 // newGuardedRouter mounts the account and signup features over the guard the
 // transport installs, with the caller the test asks for.
-func newGuardedRouter(t *testing.T, auth transport.Authenticator) http.Handler {
+func newGuardedRouter(t *testing.T, auth router.Authenticator) http.Handler {
 	t.Helper()
 
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: auth,

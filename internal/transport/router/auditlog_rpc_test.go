@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -17,7 +17,8 @@ import (
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	conttest "github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/auditlog"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -39,8 +40,7 @@ func auditPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := openTestMigrators(t, migrationDB)
-	require.NoError(t, err)
+	migrator := conttest.TestMigrator(t, migrationDB)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
@@ -71,11 +71,11 @@ func auditPool(t *testing.T) *datastore.Postgres {
 
 // newAuditRouter mounts the audit-log area over the transport's guard, with
 // the caller the test asks for.
-func newAuditRouter(t *testing.T, auth transport.Authenticator, pool *datastore.Postgres) http.Handler {
+func newAuditRouter(t *testing.T, auth router.Authenticator, pool *datastore.Postgres) http.Handler {
 	t.Helper()
 
 	service := auditlog.NewService(pool, auditlog.NewRepository(), slog.New(slog.DiscardHandler))
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: auth,

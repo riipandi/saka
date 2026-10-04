@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	rt "github.com/riipandi/saka/internal/transport/router"
 )
 
 // rpcRequest builds the POST a Connect client sends: the procedure path below
@@ -37,7 +37,7 @@ func rpcRequestWithHeaders(t *testing.T, procedure, body string, headers map[str
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodPost,
-		transport.RPCPath+procedure, strings.NewReader(body))
+		rt.RPCPath+procedure, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connect-Protocol-Version", "1")
 	for name, value := range headers {
@@ -57,7 +57,7 @@ func newRPCRouter(t *testing.T) http.Handler {
 			return nil
 		},
 	}))
-	return transport.NewRouter(transport.Options{
+	return rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: checker,
 	})
@@ -117,7 +117,7 @@ func TestRPCUnhealthyAnswersUnavailable(t *testing.T) {
 			return assert.AnError
 		},
 	}))
-	router := transport.NewRouter(transport.Options{
+	router := rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: checker,
 	})
@@ -167,7 +167,7 @@ func TestRPCRejectsGet(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		transport.RPCPath+"/saka.system.v1.HealthService/Check", nil))
+		rt.RPCPath+"/saka.system.v1.HealthService/Check", nil))
 
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code,
 		"a GET must not reach a unary procedure")
@@ -181,7 +181,7 @@ func TestRPCCheckIsCallableByTheGeneratedClient(t *testing.T) {
 	server := httptest.NewServer(newRPCRouter(t))
 	defer server.Close()
 
-	client := systemv1connect.NewHealthServiceClient(server.Client(), server.URL+transport.RPCPath)
+	client := systemv1connect.NewHealthServiceClient(server.Client(), server.URL+rt.RPCPath)
 	resp, err := client.Check(t.Context(), connect.NewRequest(&systemv1.CheckRequest{}))
 	require.NoError(t, err)
 
@@ -217,7 +217,7 @@ func (f *rpcFeature) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 // below the prefix, with the prefix already stripped.
 func TestAModuleProcedureMountsBelowThePrefix(t *testing.T) {
 	feature := &rpcFeature{}
-	router := transport.NewRouter(transport.Options{
+	router := rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
 		Modules: []kernel.Module{feature},
@@ -239,7 +239,7 @@ func TestAModuleProcedureMountsBelowThePrefix(t *testing.T) {
 // shared codec exists to prevent.
 func TestModuleProcedureGetsTheSnakeCaseCodec(t *testing.T) {
 	feature := &rpcFeature{}
-	transport.NewRouter(transport.Options{
+	rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
 		Modules: []kernel.Module{feature},
@@ -293,7 +293,7 @@ func (stubHealthService) Check(context.Context, *connect.Request[systemv1.CheckR
 // number.
 func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
 	feature := &rpcFeature{}
-	transport.NewRouter(transport.Options{
+	rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
 		Modules: []kernel.Module{feature},

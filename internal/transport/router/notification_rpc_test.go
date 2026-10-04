@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -20,7 +20,8 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	conttest "github.com/riipandi/saka/internal/testutils"
+	rt "github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/modules/notification"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -37,7 +38,7 @@ const (
 
 // notificationAuthenticator answers the caller the request's token names,
 // with the subject in the wire form the account surface reads.
-func notificationAuthenticator(subject string, admin bool) transport.Authenticator {
+func notificationAuthenticator(subject string, admin bool) rt.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if subject == "" {
 			return nil, authn.Errorf("authentication required")
@@ -62,8 +63,7 @@ func notificationPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := openTestMigrators(t, migrationDB)
-	require.NoError(t, err)
+	migrator := conttest.TestMigrator(t, migrationDB)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
@@ -87,12 +87,12 @@ func notificationPool(t *testing.T) *datastore.Postgres {
 
 // newNotificationRouter mounts the real notification feature over the
 // transport's guard, with the caller the test asks for.
-func newNotificationRouter(t *testing.T, auth transport.Authenticator, pool *datastore.Postgres) http.Handler {
+func newNotificationRouter(t *testing.T, auth rt.Authenticator, pool *datastore.Postgres) http.Handler {
 	t.Helper()
 
 	service := notification.NewService(pool,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
-	return transport.NewRouter(transport.Options{
+	return rt.NewRouter(rt.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: auth,
@@ -111,7 +111,7 @@ func TestTheNotificationGuardIsDeclared(t *testing.T) {
 	for name, tc := range map[string]struct {
 		procedure string
 		body      string
-		auth      transport.Authenticator
+		auth      rt.Authenticator
 		status    int
 		code      string
 	}{
@@ -208,7 +208,7 @@ func TestTheInboxAnswersThroughTheSurface(t *testing.T) {
 
 	service := notification.NewService(pool,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
-	router := transport.NewRouter(transport.Options{
+	router := rt.NewRouter(rt.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: notificationAuthenticator(hermioneNotified, false),
@@ -255,7 +255,7 @@ func TestTheWatchStreamDeliversThroughTheSurface(t *testing.T) {
 
 	service := notification.NewService(pool,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
-	router := transport.NewRouter(transport.Options{
+	router := rt.NewRouter(rt.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: notificationAuthenticator(hermioneNotified, false),
@@ -266,7 +266,7 @@ func TestTheWatchStreamDeliversThroughTheSurface(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := notificationv1connect.NewNotificationServiceClient(
-		server.Client(), server.URL+transport.RPCPath)
+		server.Client(), server.URL+rt.RPCPath)
 	watchCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	stream, err := client.WatchNotifications(watchCtx,

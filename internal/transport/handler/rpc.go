@@ -1,4 +1,4 @@
-package transport
+package handler
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type rpcHealthService struct {
 	checker *health.Checker
 }
 
-func newRPCHealthService(checker *health.Checker) *rpcHealthService {
+func NewRPCHealthService(checker *health.Checker) *rpcHealthService {
 	return &rpcHealthService{checker: checker}
 }
 

@@ -1,4 +1,4 @@
-package transport
+package handler
 
 import (
 	"context"
@@ -48,7 +48,7 @@ type rpcQueueService struct {
 	log   *slog.Logger
 }
 
-func newRPCQueueService(client *queue.Client, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcQueueService {
+func NewRPCQueueService(client *queue.Client, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcQueueService {
 	return &rpcQueueService{client: client, db: db, audit: audit, log: log}
 }
 
@@ -340,7 +340,7 @@ type rpcSchedulerService struct {
 	log       *slog.Logger
 }
 
-func newRPCSchedulerService(s *scheduler.Scheduler, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcSchedulerService {
+func NewRPCSchedulerService(s *scheduler.Scheduler, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcSchedulerService {
 	return &rpcSchedulerService{scheduler: s, db: db, audit: audit, log: log}
 }
 

@@ -10,14 +10,13 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	fw "github.com/riipandi/saka/framework/middleware"
+	conttest "github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
-// migratedPool answers a pool over a fresh, fully migrated database, the idiom
-// the queue tests use: the limiter's check function is an app migration's, so
-// the tests need the schema it ships in.
 // migratedPool applies the migrations to a fresh test database and returns
-// the pool the limiter runs on. The same idiom the queue tests use.
+// the pool the limiter runs on: the limiter's check function is an app
+// migration's, so the test needs the schema it ships in.
 func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
 
@@ -26,8 +25,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := openTestMigrators(t, migrationDB)
-	require.NoError(t, err)
+	migrator := conttest.TestMigrator(t, migrationDB)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())

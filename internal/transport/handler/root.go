@@ -1,4 +1,4 @@
-package transport
+package handler
 
 import (
 	"net/http"
@@ -9,7 +9,7 @@ import (
 
 // apiRoot is the /api landing endpoint. It names what is served, so a probe
 // that reached the API can report the surface it found without reading docs.
-func apiRoot(cfg config.Config) http.HandlerFunc {
+func APIRoot(cfg config.Config) http.HandlerFunc {
 	type apiRootData struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`

@@ -46,6 +46,7 @@ import (
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/transport/router"
 )
 
 // New registers the shared services of a serve run.
@@ -123,7 +124,7 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		return class, ok
 	}
 
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        *c,
 		Checker:       checker,
 		Metrics:       metrics,

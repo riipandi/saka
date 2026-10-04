@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -17,14 +17,14 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // stubAuthenticator accepts the one bearer token the tests carry and answers
 // an administrator's claims; every other token, and an absent one, is refused.
-func stubAuthenticator() transport.Authenticator {
+func stubAuthenticator() router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		token, ok := authn.BearerToken(req)
 		if !ok || token != "secret" {
@@ -39,7 +39,7 @@ func stubAuthenticator() transport.Authenticator {
 
 // newRPCRouterWithAuth builds the router the way a run does, with the
 // authenticator the composition root supplies.
-func newRPCRouterWithAuth(t *testing.T, auth transport.Authenticator) http.Handler {
+func newRPCRouterWithAuth(t *testing.T, auth router.Authenticator) http.Handler {
 	t.Helper()
 
 	checker := health.NewChecker(health.WithCheck(health.Check{
@@ -48,7 +48,7 @@ func newRPCRouterWithAuth(t *testing.T, auth transport.Authenticator) http.Handl
 			return nil
 		},
 	}))
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Checker:       checker,
 		Authenticator: auth,

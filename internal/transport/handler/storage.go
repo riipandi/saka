@@ -14,7 +14,7 @@
 // The bytes stream from the active backend through the storage engine, so a
 // deployment backed by an object store serves the same URL shape as a local
 // one; only what answers the read changes.
-package storage
+package handler
 
 import (
 	"context"
@@ -46,7 +46,7 @@ type ManagerSource interface {
 // fails every private read closed — a private object answers 404 whether a
 // signer is wired or not, so marking objects private without a signer has
 // broken them on purpose.
-func Mount(r chi.Router, manager ManagerSource, signer *engine.Signer) {
+func MountStorage(r chi.Router, manager ManagerSource, signer *engine.Signer) {
 	h := handler(manager, signer)
 	r.Handle(Path, h)
 	r.Handle(Path+"/*", h)

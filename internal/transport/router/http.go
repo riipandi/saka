@@ -1,4 +1,4 @@
-package transport
+package router
 
 import (
 	"log/slog"
@@ -18,8 +18,9 @@ import (
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/internal/transport/devtools"
+	"github.com/riipandi/saka/internal/transport/handler"
 	"github.com/riipandi/saka/internal/transport/middleware"
-	transportstorage "github.com/riipandi/saka/internal/transport/storage"
 	appweb "github.com/riipandi/saka/web"
 )
 
@@ -55,7 +56,7 @@ type Options struct {
 	// Authenticator authenticates the RPC surface's requests before their
 	// procedures run. A nil authenticator leaves the surface open, which is
 	// the state a test that reads only responses is in.
-	Authenticator Authenticator
+	Authenticator middleware.Authenticator
 	// Reauthentication spends the step-up proof a Reauthenticated procedure
 	// demands. A nil enforcer fails closed: the guarded procedures refuse,
 	// which is the state a bare test router is in.
@@ -81,6 +82,21 @@ type Options struct {
 	// build's devtool reads it; a release build ignores the field.
 	Injector do.Injector
 }
+
+// The paths the limiter never counts: the namespaces the two surfaces answer
+// are disjoint, so this list carries only the paths the REST surface is
+// spared for. A prefix matches the paths under it. The limiter itself runs on
+// the API surfaces only, so a static asset or a metrics scrape never reaches
+// a check in the first place.
+var httpRateLimitExclusions = []string{
+	"/api/healthz", // liveness probes and load-balancer checks
+}
+
+// restGuardRules is the authorization policy the REST surface's middleware
+// applies, read from internal/guard: the same table the RPC surface's guard
+// interceptor reads, so a route cannot be public for the authenticator and
+// guarded for the guard.
+var restGuardRules = guard.RestRules
 
 // NewRouter builds the HTTP surface: the request pipeline, then the endpoints
 // it mounts, then the ConnectRPC surface, the uploads, and the SPA last.
@@ -154,7 +170,7 @@ func NewRouter(opts Options) chi.Router {
 		}
 
 		throttled.Route("/api", func(api chi.Router) {
-			api.Get("/", apiRoot(opts.Config))
+			api.Get("/", handler.APIRoot(opts.Config))
 			if opts.Checker != nil {
 				api.Get("/healthz", health.Handler(opts.Checker))
 			}
@@ -214,7 +230,7 @@ func NewRouter(opts Options) chi.Router {
 	// debug build serves the samber/do web UI and the TypeID codecs, a
 	// release build answers the same paths with a 404 envelope rather than
 	// letting the SPA claim them.
-	mountDevtool(r, opts.Injector)
+	devtools.Mount(r, opts.Injector)
 
 	// Stored files are served outside the group: a page that loads an image
 	// spends no rate-limit check, the budget belonging to the API a client
@@ -227,7 +243,7 @@ func NewRouter(opts Options) chi.Router {
 			// A run without the signer still mounts: public files serve,
 			// private ones fail closed at the handler.
 			signer, _ := do.Invoke[*storage.Signer](opts.Injector)
-			transportstorage.Mount(r, manager, signer)
+			handler.MountStorage(r, manager, signer)
 		}
 	}
 

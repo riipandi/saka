@@ -8,7 +8,7 @@
 // them, because a release build refuses the same paths with a 404 envelope
 // (devtool_release.go).
 
-package transport
+package devtools
 
 import (
 	"encoding/json/v2"
@@ -23,7 +23,10 @@ import (
 	appweb "github.com/riipandi/saka/web"
 )
 
-func mountDevtool(r chi.Router, injector do.Injector) {
+// Mount mounts the debug build's instruments over the router: the samber/do
+// container web UI and the TypeID codecs. A release build answers the same
+// paths with a 404 envelope rather than letting the SPA claim them.
+func Mount(r chi.Router, injector do.Injector) {
 	r.Get(devtoolUIPath, func(w http.ResponseWriter, r *http.Request) {
 		html, err := dohttp.IndexHTML(devtoolUIPath)
 		devtoolPage(w, html, err)

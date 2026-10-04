@@ -1,4 +1,4 @@
-package transport
+package router_test
 
 import (
 	"context"
@@ -16,6 +16,8 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 )
 
 // envelopeRequestID reads the request id the envelope metadata carries.
@@ -37,7 +39,7 @@ func newTestRouter(t *testing.T) (chi.Router, config.Config) {
 	t.Helper()
 
 	cfg := config.Default()
-	router := NewRouter(Options{
+	router := router.NewRouter(router.Options{
 		Config:  cfg,
 		Checker: health.NewChecker(),
 		Metrics: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +117,7 @@ func TestEveryResponseCarriesARequestID(t *testing.T) {
 
 func TestServerTakesTheTimeoutsFromTheConfig(t *testing.T) {
 	cfg := config.Default()
-	server := NewServer(cfg, http.NotFoundHandler())
+	server := transport.NewServer(cfg, http.NotFoundHandler())
 
 	assert.Equal(t, "0.0.0.0:3080", server.Addr)
 	assert.Equal(t, cfg.Server.ReadTimeout, server.ReadTimeout)
@@ -157,7 +159,7 @@ func countAll(path string) (fwmiddleware.RateClass, bool) {
 
 func TestRateLimitRunsOnTheAPISurfaceOnly(t *testing.T) {
 	limiter := &countingLimiter{}
-	router := NewRouter(Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		RateLimiter:  limiter,
 		RateClassify: countAll,
@@ -176,7 +178,7 @@ func TestRateLimitRunsOnTheAPISurfaceOnly(t *testing.T) {
 }
 
 func TestRouterSkipsTheLoggingMiddlewaresWithoutALogger(t *testing.T) {
-	router := NewRouter(Options{Config: config.Default()})
+	router := router.NewRouter(router.Options{Config: config.Default()})
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api", nil))

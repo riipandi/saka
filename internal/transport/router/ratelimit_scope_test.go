@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -16,17 +16,8 @@ import (
 	"github.com/riipandi/saka/framework/kernel"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 )
-
-// countingLimiter records every check the limiter is asked for, so a test can
-// tell a counted route from one the limiter never saw.
-type countingLimiter struct{ calls int }
-
-func (c *countingLimiter) Allow(context.Context, string, fwmiddleware.Policy) (fwmiddleware.Result, error) {
-	c.calls++
-	return fwmiddleware.Result{Limit: 60, Remaining: 59}, nil
-}
 
 // spendingLimiter is a limiter whose window is spent: every check answers
 // limited, with the Retry-After a client waits by.
@@ -87,7 +78,7 @@ func TestAClassifiedModuleRouteIsThrottled(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			limiter := &countingLimiter{}
-			router := transport.NewRouter(transport.Options{
+			router := router.NewRouter(router.Options{
 				Config:       config.Default(),
 				RateLimiter:  limiter,
 				RateClassify: countPaths(tc.path),
@@ -106,7 +97,7 @@ func TestAClassifiedModuleRouteIsThrottled(t *testing.T) {
 // whatever surface it mounted on.
 func TestAnUnclassifiedRouteSpendsNoCheck(t *testing.T) {
 	limiter := &countingLimiter{}
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		RateLimiter:  limiter,
 		RateClassify: countPaths("/api/other/thing"),
@@ -129,7 +120,7 @@ func TestTheSPAAndMetricsAreNotThrottled(t *testing.T) {
 	cfg := config.Default()
 	cfg.OTEL.Metrics.PrometheusPath = "/metrics"
 
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       cfg,
 		RateLimiter:  limiter,
 		RateClassify: countAllEverywhere(),
@@ -157,7 +148,7 @@ func countAllEverywhere() fwmiddleware.Classifier {
 // that it covers module routes too.
 func TestAnExcludedModulePathIsSpared(t *testing.T) {
 	limiter := &countingLimiter{}
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		RateLimiter:  limiter,
 		RateClassify: countAllEverywhere(),
@@ -173,7 +164,7 @@ func TestAnExcludedModulePathIsSpared(t *testing.T) {
 // below /rpc, where a backoffice monitor calls it.
 func TestTheRPCHealthProcedureIsExcludedToo(t *testing.T) {
 	limiter := &countingLimiter{}
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		Checker:      health.NewChecker(),
 		RateLimiter:  limiter,
@@ -193,7 +184,7 @@ func TestTheRPCHealthProcedureIsExcludedToo(t *testing.T) {
 // same as its REST twin.
 func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 	feature := &rpcFeature{}
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		Checker:      health.NewChecker(),
 		RateLimiter:  &spendingLimiter{},
@@ -221,7 +212,7 @@ func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 // TestALimitedRestRouteIsRefusedInTheEnvelope is the other side of the same
 // rule: the REST surface's refusal is the envelope its clients read.
 func TestALimitedRestRouteIsRefusedInTheEnvelope(t *testing.T) {
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:       config.Default(),
 		RateLimiter:  &spendingLimiter{},
 		RateClassify: countAllEverywhere(),

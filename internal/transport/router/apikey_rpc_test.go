@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -19,8 +19,9 @@ import (
 	"github.com/riipandi/saka/framework/kernel"
 	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	conttest "github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/apikey"
 	"github.com/riipandi/saka/modules/identity"
 	"github.com/riipandi/saka/modules/identity/jwks"
@@ -39,7 +40,7 @@ const (
 // machineAuthenticator answers the caller an API key produces: the owner's
 // claims with the machine credential kind, which is what the guard's session
 // rule reads.
-func machineAuthenticator(subject string, admin bool) transport.Authenticator {
+func machineAuthenticator(subject string, admin bool) router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		return &jwtutils.Caller{UserID: subject, AccessClaims: claims,
@@ -56,8 +57,7 @@ func apiKeyPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := openTestMigrators(t, migrationDB)
-	require.NoError(t, err)
+	migrator := conttest.TestMigrator(t, migrationDB)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
@@ -104,12 +104,12 @@ func grantAdministratorRole(t *testing.T, pool *datastore.Postgres, userID uuid.
 
 // newAPIKeyRouter mounts the real key feature over the transport's guard,
 // with the caller the test asks for.
-func newAPIKeyRouter(t *testing.T, auth transport.Authenticator, pool *datastore.Postgres) http.Handler {
+func newAPIKeyRouter(t *testing.T, auth router.Authenticator, pool *datastore.Postgres) http.Handler {
 	t.Helper()
 
 	service := apikey.NewService(pool,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
-	return transport.NewRouter(transport.Options{
+	return router.NewRouter(router.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
 		Authenticator: auth,
@@ -129,7 +129,7 @@ func TestTheAPIKeyGuardIsDeclared(t *testing.T) {
 	for name, tc := range map[string]struct {
 		procedure string
 		body      string
-		auth      transport.Authenticator
+		auth      router.Authenticator
 		status    int
 		code      string
 	}{
@@ -218,7 +218,7 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 	// over the key set, the machine half over the key service, joined by the
 	// middleware the transport owns.
 	auth := middleware.APIKeyAuth(identity.Authenticate(jwks.NewService(cfg, nil, nil, nil), cfg), keyService)
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:        cfg,
 		Checker:       health.NewChecker(),
 		Authenticator: auth,

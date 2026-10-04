@@ -1,4 +1,4 @@
-package transport
+package router
 
 import (
 	"context"
@@ -20,8 +20,27 @@ import (
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/internal/transport/handler"
 	"github.com/riipandi/saka/internal/transport/middleware"
 )
+
+// Authenticator authenticates an RPC request before its procedure runs. The
+// router receives it through Options rather than resolving the key service
+// itself: verification material belongs to the identity area, and the
+// composition root is what joins the two halves.
+type Authenticator = middleware.Authenticator
+
+var rpcRateLimitExclusions = []string{
+	healthCheckPath, // the same readiness a monitor watches over ConnectRPC
+}
+
+// rpcPublicProcedures lists the procedures the RPC surface answers without a
+// caller, read from the same guard table the authorization interceptor uses,
+// so a procedure cannot be public for the authenticator and administrative
+// for the guard. The bearer middleware refuses every other path, so a new
+// procedure is protected by default and a public one is a deliberate entry in
+// internal/guard.
+var rpcPublicProcedures = guard.PublicProcedures()
 
 // RPCPath is the route prefix the ConnectRPC surface is mounted on. The SPA,
 // the admin console, and internal tools call the generated clients below it.
@@ -196,7 +215,7 @@ func rpcRouter(opts Options) http.Handler {
 
 	options := rpcHandlerOptions(maxRequestBytes, reauth)
 	_, healthHandler := systemv1connect.NewHealthServiceHandler(
-		newRPCHealthService(checker),
+		handler.NewRPCHealthService(checker),
 		options...,
 	)
 	r.Handle(systemv1connect.HealthServiceCheckProcedure, healthHandler)
@@ -206,7 +225,7 @@ func rpcRouter(opts Options) http.Handler {
 	// guard names every procedure administrative, so an anonymous miss is a
 	// 404 before the handler ever runs.
 	_, queueHandler := systemv1connect.NewQueueServiceHandler(
-		newRPCQueueService(opts.QueueClient, opts.DB, opts.Audit, opts.Logger),
+		handler.NewRPCQueueService(opts.QueueClient, opts.DB, opts.Audit, opts.Logger),
 		options...,
 	)
 	r.Handle(systemv1connect.QueueServiceListQueuesProcedure, queueHandler)
@@ -219,7 +238,7 @@ func rpcRouter(opts Options) http.Handler {
 	r.Handle(systemv1connect.QueueServiceFlushCompletedTasksProcedure, queueHandler)
 
 	_, schedulerHandler := systemv1connect.NewSchedulerServiceHandler(
-		newRPCSchedulerService(opts.Scheduler, opts.DB, opts.Audit, opts.Logger),
+		handler.NewRPCSchedulerService(opts.Scheduler, opts.DB, opts.Audit, opts.Logger),
 		options...,
 	)
 	r.Handle(systemv1connect.SchedulerServiceListJobsProcedure, schedulerHandler)

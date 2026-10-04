@@ -1,20 +1,20 @@
-// Package transport serves the application over HTTP: the HTTP and ConnectRPC
-// routers that mount every surface, the handler behind each route, and the
-// server that binds them.
+// Package transport serves the application over HTTP: the server that binds
+// the listener, and the composed router it serves.
 //
 // The package is split by role, so a reader looking for one thing opens one
-// file:
+// place:
 //
-//   - http.go registers the HTTP surface: the request pipeline and the mounts
-//     it composes.
-//   - rpc.go registers the ConnectRPC surface: the shared codec, the handler
-//     options every procedure is registered with, and the procedure table.
-//   - handler.go and handler_rpc.go hold the handlers those routers mount, and
-//     nothing else — no routing, no mount order.
-//   - server.go binds the listener to the router.
-//   - middleware/ holds the pipeline pieces, static/ the uploads mount.
-//
-// This file holds what the package as a whole needs.
+//   - server.go (this file) binds the listener to the router and carries the
+//     OpenTelemetry instrumentation around it.
+//   - router/ builds the surfaces: the request pipeline, the HTTP mounts, and
+//     the ConnectRPC procedure table.
+//   - handler/ holds the handlers those routers mount, and nothing else — no
+//     routing, no mount order.
+//   - middleware/ holds the policy pieces of the pipeline: the guard, the
+//     bearer, the API-key credential, the client facts, and the database
+//     rate-limit driver.
+//   - devtools/ holds the debug build's instruments; a release build refuses
+//     their paths.
 package transport
 
 import (
@@ -25,50 +25,8 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/guard"
-	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/transport/router"
 )
-
-// The paths the limiter never counts, one list per transport: the namespaces
-// the two surfaces answer are disjoint, so each list carries only the paths
-// its own surface is spared for. A prefix matches the paths under it. The
-// limiter itself runs on the API surfaces only, so a static asset or a
-// metrics scrape never reaches a check in the first place.
-var httpRateLimitExclusions = []string{
-	"/api/healthz", // liveness probes and load-balancer checks
-}
-
-// restGuardRules is the authorization policy the REST surface's middleware
-// applies, read from internal/guard: the same table the RPC surface's guard
-// interceptor reads, so a route cannot be public for the authenticator and
-// guarded for the guard.
-var restGuardRules = guard.RestRules
-
-// devtoolUIPath is where the samber/do web UI mounts: served by a debug
-// build, refused with a 404 envelope by a release one.
-const devtoolUIPath = "/debug/do"
-
-// webauthnProbePath is where the WebAuthn probe page mounts — the debug
-// build's browser instrument; a release build refuses the path.
-const webauthnProbePath = "/debug/webauthn-probe"
-
-var rpcRateLimitExclusions = []string{
-	healthCheckPath, // the same readiness a monitor watches over ConnectRPC
-}
-
-// rpcPublicProcedures lists the procedures the RPC surface answers without a
-// caller, read from the same guard table the authorization interceptor uses,
-// so a procedure cannot be public for the authenticator and administrative
-// for the guard. The bearer middleware refuses every other path, so a new
-// procedure is protected by default and a public one is a deliberate entry in
-// internal/guard.
-var rpcPublicProcedures = guard.PublicProcedures()
-
-// Authenticator authenticates an RPC request before its procedure runs. The
-// transport receives it through Options rather than resolving the key service
-// itself: verification material belongs to the identity area, and the
-// composition root is what joins the two halves.
-type Authenticator = middleware.Authenticator
 
 // NewServer builds the HTTP server the router is served through, with the
 // timeouts the configuration holds. The caller owns the listener and the
@@ -88,7 +46,7 @@ func NewServer(cfg config.Config, handler http.Handler) *http.Server {
 	observed := otelhttp.NewHandler(handler, "saka", otelhttp.WithFilter(
 		func(r *http.Request) bool {
 			path := r.URL.Path
-			return strings.HasPrefix(path, "/api") || strings.HasPrefix(path, RPCPath)
+			return strings.HasPrefix(path, "/api") || strings.HasPrefix(path, router.RPCPath)
 		},
 	))
 

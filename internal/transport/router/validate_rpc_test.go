@@ -1,4 +1,4 @@
-package transport_test
+package router_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/router"
 	"github.com/riipandi/saka/modules/identity/signup"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/modules/identity/verification"
@@ -32,7 +32,7 @@ import (
 // that refuses it with the not-found failure — the same answer an unknown
 // one earns — so the wire cannot tell a caller which half was wrong.
 func TestProtovalidateRefusesTheContractViolations(t *testing.T) {
-	router := transport.NewRouter(transport.Options{
+	router := router.NewRouter(router.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
 		// Authorization runs before the contract is enforced, so the caller

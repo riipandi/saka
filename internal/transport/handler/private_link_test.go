@@ -1,4 +1,4 @@
-package storage
+package handler
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func discardLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }
 func engineMount(t *testing.T, source ManagerSource, signer *engine.Signer) http.Handler {
 	t.Helper()
 	r := chi.NewRouter()
-	Mount(r, source, signer)
+	MountStorage(r, source, signer)
 	return r
 }
 
