@@ -506,7 +506,7 @@ func wireMapping(msg *authnv1.OAuthAttributeMapping) AttributeMapping {
 		EmailVerified:        msg.EmailVerified,
 		EmailVerifiedDefault: msg.GetEmailVerifiedDefault(),
 		Username:             msg.Username,
-		AvatarURL:            msg.AvatarUrl,
+		Picture:              msg.Picture,
 	}
 }
 
@@ -547,7 +547,7 @@ func wireConnection(conn Connection) *authnv1.OAuthConnection {
 	if conn.AttributeMapping.Email != "" || conn.AttributeMapping.GivenName != "" ||
 		conn.AttributeMapping.FamilyName != "" || conn.AttributeMapping.Subject != "" ||
 		conn.AttributeMapping.EmailVerified != "" || conn.AttributeMapping.EmailVerifiedDefault ||
-		conn.AttributeMapping.Username != "" || conn.AttributeMapping.AvatarURL != "" {
+		conn.AttributeMapping.Username != "" || conn.AttributeMapping.Picture != "" {
 		out.AttributeMapping = &authnv1.OAuthAttributeMapping{
 			Email:                conn.AttributeMapping.Email,
 			GivenName:            conn.AttributeMapping.GivenName,
@@ -556,7 +556,7 @@ func wireConnection(conn Connection) *authnv1.OAuthConnection {
 			EmailVerified:        conn.AttributeMapping.EmailVerified,
 			EmailVerifiedDefault: &conn.AttributeMapping.EmailVerifiedDefault,
 			Username:             conn.AttributeMapping.Username,
-			AvatarUrl:            conn.AttributeMapping.AvatarURL,
+			Picture:              conn.AttributeMapping.Picture,
 		}
 	}
 	if len(conn.CustomAttributes) > 0 {

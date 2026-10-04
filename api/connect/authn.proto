@@ -1333,9 +1333,9 @@ message OAuthAttributeMapping {
   // first sign-in. The default is `preferred_username`.
   string username = 7;
 
-  // avatar_url is the claim the account's picture is read from. The
+  // picture is the claim the account's picture is read from. The
   // default is `picture`.
-  string avatar_url = 8;
+  string picture = 8;
 }
 
 // OAuthCustomAttribute is one operator-defined attribute a custom

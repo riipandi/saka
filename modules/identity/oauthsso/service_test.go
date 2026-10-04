@@ -336,7 +336,7 @@ func TestCreateStoresTheExtendedMappingAndCustomAttributes(t *testing.T) {
 		EmailVerified:        "mail_verified",
 		EmailVerifiedDefault: true,
 		Username:             "user_name",
-		AvatarURL:            "portrait",
+		Picture:              "portrait",
 	}
 	params.CustomAttributes = []CustomAttribute{
 		{Key: "house", Claim: "hogwarts_house"},

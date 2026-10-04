@@ -164,14 +164,14 @@ func TestResolveReadsTheExtendedMappedClaims(t *testing.T) {
 		  "mail":"luna@hogwarts.example","first":"Luna","last":"Lovegood"}`,
 		oauthsso.AttributeMapping{
 			Email: "mail", Subject: "uid", EmailVerified: "mail_verified",
-			Username: "handle", AvatarURL: "portrait",
+			Username: "handle", Picture: "portrait",
 			GivenName: "first", FamilyName: "last",
 		})
 	require.NoError(t, err)
 	assert.Equal(t, "hufflepuff-7", identity.ProviderAccountID, "the mapped subject is the identity")
 	assert.True(t, identity.EmailVerified, "the mapped verified claim is read")
 	assert.Equal(t, "luna", identity.Username)
-	assert.Equal(t, "https://cdn.hogwarts.example/luna.png", identity.AvatarURL)
+	assert.Equal(t, "https://cdn.hogwarts.example/luna.png", identity.Picture)
 }
 
 func TestResolveAnswersTheMappingDefaultsOnAbsentClaims(t *testing.T) {
@@ -185,7 +185,7 @@ func TestResolveAnswersTheMappingDefaultsOnAbsentClaims(t *testing.T) {
 	assert.Equal(t, "token-subject", identity.ProviderAccountID)
 	assert.False(t, identity.EmailVerified)
 	assert.Empty(t, identity.Username)
-	assert.Empty(t, identity.AvatarURL)
+	assert.Empty(t, identity.Picture)
 
 	// The default verified flag is the operator's word, answered only
 	// when the provider names no verified claim.

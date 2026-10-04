@@ -375,7 +375,7 @@ func (s *Service) linkAndOpen(ctx context.Context, flow Flow, conn Connection, a
 	if err != nil {
 		return ContinueResult{}, err
 	}
-	s.refreshAvatar(ctx, flow, account.ID)
+	s.refreshPicture(ctx, flow, account.ID)
 	return result, nil
 }
 
@@ -443,7 +443,7 @@ func (s *Service) provisionJIT(ctx context.Context, flow Flow, conn Connection, 
 	if err != nil {
 		return ContinueResult{}, err
 	}
-	s.refreshAvatar(ctx, flow, created)
+	s.refreshPicture(ctx, flow, created)
 	return result, nil
 }
 
@@ -686,7 +686,7 @@ func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, b
 	if err != nil {
 		return ContinueResult{}, err
 	}
-	s.refreshAvatar(ctx, flow, account.ID)
+	s.refreshPicture(ctx, flow, account.ID)
 	return result, nil
 }
 

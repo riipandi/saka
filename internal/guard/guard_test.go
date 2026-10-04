@@ -206,13 +206,13 @@ func TestMatchRestCarriesTheTusRoutes(t *testing.T) {
 	// The session's own methods sit on the bucket-scoped reference; the
 	// discovery answers without a credential, the rest do not.
 	for _, method := range []string{"HEAD", "PATCH", "DELETE"} {
-		rule, target := guard.MatchRest(guard.RestRules, method, "/api/uploads/avatars/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png")
+		rule, target := guard.MatchRest(guard.RestRules, method, "/api/uploads/pictures/01a0da1c-cb41-779d-bd02-99b3eb5da32a.png")
 		assert.NoError(t, rule(caller("01a0", false), target), method)
 		assert.ErrorIs(t, rule(nil, target), guard.ErrUnauthenticated, method)
 	}
 
 	// A method the protocol does not define defaults to administrative.
-	getRule, _ := guard.MatchRest(guard.RestRules, "GET", "/api/uploads/avatars/01a0da1c.png")
+	getRule, _ := guard.MatchRest(guard.RestRules, "GET", "/api/uploads/pictures/01a0da1c.png")
 	assert.ErrorIs(t, getRule(caller("01a0", false), guard.Target{}), guard.ErrAdminRequired)
 }
 

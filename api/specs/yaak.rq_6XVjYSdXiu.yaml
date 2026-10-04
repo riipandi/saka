@@ -30,7 +30,7 @@ description: |-
   - sort_by (body, optional): One of username, email, first_name, last_name, display_name, created_at; absent orders newest first
   - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
 
-  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
 headers:
 - enabled: true
   name: Content-Type

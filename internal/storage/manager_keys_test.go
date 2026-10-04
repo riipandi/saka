@@ -18,9 +18,9 @@ func TestKeyComposesFlexibleSegments(t *testing.T) {
 	// The store is multi-purpose: the first part names the purpose, the
 	// rest is the feature's own naming — the engine only guarantees each
 	// part lands as one safe segment.
-	key, err := Key("avatar", "usr_123", "128.png")
+	key, err := Key("picture", "usr_123", "128.png")
 	require.NoError(t, err)
-	assert.Equal(t, "avatar/usr_123/128.png", key)
+	assert.Equal(t, "picture/usr_123/128.png", key)
 
 	key, err = Key("user-files", "usr_123", "Q4 report final.pdf")
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestValidateKeyRejectsTraversalAndHiddenSegments(t *testing.T) {
 	} {
 		assert.ErrorIs(t, ValidateKey(key), ErrInvalidKey, "key %q must be refused", key)
 	}
-	for _, key := range []string{"docs/report.txt", "avatar/usr_1/128.png", "single"} {
+	for _, key := range []string{"docs/report.txt", "picture/usr_1/128.png", "single"} {
 		assert.NoError(t, ValidateKey(key), "key %q must be accepted", key)
 	}
 }
@@ -67,16 +67,16 @@ func TestValidateBucketNameRejectsTheShapesANamespaceCannotCarry(t *testing.T) {
 	} {
 		assert.Error(t, ValidateBucketName(name), "bucket name %q must be refused", name)
 	}
-	for _, name := range []string{"devbucket", "user-files", "avatars_2", "staging"} {
+	for _, name := range []string{"devbucket", "user-files", "pictures_2", "staging"} {
 		assert.NoError(t, ValidateBucketName(name), "bucket name %q must be accepted", name)
 	}
 }
 
 func TestSplitRefParsesABucketScopedReference(t *testing.T) {
-	bucket, key, err := SplitRef("devbucket/avatars/usr_1.png")
+	bucket, key, err := SplitRef("devbucket/pictures/usr_1.png")
 	require.NoError(t, err)
 	assert.Equal(t, "devbucket", bucket)
-	assert.Equal(t, "avatars/usr_1.png", key)
+	assert.Equal(t, "pictures/usr_1.png", key)
 
 	_, _, err = SplitRef("nokey")
 	assert.Error(t, err, "a reference with no key segment is not a reference")

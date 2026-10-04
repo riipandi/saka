@@ -188,7 +188,7 @@ func TestDeleteRefusesANonEmptyBucket(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `
 		INSERT INTO public.storage_objects (bucket_id, key, content_hash, status)
-		VALUES ($1, 'avatars/hermione.png', 'hash', 'ready')`, created.ID)
+		VALUES ($1, 'pictures/hermione.png', 'hash', 'ready')`, created.ID)
 	require.NoError(t, err)
 
 	err = service.Delete(ctx, "admin", "gryffindor")

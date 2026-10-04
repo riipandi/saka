@@ -484,7 +484,7 @@ func TestCreateSystemNoticeAddressesOneAccountWithoutACreator(t *testing.T) {
 	ron := seedAccount(t, pool, "ron", false)
 
 	require.NoError(t, service.CreateSystemNotice(t.Context(), hermione,
-		"Upload complete", "Your file avatars/hermione.png is ready."))
+		"Upload complete", "Your file pictures/hermione.png is ready."))
 
 	inbox, _, err := service.ListInbox(t.Context(), hermione, false, CategorySystem, "", false, 1, 20)
 	require.NoError(t, err)

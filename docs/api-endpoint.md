@@ -101,9 +101,9 @@ connection. The browser flow rides two REST routes that answer 302 redirects onl
 completion procedures run over ConnectRPC with the flow token as the credential (guarded
 `Public`). A resolved account keeping a confirmed second factor answers with the MFA bridge,
 which `CompleteSignIn` spends. A custom connection carries the claim mapping (subject,
-email and its verified flag, names, username, avatar) and a custom attribute set; the
+email and its verified flag, names, username, picture) and a custom attribute set; the
 mapping applies on every sign-in, the username only at the JIT creation, and the
-avatar is downloaded to storage. The provider tokens rest sealed on the binding and
+picture is downloaded to storage. The provider tokens rest sealed on the binding and
 refresh on every sign-in; the holder reads them with `GetLinkedAccountTokens`, and a
 background job offboards accounts whose provider has withdrawn the identity (the
 refresh grant refused with `invalid_grant`) with a permanent ban.

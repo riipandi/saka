@@ -97,7 +97,7 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 	accounts := user.NewService(pool, audit.NewRecorder(nil), nil, nil)
 	recorder := &pictureRecorder{Service: accounts, records: map[uuid.UUID][]byte{}}
 	service := resolutionService(t, pool, func(s *Service) { s.WithProfiles(recorder) })
-	// The outbound client answers a PNG: the avatar the flow resolved is
+	// The outbound client answers a PNG: the picture the flow resolved is
 	// carried to the picture writer beside the transaction.
 	service.fetcher = DiscoveryFetcherFunc(func(_ context.Context, _ string) (int, []byte, error) {
 		return 200, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 0}, nil
@@ -133,7 +133,7 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 	require.NotNil(t, answer.Session)
 
 	// The second sign-in resolves new names, a username claim the
-	// mapping answered, an avatar, and a custom attribute — the account
+	// mapping answered, an picture, and a custom attribute — the account
 	// takes the answers, and its username stays.
 	provider.identity = ExternalIdentity{
 		ProviderAccountID: "prov-20",
@@ -142,7 +142,7 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 		GivenName:         "Minerva",
 		FamilyName:        "McGonagall",
 		Username:          "head-of-house",
-		AvatarURL:         "https://cdn.hogwarts.example/minerva.png",
+		Picture:           "https://cdn.hogwarts.example/minerva.png",
 		Profile:           []byte(`{"hogwarts_house":"gryffindor"}`),
 	}
 	authorizeURL, err = service.Begin(t.Context(), created.Provider)
@@ -171,9 +171,9 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 		`SELECT custom_attributes->>'house' FROM public.users WHERE id = $1`, userID).Scan(&house))
 	assert.Equal(t, "gryffindor", house)
 
-	// The avatar the flow resolved is fetched beside the transaction and
+	// The picture the flow resolved is fetched beside the transaction and
 	// carried to the picture writer.
-	assert.NotEmpty(t, recorder.records[userID], "the avatar is carried to the picture writer")
+	assert.NotEmpty(t, recorder.records[userID], "the picture is carried to the picture writer")
 }
 
 func TestTheMappedUsernameIsTheJITCandidateAndATakenOneSuffixes(t *testing.T) {
@@ -226,7 +226,7 @@ func TestTheMappedUsernameIsTheJITCandidateAndATakenOneSuffixes(t *testing.T) {
 	assert.Equal(t, "loonylovegood_1", answer.Session.User.Username)
 }
 
-func TestTheAvatarFailureKeepsTheSignIn(t *testing.T) {
+func TestThePictureFailureKeepsTheSignIn(t *testing.T) {
 	pool := migratedPool(t)
 	profiles := newStubProfiles()
 	service := resolutionService(t, pool, func(s *Service) { s.WithProfiles(profiles) })
@@ -241,7 +241,7 @@ func TestTheAvatarFailureKeepsTheSignIn(t *testing.T) {
 		EmailVerified:     true,
 		GivenName:         "Hannah",
 		FamilyName:        "Abbott",
-		AvatarURL:         "https://cdn.hogwarts.example/hannah.png",
+		Picture:           "https://cdn.hogwarts.example/hannah.png",
 	})
 	userID := seedAccount(t, pool, "hannah@hogwarts.example", true)
 	mustExec(t, pool,

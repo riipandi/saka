@@ -15,7 +15,7 @@ description: |-
   Ported from Pocket ID `GET /api/users/{id}/profile-picture.png` — the read
   stays a REST route, because a picture is fetched by an img tag rather than
   a client that speaks the protocol. Public; an account without a picture
-  answers the bundled default by redirect to /images/default-avatar.png.
+  answers the bundled default by redirect to /images/default-picture.png.
 
   Parameters:
   - id (path, required): User ID

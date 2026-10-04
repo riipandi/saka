@@ -34,14 +34,14 @@ func TestUploadFinishedProcessorTellsTheOwner(t *testing.T) {
 	owner := uuid.NewV7()
 
 	err := uploadFinishedProcessor(t.Context(), UploadFinishedTask{
-		Key:   "avatars/robert-langdon.png",
+		Key:   "pictures/robert-langdon.png",
 		Owner: owner.String(),
 		Size:  512,
 	}, publisher)
 	require.NoError(t, err)
 	require.Len(t, publisher.calls, 1)
 	assert.Equal(t, owner, publisher.calls[0].userID)
-	assert.Contains(t, publisher.calls[0].body, "avatars/robert-langdon.png")
+	assert.Contains(t, publisher.calls[0].body, "pictures/robert-langdon.png")
 }
 
 func TestUploadFinishedProcessorSkipsWhatItCannotAddress(t *testing.T) {
@@ -75,7 +75,7 @@ func TestTheUploadFinishedEnqueuerNamesTheOwner(t *testing.T) {
 	// A nil client is the state a queue-less container is in: the hook
 	// answers without enqueueing, the file still stored.
 	manifest := storage.Manifest{
-		Key:      "avatars/robert-langdon.png",
+		Key:      "pictures/robert-langdon.png",
 		Status:   "ready",
 		Size:     512,
 		Metadata: map[string]any{"owner": uuid.NewV7().String()},

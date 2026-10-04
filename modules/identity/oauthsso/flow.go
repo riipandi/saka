@@ -185,7 +185,7 @@ func (s *Service) Callback(ctx context.Context, provider, code, state string) (s
 		GivenName:          identity.GivenName,
 		FamilyName:         identity.FamilyName,
 		Username:           identity.Username,
-		AvatarURL:          identity.AvatarURL,
+		Picture:            identity.Picture,
 		Profile:            identity.Profile,
 		SealedAccessToken:  sealedAccess,
 		SealedRefreshToken: sealedRefresh,

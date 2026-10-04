@@ -37,7 +37,7 @@ func TestRESTBearerProtectsByDefault(t *testing.T) {
 	}{
 		"public route":                          {http.MethodGet, "/api/users/01a0/profile-picture.png", false, http.StatusNoContent},
 		"public route, other verb is protected": {http.MethodPut, "/api/users/01a0/profile-picture.png", true, http.StatusUnauthorized},
-		"unlisted path":                         {http.MethodGet, "/api/users/01a0/avatar.png", true, http.StatusUnauthorized},
+		"unlisted path":                         {http.MethodGet, "/api/users/01a0/picture.png", true, http.StatusUnauthorized},
 		"wildcard spans no more than one segment": {
 			http.MethodGet, "/api/users/01a0/extra/profile-picture.png", true, http.StatusUnauthorized,
 		},

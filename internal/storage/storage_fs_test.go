@@ -16,7 +16,7 @@ import (
 
 // fsTestBucket is the bucket the local-backend tests write into; the key is
 // the file's own naming inside it.
-const fsTestBucket = "avatars"
+const fsTestBucket = "pictures"
 
 // newFSStore builds a local backend over a throwaway directory and returns
 // a key with known bytes, the shape every store test runs through.

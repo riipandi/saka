@@ -103,11 +103,11 @@ func (c ctxReader) Read(p []byte) (int, error) {
 }
 
 // Key builds a storage key from flexible parts, the naming a multi-purpose
-// store needs: the first part is the purpose the files belong to — avatar,
+// store needs: the first part is the purpose the files belong to — picture,
 // user-files, export — the rest free, so a feature names its files its own
 // way without the engine knowing the scheme:
 //
-//	Key("avatar", userID, "128.png")     → avatar/usr_123/128.png
+//	Key("picture", userID, "128.png")    → picture/usr_123/128.png
 //	Key("user-files", userID, report)    → user-files/usr_123/q4-report.pdf
 //
 // Each part becomes one path segment: characters outside letters, digits,

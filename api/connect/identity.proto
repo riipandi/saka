@@ -436,11 +436,11 @@ message User {
   // match a group-based claim against.
   repeated UserGroup user_groups = 16;
 
-  // avatar_url is the account's picture's public URL, resolved from the
+  // picture is the account's picture's public URL, resolved from the
   // filestore object the account references. Empty when the account has
   // no picture: the client then shows its bundled default, the same
   // picture the profile-picture read answers by redirect.
-  string avatar_url = 17;
+  string picture = 17;
 }
 
 // UserMetadata is the account's preference document, the typed view of the

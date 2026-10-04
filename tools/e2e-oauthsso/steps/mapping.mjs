@@ -1,7 +1,7 @@
 // Steps 9–12 — the extended attribute mapping this round shipped: a
 // mapped subject binding the account, the verified default steering the
 // unverified gate, the every-sign-in refresh of the names and the custom
-// attributes with the username holding still, and the avatar the mapping
+// attributes with the username holding still, and the picture the mapping
 // names landing on the account.
 import { rpc } from '../lib/rpc.mjs'
 import { walk } from '../lib/walk.mjs'
@@ -68,16 +68,16 @@ export async function run() {
     check('11e. the custom attributes merged', attrs.includes('"department"') && attrs.includes('hufflepuff'), attrs.slice(0, 160))
   }
 
-  console.log('12. The avatar the mapping names lands on the account')
+  console.log('12. The picture the mapping names lands on the account')
   // The picture pipeline is the queue's own; the read answers the object's
   // URL once the upload syncs, so the probe polls.
   {
-    let avatar = ''
+    let picture = ''
     for (let i = 0; i < 20; i++) {
-      avatar = (await getUser('mapped-padma@hogwarts.example'))?.avatar_url ?? ''
-      if (avatar) break
+      picture = (await getUser('mapped-padma@hogwarts.example'))?.picture ?? ''
+      if (picture) break
       await sleep(1000)
     }
-    check('12a. the avatar is stored and answered', Boolean(avatar), avatar.slice(0, 160))
+    check('12a. the picture is stored and answered', Boolean(picture), picture.slice(0, 160))
   }
 }

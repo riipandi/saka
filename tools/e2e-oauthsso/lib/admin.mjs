@@ -12,7 +12,7 @@ export const customMapping = {
   email_verified: 'mail_verified',
   email_verified_default: true,
   username: 'handle',
-  avatar_url: 'photo',
+  picture: 'photo',
 }
 
 export async function ensureConnection(provider, issuer, mapping, attrs) {

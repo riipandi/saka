@@ -34,7 +34,7 @@ description: |-
   - password (body, optional): Primary credential
   - display_name (body, optional): Falls back to the composed names
 
-  The response's `avatar_url` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
 headers:
 - enabled: true
   name: Content-Type

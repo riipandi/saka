@@ -193,9 +193,9 @@ type AttributeMapping struct {
 	// Username names the claim the account's username is read from at the
 	// first sign-in; the empty field keeps `preferred_username`.
 	Username string
-	// AvatarURL names the claim the account's picture is read from; the
+	// Picture names the claim the account's picture is read from; the
 	// empty field keeps `picture`.
-	AvatarURL string
+	Picture string
 }
 
 // CustomAttribute is one operator-defined attribute a custom connection
@@ -274,7 +274,7 @@ type Flow struct {
 	GivenName         string
 	FamilyName        string
 	Username          string
-	AvatarURL         string
+	Picture           string
 	Profile           []byte
 	AccessToken       string
 	RefreshToken      string
@@ -298,7 +298,7 @@ type FlowResolution struct {
 	GivenName          string
 	FamilyName         string
 	Username           string
-	AvatarURL          string
+	Picture            string
 	Profile            []byte
 	SealedAccessToken  string
 	SealedRefreshToken string

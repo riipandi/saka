@@ -16,13 +16,13 @@ import (
 )
 
 // The bundled default picture answers for every account that has none. It is
-// a frontend asset — `public/images/default-avatar.png`, shipped in
+// a frontend asset — `public/images/default-picture.png`, shipped in
 // the compiled SPA — and the read answers it by redirect, so the picture the
 // account without one shows is the one the frontend already bundles. The
 // path is relative, so the redirect resolves against whatever host the
 // client reached: the API's own in production, the dev server through its
 // proxy.
-const DefaultPicturePath = "/images/default-avatar.png"
+const DefaultPicturePath = "/images/default-picture.png"
 
 // The picture kinds the update accepts, with the extension each one's storage
 // key carries. The bytes decide, not a declared type: the kind is read off the
@@ -61,18 +61,18 @@ type Picture struct {
 }
 
 // pictureKey composes the bucket-scoped reference one account's picture
-// lives under: `<bucket>/avatars/<id>.<ext>`. The extension travels in the
+// lives under: `<bucket>/pictures/<id>.<ext>`. The extension travels in the
 // name so the object says what it is wherever it is listed — the backend's
 // browser, the local deployment's file tree — without a lookup. It comes
 // from the sniffed bytes, never from the name the client sent. The bucket is
 // the seeded default until the storage default-bucket setting is wired in.
 func pictureKey(userID uuid.UUID, ext string) string {
-	key, err := storage.Key("avatars", userID.String()+"."+ext)
+	key, err := storage.Key("pictures", userID.String()+"."+ext)
 	if err != nil {
 		// A UUID and an extension from the fixed table above cannot form an
 		// invalid key; the fallback is here for the validator's contract, not
 		// for this composition.
-		key = "avatars/" + userID.String() + "." + ext
+		key = "pictures/" + userID.String() + "." + ext
 	}
 	return storage.DefaultBucketName + "/" + key
 }

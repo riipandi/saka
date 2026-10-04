@@ -569,7 +569,7 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 
 	// The engine holds the file whole under the key the row names — the
 	// same tree of keys both drivers keep.
-	stored, err := pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
+	stored, err := pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err)
 	storedBody, err := io.ReadAll(stored)
 	require.NoError(t, err)
@@ -580,11 +580,11 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 	// is the filestore row's identity, and the join answers the location.
 	bucket, key := storedPictureReference(t, pool, created.ID)
 	assert.Equal(t, "devbucket", bucket)
-	assert.Equal(t, "avatars/"+rowID(t, created.ID)+".png", key)
+	assert.Equal(t, "pictures/"+rowID(t, created.ID)+".png", key)
 }
 
 // TestPictureUpdateMovesTheKeyWhenTheKindChanges pins the naming contract: the
-// key is `avatars/<id>.<ext>` with the extension the sniffed bytes earned, so
+// key is `pictures/<id>.<ext>` with the extension the sniffed bytes earned, so
 // an upload of another kind moves the picture rather than leaving the old one
 // under a name that lies about its content.
 func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
@@ -600,18 +600,18 @@ func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
 
 	png := append([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, []byte("first")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, png))
-	pngKey := "devbucket/avatars/" + rowID(t, created.ID) + ".png"
+	pngKey := "devbucket/pictures/" + rowID(t, created.ID) + ".png"
 	assert.Equal(t, pngKey, storedPictureKey(t, pool, created.ID))
 
 	// The second upload is another kind, so it lands under another key.
 	jpeg := append([]byte{0xff, 0xd8, 0xff}, []byte("second")...)
 	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, jpeg))
-	jpegKey := "devbucket/avatars/" + rowID(t, created.ID) + ".jpg"
+	jpegKey := "devbucket/pictures/" + rowID(t, created.ID) + ".jpg"
 	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
 
 	// The replaced picture left the engine whole: no object answers its key,
 	// and no manifest row keeps the garbage collection from ever sweeping it.
-	_, err = pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
+	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 	// The manifest row left with the object: a row without a file is what
 	// the garbage collection keeps a key for, so one that lingered would
@@ -719,7 +719,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 	assert.Nil(t, pictureFileID)
 
 	// The file left the engine: no read answers the key anymore.
-	_, err = pictures.Open(t.Context(), "devbucket", "avatars/"+rowID(t, created.ID)+".png")
+	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
 	assert.ErrorIs(t, err, storage.ErrNotFound)
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -771,7 +771,7 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 	var bucketID string
 	require.NoError(t, pool.QueryRow(t.Context(),
 		`SELECT id FROM storage_buckets WHERE name = 'devbucket'`).Scan(&bucketID))
-	_, err = storage.NewManifests().Load(t.Context(), pool, bucketID, "avatars/"+rowID(t, created.ID)+".png")
+	_, err = storage.NewManifests().Load(t.Context(), pool, bucketID, "pictures/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err, "the manifest row outlives the object")
 
 	view, err := service.ProfilePicture(t.Context(), created.ID)
@@ -851,12 +851,12 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 	// namespace the row names.
 	listed, err := storeList(t.Context(), backend, "devbucket", "")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"avatars/" + rowID(t, created.ID) + ".png"}, listed)
+	assert.Equal(t, []string{"pictures/" + rowID(t, created.ID) + ".png"}, listed)
 
 	// The object carries the feature's content type: a direct read of the
 	// bucket — a presigned URL, a console preview — answers what the
 	// bytes are without consulting the manifest.
-	headed, err := storeHead(t.Context(), backend, "devbucket", "avatars/"+rowID(t, created.ID)+".png")
+	headed, err := storeHead(t.Context(), backend, "devbucket", "pictures/"+rowID(t, created.ID)+".png")
 	require.NoError(t, err)
 	assert.Equal(t, "image/png", awssdk.ToString(headed.ContentType))
 

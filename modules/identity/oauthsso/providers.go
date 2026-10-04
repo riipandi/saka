@@ -51,9 +51,9 @@ type ExternalIdentity struct {
 	// at the first sign-in only, the account's own derivation keeping
 	// the fallback. Empty is a provider that answered none.
 	Username string
-	// AvatarURL is the address the account's picture is read from;
+	// Picture is the address the account's picture is read from;
 	// empty is a provider that answered none.
-	AvatarURL string
+	Picture string
 	// Profile is the raw claim document the answer came from, stored
 	// with the linked account for the operator's forensics.
 	Profile []byte

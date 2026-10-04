@@ -16,7 +16,7 @@ import (
 const DefaultBucketSeederName = "DefaultBucketSeeder"
 
 // DefaultBucketName is the bucket every storage feature writes into until an
-// administrator moves the default selection: the avatar and OIDC-logo keys
+// administrator moves the default selection: the picture and OIDC-logo keys
 // the engine carries today live under it.
 const DefaultBucketName = "devbucket"
 

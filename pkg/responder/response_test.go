@@ -194,7 +194,7 @@ func TestWriteErrorNamesTheCauseInTheLog(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/users/01a0/profile-picture.png", nil)
 	req = req.WithContext(WithRequestID(req.Context(), "req_01m3dfts39e58b4zbtqqyq6aey"))
 
-	WriteError(w, req, errors.New("storage: not found: avatars/01a0.png"))
+	WriteError(w, req, errors.New("storage: not found: pictures/01a0.png"))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	body := decodeEnvelope(t, w)
@@ -202,7 +202,7 @@ func TestWriteErrorNamesTheCauseInTheLog(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), "storage", "the cause never reaches the client")
 
 	line := captured.String()
-	assert.Contains(t, line, "storage: not found: avatars/01a0.png")
+	assert.Contains(t, line, "storage: not found: pictures/01a0.png")
 	assert.Contains(t, line, "req_01m3dfts39e58b4zbtqqyq6aey")
 	assert.Contains(t, line, "/api/users/01a0/profile-picture.png")
 }

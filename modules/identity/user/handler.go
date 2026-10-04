@@ -12,7 +12,7 @@ import (
 )
 
 // maxPictureSize is the read cap the picture write enforces before the bytes
-// reach the service: a picture is an avatar, and the engine's request path
+// reach the service: a picture is an picture, and the engine's request path
 // stays cheap only while an upload is.
 const maxPictureSize = 2 << 20
 

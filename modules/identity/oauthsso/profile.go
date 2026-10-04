@@ -35,10 +35,10 @@ func (s *Service) WithProfiles(applier profileApplier) *Service {
 	return s
 }
 
-// avatarMaxBytes is the picture a provider may hand over: a bigger body
+// pictureMaxBytes is the picture a provider may hand over: a bigger body
 // is not a picture the account keeps, and reading one to the end would
 // be the provider's way to spend our bandwidth.
-const avatarMaxBytes = 4 << 20 // 4 MiB
+const pictureMaxBytes = 4 << 20 // 4 MiB
 
 // applyResolutionProfile carries the mapping's answers onto the account
 // inside the resolution's transaction: the names the flow resolved and
@@ -59,33 +59,33 @@ func (s *Service) applyResolutionProfile(ctx context.Context, tx datastore.Queri
 		customAttributeDocument(flow.Profile, conn.CustomAttributes, s.log))
 }
 
-// refreshAvatar carries the mapped picture onto the account: the URL the
+// refreshPicture carries the mapped picture onto the account: the URL the
 // flow resolved is fetched over the outbound client and the bytes stored
 // through the account seam. Every failure — no client wired, a dead
 // fetch, a body that is no image — is the refresh this run could not
 // make: logged, the stored picture kept, the sign-in never failed.
-func (s *Service) refreshAvatar(ctx context.Context, flow Flow, userID uuid.UUID) {
-	if s.profiles == nil || s.fetcher == nil || flow.AvatarURL == "" {
+func (s *Service) refreshPicture(ctx context.Context, flow Flow, userID uuid.UUID) {
+	if s.profiles == nil || s.fetcher == nil || flow.Picture == "" {
 		return
 	}
-	status, body, err := s.fetcher.Do(ctx, flow.AvatarURL)
+	status, body, err := s.fetcher.Do(ctx, flow.Picture)
 	if err != nil {
-		s.log.WarnContext(ctx, "oauthsso: the avatar download failed; the stored picture stays",
-			slog.String("user_id", userID.String()), slog.String("avatar_url", flow.AvatarURL), slog.String("error", err.Error()))
+		s.log.WarnContext(ctx, "oauthsso: the picture download failed; the stored picture stays",
+			slog.String("user_id", userID.String()), slog.String("picture", flow.Picture), slog.String("error", err.Error()))
 		return
 	}
 	if status != 200 {
-		s.log.WarnContext(ctx, "oauthsso: the avatar download answered a non-200; the stored picture stays",
-			slog.String("user_id", userID.String()), slog.String("avatar_url", flow.AvatarURL), slog.Int("status", status))
+		s.log.WarnContext(ctx, "oauthsso: the picture download answered a non-200; the stored picture stays",
+			slog.String("user_id", userID.String()), slog.String("picture", flow.Picture), slog.Int("status", status))
 		return
 	}
-	if len(body) > avatarMaxBytes {
-		s.log.WarnContext(ctx, "oauthsso: the avatar download is too large; the stored picture stays",
-			slog.String("user_id", userID.String()), slog.String("avatar_url", flow.AvatarURL), slog.Int("bytes", len(body)))
+	if len(body) > pictureMaxBytes {
+		s.log.WarnContext(ctx, "oauthsso: the picture download is too large; the stored picture stays",
+			slog.String("user_id", userID.String()), slog.String("picture", flow.Picture), slog.Int("bytes", len(body)))
 		return
 	}
 	if err := s.profiles.RefreshProviderPicture(ctx, userID, body); err != nil {
-		s.log.WarnContext(ctx, "oauthsso: the avatar could not be stored; the stored picture stays",
+		s.log.WarnContext(ctx, "oauthsso: the picture could not be stored; the stored picture stays",
 			slog.String("user_id", userID.String()), slog.String("error", err.Error()))
 	}
 }

@@ -22,13 +22,13 @@ func testEngineSigner(t *testing.T) *Signer {
 func TestTheSignerVerifiesItsOwnSignatureAndNothingElse(t *testing.T) {
 	signer := testEngineSigner(t)
 	exp := time.Now().Add(time.Hour)
-	sig := signer.Sign("devbucket", "avatars/x.png", exp)
+	sig := signer.Sign("devbucket", "pictures/x.png", exp)
 
-	assert.True(t, signer.Verify("devbucket", "avatars/x.png", exp.Unix(), sig))
-	assert.False(t, signer.Verify("devbucket", "avatars/other.png", exp.Unix(), sig), "a different key must not verify")
-	assert.False(t, signer.Verify("devbucket", "avatars/x.png", exp.Add(time.Hour).Unix(), sig), "a lifted expiry must not verify")
-	assert.False(t, signer.Verify("devbucket", "avatars/x.png", exp.Unix(), sig+"00"), "an extended signature must not verify")
-	assert.False(t, signer.Verify("devbucket", "avatars/x.png", 0, sig), "no expiry is no access")
+	assert.True(t, signer.Verify("devbucket", "pictures/x.png", exp.Unix(), sig))
+	assert.False(t, signer.Verify("devbucket", "pictures/other.png", exp.Unix(), sig), "a different key must not verify")
+	assert.False(t, signer.Verify("devbucket", "pictures/x.png", exp.Add(time.Hour).Unix(), sig), "a lifted expiry must not verify")
+	assert.False(t, signer.Verify("devbucket", "pictures/x.png", exp.Unix(), sig+"00"), "an extended signature must not verify")
+	assert.False(t, signer.Verify("devbucket", "pictures/x.png", 0, sig), "no expiry is no access")
 }
 
 func TestASignatureNeverSurvivesASecretRotation(t *testing.T) {
@@ -51,9 +51,9 @@ func TestSignedURLComposesTheBucketAndKeyUnderThePrefix(t *testing.T) {
 	signer := testEngineSigner(t)
 	exp := time.Now().Add(time.Hour)
 
-	url, err := signer.SignedURL("http://x.test/storage", "devbucket", "avatars/x.png", exp)
+	url, err := signer.SignedURL("http://x.test/storage", "devbucket", "pictures/x.png", exp)
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(url, "http://x.test/storage/devbucket/avatars/x.png?"), url)
+	assert.True(t, strings.HasPrefix(url, "http://x.test/storage/devbucket/pictures/x.png?"), url)
 
 	// A base without a path is the assets URL's shape minus its prefix:
 	// the engine's own mount is the fallback, not the caller's guess.

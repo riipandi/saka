@@ -183,7 +183,7 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 
 const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code_verifier,
 	stage, user_id, email, email_code_hash, wrong_codes, provider_account_id,
-	email_verified, given_name, family_name, username, avatar_url, profile,
+	email_verified, given_name, family_name, username, picture, profile,
 	access_token, refresh_token, access_expires_at, redirect_to, created_at, expires_at`
 
 const linkedAccountColumns = `id, user_id, connection_id, provider_account_id, email,
@@ -252,7 +252,7 @@ func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, i
 		sb.Assign("given_name", resolution.GivenName),
 		sb.Assign("family_name", resolution.FamilyName),
 		sb.Assign("username", resolution.Username),
-		sb.Assign("avatar_url", resolution.AvatarURL),
+		sb.Assign("picture", resolution.Picture),
 		sb.Assign("profile", profileJSONFromBytes(resolution.Profile)),
 		sb.Assign("access_token", resolution.SealedAccessToken),
 		sb.Assign("refresh_token", resolution.SealedRefreshToken),
@@ -702,7 +702,7 @@ func scanFlow(row pgx.Row) (Flow, error) {
 		&flow.Nonce, &flow.CodeVerifier, &flow.Stage, &flow.UserID, &flow.Email,
 		&flow.EmailCodeHash, &flow.WrongCodes, &flow.ProviderAccountID,
 		&flow.EmailVerified, &flow.GivenName, &flow.FamilyName, &flow.Username,
-		&flow.AvatarURL, &flow.Profile,
+		&flow.Picture, &flow.Profile,
 		&flow.AccessToken, &flow.RefreshToken, &flow.AccessExpiresAt,
 		&flow.RedirectTo, &flow.CreatedAt, &flow.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {

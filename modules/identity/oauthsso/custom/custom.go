@@ -117,7 +117,7 @@ func (p *Provider) Resolve(ctx context.Context, conn oauthsso.Connection, flow o
 		GivenName:            claims.mappedGiven(mapping),
 		FamilyName:           claims.mappedFamily(mapping),
 		Username:             claims.mappedUsername(mapping),
-		AvatarURL:            claims.mappedAvatarURL(mapping),
+		Picture:              claims.mappedPicture(mapping),
 		Profile:              profile,
 		AccessToken:          token.AccessToken,
 		RefreshToken:         token.RefreshToken,
@@ -319,11 +319,11 @@ func (c claimSet) mappedUsername(mapping oauthsso.AttributeMapping) string {
 	return c.string(name, "")
 }
 
-// mappedAvatarURL reads the claim the mapping names — `picture` when the
+// mappedPicture reads the claim the mapping names — `picture` when the
 // mapping is silent — from the raw document. An unanswered claim names
 // no picture.
-func (c claimSet) mappedAvatarURL(mapping oauthsso.AttributeMapping) string {
-	name := mapping.AvatarURL
+func (c claimSet) mappedPicture(mapping oauthsso.AttributeMapping) string {
+	name := mapping.Picture
 	if name == "" {
 		name = "picture"
 	}

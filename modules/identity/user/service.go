@@ -69,7 +69,7 @@ type Service struct {
 	pictures *storage.Manager
 
 	// assetsURL is the public origin the browser fetches stored files
-	// from — `app.assets_url`. The avatar URL the views answer composes
+	// from — `app.assets_url`. The picture URL the views answer composes
 	// from it; empty degrades every view's picture URL to the empty
 	// string, the state a test or a bare wiring is in.
 	assetsURL string
@@ -261,7 +261,7 @@ func (s *Service) WithSettings(reader settingsReader) *Service {
 	return s
 }
 
-// WithAssetsURL wires the public origin the avatar URLs compose from —
+// WithAssetsURL wires the public origin the picture URLs compose from —
 // `app.assets_url`. Empty keeps every view's picture URL empty.
 func (s *Service) WithAssetsURL(url string) *Service {
 	s.assetsURL = url
@@ -860,7 +860,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 // the read-back the account-creating features share: sign-up assembles its
 // answer from it, so both doors describe the account the same way. The
 // accounts these doors create carry no picture, so the view answers an
-// empty avatar URL — no assets origin to compose one from.
+// empty picture URL — no assets origin to compose one from.
 func ReadAccount(ctx context.Context, db datastore.Querier, id uuid.UUID) (UserView, error) {
 	row, err := (&Repository{}).GetUser(ctx, db, id)
 	if err != nil {
@@ -895,7 +895,7 @@ func WireView(user UserView) *identityv1.User {
 		BanReason:     user.BanReason,
 		// The picture's public URL, empty when the account has none — the
 		// client's bundled default answers for it.
-		AvatarUrl: user.Picture,
+		Picture: user.Picture,
 		// The document is the read-side view of the stored preferences; a
 		// client that wants the locale or the timezone reads it here.
 		Metadata: &identityv1.UserMetadata{
