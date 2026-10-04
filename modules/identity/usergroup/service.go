@@ -9,10 +9,10 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the service defines. The handler maps them onto the codes the
@@ -84,19 +84,19 @@ type CreateParams struct {
 
 // ListGroups answers one page of the groups, ordered as the caller asked,
 // optionally filtered by a search term.
-func (s *Service) ListGroups(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]GroupView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListGroups(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]GroupView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	rows, total, err := s.repo.ListGroups(ctx, s.pool, search, sortBy, ascending, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListGroups(ctx, s.pool, search, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	views := make([]GroupView, 0, len(rows))
 	for _, row := range rows {
 		views = append(views, GroupView(row))
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // GetGroup answers one group with its members. The membership is read in the

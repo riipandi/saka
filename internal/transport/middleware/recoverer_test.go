@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 func TestRecovererAnswersAPanicWithAnEnvelope(t *testing.T) {
@@ -25,7 +25,7 @@ func TestRecovererAnswersAPanicWithAnEnvelope(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/things", nil)
-	req = req.WithContext(responder.WithRequestID(req.Context(), "req_abc123"))
+	req = req.WithContext(webutil.WithRequestID(req.Context(), "req_abc123"))
 	handler.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)

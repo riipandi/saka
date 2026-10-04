@@ -14,7 +14,8 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedPool is the container the CRUD round trips run over: a database
@@ -53,7 +54,7 @@ func insertAdmin(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 // and answers the row that was already there, and a malformed pattern is
 // refused before the database is touched.
 func TestAddStoresAndAnswersTheStoredRow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	ctx := context.Background()
@@ -82,7 +83,7 @@ func TestAddStoresAndAnswersTheStoredRow(t *testing.T) {
 // identifier leaves, an unknown one is the not-found failure, and a removed
 // identifier can be added again.
 func TestRemoveDeletesAndRefusesAnUnknownIdentifier(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	ctx := context.Background()
@@ -103,7 +104,7 @@ func TestRemoveDeletesAndRefusesAnUnknownIdentifier(t *testing.T) {
 // TestListPagesTheEntries pins the page: newest first by default, the
 // pattern sort honored, the total counted across the pages.
 func TestListPagesTheEntries(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	ctx := context.Background()
@@ -132,7 +133,7 @@ func TestListPagesTheEntries(t *testing.T) {
 // is the sign-up gate's test — the caller that decides what a failed read
 // means.
 func TestBlockedReadsTheStoredEntries(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	ctx := context.Background()
@@ -183,7 +184,7 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 // the exact duplicate is not a collision (the caller's taken-answer owns
 // it), a base another account holds is, and the fold compares Gmail's dots.
 func TestCollisionTakenPinsTheScan(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	ctx := context.Background()

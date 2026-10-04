@@ -17,6 +17,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/blocklist"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/signin"
@@ -24,7 +25,7 @@ import (
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/modules/identity/verification"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
@@ -83,7 +84,7 @@ func userCount(t *testing.T, pool *datastore.Postgres) int {
 }
 
 func TestSignupCreatesTheAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -169,7 +170,7 @@ func testConfig() config.Config {
 }
 
 func TestSignupComposesTheDisplayNameFromTheNames(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -188,7 +189,7 @@ func TestSignupComposesTheDisplayNameFromTheNames(t *testing.T) {
 }
 
 func TestSignupRequiresValidToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -224,7 +225,7 @@ func TestSignupRequiresValidToken(t *testing.T) {
 }
 
 func TestSignupConsumesASingleUseTokenOnce(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -248,7 +249,7 @@ func TestSignupConsumesASingleUseTokenOnce(t *testing.T) {
 }
 
 func TestSignupRejectsDuplicateAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -351,7 +352,7 @@ var openMode = signupSettings{
 }
 
 func TestOpenModeSignsUpWithoutAToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool).WithSignupSettings(openMode)
@@ -367,7 +368,7 @@ func TestOpenModeSignsUpWithoutAToken(t *testing.T) {
 }
 
 func TestOpenModeIssuesTheVerificationCode(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	verifier := &recordingVerifier{repo: verification.NewRepository()}
@@ -403,7 +404,7 @@ func TestOpenModeIssuesTheVerificationCode(t *testing.T) {
 }
 
 func TestInviteModeRefusesAnUnknownTokenCheaply(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool).WithSignupSettings(signupSettings{"access.mode": "invite"})
@@ -423,7 +424,7 @@ func TestInviteModeRefusesAnUnknownTokenCheaply(t *testing.T) {
 }
 
 func TestInviteModeStillSignsUpWithAValidToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool).WithSignupSettings(signupSettings{"access.mode": "invite"})
@@ -442,7 +443,7 @@ func TestInviteModeStillSignsUpWithAValidToken(t *testing.T) {
 }
 
 func TestTheAllowlistFiltersOpenSignups(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool).WithSignupSettings(signupSettings{
@@ -470,7 +471,7 @@ func TestTheAllowlistFiltersOpenSignups(t *testing.T) {
 }
 
 func TestTheTogglesDecideTheUsername(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	// The username identity off: the field may be absent.
@@ -513,7 +514,7 @@ func TestTheTogglesDecideTheUsername(t *testing.T) {
 }
 
 func TestSignInRefusesAnUnverifiedAccountUntilTheCodeConfirms(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	verifier := &recordingVerifier{repo: verification.NewRepository()}
@@ -556,7 +557,7 @@ func TestSignInRefusesAnUnverifiedAccountUntilTheCodeConfirms(t *testing.T) {
 }
 
 func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -597,7 +598,7 @@ func TestSignupTokenIssueStoresTheHashAlone(t *testing.T) {
 }
 
 func TestSignupTokenListAndDelete(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -652,7 +653,7 @@ func insertGroup(t *testing.T, pool *datastore.Postgres, name, displayName strin
 }
 
 func TestSignupJoinsTheGroupsTheTokenCarried(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -753,7 +754,7 @@ func openSignup(blocklistOn bool) signupSettings {
 // gate's carry-over answers — is refused with the same failure an
 // allowlist refusal and a closed mode carry, so the refusal names nothing.
 func TestSignupRefusesABlockedAddress(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -775,7 +776,7 @@ func TestSignupRefusesABlockedAddress(t *testing.T) {
 // TestSignupLetsAnUnblockedAddressPass pins the gate's other side: the
 // toggle on and the address unblocked, the sign-up runs to its account.
 func TestSignupLetsAnUnblockedAddressPass(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -794,7 +795,7 @@ func TestSignupLetsAnUnblockedAddressPass(t *testing.T) {
 // an address the allowlist accepts passes even when the blocklist names it,
 // so the two lists' one conflict is decided the same way every time.
 func TestSignupAppliesTheAllowlistOverTheBlocklist(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -820,7 +821,7 @@ func TestSignupAppliesTheAllowlistOverTheBlocklist(t *testing.T) {
 // broken read refuses nothing — a deployment's own door never locks for a
 // breakage.
 func TestSignupToleratesAnUnreadableBlocklist(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -839,7 +840,7 @@ func TestSignupToleratesAnUnreadableBlocklist(t *testing.T) {
 // toggle off keeps the gate shut even with a gate wired, and a bare wiring
 // — no seam at all — keeps the sign-up running.
 func TestSignupWithoutTheBlocklistToggleOrTheSeam(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 
@@ -877,7 +878,7 @@ func (r *recordingNotices) EnqueueSignupAttemptExistingEmail(_ context.Context, 
 // fields, the verification state the gate stamps — and the address on file
 // earns the notice instead of a verification code. Nothing is created.
 func TestStrictModeAnswersTheSuccessShapeForATakenEmail(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	notices := &recordingNotices{}
@@ -930,7 +931,7 @@ func TestStrictModeAnswersTheSuccessShapeForATakenEmail(t *testing.T) {
 // username is not a verified contact channel, so its refusal stays honest —
 // there is nothing to leak past the name the caller typed.
 func TestStrictModeStillRefusesATakenUsername(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	notices := &recordingNotices{}
@@ -960,7 +961,7 @@ func TestStrictModeStillRefusesATakenUsername(t *testing.T) {
 // TestBulkModeKeepsTheHonestRefusal pins the default: without strict, a
 // taken email answers the refusal it always answered.
 func TestBulkModeKeepsTheHonestRefusal(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	notices := &recordingNotices{}

@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
@@ -18,8 +19,7 @@ import (
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	transportstorage "github.com/riipandi/saka/internal/transport/storage"
-	"github.com/riipandi/saka/pkg/responder"
-	"github.com/riipandi/saka/web"
+	appweb "github.com/riipandi/saka/web"
 )
 
 // Options is what the routers need to serve. Every field is explicit, so a
@@ -220,7 +220,7 @@ func NewRouter(opts Options) chi.Router {
 	// The SPA mounts last and renders the Go shell; the debug build points
 	// its fragment at the Vite dev server, the release build resolves its
 	// tags from the embedded manifest.
-	web.SetupStatic(r)
+	appweb.SetupStatic(r)
 	return r
 }
 
@@ -229,5 +229,5 @@ func NewRouter(opts Options) chi.Router {
 // a REST client parses. The Connect surface refuses its calls through
 // rpcRefuseWith, in its own protocol.
 func restRefuse(w http.ResponseWriter, r *http.Request) {
-	responder.Fail(w, r, http.StatusTooManyRequests, "rate limit exceeded")
+	webutil.Fail(w, r, http.StatusTooManyRequests, "rate limit exceeded")
 }

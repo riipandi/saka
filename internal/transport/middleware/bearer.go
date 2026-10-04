@@ -8,8 +8,8 @@ import (
 	"connectrpc.com/authn"
 	"connectrpc.com/connect"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/guard"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Authenticator authenticates one request and answers the identity the
@@ -107,7 +107,7 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 
 			info, err := auth(r.Context(), r)
 			if err != nil {
-				responder.Fail(w, r, http.StatusUnauthorized, "authentication required")
+				webutil.Fail(w, r, http.StatusUnauthorized, "authentication required")
 				return
 			}
 
@@ -131,8 +131,8 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 // account exists.
 func refuseREST(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, guard.ErrUnauthenticated) {
-		responder.Fail(w, r, http.StatusUnauthorized, "authentication required")
+		webutil.Fail(w, r, http.StatusUnauthorized, "authentication required")
 		return
 	}
-	responder.Fail(w, r, http.StatusNotFound, "not found")
+	webutil.Fail(w, r, http.StatusNotFound, "not found")
 }

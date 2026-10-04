@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 
 	"uuid"
 )
@@ -73,9 +73,9 @@ type Scope struct {
 
 // List answers one page of records in the scope, newest first, with the
 // pagination metadata the response carries.
-func (s *Service) List(ctx context.Context, scope Scope, sortBy string, ascending bool, page, limit int) ([]View, responder.Pagination, error) {
+func (s *Service) List(ctx context.Context, scope Scope, sortBy string, ascending bool, page, limit int) ([]View, webutil.Pagination, error) {
 	page, limit = normalizePage(page, limit)
-	params := responder.PaginationParams{Page: page, Limit: limit}
+	params := webutil.PaginationParams{Page: page, Limit: limit}
 
 	// The filter's identifier travels in the wire form; the rows key on the
 	// UUID the column stores. A wire form that cannot decode filters
@@ -96,14 +96,14 @@ func (s *Service) List(ctx context.Context, scope Scope, sortBy string, ascendin
 		Search: scope.Search,
 	}, sortBy, ascending, params.Offset(), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	views := make([]View, 0, len(rows))
 	for _, row := range rows {
 		views = append(views, s.view(ctx, row))
 	}
-	return views, responder.NewPagination(params, total), nil
+	return views, webutil.NewPagination(params, total), nil
 }
 
 // Options answers the filter facets: the events the table holds and the

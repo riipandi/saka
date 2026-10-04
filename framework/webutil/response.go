@@ -1,5 +1,10 @@
-// Package responder writes the standard API response envelope.
-package responder
+// Package web is the request kit over the stdlib signatures: the API envelope,
+// request decoding and validation, pagination, and the per-request helpers
+// (PathParam, Query, Decode, Principal) the REST handlers read. Handlers keep
+// func(w http.ResponseWriter, r *http.Request); nothing here wraps the pair.
+// The ConnectRPC surface is deliberately outside: its procedures answer
+// connect.Request and its cross-cutting concerns are interceptors.
+package webutil
 
 import (
 	"context"

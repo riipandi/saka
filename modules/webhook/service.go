@@ -23,10 +23,10 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the service defines. The handler maps them onto the codes the
@@ -208,16 +208,16 @@ func (s *Service) Create(ctx context.Context, params CreateParams) (EndpointSche
 
 // List answers one page of the endpoints, newest first. The filters narrow
 // the page; the signing secrets are never present.
-func (s *Service) List(ctx context.Context, enabled *bool, event string, page, limit int) ([]EndpointSchema, responder.Pagination, error) {
+func (s *Service) List(ctx context.Context, enabled *bool, event string, page, limit int) ([]EndpointSchema, webutil.Pagination, error) {
 	if err := checkEventFilter(event); err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListEndpoints(ctx, s.pool, enabled, event, responder.Offset(page, limit), limit)
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListEndpoints(ctx, s.pool, enabled, event, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return rows, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // Get answers one endpoint.
@@ -426,35 +426,35 @@ func (s *Service) Test(ctx context.Context, id uuid.UUID) error {
 
 // ListDeliveries answers one page of an endpoint's deliveries, newest first,
 // each riding its latest attempt when one exists.
-func (s *Service) ListDeliveries(ctx context.Context, webhookID uuid.UUID, page, limit int) ([]DeliveryView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListDeliveries(ctx, s.pool, &webhookID, "", responder.Offset(page, limit), limit)
+func (s *Service) ListDeliveries(ctx context.Context, webhookID uuid.UUID, page, limit int) ([]DeliveryView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListDeliveries(ctx, s.pool, &webhookID, "", webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	views, err := s.attachAttempts(ctx, rows)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // ListAllDeliveries answers one page of every delivery the deployment holds,
 // newest first, narrowed by the event filter when one is given.
-func (s *Service) ListAllDeliveries(ctx context.Context, event string, page, limit int) ([]DeliveryView, responder.Pagination, error) {
+func (s *Service) ListAllDeliveries(ctx context.Context, event string, page, limit int) ([]DeliveryView, webutil.Pagination, error) {
 	if err := checkEventFilter(event); err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListDeliveries(ctx, s.pool, nil, event, responder.Offset(page, limit), limit)
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListDeliveries(ctx, s.pool, nil, event, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	views, err := s.attachAttempts(ctx, rows)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // DeliveryView is one delivery with the attempt that ran last, the shape a

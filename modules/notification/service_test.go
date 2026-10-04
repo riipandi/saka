@@ -13,7 +13,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
 )
 
 // migratedPool opens a database the migrations have built, so the

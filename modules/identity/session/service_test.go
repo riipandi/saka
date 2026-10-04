@@ -15,10 +15,11 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 
@@ -191,7 +192,7 @@ func auditCount(t *testing.T, pool *datastore.Postgres, event, sessionID string)
 }
 
 func TestSignOutStampsTheRowAndTheRefreshTokenDies(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -224,7 +225,7 @@ func TestSignOutStampsTheRowAndTheRefreshTokenDies(t *testing.T) {
 }
 
 func TestAnEndedSessionCannotManageSessions(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
@@ -260,7 +261,7 @@ func TestAnEndedSessionCannotManageSessions(t *testing.T) {
 }
 
 func TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -312,7 +313,7 @@ func TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn(t *testing.T) {
 }
 
 func TestSignOutAllSessionsEndsTheCallerOwnRowToo(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -340,7 +341,7 @@ func TestSignOutAllSessionsEndsTheCallerOwnRowToo(t *testing.T) {
 }
 
 func TestSignOutOfAnExpiredSessionStampsAndSaysSo(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
@@ -365,7 +366,7 @@ func TestSignOutOfAnExpiredSessionStampsAndSaysSo(t *testing.T) {
 }
 
 func TestGetSessionAnswersTheLiveRowAndRefusesAnEndedOne(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
@@ -386,7 +387,7 @@ func TestGetSessionAnswersTheLiveRowAndRefusesAnEndedOne(t *testing.T) {
 }
 
 func TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -420,7 +421,7 @@ func TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers(t *testing.T) {
 }
 
 func TestListSessionsAnswersTheAccountsOwnNewestFirst(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -441,7 +442,7 @@ func TestListSessionsAnswersTheAccountsOwnNewestFirst(t *testing.T) {
 }
 
 func TestRefreshRotatesTheTokenAndKeepsTheSession(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -489,7 +490,7 @@ func TestRefreshRotatesTheTokenAndKeepsTheSession(t *testing.T) {
 // is stamped, so the stolen credential the caller holds cannot wait out the
 // gate and replay later. A session inside the window renews as before.
 func TestAnIdleSessionIsRefusedAndRotatedOut(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
@@ -524,7 +525,7 @@ func (s stubBound) GetInt64(context.Context, string) (int64, error) {
 }
 
 func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -559,7 +560,7 @@ func TestRefreshCapsADelegatedSessionAtTheImpersonationWindow(t *testing.T) {
 // delegation would read as the target's own session. The refusal comes before
 // the rotation, so the refresh token survives the attempt.
 func TestRefreshRefusesADelegationThatCannotNameItsActor(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -604,7 +605,7 @@ func TestRefreshRefusesADelegationThatCannotNameItsActor(t *testing.T) {
 // reuse the session dies for. Only one renewal answers a pair, and the session
 // the token named is revoked as compromised.
 func TestConcurrentRefreshOfOneTokenSerializesAndRevokesTheReuse(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -659,7 +660,7 @@ func TestConcurrentRefreshOfOneTokenSerializesAndRevokesTheReuse(t *testing.T) {
 // caller and revokes the session the spent token names, with the audit
 // record written in the same transaction.
 func TestRefreshRefusesAReplayedTokenAndRevokesTheSession(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -695,7 +696,7 @@ func TestRefreshRefusesAReplayedTokenAndRevokesTheSession(t *testing.T) {
 }
 
 func TestImpersonateUserOpensADelegatedSession(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -722,7 +723,7 @@ func TestImpersonateUserOpensADelegatedSession(t *testing.T) {
 }
 
 func TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -746,7 +747,7 @@ func TestImpersonateUserRefusesAdminsAndItselfAndTheUnknown(t *testing.T) {
 }
 
 func TestStopImpersonatingEndsTheDelegationAndReissuesTheActor(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
@@ -783,7 +784,7 @@ func TestStopImpersonatingEndsTheDelegationAndReissuesTheActor(t *testing.T) {
 }
 
 func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)

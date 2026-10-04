@@ -14,10 +14,10 @@ import (
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName names the feature in composition reports and logs.
@@ -133,7 +133,7 @@ func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[au
 	}
 
 	out := &authnv1.ContinueOAuthSignInResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the sign-in flow completed",
 		Stage:   string(answer.Stage),
 	}
@@ -341,7 +341,7 @@ func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *connect.Reque
 	}
 	return connect.NewResponse(&authnv1.ListLinkedConnectionsResponse{
 		LinkedAccounts: out,
-		Status:         responder.StatusSuccess,
+		Status:         webutil.StatusSuccess,
 		Message:        "the linked accounts were read",
 	}), nil
 }
@@ -356,7 +356,7 @@ func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *connect.Request
 	}
 	return connect.NewResponse(&authnv1.VerifyOAuthSignInEmailResponse{
 		Stage:   string(stage),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the address is proven and the sign-in flow moved on",
 	}), nil
 }
@@ -385,7 +385,7 @@ func (h *rpcHandler) UnlinkConnection(ctx context.Context, req *connect.Request[
 	}
 
 	return connect.NewResponse(&authnv1.UnlinkConnectionResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the linked account was removed",
 	}), nil
 }
@@ -416,7 +416,7 @@ func (h *rpcHandler) GetLinkedAccountTokens(ctx context.Context, req *connect.Re
 		RefreshToken: tokens.RefreshToken,
 		ConnectionId: FormatID(tokens.ConnectionID),
 		Provider:     tokens.Provider,
-		Status:       responder.StatusSuccess,
+		Status:       webutil.StatusSuccess,
 		Message:      "the provider tokens were read",
 	}
 	if tokens.ExpiresAt != nil {

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // Recoverer turns a panicking handler into a 500 response.
@@ -39,7 +39,7 @@ func Recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 
 				if log != nil {
 					log.ErrorContext(context.WithoutCancel(r.Context()), "panic recovered",
-						"request_id", responder.RequestIDFromContext(r.Context()),
+						"request_id", webutil.RequestIDFromContext(r.Context()),
 						"method", r.Method,
 						"path", r.URL.Path,
 						"panic", fmt.Sprint(rec),
@@ -51,7 +51,7 @@ func Recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 				if track.wrote {
 					return
 				}
-				responder.Fail(track, r, http.StatusInternalServerError, "internal server error")
+				webutil.Fail(track, r, http.StatusInternalServerError, "internal server error")
 			}()
 			next.ServeHTTP(track, r)
 		})

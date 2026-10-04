@@ -12,8 +12,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedPool opens a database the migrations have built, so the group
@@ -80,7 +81,7 @@ func membershipCount(t *testing.T, pool *datastore.Postgres, groupID string) int
 }
 
 func TestCreateGroupStoresTheRowAndRefusesADuplicateName(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -109,7 +110,7 @@ func TestCreateGroupStoresTheRowAndRefusesADuplicateName(t *testing.T) {
 }
 
 func TestListGroupsSearchesPaginatesAndSorts(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -164,7 +165,7 @@ func TestListGroupsSearchesPaginatesAndSorts(t *testing.T) {
 }
 
 func TestUpdateGroupReplacesTheFieldsAndRefusesADuplicate(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -201,7 +202,7 @@ func TestUpdateGroupReplacesTheFieldsAndRefusesADuplicate(t *testing.T) {
 }
 
 func TestDeleteGroupRemovesTheMemberships(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -226,7 +227,7 @@ func TestDeleteGroupRemovesTheMemberships(t *testing.T) {
 }
 
 func TestSetMembersReplacesTheWholeSet(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -306,7 +307,7 @@ func userAuditCount(t *testing.T, pool *datastore.Postgres, event, userID string
 // were written from the per-group one. An account in no group answers an
 // empty set, not an error.
 func TestGetUserGroupsAnswersTheAccountSMembership(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -343,7 +344,7 @@ func TestGetUserGroupsAnswersTheAccountSMembership(t *testing.T) {
 // group that does not exist refuses the call whole — a membership is not
 // created into nothing.
 func TestUpdateUserGroupsReplacesAndRefusesTheUnknown(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)

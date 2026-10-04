@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedPool opens a fresh database with the migrations applied, so the
@@ -20,7 +21,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 }
 
 func TestActiveSigningKeysFiltersTheRows(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	ctx := t.Context()
@@ -61,7 +62,7 @@ func TestActiveSigningKeysFiltersTheRows(t *testing.T) {
 // query: the table holds a sealed private key for the provider role, and the
 // published set must not be able to reach it.
 func TestActiveSigningKeysNeverReadsThePrivateColumn(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 

@@ -18,8 +18,9 @@ import (
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/mailer"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
@@ -126,7 +127,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) (*Serv
 }
 
 func TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, enqueuer := testService(t, pool, true)
@@ -148,7 +149,7 @@ func TestForgotPasswordStaysSilentAboutTheAccountsItDoesNotKnow(t *testing.T) {
 }
 
 func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, enqueuer := testService(t, pool, true)
@@ -181,7 +182,7 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 }
 
 func TestForgotPasswordNeedsAMailerToServe(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool, false)
@@ -192,7 +193,7 @@ func TestForgotPasswordNeedsAMailerToServe(t *testing.T) {
 }
 
 func TestResetPasswordSwapsTheCredentialAndEndsTheSessions(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	enders := &recordingEnder{}
@@ -231,7 +232,7 @@ func TestResetPasswordSwapsTheCredentialAndEndsTheSessions(t *testing.T) {
 }
 
 func TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testService(t, pool, true)
@@ -305,7 +306,7 @@ func wireForm(uuidStr string) string {
 }
 
 func TestAdminResetTriggerReportsTheStatesForgotPasswordHides(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, enqueuer := testService(t, pool, true)
@@ -331,7 +332,7 @@ func TestAdminResetTriggerReportsTheStatesForgotPasswordHides(t *testing.T) {
 }
 
 func TestResetPasswordCanSpareTheSessionsWhenAsked(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	enders := &recordingEnder{}

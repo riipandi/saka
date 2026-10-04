@@ -14,10 +14,10 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // errInternal is the one wire answer an internal failure carries. The cause
@@ -446,7 +446,7 @@ func sortAscending(order string, absentAsc bool) bool {
 
 // listMetadata maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func listMetadata(p responder.Pagination) *commonv1.ListMetadata {
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

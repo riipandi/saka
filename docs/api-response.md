@@ -5,7 +5,7 @@ is the primary protocol; REST serves external integrations, and the
 OAuth2/OIDC identity-provider features will land on it. The contract the two
 share is semantic — field naming, the pagination rules, the error semantics —
 and each transport writes it in its own idiom. The rules are defined once in
-`pkg/responder` and both transports use them, so a client reads the same
+`framework/webutil` and both transports use them, so a client reads the same
 page, limit, totals, and item range from either surface.
 
 ## Field naming
@@ -131,7 +131,7 @@ PaginationParams (query params):
 }
 ```
 
-Pagination rules (enforced once in `pkg/responder`, shared by REST and
+Pagination rules (enforced once in `framework/webutil`, shared by REST and
 ConnectRPC):
 
 - `page` starts at 1; a value below 1 becomes 1.
@@ -214,7 +214,7 @@ parsing a body:
   paths and rule descriptions a client renders per field. A rule a contract
   cannot express (a uniqueness check, a token's existence) is domain logic
   and answers its own code from the feature; the REST surface keeps
-  `pkg/validate`'s field errors in the envelope.
+  `framework/webutil`'s field errors in the envelope.
 
 ## Authorization
 

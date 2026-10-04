@@ -11,13 +11,13 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/blocklist"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures a sign-up reports. The handler maps them to connect codes, so
@@ -676,12 +676,12 @@ func (s *Service) CreateSignupToken(ctx context.Context, params CreateTokenParam
 // ListSignupTokens answers one page of the issued tokens, ordered as the
 // caller asked (absent a choice, newest first), with the pagination metadata
 // the response carries.
-func (s *Service) ListSignupTokens(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]TokenView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListSignupTokens(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]TokenView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	tokens, total, err := s.repo.ListSignupTokens(ctx, s.pool, sortBy, ascending, responder.Offset(page, limit), limit)
+	tokens, total, err := s.repo.ListSignupTokens(ctx, s.pool, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	views := make([]TokenView, 0, len(tokens))
@@ -699,7 +699,7 @@ func (s *Service) ListSignupTokens(ctx context.Context, sortBy string, ascending
 			GroupIDs:   groups,
 		})
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // DeleteSignupToken revokes an issued token. A token that named nothing is

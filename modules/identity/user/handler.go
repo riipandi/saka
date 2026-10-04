@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // maxPictureSize is the read cap the picture write enforces before the bytes
@@ -46,14 +46,14 @@ func (m *Module) Mount(r chi.Router) {
 	r.Put("/api/users/me/profile-picture", func(w http.ResponseWriter, r *http.Request) {
 		caller, ok := jwtutils.CallerFrom(r.Context())
 		if !ok {
-			responder.Fail(w, r, http.StatusUnauthorized, "authentication required")
+			webutil.Fail(w, r, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		body := http.MaxBytesReader(w, r.Body, maxPictureSize)
 		data, err := io.ReadAll(body)
 		if err != nil {
-			responder.Fail(w, r, http.StatusRequestEntityTooLarge,
+			webutil.Fail(w, r, http.StatusRequestEntityTooLarge,
 				"the picture must be at most 2 MiB")
 			return
 		}
@@ -61,34 +61,34 @@ func (m *Module) Mount(r chi.Router) {
 		err = m.service.UpdateProfilePicture(r.Context(), caller.UserID, data)
 		switch {
 		case errors.Is(err, ErrUnsupportedPicture):
-			responder.Fail(w, r, http.StatusUnsupportedMediaType,
+			webutil.Fail(w, r, http.StatusUnsupportedMediaType,
 				"the picture must be a PNG, JPEG, or WebP image")
 		case errors.Is(err, ErrPicturesUnavailable):
-			responder.Fail(w, r, http.StatusServiceUnavailable,
+			webutil.Fail(w, r, http.StatusServiceUnavailable,
 				"picture storage is not available")
 		case err != nil:
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 		default:
-			responder.Success(w, r, http.StatusOK, nil, responder.WithMessage("the profile picture was updated"))
+			webutil.Success(w, r, http.StatusOK, nil, webutil.WithMessage("the profile picture was updated"))
 		}
 	})
 
 	r.Delete("/api/users/me/profile-picture", func(w http.ResponseWriter, r *http.Request) {
 		caller, ok := jwtutils.CallerFrom(r.Context())
 		if !ok {
-			responder.Fail(w, r, http.StatusUnauthorized, "authentication required")
+			webutil.Fail(w, r, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		err := m.service.ResetProfilePicture(r.Context(), caller.UserID)
 		switch {
 		case errors.Is(err, ErrPicturesUnavailable):
-			responder.Fail(w, r, http.StatusServiceUnavailable,
+			webutil.Fail(w, r, http.StatusServiceUnavailable,
 				"picture storage is not available")
 		case err != nil:
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 		default:
-			responder.Success(w, r, http.StatusOK, nil, responder.WithMessage("the profile picture was reset"))
+			webutil.Success(w, r, http.StatusOK, nil, webutil.WithMessage("the profile picture was reset"))
 		}
 	})
 
@@ -96,13 +96,13 @@ func (m *Module) Mount(r chi.Router) {
 		picture, err := m.service.ProfilePicture(r.Context(), chi.URLParam(r, "id"))
 		switch {
 		case errors.Is(err, ErrUserNotFound):
-			responder.Fail(w, r, http.StatusNotFound, "user not found")
+			webutil.Fail(w, r, http.StatusNotFound, "user not found")
 			return
 		case errors.Is(err, ErrPicturesUnavailable):
-			responder.Fail(w, r, http.StatusServiceUnavailable, "picture storage is not available")
+			webutil.Fail(w, r, http.StatusServiceUnavailable, "picture storage is not available")
 			return
 		case err != nil:
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 			return
 		}
 		defer picture.Body.Close()
@@ -119,7 +119,7 @@ func (m *Module) Mount(r chi.Router) {
 		// A copy failure after the headers are written is a client that went
 		// away mid-body; there is no answer left to send.
 		if _, err := io.Copy(w, picture.Body); err != nil {
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 		}
 	})
 
@@ -127,7 +127,7 @@ func (m *Module) Mount(r chi.Router) {
 		body := http.MaxBytesReader(w, r.Body, maxPictureSize)
 		data, err := io.ReadAll(body)
 		if err != nil {
-			responder.Fail(w, r, http.StatusRequestEntityTooLarge,
+			webutil.Fail(w, r, http.StatusRequestEntityTooLarge,
 				"the picture must be at most 2 MiB")
 			return
 		}
@@ -135,17 +135,17 @@ func (m *Module) Mount(r chi.Router) {
 		err = m.service.UpdateProfilePicture(r.Context(), chi.URLParam(r, "id"), data)
 		switch {
 		case errors.Is(err, ErrUserNotFound):
-			responder.Fail(w, r, http.StatusNotFound, "user not found")
+			webutil.Fail(w, r, http.StatusNotFound, "user not found")
 		case errors.Is(err, ErrUnsupportedPicture):
-			responder.Fail(w, r, http.StatusUnsupportedMediaType,
+			webutil.Fail(w, r, http.StatusUnsupportedMediaType,
 				"the picture must be a PNG, JPEG, or WebP image")
 		case errors.Is(err, ErrPicturesUnavailable):
-			responder.Fail(w, r, http.StatusServiceUnavailable,
+			webutil.Fail(w, r, http.StatusServiceUnavailable,
 				"picture storage is not available")
 		case err != nil:
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 		default:
-			responder.Success(w, r, http.StatusOK, nil, responder.WithMessage("the profile picture was updated"))
+			webutil.Success(w, r, http.StatusOK, nil, webutil.WithMessage("the profile picture was updated"))
 		}
 	})
 }

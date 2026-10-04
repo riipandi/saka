@@ -1,11 +1,9 @@
-package responder
+package webutil
 
 import (
 	"context"
 	"log/slog"
 	"net/http"
-
-	"github.com/riipandi/saka/pkg/validate"
 )
 
 // WriteError maps an error to the standard response envelope.
@@ -20,9 +18,9 @@ import (
 // the cause leaves an operator with a status code and no thread to pull. The
 // request id ties the line to the response the client was given.
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
-	if validate.IsValidationError(err) {
+	if IsValidationError(err) {
 		Fail(w, r, http.StatusUnprocessableEntity, "validation failed",
-			WithError(validate.FieldErrors(err)))
+			WithError(FieldErrors(err)))
 		return
 	}
 

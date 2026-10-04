@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // requestLog reads the logged line as a map, so an assertion names a field
@@ -35,7 +35,7 @@ func TestLoggerWritesOneLinePerRequest(t *testing.T) {
 		}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/things", nil)
-	req = req.WithContext(responder.WithRequestID(req.Context(), "req_abc123"))
+	req = req.WithContext(webutil.WithRequestID(req.Context(), "req_abc123"))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	entry := requestLog(t, &buf)

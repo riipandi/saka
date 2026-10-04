@@ -12,9 +12,9 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // wireClient maps the service view onto the wire message. The hashes never
@@ -198,7 +198,7 @@ func callerUUID(ctx context.Context) (uuid.UUID, error) {
 
 // metadataOf maps the responder's pagination onto the shared block. The wire
 // fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

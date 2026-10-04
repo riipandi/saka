@@ -14,10 +14,10 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	notificationv1 "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1"
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -116,7 +116,7 @@ func (h *rpcHandler) CreateNotification(ctx context.Context, req *connect.Reques
 	}
 	return connect.NewResponse(&notificationv1.CreateNotificationResponse{
 		Notification: wireNotification(row, params.UserIDs, params.GroupIDs, nil),
-		Status:       responder.StatusSuccess,
+		Status:       webutil.StatusSuccess,
 		Message:      "the notification was created",
 	}), nil
 }
@@ -134,7 +134,7 @@ func (h *rpcHandler) GetNotification(ctx context.Context, req *connect.Request[n
 	}
 	return connect.NewResponse(&notificationv1.GetNotificationResponse{
 		Notification: wireNotification(row, userIDs, groupIDs, nil),
-		Status:       responder.StatusSuccess,
+		Status:       webutil.StatusSuccess,
 		Message:      "the notification was read",
 	}), nil
 }
@@ -149,7 +149,7 @@ func (h *rpcHandler) ListAllNotifications(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&notificationv1.ListAllNotificationsResponse{
 		Notifications: wireNotifications(rows),
 		Metadata:      metadataOf(pagination),
-		Status:        responder.StatusSuccess,
+		Status:        webutil.StatusSuccess,
 		Message:       "the notifications were listed",
 	}), nil
 }
@@ -173,7 +173,7 @@ func (h *rpcHandler) CancelNotification(ctx context.Context, req *connect.Reques
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&notificationv1.CancelNotificationResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the notification was cancelled",
 	}), nil
 }
@@ -196,7 +196,7 @@ func (h *rpcHandler) ListNotifications(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&notificationv1.ListNotificationsResponse{
 		Notifications: wireInbox(rows),
 		Metadata:      metadataOf(pagination),
-		Status:        responder.StatusSuccess,
+		Status:        webutil.StatusSuccess,
 		Message:       "the notifications were listed",
 	}), nil
 }
@@ -220,7 +220,7 @@ func (h *rpcHandler) MarkNotificationRead(ctx context.Context, req *connect.Requ
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&notificationv1.MarkNotificationReadResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the notification was marked read",
 	}), nil
 }
@@ -240,7 +240,7 @@ func (h *rpcHandler) MarkAllNotificationsRead(ctx context.Context, req *connect.
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&notificationv1.MarkAllNotificationsReadResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the notifications were marked read",
 	}), nil
 }
@@ -262,7 +262,7 @@ func (h *rpcHandler) UnreadCount(ctx context.Context, req *connect.Request[notif
 	}
 	return connect.NewResponse(&notificationv1.UnreadCountResponse{
 		Count:   int64(count),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the unread count was read",
 	}), nil
 }
@@ -409,7 +409,7 @@ func callerUUID(caller *jwtutils.Caller) (uuid.UUID, error) {
 
 // metadataOf maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

@@ -13,9 +13,9 @@ import (
 	auditlogv1 "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1"
 	auditlogv1connect "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1/auditlogv1connect"
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Module serves the audit-log procedures. Everything it answers is an RPC
@@ -82,7 +82,7 @@ func (h *rpcHandler) List(ctx context.Context, req *connect.Request[auditlogv1.L
 	return connect.NewResponse(&auditlogv1.ListResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
 	}), nil
 }
@@ -103,7 +103,7 @@ func (h *rpcHandler) ListAll(ctx context.Context, req *connect.Request[auditlogv
 	return connect.NewResponse(&auditlogv1.ListAllResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
 	}), nil
 }
@@ -120,7 +120,7 @@ func (h *rpcHandler) ListForUser(ctx context.Context, req *connect.Request[audit
 	return connect.NewResponse(&auditlogv1.ListForUserResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
 	}), nil
 }
@@ -140,7 +140,7 @@ func (h *rpcHandler) FilterOptions(ctx context.Context, _ *connect.Request[audit
 	return connect.NewResponse(&auditlogv1.FilterOptionsResponse{
 		Events:  events,
 		Users:   options,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the filter options were read",
 	}), nil
 }
@@ -173,7 +173,7 @@ func wireLogs(views []View) []*auditlogv1.AuditLog {
 }
 
 // wireMetadata maps the pagination block onto the shared contract's shape.
-func wireMetadata(metadata responder.Pagination) *commonv1.ListMetadata {
+func wireMetadata(metadata webutil.Pagination) *commonv1.ListMetadata {
 	return &commonv1.ListMetadata{
 		Page:           int32Ptr(metadata.Page),
 		Limit:          int32Ptr(metadata.Limit),
@@ -187,7 +187,7 @@ func wireMetadata(metadata responder.Pagination) *commonv1.ListMetadata {
 // int32Ptr narrows a pagination count.
 //
 // The narrowing is safe by construction: every count comes from
-// responder.NewPagination over a page size the contract caps at 100, so the
+// webutil.NewPagination over a page size the contract caps at 100, so the
 // value is far inside the range. The bound is asserted rather than assumed,
 // because a future page size that reached past it would silently wrap into a
 // negative page number.

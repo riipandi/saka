@@ -25,8 +25,9 @@ import (
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
@@ -99,7 +100,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) *Servi
 }
 
 func TestSendEmailRefusesTheStatesItCannotServe(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true)
@@ -123,7 +124,7 @@ func TestSendEmailRefusesTheStatesItCannotServe(t *testing.T) {
 }
 
 func TestSendEmailIssuesOneTokenPerAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true)
@@ -161,7 +162,7 @@ func TestSendEmailIssuesOneTokenPerAccount(t *testing.T) {
 }
 
 func TestVerifyEmailConsumesTheToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true)
@@ -188,7 +189,7 @@ func TestVerifyEmailConsumesTheToken(t *testing.T) {
 }
 
 func TestVerifyEmailRefusesAnUnknownAndAnExpiredToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true)
@@ -212,11 +213,11 @@ func TestVerifyEmailRefusesAnUnknownAndAnExpiredToken(t *testing.T) {
 // template and submits, Mailpit receives the message, and the token the
 // message's link carries verifies the account.
 func TestTheFlowEndToEnd(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 
-	mailpit := testutils.StartMailpit(t.Context(), t)
+	mailpit := conttest.StartMailpit(t.Context(), t)
 
 	cfg := config.Default()
 	cfg.Mailer.SMTPHost = host(mailpit.SMTPAddr)
@@ -261,7 +262,7 @@ func TestTheFlowEndToEnd(t *testing.T) {
 // answers the link its body carries.
 // waitForCode reads the verification code the Mailpit message carries — the
 // text form the rendered template puts the code in, not a link.
-func waitForCode(t *testing.T, mailpit *testutils.Mailpit) string {
+func waitForCode(t *testing.T, mailpit *conttest.Mailpit) string {
 	t.Helper()
 
 	deadline := time.Now().Add(30 * time.Second)
@@ -299,7 +300,7 @@ func waitForCode(t *testing.T, mailpit *testutils.Mailpit) string {
 }
 
 // readMessageBody reads one message's rendered text the Mailpit API serves.
-func readMessageBody(t *testing.T, mailpit *testutils.Mailpit, id string) string {
+func readMessageBody(t *testing.T, mailpit *conttest.Mailpit, id string) string {
 	t.Helper()
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, mailpit.APIURL+"/api/v1/message/"+id, nil)

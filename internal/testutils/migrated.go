@@ -8,6 +8,7 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // MigratedPostgres answers a pool over a fresh, fully migrated database:
@@ -22,7 +23,7 @@ import (
 func MigratedPostgres(t testing.TB, appName string) *datastore.Postgres {
 	t.Helper()
 
-	dsn := StartPostgres(t.Context(), t).NewDatabase(t)
+	dsn := conttest.StartPostgres(t.Context(), t).NewDatabase(t)
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)

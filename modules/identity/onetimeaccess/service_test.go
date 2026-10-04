@@ -24,12 +24,13 @@ import (
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/multifactor"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // testSecretHex is the HMAC secret the tests sign with: any 32-byte hex
@@ -221,7 +222,7 @@ func pendingEmails(t *testing.T, client *queue.Client) int64 {
 }
 
 func TestCreateTokenIssuesACodeTheExchangeAccepts(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, false)
@@ -256,7 +257,7 @@ func TestCreateTokenIssuesACodeTheExchangeAccepts(t *testing.T) {
 }
 
 func TestCreateTokenReplacesAnOlderCode(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, false)
@@ -281,7 +282,7 @@ func TestCreateTokenReplacesAnOlderCode(t *testing.T) {
 // the hash the caller resolved, so a stale read cannot delete the replacement:
 // the code it names is no longer the live one.
 func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, false)
@@ -306,7 +307,7 @@ func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
 }
 
 func TestExchangeRefusesAnExpiredCode(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, false)
@@ -327,7 +328,7 @@ func TestExchangeRefusesAnExpiredCode(t *testing.T) {
 }
 
 func TestExchangeRefusesADeviceTokenThatDoesNotMatch(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, true)
@@ -354,7 +355,7 @@ func TestExchangeRefusesADeviceTokenThatDoesNotMatch(t *testing.T) {
 }
 
 func TestRequestEmailAnswersTheSameForAnUnknownAddress(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, true)
@@ -374,7 +375,7 @@ func TestRequestEmailAnswersTheSameForAnUnknownAddress(t *testing.T) {
 }
 
 func TestRequestEmailPairsTheCodeWithADeviceToken(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, true)
@@ -400,7 +401,7 @@ func TestRequestEmailPairsTheCodeWithADeviceToken(t *testing.T) {
 }
 
 func TestRequestEmailRefusesADisabledPath(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	off := testService(t, pool, false, false)
@@ -425,7 +426,7 @@ func TestRequestEmailRefusesADisabledPath(t *testing.T) {
 }
 
 func TestRequestEmailAsAdminSendsWithoutExposingTheCode(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true, false)
@@ -443,7 +444,7 @@ func TestRequestEmailAsAdminSendsWithoutExposingTheCode(t *testing.T) {
 }
 
 func TestRequestEmailAsAdminRefusesAnUnknownAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true, false)
@@ -453,7 +454,7 @@ func TestRequestEmailAsAdminRefusesAnUnknownAccount(t *testing.T) {
 }
 
 func TestExchangeRefusesADisabledOrBannedAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, false)
@@ -511,7 +512,7 @@ func pendingOneTimeAccessTask(t *testing.T, pool *datastore.Postgres, client *qu
 // and no second message — while the code the first request sent goes on
 // standing, pair intact.
 func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, false, true)
@@ -546,7 +547,7 @@ func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
 // path: the caller knows the account is real, so the refusal is the answer,
 // the way the admin reset trigger reports its own window.
 func TestRequestEmailAsAdminRefusesInsideTheCooldown(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool, true, false)
@@ -587,7 +588,7 @@ func readUserID(t *testing.T, pool *datastore.Postgres, email string) string {
 // bypass this test closes is the one an email link must never be: full
 // access without the second factor.
 func TestExchangeOnAnMfaAccountMintsTheBridgeNotASession(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, mfa, _ := testServiceWithMfa(t, pool)

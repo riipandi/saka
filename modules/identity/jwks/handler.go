@@ -8,8 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Path is where the key set is published. It is the standard location a
@@ -60,7 +60,7 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		// registry fails the run before this is reachable. Answering an empty
 		// set is the safe response if it ever is: a client must not be told
 		// that every key is valid.
-		responder.Fail(w, r, http.StatusInternalServerError, "key set unavailable")
+		webutil.Fail(w, r, http.StatusInternalServerError, "key set unavailable")
 		return
 	}
 
@@ -69,12 +69,12 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		// The configured key is unreadable, which is a broken deployment
 		// rather than a bad request. The error text is not published: it
 		// names a configuration key.
-		responder.Fail(w, r, http.StatusInternalServerError, "key set unavailable")
+		webutil.Fail(w, r, http.StatusInternalServerError, "key set unavailable")
 		return
 	}
 
 	w.Header().Set("Cache-Control", cacheControl)
-	responder.WriteJSON(w, http.StatusOK, renderSet(set))
+	webutil.WriteJSON(w, http.StatusOK, renderSet(set))
 }
 
 // setDocument is the wire form: the `keys` array RFC 7517 names.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // The cookie the creating browser holds: the request id and the pairing
@@ -43,17 +43,17 @@ type chiRouter interface {
 func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	token, err := NewDeviceToken()
 	if err != nil {
-		responder.Fail(w, r, http.StatusInternalServerError, "the pairing request could not be created")
+		webutil.Fail(w, r, http.StatusInternalServerError, "the pairing request could not be created")
 		return
 	}
 
 	view, err := h.service.Create(r.Context(), token, remoteIP(r), r.UserAgent())
 	switch {
 	case errors.Is(err, ErrTooManyPendingRequests):
-		responder.Fail(w, r, http.StatusTooManyRequests, "this browser already holds the maximum number of pairing requests")
+		webutil.Fail(w, r, http.StatusTooManyRequests, "this browser already holds the maximum number of pairing requests")
 		return
 	case err != nil:
-		responder.Fail(w, r, http.StatusInternalServerError, "the pairing request could not be created")
+		webutil.Fail(w, r, http.StatusInternalServerError, "the pairing request could not be created")
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	responder.WriteJSON(w, http.StatusCreated, view)
+	webutil.WriteJSON(w, http.StatusCreated, view)
 }
 
 // exchange long-polls the decision. The creating browser holds the
@@ -82,7 +82,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 func (h *handler) exchange(w http.ResponseWriter, r *http.Request) {
 	id, token, ok := readPairingCookie(r)
 	if !ok {
-		responder.Fail(w, r, http.StatusUnauthorized, "the pairing cookie is missing")
+		webutil.Fail(w, r, http.StatusUnauthorized, "the pairing cookie is missing")
 		return
 	}
 
@@ -93,16 +93,16 @@ func (h *handler) exchange(w http.ResponseWriter, r *http.Request) {
 		case err == nil && outcome.Status == ExchangeDone:
 			account, loadErr := h.service.LoadAccount(r.Context(), outcome.UserID)
 			if loadErr != nil {
-				responder.Fail(w, r, http.StatusUnauthorized, "the approved account cannot sign in")
+				webutil.Fail(w, r, http.StatusUnauthorized, "the approved account cannot sign in")
 				return
 			}
-			responder.WriteJSON(w, http.StatusOK, account)
+			webutil.WriteJSON(w, http.StatusOK, account)
 			return
 		case errors.Is(err, ErrCodeUnknown):
-			responder.Fail(w, r, http.StatusUnauthorized, "the pairing request is unknown, expired, or already used")
+			webutil.Fail(w, r, http.StatusUnauthorized, "the pairing request is unknown, expired, or already used")
 			return
 		case err != nil:
-			responder.Fail(w, r, http.StatusInternalServerError, "the exchange failed")
+			webutil.Fail(w, r, http.StatusInternalServerError, "the exchange failed")
 			return
 		}
 

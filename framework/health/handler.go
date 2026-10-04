@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // Handler returns the REST endpoint that reports health. It answers 200 when
@@ -17,15 +17,15 @@ func Handler(checker *Checker) http.HandlerFunc {
 
 		result := checker.Check(r.Context())
 		if result.Healthy() {
-			responder.Success(w, r, http.StatusOK, result)
+			webutil.Success(w, r, http.StatusOK, result)
 			return
 		}
 
 		// The message names the failing checks, so a reader does not have to
 		// open the details to learn what is wrong.
-		responder.Fail(w, r, http.StatusServiceUnavailable,
+		webutil.Fail(w, r, http.StatusServiceUnavailable,
 			Message(result),
-			responder.WithError(result))
+			webutil.WithError(result))
 	}
 }
 

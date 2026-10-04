@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/identity/usergroup"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // Service carries the rules of the OIDC clients: how a client is defined,
@@ -207,11 +207,11 @@ type UpdateParams struct {
 
 // List answers one page of the clients, newest first unless the caller sorts
 // otherwise. Every client carries its secrets' views and its groups.
-func (s *Service) List(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]ClientView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListClients(ctx, s.pool, search, sortBy, ascending, responder.Offset(page, limit), limit)
+func (s *Service) List(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]ClientView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListClients(ctx, s.pool, search, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	views := make([]ClientView, 0, len(rows))
@@ -224,7 +224,7 @@ func (s *Service) List(ctx context.Context, search, sortBy string, ascending boo
 	// client on the page.
 	byClient, groupErr := s.repo.GroupsOfClients(ctx, s.pool, clientIDs)
 	if groupErr != nil {
-		return nil, responder.Pagination{}, groupErr
+		return nil, webutil.Pagination{}, groupErr
 	}
 	for _, row := range rows {
 		view := row.view(s.now())
@@ -232,7 +232,7 @@ func (s *Service) List(ctx context.Context, search, sortBy string, ascending boo
 		view.LogoURL = s.logoURL(view)
 		views = append(views, view)
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // Get answers one client, secrets' views and groups included. An identifier

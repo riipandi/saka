@@ -15,7 +15,8 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // The lockout policy the tests run: five attempts — the reader's floor —
@@ -93,7 +94,7 @@ func failures(t *testing.T, pool *datastore.Postgres, id uuid.UUID) int {
 // advances in place, the zero clears it, and the next bump counts from one
 // again — never a lifetime tally.
 func TestTheCounterIsAStreakNotATally(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
@@ -119,7 +120,7 @@ func TestTheCounterIsAStreakNotATally(t *testing.T) {
 // the open row's terms without moving its start, and the lift ends the
 // unit.
 func TestTheBanWritesAndLiftsAsARow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
@@ -169,7 +170,7 @@ func TestTheBanWritesAndLiftsAsARow(t *testing.T) {
 // bound only count; the attempt that reaches it writes the lockout row,
 // records the happening, and tells the account's address.
 func TestTheLockoutLandsAtTheStreakBound(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
@@ -209,7 +210,7 @@ func TestTheLockoutLandsAtTheStreakBound(t *testing.T) {
 // window's end: the read that finds an expired row lifts it, zeroes the
 // streak it answered for, and answers no restriction.
 func TestAnExpiredLockoutLiftsOnTheReadAndStartsTheStreakFresh(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
@@ -242,7 +243,7 @@ func TestAnExpiredLockoutLiftsOnTheReadAndStartsTheStreakFresh(t *testing.T) {
 // administrator's unlock is the only way out — the row lifts, the streak
 // starts fresh.
 func TestAnIndefiniteLockoutStaysUntilTheUnlock(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	id := createAccount(t, pool)

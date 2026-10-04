@@ -10,8 +10,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/pkg/responder"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
@@ -73,7 +73,7 @@ func (h *rpcHandler) CreateToken(ctx context.Context, req *connect.Request[authn
 	return connect.NewResponse(&authnv1.CreateOneTimeAccessTokenResponse{
 		Token:     token,
 		ExpiresAt: expiresAt.Format(time.RFC3339),
-		Status:    responder.StatusSuccess,
+		Status:    webutil.StatusSuccess,
 		Message:   "the one-time access code was created",
 	}), nil
 }
@@ -120,7 +120,7 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
 		},
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: message,
 	}), nil
 }
@@ -132,7 +132,7 @@ func (h *rpcHandler) RequestEmailAsAdmin(ctx context.Context, req *connect.Reque
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&authnv1.RequestOneTimeAccessEmailAsAdminResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the one-time access code was sent to the account's email address",
 	}), nil
 }
@@ -146,7 +146,7 @@ func (h *rpcHandler) RequestEmail(ctx context.Context, req *connect.Request[auth
 	}
 	return connect.NewResponse(&authnv1.RequestOneTimeAccessEmailResponse{
 		DeviceToken: deviceToken,
-		Status:      responder.StatusSuccess,
+		Status:      webutil.StatusSuccess,
 		Message:     "if the address names an account, a code is on its way",
 	}), nil
 }

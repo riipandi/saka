@@ -8,8 +8,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/pkg/responder"
 
 	"uuid"
 
@@ -241,7 +241,7 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
 		},
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the second factor verified and the session opened",
 	}), nil
 }
@@ -289,7 +289,7 @@ func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Reques
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&authnv1.VerifyRecoveryCodeResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the recovery code verified and is now spent",
 	}), nil
 }
@@ -307,7 +307,7 @@ func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[a
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&authnv1.AdminDisableMfaResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "multifactor authentication was disabled for the account",
 	}), nil
 }

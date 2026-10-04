@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // The directory the account views read through: what one account belongs
@@ -18,7 +19,7 @@ import (
 // tables.
 
 func TestGroupsOfUserAnswersTheMembershipsOrderedByDisplayName(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "usergroup_test")
 	service := testService(t, pool)
@@ -45,7 +46,7 @@ func TestGroupsOfUserAnswersTheMembershipsOrderedByDisplayName(t *testing.T) {
 }
 
 func TestGroupsOfUsersAnswersAPageInOneRead(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "usergroup_test")
 	service := testService(t, pool)
@@ -72,7 +73,7 @@ func TestGroupsOfUsersAnswersAPageInOneRead(t *testing.T) {
 }
 
 func TestAttachGroupsOpensAndRefusesTheMemberships(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "usergroup_test")
 	service := testService(t, pool)

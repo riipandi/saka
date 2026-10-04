@@ -12,8 +12,8 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -89,7 +89,7 @@ func (h *rpcHandler) ListUserGroups(ctx context.Context, req *connect.Request[id
 	return connect.NewResponse(&identityv1.ListUserGroupsResponse{
 		Groups:   views,
 		Metadata: listMetadata(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the user groups were listed",
 	}), nil
 }
@@ -102,7 +102,7 @@ func (h *rpcHandler) GetUserGroup(ctx context.Context, req *connect.Request[iden
 	}
 	return connect.NewResponse(&identityv1.GetUserGroupResponse{
 		Group:   wireDetail(group),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user group was fetched",
 	}), nil
 }
@@ -118,7 +118,7 @@ func (h *rpcHandler) CreateUserGroup(ctx context.Context, req *connect.Request[i
 	}
 	return connect.NewResponse(&identityv1.CreateUserGroupResponse{
 		Group:   wireDetail(group),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user group was created",
 	}), nil
 }
@@ -134,7 +134,7 @@ func (h *rpcHandler) UpdateUserGroup(ctx context.Context, req *connect.Request[i
 	}
 	return connect.NewResponse(&identityv1.UpdateUserGroupResponse{
 		Group:   wireDetail(group),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user group was updated",
 	}), nil
 }
@@ -145,7 +145,7 @@ func (h *rpcHandler) DeleteUserGroup(ctx context.Context, req *connect.Request[i
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.DeleteUserGroupResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user group was deleted",
 	}), nil
 }
@@ -158,7 +158,7 @@ func (h *rpcHandler) SetUserGroupMembers(ctx context.Context, req *connect.Reque
 	}
 	return connect.NewResponse(&identityv1.SetUserGroupMembersResponse{
 		Group:   wireDetail(group),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user group members were updated",
 	}), nil
 }
@@ -171,7 +171,7 @@ func (h *rpcHandler) GetUserGroups(ctx context.Context, req *connect.Request[ide
 	}
 	return connect.NewResponse(&identityv1.GetUserGroupsResponse{
 		Groups:  wireGroups(groups),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's groups were fetched",
 	}), nil
 }
@@ -184,7 +184,7 @@ func (h *rpcHandler) UpdateUserGroups(ctx context.Context, req *connect.Request[
 	}
 	return connect.NewResponse(&identityv1.UpdateUserGroupsResponse{
 		Groups:  wireGroups(groups),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's groups were updated",
 	}), nil
 }
@@ -205,7 +205,7 @@ func (h *rpcHandler) SetAllowedOidcClients(ctx context.Context, req *connect.Req
 	return connect.NewResponse(&identityv1.SetGroupAllowedOidcClientsResponse{
 		Group:          wireGroup(group),
 		AllowedClients: refs,
-		Status:         responder.StatusSuccess,
+		Status:         webutil.StatusSuccess,
 		Message:        "the group's allowed OIDC clients were updated",
 	}), nil
 }
@@ -275,7 +275,7 @@ func wireDetail(view GroupDetailView) *identityv1.UserGroupDetail {
 
 // listMetadata maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func listMetadata(p responder.Pagination) *commonv1.ListMetadata {
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

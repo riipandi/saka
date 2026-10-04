@@ -14,7 +14,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // QueueView is one registered queue's configuration and live counts.
@@ -106,8 +106,8 @@ type TaskDetail struct {
 // Queues answers one page of the registered queues — the count on every
 // queue the search admits, ordered by the key the caller named and paged
 // the way the account list pages.
-func (c *Client) Queues(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]QueueView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (c *Client) Queues(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]QueueView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
 	configs := c.queues.all()
 	views := make([]QueueView, 0, len(configs))
@@ -117,11 +117,11 @@ func (c *Client) Queues(ctx context.Context, search, sortBy string, ascending bo
 		}
 		pending, err := countPending(ctx, c.store, cfg.Name)
 		if err != nil {
-			return nil, responder.Pagination{}, err
+			return nil, webutil.Pagination{}, err
 		}
 		dead, err := countDead(ctx, c.store, cfg.Name)
 		if err != nil {
-			return nil, responder.Pagination{}, err
+			return nil, webutil.Pagination{}, err
 		}
 		views = append(views, QueueView{
 			Name:        cfg.Name,
@@ -137,7 +137,7 @@ func (c *Client) Queues(ctx context.Context, search, sortBy string, ascending bo
 	total := len(views)
 	start, end := pageBounds(page, limit, total)
 	views = views[start:end]
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // queueSortKeys is the whitelist a queue page's sort key resolves through.
@@ -183,12 +183,12 @@ func pageBounds(page, limit, total int) (int, int) {
 
 // Tasks answers one page of the pending table, with the pagination block the
 // list responses carry. An empty queue name answers every queue's rows.
-func (c *Client) Tasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]TaskView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (c *Client) Tasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]TaskView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	rows, total, err := listPending(ctx, c.store, queue, sortBy, ascending, responder.Offset(page, limit), limit)
+	rows, total, err := listPending(ctx, c.store, queue, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	views := make([]TaskView, 0, len(rows))
 	for _, t := range rows {
@@ -204,18 +204,18 @@ func (c *Client) Tasks(ctx context.Context, queue, sortBy string, ascending bool
 			LastExecutedAt: t.LastExecutedAt,
 		})
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, int(total)), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, int(total)), nil
 }
 
 // DeadTasks answers one page of the archive's failures, with the pagination
 // block the list responses carry. An empty queue name answers every queue's
 // dead.
-func (c *Client) DeadTasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]DeadView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (c *Client) DeadTasks(ctx context.Context, queue, sortBy string, ascending bool, page, limit int) ([]DeadView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	rows, total, err := listDead(ctx, c.store, queue, sortBy, ascending, responder.Offset(page, limit), limit, now())
+	rows, total, err := listDead(ctx, c.store, queue, sortBy, ascending, webutil.Offset(page, limit), limit, now())
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	views := make([]DeadView, 0, len(rows))
 	for _, d := range rows {
@@ -229,7 +229,7 @@ func (c *Client) DeadTasks(ctx context.Context, queue, sortBy string, ascending 
 			CreatedAt:      d.CreatedAt,
 		})
 	}
-	return views, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, int(total)), nil
+	return views, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, int(total)), nil
 }
 
 // Detail answers one task's full view across the two tables. The payload is

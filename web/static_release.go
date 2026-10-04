@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 //go:embed output
@@ -70,7 +70,7 @@ func SetupStatic(r chi.Router) {
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
-			responder.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
+			webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 		spaHandler()(w, r)
@@ -81,7 +81,7 @@ func SetupStatic(r chi.Router) {
 	// so a caller learns what a SPA path accepts without being reflected.
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", "GET, HEAD")
-		responder.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
+		webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
 	})
 }
 
@@ -99,7 +99,7 @@ func spaHandler() http.HandlerFunc {
 			strings.HasPrefix(r.URL.Path, "/oauth") ||
 			strings.HasPrefix(r.URL.Path, "/oidc") ||
 			strings.HasPrefix(r.URL.Path, "/debug") {
-			responder.NotFoundJSON(w, r)
+			webutil.NotFoundJSON(w, r)
 			return
 		}
 
@@ -118,12 +118,12 @@ func spaHandler() http.HandlerFunc {
 
 		tags, err := resolveFragment()
 		if err != nil {
-			responder.Fail(w, r, http.StatusInternalServerError, "vite: the build manifest did not resolve: "+err.Error())
+			webutil.Fail(w, r, http.StatusInternalServerError, "vite: the build manifest did not resolve: "+err.Error())
 			return
 		}
 		html, err := RenderPage(DefaultPage, tags)
 		if err != nil {
-			responder.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
+			webutil.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

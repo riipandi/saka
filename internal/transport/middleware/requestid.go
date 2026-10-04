@@ -9,12 +9,12 @@ import (
 
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // RequestIDHeader is the header a request id is read from and written to. It
 // is the header pkg/responder names in the envelope metadata.
-const RequestIDHeader = responder.RequestIDHeader
+const RequestIDHeader = webutil.RequestIDHeader
 
 // RequestIDPrefix is the TypeID prefix of a generated request id. The `req_`
 // form is what a reader sees in a header, a log line, and a trace, so a request
@@ -46,7 +46,7 @@ func RequestID(next http.Handler) http.Handler {
 
 		w.Header().Set(RequestIDHeader, id)
 		next.ServeHTTP(w, r.WithContext(
-			responder.WithRequestID(r.Context(), id),
+			webutil.WithRequestID(r.Context(), id),
 		))
 	})
 }
@@ -54,5 +54,5 @@ func RequestID(next http.Handler) http.Handler {
 // RequestIDFrom reads the request id a request was tagged with. It is the
 // responder's own reader, so middleware and envelope agree on one idiom.
 func RequestIDFrom(r *http.Request) string {
-	return responder.RequestIDFromContext(r.Context())
+	return webutil.RequestIDFromContext(r.Context())
 }

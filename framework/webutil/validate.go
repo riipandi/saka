@@ -1,5 +1,4 @@
-// Package validate decodes and validates request bodies.
-package validate
+package webutil
 
 import (
 	"encoding/json/v2"

@@ -17,8 +17,8 @@ import (
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // migratedPool opens a database the migrations have built, so the

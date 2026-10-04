@@ -14,8 +14,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ErrJobUnknown reports a RunNow for an id no registered job answers. It is
@@ -52,8 +52,8 @@ var jobSortColumns = map[string]string{
 // key orders, and the pagination block counts. A row the seeding has not
 // written yet — a scheduler built but never started — is absent from the
 // answer.
-func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]JobView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]JobView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
 	condition := func(sb *sqlbuilder.SelectBuilder) {
 		if search != "" {
@@ -67,12 +67,12 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	sb.From(entity.TableSchedulerJobs)
 	condition(sb)
 	sb.OrderBy(datastore.ListOrder(jobSortColumns, sortBy, "name", ascending))
-	sb.Limit(limit).Offset(responder.Offset(page, limit))
+	sb.Limit(limit).Offset(webutil.Offset(page, limit))
 
 	query, args := sb.Build()
 	rows, err := s.store.Query(ctx, query, args...)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	defer rows.Close()
 
@@ -80,12 +80,12 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	for rows.Next() {
 		var v JobView
 		if err := rows.Scan(&v.ID, &v.Name, &v.Spec, &v.NextDue, &v.LastFired, &v.UpdatedAt); err != nil {
-			return nil, responder.Pagination{}, err
+			return nil, webutil.Pagination{}, err
 		}
 		jobs = append(jobs, v)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -95,10 +95,10 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	query, args = cb.Build()
 	var total int64
 	if err := s.store.QueryRow(ctx, query, args...).Scan(&total); err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
-	return jobs, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, int(total)), nil
+	return jobs, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, int(total)), nil
 }
 
 // RunNow enqueues a job's task immediately, without advancing the job's

@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 func mountDevtool(r chi.Router, _ do.Injector) {
@@ -25,5 +25,5 @@ func mountDevtool(r chi.Router, _ do.Injector) {
 }
 
 func devtoolUnavailable(w http.ResponseWriter, r *http.Request) {
-	responder.NotFoundJSON(w, r)
+	webutil.NotFoundJSON(w, r)
 }

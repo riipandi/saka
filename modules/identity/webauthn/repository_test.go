@@ -12,14 +12,15 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // webauthnTestPool runs the migrations over a fresh container database. The
 // signature matches the identity area's other suites.
 func webauthnTestPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 	return testutils.MigratedPostgres(t, "webauthn_test")
 }
 

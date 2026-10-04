@@ -19,7 +19,7 @@ import (
 	dohttp "github.com/samber/do/v2/http"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/web"
 )
 
@@ -54,14 +54,14 @@ func mountDevtool(r chi.Router, injector do.Injector) {
 	// The passkey probe pages: the simulation of the SPA surfaces the
 	// frontend work will replace, one route per flow, carried by the web
 	// package's debug build.
-	for path, body := range web.WebauthnProbePages {
+	for path, body := range appweb.WebauthnProbePages {
 		page := body
 		r.Get(path, func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = w.Write([]byte(page))
 		})
 	}
-	for path, body := range web.UploadProbePages {
+	for path, body := range appweb.UploadProbePages {
 		page := body
 		r.Get(path, func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -85,19 +85,19 @@ func encodeID(w http.ResponseWriter, r *http.Request) {
 		UUID   string `json:"uuid"`
 	}
 	if err := json.UnmarshalRead(r.Body, &req); err != nil {
-		responder.BadRequestJSON(w, r, "the body must be JSON with a prefix and a uuid")
+		webutil.BadRequestJSON(w, r, "the body must be JSON with a prefix and a uuid")
 		return
 	}
 
 	id, err := typeid.FromUUIDWithPrefix(req.Prefix, req.UUID)
 	if err != nil {
-		responder.BadRequestJSON(w, r, err.Error())
+		webutil.BadRequestJSON(w, r, err.Error())
 		return
 	}
 
-	responder.Success(w, r, http.StatusOK, devtoolID{
+	webutil.Success(w, r, http.StatusOK, devtoolID{
 		Prefix: id.Prefix(), UUID: req.UUID, ID: id.String(),
-	}, responder.WithMessage("the type id was encoded"))
+	}, webutil.WithMessage("the type id was encoded"))
 }
 
 // decodeID turns a TypeID string back into the prefix and UUID it carries.
@@ -106,19 +106,19 @@ func decodeID(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := json.UnmarshalRead(r.Body, &req); err != nil {
-		responder.BadRequestJSON(w, r, "the body must be JSON with an id")
+		webutil.BadRequestJSON(w, r, "the body must be JSON with an id")
 		return
 	}
 
 	id, err := typeid.FromString(req.ID)
 	if err != nil {
-		responder.BadRequestJSON(w, r, err.Error())
+		webutil.BadRequestJSON(w, r, err.Error())
 		return
 	}
 
-	responder.Success(w, r, http.StatusOK, devtoolID{
+	webutil.Success(w, r, http.StatusOK, devtoolID{
 		Prefix: id.Prefix(), UUID: id.UUID(), ID: id.String(),
-	}, responder.WithMessage("the type id was decoded"))
+	}, webutil.WithMessage("the type id was decoded"))
 }
 
 // devtoolPage renders one of the dohttp pages, whose only failure mode is a

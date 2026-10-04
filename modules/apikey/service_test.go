@@ -13,8 +13,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 )
@@ -96,7 +97,7 @@ func createdExpiring(t *testing.T, service *Service, owner uuid.UUID, name strin
 }
 
 func TestCreateShowsTheKeyOnceAndRefusesADuplicateName(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -146,7 +147,7 @@ func TestCreateShowsTheKeyOnceAndRefusesADuplicateName(t *testing.T) {
 }
 
 func TestValidateRefusesAnUnknownExpiredRevokedOrDisabledKey(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := clock(t, pool)
@@ -209,7 +210,7 @@ func TestValidateRefusesAnUnknownExpiredRevokedOrDisabledKey(t *testing.T) {
 }
 
 func TestRenewReplacesAnExpiredKeyAndRefusesALiveOne(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, now := clock(t, pool)
@@ -268,7 +269,7 @@ func TestRenewReplacesAnExpiredKeyAndRefusesALiveOne(t *testing.T) {
 }
 
 func TestRevokeIsSoftAndIdempotent(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -299,7 +300,7 @@ func TestRevokeIsSoftAndIdempotent(t *testing.T) {
 }
 
 func TestListOwnScopesToTheOwnerAndListAllSeesEverything(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -329,7 +330,7 @@ func TestListOwnScopesToTheOwnerAndListAllSeesEverything(t *testing.T) {
 }
 
 func TestExpiryWindowAnswersTheUnreminded(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)

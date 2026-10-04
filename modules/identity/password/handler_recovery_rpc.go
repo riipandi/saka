@@ -9,8 +9,8 @@ import (
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // RecoveryModuleName is the name this feature reports under. The area it
@@ -80,7 +80,7 @@ func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Reque
 		return nil, mapRecoveryError(err)
 	}
 	resp := &authnv1.ForgotPasswordResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "if the address names an account, a reset email was sent",
 	}
 	if h.exposeResetToken {
@@ -102,7 +102,7 @@ func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Reques
 		return nil, mapRecoveryError(err)
 	}
 	return connect.NewResponse(&authnv1.ResetPasswordResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the password was reset",
 	}), nil
 }
@@ -119,7 +119,7 @@ func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *conne
 		return nil, mapRecoveryError(err)
 	}
 	return connect.NewResponse(&authnv1.AdminResetUserPasswordResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "a reset email was sent to the account's address",
 	}), nil
 }

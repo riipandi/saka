@@ -10,9 +10,9 @@ import (
 
 	storagev1 "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1"
 	storagev1connect "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1/storagev1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // AreaName is the name the area reports under in the registry.
@@ -87,7 +87,7 @@ func (h *rpcHandler) CreateBucket(ctx context.Context, req *connect.Request[stor
 	}
 	return connect.NewResponse(&storagev1.CreateBucketResponse{
 		Bucket:  wireBucket(created),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the bucket was created",
 	}), nil
 }
@@ -111,7 +111,7 @@ func (h *rpcHandler) UpdateBucket(ctx context.Context, req *connect.Request[stor
 	}
 	return connect.NewResponse(&storagev1.UpdateBucketResponse{
 		Bucket:  wireBucket(updated),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the bucket was updated",
 	}), nil
 }
@@ -127,7 +127,7 @@ func (h *rpcHandler) DeleteBucket(ctx context.Context, req *connect.Request[stor
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&storagev1.DeleteBucketResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the bucket was deleted",
 	}), nil
 }
@@ -140,7 +140,7 @@ func (h *rpcHandler) ListBuckets(ctx context.Context, req *connect.Request[stora
 	}
 	return connect.NewResponse(&storagev1.ListBucketsResponse{
 		Buckets: wireBuckets(buckets),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the buckets were listed",
 	}), nil
 }
@@ -153,7 +153,7 @@ func (h *rpcHandler) GetBucket(ctx context.Context, req *connect.Request[storage
 	}
 	return connect.NewResponse(&storagev1.GetBucketResponse{
 		Bucket:  wireBucket(bucket),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the bucket was read",
 	}), nil
 }

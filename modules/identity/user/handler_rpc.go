@@ -13,9 +13,9 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -90,7 +90,7 @@ func (h *rpcHandler) ListUsers(ctx context.Context, req *connect.Request[identit
 	return connect.NewResponse(&identityv1.ListUsersResponse{
 		Users:    views,
 		Metadata: listMetadata(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the users were listed",
 	}), nil
 }
@@ -103,7 +103,7 @@ func (h *rpcHandler) GetUser(ctx context.Context, req *connect.Request[identityv
 	}
 	return connect.NewResponse(&identityv1.GetUserResponse{
 		User:    WireView(user),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user was fetched",
 	}), nil
 }
@@ -128,7 +128,7 @@ func (h *rpcHandler) CreateUser(ctx context.Context, req *connect.Request[identi
 	}
 	return connect.NewResponse(&identityv1.CreateUserResponse{
 		User:    WireView(user),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user was created",
 	}), nil
 }
@@ -157,7 +157,7 @@ func (h *rpcHandler) UpdateUser(ctx context.Context, req *connect.Request[identi
 	}
 	return connect.NewResponse(&identityv1.UpdateUserResponse{
 		User:    WireView(user),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user was updated",
 	}), nil
 }
@@ -175,7 +175,7 @@ func (h *rpcHandler) BanUser(ctx context.Context, req *connect.Request[identityv
 	}
 	return connect.NewResponse(&identityv1.BanUserResponse{
 		User:    WireView(outcome.User),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: banMessage(outcome.User, outcome.EndedSessions),
 	}), nil
 }
@@ -188,7 +188,7 @@ func (h *rpcHandler) UnbanUser(ctx context.Context, req *connect.Request[identit
 	}
 	return connect.NewResponse(&identityv1.UnbanUserResponse{
 		User:    WireView(outcome.User),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the ban was lifted",
 	}), nil
 }
@@ -205,7 +205,7 @@ func (h *rpcHandler) UnlockUser(ctx context.Context, req *connect.Request[identi
 	}
 	return connect.NewResponse(&identityv1.UnlockUserResponse{
 		User:    WireView(outcome),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the lockout was lifted",
 	}), nil
 }
@@ -241,7 +241,7 @@ func (h *rpcHandler) DeleteUser(ctx context.Context, req *connect.Request[identi
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.DeleteUserResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user was deleted",
 	}), nil
 }
@@ -254,7 +254,7 @@ func (h *rpcHandler) ResetProfilePicture(ctx context.Context, req *connect.Reque
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.ResetProfilePictureResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the profile picture was reset",
 	}), nil
 }
@@ -272,7 +272,7 @@ func (h *rpcHandler) GetCurrentUser(ctx context.Context, req *connect.Request[id
 	}
 	return connect.NewResponse(&identityv1.GetCurrentUserResponse{
 		User:    WireView(user),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the current user was fetched",
 	}), nil
 }
@@ -299,7 +299,7 @@ func (h *rpcHandler) UpdateCurrentUser(ctx context.Context, req *connect.Request
 	}
 	return connect.NewResponse(&identityv1.UpdateCurrentUserResponse{
 		User:    WireView(user),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the current user was updated",
 	}), nil
 }
@@ -320,7 +320,7 @@ func (h *rpcHandler) DeleteMyAccount(ctx context.Context, req *connect.Request[i
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.DeleteMyAccountResponse{
-		Status: responder.StatusSuccess, Message: "the account was deleted",
+		Status: webutil.StatusSuccess, Message: "the account was deleted",
 	}), nil
 }
 
@@ -340,7 +340,7 @@ func (h *rpcHandler) AddPassword(ctx context.Context, req *connect.Request[ident
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.AddPasswordResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the password was added",
 	}), nil
 }
@@ -363,14 +363,14 @@ func (h *rpcHandler) RemovePassword(ctx context.Context, req *connect.Request[id
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.RemovePasswordResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the password was removed",
 	}), nil
 }
 
 // listMetadata maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func listMetadata(p responder.Pagination) *commonv1.ListMetadata {
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

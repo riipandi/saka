@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // Logger writes one line per request: method, path, status, duration, size,
@@ -46,7 +46,7 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 			}
 
 			attrs := []slog.Attr{
-				slog.String("request_id", responder.RequestIDFromContext(r.Context())),
+				slog.String("request_id", webutil.RequestIDFromContext(r.Context())),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", status),

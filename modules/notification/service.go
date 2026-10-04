@@ -11,9 +11,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the service defines. The handler maps them onto the codes
@@ -320,13 +320,13 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Notification, []uuid.U
 
 // ListAll answers one page of every notification, ordered as the caller
 // asked (absent a choice, newest first).
-func (s *Service) ListAll(ctx context.Context, category, sortBy string, ascending bool, page, limit int) ([]Notification, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListAll(ctx, s.pool, category, sortBy, ascending, responder.Offset(page, limit), limit)
+func (s *Service) ListAll(ctx context.Context, category, sortBy string, ascending bool, page, limit int) ([]Notification, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListAll(ctx, s.pool, category, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return rows, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // Cancel withdraws one notification. The row is read first, so an unknown
@@ -362,13 +362,13 @@ func (s *Service) Cancel(ctx context.Context, admin uuid.UUID, id uuid.UUID) err
 
 // ListInbox answers one page of the caller's inbox, ordered by creation
 // newest first until the request sorts otherwise.
-func (s *Service) ListInbox(ctx context.Context, userID uuid.UUID, unreadOnly bool, category, sortBy string, ascending bool, page, limit int) ([]InboxRow, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	rows, total, err := s.repo.ListInbox(ctx, s.pool, userID, unreadOnly, category, sortBy, ascending, responder.Offset(page, limit), limit)
+func (s *Service) ListInbox(ctx context.Context, userID uuid.UUID, unreadOnly bool, category, sortBy string, ascending bool, page, limit int) ([]InboxRow, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	rows, total, err := s.repo.ListInbox(ctx, s.pool, userID, unreadOnly, category, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return rows, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // MarkRead writes the caller's receipt for one notification. A

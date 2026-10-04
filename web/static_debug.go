@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // viteDevServer is where `task dev` runs the Vite dev server — the
@@ -36,7 +36,7 @@ func SetupStatic(r chi.Router) {
 	// same origin it loaded the document from.
 	proxy := httputil.NewSingleHostReverseProxy(vite)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		responder.Fail(w, r, http.StatusBadGateway,
+		webutil.Fail(w, r, http.StatusBadGateway,
 			"the vite dev server is not reachable — run task dev")
 	}
 
@@ -46,7 +46,7 @@ func SetupStatic(r chi.Router) {
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
-			responder.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
+			webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 		serveShellOrProxy(w, r, proxy)
@@ -55,7 +55,7 @@ func SetupStatic(r chi.Router) {
 	// boundary; the shape here keeps it consistent with the SPA's.
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", "GET, HEAD")
-		responder.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
+		webutil.Fail(w, r, http.StatusMethodNotAllowed, "method not allowed")
 	})
 }
 
@@ -66,7 +66,7 @@ func SetupStatic(r chi.Router) {
 // refused with the envelope before either branch runs.
 func serveShellOrProxy(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy) {
 	if isSurfacePrefix(r.URL.Path) {
-		responder.NotFoundJSON(w, r)
+		webutil.NotFoundJSON(w, r)
 		return
 	}
 
@@ -77,12 +77,12 @@ func serveShellOrProxy(w http.ResponseWriter, r *http.Request, proxy *httputil.R
 			ViteTemplate: ViteReact,
 		})
 		if err != nil {
-			responder.Fail(w, r, http.StatusInternalServerError, "the dev fragment did not resolve: "+err.Error())
+			webutil.Fail(w, r, http.StatusInternalServerError, "the dev fragment did not resolve: "+err.Error())
 			return
 		}
 		html, err := RenderPage(DefaultPage, tags.Tags)
 		if err != nil {
-			responder.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
+			webutil.Fail(w, r, http.StatusInternalServerError, "the document failed to render")
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

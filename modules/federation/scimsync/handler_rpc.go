@@ -11,7 +11,7 @@ import (
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // rpcHandler is the transport mapping of the procedures. The service
@@ -33,7 +33,7 @@ func (h *rpcHandler) GetByClient(ctx context.Context, req *connect.Request[feder
 	}
 	return connect.NewResponse(&federationv1.GetScimProviderResponse{
 		Provider: wireProvider(provider, false),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the client's SCIM service provider was read",
 	}), nil
 }
@@ -47,7 +47,7 @@ func (h *rpcHandler) Create(ctx context.Context, req *connect.Request[federation
 	}
 	return connect.NewResponse(&federationv1.CreateScimProviderResponse{
 		Provider: wireProvider(provider, true),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the SCIM service provider was created; the token is shown once",
 	}), nil
 }
@@ -64,7 +64,7 @@ func (h *rpcHandler) Update(ctx context.Context, req *connect.Request[federation
 	}
 	return connect.NewResponse(&federationv1.UpdateScimProviderResponse{
 		Provider: wireProvider(provider, false),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the SCIM service provider was updated",
 	}), nil
 }
@@ -79,7 +79,7 @@ func (h *rpcHandler) Delete(ctx context.Context, req *connect.Request[federation
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteScimProviderResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the SCIM service provider was deleted",
 	}), nil
 }
@@ -101,7 +101,7 @@ func (h *rpcHandler) Sync(ctx context.Context, req *connect.Request[federationv1
 		GroupsCreated: clampToInt32(stats.GroupsCreated),
 		GroupsUpdated: clampToInt32(stats.GroupsUpdated),
 		GroupsDeleted: clampToInt32(stats.GroupsDeleted),
-		Status:        responder.StatusSuccess,
+		Status:        webutil.StatusSuccess,
 		Message:       "the SCIM sync pass completed",
 	}), nil
 }

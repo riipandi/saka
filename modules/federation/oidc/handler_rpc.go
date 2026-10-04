@@ -10,7 +10,7 @@ import (
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -35,7 +35,7 @@ func (h *rpcHandler) ListClients(ctx context.Context, req *connect.Request[feder
 	return connect.NewResponse(&federationv1.ListOidcClientsResponse{
 		Clients:  wireClients(clients),
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the OIDC clients were listed",
 	}), nil
 }
@@ -71,7 +71,7 @@ func (h *rpcHandler) CreateClient(ctx context.Context, req *connect.Request[fede
 	return connect.NewResponse(&federationv1.CreateOidcClientResponse{
 		Client:  wireClient(issued.Client),
 		Secret:  issued.Secret,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client was created",
 	}), nil
 }
@@ -84,7 +84,7 @@ func (h *rpcHandler) GetClient(ctx context.Context, req *connect.Request[federat
 	}
 	return connect.NewResponse(&federationv1.GetOidcClientResponse{
 		Client:  wireClient(client),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client was read",
 	}), nil
 }
@@ -113,7 +113,7 @@ func (h *rpcHandler) UpdateClient(ctx context.Context, req *connect.Request[fede
 	}
 	return connect.NewResponse(&federationv1.UpdateOidcClientResponse{
 		Client:  wireClient(client),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client was updated",
 	}), nil
 }
@@ -124,7 +124,7 @@ func (h *rpcHandler) DeleteClient(ctx context.Context, req *connect.Request[fede
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteOidcClientResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client was deleted",
 	}), nil
 }
@@ -137,7 +137,7 @@ func (h *rpcHandler) UpdateAllowedUserGroups(ctx context.Context, req *connect.R
 	}
 	return connect.NewResponse(&federationv1.UpdateOidcClientAllowedUserGroupsResponse{
 		Client:  wireClient(client),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the allowed user groups were updated",
 	}), nil
 }
@@ -150,7 +150,7 @@ func (h *rpcHandler) GetClientMeta(ctx context.Context, req *connect.Request[fed
 	}
 	return connect.NewResponse(&federationv1.GetOidcClientMetaResponse{
 		Meta:    wireMeta(meta),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client metadata was read",
 	}), nil
 }
@@ -179,7 +179,7 @@ func (h *rpcHandler) PreviewClient(ctx context.Context, req *connect.Request[fed
 			AccessToken: accessTokenStruct,
 			UserInfo:    userInfoStruct,
 		},
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the OIDC client preview was built",
 	}), nil
 }
@@ -190,7 +190,7 @@ func (h *rpcHandler) UploadLogo(ctx context.Context, req *connect.Request[federa
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.UploadOidcClientLogoResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client logo was updated",
 	}), nil
 }
@@ -201,7 +201,7 @@ func (h *rpcHandler) DeleteLogo(ctx context.Context, req *connect.Request[federa
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteOidcClientLogoResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client logo was deleted",
 	}), nil
 }
@@ -214,7 +214,7 @@ func (h *rpcHandler) ListSecrets(ctx context.Context, req *connect.Request[feder
 	}
 	return connect.NewResponse(&federationv1.ListOidcClientSecretsResponse{
 		Credentials: wireCredentials(secrets),
-		Status:      responder.StatusSuccess,
+		Status:      webutil.StatusSuccess,
 		Message:     "the client secrets were listed",
 	}), nil
 }
@@ -233,7 +233,7 @@ func (h *rpcHandler) CreateSecret(ctx context.Context, req *connect.Request[fede
 	return connect.NewResponse(&federationv1.CreateOidcClientSecretResponse{
 		Secret:  wireSecret(issued.Secret),
 		Value:   issued.Value,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client secret was created",
 	}), nil
 }
@@ -244,7 +244,7 @@ func (h *rpcHandler) DeleteSecret(ctx context.Context, req *connect.Request[fede
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteOidcClientSecretResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client secret was deleted",
 	}), nil
 }
@@ -257,7 +257,7 @@ func (h *rpcHandler) RefreshClient(ctx context.Context, req *connect.Request[fed
 	}
 	return connect.NewResponse(&federationv1.RefreshOidcClientResponse{
 		Client:  wireClient(client),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client metadata document was refreshed",
 	}), nil
 }

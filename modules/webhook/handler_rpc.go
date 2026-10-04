@@ -15,7 +15,7 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	webhookv1 "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1"
 	webhookv1connect "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1/webhookv1connect"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -80,7 +80,7 @@ func (h *rpcHandler) List(ctx context.Context, req *connect.Request[webhookv1.Li
 	return connect.NewResponse(&webhookv1.ListWebhooksResponse{
 		Webhooks: wireEndpoints(rows),
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the webhooks were listed",
 	}), nil
 }
@@ -104,7 +104,7 @@ func (h *rpcHandler) Create(ctx context.Context, req *connect.Request[webhookv1.
 	return connect.NewResponse(&webhookv1.CreateWebhookResponse{
 		Webhook: wireEndpoint(row),
 		Secret:  secret,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the webhook was created",
 	}), nil
 }
@@ -121,7 +121,7 @@ func (h *rpcHandler) Get(ctx context.Context, req *connect.Request[webhookv1.Get
 	}
 	return connect.NewResponse(&webhookv1.GetWebhookResponse{
 		Webhook: wireEndpoint(row),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the webhook was read",
 	}), nil
 }
@@ -150,7 +150,7 @@ func (h *rpcHandler) Update(ctx context.Context, req *connect.Request[webhookv1.
 	}
 	return connect.NewResponse(&webhookv1.UpdateWebhookResponse{
 		Webhook: wireEndpoint(row),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the webhook was updated",
 	}), nil
 }
@@ -165,7 +165,7 @@ func (h *rpcHandler) Delete(ctx context.Context, req *connect.Request[webhookv1.
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&webhookv1.DeleteWebhookResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the webhook was deleted",
 	}), nil
 }
@@ -183,7 +183,7 @@ func (h *rpcHandler) RotateSecret(ctx context.Context, req *connect.Request[webh
 	return connect.NewResponse(&webhookv1.RotateWebhookSecretResponse{
 		Webhook: wireEndpoint(row),
 		Secret:  secret,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the webhook secret was rotated",
 	}), nil
 }
@@ -198,7 +198,7 @@ func (h *rpcHandler) Test(ctx context.Context, req *connect.Request[webhookv1.Te
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&webhookv1.TestWebhookResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the test delivery was queued",
 	}), nil
 }
@@ -216,7 +216,7 @@ func (h *rpcHandler) ListDeliveries(ctx context.Context, req *connect.Request[we
 	return connect.NewResponse(&webhookv1.ListWebhookDeliveriesResponse{
 		Deliveries: wireDeliveries(views),
 		Metadata:   metadataOf(pagination),
-		Status:     responder.StatusSuccess,
+		Status:     webutil.StatusSuccess,
 		Message:    "the webhook deliveries were listed",
 	}), nil
 }
@@ -230,7 +230,7 @@ func (h *rpcHandler) ListAllDeliveries(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&webhookv1.ListAllWebhookDeliveriesResponse{
 		Deliveries: wireDeliveries(views),
 		Metadata:   metadataOf(pagination),
-		Status:     responder.StatusSuccess,
+		Status:     webutil.StatusSuccess,
 		Message:    "the webhook deliveries were listed",
 	}), nil
 }
@@ -248,7 +248,7 @@ func (h *rpcHandler) ListEventTypes(ctx context.Context, req *connect.Request[we
 	}
 	return connect.NewResponse(&webhookv1.ListWebhookEventTypesResponse{
 		EventTypes: types,
-		Status:     responder.StatusSuccess,
+		Status:     webutil.StatusSuccess,
 		Message:    "the webhook event types were listed",
 	}), nil
 }
@@ -379,7 +379,7 @@ func parseID(id string) (uuid.UUID, error) {
 
 // metadataOf maps the responder's pagination onto the shared block. The wire
 // fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

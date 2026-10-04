@@ -12,11 +12,11 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 	"github.com/riipandi/saka/pkg/strutils"
 )
 
@@ -277,27 +277,27 @@ func (s *Service) liveOwnSession(ctx context.Context, db datastore.Querier, sid 
 // ended ones included. The gate is the caller's own session: a sign-out ends
 // the holder's view of the list along with everything else the session
 // surface serves.
-func (s *Service) ListSessions(ctx context.Context, callerSession, callerID string, page, limit int) ([]SessionSchema, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListSessions(ctx context.Context, callerSession, callerID string, page, limit int) ([]SessionSchema, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
 	sid, err := parseSessionID(callerSession)
 	if err != nil {
-		return nil, responder.Pagination{}, ErrSessionEnded
+		return nil, webutil.Pagination{}, ErrSessionEnded
 	}
 	if liveErr := s.liveOwnSession(ctx, s.pool, sid); liveErr != nil {
-		return nil, responder.Pagination{}, liveErr
+		return nil, webutil.Pagination{}, liveErr
 	}
 
 	userID, callerErr := callerUUID(callerID)
 	if callerErr != nil {
-		return nil, responder.Pagination{}, ErrSessionEnded
+		return nil, webutil.Pagination{}, ErrSessionEnded
 	}
 
-	rows, total, err := s.repo.ListOwn(ctx, s.pool, userID, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListOwn(ctx, s.pool, userID, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return rows, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // RevokeSession ends one of the account's sessions. Ending the current one is

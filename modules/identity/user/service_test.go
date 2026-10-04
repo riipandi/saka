@@ -25,8 +25,9 @@ import (
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/storage"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/restrictions"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 )
@@ -102,7 +103,7 @@ func passwordCount(t *testing.T, pool *datastore.Postgres, userID string) int {
 }
 
 func TestCreateUserStoresTheAccountAndTheCredential(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -133,7 +134,7 @@ func TestCreateUserStoresTheAccountAndTheCredential(t *testing.T) {
 }
 
 func TestCreateUserWithoutAPasswordCarriesNoCredential(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -152,7 +153,7 @@ func TestCreateUserWithoutAPasswordCarriesNoCredential(t *testing.T) {
 }
 
 func TestCreateUserRefusesADuplicateAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -181,7 +182,7 @@ func mustID(t *testing.T, wire string) UserID {
 // subject travels as the wire identifier, and the answer is the same view
 // the identifier-addressed read produces.
 func TestGetCurrentUserAnswersTheSubject(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -205,7 +206,7 @@ func TestGetCurrentUserAnswersTheSubject(t *testing.T) {
 // identifier that names no account is the not-found failure, whatever
 // surface read it.
 func TestGetCurrentUserRefusesAnUnknownSubject(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	service := testService(t, migratedPool(t))
 
@@ -218,7 +219,7 @@ func TestGetCurrentUserRefusesAnUnknownSubject(t *testing.T) {
 // administrative surface owns — the username, the email, the role, the
 // disabled flag — rides through untouched.
 func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -252,7 +253,7 @@ func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
 }
 
 func TestUpdateCurrentUserSetsTheTimezoneItIsGiven(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -298,7 +299,7 @@ func TestUpdateCurrentUserSetsTheTimezoneItIsGiven(t *testing.T) {
 }
 
 func TestUpdateUserReplacesTheTimezoneAndRefusesAnUnknownZone(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -339,7 +340,7 @@ func TestUpdateUserReplacesTheTimezoneAndRefusesAnUnknownZone(t *testing.T) {
 }
 
 func TestGetUserRefusesAnUnknownIdentifier(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -352,7 +353,7 @@ func TestGetUserRefusesAnUnknownIdentifier(t *testing.T) {
 }
 
 func TestListUsersSearchesAndPaginates(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -387,7 +388,7 @@ func TestListUsersSearchesAndPaginates(t *testing.T) {
 }
 
 func TestUpdateUserReplacesTheFields(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -428,7 +429,7 @@ func TestUpdateUserReplacesTheFields(t *testing.T) {
 }
 
 func TestUpdateUserAppliesAndLiftsTheBan(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -479,7 +480,7 @@ func TestUpdateUserAppliesAndLiftsTheBan(t *testing.T) {
 }
 
 func TestUpdateUserRefusesAnUnknownIdentifierAndADuplicate(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -502,7 +503,7 @@ func TestUpdateUserRefusesAnUnknownIdentifierAndADuplicate(t *testing.T) {
 }
 
 func TestDeleteUserRefusesTheSignedInAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -544,7 +545,7 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 // engine — stage, inline sync, row pointer — and reads the bytes back with
 // the content type the update recorded.
 func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, pictures := testPictureService(t, pool)
@@ -588,7 +589,7 @@ func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
 // an upload of another kind moves the picture rather than leaving the old one
 // under a name that lies about its content.
 func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, pictures := testPictureService(t, pool)
@@ -666,7 +667,7 @@ func storedPictureKey(t *testing.T, pool *datastore.Postgres, userID string) str
 // TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration refuses a payload
 // no accepted image kind claims, whatever its name says.
 func TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testPictureService(t, pool)
@@ -690,7 +691,7 @@ func TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration(t *testing.T) {
 // TestPictureResetFallsBackToTheDefault clears the row and removes the file,
 // so the read answers the bundled default the frontend ships.
 func TestPictureResetFallsBackToTheDefault(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, pictures := testPictureService(t, pool)
@@ -741,7 +742,7 @@ func TestPictureResetFallsBackToTheDefault(t *testing.T) {
 // read answers the bundled default; a 500 would tell the client its request
 // was wrong when the request was fine.
 func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	// The backend's root is the test's own, so the object can be taken away
@@ -786,7 +787,7 @@ func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
 // TestPictureRefusesAnUnknownAccount keeps the not-found boundary on every
 // picture procedure.
 func TestPictureRefusesAnUnknownAccount(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service, _ := testPictureService(t, pool)
@@ -806,10 +807,10 @@ func TestPictureRefusesAnUnknownAccount(t *testing.T) {
 // given. The picture feature writes into the engine's default bucket, so
 // the physical bucket the container gets is that row's own name.
 func TestThePictureFlowLandsOnS3(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
-	backend := testutils.StartMinIO(t.Context(), t)
+	backend := conttest.StartMinIO(t.Context(), t)
 	store, err := storage.NewS3(config.S3{
 		AccessKey:      backend.AccessKey,
 		SecretKey:      backend.Secret,
@@ -877,7 +878,7 @@ func TestThePictureFlowLandsOnS3(t *testing.T) {
 
 // storeList lists one physical bucket through the raw S3 client, the view
 // the engine's driver answers to.
-func storeList(ctx context.Context, backend *testutils.MinIO, bucket, prefix string) ([]string, error) {
+func storeList(ctx context.Context, backend *conttest.MinIO, bucket, prefix string) ([]string, error) {
 	client, err := backend.Client(ctx)
 	if err != nil {
 		return nil, err
@@ -897,7 +898,7 @@ func storeList(ctx context.Context, backend *testutils.MinIO, bucket, prefix str
 }
 
 // storeHead reads one object's headers through the raw S3 client.
-func storeHead(ctx context.Context, backend *testutils.MinIO, bucket, key string) (*s3.HeadObjectOutput, error) {
+func storeHead(ctx context.Context, backend *conttest.MinIO, bucket, key string) (*s3.HeadObjectOutput, error) {
 	client, err := backend.Client(ctx)
 	if err != nil {
 		return nil, err
@@ -912,7 +913,7 @@ func storeHead(ctx context.Context, backend *testutils.MinIO, bucket, key string
 // serves accounts without picture storage: the account procedures answer as
 // usual, the picture procedures refuse.
 func TestPictureProceduresRefuseARunWithoutTheEngine(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -953,7 +954,7 @@ func (s *silentNotifier) UserUnbanned(_ context.Context, _ string, _ UserView) {
 }
 
 func TestBanUserAppliesTheTermAndEndsTheSessions(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -998,7 +999,7 @@ func TestBanUserAppliesTheTermAndEndsTheSessions(t *testing.T) {
 }
 
 func TestBanUserRefusesAPastExpiryAndAnUnknownTarget(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -1017,7 +1018,7 @@ func TestBanUserRefusesAPastExpiryAndAnUnknownTarget(t *testing.T) {
 }
 
 func TestUnbanUserLiftsTheBanAsAUnitAndAnswersTheQuiet(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -1059,7 +1060,7 @@ func (s stubUserSettings) GetBool(_ context.Context, key string) (bool, error) {
 }
 
 func TestUpdateCurrentUserChangesTheUsernameBehindTheToggle(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	ctx := t.Context()
@@ -1126,7 +1127,7 @@ func TestUpdateCurrentUserChangesTheUsernameBehindTheToggle(t *testing.T) {
 }
 
 func TestDeleteMyAccountFollowsTheGateAndTheOverride(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	ctx := t.Context()

@@ -14,9 +14,9 @@ import (
 	apikeyv1 "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1"
 	apikeyv1connect "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1/apikeyv1connect"
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -96,7 +96,7 @@ func (h *rpcHandler) CreateAPIKey(ctx context.Context, req *connect.Request[apik
 	return connect.NewResponse(&apikeyv1.CreateAPIKeyResponse{
 		ApiKey:  wireKey(issued.Key),
 		Key:     issued.Raw,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the API key was created",
 	}), nil
 }
@@ -119,7 +119,7 @@ func (h *rpcHandler) ListAPIKeys(ctx context.Context, req *connect.Request[apike
 	return connect.NewResponse(&apikeyv1.ListAPIKeysResponse{
 		ApiKeys:  wireKeys(keys),
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the API keys were listed",
 	}), nil
 }
@@ -150,7 +150,7 @@ func (h *rpcHandler) RenewAPIKey(ctx context.Context, req *connect.Request[apike
 	return connect.NewResponse(&apikeyv1.RenewAPIKeyResponse{
 		ApiKey:  wireKey(issued.Key),
 		Key:     issued.Raw,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the API key was renewed",
 	}), nil
 }
@@ -174,7 +174,7 @@ func (h *rpcHandler) RevokeAPIKey(ctx context.Context, req *connect.Request[apik
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&apikeyv1.RevokeAPIKeyResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the API key was revoked",
 	}), nil
 }
@@ -188,7 +188,7 @@ func (h *rpcHandler) ListAllAPIKeys(ctx context.Context, req *connect.Request[ap
 	return connect.NewResponse(&apikeyv1.ListAllAPIKeysResponse{
 		ApiKeys:  wireKeys(keys),
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the API keys were listed",
 	}), nil
 }
@@ -256,7 +256,7 @@ func sessionCaller(ctx context.Context) (*jwtutils.Caller, error) {
 
 // metadataOf maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

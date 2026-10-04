@@ -13,7 +13,8 @@ import (
 	storagev1connect "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1/storagev1connect"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // fakeSettings answers the default-bucket setting with a value the test
@@ -30,7 +31,7 @@ func (f *fakeSettings) GetString(ctx context.Context, key string) (string, error
 // setting source the test names.
 func bucketService(t *testing.T, settings settingsReader) (*Service, *datastore.Postgres) {
 	t.Helper()
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "storage_bucket_test")
 	service := NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
@@ -277,7 +278,7 @@ func TestTheModuleClaimsEveryProcedureTheContractDeclares(t *testing.T) {
 // "unknown procedure" — a hand-built service would pass while the wiring is
 // broken.
 func TestTheAreaForwardsTheServiceThroughTheContainer(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "storage_bucket_wiring_test")
 	logger := slog.New(slog.DiscardHandler)

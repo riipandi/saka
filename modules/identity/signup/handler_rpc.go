@@ -12,9 +12,9 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -83,7 +83,7 @@ func (h *rpcHandler) Signup(ctx context.Context, req *connect.Request[identityv1
 	return connect.NewResponse(&identityv1.SignupResponse{
 		User: user.WireView(account),
 
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the account was created",
 	}), nil
 }
@@ -105,7 +105,7 @@ func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request
 		Token:    tokenView(created.Token),
 		RawToken: created.RawToken,
 
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the signup token was created",
 	}), nil
 }
@@ -125,7 +125,7 @@ func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[
 		Tokens:   views,
 		Metadata: listMetadata(pagination),
 
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the signup tokens were listed",
 	}), nil
 }
@@ -136,7 +136,7 @@ func (h *rpcHandler) DeleteSignupToken(ctx context.Context, req *connect.Request
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.DeleteSignupTokenResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the signup token was deleted",
 	}), nil
 }
@@ -155,7 +155,7 @@ func tokenView(token TokenView) *identityv1.SignupToken {
 
 // listMetadata maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func listMetadata(p responder.Pagination) *commonv1.ListMetadata {
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

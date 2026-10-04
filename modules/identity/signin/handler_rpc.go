@@ -7,8 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/pkg/responder"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -119,7 +119,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 			DisplayName: result.User.DisplayName,
 		},
 
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: message,
 	}), nil
 }

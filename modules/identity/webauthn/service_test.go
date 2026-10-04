@@ -14,10 +14,11 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // testOrigin is the origin the ceremonies run against: the RP ID is its
@@ -106,7 +107,7 @@ func (f *fakeSettings) GetInt64(ctx context.Context, key string) (int64, error) 
 // issuer, and the fake settings, answering the pieces a test drives.
 func webauthnTestService(t *testing.T, values map[string]string) (*Service, *fakeIssuer, *fakeSettings) {
 	t.Helper()
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "webauthn_service_test")
 	issuer := &fakeIssuer{accounts: map[uuid.UUID]*signin.Account{}}

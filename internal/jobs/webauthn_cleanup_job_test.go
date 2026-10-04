@@ -12,8 +12,9 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/webauthn"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // ceremonySession writes one live ceremony row. The table's check refuses an
@@ -55,7 +56,7 @@ func countCeremonySessions(t *testing.T, pool *datastore.Postgres) int {
 // ceremony still inside its window survives, an expired one goes, and a
 // second run finds nothing left to do.
 func TestTheCeremonySweepReapsOnlyTheExpired(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "webauthn_cleanup_test")
 	ceremonySession(t, pool, time.Minute) // judged expired when the clock moves
@@ -77,7 +78,7 @@ func TestTheCeremonySweepReapsOnlyTheExpired(t *testing.T) {
 // a step-up proof minted and never spent leaves the table through the
 // sweep, and a live token survives it.
 func TestTheTokenSweepReapsTheExpired(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "webauthn_token_cleanup_test")
 	repo := webauthn.NewRepository()

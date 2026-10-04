@@ -20,8 +20,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/signin"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // testCipher is the sealing a test runs: a real AES-256-GCM over a key the
@@ -103,7 +104,7 @@ func (f *fakeNoticeEnqueuer) EnqueueMfaDisabledNotice(_ context.Context, notice 
 // account, answering the pieces a test drives.
 func mfaTestService(t *testing.T) (*Service, *fakeIssuer, uuid.UUID, func(code string) string) {
 	t.Helper()
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	issuer := &fakeIssuer{}

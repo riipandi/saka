@@ -3,9 +3,9 @@ package appconfig
 import (
 	"net/http"
 
+	"github.com/riipandi/saka/framework/webutil"
 	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // serveConfiguration answers `GET /api/configuration`: the deployment's
@@ -28,6 +28,6 @@ import (
 func (m *Module) serveConfiguration(w http.ResponseWriter, r *http.Request) {
 	caller, _ := jwtutils.CallerFrom(r.Context())
 
-	responder.Success(w, r, http.StatusOK, m.config.Published(caller.HasRole(appauthz.AdministratorRole)),
-		responder.WithMessage("the application configuration"))
+	webutil.Success(w, r, http.StatusOK, m.config.Published(caller.HasRole(appauthz.AdministratorRole)),
+		webutil.WithMessage("the application configuration"))
 }

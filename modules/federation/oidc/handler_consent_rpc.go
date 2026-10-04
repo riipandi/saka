@@ -8,8 +8,8 @@ import (
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // consentHandler is the transport mapping of the consent procedures. It
@@ -40,7 +40,7 @@ func (h *consentHandler) ListMyAuthorizedClients(ctx context.Context, _ *connect
 	}
 	return connect.NewResponse(&federationv1.ListMyAuthorizedClientsResponse{
 		Clients: clients,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the authorized clients were listed",
 	}), nil
 }
@@ -56,7 +56,7 @@ func (h *consentHandler) RevokeMyAuthorizedClient(ctx context.Context, req *conn
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.RevokeMyAuthorizedClientResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the client's authorization was revoked",
 	}), nil
 }
@@ -73,7 +73,7 @@ func (h *consentHandler) ListMyClients(ctx context.Context, _ *connect.Request[f
 	}
 	return connect.NewResponse(&federationv1.ListMyOidcClientsResponse{
 		Clients: wireClients(views),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the accessible clients were listed",
 	}), nil
 }
@@ -95,7 +95,7 @@ func (h *consentHandler) ListUserAuthorizedClients(ctx context.Context, req *con
 	}
 	return connect.NewResponse(&federationv1.ListUserAuthorizedClientsResponse{
 		Clients: clients,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the authorized clients were listed",
 	}), nil
 }
@@ -112,7 +112,7 @@ func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, _ *connec
 	}
 	return connect.NewResponse(&federationv1.ListAllAuthorizedClientsResponse{
 		Entries: rows,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the authorized clients were listed",
 	}), nil
 }

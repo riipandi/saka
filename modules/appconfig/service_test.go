@@ -19,7 +19,8 @@ import (
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/pkg/testutils"
+	"github.com/riipandi/saka/internal/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 func migratedPool(t *testing.T) *datastore.Postgres {
@@ -51,7 +52,7 @@ func seedUser(t *testing.T, pool *datastore.Postgres, username, email string) uu
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
 
-	mailpit := testutils.StartMailpit(t.Context(), t)
+	mailpit := conttest.StartMailpit(t.Context(), t)
 
 	cfg := config.Default()
 	cfg.Mailer.SMTPHost = host(mailpit.SMTPAddr)
@@ -143,13 +144,13 @@ func subjectAt(t *testing.T, list messageList, to ...string) bool {
 }
 
 func TestTestEmailSendsToTheCallerSAddressOnRecord(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	callerID := seedUser(t, pool, "langdon", "langdon@example.com")
 
-	mailpit := testutils.StartMailpit(t.Context(), t)
+	mailpit := conttest.StartMailpit(t.Context(), t)
 	before := mailpitMessages(t.Context(), mailpit.APIURL)
 	require.NoError(t, service.SendTestEmail(t.Context(), callerID, ""))
 
@@ -160,13 +161,13 @@ func TestTestEmailSendsToTheCallerSAddressOnRecord(t *testing.T) {
 }
 
 func TestTestEmailFollowsTheRedirectionTheRequestNames(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
 	callerID := seedUser(t, pool, "neveu", "neveu@example.com")
 
-	mailpit := testutils.StartMailpit(t.Context(), t)
+	mailpit := conttest.StartMailpit(t.Context(), t)
 	before := mailpitMessages(t.Context(), mailpit.APIURL)
 	require.NoError(t, service.SendTestEmail(t.Context(), callerID, "vetra@example.com"))
 
@@ -177,7 +178,7 @@ func TestTestEmailFollowsTheRedirectionTheRequestNames(t *testing.T) {
 }
 
 func TestTestEmailRefusesAMailerThatNamesNoServer(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := unconfiguredService(t, pool)
@@ -188,7 +189,7 @@ func TestTestEmailRefusesAMailerThatNamesNoServer(t *testing.T) {
 }
 
 func TestTestEmailRefusesACallerTheDatabaseDoesNotKnow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -204,7 +205,7 @@ func TestTestEmailRefusesACallerTheDatabaseDoesNotKnow(t *testing.T) {
 }
 
 func TestTestEmailWritesTheAuditRecordTheSendDeserves(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"uuid"
 
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
@@ -77,7 +77,7 @@ func (h *rpcHandler) SendEmail(ctx context.Context, req *connect.Request[identit
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.SendVerificationEmailResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the verification email was sent",
 	}), nil
 }
@@ -90,7 +90,7 @@ func (h *rpcHandler) VerifyEmail(ctx context.Context, req *connect.Request[ident
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.VerifyEmailResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the email address was verified",
 	}), nil
 }
@@ -121,7 +121,7 @@ func (h *rpcHandler) RequestEmailChange(ctx context.Context, req *connect.Reques
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.RequestEmailChangeResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the change was requested; the confirm code was sent to the new address",
 	}), nil
 }
@@ -135,7 +135,7 @@ func (h *rpcHandler) ConfirmEmailChange(ctx context.Context, req *connect.Reques
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.ConfirmEmailChangeResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the email address was changed",
 	}), nil
 }

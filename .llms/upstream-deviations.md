@@ -14,7 +14,7 @@ surface), **excluded** (never parity work), **hold** (deliberately undecided, do
 | Deviation | Upstream | Saka |
 |---|---|---|
 | Transport | REST under `/api`, gin | ConnectRPC under `/rpc` for first-party surfaces; REST only for protocol/infrastructure paths (`/healthz`, `/.well-known/jwks.json`, `/storage/{bucket}/{key}`, the tus endpoint `/api/uploads`, profile pictures). Original REST paths are kept in the endpoint reference for traceability only. |
-| Envelope | per-endpoint JSON bodies | `pkg/responder` envelope: `status` + `message` + payload; ConnectRPC errors carry the code. |
+| Envelope | per-endpoint JSON bodies | `framework/webutil` envelope: `status` + `message` + payload; ConnectRPC errors carry the code. |
 | Pagination | `pagination[page]` / `pagination[limit]` query params | Flat optional `page` / `limit` request fields; the answer carries `metadata` (shared `saka.common.v1.ListMetadata`). |
 | Sorting | `sort[column]` / `sort[direction]` query params | Flat optional `sort_by` (whitelisted, validated by protovalidate `in:`) + `sort_order` (`asc` / `desc`, validated the same way) request fields. |
 | Field naming | camelCase JSON | snake_case wire names (the shared ConnectRPC codec). |

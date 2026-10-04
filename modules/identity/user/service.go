@@ -13,12 +13,12 @@ import (
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/identity/password"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the account procedures report. The handler maps them to
@@ -742,12 +742,12 @@ func (s *Service) RemovePassword(ctx context.Context, subject string) error {
 
 // ListUsers answers one page of the accounts, newest first, optionally
 // filtered by a search term.
-func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]UserView, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascending bool, page, limit int) ([]UserView, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	rows, total, err := s.repo.ListUsers(ctx, s.pool, search, sortBy, ascending, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListUsers(ctx, s.pool, search, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 
 	views := make([]UserView, 0, len(rows))
@@ -756,9 +756,9 @@ func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascendin
 	}
 	filled, err := s.withGroups(ctx, views)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return filled, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return filled, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // UpdateUser replaces an account's writable fields. The account is read

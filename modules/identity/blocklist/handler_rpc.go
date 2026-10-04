@@ -13,9 +13,9 @@ import (
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -71,7 +71,7 @@ func (h *rpcHandler) ListBlocklistEntries(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&identityv1.ListBlocklistEntriesResponse{
 		Entries:  wireEntries(entries),
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the blocklist entries were listed",
 	}), nil
 }
@@ -93,7 +93,7 @@ func (h *rpcHandler) AddBlocklistEntry(ctx context.Context, req *connect.Request
 	}
 	return connect.NewResponse(&identityv1.AddBlocklistEntryResponse{
 		Entry:   wireEntry(entry),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the blocklist entry was stored",
 	}), nil
 }
@@ -108,7 +108,7 @@ func (h *rpcHandler) RemoveBlocklistEntry(ctx context.Context, req *connect.Requ
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&identityv1.RemoveBlocklistEntryResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the blocklist entry was removed",
 	}), nil
 }
@@ -150,7 +150,7 @@ func wireEntries(rows []EntrySchema) []*identityv1.BlocklistEntry {
 
 // metadataOf maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

@@ -7,7 +7,7 @@ import (
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -36,7 +36,7 @@ func (h *rpcHandler) Suggest(ctx context.Context, req *connect.Request[federatio
 	}
 	return connect.NewResponse(&federationv1.SuggestCustomClaimsResponse{
 		Keys:    list,
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the custom claim suggestions were listed",
 	}), nil
 }
@@ -49,7 +49,7 @@ func (h *rpcHandler) ListUserClaims(ctx context.Context, req *connect.Request[fe
 	}
 	return connect.NewResponse(&federationv1.ListUserCustomClaimsResponse{
 		Claims:  wireClaims(claims),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claims were listed",
 	}), nil
 }
@@ -62,7 +62,7 @@ func (h *rpcHandler) CreateUserClaim(ctx context.Context, req *connect.Request[f
 	}
 	return connect.NewResponse(&federationv1.CreateUserCustomClaimResponse{
 		Claim:   wireClaim(claim),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was created",
 	}), nil
 }
@@ -75,7 +75,7 @@ func (h *rpcHandler) UpdateUserClaim(ctx context.Context, req *connect.Request[f
 	}
 	return connect.NewResponse(&federationv1.UpdateUserCustomClaimResponse{
 		Claim:   wireClaim(claim),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was updated",
 	}), nil
 }
@@ -86,7 +86,7 @@ func (h *rpcHandler) DeleteUserClaim(ctx context.Context, req *connect.Request[f
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteUserCustomClaimResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was deleted",
 	}), nil
 }
@@ -99,7 +99,7 @@ func (h *rpcHandler) ListGroupClaims(ctx context.Context, req *connect.Request[f
 	}
 	return connect.NewResponse(&federationv1.ListGroupCustomClaimsResponse{
 		Claims:  wireClaims(claims),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claims were listed",
 	}), nil
 }
@@ -112,7 +112,7 @@ func (h *rpcHandler) CreateGroupClaim(ctx context.Context, req *connect.Request[
 	}
 	return connect.NewResponse(&federationv1.CreateGroupCustomClaimResponse{
 		Claim:   wireClaim(claim),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was created",
 	}), nil
 }
@@ -125,7 +125,7 @@ func (h *rpcHandler) UpdateGroupClaim(ctx context.Context, req *connect.Request[
 	}
 	return connect.NewResponse(&federationv1.UpdateGroupCustomClaimResponse{
 		Claim:   wireClaim(claim),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was updated",
 	}), nil
 }
@@ -136,7 +136,7 @@ func (h *rpcHandler) DeleteGroupClaim(ctx context.Context, req *connect.Request[
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.DeleteGroupCustomClaimResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was deleted",
 	}), nil
 }

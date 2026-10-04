@@ -13,10 +13,10 @@ import (
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/riipandi/saka/pkg/printext"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -111,7 +111,7 @@ func (h *rpcHandler) SignOut(ctx context.Context, req *connect.Request[authnv1.S
 		message = "you have been signed out; the session had already expired"
 	}
 	return connect.NewResponse(&authnv1.SignOutResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: message,
 	}), nil
 }
@@ -132,7 +132,7 @@ func (h *rpcHandler) SignOutOtherSessions(ctx context.Context, req *connect.Requ
 	}
 	return connect.NewResponse(&authnv1.SignOutOtherSessionsResponse{
 		RevokedCount: narrowCount(count),
-		Status:       responder.StatusSuccess,
+		Status:       webutil.StatusSuccess,
 		Message:      message,
 	}), nil
 }
@@ -153,7 +153,7 @@ func (h *rpcHandler) SignOutAllSessions(ctx context.Context, req *connect.Reques
 	}
 	return connect.NewResponse(&authnv1.SignOutAllSessionsResponse{
 		RevokedCount: narrowCount(count),
-		Status:       responder.StatusSuccess,
+		Status:       webutil.StatusSuccess,
 		Message:      message,
 	}), nil
 }
@@ -187,7 +187,7 @@ func (h *rpcHandler) GetSession(ctx context.Context, req *connect.Request[authnv
 	return connect.NewResponse(&authnv1.GetSessionResponse{
 		Session: wireSession(row, caller.SessionID),
 		User:    wireUser(view),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the session was fetched",
 	}), nil
 }
@@ -211,7 +211,7 @@ func (h *rpcHandler) ListSessions(ctx context.Context, req *connect.Request[auth
 	return connect.NewResponse(&authnv1.ListSessionsResponse{
 		Sessions: views,
 		Metadata: metadataOf(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the sessions were listed",
 	}), nil
 }
@@ -227,7 +227,7 @@ func (h *rpcHandler) RevokeSession(ctx context.Context, req *connect.Request[aut
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&authnv1.RevokeSessionResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the session was revoked",
 	}), nil
 }
@@ -250,7 +250,7 @@ func (h *rpcHandler) Refresh(ctx context.Context, req *connect.Request[authnv1.R
 		RefreshToken:     refreshed.RefreshToken,
 		SessionId:        refreshed.SessionID,
 		User:             wireUser(refreshed.User),
-		Status:           responder.StatusSuccess,
+		Status:           webutil.StatusSuccess,
 		Message:          "the token pair was refreshed",
 	}), nil
 }
@@ -277,7 +277,7 @@ func (h *rpcHandler) ImpersonateUser(ctx context.Context, req *connect.Request[a
 		RefreshToken:     refreshed.RefreshToken,
 		SessionId:        refreshed.SessionID,
 		User:             wireUser(refreshed.User),
-		Status:           responder.StatusSuccess,
+		Status:           webutil.StatusSuccess,
 		Message:          "the impersonated session was opened",
 	}), nil
 }
@@ -303,7 +303,7 @@ func (h *rpcHandler) StopImpersonating(ctx context.Context, req *connect.Request
 		RefreshToken:     refreshed.RefreshToken,
 		SessionId:        refreshed.SessionID,
 		User:             wireUser(refreshed.User),
-		Status:           responder.StatusSuccess,
+		Status:           webutil.StatusSuccess,
 		Message:          "the impersonated session was ended",
 	}), nil
 }
@@ -358,7 +358,7 @@ func narrowCount(n int) int32 {
 
 // metadataOf maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func metadataOf(p responder.Pagination) *commonv1.ListMetadata {
+func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

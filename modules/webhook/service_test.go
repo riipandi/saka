@@ -24,8 +24,8 @@ import (
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
-	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The hex the test cipher builds from: sixty-four hex characters, the shape

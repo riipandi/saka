@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
-	"github.com/riipandi/saka/pkg/responder"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -40,16 +40,16 @@ func (m *Module) Mount(r chi.Router) {
 		logo, err := m.service.Logo(r.Context(), chi.URLParam(r, "id"))
 		switch {
 		case errors.Is(err, ErrClientNotFound):
-			responder.Fail(w, r, http.StatusNotFound, "client not found")
+			webutil.Fail(w, r, http.StatusNotFound, "client not found")
 			return
 		case errors.Is(err, ErrLogoMissing):
-			responder.Fail(w, r, http.StatusNotFound, "the client has no logo")
+			webutil.Fail(w, r, http.StatusNotFound, "the client has no logo")
 			return
 		case errors.Is(err, ErrLogosUnavailable):
-			responder.Fail(w, r, http.StatusServiceUnavailable, "logo storage is not available")
+			webutil.Fail(w, r, http.StatusServiceUnavailable, "logo storage is not available")
 			return
 		case err != nil:
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 			return
 		}
 		defer logo.Body.Close()
@@ -59,7 +59,7 @@ func (m *Module) Mount(r chi.Router) {
 		w.Header().Set("Content-Type", logo.ContentType)
 		w.Header().Set("Cache-Control", "private, max-age=60")
 		if _, err := io.Copy(w, logo.Body); err != nil {
-			responder.WriteError(w, r, err)
+			webutil.WriteError(w, r, err)
 		}
 	})
 }

@@ -23,13 +23,14 @@ import (
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/modules/identity/session"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/testutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 )
 
 // The HMAC secret a test deployment signs with: 32 bytes of hex, the form
@@ -131,7 +132,7 @@ func createAccount(t *testing.T, pool *datastore.Postgres, username, email, pass
 // sign-up leaves the column NULL, and the scan that read it as a string
 // once turned every such sign-in into a 500 — the regression this pins.
 func TestASignInWithoutAUsernameOpensTheSession(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -160,7 +161,7 @@ func TestASignInWithoutAUsernameOpensTheSession(t *testing.T) {
 }
 
 func TestSignInIssuesTheTokenPair(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -245,7 +246,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 }
 
 func TestSignInAcceptsUsernameCaseInsensitively(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -257,7 +258,7 @@ func TestSignInAcceptsUsernameCaseInsensitively(t *testing.T) {
 }
 
 func TestSignInHidesWhichHalfFailed(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -280,7 +281,7 @@ func TestSignInHidesWhichHalfFailed(t *testing.T) {
 }
 
 func TestSignInRefusesTheStatesThatCannotSignIn(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -337,7 +338,7 @@ func TestSignInRefusesTheStatesThatCannotSignIn(t *testing.T) {
 }
 
 func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	service := testService(t, pool)
@@ -365,7 +366,7 @@ func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
 // path share session.max_lifetime, so either sign-in writes the same window
 // and the flag only records the caller's choice on the row.
 func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 
@@ -425,7 +426,7 @@ func (s stubSettingReader) GetBool(_ context.Context, key string) (bool, error) 
 }
 
 func TestSessionLifetimeFallsBackWhenUnreadable(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	cfg := testConfig()
@@ -503,7 +504,7 @@ func (b *blockingList) Blocked(_ context.Context, address string) (bool, error) 
 // allowlist rescues its own, the toggles off or a failed read or an
 // unwired gate lets the sign-in pass — the lists' fail-open stance.
 func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	blocked := &blockingList{address: "hermione@example.com"}
@@ -593,7 +594,7 @@ func (lockoutSettings) GetString(_ context.Context, key string) (string, error) 
 // hand the attacker. The account's address learns of the lock through the
 // notice, not the response.
 func TestTheLockoutAnswersTheCredentialError(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
+	conttest.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
 	const password = "expecto-patronum"

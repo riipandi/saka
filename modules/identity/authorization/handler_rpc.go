@@ -12,8 +12,8 @@ import (
 	authzv1 "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1"
 	authzv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1/authzv1connect"
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -91,7 +91,7 @@ func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[a
 	}
 	return connect.NewResponse(&authzv1.ListPermissionsResponse{
 		Permissions: permissions,
-		Status:      responder.StatusSuccess,
+		Status:      webutil.StatusSuccess,
 		Message:     "the permission catalog was listed",
 	}), nil
 }
@@ -118,7 +118,7 @@ func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1
 	return connect.NewResponse(&authzv1.ListRolesResponse{
 		Roles:    views,
 		Metadata: listMetadata(pagination),
-		Status:   responder.StatusSuccess,
+		Status:   webutil.StatusSuccess,
 		Message:  "the roles were listed",
 	}), nil
 }
@@ -131,7 +131,7 @@ func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[authzv1.G
 	}
 	return connect.NewResponse(&authzv1.GetRoleResponse{
 		Role:    wireDetail(role),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the role was fetched",
 	}), nil
 }
@@ -148,7 +148,7 @@ func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[authzv
 	}
 	return connect.NewResponse(&authzv1.CreateRoleResponse{
 		Role:    wireDetail(role),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the role was created",
 	}), nil
 }
@@ -164,7 +164,7 @@ func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[authzv
 	}
 	return connect.NewResponse(&authzv1.UpdateRoleResponse{
 		Role:    wireDetail(role),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the role was updated",
 	}), nil
 }
@@ -175,7 +175,7 @@ func (h *rpcHandler) DeleteRole(ctx context.Context, req *connect.Request[authzv
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&authzv1.DeleteRoleResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the role was deleted",
 	}), nil
 }
@@ -188,7 +188,7 @@ func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *connect.Reques
 	}
 	return connect.NewResponse(&authzv1.SetRolePermissionsResponse{
 		Role:    wireDetail(role),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the role permissions were updated",
 	}), nil
 }
@@ -202,7 +202,7 @@ func (h *rpcHandler) ListUserRoles(ctx context.Context, req *connect.Request[aut
 	return connect.NewResponse(&authzv1.ListUserRolesResponse{
 		UserId:  req.Msg.UserId,
 		Roles:   wireRoles(roles),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's roles were fetched",
 	}), nil
 }
@@ -218,7 +218,7 @@ func (h *rpcHandler) SetUserRoles(ctx context.Context, req *connect.Request[auth
 	return connect.NewResponse(&authzv1.SetUserRolesResponse{
 		UserId:  req.Msg.UserId,
 		Roles:   wireRoles(roles),
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the user's roles were updated",
 	}), nil
 }
@@ -233,7 +233,7 @@ func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(&authzv1.ListUserPermissionsResponse{
 		UserId:          req.Msg.UserId,
 		PermissionSlugs: slugs,
-		Status:          responder.StatusSuccess,
+		Status:          webutil.StatusSuccess,
 		Message:         "the user's permissions were fetched",
 	}), nil
 }
@@ -247,7 +247,7 @@ func (h *rpcHandler) SetUserPermissions(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(&authzv1.SetUserPermissionsResponse{
 		UserId:          req.Msg.UserId,
 		PermissionSlugs: slugs,
-		Status:          responder.StatusSuccess,
+		Status:          webutil.StatusSuccess,
 		Message:         "the user's permissions were updated",
 	}), nil
 }
@@ -356,7 +356,7 @@ func derefString(value *string) string {
 
 // listMetadata maps the responder's pagination onto the shared block. The
 // wire fields are optional, so an unknown range is absent rather than zero.
-func listMetadata(p responder.Pagination) *commonv1.ListMetadata {
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	meta := &commonv1.ListMetadata{}
 	set := func(dst **int32, src *int) {
 		if src == nil {

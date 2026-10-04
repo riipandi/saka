@@ -15,8 +15,8 @@ import (
 	"github.com/valkey-io/valkey-go"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/pkg/responder"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -62,7 +62,7 @@ func (s *stubLimiter) Allow(_ context.Context, key string, policy Policy) (Resul
 // envelopeRefuse is the refusal the REST surface passes the middleware: the
 // 429 envelope the responder writes.
 func envelopeRefuse(w http.ResponseWriter, r *http.Request) {
-	responder.Fail(w, r, http.StatusTooManyRequests, "rate limit exceeded")
+	webutil.Fail(w, r, http.StatusTooManyRequests, "rate limit exceeded")
 }
 
 func TestRateLimitWritesTheHeadersAClientPacesBy(t *testing.T) {

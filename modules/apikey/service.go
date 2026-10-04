@@ -10,11 +10,11 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The shape of a presented key: an eight-character prefix an operator reads,
@@ -148,16 +148,16 @@ func (s *Service) Create(ctx context.Context, owner uuid.UUID, params CreatePara
 
 // ListOwn answers one page of the owner's keys, ordered as the caller asked
 // (absent a choice, newest first).
-func (s *Service) ListOwn(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListOwn(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 	return s.listPage(ctx, owner, sortBy, ascending, page, limit)
 }
 
 // ListAll answers one page of every key the deployment holds, ordered as the
 // caller asked. It is the administrative view — the owner's own list is
 // ListOwn.
-func (s *Service) ListAll(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) ListAll(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]KeySchema, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 	return s.listPage(ctx, uuid.Nil(), sortBy, ascending, page, limit)
 }
 
@@ -339,12 +339,12 @@ func (s *Service) AuthenticateAPIKey(ctx context.Context, presented string) (*jw
 
 // listPage runs one list query and answers the page with its metadata. An
 // owner identifier scopes the page; the zero value names every key.
-func (s *Service) listPage(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, responder.Pagination, error) {
-	keys, total, err := s.repo.ListKeys(ctx, s.pool, owner, sortBy, ascending, responder.Offset(page, limit), limit)
+func (s *Service) listPage(ctx context.Context, owner uuid.UUID, sortBy string, ascending bool, page, limit int) ([]KeySchema, webutil.Pagination, error) {
+	keys, total, err := s.repo.ListKeys(ctx, s.pool, owner, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return keys, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return keys, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // generateKey draws one presented credential: an eight-character prefix an

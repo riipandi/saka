@@ -18,10 +18,10 @@ import (
 
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the service defines. The handler maps them onto the codes the
@@ -126,14 +126,14 @@ func (s *Service) listPermissions(ctx context.Context, search, resource, sortBy 
 // roleList is the pair a roles page answers, the shape the cache stores.
 type roleList struct {
 	Rows       []RoleRow
-	Pagination responder.Pagination
+	Pagination webutil.Pagination
 }
 
 // ListRoles answers one page of the roles, ordered as the caller asked,
 // optionally filtered by a search term and a role kind. The read is served
 // through the cache under the query's fingerprint, the way
 // ListPermissions is.
-func (s *Service) ListRoles(ctx context.Context, bypass bool, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
+func (s *Service) ListRoles(ctx context.Context, bypass bool, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, webutil.Pagination, error) {
 	if s.cache == nil {
 		return s.listRoles(ctx, search, roleType, sortBy, ascending, page, limit)
 	}
@@ -146,20 +146,20 @@ func (s *Service) ListRoles(ctx context.Context, bypass bool, search, roleType, 
 		return roleList{Rows: rows, Pagination: pagination}, nil
 	})
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
 	return cached.Rows, cached.Pagination, nil
 }
 
 // listRoles is ListRoles' own read.
-func (s *Service) listRoles(ctx context.Context, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
+func (s *Service) listRoles(ctx context.Context, search, roleType, sortBy string, ascending bool, page, limit int) ([]RoleRow, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
 
-	rows, total, err := s.repo.ListRoles(ctx, s.pool, search, roleType, sortBy, ascending, responder.Offset(page, limit), limit)
+	rows, total, err := s.repo.ListRoles(ctx, s.pool, search, roleType, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return rows, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return rows, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // GetRole answers one role with the permission slugs it carries. The read

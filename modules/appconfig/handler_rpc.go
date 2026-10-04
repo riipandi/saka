@@ -13,10 +13,10 @@ import (
 	settingsv1connect "github.com/riipandi/saka/codegen/proto/go/saka/settings/v1/settingsv1connect"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // ModuleName is the name this feature reports under. The area it belongs to
@@ -91,7 +91,7 @@ func (h *rpcHandler) TestEmail(ctx context.Context, req *connect.Request[systemv
 		return nil, mapError(err)
 	}
 	return connect.NewResponse(&systemv1.TestEmailResponse{
-		Status:  responder.StatusSuccess,
+		Status:  webutil.StatusSuccess,
 		Message: "the test email was sent",
 	}), nil
 }

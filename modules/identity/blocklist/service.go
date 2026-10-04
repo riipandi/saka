@@ -10,8 +10,8 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/pkg/responder"
 )
 
 // The failures the service defines. The handler maps them onto the codes the
@@ -54,13 +54,13 @@ func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Lo
 
 // List answers one page of the entries, ordered as the caller asked (absent
 // a choice, newest first).
-func (s *Service) List(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]EntrySchema, responder.Pagination, error) {
-	page, limit = responder.NormalizePage(page, limit, responder.DefaultPageSize, responder.MaxPageSize)
-	entries, total, err := s.repo.ListEntries(ctx, s.pool, sortBy, ascending, responder.Offset(page, limit), limit)
+func (s *Service) List(ctx context.Context, sortBy string, ascending bool, page, limit int) ([]EntrySchema, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+	entries, total, err := s.repo.ListEntries(ctx, s.pool, sortBy, ascending, webutil.Offset(page, limit), limit)
 	if err != nil {
-		return nil, responder.Pagination{}, err
+		return nil, webutil.Pagination{}, err
 	}
-	return entries, responder.NewPagination(responder.PaginationParams{Page: page, Limit: limit}, total), nil
+	return entries, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // Add stores one entry. The pattern is validated against the grammar and

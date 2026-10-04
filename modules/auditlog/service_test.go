@@ -14,9 +14,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/auditlog"
 	"github.com/riipandi/saka/modules/identity/user"
-	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // The fixture accounts. Their names come from the test-copywriting convention;
