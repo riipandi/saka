@@ -6,6 +6,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // TotpPrefix is the TypeID prefix of an enrolled authenticator's identifier.
@@ -22,7 +24,7 @@ type TotpID = typeid.TypeID[TotpPrefix]
 // IDFromUUID wraps the row's UUID into the wire form. It is the one direction
 // every response takes.
 func IDFromUUID(raw uuid.UUID) (TotpID, error) {
-	return typeid.FromUUID[TotpID](raw.String())
+	return strutils.EncodeID[TotpID](raw)
 }
 
 // AlgorithmSHA1 and friends name the algorithms the table's check constraint

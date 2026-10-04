@@ -8,6 +8,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // UserSchema is one row of entity.TableUsers. It lists only the columns the application
@@ -123,7 +125,7 @@ type UserID = typeid.TypeID[UserIDPrefix]
 // FromUUID wraps the row's UUID into the wire form. It is the one direction
 // every response and every signed token takes.
 func IDFromUUID(raw uuid.UUID) (UserID, error) {
-	return typeid.FromUUID[UserID](raw.String())
+	return strutils.EncodeID[UserID](raw)
 }
 
 // FromUUIDString wraps a UUID in its text form into the wire form. Rows scan
@@ -140,18 +142,14 @@ func IDFromUUIDString(raw string) (UserID, error) {
 // always carry a valid UUID, so the render cannot fail; an invalid one
 // answers the empty string, which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[UserID](raw)
 }
 
 // ParseID reads the wire form back. It is the boundary a request crosses: an
 // identifier that arrives without the prefix names nothing this server
 // speaks about, and the caller refuses it as the not-found it is.
 func ParseID(wire string) (UserID, error) {
-	parsed, err := typeid.Parse[UserID](wire)
+	parsed, err := strutils.ParseID[UserID](wire)
 	if err != nil {
 		return UserID{}, fmt.Errorf("user: %w", err)
 	}
@@ -161,16 +159,12 @@ func ParseID(wire string) (UserID, error) {
 // IDToUUID unwraps the wire form into the UUID the column stores. The typed id
 // carries the bytes itself, so nothing re-parses text to get there.
 func IDToUUID(id UserID) uuid.UUID {
-	return uuid.UUID(id.UUIDBytes())
+	return strutils.ToUUID(id)
 }
 
 // UUIDFromWire is the request boundary in one step: the wire form a request
 // carries in, the key the rows carry out. A malformed identifier names
 // nothing, and the caller refuses it as the not-found it is.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return IDToUUID(id), nil
+	return strutils.UUIDFromWire[UserID](wire)
 }

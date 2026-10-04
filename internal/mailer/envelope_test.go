@@ -25,7 +25,7 @@ func testConfig() config.Config {
 	cfg.Mailer.SMTPHost = "smtp.example.com"
 	cfg.Mailer.SMTPPort = 587
 	cfg.Mailer.FromEmail = "owl-post@example.com"
-	cfg.Mailer.FromName = "Saka"
+	cfg.Mailer.FromName = "Saka Mailer Test"
 	return cfg
 }
 

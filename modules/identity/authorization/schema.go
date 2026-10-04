@@ -9,6 +9,7 @@ import (
 	"go.jetify.com/typeid"
 
 	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ResourceRole is the resource type an audit record names when the change is
@@ -41,25 +42,21 @@ type PermID = typeid.TypeID[PermissionIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (RoleID, error) {
-	return typeid.FromUUID[RoleID](raw.String())
+	return strutils.EncodeID[RoleID](raw)
 }
 
 // FormatID renders the wire form of a row's UUID. Rows read from the
 // database always carry a valid UUID, so the render cannot fail; an invalid
 // one answers the empty string, which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[RoleID](raw)
 }
 
 // ParseID reads the wire form back. It is the boundary a request crosses: an
 // identifier that arrives without the prefix names no role, the not-found
 // the caller refuses.
 func ParseID(wire string) (RoleID, error) {
-	parsed, err := typeid.Parse[RoleID](wire)
+	parsed, err := strutils.ParseID[RoleID](wire)
 	if err != nil {
 		return RoleID{}, fmt.Errorf("authorization: %w", err)
 	}
@@ -69,11 +66,7 @@ func ParseID(wire string) (RoleID, error) {
 // UUIDFromWire reads the row's UUID out of the wire form. A malformed
 // identifier is the caller's not-found, never a 500.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("authorization: %w", err)
-	}
-	parsed, err := uuid.Parse(id.UUID())
+	parsed, err := strutils.UUIDFromWire[RoleID](wire)
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("authorization: %w", err)
 	}

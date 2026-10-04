@@ -19,6 +19,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // The tables the feature's rows live in. The migrations own the schema;
@@ -88,7 +90,7 @@ type LinkedAccountID = typeid.TypeID[LinkedAccountIDPrefix]
 // IDFromUUID wraps the connection row's UUID into the wire form. It is
 // the one direction every response takes.
 func IDFromUUID(raw uuid.UUID) (ConnectionID, error) {
-	return typeid.FromUUID[ConnectionID](raw.String())
+	return strutils.EncodeID[ConnectionID](raw)
 }
 
 // FormatID renders the wire form of a connection row's UUID. Rows read
@@ -96,18 +98,14 @@ func IDFromUUID(raw uuid.UUID) (ConnectionID, error) {
 // an invalid one answers the empty string, which no consumer should
 // mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[ConnectionID](raw)
 }
 
 // ParseID reads the connection's wire form back. It is the boundary a
 // request crosses: an identifier that arrives without the prefix names no
 // connection, the not-found the caller refuses.
 func ParseID(wire string) (ConnectionID, error) {
-	parsed, err := typeid.Parse[ConnectionID](wire)
+	parsed, err := strutils.ParseID[ConnectionID](wire)
 	if err != nil {
 		return ConnectionID{}, fmt.Errorf("oauthsso: %w", err)
 	}
@@ -118,42 +116,34 @@ func ParseID(wire string) (ConnectionID, error) {
 // typed id carries the bytes itself, so nothing re-parses text to get
 // there.
 func IDToUUID(id ConnectionID) uuid.UUID {
-	return uuid.UUID(id.UUIDBytes())
+	return strutils.ToUUID(id)
 }
 
 // UUIDFromWire is the request boundary in one step: the wire form a
 // request carries in, the key the rows carry out.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return IDToUUID(id), nil
+	return strutils.UUIDFromWire[ConnectionID](wire)
 }
 
 // LinkedAccountIDFromUUID wraps a linked account row's UUID into the wire
 // form.
 func LinkedAccountIDFromUUID(raw uuid.UUID) (LinkedAccountID, error) {
-	return typeid.FromUUID[LinkedAccountID](raw.String())
+	return strutils.EncodeID[LinkedAccountID](raw)
 }
 
 // FormatLinkedAccountID renders the wire form of a linked account row's
 // UUID.
 func FormatLinkedAccountID(raw uuid.UUID) string {
-	id, err := LinkedAccountIDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[LinkedAccountID](raw)
 }
 
 // ParseLinkedAccountID reads the linked account's wire form back.
 func ParseLinkedAccountID(wire string) (uuid.UUID, error) {
-	parsed, err := typeid.Parse[LinkedAccountID](wire)
+	parsed, err := strutils.UUIDFromWire[LinkedAccountID](wire)
 	if err != nil {
 		return uuid.Nil(), fmt.Errorf("oauthsso: %w", err)
 	}
-	return uuid.UUID(parsed.UUIDBytes()), nil
+	return parsed, nil
 }
 
 // Endpoints are the provider endpoints one connection talks to: the

@@ -7,6 +7,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ResourceGroup is the resource type an audit record names when the change is
@@ -29,25 +31,21 @@ type GroupID = typeid.TypeID[GroupIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (GroupID, error) {
-	return typeid.FromUUID[GroupID](raw.String())
+	return strutils.EncodeID[GroupID](raw)
 }
 
 // FormatID renders the wire form of a row's UUID. Rows read from the
 // database always carry a valid UUID, so the render cannot fail; an invalid
 // one answers the empty string, which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[GroupID](raw)
 }
 
 // ParseID reads the wire form back. It is the boundary a request crosses: an
 // identifier that arrives without the prefix names no group, the not-found
 // the caller refuses.
 func ParseID(wire string) (GroupID, error) {
-	parsed, err := typeid.Parse[GroupID](wire)
+	parsed, err := strutils.ParseID[GroupID](wire)
 	if err != nil {
 		return GroupID{}, fmt.Errorf("usergroup: %w", err)
 	}
@@ -57,17 +55,13 @@ func ParseID(wire string) (GroupID, error) {
 // IDToUUID unwraps the wire form into the UUID the column stores. The typed
 // id carries the bytes itself, so nothing re-parses text to get there.
 func IDToUUID(id GroupID) uuid.UUID {
-	return uuid.UUID(id.UUIDBytes())
+	return strutils.ToUUID(id)
 }
 
 // UUIDFromWire is the request boundary in one step: the wire form a request
 // carries in, the key the rows carry out.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return IDToUUID(id), nil
+	return strutils.UUIDFromWire[GroupID](wire)
 }
 
 // GroupSchema is one row of entity.TableUserGroups. The updated column is nullable by

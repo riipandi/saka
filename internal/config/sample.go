@@ -268,6 +268,12 @@ func Sample() ([]byte, error) {
 // the secrets in secretKeys plus every entry in envKeys — with the built-in
 // default as the value and the placeholders above for the empty secrets. The
 // output is sorted by variable name, so two runs produce the same bytes.
+//
+// Several keys may name one variable — app.base_url and auth.issuer both name
+// PUBLIC_BASE_URL — and the example carries the variable once. The line is
+// picked deterministically: keys are walked in sorted order, so the first
+// key that names the variable wins, and app.base_url outranks auth.issuer
+// because it carries the example value a fresh checkout resolves from.
 func EnvExample() ([]byte, error) {
 	names := make(map[string]string, len(secretKeys)+len(envKeys))
 	for _, key := range secretKeys {
@@ -277,7 +283,13 @@ func EnvExample() ([]byte, error) {
 
 	flat := DefaultsMap()
 	lines := make([]string, 0, len(names))
-	for key, name := range names {
+	written := make(map[string]bool, len(names))
+	for _, key := range slices.Sorted(maps.Keys(names)) {
+		name := names[key]
+		if written[name] {
+			continue
+		}
+		written[name] = true
 		value, ok := envExampleValues[key]
 		if !ok {
 			defaultValue, ok := flat[key]

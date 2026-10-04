@@ -6,6 +6,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ResourceBucket is the resource type an audit record names when the change
@@ -27,29 +29,21 @@ type BucketID = typeid.TypeID[BucketIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (BucketID, error) {
-	return typeid.FromUUID[BucketID](raw.String())
+	return strutils.EncodeID[BucketID](raw)
 }
 
 // FormatID renders the wire form of a row's UUID. Rows read from the
 // database always carry a valid UUID, so the render cannot fail; an invalid
 // one answers the empty string, which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[BucketID](raw)
 }
 
 // UUIDFromWire reads the row's UUID out of the wire form. A malformed
 // identifier names no bucket — the caller refuses it as the not-found it
 // is.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	parsed, err := typeid.Parse[BucketID](wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return uuid.UUID(parsed.UUIDBytes()), nil
+	return strutils.UUIDFromWire[BucketID](wire)
 }
 
 // BucketSchema is one row of entity.TableStorageBuckets. The nullable limit columns are

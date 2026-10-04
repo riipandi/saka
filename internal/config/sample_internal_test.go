@@ -505,6 +505,8 @@ func TestEnvExampleCoversEveryDirectiveVariable(t *testing.T) {
 		require.True(t, ok, "every line is NAME=value: %q", line)
 		values[name] = value
 	}
+	require.Len(t, lines, len(values))
+	assert.Equal(t, "http://localhost:3080", values["PUBLIC_BASE_URL"])
 
 	expected := make(map[string]string, len(secretKeys)+len(envKeys))
 	for _, key := range secretKeys {

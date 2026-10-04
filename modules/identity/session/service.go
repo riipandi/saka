@@ -17,8 +17,7 @@ import (
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/riipandi/saka/pkg/responder"
-
-	"go.jetify.com/typeid"
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // The failures the service defines. The handler maps them onto the codes the
@@ -690,9 +689,5 @@ func callerUUID(wire string) (uuid.UUID, error) {
 }
 
 func parseSessionID(raw string) (SessionID, error) {
-	parsed, err := typeid.Parse[SessionID](raw)
-	if err != nil {
-		return SessionID{}, err
-	}
-	return parsed, nil
+	return strutils.ParseID[SessionID](raw)
 }

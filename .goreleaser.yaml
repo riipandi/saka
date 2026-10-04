@@ -52,7 +52,7 @@ archives:
         formats: [zip]
     files:
       - README.md
-      - CHANGELOG.md
+      - docs/changelog.md
 
 checksum:
   name_template: "checksums.txt"

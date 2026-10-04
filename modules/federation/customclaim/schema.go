@@ -7,6 +7,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ResourceCustomClaim is the resource type an audit record names when the
@@ -27,25 +29,21 @@ type ClaimID = typeid.TypeID[ClaimIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (ClaimID, error) {
-	return typeid.FromUUID[ClaimID](raw.String())
+	return strutils.EncodeID[ClaimID](raw)
 }
 
 // FormatID renders the wire form. The rows the database always carry a valid
 // UUID, so the render cannot fail; an invalid one answers the empty string,
 // which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[ClaimID](raw)
 }
 
 // ParseID reads the wire form back. It is the boundary a request crosses: an
 // identifier that arrives without the prefix names no claim, the not-found
 // the caller refuses.
 func ParseID(wire string) (ClaimID, error) {
-	parsed, err := typeid.Parse[ClaimID](wire)
+	parsed, err := strutils.ParseID[ClaimID](wire)
 	if err != nil {
 		return ClaimID{}, fmt.Errorf("customclaim: %w", err)
 	}
@@ -55,17 +53,13 @@ func ParseID(wire string) (ClaimID, error) {
 // IDToUUID unwraps the wire form into the UUID the column stores. The typed
 // id carries the bytes itself, so nothing re-parses text to get there.
 func IDToUUID(id ClaimID) uuid.UUID {
-	return uuid.UUID(id.UUIDBytes())
+	return strutils.ToUUID(id)
 }
 
 // UUIDFromWire is the request boundary in one step: the wire form a request
 // carries in, the key the rows carry out.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return IDToUUID(id), nil
+	return strutils.UUIDFromWire[ClaimID](wire)
 }
 
 // SuggestedKey is one key in the autocomplete list.

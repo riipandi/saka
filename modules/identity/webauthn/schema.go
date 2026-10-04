@@ -6,6 +6,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ChallengeTypeRegistration and ChallengeTypeAuthentication name the two
@@ -49,12 +51,12 @@ type SessionID = typeid.TypeID[SessionPrefix]
 // IDFromUUID wraps a row's UUID into the credential's wire form. It is the
 // one direction every response takes.
 func IDFromUUID(raw uuid.UUID) (CredentialID, error) {
-	return typeid.FromUUID[CredentialID](raw.String())
+	return strutils.EncodeID[CredentialID](raw)
 }
 
 // SessionIDFromUUID wraps a row's UUID into the ceremony handle's wire form.
 func SessionIDFromUUID(raw uuid.UUID) (SessionID, error) {
-	return typeid.FromUUID[SessionID](raw.String())
+	return strutils.EncodeID[SessionID](raw)
 }
 
 // CredentialSchema is one enrolled passkey. It lists only the columns the

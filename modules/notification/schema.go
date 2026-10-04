@@ -20,6 +20,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // ResourceNotification is the resource type an audit record names when the
@@ -42,25 +44,21 @@ type NotificationID = typeid.TypeID[NotificationIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.
 func IDFromUUID(raw uuid.UUID) (NotificationID, error) {
-	return typeid.FromUUID[NotificationID](raw.String())
+	return strutils.EncodeID[NotificationID](raw)
 }
 
 // FormatID renders the wire form of a row's UUID. Rows read from the
 // database always carry a valid UUID, so the render cannot fail; an invalid
 // one answers the empty string, which no consumer should mistake for an id.
 func FormatID(raw uuid.UUID) string {
-	id, err := IDFromUUID(raw)
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[NotificationID](raw)
 }
 
 // ParseID reads the wire form back. It is the boundary a request crosses:
 // an identifier that arrives without the prefix names no notification, the
 // not-found the caller refuses.
 func ParseID(wire string) (NotificationID, error) {
-	parsed, err := typeid.Parse[NotificationID](wire)
+	parsed, err := strutils.ParseID[NotificationID](wire)
 	if err != nil {
 		return NotificationID{}, fmt.Errorf("notification: %w", err)
 	}
@@ -70,11 +68,7 @@ func ParseID(wire string) (NotificationID, error) {
 // UUIDFromWire is the request boundary in one step: the wire form a request
 // carries in, the key the rows carry out.
 func UUIDFromWire(wire string) (uuid.UUID, error) {
-	id, err := ParseID(wire)
-	if err != nil {
-		return uuid.Nil(), err
-	}
-	return uuid.UUID(id.UUIDBytes()), nil
+	return strutils.UUIDFromWire[NotificationID](wire)
 }
 
 // The category and audience values the contract validates on the wire.
