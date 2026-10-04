@@ -98,21 +98,26 @@ func (p *Provider) Resolve(ctx context.Context, conn oauthsso.Connection, flow o
 		claims = claims.merged(userinfo)
 	}
 
-	// The bindability judge is the mapped email, not the standard claim
-	// alone: a connection that maps `mail` into the account's address
-	// names no `email` claim at all, and the mapping is what speaks.
-	email := claims.mappedEmail(conn.AttributeMapping)
-	if claims.Subject == "" || email == "" {
+	// The bindability judge is the mapped identity, not the standard
+	// claims alone: a connection that maps `uuid` into the account's
+	// identity and `mail` into its address names neither standard claim
+	// at all, and the mapping is what speaks.
+	mapping := conn.AttributeMapping
+	subject := claims.mappedSubject(mapping)
+	email := claims.mappedEmail(mapping)
+	if subject == "" || email == "" {
 		return oauthsso.ExternalIdentity{}, fmt.Errorf("%w: the provider named no bindable identity", oauthsso.ErrIdentityInvalid)
 	}
 
 	profile, _ := json.Marshal(claims.raw)
 	return oauthsso.ExternalIdentity{
-		ProviderAccountID: claims.Subject,
+		ProviderAccountID: subject,
 		Email:             email,
-		EmailVerified:     claims.EmailVerified.value(),
-		GivenName:         claims.mappedGiven(conn.AttributeMapping),
-		FamilyName:        claims.mappedFamily(conn.AttributeMapping),
+		EmailVerified:     claims.mappedEmailVerified(mapping),
+		GivenName:         claims.mappedGiven(mapping),
+		FamilyName:        claims.mappedFamily(mapping),
+		Username:          claims.mappedUsername(mapping),
+		AvatarURL:         claims.mappedAvatarURL(mapping),
 		Profile:           profile,
 		AccessToken:       token.AccessToken,
 		RefreshToken:      token.RefreshToken,
@@ -231,34 +236,91 @@ func (c claimSet) merged(other claimSet) claimSet {
 	return c
 }
 
+// The mapped readers share one rule: a silent mapping keeps the
+// standard claim — the named field is its fallback — while an explicit
+// mapping names THE claim, and a provider that does not answer it
+// leaves the field empty. The mapping, not the standard claim, speaks
+// once it is named.
+
 // mappedEmail reads the claim the mapping names — `email` when the
 // mapping is silent — from the raw document.
 func (c claimSet) mappedEmail(mapping oauthsso.AttributeMapping) string {
-	name := mapping.Email
-	if name == "" {
-		name = "email"
+	if mapping.Email != "" {
+		return c.string(mapping.Email, "")
 	}
-	return c.string(name, c.Email)
+	return c.string("email", c.Email)
 }
 
 // mappedGiven reads the claim the mapping names — `given_name` when the
 // mapping is silent — from the raw document.
 func (c claimSet) mappedGiven(mapping oauthsso.AttributeMapping) string {
-	name := mapping.GivenName
-	if name == "" {
-		name = "given_name"
+	if mapping.GivenName != "" {
+		return c.string(mapping.GivenName, "")
 	}
-	return c.string(name, c.GivenName)
+	return c.string("given_name", c.GivenName)
 }
 
 // mappedFamily reads the claim the mapping names — `family_name` when
 // the mapping is silent — from the raw document.
 func (c claimSet) mappedFamily(mapping oauthsso.AttributeMapping) string {
-	name := mapping.FamilyName
-	if name == "" {
-		name = "family_name"
+	if mapping.FamilyName != "" {
+		return c.string(mapping.FamilyName, "")
 	}
-	return c.string(name, c.FamilyName)
+	return c.string("family_name", c.FamilyName)
+}
+
+// mappedSubject reads the claim the mapping names — `sub` when the
+// mapping is silent — from the raw document.
+func (c claimSet) mappedSubject(mapping oauthsso.AttributeMapping) string {
+	if mapping.Subject != "" {
+		return c.string(mapping.Subject, "")
+	}
+	return c.string("sub", c.Subject)
+}
+
+// mappedEmailVerified reads the proven flag the mapping names —
+// `email_verified` when the mapping is silent — from the raw document,
+// accepting the shapes flexibleBool accepts. A provider that answers no
+// verified claim at all is held to the mapping's default.
+func (c claimSet) mappedEmailVerified(mapping oauthsso.AttributeMapping) bool {
+	name := mapping.EmailVerified
+	if name == "" {
+		name = "email_verified"
+	}
+	if c.raw != nil {
+		if raw, present := c.raw[name]; present {
+			encoded, err := json.Marshal(raw)
+			if err == nil {
+				var flag flexibleBool
+				if json.Unmarshal(encoded, &flag) == nil {
+					return flag.value()
+				}
+			}
+		}
+	}
+	return mapping.EmailVerifiedDefault
+}
+
+// mappedUsername reads the claim the mapping names —
+// `preferred_username` when the mapping is silent — from the raw
+// document. An unanswered claim names no username.
+func (c claimSet) mappedUsername(mapping oauthsso.AttributeMapping) string {
+	name := mapping.Username
+	if name == "" {
+		name = "preferred_username"
+	}
+	return c.string(name, "")
+}
+
+// mappedAvatarURL reads the claim the mapping names — `picture` when the
+// mapping is silent — from the raw document. An unanswered claim names
+// no picture.
+func (c claimSet) mappedAvatarURL(mapping oauthsso.AttributeMapping) string {
+	name := mapping.AvatarURL
+	if name == "" {
+		name = "picture"
+	}
+	return c.string(name, "")
 }
 
 // string reads one claim from the raw document, answering the fallback

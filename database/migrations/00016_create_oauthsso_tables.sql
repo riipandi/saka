@@ -104,6 +104,11 @@ CREATE TABLE IF NOT EXISTS public.oauth_flows (
     email_verified BOOLEAN NOT NULL DEFAULT FALSE CHECK (email_verified IN (TRUE, FALSE)),
     given_name TEXT NOT NULL DEFAULT '',
     family_name TEXT NOT NULL DEFAULT '',
+    -- The mapped username and the avatar address the resolution carries
+    -- on to the account: the username is read at the first sign-in only,
+    -- the picture refreshed on every one.
+    username TEXT NOT NULL DEFAULT '',
+    avatar_url TEXT NOT NULL DEFAULT '',
     profile JSONB NOT NULL DEFAULT '{}',
     access_token TEXT NOT NULL DEFAULT '' CHECK (access_token = '' OR access_token LIKE 'enc:%'),
     refresh_token TEXT NOT NULL DEFAULT '' CHECK (refresh_token = '' OR refresh_token LIKE 'enc:%'),

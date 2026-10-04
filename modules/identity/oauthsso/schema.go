@@ -269,6 +269,8 @@ type Flow struct {
 	EmailVerified     bool
 	GivenName         string
 	FamilyName        string
+	Username          string
+	AvatarURL         string
 	Profile           []byte
 	AccessToken       string
 	RefreshToken      string
@@ -288,6 +290,8 @@ type FlowResolution struct {
 	EmailVerified      bool
 	GivenName          string
 	FamilyName         string
+	Username           string
+	AvatarURL          string
 	Profile            []byte
 	SealedAccessToken  string
 	SealedRefreshToken string

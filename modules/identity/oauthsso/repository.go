@@ -182,8 +182,8 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 
 const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code_verifier,
 	stage, user_id, email, email_code_hash, wrong_codes, provider_account_id,
-	email_verified, given_name, family_name, profile, access_token, refresh_token,
-	redirect_to, created_at, expires_at`
+	email_verified, given_name, family_name, username, avatar_url, profile,
+	access_token, refresh_token, redirect_to, created_at, expires_at`
 
 const linkedAccountColumns = `id, user_id, connection_id, provider_account_id, email,
 	email_verified, profile, access_token, refresh_token, created_at, updated_at`
@@ -249,6 +249,8 @@ func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, i
 		sb.Assign("email_verified", resolution.EmailVerified),
 		sb.Assign("given_name", resolution.GivenName),
 		sb.Assign("family_name", resolution.FamilyName),
+		sb.Assign("username", resolution.Username),
+		sb.Assign("avatar_url", resolution.AvatarURL),
 		sb.Assign("profile", profileJSONFromBytes(resolution.Profile)),
 		sb.Assign("access_token", resolution.SealedAccessToken),
 		sb.Assign("refresh_token", resolution.SealedRefreshToken),
@@ -623,7 +625,8 @@ func scanFlow(row pgx.Row) (Flow, error) {
 	err := row.Scan(&flow.ID, &flow.ConnectionID, &flow.StateHash, &flow.FlowTokenHash,
 		&flow.Nonce, &flow.CodeVerifier, &flow.Stage, &flow.UserID, &flow.Email,
 		&flow.EmailCodeHash, &flow.WrongCodes, &flow.ProviderAccountID,
-		&flow.EmailVerified, &flow.GivenName, &flow.FamilyName, &flow.Profile,
+		&flow.EmailVerified, &flow.GivenName, &flow.FamilyName, &flow.Username,
+		&flow.AvatarURL, &flow.Profile,
 		&flow.AccessToken, &flow.RefreshToken, &flow.RedirectTo, &flow.CreatedAt,
 		&flow.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
