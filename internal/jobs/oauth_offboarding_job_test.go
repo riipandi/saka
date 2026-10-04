@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,14 +14,25 @@ import (
 )
 
 // recordingOffboarder is the oauthsso pass the job tests drive: it records
-// the batch the processor handed it.
+// the batch the processor handed it. The record rides a mutex — the
+// processor calls from the queue's worker goroutine, the test's polling
+// reads from its own.
 type recordingOffboarder struct {
+	mu      sync.Mutex
 	batches []int
 }
 
 func (o *recordingOffboarder) OffboardPass(_ context.Context, batch int) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	o.batches = append(o.batches, batch)
 	return nil
+}
+
+func (o *recordingOffboarder) seen() []int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]int(nil), o.batches...)
 }
 
 // TestTheOffboardingPassRunsHourlyAndBounded dispatches one pass the way a
@@ -50,9 +62,9 @@ func TestTheOffboardingPassRunsHourlyAndBounded(t *testing.T) {
 	})
 
 	require.Eventually(t, func() bool {
-		return len(offboarder.batches) == 1
+		return len(offboarder.seen()) == 1
 	}, 20*time.Second, 25*time.Millisecond, "the dispatched pass must reach the feature")
-	assert.Equal(t, []int{DefaultOffboardingBatch}, offboarder.batches)
+	assert.Equal(t, []int{DefaultOffboardingBatch}, offboarder.seen())
 
 	// The successor is the schedule: exactly one task pending, waiting
 	// out the hourly interval the pass carries.
