@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/fetcher"
 )
 
 // The client-id metadata document (CIMD): a client whose identifier is the

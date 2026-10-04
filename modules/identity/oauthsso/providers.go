@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/framework/fetcher"
 )
 
 // The failures the provider adapters report. The handler maps them onto

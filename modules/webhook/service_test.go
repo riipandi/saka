@@ -20,9 +20,9 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -71,7 +71,7 @@ func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Serv
 
 	var fetch *fetcher.Client
 	if receiver != nil {
-		fetchClient, err := fetcher.New(config.Default(), slog.New(slog.DiscardHandler))
+		fetchClient, err := fetcher.New(config.Default().FetcherOptions(), slog.New(slog.DiscardHandler))
 		require.NoError(t, err)
 		fetch = fetchClient
 	}

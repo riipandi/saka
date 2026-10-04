@@ -10,9 +10,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/logger"
+	"github.com/riipandi/saka/framework/observer"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/logger"
-	"github.com/riipandi/saka/internal/observer"
 )
 
 // # The process logger
@@ -44,7 +44,7 @@ func loggerFrom(ctx context.Context) (*logger.Logger, error) {
 	}
 
 	state.once.Do(func() {
-		state.log, state.err = logger.New(state.cfg)
+		state.log, state.err = logger.New(state.cfg.LoggerOptions())
 		if state.err == nil {
 			state.log.SetDefault()
 		}
@@ -83,7 +83,7 @@ func observerFrom(ctx context.Context) (*observer.Observer, error) {
 	}
 
 	state.once.Do(func() {
-		state.observer, state.err = observer.New(context.WithoutCancel(ctx), state.cfg)
+		state.observer, state.err = observer.New(context.WithoutCancel(ctx), state.cfg.ObserverOptions())
 		if state.err == nil {
 			state.observer.SetGlobals()
 		}

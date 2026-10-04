@@ -104,7 +104,7 @@ shared with the scheduler's state table) — run `task db:migrate`; the client n
 tables itself.
 
 The engine logs through `log/slog` — the same `*slog.Logger` the process built in
-`internal/logger`, handed over by `serve` — so queue lines reach every configured sink
+`framework/logger`, handed over by `serve` — so queue lines reach every configured sink
 (console, file, OTLP) and carry the trace context of the run that logged them. Feature code
 never builds a logger for the queue.
 

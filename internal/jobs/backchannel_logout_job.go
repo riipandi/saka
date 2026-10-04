@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/queue"
 )
 

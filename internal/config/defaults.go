@@ -16,6 +16,11 @@ const LogDir = "logs"
 // files take a timestamp suffix from it.
 const LogFileName = "saka.log"
 
+// CacheKeyPrefix namespaces this deployment's cache keys inside a shared
+// key-value backend. Features sharing one server are isolated by prefix, not
+// by logical database index, which Valkey cluster does not support.
+const CacheKeyPrefix = "saka:cache:"
+
 // DefaultS3Region is the signing region a deployment that never sets one gets.
 //
 // A region cannot be empty: the S3 client refuses to resolve an endpoint without

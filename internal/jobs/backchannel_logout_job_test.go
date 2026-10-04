@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/queue"
 )
 
@@ -29,7 +29,7 @@ func TestBackchannelLogoutDeliversTheFormEncodedToken(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client, err := fetcher.New(config.Default(), nil)
+	client, err := fetcher.New(config.Default().FetcherOptions(), nil)
 	require.NoError(t, err)
 
 	task := BackchannelLogoutTask{ClientID: "client-one", URL: server.URL, Token: "signed.logout.token"}
@@ -45,7 +45,7 @@ func TestBackchannelLogoutRefusesANonSuccessAnswer(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client, err := fetcher.New(config.Default(), nil)
+	client, err := fetcher.New(config.Default().FetcherOptions(), nil)
 	require.NoError(t, err)
 
 	task := BackchannelLogoutTask{ClientID: "client-one", URL: server.URL, Token: "signed"}

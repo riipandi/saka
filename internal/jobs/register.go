@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"

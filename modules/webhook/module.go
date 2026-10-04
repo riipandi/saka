@@ -21,10 +21,10 @@ import (
 	"github.com/samber/do/v2"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 )

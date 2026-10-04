@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -165,10 +165,10 @@ func serveCorpus(t *testing.T, answer func(prefix string) (int, string)) *corpus
 	captured.server = httptest.NewServer(http.HandlerFunc(handler))
 	t.Cleanup(captured.server.Close)
 
-	cfg := config.Default()
-	cfg.Fetcher.RetryCount = 0
-	cfg.Fetcher.Timeout = 2 * time.Second
-	client, err := fetcher.New(cfg, nil)
+	opts := config.Default().FetcherOptions()
+	opts.RetryCount = 0
+	opts.Timeout = 2 * time.Second
+	client, err := fetcher.New(opts, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Shutdown(context.Background()) })
 

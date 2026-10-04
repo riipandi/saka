@@ -9,8 +9,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/logger"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/logger"
 	"github.com/riipandi/saka/pkg/printext"
 )
 
@@ -59,7 +59,7 @@ func runLoggerSmoke(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	log, err := logger.New(cfg, logger.WithWriter(cmd.Root().Writer))
+	log, err := logger.New(cfg.LoggerOptions(), logger.WithWriter(cmd.Root().Writer))
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func printSmokePlan(p printext.Palette, cfg config.Config) error {
 		case config.LogTransportConsole:
 			targets = append(targets, field{"console", "this terminal"})
 		case config.LogTransportFile:
-			targets = append(targets, field{"file", logger.LogFilePath(cfg)})
+			targets = append(targets, field{"file", cfg.LogFilePath()})
 		case config.LogTransportOTLP:
 			targets = append(targets, field{"otlp", cfg.OTEL.Endpoint})
 		}

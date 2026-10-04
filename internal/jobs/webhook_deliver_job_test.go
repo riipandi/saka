@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/webhook"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -49,7 +49,7 @@ func TestWebhookPruneDeletesAgedOutAttemptsAndReschedules(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(receiver.Close)
-	fetchClient, err := fetcher.New(config.Default(), log)
+	fetchClient, err := fetcher.New(config.Default().FetcherOptions(), log)
 	require.NoError(t, err)
 	// The receiver answers 500 and lives on loopback, so the private network
 	// is on: the retention test reaches it the way a delivery would.

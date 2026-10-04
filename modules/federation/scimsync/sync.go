@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riipandi/saka/internal/fetcher"
+	"github.com/riipandi/saka/framework/fetcher"
 )
 
 // remoteUser is one account's SCIM 2.0 document, the fields the sync

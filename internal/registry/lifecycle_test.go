@@ -111,7 +111,7 @@ func TestPrewarmResolvesEveryBlockingService(t *testing.T) {
 	// is on, and its construction cannot fail on a dependency.
 	cold := map[string]string{
 		"*github.com/riipandi/saka/framework/datastore.Valkey": "opt-in backend, disabled in this run",
-		"github.com/riipandi/saka/internal/cache.Cache":        "module-facing, cold until a feature resolves it",
+		"github.com/riipandi/saka/framework/cache.Cache":       "module-facing, cold until a feature resolves it",
 		"*github.com/riipandi/saka/internal/storage.Watcher":   "runner-owned, not on the prewarm walk",
 	}
 

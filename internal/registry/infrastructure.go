@@ -10,12 +10,12 @@ import (
 
 	"github.com/samber/do/v2"
 
+	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/cache"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
@@ -147,7 +147,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 		do.Lazy(func(i do.Injector) (*fetcher.Client, error) {
 			c := do.MustInvoke[*config.Config](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			return fetcher.New(*c, log)
+			return fetcher.New(c.FetcherOptions(), log)
 		}),
 
 		do.Lazy(func(i do.Injector) (*datastore.Postgres, error) {
@@ -187,7 +187,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			if c.KVStore.Enable {
 				kv = do.MustInvoke[*datastore.Valkey](i)
 			}
-			return cache.New(*c, kv), nil
+			return cache.New(c.CacheOptions(), kv), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*health.Checker, error) {

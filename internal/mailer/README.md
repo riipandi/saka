@@ -85,7 +85,7 @@ send reuses it. Measured on an M2 Pro (`internal/mailer/bench_test.go`):
 
 A submission costs 60–100 ms against a real server, so rendering is ~0.005% of it. There is no
 second cache layer, and one would not pay: memoizing by template data would retain reset tokens in
-memory past their use, and caching templates in `internal/cache` would add a network round trip for
+memory past their use, and caching templates in `framework/cache` would add a network round trip for
 content that is already in the binary.
 
 ## Defaults
