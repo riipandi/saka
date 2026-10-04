@@ -24,7 +24,8 @@ type ClaimIDPrefix struct{}
 func (ClaimIDPrefix) Prefix() string { return "cclm" }
 
 // ClaimID is the typed identifier of one row of entity.TableCustomClaims, in its wire
-// form. The column stays a UUID; the conversion lives here and nowhere else.
+// form. The column stays a UUID; the conversion is strutils', bound to this
+// prefix by the type.
 type ClaimID = typeid.TypeID[ClaimIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.

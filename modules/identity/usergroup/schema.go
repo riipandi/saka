@@ -26,7 +26,8 @@ type GroupIDPrefix struct{}
 func (GroupIDPrefix) Prefix() string { return "ugrp" }
 
 // GroupID is the typed identifier of one row of entity.TableUserGroups, in its wire
-// form. The column stays a UUID; the conversion lives here and nowhere else.
+// form. The column stays a UUID; the conversion is strutils', bound to this
+// prefix by the type.
 type GroupID = typeid.TypeID[GroupIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.

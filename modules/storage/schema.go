@@ -23,8 +23,8 @@ type BucketIDPrefix struct{}
 func (BucketIDPrefix) Prefix() string { return "bkt" }
 
 // BucketID is the typed identifier of one row of entity.TableStorageBuckets, in its wire
-// form. The column stays a UUID; the conversion lives here and nowhere
-// else.
+// form. The column stays a UUID; the conversion is strutils', bound to this
+// prefix by the type.
 type BucketID = typeid.TypeID[BucketIDPrefix]
 
 // IDFromUUID wraps the row's UUID into the wire form.

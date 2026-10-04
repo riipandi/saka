@@ -8,6 +8,8 @@ import (
 	"uuid"
 
 	"go.jetify.com/typeid"
+
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // The tables the webhook feature owns. The migrations own the schema; these
@@ -70,7 +72,8 @@ type EndpointIDPrefix struct{}
 func (EndpointIDPrefix) Prefix() string { return "whk" }
 
 // EndpointID is the typed identifier of one row of entity.TableWebhookEndpoints, in its wire
-// form. The column stays a UUID; the conversion lives here and nowhere else.
+// form. The column stays a UUID; the conversion is strutils', bound to this
+// prefix by the type.
 type EndpointID = typeid.TypeID[EndpointIDPrefix]
 
 // DeliveryIDPrefix is the TypeID prefix of a delivery row's identifier.
@@ -97,40 +100,28 @@ type AttemptID = typeid.TypeID[AttemptIDPrefix]
 // holds always carry a valid UUID, so the render cannot fail; an invalid one
 // answers the empty string, which no consumer should mistake for an id.
 func FormatEndpointID(raw uuid.UUID) string {
-	id, err := typeid.FromUUID[EndpointID](raw.String())
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[EndpointID](raw)
 }
 
 // ParseEndpointID reads the endpoint's wire form back. It is the boundary a
 // request crosses: an identifier that arrives without the prefix names no
 // endpoint, the not-found the caller refuses.
 func ParseEndpointID(wire string) (uuid.UUID, error) {
-	parsed, err := typeid.Parse[EndpointID](wire)
+	parsed, err := strutils.UUIDFromWire[EndpointID](wire)
 	if err != nil {
 		return uuid.Nil(), fmt.Errorf("webhook: %w", err)
 	}
-	return uuid.UUID(parsed.UUIDBytes()), nil
+	return parsed, nil
 }
 
 // FormatDeliveryID renders the delivery's wire form.
 func FormatDeliveryID(raw uuid.UUID) string {
-	id, err := typeid.FromUUID[DeliveryID](raw.String())
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[DeliveryID](raw)
 }
 
 // FormatAttemptID renders the attempt's wire form.
 func FormatAttemptID(raw uuid.UUID) string {
-	id, err := typeid.FromUUID[AttemptID](raw.String())
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return strutils.FormatID[AttemptID](raw)
 }
 
 // EndpointSchema is one row of entity.TableWebhookEndpoints. The secret lives sealed: its

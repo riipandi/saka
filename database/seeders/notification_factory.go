@@ -15,6 +15,7 @@ import (
 	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/modules/notification"
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
 // NotificationSeederName is the name this seeder reports under.
@@ -203,7 +204,7 @@ func insertGroupAudience(ctx context.Context, q datastore.Querier, noticeID noti
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(entity.TableNotificationUserGroups)
 	ib.Cols("notification_id", "user_group_id")
-	ib.Values(uuid.UUID(noticeID.UUIDBytes()), usergroup.IDToUUID(groupID))
+	ib.Values(strutils.ToUUID(noticeID), usergroup.IDToUUID(groupID))
 	ib.SQL("ON CONFLICT DO NOTHING")
 
 	query, args := ib.Build()
@@ -236,7 +237,7 @@ func insertReadReceipt(ctx context.Context, q datastore.Querier, noticeID notifi
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(entity.TableNotificationReads)
 	ib.Cols("notification_id", "user_id", "read_at")
-	ib.Values(uuid.UUID(noticeID.UUIDBytes()), userID, time.Now().UTC())
+	ib.Values(strutils.ToUUID(noticeID), userID, time.Now().UTC())
 	ib.SQL("ON CONFLICT DO NOTHING")
 
 	query, args := ib.Build()
@@ -288,7 +289,7 @@ func notificationIDByTitle(ctx context.Context, q datastore.Querier, title strin
 func readReceiptExists(ctx context.Context, q datastore.Querier, noticeID notification.NotificationID, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("1").From(entity.TableNotificationReads).
-		Where(sb.Equal("notification_id", uuid.UUID(noticeID.UUIDBytes())), sb.Equal("user_id", userID))
+		Where(sb.Equal("notification_id", strutils.ToUUID(noticeID)), sb.Equal("user_id", userID))
 
 	query, args := sb.Build()
 	var one int
