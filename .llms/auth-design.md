@@ -65,6 +65,8 @@ corpus (NIST 800-63B posture) — the zxcvbn requirement above was dropped
 
 - [x] **Account linking**: Allow users to link their account with an external SSO provider (default: true)
 - [x] **Custom attribute mapping**: Map provider claims onto the account — subject, email and its verified flag, names, username, avatar — plus free-form custom attributes stored on the user, refreshed on every sign-in (2026-10-04, Clerk custom-provider parity)
+- [x] **Provider token retrieval**: The holder reads their binding's provider tokens (access, refresh, expiry) over the wire; an expired access token refreshes first, the rotation stored (2026-10-04)
+- [x] **Local offboarding**: A background job probes each binding through the refresh-token grant; a provider that answers `invalid_grant` has withdrawn the identity, and the account is offboarded — a permanent ban, every session revoked, one audit record (2026-10-04)
 
 ---
 

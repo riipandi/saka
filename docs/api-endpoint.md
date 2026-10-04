@@ -103,7 +103,10 @@ completion procedures run over ConnectRPC with the flow token as the credential 
 which `CompleteSignIn` spends. A custom connection carries the claim mapping (subject,
 email and its verified flag, names, username, avatar) and a custom attribute set; the
 mapping applies on every sign-in, the username only at the JIT creation, and the
-avatar is downloaded to storage.
+avatar is downloaded to storage. The provider tokens rest sealed on the binding and
+refresh on every sign-in; the holder reads them with `GetLinkedAccountTokens`, and a
+background job offboards accounts whose provider has withdrawn the identity (the
+refresh grant refused with `invalid_grant`) with a permanent ban.
 
 | Method | Procedure / Endpoint                                          | Protocol     | Summary |
 | ------ | ------------------------------------------------------------- | ------------ | ------- |
@@ -119,6 +122,7 @@ avatar is downloaded to storage.
 | POST   | `/rpc/saka.authn.v1.OAuthSSOService/DeleteConnection`         | ConnectRPC   | Remove a connection (admin, bindings cascade) |
 | POST   | `/rpc/saka.authn.v1.OAuthSSOService/ListLinkedConnections`    | ConnectRPC   | List the holder's bindings (oldest first) |
 | POST   | `/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection`         | ConnectRPC   | Remove a binding (step-up; the last credential of a passwordless account is refused) |
+| POST   | `/rpc/saka.authn.v1.OAuthSSOService/GetLinkedAccountTokens`   | ConnectRPC   | Read a binding's provider tokens (holder-only; the access token refreshed when expired) |
 
 ## API Key
 
