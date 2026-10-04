@@ -182,19 +182,14 @@ type PublishedMailerNotifications struct {
 // with their names kept and every value redacted — a header is a secret as
 // a whole, because an authorization token is why the key exists.
 type PublishedOTEL struct {
-	Endpoint    string               `json:"endpoint,omitzero"`
-	ServiceName string               `json:"service_name,omitzero"`
-	Environment string               `json:"environment,omitzero"`
-	Compression string               `json:"compression,omitzero"`
-	Headers     map[string]string    `json:"headers,omitzero"`
-	Queue       PublishedOTELQueue   `json:"queue,omitzero"`
-	Tracing     PublishedOTELTracing `json:"tracing,omitzero"`
-	Metrics     PublishedOTELMetrics `json:"metrics,omitzero"`
-}
-
-// PublishedOTELQueue bounds each signal's export buffer.
-type PublishedOTELQueue struct {
-	MaxSize int `json:"max_size,omitzero"`
+	Endpoint     string               `json:"endpoint,omitzero"`
+	ServiceName  string               `json:"service_name,omitzero"`
+	Environment  string               `json:"environment,omitzero"`
+	Compression  string               `json:"compression,omitzero"`
+	Headers      map[string]string    `json:"headers,omitzero"`
+	QueueMaxSize int                  `json:"queue_max_size,omitzero"`
+	Tracing      PublishedOTELTracing `json:"tracing,omitzero"`
+	Metrics      PublishedOTELMetrics `json:"metrics,omitzero"`
 }
 
 // PublishedOTELTracing is the trace export settings.
@@ -420,12 +415,12 @@ func (c Config) Published(full bool) Published {
 		CIMDURLAllowlist: c.OIDC.CIMDURLAllowlist,
 	}
 	public.OTEL = PublishedOTEL{
-		Endpoint:    c.OTEL.Endpoint,
-		ServiceName: c.OTEL.ServiceName,
-		Environment: c.OTEL.Environment,
-		Compression: c.OTEL.Compression,
-		Headers:     sealed.OTEL.Headers,
-		Queue:       PublishedOTELQueue{MaxSize: c.OTEL.Queue.MaxSize},
+		Endpoint:     c.OTEL.Endpoint,
+		ServiceName:  c.OTEL.ServiceName,
+		Environment:  c.OTEL.Environment,
+		Compression:  c.OTEL.Compression,
+		Headers:      sealed.OTEL.Headers,
+		QueueMaxSize: c.OTEL.QueueMaxSize,
 		Tracing: PublishedOTELTracing{
 			Enable:        c.OTEL.Tracing.Enable,
 			Path:          c.OTEL.Tracing.Path,

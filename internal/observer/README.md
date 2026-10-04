@@ -143,7 +143,7 @@ default and is rendered through the same path every secret takes.
 | `otel.environment` | — | The deployment a signal came from — a resource attribute |
 | `otel.compression` | gzip | `gzip` or `none` (none saves the CPU on a loopback collector) |
 | `otel.headers` | — | Sent with every export; values are secrets |
-| `otel.queue.max_size` | 4096 | What one signal buffers before dropping the oldest |
+| `otel.queue_max_size` | 4096 | What one signal buffers before dropping the oldest |
 | `otel.tracing.enable` | false | Export spans |
 | `otel.tracing.sampler` | always | `always`, `never`, `ratio`, `parent_ratio` |
 | `otel.tracing.ratio` | 1.0 | The fraction `ratio`/`parent_ratio` record |

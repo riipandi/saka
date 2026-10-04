@@ -31,7 +31,7 @@ export async function walk(provider, subject) {
   const login = await open(authorize, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username: subject }).toString(),
+    body: new URLSearchParams({ username: subject }).toString()
   })
   const callback = login.headers.get('Location')
   if (login.status !== 302 || !callback?.includes('code=')) {

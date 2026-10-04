@@ -68,7 +68,7 @@ func newOTLPSink(cfg config.Config) (*otlpSink, error) {
 	// down costs dropped records and never a slow request.
 	provider := sdklog.NewLoggerProvider(
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter,
-			sdklog.WithMaxQueueSize(cfg.OTEL.Queue.MaxSize),
+			sdklog.WithMaxQueueSize(cfg.OTEL.QueueMaxSize),
 		)),
 		sdklog.WithResource(resource.NewSchemaless(attributes...)),
 	)

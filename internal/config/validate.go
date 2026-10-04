@@ -134,7 +134,7 @@ func (c Config) Validate() error {
 
 	check(isOneOf(c.OTEL.Compression, OTELCompressions()...),
 		"otel.compression: %q is not one of %s", c.OTEL.Compression, joinValues(OTELCompressions()...))
-	check(c.OTEL.Queue.MaxSize > 0, "otel.queue.max_size: must be positive")
+	check(c.OTEL.QueueMaxSize > 0, "otel.queue_max_size: must be positive")
 
 	// The metadata-document allowlist is read only when a CIMD client asks
 	// for a fetch, but a typo in the file would then read as "not allowed" —

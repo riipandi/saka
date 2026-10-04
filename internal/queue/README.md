@@ -214,7 +214,7 @@ client.Register(queue.NewQueue[OrderTask](func(ctx context.Context, task OrderTa
 
 | Key                    | Default | Description                                                                     |
 | ---------------------- | ------- | ------------------------------------------------------------------------------- |
-| `queue.num_workers`    | 5       | Worker goroutines that execute queued tasks concurrently                        |
+| `queue.num_workers`    | 4       | Worker goroutines that execute queued tasks concurrently                        |
 | `queue.release_after`  | 1h      | How long a claimed task may run before the queue considers its worker lost      |
 | `queue.cleanup_interval` | 1h    | How often the cleanup job purges the completed records retention has expired    |
 | `queue.encrypt`        | false   | Seal task payloads at rest with `app.secret_key` (AES-256-GCM)                  |

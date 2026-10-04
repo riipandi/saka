@@ -5,14 +5,14 @@ export const BASE = 'http://localhost:3080'
 export async function rpc(method, body, token, reauth) {
   const headers = {
     'Content-Type': 'application/json',
-    'Connect-Protocol-Version': '1',
+    'Connect-Protocol-Version': '1'
   }
   if (token) headers.Authorization = `Bearer ${token}`
   if (reauth) headers['X-Saka-Reauthentication'] = reauth
   const r = await fetch(`${BASE}/rpc/${method}`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify(body)
   })
   return { status: r.status, body: await r.json() }
 }

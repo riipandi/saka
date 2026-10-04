@@ -6,5 +6,5 @@ export const state = {
   aliceToken: '',
   aliceId: '',
   padmaId: '',
-  mapped: null,
+  mapped: null
 }

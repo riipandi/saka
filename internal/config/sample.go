@@ -39,9 +39,12 @@ var secretKeys = []string{
 }
 
 // omittedKeys stay on Config and keep the built-in default, but a generated
-// file does not list them. fetcher.user_agent is the product token the binary
-// already sends. Writing it into the file would be the place a deployment
-// replaces it.
+// file does not list them. auth.jwt_algorithm is the algorithm a deployment
+// with two signing stacks must name; a deployment with one stack is better
+// served by the derived answer. fetcher.user_agent is the product token the
+// binary already sends — writing it into the file would be the place a
+// deployment replaces it, and the fetcher section is not published at all
+// (see samplePublishes).
 var omittedKeys = []string{
 	"fetcher.user_agent",
 	"auth.jwt_algorithm",
@@ -57,7 +60,11 @@ var omittedKeys = []string{
 // from the key, because the two do not always agree: app.base_url is
 // PUBLIC_BASE_URL, the name the origin is known by outside this file, not
 // APP_BASE_URL, and app.assets_url is PUBLIC_ASSETS_URL for the same reason —
-// the same origin an S3 bucket or a CDN is published at.
+// the same origin an S3 bucket or a CDN is published at. auth.issuer shares
+// the variable: the issuer is the identity the tokens claim, and the origin
+// is the value a token consumer checks that claim against, so one variable
+// keeps the two from disagreeing (the loader fills an unset issuer from the
+// same variable; see Load).
 //
 // A path is deliberately not here. storage.local_path comes from the file alone:
 // where an instance writes its files is a property of the deployment image, and a
@@ -82,12 +89,12 @@ var omittedKeys = []string{
 // value is a secret, and this map says what the variable is called. kvstore.url
 // is the case where the two disagree, being VALKEY_URL rather than KVSTORE_URL.
 //
-// Deliberately absent: cache.enable, kvstore.enable, and kvstore.db are plain
-// product switches a checkout flips in the file (all off/zero by default), and
-// server.cors.allowed_origins is a list of literal origins, not a credential.
-// otel.environment is not here either — the deployment environment a signal
-// reports is empty by default, and a deployment that wants the attribute fills
-// the key in the file directly.
+// Deliberately not directives: cache.enable, kvstore.enable, and kvstore.db are
+// plain product switches a checkout flips in the file (all off/zero by default),
+// and server.cors.allowed_origins is a list of literal origins, not a
+// credential. otel.environment is not here either — the deployment environment
+// a signal reports is empty by default, and a deployment that wants the
+// attribute fills the key in the file directly.
 //
 // Validate reports a key here only when the variable leaves it unusable. An unset
 // APP_MODE falls back to development, an empty base_url is a valid value, an unset
@@ -101,6 +108,7 @@ var envKeys = map[string]string{
 	"app.base_url":                     "PUBLIC_BASE_URL",
 	"app.mode":                         "APP_MODE",
 	"auth.hibp_api_key":                "HIBP_API_KEY",
+	"auth.issuer":                      "PUBLIC_BASE_URL",
 	"kvstore.url":                      "VALKEY_URL",
 	"log.level":                        "LOG_LEVEL",
 	"log.transport":                    "LOG_TRANSPORT",
@@ -146,23 +154,91 @@ var envExampleValues = map[string]string{
 	"storage.s3.secret_key":            "s3passw0rd",
 }
 
-// Sample renders the config file a fresh checkout starts from: every key with its
-// built-in default, every secret as an env: directive naming the variable
-// key:generate writes for it, and every key in envKeys as a directive naming the
-// variable a deployment sets.
+// recommendedKeys are the keys a generated file carries because a fresh
+// checkout is likely to turn them, listed beside the keys the publish rules
+// force in (every app.* and storage.* key, the server.cors origin pair, and
+// every key in envKeys and secretKeys). They are the operating decisions —
+// the switches, the pool sizes, the toggles — a deployment names on day one;
+// the tuning a deployment rarely touches (the server timeouts, the retry
+// schedule, the notification toggles) stays out and keeps its built-in
+// default, which the schema documents.
+var recommendedKeys = []string{
+	"auth.access_ttl",
+	"auth.session_driver",
+	"cache.enable",
+	"cache.driver",
+	"database.max_conns",
+	"database.min_conns",
+	"kvstore.enable",
+	"kvstore.db",
+	"log.format",
+	"mailer.from_email",
+	"mailer.from_name",
+	"mailer.timeout",
+	"oidc.enabled",
+	"oidc.cimd_url_allowlist",
+	"otel.compression",
+	"otel.queue_max_size",
+	"queue.num_workers",
+	"queue.encrypt",
+	"rate_limit.driver",
+	"server.trusted_proxy_headers",
+	"webhook.allow_private_network",
+}
+
+// samplePublishes reports whether the generated sample carries a key. The
+// whole app and storage sections ship, the server CORS policy ships as the
+// two keys a deployment actually writes (the origin list and the credential
+// switch), every key a directive or a secret fills ships, and the
+// recommended keys above ride along. Everything else — the fetcher section
+// whole, the timeouts, the retry schedule — keeps its built-in default by
+// being absent, which the JSON Schema documents.
 //
-// Every key is written out rather than only the ones a user is likely to change,
-// so the file doubles as the list of what can be configured, except omittedKeys,
-// which keep the built-in default by being absent. The file opens with a
-// "$schema" key naming the schema beside it, so an editor picks up completion
-// and validation; the loader ignores the key, the way it ignores anything that
+// Every root section except fetcher still reaches the file: each one keeps
+// at least one published key, so the file shows the shape of the
+// configuration without burying the reader in values they would not touch.
+func samplePublishes(key string) bool {
+	switch {
+	case strings.HasPrefix(key, "app."), strings.HasPrefix(key, "storage."):
+		return true
+	case key == "server.cors.allow_credentials" || key == "server.cors.allowed_origins":
+		return true
+	case slices.Contains(secretKeys, key):
+		return true
+	case slices.Contains(recommendedKeys, key):
+		return true
+	}
+	_, ok := envKeys[key]
+	return ok
+}
+
+// Sample renders the config file a fresh checkout starts from: the keys the
+// publish rules select (see samplePublishes) with their built-in defaults,
+// every secret as an env: directive naming the variable key:generate writes
+// for it, and every key in envKeys as a directive naming the variable a
+// deployment sets.
+//
+// The file is the list of what a deployment is likely to set, not the list
+// of everything that can be configured — the JSON Schema beside it is that
+// list, and an absent key keeps its built-in default. The file opens with a
+// "$schema" key naming the schema, so an editor picks up completion and
+// validation; the loader ignores the key, the way it ignores anything that
 // is not a config path. The output is deterministic: keys are sorted, so two
 // runs produce the same bytes.
 func Sample() ([]byte, error) {
-	flat := DefaultsMap()
+	known := DefaultsMap()
+	flat := make(map[string]any)
 	flat["$schema"] = SchemaFileName
+	for key, value := range known {
+		if samplePublishes(key) {
+			flat[key] = value
+		}
+	}
+	// An omitted key is one the file deliberately never carries; the check
+	// runs against the whole key set, because the sample no longer holds
+	// every key for the guard to find.
 	for _, key := range omittedKeys {
-		if _, ok := flat[key]; !ok {
+		if _, ok := known[key]; !ok {
 			return nil, fmt.Errorf("config: omitted key %s is not part of Config", key)
 		}
 		delete(flat, key)

@@ -94,23 +94,59 @@ func TestDeploymentKeysThatAreNotSecrets(t *testing.T) {
 	assert.Equal(t, []string{"auth.hibp_api_key", "kvstore.url"}, both)
 }
 
-func TestSampleCoversEveryKey(t *testing.T) {
-	// A generated file is also the list of what can be configured, so it must
-	// carry every key the struct defines except the ones omittedKeys hides.
-	// An omitted key keeps its built-in default when the file leaves it out.
-	// The "$schema" key is not a config key: it names the schema beside the
-	// file so an editor picks up completion, and the loader skips it.
+func TestSamplePublishesTheSelectedKeys(t *testing.T) {
+	// The generated file is the list of what a deployment is likely to set,
+	// not the list of everything that can be configured — the JSON Schema
+	// beside it is that list. The publish rules select the whole app and
+	// storage sections, the two CORS keys a deployment writes, the directive
+	// and secret keys, and the recommended set; everything else, the fetcher
+	// section included, keeps its built-in default by being absent.
 	flat := sampleDoc(t)
 
-	require.Len(t, flat, len(Keys())-len(omittedKeys)+1)
 	assert.Equal(t, SchemaFileName, flat["$schema"])
+
 	for _, key := range Keys() {
-		if slices.Contains(omittedKeys, key) {
-			assert.NotContains(t, flat, key)
+		if samplePublishes(key) && !slices.Contains(omittedKeys, key) {
+			assert.Contains(t, flat, key, "%s must be published", key)
 			continue
 		}
-		assert.Contains(t, flat, key)
+		assert.NotContains(t, flat, key, "%s must keep its default by being absent", key)
 	}
+
+	// Every root section except fetcher still reaches the file, so the file
+	// shows the shape of the configuration without burying the reader in
+	// values they would not touch.
+	sections := make(map[string]bool)
+	for _, key := range Keys() {
+		sections[strings.Split(key, Delim)[0]] = true
+	}
+	for section := range sections {
+		if section == "fetcher" {
+			continue
+		}
+		present := false
+		for key := range flat {
+			if strings.HasPrefix(key, section+Delim) {
+				present = true
+				break
+			}
+		}
+		assert.True(t, present, "the %s section must reach the sample", section)
+	}
+}
+
+func TestSamplePublishesOnlyTheTwoCORSKeys(t *testing.T) {
+	// The CORS policy ships as the origin list and the credential switch,
+	// the two keys a deployment writes; the header and method lists keep the
+	// presets the defaults carry.
+	flat := sampleDoc(t)
+
+	assert.Contains(t, flat, "server.cors.allowed_origins")
+	assert.Contains(t, flat, "server.cors.allow_credentials")
+	assert.NotContains(t, flat, "server.cors.allowed_methods")
+	assert.NotContains(t, flat, "server.cors.allowed_headers")
+	assert.NotContains(t, flat, "server.cors.exposed_headers")
+	assert.NotContains(t, flat, "server.cors.max_age")
 }
 
 func TestSampleIsDeterministic(t *testing.T) {
@@ -129,7 +165,7 @@ func TestSampleWritesDurationsAsSeconds(t *testing.T) {
 	flat := sampleDoc(t)
 
 	assert.Equal(t, float64(900), flat["auth.access_ttl"])
-	assert.Equal(t, float64(3600), flat["database.max_conn_lifetime"])
+	assert.Equal(t, float64(15), flat["mailer.timeout"])
 }
 
 func TestDurationKeysMatchTheStruct(t *testing.T) {
@@ -149,13 +185,14 @@ func TestDurationKeysMatchTheStruct(t *testing.T) {
 func TestSampleWritesTheLogKeys(t *testing.T) {
 	// The transport list is a directive, because a deployment is the one that
 	// decides whether it keeps the terminal, ships to a collector, or both.
+	// The file sink's rotation settings are not published: a deployment that
+	// names the file transport gets the documented defaults.
 	flat := sampleDoc(t)
 
 	assert.Equal(t, "env:LOG_TRANSPORT", flat["log.transport"])
-	assert.Equal(t, float64(100), flat["log.file.max_size"])
-	assert.Equal(t, float64(7), flat["log.file.max_backups"])
-	assert.Equal(t, float64(30), flat["log.file.max_age"])
-	assert.Equal(t, true, flat["log.file.compress"])
+	assert.Equal(t, "env:LOG_LEVEL", flat["log.level"])
+	assert.Equal(t, "pretty", flat["log.format"])
+	assert.NotContains(t, flat, "log.file.max_size")
 }
 
 func TestSampleWritesTheOTELKeys(t *testing.T) {
@@ -163,15 +200,17 @@ func TestSampleWritesTheOTELKeys(t *testing.T) {
 	// deployment is the one that knows where its collector listens and what the
 	// service is called there. The two enable switches stay in the file, so a
 	// checkout that ships nothing keeps shipping nothing. otel.environment is
-	// neither: it is empty by default, and a deployment that wants the resource
-	// attribute fills the key in the file, so it is a literal empty string.
+	// not published: it is empty by default, and a deployment that wants the
+	// resource attribute fills the key in the file.
 	flat := sampleDoc(t)
 
 	assert.Equal(t, "env:OTEL_ENDPOINT", flat["otel.endpoint"])
 	assert.Equal(t, "env:OTEL_SERVICE_NAME", flat["otel.service_name"])
-	assert.Equal(t, "", flat["otel.environment"])
+	assert.NotContains(t, flat, "otel.environment")
 	assert.Equal(t, "env:OTEL_TRACING_ENABLE", flat["otel.tracing.enable"])
 	assert.Equal(t, "env:OTEL_METRICS_ENABLE", flat["otel.metrics.enable"])
+	assert.Equal(t, "gzip", flat["otel.compression"])
+	assert.Equal(t, float64(4096), flat["otel.queue_max_size"])
 }
 
 func TestSampleWritesTheTransportListAsOneDirective(t *testing.T) {
@@ -200,6 +239,7 @@ func TestSampleRoundTripsThroughLoad(t *testing.T) {
 			"DATABASE_URL=" + probeDSN,
 			"AUTH_SECRET_KEY=" + probeSecret,
 			"APP_SECRET_KEY=" + probeSecret,
+			"PUBLIC_BASE_URL=http://localhost:3080",
 			"MAILER_SMTP_USERNAME=bot",
 			"MAILER_SMTP_PASSWORD=" + probeSecret,
 		},
@@ -232,6 +272,7 @@ func TestSampleMailerDirectivesResolveFromTheEnvironment(t *testing.T) {
 			"DATABASE_URL=" + probeDSN,
 			"AUTH_SECRET_KEY=" + probeSecret,
 			"APP_SECRET_KEY=" + probeSecret,
+			"PUBLIC_BASE_URL=http://localhost:3080",
 			"MAILER_SMTP_HOST=smtp.example.com",
 			"MAILER_SMTP_PORT=465",
 			"MAILER_SMTP_USERNAME=bot",

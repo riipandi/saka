@@ -57,7 +57,7 @@ func TestValidationAcceptsAConfigWithNoSigningMaterial(t *testing.T) {
 	// neither is a valid deployment: the key pairs come from the rows.
 	_, err := resolveAndValidate(t, config.Options{
 		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`),
-		Environ:    []string{"DATABASE_URL=" + dsn},
+		Environ:    []string{"DATABASE_URL=" + dsn, "PUBLIC_BASE_URL=http://localhost:3080"},
 	})
 	require.NoError(t, err)
 }

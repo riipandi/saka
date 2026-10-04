@@ -103,7 +103,7 @@ func newTracerProvider(ctx context.Context, cfg config.Config, res *resource.Res
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(samplerFor(cfg.OTEL.Tracing)),
 		sdktrace.WithBatcher(exporter,
-			sdktrace.WithMaxQueueSize(cfg.OTEL.Queue.MaxSize),
+			sdktrace.WithMaxQueueSize(cfg.OTEL.QueueMaxSize),
 			sdktrace.WithMaxExportBatchSize(cfg.OTEL.Tracing.MaxBatchSize),
 			sdktrace.WithBatchTimeout(cfg.OTEL.Tracing.BatchTimeout),
 			sdktrace.WithExportTimeout(cfg.OTEL.Tracing.ExportTimeout),

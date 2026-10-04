@@ -5,7 +5,9 @@
 export async function mailpitClear() {
   try {
     await fetch('http://localhost:8025/api/v1/messages', { method: 'DELETE' })
-  } catch { /* mailpit down is a step's own failure to report */ }
+  } catch {
+    /* mailpit down is a step's own failure to report */
+  }
 }
 
 async function mailpitCode(recipient) {
@@ -15,7 +17,9 @@ async function mailpitCode(recipient) {
     const addresses = (message.To ?? []).map((a) => a.Address)
     if (!addresses.includes(recipient)) continue
     const full = await (await fetch(`http://localhost:8025/api/v1/message/${message.ID}`)).json()
-    const match = /<span[^>]*letter-spacing[^>]*>\s*([A-Za-z0-9]+)\s*<\/span>/s.exec(full.HTML ?? '')
+    const match = /<span[^>]*letter-spacing[^>]*>\s*([A-Za-z0-9]+)\s*<\/span>/s.exec(
+      full.HTML ?? ''
+    )
     if (match) return match[1]
   }
   return null

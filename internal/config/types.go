@@ -89,7 +89,10 @@ type Auth struct {
 	// file: a deployment that configures one stack never needs it, and the
 	// derived answer is the right one for every such deployment.
 	JWTAlgorithm string `koanf:"jwt_algorithm" json:"jwt_algorithm"`
-	// Issuer is the iss claim placed in every token.
+	// Issuer is the iss claim placed in every token. An empty value is
+	// filled by the loader from PUBLIC_BASE_URL — the origin the
+	// deployment is published at, which is what a token's audience can
+	// check — and Validate refuses an issuer nothing supplied.
 	Issuer string `koanf:"issuer" json:"issuer"`
 	// AccessTTL is the lifetime of an access token. The session bounds —
 	// the remembered lifetime, inactivity, reauthentication — are not here:
@@ -339,26 +342,20 @@ type OTEL struct {
 	// be told from one that may, so every value is rendered through the same
 	// path a secret takes.
 	Headers map[string]string `koanf:"headers" json:"headers"`
-	// Queue bounds the in-memory buffer each signal exports from.
-	Queue OTELQueue `koanf:"queue" json:"queue"`
+	// QueueMaxSize is how many items one signal buffers before it starts
+	// dropping. The default is generous rather than minimal, because the queue
+	// is what absorbs a collector that is briefly down.
+	//
+	// It is the setting that keeps export off the request path: a span or a
+	// measurement is handed to an in-memory queue and the caller returns, while a
+	// background goroutine drains the queue to the collector. Nothing here ever
+	// blocks the goroutine that produced a signal, so a slow or unreachable
+	// collector costs dropped telemetry, never a slow request.
+	QueueMaxSize int `koanf:"queue_max_size" json:"queue_max_size"`
 	// Tracing holds the trace export settings.
 	Tracing OTELTracing `koanf:"tracing" json:"tracing"`
 	// Metrics holds the metric export settings.
 	Metrics OTELMetrics `koanf:"metrics" json:"metrics"`
-}
-
-// OTELQueue bounds the buffer a signal exports from.
-//
-// It is the setting that keeps export off the request path: a span or a
-// measurement is handed to an in-memory queue and the caller returns, while a
-// background goroutine drains the queue to the collector. Nothing here ever
-// blocks the goroutine that produced a signal, so a slow or unreachable
-// collector costs dropped telemetry, never a slow request.
-type OTELQueue struct {
-	// MaxSize is how many items one signal buffers before it starts dropping.
-	// The default is generous rather than minimal, because the queue is what
-	// absorbs a collector that is briefly down.
-	MaxSize int `koanf:"max_size" json:"max_size"`
 }
 
 // OTELTracing holds the trace export settings.

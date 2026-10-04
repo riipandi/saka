@@ -1,7 +1,7 @@
+import { deleteConnections } from '../lib/admin.mjs'
 // Step 0b — the rows a previous ladder run left behind leave first, so
 // every probe meets a clean surface.
 import { rpc } from '../lib/rpc.mjs'
-import { deleteConnections } from '../lib/admin.mjs'
 import { state } from '../lib/state.mjs'
 
 export async function run() {

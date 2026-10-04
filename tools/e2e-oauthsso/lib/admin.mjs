@@ -12,7 +12,7 @@ export const customMapping = {
   email_verified: 'mail_verified',
   email_verified_default: true,
   username: 'handle',
-  picture: 'photo',
+  picture: 'photo'
 }
 
 export async function ensureConnection(provider, issuer, mapping, attrs) {
@@ -26,17 +26,22 @@ export async function ensureConnection(provider, issuer, mapping, attrs) {
     discovery_url: `https://localhost:3220/${issuer}/.well-known/openid-configuration`,
     client_id: 'e2e-ladder',
     client_secret: 'e2e-ladder-secret',
-    enabled: true,
+    enabled: true
   }
   if (mapping) request.attribute_mapping = mapping
   if (attrs) request.custom_attributes = attrs
   const created = await rpc('saka.authn.v1.OAuthSSOService/CreateConnection', request, state.admin)
-  if (created.status !== 200) throw new Error(`connection ${provider} refused: ${JSON.stringify(created.body).slice(0, 200)}`)
+  if (created.status !== 200)
+    throw new Error(`connection ${provider} refused: ${JSON.stringify(created.body).slice(0, 200)}`)
   return created.body.connection
 }
 
 export async function getUser(email) {
-  const { body } = await rpc('saka.identity.v1.UserService/ListUsers', { search: email }, state.admin)
+  const { body } = await rpc(
+    'saka.identity.v1.UserService/ListUsers',
+    { search: email },
+    state.admin
+  )
   return (body.users ?? []).find((u) => u.email === email) ?? null
 }
 

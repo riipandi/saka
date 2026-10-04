@@ -132,6 +132,19 @@ func Load(opts Options) (Config, error) {
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return Config{}, fmt.Errorf("config: decode: %w", err)
 	}
+
+	// The issuer is the deployment's own identity, and the origin it is
+	// published at is the value every token consumer can check against. An
+	// issuer no source set takes PUBLIC_BASE_URL — the same variable the
+	// generated file points both app.base_url and auth.issuer at — and an
+	// empty result is Validate's report, not a silent placeholder. The
+	// fallback is a resolution rule, not a layer: Origin keeps reporting
+	// that no source set the key.
+	if cfg.Auth.Issuer == "" {
+		if value := lookupValue(table, "PUBLIC_BASE_URL"); value != "" {
+			cfg.Auth.Issuer = value
+		}
+	}
 	return cfg, nil
 }
 

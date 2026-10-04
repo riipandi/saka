@@ -158,7 +158,7 @@ const (
 // reaches it, so a feature that needs longer fails at wiring rather than
 // running twice.
 const (
-	DefaultQueueNumWorkers     = 5
+	DefaultQueueNumWorkers     = 4
 	DefaultQueueReleaseAfter   = time.Hour
 	DefaultQueueCleanupArchive = time.Hour
 )
@@ -240,7 +240,10 @@ func Default() Config {
 			Timezone:           DefaultTimezone,
 		},
 		Auth: Auth{
-			Issuer:        "saka",
+			// The issuer is empty by default: the loader fills it from
+			// PUBLIC_BASE_URL when the deployment names its origin (see
+			// Load), and Validate refuses an issuer nothing supplied.
+			Issuer:        "",
 			AccessTTL:     15 * time.Minute,
 			SessionDriver: SessionDB,
 			// The API key's expiry reminder is off by default, the way the
@@ -316,10 +319,8 @@ func Default() Config {
 			ServiceName: AppIdentifier,
 			Compression: OTELCompressionGzip,
 			// No headers: a collector that checks nothing needs nothing sent.
-			Headers: map[string]string{},
-			Queue: OTELQueue{
-				MaxSize: DefaultOTELQueueSize,
-			},
+			Headers:      map[string]string{},
+			QueueMaxSize: DefaultOTELQueueSize,
 			// No path on any signal: a collector serves the protocol's own
 			// routes, and the shared endpoint already names where it is.
 			Tracing: OTELTracing{

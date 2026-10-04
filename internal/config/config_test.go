@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"encoding/json/jsontext"
@@ -25,11 +26,14 @@ const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 // doubles as the example of how a secret is meant to be written.
 const baseBody = `"database": {"url": "env:DATABASE_URL"}, "auth": {"secret_key": "env:AUTH_SECRET_KEY"}`
 
-// baseEnv is the environment that baseBody resolves from.
+// baseEnv is the environment that baseBody resolves from. PUBLIC_BASE_URL
+// rides along because Validate requires an issuer, and the loader fills an
+// unset one from this variable.
 func baseEnv() []string {
 	return []string{
 		"DATABASE_URL=" + dsn,
 		"AUTH_SECRET_KEY=" + secret,
+		"PUBLIC_BASE_URL=http://localhost:3080",
 	}
 }
 
@@ -112,6 +116,22 @@ func TestDefaultsAreValid(t *testing.T) {
 	require.Equal(t, defaults.Storage.LocalPath, cfg.Storage.LocalPath)
 	require.Equal(t, defaults.Log.Level, cfg.Log.Level)
 	require.Equal(t, config.LayerDefault, cfg.Origin("server.port"))
+}
+
+func TestIssuerFallsBackToPublicBaseURL(t *testing.T) {
+	// An issuer no source set takes PUBLIC_BASE_URL: the origin the
+	// deployment is published at is the value a token consumer checks the
+	// claim against. The fallback is a resolution rule, not a layer, so
+	// Origin keeps reporting that no source set the key.
+	path := configFile(t, "")
+	environ := append([]string{"PUBLIC_BASE_URL=https://saka.example"}, baseEnv()...)
+
+	cfg, err := config.Load(config.Options{ConfigFile: path, Environ: environ})
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://saka.example", cfg.Auth.Issuer)
+	assert.Equal(t, config.LayerDefault, cfg.Origin("auth.issuer"),
+		"the fallback is a resolution rule, not a layer")
 }
 
 func TestEnvironmentAloneCannotSetAKey(t *testing.T) {
