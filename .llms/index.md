@@ -12,7 +12,7 @@ reference, history, or contract — navigate from here.
 | `.llms/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
 | `.llms/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
 | `.llms/auth-design.md` | The authentication design the auth surface follows. |
-| `.llms/saka-deviations.md` | Every intentional departure from Pocket ID upstream, with reasons. |
+| `.llms/upstream-deviations.md` | Every intentional departure from Pocket ID upstream, with reasons. |
 | `.llms/endpoint-reference.md` | Shipped endpoints vs the ported upstream reference, at a glance. |
 | `.llms/references/pocket-id-api-reference.md` | The upstream API surface the port maps onto. |
 | `.llms/references/supabase-storage-schema.sql`, `database-reference.sql` | Storage-model source material and the database's table inventory. |

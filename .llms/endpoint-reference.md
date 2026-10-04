@@ -5,10 +5,10 @@ request checklist: one request per row, named `<METHOD> <path>` for REST and
 `<METHOD> /rpc/<package>.<Service>/<Method>` for ConnectRPC. Status vocabulary:
 **done** (implemented with test evidence in the Evidence column), **partial**
 (implemented with a noted deviation), **planned** (unimplemented — owning phase
-named), **excluded** (out of scope per `.llms/saka-deviations.md` — never parity work).
+named), **excluded** (out of scope per `.llms/upstream-deviations.md` — never parity work).
 
 Saka-only extensions (not in the upstream spec) and all structural deviations (envelope,
-pagination, snake_case) are documented in `.llms/saka-deviations.md` — read it before porting
+pagination, snake_case) are documented in `.llms/upstream-deviations.md` — read it before porting
 upstream handlers.
 
 ## Transport split
@@ -371,7 +371,7 @@ keys a second time, so legacy rows predating the rule cannot overwrite
 
 Upstream replaces a subject's whole claim set in one PUT; saka addresses
 each row (create, update, delete by identifier) — the deviation
-`.llms/saka-deviations.md` carries. The merge into the tokens happens at
+`.llms/upstream-deviations.md` carries. The merge into the tokens happens at
 issuance time (userinfo and the ID token), the same merge the preview
 renders.
 
