@@ -337,7 +337,7 @@ under `/oidc` (the specifications' own shapes). Discovery at
 | POST     | `/rpc/saka.identity.v1.UserGroupService/SetAllowedOidcClients`               | ConnectRPC   | Replace a group's client allowlist (admin)  |
 | GET, POST | `/oidc/authorize`                                                            | HTTP/REST    | Authorization endpoint                      |
 | POST     | `/oidc/token`                                                                 | HTTP/REST    | Token endpoint (code, refresh, device grants) |
-| GET, POST | `/oidc/userinfo`                                                             | HTTP/REST    | Userinfo (bearer)                           |
+| GET, POST | `/oidc/userinfo`                                                             | HTTP/REST    | Userinfo (bearer); the `profile` scope answers the Standard Claims the account holds — `picture` and `updated_at` included |
 | POST     | `/oidc/introspect`                                                            | HTTP/REST    | Introspection (client-scoped, RFC 7662)     |
 | POST     | `/oidc/par`                                                                   | HTTP/REST    | Pushed authorization request (RFC 9126)     |
 | POST     | `/oidc/device_authorization`                                                  | HTTP/REST    | Device authorization grant (RFC 8628)       |

@@ -770,6 +770,17 @@ consuming package names the interface, the area wires it post-construction,
 and a typed-nil dependency is dropped at the seam rather than held in an
 interface the first call would panic through.
 
+The `profile` scope answers the Standard Claims the account holds (2026-10-04,
+the Standard Claims round): `picture` — the composed public URL under its
+standard name, the Go read-model field renamed `Picture` to match — and
+`updated_at` — the trigger's stamp as epoch seconds, falling back to the
+creation stamp for an account no update has touched. Both mint in
+`subjectClaims` and echo in the preview: the preview's map must never name a
+shape the issuance would not. Both join `protectedClaimKeys`, so an operator's
+custom claim row cannot shadow what the protocol mints itself. The Standard
+Claims the account holds no column for — `nickname`, `locale`, `zoneinfo`, the
+rest — stay unconsumed and unissued.
+
 CIMD (client-id metadata document) is **implemented on the management side**:
 `client_type = 'cimd'` materializes from a fetched document whose URL is the
 client's own identifier, gated by the `oidc.cimd_url_allowlist` config
