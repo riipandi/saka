@@ -1,6 +1,12 @@
 // Package config resolves the application configuration from one source of
 // truth, a JSON config file, and the layers that may override it.
 //
+// The loading engine — the sources, the precedence, the file's environment
+// directives — lives in framework/config; this package is the application's
+// schema over it: the Config struct defines every key, its default (Default),
+// and its rule (Validate), and Load wraps the engine with the schema and the
+// application's resolution rules.
+//
 // # Sources and precedence
 //
 // From lowest to highest:
@@ -49,11 +55,8 @@ package config
 
 import (
 	"fmt"
-	"maps"
-	"os"
 
-	"github.com/knadh/koanf/providers/confmap"
-	"github.com/knadh/koanf/v2"
+	fconfig "github.com/riipandi/saka/framework/config"
 )
 
 // Options describes the sources Load merges. Every field is optional: with no
@@ -79,59 +82,35 @@ type Options struct {
 // command-line flags. The environment supplies values to the file's directives
 // but is not itself a layer.
 //
-// Each layer is flattened before it is merged, so a nested object in the file
-// and a flat flag override the same key.
-//
-// Only known keys are accepted. A key that is not part of Config is dropped, so
-// a stray entry naming a section cannot replace that section with a scalar and
-// break the decode.
+// Load wraps the framework engine with this application's schema — the known
+// keys through their defaults, and the value-form vocabularies (durations,
+// lists, maps) — and applies the schema's own resolution rules on top.
 //
 // Load does not validate: a command that needs one key, such as a migration that
 // needs only database.url, must not be blocked by a key it never reads. Call
 // Validate where the whole configuration is required.
 func Load(opts Options) (Config, error) {
-	environ := opts.Environ
-	if environ == nil {
-		environ = os.Environ()
-	}
-	table := interpolateEnv(environ, opts.EnvFile)
-
-	cfg := Default()
-	cfg.origin = make(map[string]string)
-	cfg.unresolved = make(map[string]string)
-	k := koanf.New(Delim)
-
-	fileKeys, unresolved, err := configFileLayer(opts, table)
+	resolved, err := fconfig.Resolve(fconfig.Options{
+		ConfigFile: opts.ConfigFile,
+		EnvFile:    opts.EnvFile,
+		Flags:      opts.Flags,
+		Environ:    opts.Environ,
+	}, fconfig.Schema{
+		Defaults:  DefaultsMap(),
+		Durations: durationKeys,
+		Lists:     listKeys,
+		Maps:      mapKeys,
+	})
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.unresolved = unresolved
 
-	layers := []struct {
-		name string
-		keys map[string]any
-	}{
-		{LayerDefault, DefaultsMap()},
-		{LayerConfigFile, fileKeys},
-		{LayerFlag, filterKnown(opts.Flags)},
-	}
-	for _, layer := range layers {
-		// A duration key is read as seconds before the layer is merged, so the
-		// unit is decided by the key rather than guessed by the decoder, a list
-		// key written as one comma-separated string becomes the list the field
-		// wants, and a map key written that way becomes the map it wants.
-		normalizeDurations(layer.keys)
-		normalizeLists(layer.keys)
-		normalizeMaps(layer.keys)
-		if err := merge(k, cfg.origin, layer.name, layer.keys); err != nil {
-			return Config{}, err
-		}
-	}
-
-	// Unmarshal into the defaults, so a key no source set keeps its default.
-	if err := k.Unmarshal("", &cfg); err != nil {
+	cfg := Config{}
+	if err := resolved.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("config: decode: %w", err)
 	}
+	cfg.origin = resolved.Origins()
+	cfg.unresolved = resolved.Unresolved()
 
 	// The issuer is the deployment's own identity, and the origin it is
 	// published at is the value every token consumer can check against. An
@@ -141,27 +120,11 @@ func Load(opts Options) (Config, error) {
 	// fallback is a resolution rule, not a layer: Origin keeps reporting
 	// that no source set the key.
 	if cfg.Auth.Issuer == "" {
-		if value := lookupValue(table, "PUBLIC_BASE_URL"); value != "" {
+		if value := resolved.LookupEnv("PUBLIC_BASE_URL"); value != "" {
 			cfg.Auth.Issuer = value
 		}
 	}
 	return cfg, nil
-}
-
-// merge applies one layer to the accumulated configuration and records it as the
-// origin of the keys it set, replacing an earlier entry. The last layer to set a
-// key is the one that won.
-func merge(k *koanf.Koanf, origin map[string]string, layer string, keys map[string]any) error {
-	if len(keys) == 0 {
-		return nil
-	}
-	if err := k.Load(confmap.Provider(keys, Delim), nil); err != nil {
-		return fmt.Errorf("config: load %s: %w", layer, err)
-	}
-	for key := range keys {
-		origin[key] = layer
-	}
-	return nil
 }
 
 // Unresolved returns the keys whose interpolation directive named a variable
@@ -170,7 +133,9 @@ func merge(k *koanf.Koanf, origin map[string]string, layer string, keys map[stri
 // variable while a command that does not is unaffected.
 func (c Config) Unresolved() map[string]string {
 	out := make(map[string]string, len(c.unresolved))
-	maps.Copy(out, c.unresolved)
+	for key, name := range c.unresolved {
+		out[key] = name
+	}
 	return out
 }
 
@@ -186,6 +151,8 @@ func (c Config) Origin(key string) string {
 // Origins returns a copy of the source of every resolved key.
 func (c Config) Origins() map[string]string {
 	out := make(map[string]string, len(c.origin))
-	maps.Copy(out, c.origin)
+	for key, layer := range c.origin {
+		out[key] = layer
+	}
 	return out
 }

@@ -13,8 +13,11 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-// SchemaFileName is also referenced from the generated sample file; the schema
-// and the file it describes travel together (see file.go).
+// SchemaFileName is the JSON Schema the generated file references from its
+// "$schema" key. The name is relative, so the pair travels together: the
+// schema lives beside the file it describes, in public/ for the repository
+// and beside app.config.json wherever the file is generated.
+const SchemaFileName = "config.schema.json"
 
 // SchemaDoc builds the JSON Schema for app.config.json from the Config struct
 // itself, so a new key needs no second entry anywhere: the field's json tag is

@@ -11,14 +11,14 @@ import (
 // the same string.
 const Delim = "."
 
-// Layer names, lowest precedence first. Load applies them in this order, so a
-// later layer wins: the JSON config file replaces a built-in default, and a
+// Layer names, lowest precedence first. Resolve applies them in this order, so
+// a later layer wins: the JSON config file replaces a built-in default, and a
 // command-line flag replaces both.
 //
 // The environment is deliberately not a layer. A variable reaches a config key
 // only where the config file references it, with env: or ${...}, so the file
-// stays the single source of truth: a variable nobody referenced cannot change a
-// value, and no key needs a fixed variable name.
+// stays the single source of truth: a variable nobody referenced cannot change
+// a value, and no key needs a fixed variable name.
 const (
 	LayerDefault    = "default"
 	LayerConfigFile = "config-file"
@@ -29,9 +29,8 @@ const (
 // database.url becomes DATABASE_URL.
 //
 // It is a naming convention, not a mapping the loader applies: nothing reaches a
-// config key by this name alone. It exists so the variable names this package
-// writes into a generated config file are the ones key:generate writes and
-// .env.example lists.
+// config key by this name alone. It exists so the variable names a generated
+// config file writes are the ones key generation writes and .env.example lists.
 func EnvName(key string) string {
 	return strings.ToUpper(strings.ReplaceAll(key, Delim, "_"))
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 )
 
@@ -19,8 +20,8 @@ func TestConfigFileBeatsDefaults(t *testing.T) {
 	assert.Equal(t, 4444, cfg.Server.Port, "the file must win over the default")
 	assert.Equal(t, "from-file", cfg.Server.Host)
 	assert.Equal(t, config.LogWarn, cfg.Log.Level)
-	assert.Equal(t, config.LayerConfigFile, cfg.Origin("log.level"))
-	assert.Equal(t, config.LayerDefault, cfg.Origin("auth.issuer"), "a key no source set keeps the default")
+	assert.Equal(t, fconfig.LayerConfigFile, cfg.Origin("log.level"))
+	assert.Equal(t, fconfig.LayerDefault, cfg.Origin("auth.issuer"), "a key no source set keeps the default")
 }
 
 func TestFlagBeatsConfigFile(t *testing.T) {
@@ -32,7 +33,7 @@ func TestFlagBeatsConfigFile(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 3333, cfg.Server.Port)
-	assert.Equal(t, config.LayerFlag, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerFlag, cfg.Origin("server.port"))
 }
 
 func TestFlagBeatsTheVariableTheFileReferences(t *testing.T) {
@@ -46,7 +47,7 @@ func TestFlagBeatsTheVariableTheFileReferences(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 3333, cfg.Server.Port)
-	assert.Equal(t, config.LayerFlag, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerFlag, cfg.Origin("server.port"))
 }
 
 func TestNestedLeafOverrideKeepsSiblings(t *testing.T) {
@@ -71,15 +72,15 @@ func TestOriginReportsTheWinningLayer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, config.LayerFlag, cfg.Origin("server.port"))
-	assert.Equal(t, config.LayerConfigFile, cfg.Origin("database.url"))
-	assert.Equal(t, config.LayerDefault, cfg.Origin("log.level"))
+	assert.Equal(t, fconfig.LayerFlag, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerConfigFile, cfg.Origin("database.url"))
+	assert.Equal(t, fconfig.LayerDefault, cfg.Origin("log.level"))
 	assert.Empty(t, cfg.Origin("nope"))
 
 	origins := cfg.Origins()
-	assert.Equal(t, config.LayerFlag, origins["server.port"])
+	assert.Equal(t, fconfig.LayerFlag, origins["server.port"])
 
 	// Origins must return a copy: mutating it cannot change the Config.
 	origins["server.port"] = "tampered"
-	assert.Equal(t, config.LayerFlag, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerFlag, cfg.Origin("server.port"))
 }

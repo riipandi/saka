@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/envfile"
 )
@@ -22,7 +23,7 @@ func TestVariableAloneDoesNotReachAKey(t *testing.T) {
 
 	assert.Equal(t, config.Default().Server.Port, cfg.Server.Port)
 	assert.Equal(t, config.Default().Log.Level, cfg.Log.Level)
-	assert.Equal(t, config.LayerDefault, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
 	assert.Empty(t, cfg.Origin("server.port.by_env"))
 }
 
@@ -46,19 +47,19 @@ func TestEnvNameRoundTripsEveryKey(t *testing.T) {
 	// keys sharing a name would make one of them unnameable.
 	seen := make(map[string]string)
 	for _, key := range config.Keys() {
-		name := config.EnvName(key)
+		name := fconfig.EnvName(key)
 		assert.NotContains(t, seen, name, "duplicate environment name for %s and %s", seen[name], key)
 		seen[name] = key
 	}
-	assert.Equal(t, "DATABASE_URL", config.EnvName("database.url"))
-	assert.Equal(t, "AUTH_SECRET_KEY", config.EnvName("auth.secret_key"))
-	assert.Equal(t, "SERVER_READ_TIMEOUT", config.EnvName("server.read_timeout"))
+	assert.Equal(t, "DATABASE_URL", fconfig.EnvName("database.url"))
+	assert.Equal(t, "AUTH_SECRET_KEY", fconfig.EnvName("auth.secret_key"))
+	assert.Equal(t, "SERVER_READ_TIMEOUT", fconfig.EnvName("server.read_timeout"))
 }
 
 func TestEnvNameAgreesWithEnvfile(t *testing.T) {
 	// pkg/envfile spells DATABASE_URL out because pkg/ cannot import internal/.
 	// The config layer derives the same name, so the two must agree.
-	assert.Equal(t, envfile.DatabaseURL, config.EnvName("database.url"))
+	assert.Equal(t, envfile.DatabaseURL, fconfig.EnvName("database.url"))
 }
 
 func TestUnknownFileKeyIsIgnored(t *testing.T) {
@@ -86,7 +87,7 @@ func TestEmptyValueIsKept(t *testing.T) {
 	}`)
 
 	assert.Empty(t, cfg.App.BaseURL)
-	assert.Equal(t, config.LayerConfigFile, cfg.Origin("app.base_url"))
+	assert.Equal(t, fconfig.LayerConfigFile, cfg.Origin("app.base_url"))
 }
 
 func TestDurationAndNumericFromFile(t *testing.T) {

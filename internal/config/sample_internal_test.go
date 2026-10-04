@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	fconfig "github.com/riipandi/saka/framework/config"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +35,7 @@ func sampleDoc(t *testing.T) map[string]any {
 
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(raw, &doc))
-	return flattenNested(doc, nil)
+	return fconfig.FlattenNested(doc, mapKeys)
 }
 
 func TestSampleWritesEverySecretAsADirective(t *testing.T) {
@@ -44,7 +46,7 @@ func TestSampleWritesEverySecretAsADirective(t *testing.T) {
 	for _, key := range secretKeys {
 		name, named := envKeys[key]
 		if !named {
-			name = EnvName(key)
+			name = fconfig.EnvName(key)
 		}
 		assert.Equal(t, "env:"+name, flat[key],
 			"%s must be written as a directive, never as a literal", key)
@@ -118,7 +120,7 @@ func TestSamplePublishesTheSelectedKeys(t *testing.T) {
 	// values they would not touch.
 	sections := make(map[string]bool)
 	for _, key := range Keys() {
-		sections[strings.Split(key, Delim)[0]] = true
+		sections[strings.Split(key, fconfig.Delim)[0]] = true
 	}
 	for section := range sections {
 		if section == "fetcher" {
@@ -126,7 +128,7 @@ func TestSamplePublishesTheSelectedKeys(t *testing.T) {
 		}
 		present := false
 		for key := range flat {
-			if strings.HasPrefix(key, section+Delim) {
+			if strings.HasPrefix(key, section+fconfig.Delim) {
 				present = true
 				break
 			}
@@ -514,7 +516,7 @@ func TestEnvExampleCoversEveryDirectiveVariable(t *testing.T) {
 		// VALKEY_URL, not KVSTORE_URL); the rest derive their name.
 		name, named := envKeys[key]
 		if !named {
-			name = EnvName(key)
+			name = fconfig.EnvName(key)
 		}
 		expected[name] = values[name]
 	}

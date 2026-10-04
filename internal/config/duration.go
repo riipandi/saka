@@ -1,9 +1,5 @@
 package config
 
-import (
-	"time"
-)
-
 // durationKeys are the config keys whose value is a length of time, and which a
 // config file therefore writes as a plain number of seconds.
 //
@@ -42,64 +38,3 @@ var durationKeys = []string{
 	"server.shutdown_timeout",
 	"server.write_timeout",
 }
-
-// normalizeDurations reads every duration key of a layer as seconds when it
-// holds a number, so a config file can say 900 rather than "15m".
-//
-// Only a named key is converted, and only a number: a duration string such as
-// "15m" is left for the decoder to parse, and a number under any other key stays
-// the type error it is.
-func normalizeDurations(keys map[string]any) {
-	for _, key := range durationKeys {
-		value, ok := keys[key]
-		if !ok {
-			continue
-		}
-		seconds, ok := asSeconds(value)
-		if !ok {
-			continue
-		}
-		keys[key] = time.Duration(seconds * float64(time.Second))
-	}
-}
-
-// asSeconds reads a number of seconds from the forms a source may hand over: a
-// JSON number arrives as a float64, and a caller building Options.Flags may pass
-// any Go numeric type. A string is not a number here, even though the decoder
-// would read "900" as one: a quoted value is a duration string, and the unit it
-// carries is the one it means.
-func asSeconds(value any) (float64, bool) {
-	var seconds float64
-	switch number := value.(type) {
-	case float64:
-		seconds = number
-	case float32:
-		seconds = float64(number)
-	case int:
-		seconds = float64(number)
-	case int32:
-		seconds = float64(number)
-	case int64:
-		seconds = float64(number)
-	case uint:
-		seconds = float64(number)
-	case uint32:
-		seconds = float64(number)
-	case uint64:
-		seconds = float64(number)
-	default:
-		return 0, false
-	}
-
-	// Reject NaN, an infinity, and a value that would overflow the
-	// multiplication, so a nonsense number cannot wrap into a duration that
-	// looks plausible.
-	if seconds != seconds || seconds > maxDurationSeconds || seconds < -maxDurationSeconds {
-		return 0, false
-	}
-	return seconds, true
-}
-
-// maxDurationSeconds is the largest number of seconds a time.Duration can hold,
-// about 292 years.
-const maxDurationSeconds = float64(1<<63-1) / float64(time.Second)

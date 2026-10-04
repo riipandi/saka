@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 )
 
 func TestConfigFileResolvedFromEnvironment(t *testing.T) {
 	path := writeConfig(t, "{"+baseBody+`, "server": {"port": 4444}}`)
 
-	cfg, err := config.Load(config.Options{Environ: append(baseEnv(), config.FileEnv+"="+path)})
+	cfg, err := config.Load(config.Options{Environ: append(baseEnv(), fconfig.FileEnv+"="+path)})
 	require.NoError(t, err)
 
 	assert.Equal(t, 4444, cfg.Server.Port)
@@ -25,7 +26,7 @@ func TestConfigFileFlagBeatsEnvironment(t *testing.T) {
 
 	cfg, err := config.Load(config.Options{
 		ConfigFile: fromFlag,
-		Environ:    append(baseEnv(), config.FileEnv+"="+fromEnv),
+		Environ:    append(baseEnv(), fconfig.FileEnv+"="+fromEnv),
 	})
 	require.NoError(t, err)
 
@@ -37,7 +38,7 @@ func TestConfigFileRejectsMalformedJSON(t *testing.T) {
 
 	_, err := config.Load(config.Options{ConfigFile: path, Environ: baseEnv()})
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, config.ErrNoConfigFile)
+	assert.NotErrorIs(t, err, fconfig.ErrNoConfigFile)
 }
 
 func TestConfigFileIgnoresUnknownKeys(t *testing.T) {
@@ -151,7 +152,7 @@ func TestEmptyVariableIsAValueNotAnUnresolvedDirective(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Empty(t, cfg.Unresolved())
-	require.Equal(t, config.LayerConfigFile, cfg.Origin("app.base_url"))
+	require.Equal(t, fconfig.LayerConfigFile, cfg.Origin("app.base_url"))
 }
 
 func TestInterpolationOnlyAppliesToTheFile(t *testing.T) {

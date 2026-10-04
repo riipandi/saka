@@ -9,21 +9,15 @@ import (
 	"encoding/json/v2"
 )
 
-// DefaultConfigFile is the config file Load reads when no source names one. The
-// file is the single source of truth for the configuration, so a missing default
-// file is an error: a run without it would silently fall back to the built-in
-// defaults, which is not a configuration anyone chose.
+// DefaultConfigFile is the config file Resolve reads when no source names one.
+// The file is the single source of truth for the configuration, so a missing
+// default file is an error: a run without it would silently fall back to the
+// built-in defaults, which is not a configuration anyone chose.
 const DefaultConfigFile = "app.config.json"
 
 // FileEnv is the environment variable naming the JSON config file. It is
 // overridden by an explicit --config-file flag.
 const FileEnv = "CONFIG_FILE"
-
-// SchemaFileName is the JSON Schema the generated file references from its
-// "$schema" key. The name is relative, so the pair travels together: the
-// schema lives beside the file it describes, in public/ for the repository
-// and beside app.config.json wherever the file is generated.
-const SchemaFileName = "config.schema.json"
 
 // ErrNoConfigFile reports a config file that does not exist.
 var ErrNoConfigFile = errors.New("config: config file not found")
@@ -33,7 +27,7 @@ var ErrNoConfigFile = errors.New("config: config file not found")
 // it would silently blank a key.
 var ErrUnresolvedVar = errors.New("config: unresolved variable")
 
-// ConfigPath returns the config file Load reads: the one named by
+// ConfigPath returns the config file Resolve reads: the one named by
 // Options.ConfigFile, then FileEnv, then DefaultConfigFile in the working
 // directory.
 func ConfigPath(opts Options, environ []string) string {
@@ -55,10 +49,9 @@ func ConfigPath(opts Options, environ []string) string {
 //
 // A directive naming a variable that is not set is not a load failure. It is
 // reported as unresolved and the key is left out of the layer, so it keeps its
-// default and only the command that reads it is affected: a migration needs
-// database.url and must not be blocked by the JWT key it never touches. Validate
-// reports every unresolved key.
-func configFileLayer(opts Options, environ []string) (map[string]any, map[string]string, error) {
+// default and only the caller that reads it is affected. The schema's
+// validation reports every unresolved key.
+func configFileLayer(opts Options, environ []string, schema Schema) (map[string]any, map[string]string, error) {
 	path := ConfigPath(opts, environ)
 
 	raw, err := os.ReadFile(path)
@@ -74,7 +67,7 @@ func configFileLayer(opts Options, environ []string) (map[string]any, map[string
 		return nil, nil, fmt.Errorf("config: parse %s: %w", path, err)
 	}
 
-	flat := flattenNested(doc, nil)
+	flat := FlattenNested(doc, schema.Maps)
 	unresolved := make(map[string]string)
 	for key, value := range flat {
 		text, ok := value.(string)
@@ -95,7 +88,7 @@ func configFileLayer(opts Options, environ []string) (map[string]any, map[string
 		}
 		flat[key] = resolved
 	}
-	return filterKnown(flat), unresolved, nil
+	return FilterKnown(flat, schema.Defaults), unresolved, nil
 }
 
 // interpolate expands the two directives a config file may use: env:NAME, the

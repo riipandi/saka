@@ -11,6 +11,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/pkg/printext"
@@ -84,7 +85,7 @@ func runMailerSmoke(ctx context.Context, cmd *cli.Command) error {
 
 	if !client.Configured() {
 		return printStatusLine(p, "mailer is not configured; set %s to send",
-			p.Dim(config.EnvName("mailer.smtp_host")))
+			p.Dim(fconfig.EnvName("mailer.smtp_host")))
 	}
 
 	started := time.Now()

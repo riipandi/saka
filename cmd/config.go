@@ -16,6 +16,7 @@ import (
 	"github.com/rodaine/table"
 	"github.com/urfave/cli/v3"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/envfile"
@@ -136,8 +137,8 @@ func dataDir(cfg config.Config) string {
 // configPath reports the file the configuration came from, so a command can name
 // it. It is the path the layer resolved, not a second guess at it.
 func configPath(cmd *cli.Command) string {
-	return config.ConfigPath(
-		config.Options{ConfigFile: cmd.String(config.FlagConfigFile)}, os.Environ())
+	return fconfig.ConfigPath(
+		fconfig.Options{ConfigFile: cmd.String(config.FlagConfigFile)}, os.Environ())
 }
 
 // configKey is the context key under which the resolved configuration is stored.
@@ -287,7 +288,7 @@ func printConfigWritten(p printext.Palette, path, schemaPath string, more ...str
 		return err
 	}
 	if _, err := fmt.Fprintf(p.Writer(), "next step: run %s, then set %s\n",
-		p.Dim("key:generate --env-file=.env.local"), p.Dim(config.EnvName("database.url"))); err != nil {
+		p.Dim("key:generate --env-file=.env.local"), p.Dim(fconfig.EnvName("database.url"))); err != nil {
 		return err
 	}
 	return printStatusLine(p, "config file ready")

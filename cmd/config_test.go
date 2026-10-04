@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/envfile"
 )
@@ -49,7 +50,7 @@ func useConfig(t *testing.T, body string) string {
 
 	path := filepath.Join(t.TempDir(), "app.config.json")
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
-	t.Setenv(config.FileEnv, path)
+	t.Setenv(fconfig.FileEnv, path)
 	return path
 }
 
@@ -144,7 +145,7 @@ func TestConfigGenerateNeverWritesALiteralSecret(t *testing.T) {
 	// Each secret must be a directive. A literal here would be committed by
 	// accident, because the file is meant to be readable.
 	for _, key := range []string{"app.secret_key", "auth.secret_key", "database.url"} {
-		assert.Contains(t, string(written), `"`+lastSegment(key)+`": "env:`+config.EnvName(key)+`"`)
+		assert.Contains(t, string(written), `"`+lastSegment(key)+`": "env:`+fconfig.EnvName(key)+`"`)
 	}
 }
 
@@ -190,13 +191,13 @@ func TestConfigGenerateDefaultsToTheConfigFile(t *testing.T) {
 	// With no --output the file lands where the loader looks for it, which is
 	// what makes the command the first step of a fresh checkout.
 	dir := t.TempDir()
-	t.Setenv(config.FileEnv, filepath.Join(dir, config.DefaultConfigFile))
+	t.Setenv(fconfig.FileEnv, filepath.Join(dir, fconfig.DefaultConfigFile))
 
 	out, err := runConfigGenerateCmd(t)
 	require.NoError(t, err)
-	assert.Contains(t, out, config.DefaultConfigFile)
+	assert.Contains(t, out, fconfig.DefaultConfigFile)
 
-	_, statErr := os.Stat(filepath.Join(dir, config.DefaultConfigFile))
+	_, statErr := os.Stat(filepath.Join(dir, fconfig.DefaultConfigFile))
 	require.NoError(t, statErr)
 }
 
@@ -240,10 +241,10 @@ func TestConfigValidateReportsAnUnresolvedVariable(t *testing.T) {
 }
 
 func TestConfigValidateReportsAMissingFile(t *testing.T) {
-	t.Setenv(config.FileEnv, filepath.Join(t.TempDir(), "absent.json"))
+	t.Setenv(fconfig.FileEnv, filepath.Join(t.TempDir(), "absent.json"))
 
 	_, err := runConfigValidateCmd(t)
-	require.ErrorIs(t, err, config.ErrNoConfigFile)
+	require.ErrorIs(t, err, fconfig.ErrNoConfigFile)
 }
 
 func TestConfigValidateUsesTheConfigFileFlag(t *testing.T) {

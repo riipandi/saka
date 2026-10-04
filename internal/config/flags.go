@@ -8,6 +8,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/riipandi/saka/pkg/envfile"
+
+	fconfig "github.com/riipandi/saka/framework/config"
 )
 
 // Flag names the root command declares. They are the plumbing of the config
@@ -115,16 +117,16 @@ func executingCommand(cmd *cli.Command) *cli.Command {
 // back to the flag names the bindings are written in. The path is built from the
 // same lineage the provider walked, so the two cannot disagree.
 func readFlags(cmd *cli.Command) map[string]any {
-	flat, err := cliflagv3.Provider(cmd, Delim).Read()
+	flat, err := cliflagv3.Provider(cmd, fconfig.Delim).Read()
 	if err != nil {
 		// The provider only fails when its output cannot be unflattened, which
 		// would be a bug in this package rather than a user error.
 		return nil
 	}
 
-	prefix := strings.Join(commandPath(cmd), Delim) + Delim
+	prefix := strings.Join(commandPath(cmd), fconfig.Delim) + fconfig.Delim
 	out := make(map[string]any, len(flat))
-	for key, value := range flattenNested(flat, nil) {
+	for key, value := range fconfig.FlattenNested(flat, mapKeys) {
 		name, ok := strings.CutPrefix(key, prefix)
 		if !ok || name == "" {
 			continue

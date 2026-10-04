@@ -10,6 +10,8 @@ import (
 
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+
+	fconfig "github.com/riipandi/saka/framework/config"
 )
 
 // secretKeys are the keys a generated file must not carry a literal value for.
@@ -247,7 +249,7 @@ func Sample() ([]byte, error) {
 		if _, ok := flat[key]; !ok {
 			return nil, fmt.Errorf("config: secret key %s is not part of Config", key)
 		}
-		flat[key] = "env:" + EnvName(key)
+		flat[key] = "env:" + fconfig.EnvName(key)
 	}
 	for key, name := range envKeys {
 		if _, ok := flat[key]; !ok {
@@ -277,7 +279,7 @@ func Sample() ([]byte, error) {
 func EnvExample() ([]byte, error) {
 	names := make(map[string]string, len(secretKeys)+len(envKeys))
 	for _, key := range secretKeys {
-		names[key] = EnvName(key)
+		names[key] = fconfig.EnvName(key)
 	}
 	maps.Copy(names, envKeys)
 
@@ -349,7 +351,7 @@ func renderScalar(value any) string {
 func nest(flat map[string]any) map[string]any {
 	out := make(map[string]any)
 	for key, value := range flat {
-		parts := strings.Split(key, Delim)
+		parts := strings.Split(key, fconfig.Delim)
 		node := out
 		for _, part := range parts[:len(parts)-1] {
 			child, ok := node[part].(map[string]any)

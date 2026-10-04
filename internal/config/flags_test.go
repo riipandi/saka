@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 )
 
@@ -123,5 +124,5 @@ func TestResolveAppliesFlagOverEverything(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 3333, cfg.Server.Port)
-	assert.Equal(t, config.LayerFlag, cfg.Origin("server.port"))
+	assert.Equal(t, fconfig.LayerFlag, cfg.Origin("server.port"))
 }

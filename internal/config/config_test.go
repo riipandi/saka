@@ -11,6 +11,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 
+	fconfig "github.com/riipandi/saka/framework/config"
 	"github.com/riipandi/saka/internal/config"
 )
 
@@ -115,7 +116,7 @@ func TestDefaultsAreValid(t *testing.T) {
 	require.Equal(t, defaults.Server.Port, cfg.Server.Port)
 	require.Equal(t, defaults.Storage.LocalPath, cfg.Storage.LocalPath)
 	require.Equal(t, defaults.Log.Level, cfg.Log.Level)
-	require.Equal(t, config.LayerDefault, cfg.Origin("server.port"))
+	require.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
 }
 
 func TestIssuerFallsBackToPublicBaseURL(t *testing.T) {
@@ -130,7 +131,7 @@ func TestIssuerFallsBackToPublicBaseURL(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "https://saka.example", cfg.Auth.Issuer)
-	assert.Equal(t, config.LayerDefault, cfg.Origin("auth.issuer"),
+	assert.Equal(t, fconfig.LayerDefault, cfg.Origin("auth.issuer"),
 		"the fallback is a resolution rule, not a layer")
 }
 
@@ -145,7 +146,7 @@ func TestEnvironmentAloneCannotSetAKey(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, config.Default().Server, cfg.Server)
-	require.Equal(t, config.LayerDefault, cfg.Origin("server.port"))
+	require.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
 }
 
 func TestNamedConfigFileMustExist(t *testing.T) {
@@ -153,7 +154,7 @@ func TestNamedConfigFileMustExist(t *testing.T) {
 		ConfigFile: filepath.Join(t.TempDir(), "absent.json"),
 		Environ:    baseEnv(),
 	})
-	require.ErrorIs(t, err, config.ErrNoConfigFile)
+	require.ErrorIs(t, err, fconfig.ErrNoConfigFile)
 }
 
 func TestDefaultConfigFileInWorkingDirectory(t *testing.T) {
@@ -161,7 +162,7 @@ func TestDefaultConfigFileInWorkingDirectory(t *testing.T) {
 	// the working directory when no source names one.
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, config.DefaultConfigFile),
+		filepath.Join(dir, fconfig.DefaultConfigFile),
 		[]byte("{"+baseBody+`, "server": {"port": 7777}}`),
 		0o600,
 	))
@@ -171,7 +172,7 @@ func TestDefaultConfigFileInWorkingDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 7777, cfg.Server.Port)
-	require.Equal(t, config.LayerConfigFile, cfg.Origin("server.port"))
+	require.Equal(t, fconfig.LayerConfigFile, cfg.Origin("server.port"))
 }
 
 func TestMissingDefaultConfigFileIsAnError(t *testing.T) {
@@ -180,18 +181,18 @@ func TestMissingDefaultConfigFileIsAnError(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	_, err := config.Load(config.Options{Environ: baseEnv()})
-	require.ErrorIs(t, err, config.ErrNoConfigFile)
+	require.ErrorIs(t, err, fconfig.ErrNoConfigFile)
 }
 
 func TestConfigPathPrecedence(t *testing.T) {
 	fromFlag := "/from/flag.json"
 	fromEnv := "/from/env.json"
 
-	require.Equal(t, fromFlag, config.ConfigPath(
-		config.Options{ConfigFile: fromFlag},
-		[]string{config.FileEnv + "=" + fromEnv}))
-	require.Equal(t, fromEnv, config.ConfigPath(
-		config.Options{},
-		[]string{config.FileEnv + "=" + fromEnv}))
-	require.Equal(t, config.DefaultConfigFile, config.ConfigPath(config.Options{}, nil))
+	require.Equal(t, fromFlag, fconfig.ConfigPath(
+		fconfig.Options{ConfigFile: fromFlag},
+		[]string{fconfig.FileEnv + "=" + fromEnv}))
+	require.Equal(t, fromEnv, fconfig.ConfigPath(
+		fconfig.Options{},
+		[]string{fconfig.FileEnv + "=" + fromEnv}))
+	require.Equal(t, fconfig.DefaultConfigFile, fconfig.ConfigPath(fconfig.Options{}, nil))
 }
