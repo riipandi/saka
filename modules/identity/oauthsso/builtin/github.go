@@ -10,6 +10,19 @@ import (
 	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
+// GitHub is the OAuth2-only provider. `read:user` and `user:email` are
+// the scopes the identity read needs; the primary verified email — not
+// the profile's public one — is what the linking rule judges.
+var GitHub = Definition{
+	Slug:             "github",
+	DisplayName:      "GitHub",
+	Scopes:           []string{"read:user", "user:email"},
+	AuthorizationURL: "https://github.com/login/oauth/authorize",
+	TokenURL:         "https://github.com/login/oauth/access_token",
+	UserinfoURL:      "https://api.github.com/user",
+	EmailsURL:        "https://api.github.com/user/emails",
+}
+
 // githubProvider is the GitHub adapter: an OAuth2-only provider whose
 // identity is read from its user API, with the verified flag carried by
 // the address-list endpoint beside it. The primary verified email — not
@@ -23,6 +36,12 @@ type githubProvider struct {
 // the shared outbound fetch the identity reads run through.
 func NewGitHub(fetcher oauthsso.IdentityFetcher) *githubProvider {
 	return &githubProvider{def: GitHub, fetcher: fetcher}
+}
+
+// TokenEndpoint is the provider's fixed token endpoint — the URL the
+// token client presents the refresh grant to.
+func (g *githubProvider) TokenEndpoint(conn oauthsso.Connection) string {
+	return g.def.TokenURL
 }
 
 // AuthorizeURL renders GitHub's authorize URL with the PKCE challenge.
@@ -61,14 +80,15 @@ func (g *githubProvider) Resolve(ctx context.Context, conn oauthsso.Connection, 
 	given, family := splitName(profile.Name)
 	profileJSON, _ := json.Marshal(map[string]string{"login": profile.Login})
 	return oauthsso.ExternalIdentity{
-		ProviderAccountID: strconv.FormatInt(profile.ID, 10),
-		Email:             email,
-		EmailVerified:     verified,
-		GivenName:         given,
-		FamilyName:        family,
-		Profile:           profileJSON,
-		AccessToken:       token.AccessToken,
-		RefreshToken:      token.RefreshToken,
+		ProviderAccountID:    strconv.FormatInt(profile.ID, 10),
+		Email:                email,
+		EmailVerified:        verified,
+		GivenName:            given,
+		FamilyName:           family,
+		Profile:              profileJSON,
+		AccessToken:          token.AccessToken,
+		RefreshToken:         token.RefreshToken,
+		AccessTokenExpiresAt: token.Expiry,
 	}, nil
 }
 

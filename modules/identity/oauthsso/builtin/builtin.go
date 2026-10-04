@@ -42,32 +42,6 @@ type Definition struct {
 	EmailsURL string
 }
 
-// Google is the OIDC provider. The scopes are the minimum the identity
-// resolution reads: the address, its verified flag, and the names.
-var Google = Definition{
-	Slug:             "google",
-	DisplayName:      "Google",
-	Scopes:           []string{"openid", "email", "profile"},
-	OIDC:             true,
-	Issuer:           "https://accounts.google.com",
-	AuthorizationURL: "https://accounts.google.com/o/oauth2/v2/auth",
-	TokenURL:         "https://oauth2.googleapis.com/token",
-	JwksURL:          "https://www.googleapis.com/oauth2/v3/certs",
-}
-
-// GitHub is the OAuth2-only provider. `read:user` and `user:email` are
-// the scopes the identity read needs; the primary verified email — not
-// the profile's public one — is what the linking rule judges.
-var GitHub = Definition{
-	Slug:             "github",
-	DisplayName:      "GitHub",
-	Scopes:           []string{"read:user", "user:email"},
-	AuthorizationURL: "https://github.com/login/oauth/authorize",
-	TokenURL:         "https://github.com/login/oauth/access_token",
-	UserinfoURL:      "https://api.github.com/user",
-	EmailsURL:        "https://api.github.com/user/emails",
-}
-
 // definitions indexes the shipped providers by slug.
 var definitions = map[string]Definition{
 	Google.Slug: Google,

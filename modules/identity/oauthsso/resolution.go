@@ -258,7 +258,7 @@ func (s *Service) ContinueSignIn(ctx context.Context, params ContinueParams) (Co
 	binding, err := s.repo.LinkedAccountByProvider(ctx, s.pool, flow.ConnectionID, flow.ProviderAccountID)
 	switch {
 	case err == nil:
-		return s.openSession(ctx, flow, conn, binding.UserID, params)
+		return s.openSession(ctx, flow, conn, binding, params)
 	case errors.Is(err, datastore.ErrNoRows):
 		// The branches below decide.
 	default:
@@ -584,6 +584,7 @@ func (s *Service) bindIdentity(ctx context.Context, tx datastore.Querier, flow F
 		Profile:           flow.Profile,
 		AccessToken:       flow.AccessToken,
 		RefreshToken:      flow.RefreshToken,
+		AccessExpiresAt:   flow.AccessExpiresAt,
 	}); err != nil {
 		return fmt.Errorf("oauthsso: bind identity: %w", err)
 	}
@@ -655,10 +656,12 @@ func (s *Service) finish(ctx context.Context, tx datastore.Querier, flow Flow, a
 }
 
 // openSession runs the MFA fork and the mint for an account the
-// resolution already bound — the first question's branch, and the only
-// one that needs no writes beside the flow's.
-func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, userID uuid.UUID, params ContinueParams) (ContinueResult, error) {
-	account, err := s.issuer.FindAccountByIDAny(ctx, userID)
+// resolution already bound. The binding's tokens ride the same
+// transaction the session does — the provider minted a fresh pair at the
+// callback, and a binding storing the stale half is a read the retrieval
+// and the offboarding pass would both judge wrongly.
+func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, binding LinkedAccount, params ContinueParams) (ContinueResult, error) {
+	account, err := s.issuer.FindAccountByIDAny(ctx, binding.UserID)
 	if err != nil {
 		return ContinueResult{}, err
 	}
@@ -669,6 +672,12 @@ func (s *Service) openSession(ctx context.Context, flow Flow, conn Connection, u
 		// earns, one transaction for both.
 		if profileErr := s.applyResolutionProfile(ctx, tx, flow, conn, account.ID); profileErr != nil {
 			return profileErr
+		}
+		if flow.AccessToken != "" {
+			if rotErr := s.repo.UpdateBindingTokens(ctx, tx, binding.ID,
+				flow.AccessToken, flow.RefreshToken, flow.AccessExpiresAt); rotErr != nil {
+				return rotErr
+			}
 		}
 		var openErr error
 		result, openErr = s.finish(ctx, tx, flow, account, conn, params)

@@ -9,6 +9,19 @@ import (
 	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 
+// Google is the OIDC provider. The scopes are the minimum the identity
+// resolution reads: the address, its verified flag, and the names.
+var Google = Definition{
+	Slug:             "google",
+	DisplayName:      "Google",
+	Scopes:           []string{"openid", "email", "profile"},
+	OIDC:             true,
+	Issuer:           "https://accounts.google.com",
+	AuthorizationURL: "https://accounts.google.com/o/oauth2/v2/auth",
+	TokenURL:         "https://oauth2.googleapis.com/token",
+	JwksURL:          "https://www.googleapis.com/oauth2/v3/certs",
+}
+
 // googleProvider is the Google adapter: an OIDC provider whose id_token
 // carries the whole identity — subject, address, verified flag, names —
 // so no userinfo read rides the flow. The endpoints are the code's own;
@@ -23,6 +36,12 @@ type googleProvider struct {
 // NewGoogle builds the Google adapter over the shipped definition.
 func NewGoogle() *googleProvider {
 	return &googleProvider{issuer: Google.Issuer, jwksURL: Google.JwksURL, def: Google}
+}
+
+// TokenEndpoint is the provider's fixed token endpoint — the URL the
+// token client presents the refresh grant to.
+func (g *googleProvider) TokenEndpoint(conn oauthsso.Connection) string {
+	return g.def.TokenURL
 }
 
 // AuthorizeURL renders Google's authorize URL: the PKCE challenge, the
@@ -78,12 +97,13 @@ func (g *googleProvider) Resolve(ctx context.Context, conn oauthsso.Connection, 
 	}
 
 	return oauthsso.ExternalIdentity{
-		ProviderAccountID: claims.Subject,
-		Email:             claims.Email,
-		EmailVerified:     bool(claims.EmailVerified),
-		GivenName:         claims.GivenName,
-		FamilyName:        claims.FamilyName,
-		AccessToken:       token.AccessToken,
-		RefreshToken:      token.RefreshToken,
+		ProviderAccountID:    claims.Subject,
+		Email:                claims.Email,
+		EmailVerified:        bool(claims.EmailVerified),
+		GivenName:            claims.GivenName,
+		FamilyName:           claims.FamilyName,
+		AccessToken:          token.AccessToken,
+		RefreshToken:         token.RefreshToken,
+		AccessTokenExpiresAt: token.Expiry,
 	}, nil
 }

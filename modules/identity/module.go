@@ -631,9 +631,11 @@ var Package = do.Package(
 		}
 		var discovery oauthsso.DiscoveryFetcher
 		var identityReads oauthsso.IdentityFetcher
+		var tokenPosts oauthsso.TokenPoster
 		if fetch != nil {
 			discovery = oauthsso.FetcherAdapter(fetch)
 			identityReads = oauthsso.BearerFetchAdapter(fetch)
+			tokenPosts = oauthsso.FormPostAdapter(fetch)
 		}
 		service := oauthsso.NewService(pool, cipher, recorder, discovery, log).
 			WithBaseURL(c.App.BaseURL)
@@ -659,6 +661,9 @@ var Package = do.Package(
 		}
 		if profiles := do.MustInvoke[*user.Service](i); profiles != nil {
 			service = service.WithProfiles(profiles)
+		}
+		if tokenPosts != nil {
+			service = service.WithTokenPoster(tokenPosts)
 		}
 		return service.WithProviders(oauthsso.ProviderSet{
 			Builtin: map[string]oauthsso.Provider{

@@ -18,6 +18,7 @@ type fakeProvider struct {
 	identity ExternalIdentity
 	err      error
 	last     FlowSecrets
+	endpoint string
 }
 
 func (f *fakeProvider) AuthorizeURL(_ Connection, flow FlowSecrets) (string, error) {
@@ -28,6 +29,10 @@ func (f *fakeProvider) AuthorizeURL(_ Connection, flow FlowSecrets) (string, err
 func (f *fakeProvider) Resolve(_ context.Context, _ Connection, flow FlowSecrets, _ string) (ExternalIdentity, error) {
 	f.last = flow
 	return f.identity, f.err
+}
+
+func (f *fakeProvider) TokenEndpoint(_ Connection) string {
+	return f.endpoint
 }
 
 func flowService(t *testing.T, provider Provider) *Service {

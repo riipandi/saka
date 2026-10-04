@@ -278,9 +278,12 @@ type Flow struct {
 	Profile           []byte
 	AccessToken       string
 	RefreshToken      string
-	RedirectTo        string
-	CreatedAt         time.Time
-	ExpiresAt         time.Time
+	// AccessExpiresAt is when the resolved access token dies; NULL is a
+	// provider that answered no expiry.
+	AccessExpiresAt *time.Time
+	RedirectTo      string
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
 }
 
 // FlowResolution is what the callback writes when the provider answered:
@@ -299,4 +302,8 @@ type FlowResolution struct {
 	Profile            []byte
 	SealedAccessToken  string
 	SealedRefreshToken string
+	// AccessExpiresAt is the expiry the adapter answered, carried to the
+	// binding beside the tokens themselves. Nil is a provider that
+	// answered none.
+	AccessExpiresAt *time.Time
 }

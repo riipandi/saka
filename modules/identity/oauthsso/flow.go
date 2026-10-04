@@ -189,6 +189,7 @@ func (s *Service) Callback(ctx context.Context, provider, code, state string) (s
 		Profile:            identity.Profile,
 		SealedAccessToken:  sealedAccess,
 		SealedRefreshToken: sealedRefresh,
+		AccessExpiresAt:    expiresAtOf(identity),
 	})
 	if err != nil {
 		return "", err
@@ -232,6 +233,16 @@ func (s *Service) FlowRedirect(flowToken string) string {
 // and no JSON envelope reaches it.
 func (s *Service) ErrorRedirect(code string) string {
 	return s.baseURL + spaCallbackPath + "?error=" + url.QueryEscape(code)
+}
+
+// expiresAtOf renders the identity's token expiry for the row: a
+// provider that answered none stays NULL, the age the row cannot know.
+func expiresAtOf(identity ExternalIdentity) *time.Time {
+	if identity.AccessTokenExpiresAt.IsZero() {
+		return nil
+	}
+	expires := identity.AccessTokenExpiresAt
+	return &expires
 }
 
 // unseal opens a sealed value. A process without the cipher cannot open

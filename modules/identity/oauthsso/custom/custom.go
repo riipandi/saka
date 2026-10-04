@@ -111,17 +111,24 @@ func (p *Provider) Resolve(ctx context.Context, conn oauthsso.Connection, flow o
 
 	profile, _ := json.Marshal(claims.raw)
 	return oauthsso.ExternalIdentity{
-		ProviderAccountID: subject,
-		Email:             email,
-		EmailVerified:     claims.mappedEmailVerified(mapping),
-		GivenName:         claims.mappedGiven(mapping),
-		FamilyName:        claims.mappedFamily(mapping),
-		Username:          claims.mappedUsername(mapping),
-		AvatarURL:         claims.mappedAvatarURL(mapping),
-		Profile:           profile,
-		AccessToken:       token.AccessToken,
-		RefreshToken:      token.RefreshToken,
+		ProviderAccountID:    subject,
+		Email:                email,
+		EmailVerified:        claims.mappedEmailVerified(mapping),
+		GivenName:            claims.mappedGiven(mapping),
+		FamilyName:           claims.mappedFamily(mapping),
+		Username:             claims.mappedUsername(mapping),
+		AvatarURL:            claims.mappedAvatarURL(mapping),
+		Profile:              profile,
+		AccessToken:          token.AccessToken,
+		RefreshToken:         token.RefreshToken,
+		AccessTokenExpiresAt: token.Expiry,
 	}, nil
+}
+
+// TokenEndpoint is the connection's own token endpoint — the one its
+// manual endpoints or its discovery document stored.
+func (p *Provider) TokenEndpoint(conn oauthsso.Connection) string {
+	return conn.Endpoints.Token
 }
 
 // config renders the oauth2 client the connection's endpoints name. An

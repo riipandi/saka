@@ -117,6 +117,10 @@ CREATE TABLE IF NOT EXISTS public.oauth_flows (
     profile JSONB NOT NULL DEFAULT '{}',
     access_token TEXT NOT NULL DEFAULT '' CHECK (access_token = '' OR access_token LIKE 'enc:%'),
     refresh_token TEXT NOT NULL DEFAULT '' CHECK (refresh_token = '' OR refresh_token LIKE 'enc:%'),
+    -- When the resolved access token dies, named by the provider's
+    -- expires_in at the callback that wrote it: the value rides the
+    -- resolution onto the binding beside the tokens themselves.
+    access_expires_at TIMESTAMPTZ,
     redirect_to TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at > CURRENT_TIMESTAMP)

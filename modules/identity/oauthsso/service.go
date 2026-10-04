@@ -86,6 +86,12 @@ type Service struct {
 	// refuses at the begin rather than failing the run.
 	providers ProviderSet
 
+	// tokens is the form POST the token client presents the refresh
+	// grant with, wired after construction like the adapters. A nil
+	// poster makes every refresh a skip: the retrieval answers the
+	// stored tokens, and the offboarding pass has nothing to probe with.
+	tokens TokenPoster
+
 	// issuer is the session mint the resolution binds accounts through,
 	// the mfa gate the second factor's fork runs, settings the JIT
 	// policy's runtime source, blocklist the identifier gate, and codes
@@ -122,6 +128,13 @@ type ProviderSet struct {
 // this one for its types.
 func (s *Service) WithProviders(set ProviderSet) *Service {
 	s.providers = set
+	return s
+}
+
+// WithTokenPoster wires the form POST the token client presents the
+// refresh grant with — the same post-construction seam the adapters ride.
+func (s *Service) WithTokenPoster(poster TokenPoster) *Service {
+	s.tokens = poster
 	return s
 }
 

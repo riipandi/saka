@@ -3,6 +3,7 @@ package oauthsso
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"uuid"
@@ -99,10 +100,23 @@ type LinkedAccountTokens struct {
 	Provider     string
 }
 
+// tokenRefreshGrace is how close to an access token's death a read
+// still refreshes: a token inside the window answers the provider's API
+// long enough to be refused mid-call, so the read treats it as spent.
+const tokenRefreshGrace = time.Minute
+
 // GetLinkedAccountTokens reads the calling account's binding and opens
 // the tokens it carries. A foreign binding is a missing one — the same
 // `not_found` the unlink answers keeps the procedure from naming whose
-// bindings exist — and the read touches no write.
+// bindings exist — and the read touches no account fact.
+//
+// An expired access token — or one whose age the provider never named —
+// refreshes first against the connection's token endpoint, and the
+// rotation persists: the next read and the offboarding pass judge fresh
+// material. A refresh that fails for any reason answers the stored
+// tokens as they lie — the read does not fail because maintenance did,
+// and the provider's `invalid_grant` word is the offboarding job's
+// judgement to make, not a read's.
 func (s *Service) GetLinkedAccountTokens(ctx context.Context, userID, linkedID uuid.UUID) (LinkedAccountTokens, error) {
 	binding, err := s.repo.LinkedAccountByID(ctx, s.pool, linkedID)
 	if errors.Is(err, datastore.ErrNoRows) {
@@ -113,6 +127,28 @@ func (s *Service) GetLinkedAccountTokens(ctx context.Context, userID, linkedID u
 	}
 	if binding.LinkedAccount.UserID != userID {
 		return LinkedAccountTokens{}, ErrLinkedAccountNotFound
+	}
+
+	if s.staleTokens(binding.LinkedAccount) {
+		conn, connErr := s.repo.ByID(ctx, s.pool, binding.LinkedAccount.ConnectionID)
+		if connErr != nil {
+			return LinkedAccountTokens{}, connErr
+		}
+		if rotated, refreshErr := s.refreshTokens(ctx, conn, binding.LinkedAccount.RefreshToken); refreshErr == nil {
+			if storeErr := s.repo.UpdateBindingTokens(ctx, s.pool, binding.LinkedAccount.ID,
+				rotated.SealedAccessToken, rotated.SealedRefreshToken, rotated.AccessExpiresAt); storeErr != nil {
+				return LinkedAccountTokens{}, storeErr
+			}
+			binding.LinkedAccount.AccessToken = rotated.SealedAccessToken
+			binding.LinkedAccount.RefreshToken = rotated.SealedRefreshToken
+			binding.LinkedAccount.AccessExpiresAt = rotated.AccessExpiresAt
+		} else if !errors.Is(refreshErr, errNoRefresh) {
+			// Every other failure — a dead endpoint, a refused grant —
+			// leaves the stored tokens the answer.
+			s.log.WarnContext(ctx, "oauthsso: the token refresh did not run; the stored tokens answer",
+				slog.String("linked_account_id", binding.LinkedAccount.ID.String()),
+				slog.String("error", refreshErr.Error()))
+		}
 	}
 
 	access, err := s.openToken(binding.LinkedAccount.AccessToken)
@@ -130,6 +166,20 @@ func (s *Service) GetLinkedAccountTokens(ctx context.Context, userID, linkedID u
 		ConnectionID: binding.LinkedAccount.ConnectionID,
 		Provider:     binding.Provider,
 	}, nil
+}
+
+// staleTokens judges whether the binding's access token needs a refresh
+// before it answers: a token whose age the provider never named, or one
+// dead (or inside the grace window), is a token the provider's API
+// would refuse — the refresh is the read's own maintenance.
+func (s *Service) staleTokens(binding LinkedAccount) bool {
+	if binding.AccessToken == "" || binding.RefreshToken == "" {
+		return false
+	}
+	if binding.AccessExpiresAt == nil {
+		return true
+	}
+	return !binding.AccessExpiresAt.After(s.now().Add(tokenRefreshGrace))
 }
 
 // openToken opens one sealed token column. The empty column is the

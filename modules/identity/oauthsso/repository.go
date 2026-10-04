@@ -183,7 +183,7 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code_verifier,
 	stage, user_id, email, email_code_hash, wrong_codes, provider_account_id,
 	email_verified, given_name, family_name, username, avatar_url, profile,
-	access_token, refresh_token, redirect_to, created_at, expires_at`
+	access_token, refresh_token, access_expires_at, redirect_to, created_at, expires_at`
 
 const linkedAccountColumns = `id, user_id, connection_id, provider_account_id, email,
 	email_verified, profile, access_token, refresh_token, access_expires_at,
@@ -255,6 +255,7 @@ func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, i
 		sb.Assign("profile", profileJSONFromBytes(resolution.Profile)),
 		sb.Assign("access_token", resolution.SealedAccessToken),
 		sb.Assign("refresh_token", resolution.SealedRefreshToken),
+		sb.Assign("access_expires_at", resolution.AccessExpiresAt),
 	)
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StagePending)), sb.IsNull("flow_token_hash"))
 	query, args := sb.Build()
@@ -322,10 +323,31 @@ func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Queri
 	row.ID = uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(entity.TableOAuthLinkedAccounts)
-	ib.Cols("id", "user_id", "connection_id", "provider_account_id", "email", "email_verified", "profile", "access_token", "refresh_token")
+	ib.Cols("id", "user_id", "connection_id", "provider_account_id", "email", "email_verified", "profile", "access_token", "refresh_token", "access_expires_at")
 	ib.Values(row.ID, row.UserID, row.ConnectionID, row.ProviderAccountID, row.Email,
-		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken)
+		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken, row.AccessExpiresAt)
 	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateBindingTokens rotates the tokens an existing binding carries:
+// the sealed pair and the expiry are one guarded write inside the
+// caller's transaction. Every sign-in and every successful refresh runs
+// through it — a binding whose provider rotated its tokens must never
+// store the stale half.
+func (r *Repository) UpdateBindingTokens(ctx context.Context, db datastore.Querier, id uuid.UUID, sealedAccess, sealedRefresh string, expiresAt *time.Time) error {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(entity.TableOAuthLinkedAccounts)
+	ub.Set(
+		ub.Assign("access_token", sealedAccess),
+		ub.Assign("refresh_token", sealedRefresh),
+		ub.Assign("access_expires_at", expiresAt),
+	)
+	ub.Where(ub.Equal("id", id))
+	query, args := ub.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
 		return err
 	}
@@ -629,8 +651,8 @@ func scanFlow(row pgx.Row) (Flow, error) {
 		&flow.EmailCodeHash, &flow.WrongCodes, &flow.ProviderAccountID,
 		&flow.EmailVerified, &flow.GivenName, &flow.FamilyName, &flow.Username,
 		&flow.AvatarURL, &flow.Profile,
-		&flow.AccessToken, &flow.RefreshToken, &flow.RedirectTo, &flow.CreatedAt,
-		&flow.ExpiresAt)
+		&flow.AccessToken, &flow.RefreshToken, &flow.AccessExpiresAt,
+		&flow.RedirectTo, &flow.CreatedAt, &flow.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Flow{}, datastore.ErrNoRows
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/riipandi/saka/internal/fetcher"
 )
@@ -59,6 +61,10 @@ type ExternalIdentity struct {
 	// for the scopes asked.
 	AccessToken  string
 	RefreshToken string
+	// AccessTokenExpiresAt is when the access token dies, named by the
+	// provider's expires_in. Zero is a provider that answered none — the
+	// token's age is then unknown to the binding.
+	AccessTokenExpiresAt time.Time
 }
 
 // FlowSecrets are the per-flow values the authorize request and the code
@@ -88,6 +94,11 @@ type Provider interface {
 	// identity. The nonce the flow minted is what an OIDC id_token must
 	// answer; an OAuth2-only provider ignores it.
 	Resolve(ctx context.Context, conn Connection, flow FlowSecrets, code string) (ExternalIdentity, error)
+	// TokenEndpoint is the URL the token client presents the refresh
+	// grant to — the adapter's own fixed endpoint for a builtin, the
+	// connection's stored endpoint for a custom one. Empty is a
+	// connection the client cannot refresh against.
+	TokenEndpoint(conn Connection) string
 }
 
 // IdentityFetcher is the authenticated read an adapter makes against a
@@ -120,4 +131,38 @@ type IdentityFetcherFunc func(ctx context.Context, url string, bearer string) (i
 // Do runs the function.
 func (f IdentityFetcherFunc) Do(ctx context.Context, url string, bearer string) (int, []byte, error) {
 	return f(ctx, url, bearer)
+}
+
+// TokenPoster is the form POST the token client presents the refresh
+// grant with: the endpoint URL, the form fields the grant carries. The
+// shared outbound client satisfies it; the tests hand a stub.
+type TokenPoster interface {
+	PostForm(ctx context.Context, url string, form url.Values) (status int, body []byte, err error)
+}
+
+// TokenPosterFunc adapts a function onto the token POST seam.
+type TokenPosterFunc func(ctx context.Context, url string, form url.Values) (int, []byte, error)
+
+// PostForm runs the function.
+func (f TokenPosterFunc) PostForm(ctx context.Context, url string, form url.Values) (int, []byte, error) {
+	return f(ctx, url, form)
+}
+
+// FormPostAdapter adapts the shared fetcher client onto the token POST
+// seam: the form encodes as the body string, the content type names it,
+// and the client's policy — timeouts, body bound, no credential logged —
+// is the one every outbound call shares.
+func FormPostAdapter(client *fetcher.Client) TokenPoster {
+	return TokenPosterFunc(func(ctx context.Context, rawurl string, form url.Values) (int, []byte, error) {
+		res, err := client.Do(ctx, fetcher.Request{
+			Method:  http.MethodPost,
+			URL:     rawurl,
+			Headers: http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}},
+			Body:    form.Encode(),
+		})
+		if err != nil {
+			return 0, nil, err
+		}
+		return res.StatusCode, res.Body, nil
+	})
 }
