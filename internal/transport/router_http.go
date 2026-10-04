@@ -10,6 +10,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
@@ -42,12 +43,12 @@ type Options struct {
 	// RateLimiter is the limiter the API surface is throttled by. A nil
 	// limiter mounts no throttling, which is the state a run without a
 	// rate_limit driver is in.
-	RateLimiter middleware.Limiter
+	RateLimiter fwmiddleware.Limiter
 	// RateClassify answers the bucket a request path is counted under, or
 	// false when the limiter never counts it. A nil classifier counts
 	// nothing, which is the state a bare test router is in — the limiter's
 	// counted surface is the guard's decision, wired here.
-	RateClassify middleware.Classifier
+	RateClassify fwmiddleware.Classifier
 	// Modules are the feature modules whose routes and procedures the server
 	// mounts.
 	Modules []kernel.Module
@@ -104,21 +105,28 @@ type Options struct {
 func NewRouter(opts Options) chi.Router {
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
+	r.Use(fwmiddleware.RequestID)
 	// The security headers ride every response, refusals included: they are
 	// written before the handler runs, at the top of the chain, so no
 	// surface — API, protocol, SPA, metrics — answers without them.
-	r.Use(middleware.SecurityHeaders)
+	r.Use(fwmiddleware.SecurityHeaders)
 	// The client facts are captured here rather than per surface: both the
 	// REST routes and the procedures read them from the context, and the
 	// groups below inherit this chain, so there is one place a fact is
 	// gathered instead of one per transport. The address it resolves is the
 	// same one the rate limiter keys by, because both read chi's context.
 	r.Use(middleware.ClientInfo(opts.Config.Server.TrustedProxyHeaders))
-	r.Use(middleware.Logger(opts.Logger))
-	r.Use(middleware.Recoverer(opts.Logger))
-	r.Use(middleware.CORS(opts.Config.Server.CORS))
-	r.Use(middleware.Timeout(opts.Config.Server.WriteTimeout))
+	r.Use(fwmiddleware.Logger(opts.Logger))
+	r.Use(fwmiddleware.Recoverer(opts.Logger))
+	r.Use(fwmiddleware.CORS(fwmiddleware.CORSOptions{
+		AllowedOrigins:   opts.Config.Server.CORS.AllowedOrigins,
+		AllowedMethods:   opts.Config.Server.CORS.AllowedMethods,
+		AllowedHeaders:   opts.Config.Server.CORS.AllowedHeaders,
+		ExposedHeaders:   opts.Config.Server.CORS.ExposedHeaders,
+		AllowCredentials: opts.Config.Server.CORS.AllowCredentials,
+		MaxAge:           opts.Config.Server.CORS.MaxAge,
+	}))
+	r.Use(fwmiddleware.Timeout(opts.Config.Server.WriteTimeout))
 
 	if opts.Metrics != nil {
 		r.Handle(opts.Config.OTEL.Metrics.PrometheusPath, opts.Metrics)
@@ -139,7 +147,10 @@ func NewRouter(opts Options) chi.Router {
 	// paths from being answered with index.html.
 	r.Group(func(throttled chi.Router) {
 		if opts.RateLimiter != nil {
-			throttled.Use(middleware.RateLimit("rest", opts.RateLimiter, restRefuse, opts.RateClassify, httpRateLimitExclusions...))
+			throttled.Use(fwmiddleware.RateLimit(fwmiddleware.RateLimitOptions{
+				Surface: "rest", Limiter: opts.RateLimiter, Refuse: restRefuse,
+				Classify: opts.RateClassify, Excluded: httpRateLimitExclusions, TelemetryNamespace: config.AppIdentifier,
+			}))
 		}
 
 		throttled.Route("/api", func(api chi.Router) {
@@ -160,7 +171,7 @@ func NewRouter(opts Options) chi.Router {
 			// rides: a PATCH is one chunk of a whole whose travel time no
 			// unary deadline can bound, so the family is lifted out of the
 			// request deadlines above it.
-			mod.Use(middleware.UnboundedForPrefix("/api/uploads"))
+			mod.Use(fwmiddleware.UnboundedForPrefix("/api/uploads"))
 			// The uploads mount beside the modules: the same bearer
 			// middleware guards them, and the engine they drive is
 			// infrastructure's to resolve. A container without the engine
@@ -189,8 +200,11 @@ func NewRouter(opts Options) chi.Router {
 	// handlers for one path.
 	r.Group(func(throttled chi.Router) {
 		if opts.RateLimiter != nil {
-			throttled.Use(middleware.RateLimit("rpc", opts.RateLimiter,
-				rpcRefuseWith(opts.Config.Server.MaxRequestBytes), opts.RateClassify, rpcRateLimitExclusions...))
+			throttled.Use(fwmiddleware.RateLimit(fwmiddleware.RateLimitOptions{
+				Surface: "rpc", Limiter: opts.RateLimiter,
+				Refuse:   rpcRefuseWith(opts.Config.Server.MaxRequestBytes),
+				Classify: opts.RateClassify, Excluded: rpcRateLimitExclusions, TelemetryNamespace: config.AppIdentifier,
+			}))
 		}
 
 		mountRPC(throttled, opts)

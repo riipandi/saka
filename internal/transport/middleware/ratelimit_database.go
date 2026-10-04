@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fw "github.com/riipandi/saka/framework/middleware"
 )
 
 // sqlStateLimited is the SQLSTATE the check function raises when a client has
@@ -39,7 +40,7 @@ func NewDatabaseLimiter(pool datastore.Querier) *DatabaseLimiter {
 // Allow runs the check function. A limited client comes back as a result, not
 // as an error, so the middleware's failure path stays reserved for a backend
 // that cannot answer at all.
-func (l *DatabaseLimiter) Allow(ctx context.Context, key string, policy Policy) (Result, error) {
+func (l *DatabaseLimiter) Allow(ctx context.Context, key string, policy fw.Policy) (fw.Result, error) {
 	windowSeconds := max(int(policy.Window/time.Second), 1)
 
 	// The check is one function call, built the way every table query is:
@@ -54,15 +55,15 @@ func (l *DatabaseLimiter) Allow(ctx context.Context, key string, policy Policy) 
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == sqlStateLimited {
-		return Result{
+		return fw.Result{
 			Limited:    true,
 			Limit:      policy.Limit,
 			Remaining:  0,
-			RetryAfter: retryAfterFromDetail(pgErr.Detail, policy.Window),
+			RetryAfter: fw.RetryAfterFromDetail(pgErr.Detail, policy.Window),
 		}, nil
 	}
 	if err != nil {
-		return Result{}, fmt.Errorf("ratelimit: check: %w", err)
+		return fw.Result{}, fmt.Errorf("ratelimit: check: %w", err)
 	}
 
 	var reply struct {
@@ -70,9 +71,9 @@ func (l *DatabaseLimiter) Allow(ctx context.Context, key string, policy Policy) 
 		Reset     float64 `json:"reset"`
 	}
 	if err := json.Unmarshal(raw, &reply); err != nil {
-		return Result{}, fmt.Errorf("ratelimit: check: %w", err)
+		return fw.Result{}, fmt.Errorf("ratelimit: check: %w", err)
 	}
-	return Result{
+	return fw.Result{
 		Limit:     policy.Limit,
 		Remaining: reply.Remaining,
 		// The epoch the function answers carries the fractional seconds an

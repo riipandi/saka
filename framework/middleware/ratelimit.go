@@ -99,14 +99,27 @@ type Refuse func(w http.ResponseWriter, r *http.Request)
 // proxy every address is the proxy's, which makes a bucket's limit global
 // rather than per client; a deployment that terminates TLS on the
 // application itself gets honest keys.
-func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifier, excluded ...string) func(http.Handler) http.Handler {
+// RateLimitOptions carries what one mount of the limiter needs. The surface,
+// the limiter, the refusal, and the classifier are the caller's wiring; the
+// telemetry namespace is the caller's series identity (decision 8) — empty
+// leaves the instruments under their bare domain name.
+type RateLimitOptions struct {
+	Surface            string
+	Limiter            Limiter
+	Refuse             Refuse
+	Classify           Classifier
+	Excluded           []string
+	TelemetryNamespace string
+}
+
+func RateLimit(opts RateLimitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		if limiter == nil {
+		if opts.Limiter == nil {
 			return next
 		}
-		metrics := rateLimitInstrumentation()
+		metrics := rateLimitInstrumentation(opts.TelemetryNamespace)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			class, counted := classify(r.URL.Path)
+			class, counted := opts.Classify(r.URL.Path)
 
 			// A path the policy tables do not name, and an excluded one, are
 			// answered before any check runs: an exempt route costs the
@@ -114,16 +127,16 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifi
 			// passed.
 			if !counted {
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
-					attribute.String("surface", surface),
+					attribute.String("surface", opts.Surface),
 					attribute.String("outcome", outcomeExcluded),
 				))
 				next.ServeHTTP(w, r)
 				return
 			}
-			for _, prefix := range excluded {
+			for _, prefix := range opts.Excluded {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
-						attribute.String("surface", surface),
+						attribute.String("surface", opts.Surface),
 						attribute.String("outcome", outcomeExcluded),
 					))
 					next.ServeHTTP(w, r)
@@ -131,10 +144,10 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifi
 				}
 			}
 
-			result, err := limiter.Allow(r.Context(), rateLimitKey(class.Name, r), class.Policy)
+			result, err := opts.Limiter.Allow(r.Context(), rateLimitKey(class.Name, r), class.Policy)
 			if err != nil {
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
-					attribute.String("surface", surface),
+					attribute.String("surface", opts.Surface),
 					attribute.String("outcome", outcomeDegraded),
 				))
 				next.ServeHTTP(w, r)
@@ -151,16 +164,16 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifi
 				seconds := max(int64(result.RetryAfter/time.Second), 1)
 				w.Header().Set(RateLimitRetryHeader, strconv.FormatInt(seconds, 10))
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
-					attribute.String("surface", surface),
+					attribute.String("surface", opts.Surface),
 					attribute.String("outcome", outcomeLimited),
 					attribute.String("bucket", class.Name),
 				))
-				refuse(w, r)
+				opts.Refuse(w, r)
 				return
 			}
 
 			metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
-				attribute.String("surface", surface),
+				attribute.String("surface", opts.Surface),
 				attribute.String("outcome", outcomeAllowed),
 				attribute.String("bucket", class.Name),
 			))
@@ -175,7 +188,7 @@ func RateLimit(surface string, limiter Limiter, refuse Refuse, classify Classifi
 // becomes a key. The bucket stands first, so one client's budgets read
 // together in the table.
 func rateLimitKey(bucket string, r *http.Request) string {
-	return sanitizeKey(bucket) + ":ip_" + sanitizeKey(clientIP(r))
+	return sanitizeKey(bucket) + ":ip_" + sanitizeKey(ClientIP(r))
 }
 
 // sanitizeKey reduces any string to the alphabet the rate_limits check allows.
@@ -197,7 +210,7 @@ func sanitizeKey(s string) string {
 // the window is the fallback, and a mismatch costs a client one polite wait.
 var retryAfterPattern = regexp.MustCompile(`Retry after:\s*(\d+)`)
 
-func retryAfterFromDetail(detail string, window time.Duration) time.Duration {
+func RetryAfterFromDetail(detail string, window time.Duration) time.Duration {
 	if match := retryAfterPattern.FindStringSubmatch(detail); match != nil {
 		if seconds, err := strconv.ParseInt(match[1], 10, 64); err == nil && seconds > 0 {
 			return time.Duration(seconds) * time.Second

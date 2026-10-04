@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/health"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/transport/middleware"
 )
 
 // envelopeRequestID reads the request id the envelope metadata carries.
@@ -109,7 +109,7 @@ func TestEveryResponseCarriesARequestID(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api", nil))
 
-	assert.True(t, len(rec.Header().Get(middleware.RequestIDHeader)) > len("req_"),
+	assert.True(t, len(rec.Header().Get(fwmiddleware.RequestIDHeader)) > len("req_"),
 		"a response must name its request")
 }
 
@@ -144,15 +144,15 @@ type countingLimiter struct {
 	calls int
 }
 
-func (c *countingLimiter) Allow(_ context.Context, _ string, _ middleware.Policy) (middleware.Result, error) {
+func (c *countingLimiter) Allow(_ context.Context, _ string, _ fwmiddleware.Policy) (fwmiddleware.Result, error) {
 	c.calls++
-	return middleware.Result{Limit: 100, Remaining: 99, ResetAt: time.Now().Add(time.Minute)}, nil
+	return fwmiddleware.Result{Limit: 100, Remaining: 99, ResetAt: time.Now().Add(time.Minute)}, nil
 }
 
 // countAll classifies every path into the default bucket, the classifier a
 // test uses to exercise the limiter's own behaviour.
-func countAll(path string) (middleware.RateClass, bool) {
-	return middleware.RateClass{Name: "default", Policy: middleware.Policy{Limit: 100, Window: time.Minute}}, true
+func countAll(path string) (fwmiddleware.RateClass, bool) {
+	return fwmiddleware.RateClass{Name: "default", Policy: fwmiddleware.Policy{Limit: 100, Window: time.Minute}}, true
 }
 
 func TestRateLimitRunsOnTheAPISurfaceOnly(t *testing.T) {

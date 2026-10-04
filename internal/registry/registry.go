@@ -35,6 +35,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
@@ -86,7 +87,7 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 	c := do.MustInvoke[*config.Config](i)
 	checker := do.MustInvoke[*health.Checker](i)
 	log := do.MustInvoke[*slog.Logger](i)
-	limiter := do.MustInvoke[middleware.Limiter](i)
+	limiter := do.MustInvoke[fwmiddleware.Limiter](i)
 	metrics := do.MustInvoke[http.Handler](i)
 
 	// The authenticator is built here, the join point, because it is the one
@@ -103,20 +104,20 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 	// which bucket, the configuration gives each bucket its numbers. A path
 	// the tables do not name is not counted, so the classified surface is a
 	// decision on record rather than a default every request falls into.
-	classes := map[string]middleware.RateClass{
+	classes := map[string]fwmiddleware.RateClass{
 		guard.RateAuth: {
 			Name:   guard.RateAuth,
-			Policy: middleware.Policy{Limit: c.RateLimit.AuthLimit, Window: c.RateLimit.Window},
+			Policy: fwmiddleware.Policy{Limit: c.RateLimit.AuthLimit, Window: c.RateLimit.Window},
 		},
 		guard.RateDefault: {
 			Name:   guard.RateDefault,
-			Policy: middleware.Policy{Limit: c.RateLimit.Limit, Window: c.RateLimit.Window},
+			Policy: fwmiddleware.Policy{Limit: c.RateLimit.Limit, Window: c.RateLimit.Window},
 		},
 	}
-	classify := func(path string) (middleware.RateClass, bool) {
+	classify := func(path string) (fwmiddleware.RateClass, bool) {
 		bucket, ok := guard.RateBucketFor(path)
 		if !ok {
-			return middleware.RateClass{}, false
+			return fwmiddleware.RateClass{}, false
 		}
 		class, ok := classes[bucket]
 		return class, ok

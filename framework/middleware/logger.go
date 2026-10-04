@@ -52,7 +52,7 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("status", status),
 				slog.Duration("duration", time.Since(start)),
 				slog.Int("bytes", rec.bytes),
-				slog.String("remote", clientIP(r)),
+				slog.String("remote", ClientIP(r)),
 			}
 			// The context of a finished request may already be cancelled; the
 			// span it carried is still readable, so correlation survives.

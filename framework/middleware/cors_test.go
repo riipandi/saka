@@ -8,12 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
 func TestCORSPreflightNamesTheAllowedOrigin(t *testing.T) {
-	handle := CORS(config.CORS{
+	handle := CORS(CORSOptions{
 		AllowedOrigins: []string{"http://localhost:3080"},
 		AllowedMethods: []string{"GET", "POST"},
 		AllowedHeaders: []string{"Authorization"},
@@ -35,7 +33,7 @@ func TestCORSPreflightNamesTheAllowedOrigin(t *testing.T) {
 }
 
 func TestCORSLeavesAForeignOriginUnanswered(t *testing.T) {
-	handle := CORS(config.CORS{
+	handle := CORS(CORSOptions{
 		AllowedOrigins: []string{"http://localhost:3080"},
 		AllowedMethods: []string{"GET"},
 	})
@@ -52,7 +50,7 @@ func TestCORSLeavesAForeignOriginUnanswered(t *testing.T) {
 }
 
 func TestCORSWithNoOriginsIsAPassthrough(t *testing.T) {
-	handle := CORS(config.CORS{})
+	handle := CORS(CORSOptions{})
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
@@ -69,7 +67,7 @@ func TestCORSWithNoOriginsIsAPassthrough(t *testing.T) {
 }
 
 func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
-	handle := CORS(config.CORS{
+	handle := CORS(CORSOptions{
 		AllowedOrigins: []string{"http://localhost:3080"},
 		MaxAge:         time.Hour,
 	})
@@ -77,8 +75,8 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	// rs/cors answers a preflight by echoing the method and headers the
 	// browser asked about, so the defaults are proven by accepting every
 	// one of them and refusing what the list does not name.
-	for _, method := range config.DefaultCORSMethods {
-		req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	for _, method := range DefaultCORSMethods {
+		req := httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 		req.Header.Set("Origin", "http://localhost:3080")
 		req.Header.Set("Access-Control-Request-Method", method)
 		rec := httptest.NewRecorder()
@@ -90,7 +88,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	}
 
 	// A method neither the Connect nor the REST surface answers is refused.
-	req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodTrace)
 	rec := httptest.NewRecorder()
@@ -102,7 +100,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 	// preflightable without the configuration naming them. rs/cors answers a
 	// preflight by echoing the names back, and its matcher demands the list
 	// sorted, which is the order a browser sends.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	req.Header.Set("Access-Control-Request-Headers", "connect-protocol-version, content-type, x-api-key")
@@ -114,7 +112,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 		"the requested protocol headers are within the defaults")
 
 	// A header outside the defaults is refused.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	req.Header.Set("Access-Control-Request-Headers", "x-unknown")
@@ -125,7 +123,7 @@ func TestCORSPreflightFallsBackToTheDualSurfaceDefaults(t *testing.T) {
 }
 
 func TestCORSNamesTheExposedResponseHeaders(t *testing.T) {
-	handle := CORS(config.CORS{
+	handle := CORS(CORSOptions{
 		AllowedOrigins: []string{"http://localhost:3080"},
 		MaxAge:         time.Hour,
 	})
@@ -137,14 +135,14 @@ func TestCORSNamesTheExposedResponseHeaders(t *testing.T) {
 	handle(http.NotFoundHandler()).ServeHTTP(rec, req)
 
 	exposed := rec.Header().Get("Access-Control-Expose-Headers")
-	for _, header := range config.DefaultCORSExposedHeaders {
+	for _, header := range DefaultCORSExposedHeaders {
 		assert.Contains(t, exposed, header,
 			"a cross-origin script must be able to read the RPC status fields")
 	}
 }
 
 func TestCORSConfigOverridesTheDefaults(t *testing.T) {
-	handle := CORS(config.CORS{
+	handle := CORS(CORSOptions{
 		AllowedOrigins: []string{"http://localhost:3080"},
 		AllowedMethods: []string{"GET"},
 		AllowedHeaders: []string{"X-Custom"},
@@ -154,7 +152,7 @@ func TestCORSConfigOverridesTheDefaults(t *testing.T) {
 
 	// A named method list is the operator's policy: POST, which the defaults
 	// answer, is now refused.
-	req := httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	rec := httptest.NewRecorder()
@@ -163,7 +161,7 @@ func TestCORSConfigOverridesTheDefaults(t *testing.T) {
 		"a named list replaces the defaults wholesale")
 
 	// A named header list answers only its own names.
-	req = httptest.NewRequest(http.MethodOptions, "/rpc/saka.identity.v1.UserService/ListUsers", nil)
+	req = httptest.NewRequest(http.MethodOptions, "/rpc/hogwarts.identity.v1.UserService/ListUsers", nil)
 	req.Header.Set("Origin", "http://localhost:3080")
 	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	req.Header.Set("Access-Control-Request-Headers", "x-custom")

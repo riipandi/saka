@@ -15,6 +15,7 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/registry"
 	"github.com/riipandi/saka/internal/transport/middleware"
@@ -77,7 +78,7 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 	// default, and the stub above has no connections: the throttling itself is
 	// covered by internal/transport, and what this test asserts is that an
 	// area passed to New reaches the served router.
-	do.Override[middleware.Limiter](injector, func(do.Injector) (middleware.Limiter, error) {
+	do.Override[fwmiddleware.Limiter](injector, func(do.Injector) (fwmiddleware.Limiter, error) {
 		return allowAll{}, nil
 	})
 	// The authenticator is stubbed for the same reason: the consumer area's
@@ -108,8 +109,8 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 // routing above it without a backend.
 type allowAll struct{}
 
-func (allowAll) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
-	return middleware.Result{Limit: 60, Remaining: 60}, nil
+func (allowAll) Allow(context.Context, string, fwmiddleware.Policy) (fwmiddleware.Result, error) {
+	return fwmiddleware.Result{Limit: 60, Remaining: 60}, nil
 }
 
 // TestTheApplicationAreasAreListedOnce keeps the built-in list honest: every

@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
 
-	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -68,7 +66,7 @@ func envelopeRefuse(w http.ResponseWriter, r *http.Request) {
 func TestRateLimitWritesTheHeadersAClientPacesBy(t *testing.T) {
 	reset := time.Now().Add(time.Minute).Truncate(time.Second)
 	limiter := &stubLimiter{result: Result{Limit: 60, Remaining: 59, ResetAt: reset}}
-	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusAccepted)
 		}))
@@ -92,7 +90,7 @@ func TestRateLimitWritesTheHeadersAClientPacesBy(t *testing.T) {
 
 func TestRateLimitSparesAClassifiedAsExempt(t *testing.T) {
 	limiter := &stubLimiter{}
-	handler := RateLimit("rest", limiter, envelopeRefuse, classifyNothing)(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyNothing})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -112,7 +110,7 @@ func TestRateLimitRefusesAStudentWhoSpentTheWindow(t *testing.T) {
 		Limited: true, Limit: 60, Remaining: 0,
 		RetryAfter: 30 * time.Second,
 	}}
-	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			require.Fail(t, "a limited request must not reach the route")
 		}))
@@ -133,7 +131,7 @@ func TestRateLimitRefusesAStudentWhoSpentTheWindow(t *testing.T) {
 
 func TestRateLimitLetsTheRequestThroughWhenTheBackendCannotAnswer(t *testing.T) {
 	limiter := &stubLimiter{err: context.DeadlineExceeded}
-	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted)(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -148,7 +146,7 @@ func TestRateLimitLetsTheRequestThroughWhenTheBackendCannotAnswer(t *testing.T) 
 }
 
 func TestRateLimitWithoutALimiterIsAPassThrough(t *testing.T) {
-	handler := RateLimit("rest", nil, envelopeRefuse, classifyCounted)(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: nil, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -161,7 +159,7 @@ func TestRateLimitWithoutALimiterIsAPassThrough(t *testing.T) {
 
 func TestRateLimitSparesTheExcludedPrefixes(t *testing.T) {
 	limiter := &stubLimiter{}
-	handler := RateLimit("rest", limiter, envelopeRefuse, classifyCounted, "/api/healthz")(http.HandlerFunc(
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted, Excluded: []string{"/api/healthz"}})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -179,93 +177,11 @@ func TestRateLimitSparesTheExcludedPrefixes(t *testing.T) {
 
 func TestRetryAfterFromDetailPrefersTheFunctionHint(t *testing.T) {
 	detail := "Key: ip_1, Count: 61, Limit: 60, Retry after: 42 seconds"
-	assert.Equal(t, 42*time.Second, retryAfterFromDetail(detail, time.Minute))
+	assert.Equal(t, 42*time.Second, RetryAfterFromDetail(detail, time.Minute))
 }
 
 func TestRetryAfterFromDetailFallsBackToTheWindow(t *testing.T) {
-	assert.Equal(t, time.Minute, retryAfterFromDetail("no hint", time.Minute))
-}
-
-// migratedPool applies the migrations to a fresh test database and returns
-// the pool the limiter runs on. The same idiom the queue tests use.
-func migratedPool(t *testing.T) *datastore.Postgres {
-	t.Helper()
-
-	container := testutils.StartPostgres(t.Context(), t)
-	dsn := container.NewDatabase(t)
-
-	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
-	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
-	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
-	require.NoError(t, err)
-	require.NoError(t, migrationDB.Close())
-
-	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
-		DSN:             dsn,
-		ApplicationName: "ratelimit_test",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { pool.Shutdown(context.Background()) })
-	return pool
-}
-
-func TestDatabaseLimiterCountsTheWindow(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
-
-	limiter := NewDatabaseLimiter(migratedPool(t))
-	policy := Policy{Limit: 2, Window: time.Minute}
-
-	first, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
-	require.NoError(t, err)
-	assert.False(t, first.Limited)
-	assert.Equal(t, 2, first.Limit)
-	assert.Equal(t, 1, first.Remaining)
-
-	second, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
-	require.NoError(t, err)
-	assert.Equal(t, 0, second.Remaining)
-
-	third, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", policy)
-	require.NoError(t, err)
-	assert.True(t, third.Limited)
-	assert.Equal(t, 0, third.Remaining)
-	assert.Greater(t, third.RetryAfter, time.Duration(0), "the function's own retry hint")
-}
-
-func TestDatabaseLimiterBucketsAreIndependent(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
-
-	limiter := NewDatabaseLimiter(migratedPool(t))
-
-	// The same address in two buckets spends two budgets: the credential
-	// attempts a client makes must not starve the rest of its traffic.
-	_, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
-	require.NoError(t, err)
-	_, err = limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
-	require.NoError(t, err)
-	spent, err := limiter.Allow(t.Context(), "auth:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
-	require.NoError(t, err)
-	assert.True(t, spent.Limited, "the credential bucket is spent")
-
-	other, err := limiter.Allow(t.Context(), "default:ip_192_0_2_7", Policy{Limit: 1, Window: time.Minute})
-	require.NoError(t, err)
-	assert.False(t, other.Limited, "the default bucket is the client's own budget")
-}
-
-func TestDatabaseLimiterKeysAreIndependent(t *testing.T) {
-	testutils.SkipWithoutDocker(t)
-
-	limiter := NewDatabaseLimiter(migratedPool(t))
-	policy := Policy{Limit: 1, Window: time.Minute}
-
-	_, err := limiter.Allow(t.Context(), "ip_192_0_2_7", policy)
-	require.NoError(t, err)
-
-	other, err := limiter.Allow(t.Context(), "ip_192_0_2_8", policy)
-	require.NoError(t, err)
-	assert.False(t, other.Limited, "a second client starts its own window")
+	assert.Equal(t, time.Minute, RetryAfterFromDetail("no hint", time.Minute))
 }
 
 func TestKVStoreLimiterCountsTheWindow(t *testing.T) {

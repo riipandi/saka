@@ -14,6 +14,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
@@ -363,7 +364,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			return middleware.APIKeyAuth(identity.Authenticate(keys, *c), machine), nil
 		}),
 
-		do.Lazy(func(i do.Injector) (middleware.Limiter, error) {
+		do.Lazy(func(i do.Injector) (fwmiddleware.Limiter, error) {
 			c := do.MustInvoke[*config.Config](i)
 			switch c.RateLimit.Driver {
 			case config.RateLimitDB:
@@ -374,7 +375,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 				// disabled, so resolving the client here is always a run that
 				// asked for it.
 				kv := do.MustInvoke[*datastore.Valkey](i)
-				return middleware.NewKVStoreLimiter(kv.Client()), nil
+				return fwmiddleware.NewKVStoreLimiter(kv.Client()), nil
 			default:
 				return nil, fmt.Errorf("registry: rate_limit.driver: unknown driver %q", c.RateLimit.Driver)
 			}

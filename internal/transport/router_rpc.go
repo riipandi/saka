@@ -19,6 +19,7 @@ import (
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/transport/middleware"
 )
 
@@ -191,7 +192,7 @@ func rpcRouter(opts Options) http.Handler {
 	// chain above them sets: a stream's whole job is to outlive the timeouts
 	// a unary call is bounded by. The paths are the contract's own, so a
 	// renamed procedure breaks the build rather than losing its exemption.
-	r.Use(middleware.UnboundedFor(rpcStreamingProcedures...))
+	r.Use(fwmiddleware.UnboundedFor(rpcStreamingProcedures...))
 
 	options := rpcHandlerOptions(maxRequestBytes, reauth)
 	_, healthHandler := systemv1connect.NewHealthServiceHandler(

@@ -14,27 +14,27 @@ import (
 
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/transport"
-	"github.com/riipandi/saka/internal/transport/middleware"
 )
 
 // countingLimiter records every check the limiter is asked for, so a test can
 // tell a counted route from one the limiter never saw.
 type countingLimiter struct{ calls int }
 
-func (c *countingLimiter) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
+func (c *countingLimiter) Allow(context.Context, string, fwmiddleware.Policy) (fwmiddleware.Result, error) {
 	c.calls++
-	return middleware.Result{Limit: 60, Remaining: 59}, nil
+	return fwmiddleware.Result{Limit: 60, Remaining: 59}, nil
 }
 
 // spendingLimiter is a limiter whose window is spent: every check answers
 // limited, with the Retry-After a client waits by.
 type spendingLimiter struct{ calls int }
 
-func (s *spendingLimiter) Allow(context.Context, string, middleware.Policy) (middleware.Result, error) {
+func (s *spendingLimiter) Allow(context.Context, string, fwmiddleware.Policy) (fwmiddleware.Result, error) {
 	s.calls++
-	return middleware.Result{
+	return fwmiddleware.Result{
 		Limited: true, Limit: 60, Remaining: 0,
 		RetryAfter: 30 * time.Second,
 		ResetAt:    time.Now().Add(time.Minute),
@@ -43,18 +43,18 @@ func (s *spendingLimiter) Allow(context.Context, string, middleware.Policy) (mid
 
 // countPaths classifies exactly the paths the test names, the way the
 // composition root's classifier answers the guard's tables.
-func countPaths(paths ...string) middleware.Classifier {
+func countPaths(paths ...string) fwmiddleware.Classifier {
 	counted := map[string]struct{}{}
 	for _, path := range paths {
 		counted[path] = struct{}{}
 	}
-	return func(path string) (middleware.RateClass, bool) {
+	return func(path string) (fwmiddleware.RateClass, bool) {
 		if _, ok := counted[path]; !ok {
-			return middleware.RateClass{}, false
+			return fwmiddleware.RateClass{}, false
 		}
-		return middleware.RateClass{
+		return fwmiddleware.RateClass{
 			Name:   "default",
-			Policy: middleware.Policy{Limit: 60, Window: time.Minute},
+			Policy: fwmiddleware.Policy{Limit: 60, Window: time.Minute},
 		}, true
 	}
 }
@@ -144,11 +144,11 @@ func TestTheSPAAndMetricsAreNotThrottled(t *testing.T) {
 }
 
 // countAllEverywhere classifies every path into the default bucket.
-func countAllEverywhere() middleware.Classifier {
-	return func(path string) (middleware.RateClass, bool) {
-		return middleware.RateClass{
+func countAllEverywhere() fwmiddleware.Classifier {
+	return func(path string) (fwmiddleware.RateClass, bool) {
+		return fwmiddleware.RateClass{
 			Name:   "default",
-			Policy: middleware.Policy{Limit: 60, Window: time.Minute},
+			Policy: fwmiddleware.Policy{Limit: 60, Window: time.Minute},
 		}, true
 	}
 }
@@ -214,8 +214,8 @@ func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 	assert.NotContains(t, rec.Body.String(), `"status"`,
 		"the refusal is a connect error, not the REST envelope")
 
-	assert.Equal(t, "30", rec.Header().Get(middleware.RateLimitRetryHeader))
-	assert.False(t, rec.Header().Get(middleware.RateLimitLimitHeader) == "")
+	assert.Equal(t, "30", rec.Header().Get(fwmiddleware.RateLimitRetryHeader))
+	assert.False(t, rec.Header().Get(fwmiddleware.RateLimitLimitHeader) == "")
 }
 
 // TestALimitedRestRouteIsRefusedInTheEnvelope is the other side of the same
@@ -237,5 +237,5 @@ func TestALimitedRestRouteIsRefusedInTheEnvelope(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Equal(t, "error", body.Status)
-	assert.Equal(t, "30", rec.Header().Get(middleware.RateLimitRetryHeader))
+	assert.Equal(t, "30", rec.Header().Get(fwmiddleware.RateLimitRetryHeader))
 }
