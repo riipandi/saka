@@ -16,10 +16,10 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/apikey"
 	"github.com/riipandi/saka/pkg/testutils"
 

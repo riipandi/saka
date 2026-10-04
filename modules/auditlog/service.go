@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 
 	"uuid"
@@ -143,8 +143,8 @@ func (s *Service) view(ctx context.Context, row Row) View {
 		ActionStatus:  row.ActionStatus,
 		UserID:        row.UserID,
 		Username:      row.Username,
-		ActorID:       payload[audit.PayloadActorID],
-		ActorUsername: payload[audit.PayloadActorUsername],
+		ActorID:       payload[fwaudit.PayloadActorID],
+		ActorUsername: payload[fwaudit.PayloadActorUsername],
 		IPAddress:     row.IPAddress,
 		UserAgent:     row.UserAgent,
 		Fingerprint:   row.Fingerprint,

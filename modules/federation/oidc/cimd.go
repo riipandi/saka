@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/audit"
@@ -285,9 +286,9 @@ func (s *Service) MaterializeCIMDClient(ctx context.Context, metadataURL string)
 			}
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload: map[string]string{
 				"client_id":   row.ID,
@@ -336,9 +337,9 @@ func (s *Service) RefreshCIMDClient(ctx context.Context, clientID string) (Clien
 		if _, updateErr := s.repo.UpdateCIMDClient(ctx, tx, row); updateErr != nil {
 			return updateErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientMetadataRefreshed,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": clientID},
 		})

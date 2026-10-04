@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // OAuthOffboardingName is the queue the offboarding passes run on.

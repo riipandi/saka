@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	storagev1connect "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1/storagev1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/testutils"
 	conttest "github.com/riipandi/saka/pkg/testutils"
 )
@@ -34,7 +34,7 @@ func bucketService(t *testing.T, settings settingsReader) (*Service, *datastore.
 	conttest.SkipWithoutDocker(t)
 
 	pool := testutils.MigratedPostgres(t, "storage_bucket_test")
-	service := NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+	service := NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	service.WithSettings(settings)
 	return service, pool
 }
@@ -286,7 +286,7 @@ func TestTheAreaForwardsTheServiceThroughTheContainer(t *testing.T) {
 	i := do.New(
 		do.Eager(logger),
 		do.Eager(pool),
-		do.Eager(audit.NewRecorder(logger)),
+		do.Eager(fwaudit.NewRecorder(logger)),
 	)
 	Package(i)
 

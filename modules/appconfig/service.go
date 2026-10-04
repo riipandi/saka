@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
@@ -40,7 +41,7 @@ type Service struct {
 	users *user.Repository
 	// audit writes the record of a message that left, on the pool: the send
 	// is not a database change, so there is no transaction to ride.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	mail  *fwmailer.Service
 	log   *slog.Logger
 }
@@ -48,7 +49,7 @@ type Service struct {
 // NewService builds the service. The mailer is the infrastructure the
 // composition root resolves; its configuration decides whether the
 // procedure can serve at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, mail *fwmailer.Service, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, mail *fwmailer.Service, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -103,9 +104,9 @@ func (s *Service) SendTestEmail(ctx context.Context, callerID uuid.UUID, to stri
 	if to != "" && to != account.Email {
 		payload["redirected"] = "true"
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:   audit.EventTestEmailSent,
-		Status:  audit.StatusSuccess,
+		Status:  fwaudit.StatusSuccess,
 		UserID:  callerID.String(),
 		Payload: payload,
 	})

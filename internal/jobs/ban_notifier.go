@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 

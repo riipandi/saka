@@ -25,8 +25,8 @@ import (
 	"github.com/pquerna/otp/totp"
 	"go.jetify.com/typeid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -127,7 +127,7 @@ type Service struct {
 	repo       *Repository
 	cipher     cryptoCipher
 	issuer     signinIssuer
-	audit      *audit.Recorder
+	audit      *fwaudit.Recorder
 	log        *slog.Logger
 	issuerName string
 	now        func() time.Time
@@ -161,7 +161,7 @@ type signinIssuer interface {
 // the state a unit test that never enrolls is in — and a nil recorder writes
 // no audit rows, both answered at the call site. The log is reserved for the
 // unreadable-hash class of report; a service without one discards.
-func NewService(pool *datastore.Postgres, cipher cryptoCipher, issuer signinIssuer, recorder *audit.Recorder, issuerName string, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, cipher cryptoCipher, issuer signinIssuer, recorder *fwaudit.Recorder, issuerName string, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -297,9 +297,9 @@ func (s *Service) ownedEnrollment(ctx context.Context, userID uuid.UUID, totpID 
 // is recorded where the success is: the attempt's pattern is what a reader
 // of the log is looking for.
 func (s *Service) recordRefusal(ctx context.Context, userID uuid.UUID, event string, id uuid.UUID, reason string) {
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  event,
-		Status: audit.StatusFailed,
+		Status: fwaudit.StatusFailed,
 		UserID: userID.String(),
 		Payload: map[string]string{
 			"totp_id": totpIDString(id),

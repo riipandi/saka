@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/modules/identity/password"
 )
 

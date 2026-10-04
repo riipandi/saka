@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/fetcher"
-	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/webhook"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -53,7 +53,7 @@ func TestWebhookPruneDeletesAgedOutAttemptsAndReschedules(t *testing.T) {
 	require.NoError(t, err)
 	// The receiver answers 500 and lives on loopback, so the private network
 	// is on: the retention test reaches it the way a delivery would.
-	service := webhook.NewService(pool, audit.NewRecorder(log), client, fetchClient, cipher, log, true)
+	service := webhook.NewService(pool, fwaudit.NewRecorder(log), client, fetchClient, cipher, log, true)
 
 	// The prune processor is wired the way Register wires it, with the real
 	// service as the runner. The delivery queue is registered to a no-op:

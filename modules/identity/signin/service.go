@@ -16,6 +16,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
@@ -74,7 +75,7 @@ type Service struct {
 	// audit writes the record of a successful sign-in. It is the shared
 	// recorder, so the record's columns and vocabulary are decided in one
 	// place rather than here.
-	audit     *audit.Recorder
+	audit     *fwaudit.Recorder
 	keys      *jwks.Service
 	hasher    *crypto.PasswordHasher
 	log       *slog.Logger
@@ -135,7 +136,7 @@ type PendingSignIn struct {
 // NewService builds the service. keys is the area's key-set service: the
 // signing material resolves through it, so the dual stack (key pair or HMAC
 // secret) is the deployment's decision, not this feature's.
-func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, keys *jwks.Service, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, keys *jwks.Service, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -308,9 +309,9 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	}
 	if flagged {
 		s.log.WarnContext(ctx, "signin: a breached password opened the session")
-		s.audit.Record(ctx, s.pool, audit.Entry{
+		s.audit.Record(ctx, s.pool, fwaudit.Entry{
 			Event:  audit.EventSigninBreachedPassword,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: account.ID.String(),
 			Payload: map[string]string{
 				"provider": ProviderPassword,
@@ -414,9 +415,9 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 	if touchErr := repo.TouchLastLogin(ctx, account.ID, now); touchErr != nil {
 		return Result{}, touchErr
 	}
-	s.audit.Record(ctx, db, audit.Entry{
+	s.audit.Record(ctx, db, fwaudit.Entry{
 		Event:  event,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: account.ID.String(),
 		Payload: map[string]string{
 			"provider":   provider,

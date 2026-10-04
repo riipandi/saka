@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
@@ -33,7 +34,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 // table the writer fills.
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+	return NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 }
 
 // createParams is the creation every test starts from: a named client with

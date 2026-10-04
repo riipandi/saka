@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -55,7 +55,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// The features write audit records through the shared recorder;
 		// nil stands in for the wiring the composition root guarantees,
 		// and the recorder is nil-safe so a feature runs without one.
-		do.Eager[*audit.Recorder](nil),
+		do.Eager[*fwaudit.Recorder](nil),
 		// The protocol feature resolves the signing service; nil stands
 		// in for the wiring the composition root guarantees, and the
 		// test's configuration switches the protocol off — the

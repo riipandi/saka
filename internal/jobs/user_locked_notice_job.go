@@ -7,8 +7,8 @@ import (
 	"time"
 
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // UserLockedNoticeName is the queue the lockout notices run on.

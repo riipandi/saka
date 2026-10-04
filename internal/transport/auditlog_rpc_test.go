@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	auditlogv1connect "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1/auditlogv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/auditlog"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -39,7 +39,7 @@ func auditPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
@@ -63,9 +63,9 @@ func auditPool(t *testing.T) *datastore.Postgres {
 		require.NoError(t, err)
 	}
 
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
-	recorder.Record(t.Context(), pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneAccount})
-	recorder.Record(t.Context(), pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonAccount})
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder.Record(t.Context(), pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneAccount})
+	recorder.Record(t.Context(), pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: langdonAccount})
 	return pool
 }
 

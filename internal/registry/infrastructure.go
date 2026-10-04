@@ -10,19 +10,19 @@ import (
 
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/apikey"
 	"github.com/riipandi/saka/modules/appconfig"
@@ -222,9 +222,9 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 		// transaction that caused it, so the writer cannot belong to any one
 		// area. The area that *reads* records is modules/auditlog, which
 		// imports nothing from here but the vocabulary.
-		do.Lazy(func(i do.Injector) (*audit.Recorder, error) {
+		do.Lazy(func(i do.Injector) (*fwaudit.Recorder, error) {
 			log := do.MustInvoke[*slog.Logger](i)
-			return audit.NewRecorder(log), nil
+			return fwaudit.NewRecorder(log), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*fwmailer.Service, error) {

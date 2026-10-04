@@ -11,12 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -34,7 +33,7 @@ func userGroupPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
@@ -61,7 +60,7 @@ func newUserGroupRouter(t *testing.T, auth transport.Authenticator, pool *datast
 	t.Helper()
 
 	service := usergroup.NewService(pool,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	return transport.NewRouter(transport.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),

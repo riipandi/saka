@@ -32,18 +32,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/internal/transport/middleware"
 )
@@ -144,7 +144,7 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		QueueClient: do.MustInvoke[*queue.Client](i),
 		Scheduler:   do.MustInvoke[*scheduler.Scheduler](i),
 		DB:          do.MustInvoke[*datastore.Postgres](i),
-		Audit:       do.MustInvoke[*audit.Recorder](i),
+		Audit:       do.MustInvoke[*fwaudit.Recorder](i),
 		Injector:    i,
 	}), nil
 }

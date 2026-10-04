@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/signin"
@@ -108,7 +108,7 @@ func mfaTestService(t *testing.T) (*Service, *fakeIssuer, uuid.UUID, func(code s
 
 	pool := migratedPool(t)
 	issuer := &fakeIssuer{}
-	service := NewService(pool, newTestCipher(t), issuer, audit.NewRecorder(nil), "Saka Test", nil)
+	service := NewService(pool, newTestCipher(t), issuer, fwaudit.NewRecorder(nil), "Saka Test", nil)
 
 	// The account the ceremonies run on.
 	userID := uuid.NewV7()

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/testutils"
 	conttest "github.com/riipandi/saka/pkg/testutils"
@@ -175,7 +175,7 @@ func TestTheLockoutLandsAtTheStreakBound(t *testing.T) {
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
 	notices := &recordingNotices{}
-	service := NewService(pool, audit.NewRecorder(nil), nil).
+	service := NewService(pool, fwaudit.NewRecorder(nil), nil).
 		WithLockedNotice(notices)
 	// The policy is read at call time; the stub arms the bound the test
 	// runs. The fixture mirrors it: three attempts.
@@ -231,7 +231,7 @@ func TestAnExpiredLockoutLiftsOnTheReadAndStartsTheStreakFresh(t *testing.T) {
 	_, err := repo.ActiveRow(t.Context(), pool, id, now)
 	require.NoError(t, err)
 
-	service := NewService(pool, audit.NewRecorder(nil), nil)
+	service := NewService(pool, fwaudit.NewRecorder(nil), nil)
 	status, err := service.Active(t.Context(), pool, id)
 	require.NoError(t, err)
 	assert.Empty(t, status.Kind, "the expired window answers no restriction")
@@ -259,7 +259,7 @@ func TestAnIndefiniteLockoutStaysUntilTheUnlock(t *testing.T) {
 		return nil
 	}))
 
-	service := NewService(pool, audit.NewRecorder(nil), nil)
+	service := NewService(pool, fwaudit.NewRecorder(nil), nil)
 	status, err := service.Active(t.Context(), pool, id)
 	require.NoError(t, err)
 	assert.Equal(t, KindLockout, status.Kind)

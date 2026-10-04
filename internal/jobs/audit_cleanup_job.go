@@ -10,8 +10,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // AuditCleanupName is the queue the audit-trail retention runs on.

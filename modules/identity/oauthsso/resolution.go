@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/blocklist"
@@ -410,9 +411,9 @@ func (s *Service) provisionJIT(ctx context.Context, flow Flow, conn Connection, 
 			return createErr
 		}
 		created = userID
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventOauthSsoAccountCreated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"provider": conn.Provider,
@@ -588,9 +589,9 @@ func (s *Service) bindIdentity(ctx context.Context, tx datastore.Querier, flow F
 	}); err != nil {
 		return fmt.Errorf("oauthsso: bind identity: %w", err)
 	}
-	s.audit.Record(ctx, tx, audit.Entry{
+	s.audit.Record(ctx, tx, fwaudit.Entry{
 		Event:  audit.EventOauthSsoAccountLinked,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: userID.String(),
 		Payload: map[string]string{
 			"provider":            conn.Provider,

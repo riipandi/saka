@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apikeyv1connect "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1/apikeyv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
-	"github.com/riipandi/saka/internal/audit"
 	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/apikey"
@@ -57,7 +56,7 @@ func apiKeyPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
@@ -109,7 +108,7 @@ func newAPIKeyRouter(t *testing.T, auth transport.Authenticator, pool *datastore
 	t.Helper()
 
 	service := apikey.NewService(pool,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	return transport.NewRouter(transport.Options{
 		Config:        config.Default(),
 		Checker:       health.NewChecker(),
@@ -208,7 +207,7 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 
 	keyService := apikey.NewService(pool,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	issued, err := keyService.Create(t.Context(), mustUUID(t, ronKeyOwner), apikey.CreateParams{
 		Name:      "hogwarts-library",
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),

@@ -10,8 +10,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
@@ -86,7 +86,7 @@ func (h *rpcHandler) ExchangeToken(ctx context.Context, req *connect.Request[aut
 	// from the request before the procedure ran, so the session the exchange
 	// opens carries the same address, agent, and fingerprint the audit
 	// record does.
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 
 	result, err := h.service.Exchange(ctx, body.Token, body.GetDeviceToken(), client)
 	if err != nil {

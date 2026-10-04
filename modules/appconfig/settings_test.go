@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -25,7 +26,7 @@ func settingsService(t *testing.T) (*Settings, *datastore.Postgres) {
 	pool := migratedPool(t)
 	cipher, err := crypto.NewCipherFromHex(testCipherKey)
 	require.NoError(t, err)
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	settings, err := NewSettings(pool, cipher, recorder, nil)
 	require.NoError(t, err)
 	return settings, pool
@@ -38,7 +39,7 @@ func blindSettings(t *testing.T) (*Settings, *datastore.Postgres) {
 	testutils.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	settings, err := NewSettings(pool, nil, recorder, nil)
 	require.NoError(t, err)
 	return settings, pool
@@ -201,7 +202,7 @@ func catalogWith(t *testing.T, defs []SettingDef) (*Settings, *datastore.Postgre
 	testutils.SkipWithoutDocker(t)
 
 	pool := migratedPool(t)
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	settings, err := newSettings(pool, nil, recorder, defs, nil)
 	require.NoError(t, err)
 	return settings, pool

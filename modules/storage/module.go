@@ -19,10 +19,10 @@ import (
 
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/appconfig"
 )
 
@@ -33,7 +33,7 @@ import (
 var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		service := NewService(pool, recorder, log)
 

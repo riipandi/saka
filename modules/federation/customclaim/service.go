@@ -7,6 +7,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -21,7 +22,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of every claim change, in the transaction
 	// that makes the change.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
 }
@@ -29,7 +30,7 @@ type Service struct {
 // NewService builds the service. The database writes run in one transaction
 // the service opens over the pool, so a claim and its audit record commit
 // together or not at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -118,9 +119,9 @@ func (s *Service) CreateByUser(ctx context.Context, wireUserID, key, value strin
 			return mapWriteError(rowErr)
 		}
 		created = row
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventCustomClaimCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceCustomClaim,
 			ResourceID:   row.ID.String(),
 			Payload:      map[string]string{"subject": "user", "key": key},
@@ -149,9 +150,9 @@ func (s *Service) CreateByGroup(ctx context.Context, wireGroupID, key, value str
 			return mapWriteError(rowErr)
 		}
 		created = row
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventCustomClaimCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceCustomClaim,
 			ResourceID:   row.ID.String(),
 			Payload:      map[string]string{"subject": "user_group", "key": key},
@@ -236,9 +237,9 @@ func (s *Service) update(ctx context.Context, wireClaimID, key, value string, ki
 			// claim the surface names is gone, the not-found it answers.
 			return ErrClaimNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventCustomClaimUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceCustomClaim,
 			ResourceID:   claimID.String(),
 			Payload:      map[string]string{"key": key},
@@ -277,9 +278,9 @@ func (s *Service) delete(ctx context.Context, wireClaimID string, kind subjectKi
 		if !deleted {
 			return ErrClaimNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventCustomClaimDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceCustomClaim,
 			ResourceID:   claimID.String(),
 			Payload:      map[string]string{"key": row.Key},

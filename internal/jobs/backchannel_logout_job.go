@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/fetcher"
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // BackchannelLogoutName is the queue the OIDC back-channel logout

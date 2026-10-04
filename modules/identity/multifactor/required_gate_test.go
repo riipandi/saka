@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/modules/identity/jwks"
@@ -60,7 +60,7 @@ func gateTestService(t *testing.T) (*signin.Service, *Service, uuid.UUID, *datas
 
 	cfg := config.Default()
 	cfg.Auth.SecretKey = gateTestSecretHex
-	recorder := audit.NewRecorder(nil)
+	recorder := fwaudit.NewRecorder(nil)
 
 	signinService := signin.NewService(cfg, pool, signin.NewRepository(pool),
 		jwks.NewService(cfg, nil, nil, nil), recorder, nil)

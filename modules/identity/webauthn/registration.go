@@ -13,6 +13,7 @@ import (
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 	"go.jetify.com/typeid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -150,7 +151,7 @@ func (s *Service) VerifyRegistration(ctx context.Context, userID uuid.UUID, sess
 
 	wireID, err := IDFromUUID(stored.ID)
 	if err == nil {
-		s.audit.Record(ctx, s.pool, audit.Entry{
+		s.audit.Record(ctx, s.pool, fwaudit.Entry{
 			Event:        audit.EventWebauthnCredentialRegistered,
 			UserID:       userID.String(),
 			ResourceType: "webauthn_credential",

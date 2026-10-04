@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
@@ -65,7 +66,7 @@ func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
+	return NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
 }
 
 // unconfiguredService builds the service the way a deployment without an
@@ -80,7 +81,7 @@ func unconfiguredService(t *testing.T, pool *datastore.Postgres) *Service {
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
+	return NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
 }
 
 func host(addr string) string {

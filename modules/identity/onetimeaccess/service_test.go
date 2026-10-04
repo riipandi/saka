@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
-	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/jobs"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/multifactor"
@@ -77,7 +77,7 @@ func testService(t *testing.T, pool *datastore.Postgres, adminEmail, publicEmail
 
 	issuer := signin.NewService(testConfig(), pool, signin.NewRepository(pool),
 		jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
-	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
+	return NewService(cfg, pool, issuer, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 }
 
 // testServiceWithMfa builds the service with the real second factor wired
@@ -101,11 +101,11 @@ func testServiceWithMfa(t *testing.T, pool *datastore.Postgres) (*Service, *mult
 
 	cfg.Auth.SecretKey = testSecretHex
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		jwks.NewService(cfg, nil, nil, nil), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	mfa := multifactor.NewService(pool, testSealer(t), issuer,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), "Saka", nil)
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), "Saka", nil)
 	issuer.WithMFAGate(mfa)
-	return NewService(cfg, pool, issuer, audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil), mfa, issuer
+	return NewService(cfg, pool, issuer, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil), mfa, issuer
 }
 
 // testSealer is the sealing a test runs: a real AES-256-GCM over a key the
@@ -235,7 +235,7 @@ func TestCreateTokenIssuesACodeTheExchangeAccepts(t *testing.T) {
 	assert.True(t, expiresAt.After(time.Now()), "the expiry is in the future")
 
 	// The exchange answers the token pair and names the session it opened.
-	result, err := service.Exchange(t.Context(), code, "", audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 	assert.NotEmpty(t, result.AccessToken)
@@ -252,7 +252,7 @@ func TestCreateTokenIssuesACodeTheExchangeAccepts(t *testing.T) {
 
 	// The code is spent: a second exchange with the same value answers the
 	// same refusal an unknown one does, and never a second session.
-	_, err = service.Exchange(t.Context(), code, "", audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, ErrTokenInvalid)
 	assert.Equal(t, 0, countTokens(t, pool, userID), "a spent code leaves no row behind")
 }
@@ -273,9 +273,9 @@ func TestCreateTokenReplacesAnOlderCode(t *testing.T) {
 		"an account carries one code at a time: the new one replaces the old")
 
 	// The older code was replaced, not stacked, so it no longer works.
-	_, err = service.Exchange(t.Context(), first, "", audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), first, "", fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, ErrTokenInvalid)
-	_, err = service.Exchange(t.Context(), second, "", audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), second, "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 }
 
@@ -302,7 +302,7 @@ func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
 	assert.Zero(t, spent, "a stale hash removes nothing")
 	assert.Equal(t, 1, countTokens(t, pool, userID), "the live code survives the stale delete")
 
-	result, err := service.Exchange(t.Context(), second, "", audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), second, "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 }
@@ -323,7 +323,7 @@ func TestExchangeRefusesAnExpiredCode(t *testing.T) {
 	// the sweep is exactly what a rollback undoes. One row per account is
 	// the bound the table carries, so nothing accumulates.
 	service.now = func() time.Time { return time.Now().Add(time.Hour) }
-	_, err = service.Exchange(t.Context(), code, "", audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, ErrTokenInvalid)
 	assert.Equal(t, 1, countTokens(t, pool, userID))
 }
@@ -345,12 +345,12 @@ func TestExchangeRefusesADeviceTokenThatDoesNotMatch(t *testing.T) {
 	// retype.
 	wrong, err := generateDeviceToken()
 	require.NoError(t, err)
-	_, err = service.Exchange(t.Context(), code, wrong, audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), code, wrong, fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, ErrDeviceMismatch)
 
 	// A mismatch leaves the code spendable: the mistake was the caller's,
 	// not the code's spend.
-	result, err := service.Exchange(t.Context(), code, deviceToken, audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), code, deviceToken, fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 }
@@ -391,13 +391,13 @@ func TestRequestEmailPairsTheCodeWithADeviceToken(t *testing.T) {
 	assert.NotEmpty(t, task.Token)
 	assert.Equal(t, "hermione@example.com", task.Email)
 
-	result, err := service.Exchange(t.Context(), task.Token, deviceToken, audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), task.Token, deviceToken, fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 
 	// The code the email carried no longer works without the device token:
 	// the row was consumed with the session it opened.
-	_, err = service.Exchange(t.Context(), task.Token, deviceToken, audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), task.Token, deviceToken, fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, ErrTokenInvalid)
 }
 
@@ -471,7 +471,7 @@ func TestExchangeRefusesADisabledOrBannedAccount(t *testing.T) {
 
 	code, _, err := service.CreateToken(t.Context(), wireOf(t, disabled), 0)
 	require.NoError(t, err)
-	_, err = service.Exchange(t.Context(), code, "", audit.ClientInfo{})
+	_, err = service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
 	assert.ErrorIs(t, err, signin.ErrAccountDisabled)
 
 	// The refusal rolled the spend back with the session it refused to open:
@@ -484,7 +484,7 @@ func TestExchangeRefusesADisabledOrBannedAccount(t *testing.T) {
 	_, err = pool.Exec(t.Context(), query, args...)
 	require.NoError(t, err)
 
-	result, err := service.Exchange(t.Context(), code, "", audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "langdon", result.User.Username)
 }
@@ -532,7 +532,7 @@ func TestRequestEmailHoldsTheSendInsideTheCooldown(t *testing.T) {
 
 	// The first email's pair is untouched: the account holder signs in with
 	// what already arrived.
-	result, err := service.Exchange(t.Context(), code, deviceToken, audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), code, deviceToken, fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 
@@ -614,7 +614,7 @@ func TestExchangeOnAnMfaAccountMintsTheBridgeNotASession(t *testing.T) {
 	// The exchange answers the bridge, and no token field travels.
 	token, _, err := service.CreateToken(t.Context(), wireOf(t, userID), 0)
 	require.NoError(t, err)
-	result, err := service.Exchange(t.Context(), token, "", audit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), token, "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.True(t, result.MFARequired)
 	assert.Empty(t, result.AccessToken)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/framework/webutil"
@@ -27,7 +28,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of every client change, in the transaction
 	// that makes the change.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
 
@@ -92,7 +93,7 @@ type ConsentRevocationSource interface {
 // NewService builds the service. The database writes run in one transaction
 // the service opens over the pool, so a client and its audit record commit
 // together or not at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -321,9 +322,9 @@ func (s *Service) Create(ctx context.Context, callerID uuid.UUID, params CreateP
 				return groupErr
 			}
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload: map[string]string{
 				"client_id":  id,
@@ -393,9 +394,9 @@ func (s *Service) Update(ctx context.Context, id string, params UpdateParams) (C
 		if _, err := s.repo.UpdateClient(ctx, tx, row); err != nil {
 			return err
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id, "name": params.Name},
 		})
@@ -426,9 +427,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		if !deleted {
 			return ErrClientNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			// The client id is the operator's word, not a row UUID, so it
 			// cannot ride the uuid resource_id column — the payload is the
@@ -457,9 +458,9 @@ func (s *Service) SetAllowedGroups(ctx context.Context, id string, wires []strin
 		if setErr := s.repo.SetAllowedGroups(ctx, tx, id, ids); setErr != nil {
 			return setErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientGroupsUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id, "group_count": fmt.Sprintf("%d", len(ids))},
 		})

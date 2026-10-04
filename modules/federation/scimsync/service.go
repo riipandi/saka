@@ -11,6 +11,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/internal/audit"
@@ -48,7 +49,7 @@ var ErrNoDirectory = errors.New("scimsync: no account directory wired")
 type Service struct {
 	repo       *Repository
 	pool       *datastore.Postgres
-	recorder   *audit.Recorder
+	recorder   *fwaudit.Recorder
 	log        *slog.Logger
 	cipher     *crypto.Cipher
 	httpClient HTTPClient
@@ -120,7 +121,7 @@ type Stats struct {
 // be nil — a run without the identity area answers ErrNoDirectory on sync
 // and the management procedures still work. A nil cipher unseals nothing:
 // the sync fails closed on the first pass, and a Create refuses.
-func NewService(pool *datastore.Postgres, repo *Repository, recorder *audit.Recorder, cipher *crypto.Cipher, httpClient HTTPClient, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, repo *Repository, recorder *fwaudit.Recorder, cipher *crypto.Cipher, httpClient HTTPClient, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -336,10 +337,10 @@ func (s *Service) record(ctx context.Context, event, providerID, clientID string
 	if s.recorder == nil {
 		return
 	}
-	s.recorder.Record(ctx, s.pool, audit.Entry{
+	s.recorder.Record(ctx, s.pool, fwaudit.Entry{
 		Event:        event,
-		Trigger:      audit.TriggerUser,
-		Status:       audit.StatusSuccess,
+		Trigger:      fwaudit.TriggerUser,
+		Status:       fwaudit.StatusSuccess,
 		ResourceType: ResourceProvider,
 		ResourceID:   providerID,
 		Payload:      map[string]string{"client_id": clientID},
@@ -352,10 +353,10 @@ func (s *Service) recordWithStats(ctx context.Context, event string, provider Pr
 	if s.recorder == nil {
 		return
 	}
-	s.recorder.Record(ctx, s.pool, audit.Entry{
+	s.recorder.Record(ctx, s.pool, fwaudit.Entry{
 		Event:        event,
-		Trigger:      audit.TriggerSystem,
-		Status:       audit.StatusSuccess,
+		Trigger:      fwaudit.TriggerSystem,
+		Status:       fwaudit.StatusSuccess,
 		ResourceType: ResourceProvider,
 		ResourceID:   provider.ID.String(),
 		Payload: map[string]string{

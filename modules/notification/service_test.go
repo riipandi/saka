@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/testutils"
 )
@@ -30,7 +30,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
 
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+	return NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 }
 
 // seedAccount inserts an account directly and answers its identifier. A

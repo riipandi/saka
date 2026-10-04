@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -63,7 +64,7 @@ func testService(t *testing.T, pool *datastore.Postgres) (*Service, *time.Time) 
 	users := user.NewService(pool, nil, nil, nil)
 	now := time.Now()
 	service := NewService(pool, &fakeIssuer{lifetime: 14 * 24 * time.Hour}, users,
-		audit.NewRecorder(slog.New(slog.NewTextHandler(os.Stderr, nil))), slog.New(slog.DiscardHandler))
+		fwaudit.NewRecorder(slog.New(slog.NewTextHandler(os.Stderr, nil))), slog.New(slog.DiscardHandler))
 	service.now = func() time.Time { return now }
 	return service, &now
 }

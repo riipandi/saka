@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 
@@ -94,7 +94,7 @@ func TestCustomAttributeDocumentKeepsTheAnswersTheAccountMayHold(t *testing.T) {
 
 func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 	pool := migratedPool(t)
-	accounts := user.NewService(pool, audit.NewRecorder(nil), nil, nil)
+	accounts := user.NewService(pool, fwaudit.NewRecorder(nil), nil, nil)
 	recorder := &pictureRecorder{Service: accounts, records: map[uuid.UUID][]byte{}}
 	service := resolutionService(t, pool, func(s *Service) { s.WithProfiles(recorder) })
 	// The outbound client answers a PNG: the picture the flow resolved is

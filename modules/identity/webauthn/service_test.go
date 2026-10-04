@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/signin"
@@ -115,7 +115,7 @@ func webauthnTestService(t *testing.T, values map[string]string) (*Service, *fak
 	cfg := config.Default()
 	cfg.App.BaseURL = testOrigin
 	service, err := NewService(cfg, pool, NewRepository(), issuer, settings,
-		audit.NewRecorder(nil), nil)
+		fwaudit.NewRecorder(nil), nil)
 	require.NoError(t, err)
 	return service, issuer, settings
 }

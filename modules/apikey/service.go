@@ -9,6 +9,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -57,7 +58,7 @@ type Service struct {
 	// audit writes the record of every key change, in the transaction that
 	// changes the key. A revocation and the record of it commit together, so
 	// the log cannot describe a key that is still live.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 
 	// now is the instant the service's decisions read. It is a field so a
@@ -67,7 +68,7 @@ type Service struct {
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	return &Service{
 		pool:  pool,
 		repo:  NewRepository(),
@@ -127,9 +128,9 @@ func (s *Service) Create(ctx context.Context, owner uuid.UUID, params CreatePara
 		}
 		issued = Issued{Key: row, Raw: raw}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAPIKeyCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       owner.String(),
 			ResourceType: ResourceAPIKey,
 			ResourceID:   id.String(),
@@ -201,9 +202,9 @@ func (s *Service) Renew(ctx context.Context, owner, keyID uuid.UUID, expiresAt t
 		}
 		issued = Issued{Key: fresh, Raw: raw}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAPIKeyRenewed,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       owner.String(),
 			ResourceType: ResourceAPIKey,
 			ResourceID:   keyID.String(),
@@ -267,9 +268,9 @@ func (s *Service) Revoke(ctx context.Context, owner, keyID uuid.UUID) error {
 			return nil
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAPIKeyRevoked,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       owner.String(),
 			ResourceType: ResourceAPIKey,
 			ResourceID:   keyID.String(),

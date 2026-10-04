@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -119,9 +120,9 @@ func (s *Service) CreateSecret(ctx context.Context, id, secretValue string, expi
 			return err
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientSecretCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id, "secret_id": secret.ID},
 		})
@@ -162,9 +163,9 @@ func (s *Service) DeleteSecret(ctx context.Context, id, secretID string) error {
 			return err
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientSecretDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id, "secret_id": secretID},
 		})

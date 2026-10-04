@@ -2,11 +2,16 @@ package testutils
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/migration"
+	fwqueue "github.com/riipandi/saka/framework/queue"
+	fwscheduler "github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/internal/database"
 	conttest "github.com/riipandi/saka/pkg/testutils"
 )
@@ -27,9 +32,18 @@ func MigratedPostgres(t testing.TB, appName string) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	// The sets composed here are the ones the binary composes: the app set
+	// and every framework package's own — a feature's test sees the schema
+	// the serving process runs.
+	sets, err := migration.Compose(database.Schema(), fwqueue.Schema(), fwscheduler.Schema(), fwaudit.Schema())
 	require.NoError(t, err)
-	_, err = migrator.Up(t.Context())
+	for _, set := range sets {
+		setMigrator, migrateErr := migration.NewMigrator(t.Context(), migrationDB, set, migration.MigratorOptions{})
+		require.NoError(t, migrateErr)
+		_, migrateErr = setMigrator.Up(t.Context())
+		require.NoError(t, migrateErr)
+	}
+	require.NoError(t, err)
 	require.NoError(t, err)
 	require.NoError(t, migrationDB.Close())
 
@@ -40,4 +54,19 @@ func MigratedPostgres(t testing.TB, appName string) *datastore.Postgres {
 	require.NoError(t, err)
 	t.Cleanup(func() { pool.Shutdown(context.WithoutCancel(t.Context())) })
 	return pool
+}
+
+// TestMigrator answers a runner over the composed sets — the ones the binary
+// runs — for a test that migrates a database handle it manages itself.
+func TestMigrator(t testing.TB, db *sql.DB) *migration.Runner {
+	t.Helper()
+	runner, err := migration.NewRunner(t.Context(), db, ComposedSets(), migration.MigratorOptions{})
+	require.NoError(t, err)
+	return runner
+}
+
+// ComposedSets is the set list the binary runs: the app set and every
+// framework package's own.
+func ComposedSets() []migration.Set {
+	return []migration.Set{database.Schema(), fwqueue.Schema(), fwscheduler.Schema(), fwaudit.Schema()}
 }

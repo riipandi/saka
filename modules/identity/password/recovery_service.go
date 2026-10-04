@@ -8,6 +8,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
@@ -134,7 +135,7 @@ type Service struct {
 	sessions sessionEnder
 	// audit writes the records of a send and of a completed reset, in the
 	// transactions their writes run in.
-	audit   *audit.Recorder
+	audit   *fwaudit.Recorder
 	mail    *fwmailer.Service
 	baseURL string
 	log     *slog.Logger
@@ -172,7 +173,7 @@ type hasherFunc func(clearText string) (string, error)
 // NewService builds the service. The mailer is the infrastructure the
 // composition root resolves: the procedure writes the token row and hands
 // the message to the enqueuer, which owns the SMTP attempt and its retries.
-func NewService(pool *datastore.Postgres, mail *fwmailer.Service, recorder *audit.Recorder, baseURL string, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, mail *fwmailer.Service, recorder *fwaudit.Recorder, baseURL string, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -333,9 +334,9 @@ func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 	}); err != nil {
 		return "", fmt.Errorf("password: enqueue: %w", err)
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventPasswordResetEmailSent,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: account.ID.String(),
 	})
 	return raw, nil
@@ -423,9 +424,9 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		}
 		// The swap, the revocations, and the record commit together: a
 		// credential that reads as replaced has a record saying so.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventPasswordReset,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: token.UserID.String(),
 			Payload: map[string]string{
 				"ended_sessions": fmt.Sprintf("%d", ended),
@@ -494,9 +495,9 @@ func (s *Service) AddPassword(ctx context.Context, userID uuid.UUID, newPassword
 		}
 		// The hash and the record commit together: a credential that reads
 		// as added has a record saying so.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventPasswordAdded,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 		})
 		return nil
@@ -564,9 +565,9 @@ func (s *Service) RemovePassword(ctx context.Context, userID uuid.UUID) error {
 		}
 		// The removal and the record commit together: a credential that
 		// reads as removed has a record saying so.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventPasswordRemoved,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 		})
 		return nil

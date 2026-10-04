@@ -8,6 +8,7 @@ import (
 
 	"github.com/briandowns/spinner"
 
+	"github.com/riipandi/saka/framework/migration"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/printext"
@@ -117,7 +118,7 @@ type migrationRow struct {
 
 // The state words a report uses for a migration that has not run, and for the
 // plan a dry run describes. The words for a migration that has run come from
-// database.ProgressState.
+// migration.ProgressState.
 const (
 	statePending  = "pending"
 	stateRollback = "rollback"
@@ -201,7 +202,7 @@ func printMigrationRows(p printext.Palette, stateWidth int, rows []migrationRow)
 // empty migration and a rollback both did what was asked, so they are states to
 // notice rather than failures.
 func stateColour(state string) printext.Colour {
-	if state == string(database.ProgressApplied) {
+	if state == string(migration.ProgressApplied) {
 		return printext.Green
 	}
 	return printext.Yellow
@@ -239,11 +240,11 @@ func newReporter(p printext.Palette, stateWidth int) *reporter {
 }
 
 // progress is the callback handed to the migrator.
-func (r *reporter) progress(event database.ProgressEvent) {
+func (r *reporter) progress(event migration.ProgressEvent) {
 	if r.err != nil {
 		return
 	}
-	if event.State == database.ProgressStarted {
+	if event.State == migration.ProgressStarted {
 		r.begin(event)
 		return
 	}
@@ -262,7 +263,7 @@ func (r *reporter) progress(event database.ProgressEvent) {
 }
 
 // begin names the migration now in flight and starts the animation.
-func (r *reporter) begin(event database.ProgressEvent) {
+func (r *reporter) begin(event migration.ProgressEvent) {
 	if r.spin == nil {
 		return
 	}

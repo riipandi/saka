@@ -13,7 +13,7 @@ import (
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
-	"github.com/riipandi/saka/internal/audit"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -137,7 +137,7 @@ func (h *rpcHandler) BeginLogin(ctx context.Context, _ *connect.Request[authnv1.
 
 // VerifyLogin finishes the sign-in and answers the token pair.
 func (h *rpcHandler) VerifyLogin(ctx context.Context, req *connect.Request[authnv1.VerifyLoginRequest]) (*connect.Response[authnv1.VerifyLoginResponse], error) {
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 	result, err := h.service.VerifyLogin(ctx, req.Msg.SessionId, req.Msg.Credential, signin.SessionParams{
 		UserAgent:   client.UserAgent,
 		IPAddress:   client.IPAddress,

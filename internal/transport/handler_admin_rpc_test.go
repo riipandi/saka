@@ -17,10 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -113,7 +114,7 @@ func adminAuditRouter(t *testing.T) (http.Handler, *datastore.Postgres, *queue.C
 		Authenticator: callerAuthenticator(wireID(t, langdonAccount), true, false),
 		QueueClient:   client,
 		DB:            pool,
-		Audit:         audit.NewRecorder(slog.Default()),
+		Audit:         fwaudit.NewRecorder(slog.Default()),
 	})
 	return router, pool, client
 }
@@ -234,7 +235,7 @@ func TestTheStaticInternalAnswerCarriesNoDriverText(t *testing.T) {
 		Config:        config.Default(),
 		Authenticator: callerAuthenticator(wireID(t, langdonAccount), true, false),
 		QueueClient:   client,
-		Audit:         audit.NewRecorder(nil),
+		Audit:         fwaudit.NewRecorder(nil),
 	})
 
 	rec := httptest.NewRecorder()

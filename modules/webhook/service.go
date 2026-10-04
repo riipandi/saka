@@ -21,11 +21,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
@@ -96,7 +97,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of every endpoint change, in the transaction
 	// that changes the endpoint.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	// queue carries the deliveries. The emission path enqueues through the
 	// transaction that caused the event; the Test path enqueues through the
 	// pool.
@@ -121,7 +122,7 @@ type Service struct {
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger, allowPrivateNetwork bool) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger, allowPrivateNetwork bool) *Service {
 	return &Service{
 		pool:   pool,
 		repo:   NewRepository(),
@@ -188,9 +189,9 @@ func (s *Service) Create(ctx context.Context, params CreateParams) (EndpointSche
 		}
 		row = created
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventWebhookCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceWebhook,
 			ResourceID:   id.String(),
 			Payload: map[string]string{
@@ -288,9 +289,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, params UpdateParams)
 		}
 		row = updated
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventWebhookUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceWebhook,
 			ResourceID:   id.String(),
 			Payload: map[string]string{
@@ -322,9 +323,9 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 			return ErrEndpointNotFound
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventWebhookDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceWebhook,
 			ResourceID:   id.String(),
 			Payload: map[string]string{
@@ -359,9 +360,9 @@ func (s *Service) RotateSecret(ctx context.Context, id uuid.UUID) (EndpointSchem
 		}
 		row = rotated
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventWebhookSecretRotated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceWebhook,
 			ResourceID:   id.String(),
 			Payload: map[string]string{
@@ -404,9 +405,9 @@ func (s *Service) Test(ctx context.Context, id uuid.UUID) error {
 			return saveErr
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventWebhookTested,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceWebhook,
 			ResourceID:   id.String(),
 			Payload: map[string]string{
@@ -496,7 +497,7 @@ func (s *Service) attachAttempts(ctx context.Context, rows []DeliverySchema) ([]
 // It never fails the caller. An emission is a side effect of the record the
 // feature asked for, and a failure here costs the delivery, not the change;
 // the failure is logged so a broken pipeline is visible.
-func (s *Service) AuditRecorded(ctx context.Context, db datastore.Querier, entry audit.Entry) {
+func (s *Service) AuditRecorded(ctx context.Context, db datastore.Querier, entry fwaudit.Entry) {
 	if s == nil || s.queue == nil {
 		return
 	}
@@ -878,14 +879,14 @@ func Sign(secret string, at time.Time, body []byte) string {
 // to. The map keys are sorted by the encoder, so the same record always
 // produces the same bytes — the property a signature over the body relies
 // on.
-func canonicalBody(event string, entry audit.Entry, at time.Time) eventBody {
+func canonicalBody(event string, entry fwaudit.Entry, at time.Time) eventBody {
 	trigger := entry.Trigger
 	if trigger == "" {
-		trigger = audit.TriggerUser
+		trigger = fwaudit.TriggerUser
 	}
 	status := entry.Status
 	if status == "" {
-		status = audit.StatusSuccess
+		status = fwaudit.StatusSuccess
 	}
 	return eventBody{
 		Event:        event,

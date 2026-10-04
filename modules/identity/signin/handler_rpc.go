@@ -7,8 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -71,7 +71,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 	// from the request before the procedure ran, so this handler reads the
 	// same address, agent, and fingerprint the audit record carries rather
 	// than re-deriving a narrower set from the connect request.
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 
 	result, err := h.service.SignIn(ctx, Params{
 		Identity:    body.Identity,

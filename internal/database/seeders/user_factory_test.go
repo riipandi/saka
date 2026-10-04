@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/database/seeders"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -25,7 +24,7 @@ func newSeededPool(t *testing.T) *datastore.Postgres {
 	db, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
 
-	migrator, err := database.NewMigrator(t.Context(), db, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, db)
 	require.NoError(t, err)
 
 	applied, err := migrator.Up(t.Context())

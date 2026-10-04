@@ -10,7 +10,6 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	fw "github.com/riipandi/saka/framework/middleware"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -27,7 +26,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)

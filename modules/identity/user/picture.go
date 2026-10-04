@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
@@ -181,9 +182,9 @@ func (s *Service) storePicture(ctx context.Context, userID uuid.UUID, row UserSc
 	// The record is written after the row names the object: the object row
 	// is what makes the picture the account reads, so a record written
 	// before the row would describe a change that had not landed.
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventProfilePictureUpdated,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: userID.String(),
 		Payload: map[string]string{
 			"content_type": mime,
@@ -222,9 +223,9 @@ func (s *Service) ResetProfilePicture(ctx context.Context, id string) error {
 	if _, err := s.repo.SetPictureFileID(ctx, s.pool, userID, ""); err != nil {
 		return err
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventProfilePictureReset,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: userID.String(),
 	})
 	s.log.Info("user: profile picture reset", slog.String("user_id", userID.String()))

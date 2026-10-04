@@ -25,17 +25,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/devicelogin"
 	"github.com/riipandi/saka/modules/identity/authorization"
@@ -219,7 +219,7 @@ var Package = do.Package(
 			if algorithm == "" || config.IsHMACAlgorithm(algorithm) {
 				algorithm = crypto.DefaultSignatureAlgorithm
 			}
-			recorder := do.MustInvoke[*audit.Recorder](i)
+			recorder := do.MustInvoke[*fwaudit.Recorder](i)
 			service.WithSealer(repo, repo.GeneratePair, algorithm, recorder)
 		}
 		// The derived algorithm is worth a line at startup: when
@@ -260,7 +260,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		keys := do.MustInvoke[*jwks.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
 		service := signin.NewService(*c, pool, signin.NewRepository(pool), keys, recorder, log).
 			WithDeviceNotifier(jobs.NewDeviceNotifier(client, log, c.Mailer.Notifications.NewDeviceNoticeEnabled))
@@ -286,7 +286,7 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
 		users := do.MustInvoke[*user.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		service := session.NewService(pool, issuer, users, recorder, log)
 		// The inactivity bound reads the catalog at renewal time; a nil
 		// settings feature keeps the catalog default, the state a bare
@@ -328,7 +328,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*signup.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		service := signup.NewService(pool, recorder, log)
 		// The sign-up policy reads the catalog at call time; a nil settings
 		// feature runs the bare-wiring policy — open mode, no toggles, no
@@ -353,7 +353,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*blocklist.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		return blocklist.NewService(pool, recorder, log), nil
 	}),
 
@@ -367,7 +367,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*restrictions.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
 		service := restrictions.NewService(pool, recorder, log)
 		if settings := do.MustInvoke[*appconfig.Settings](i); settings != nil {
@@ -384,7 +384,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		service := user.NewService(pool, recorder, log, pictures)
 		service.WithAssetsURL(c.App.AssetsURL)
 		if policy := do.MustInvoke[*password.Validator](i); policy != nil {
@@ -408,7 +408,7 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		mail := do.MustInvoke[*fwmailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		settings := do.MustInvoke[*appconfig.Settings](i)
 		// The change notices ride the deployment's cost decision; the
 		// confirm message the request itself sends is transactional and
@@ -430,7 +430,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		mail := do.MustInvoke[*fwmailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
 		return onetimeaccess.NewService(*c, pool, issuer, recorder, mail, client, log), nil
@@ -444,7 +444,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		c := do.MustInvoke[*config.Config](i)
 		// The cipher seals each enrollment's TOTP secret; it is the auth
 		// half — derived from AUTH_SECRET_KEY, not the application secret —
@@ -495,7 +495,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		// A nil settings feature keeps the fail-closed reads — the state a
 		// bare wiring is in; the composition root always resolves the
 		// catalog.
@@ -543,7 +543,7 @@ var Package = do.Package(
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		mail := do.MustInvoke[*fwmailer.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
 		sessions := do.MustInvoke[*session.Service](i)
 		service := password.NewService(pool, mail, recorder, c.App.BaseURL, log).
@@ -576,7 +576,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*usergroup.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		service := usergroup.NewService(pool, recorder, log)
 		// The account views' group seam rides the post-construction wiring
 		// like the ban's side effects do: the directory is the group
@@ -590,7 +590,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*authorization.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		return authorization.NewService(pool, recorder, log, do.MustInvoke[cache.Cache](i)), nil
 	}),
 
@@ -598,7 +598,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		users := do.MustInvoke[*user.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		return devicelogin.NewService(pool, users, recorder, c.App.BaseURL), nil
 	}),
 
@@ -615,7 +615,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		fetch := do.MustInvoke[*fetcher.Client](i)
 		// The cipher seals the client secrets; it is the application
 		// half — derived from the application secret, not AUTH_SECRET_KEY

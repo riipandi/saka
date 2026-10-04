@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -21,12 +21,12 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(pool, userService(t, pool), audit.NewRecorder(nil), "http://localhost:3080")
+	return NewService(pool, userService(t, pool), fwaudit.NewRecorder(nil), "http://localhost:3080")
 }
 
 func userService(t *testing.T, pool *datastore.Postgres) *user.Service {
 	t.Helper()
-	return user.NewService(pool, audit.NewRecorder(nil), nil, nil)
+	return user.NewService(pool, fwaudit.NewRecorder(nil), nil, nil)
 }
 
 func seedAccount(t *testing.T, pool *datastore.Postgres, username string) string {

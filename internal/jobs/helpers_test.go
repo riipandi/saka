@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // migratedClient applies the migrations to a fresh test database and returns
@@ -19,7 +18,7 @@ func migratedClient(t *testing.T, dsn string) (*datastore.Postgres, *queue.Clien
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)

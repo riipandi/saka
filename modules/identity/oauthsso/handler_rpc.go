@@ -14,8 +14,8 @@ import (
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
@@ -119,7 +119,7 @@ func (h *rpcHandler) BeginSignIn(ctx context.Context, req *connect.Request[authn
 // spends. The client facts ride the request's context, the way the
 // password sign-in records them.
 func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[authnv1.ContinueOAuthSignInRequest]) (*connect.Response[authnv1.ContinueOAuthSignInResponse], error) {
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 	answer, err := h.service.ContinueSignIn(ctx, ContinueParams{
 		FlowToken:   req.Msg.FlowToken,
 		GivenName:   req.Msg.GivenName,

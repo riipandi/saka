@@ -8,6 +8,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -74,9 +75,9 @@ func (s *Service) UnlinkLinkedAccount(ctx context.Context, userID, linkedID uuid
 			// the same not-found a later call would earn.
 			return ErrLinkedAccountNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventOauthSsoAccountUnlinked,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"provider":            binding.Provider,

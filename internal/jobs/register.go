@@ -8,9 +8,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/modules/notification"
 	"github.com/riipandi/saka/modules/webhook"
 )

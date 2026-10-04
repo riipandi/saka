@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
@@ -108,9 +109,9 @@ func (s *Service) UploadLogo(ctx context.Context, id string, data []byte) error 
 		if _, err := s.repo.SetLogoPath(ctx, tx, id, &ref); err != nil {
 			return err
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientLogoUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id, "content_type": mime},
 		})
@@ -142,9 +143,9 @@ func (s *Service) DeleteLogo(ctx context.Context, id string) error {
 		if _, err := s.repo.SetLogoPath(ctx, tx, id, nil); err != nil {
 			return err
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcClientLogoDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": id},
 		})

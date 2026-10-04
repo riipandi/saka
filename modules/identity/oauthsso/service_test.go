@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -29,7 +29,7 @@ func testService(t *testing.T, pool *datastore.Postgres, fetcher DiscoveryFetche
 	// shipped provider only when the adapter set declares it, and a custom
 	// slug that collides with one is reserved. The adapters themselves are
 	// nil — these tests never begin a flow.
-	return NewService(pool, testCipher(t), audit.NewRecorder(nil), fetcher, nil).
+	return NewService(pool, testCipher(t), fwaudit.NewRecorder(nil), fetcher, nil).
 		WithProviders(ProviderSet{
 			Builtin: map[string]Provider{"google": nil, "github": nil},
 		})
@@ -243,7 +243,7 @@ func TestCreateRefusesASealedWriteWithoutACipher(t *testing.T) {
 	pool := migratedPool(t)
 	// A nil cipher is the no-application-secret state: reads serve, a
 	// sealed write is refused at the call site.
-	service := NewService(pool, nil, audit.NewRecorder(nil), nil, nil)
+	service := NewService(pool, nil, fwaudit.NewRecorder(nil), nil, nil)
 
 	_, err := service.Create(t.Context(), customParams())
 	require.ErrorIs(t, err, ErrSecretUnavailable)

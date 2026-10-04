@@ -7,17 +7,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
-	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	transportstorage "github.com/riipandi/saka/internal/transport/storage"
 	appweb "github.com/riipandi/saka/web"
@@ -76,7 +76,7 @@ type Options struct {
 	// Audit writes the records the queue and scheduler's destructive
 	// procedures leave behind. A nil recorder writes none, which is the same
 	// bare-test state.
-	Audit *audit.Recorder
+	Audit *fwaudit.Recorder
 	// Injector is the samber/do container the run composed. Only the debug
 	// build's devtool reads it; a release build ignores the field.
 	Injector do.Injector

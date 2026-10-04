@@ -84,7 +84,7 @@ func migratedPool(t *testing.T) (*pgxpool.Pool, string) {
 		datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
 
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)

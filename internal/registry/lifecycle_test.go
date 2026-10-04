@@ -18,7 +18,6 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/registry"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -35,7 +34,7 @@ func servedInjector(t *testing.T) *do.RootScope {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)

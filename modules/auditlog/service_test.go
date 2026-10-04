@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	auditlogv1connect "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1/auditlogv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
@@ -49,10 +50,10 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 // record writes one record through the shared recorder, the way a feature
 // does, so the tests read what the writer actually produces.
-func record(t *testing.T, pool *datastore.Postgres, entry audit.Entry) {
+func record(t *testing.T, pool *datastore.Postgres, entry fwaudit.Entry) {
 	t.Helper()
 
-	audit.NewRecorder(slog.New(slog.DiscardHandler)).Record(t.Context(), pool, entry)
+	fwaudit.NewRecorder(slog.New(slog.DiscardHandler)).Record(t.Context(), pool, entry)
 }
 
 // wireOf renders an account's row identifier in the wire form the contract's
@@ -74,8 +75,8 @@ func newService(pool *datastore.Postgres) *auditlog.Service {
 // the page however recent they are.
 func TestListAnswersTheCallersOwnActivityOnly(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: langdonID})
 
 	logs, metadata, err := newService(pool).List(t.Context(),
 		auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
@@ -97,7 +98,7 @@ func TestListOrdersNewestFirst(t *testing.T) {
 		audit.EventAccountUpdated,
 		audit.EventAccountDeleted,
 	} {
-		record(t, pool, audit.Entry{Event: event, UserID: hermioneID})
+		record(t, pool, fwaudit.Entry{Event: event, UserID: hermioneID})
 	}
 
 	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
@@ -116,7 +117,7 @@ func TestListOrdersNewestFirst(t *testing.T) {
 func TestListPagesTheWindow(t *testing.T) {
 	pool := migratedPool(t)
 	for range 5 {
-		record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+		record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
 	}
 
 	first, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 2)
@@ -141,9 +142,9 @@ func TestListPagesTheWindow(t *testing.T) {
 // administrator's view offers, one at a time.
 func TestTheAdministrativeFiltersNarrowTheList(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
-	record(t, pool, audit.Entry{Event: audit.EventAccountUpdated, UserID: hermioneID})
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventAccountUpdated, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: langdonID})
 
 	service := newService(pool)
 
@@ -173,10 +174,10 @@ func TestTheAdministrativeFiltersNarrowTheList(t *testing.T) {
 // a set the caller cannot page to.
 func TestTheSearchCountsWhatThePageShows(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: langdonID})
 	// A record with no account at all, which the search's join would drop.
-	record(t, pool, audit.Entry{Event: audit.EventSignIn})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn})
 
 	_, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{Search: "hermione"}, "", false, 1, 20)
 	require.NoError(t, err)
@@ -191,13 +192,13 @@ func TestTheSearchCountsWhatThePageShows(t *testing.T) {
 // how the writer spelled it.
 func TestTheRecordCarriesTheActorTheWriterStored(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{
+	record(t, pool, fwaudit.Entry{
 		Event:  audit.EventAccountUpdated,
 		UserID: hermioneID,
 		Payload: map[string]string{
-			audit.PayloadActorID:       langdonID,
-			audit.PayloadActorUsername: "langdon",
-			"changed":                  "display_name",
+			fwaudit.PayloadActorID:       langdonID,
+			fwaudit.PayloadActorUsername: "langdon",
+			"changed":                    "display_name",
 		},
 	})
 
@@ -217,10 +218,10 @@ func TestTheRecordCarriesTheActorTheWriterStored(t *testing.T) {
 // client asked for.
 func TestTheAddressIsStoredWithoutItsMask(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{
+	record(t, pool, fwaudit.Entry{
 		Event:  audit.EventSignIn,
 		UserID: hermioneID,
-		Client: audit.ClientInfo{IPAddress: "203.0.113.7", UserAgent: "Mozilla/5.0 Firefox/128.0"},
+		Client: fwaudit.ClientInfo{IPAddress: "203.0.113.7", UserAgent: "Mozilla/5.0 Firefox/128.0"},
 	})
 
 	logs, _, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 1, 20)
@@ -236,7 +237,7 @@ func TestTheAddressIsStoredWithoutItsMask(t *testing.T) {
 // stays in the list with no name rather than disappearing with the account.
 func TestTheUsernameIsEmptyOnceTheAccountIsGone(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: vetraID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: vetraID})
 
 	_, err := pool.Exec(t.Context(), `DELETE FROM public.users WHERE id = $1`, vetraID)
 	require.NoError(t, err)
@@ -254,11 +255,11 @@ func TestTheUsernameIsEmptyOnceTheAccountIsGone(t *testing.T) {
 // in step with a contract.
 func TestFilterOptionsAnswersWhatTheTableHolds(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
-	record(t, pool, audit.Entry{Event: audit.EventAccountCreated, UserID: langdonID})
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: langdonID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventAccountCreated, UserID: langdonID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: langdonID})
 	// A record with no account contributes no user option.
-	record(t, pool, audit.Entry{Event: audit.EventSignIn})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn})
 
 	events, users, err := newService(pool).Options(t.Context())
 	require.NoError(t, err)
@@ -289,7 +290,7 @@ func TestAnEmptyTableAnswersEmptyFacets(t *testing.T) {
 // the first page.
 func TestAnUnsetPageAnswersTheDefaultWindow(t *testing.T) {
 	pool := migratedPool(t)
-	record(t, pool, audit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
+	record(t, pool, fwaudit.Entry{Event: audit.EventSignIn, UserID: hermioneID})
 
 	logs, metadata, err := newService(pool).List(t.Context(), auditlog.Scope{UserID: wireOf(hermioneID)}, "", false, 0, 0)
 	require.NoError(t, err)

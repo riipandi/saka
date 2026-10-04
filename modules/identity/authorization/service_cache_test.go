@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
-	"github.com/riipandi/saka/internal/audit"
 )
 
 // TestAListingIsServedFromTheCache pins the read the administrative
@@ -17,7 +17,7 @@ import (
 func TestAListingIsServedFromTheCache(t *testing.T) {
 	pool := migratedPool(t)
 	kvCache := cache.NewMemory(0, 0)
-	service := NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
+	service := NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
 	seedCatalog(t, pool)
 
 	first, pagination, err := service.ListRoles(t.Context(), false, "", "", "", true, 1, 100)
@@ -37,7 +37,7 @@ func TestAListingIsServedFromTheCache(t *testing.T) {
 func TestAChangeDropsEveryCachedListing(t *testing.T) {
 	pool := migratedPool(t)
 	kvCache := cache.NewMemory(0, 0)
-	service := NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
+	service := NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
 	seedCatalog(t, pool)
 
 	_, _, err := service.ListRoles(t.Context(), false, "", "", "", true, 1, 100)
@@ -70,7 +70,7 @@ func TestAChangeDropsEveryCachedListing(t *testing.T) {
 func TestABypassedReadLeavesTheCacheAlone(t *testing.T) {
 	pool := migratedPool(t)
 	kvCache := cache.NewMemory(0, 0)
-	service := NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
+	service := NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler), kvCache)
 	seedCatalog(t, pool)
 
 	_, _, err := service.ListRoles(t.Context(), false, "", "", "", true, 1, 100)

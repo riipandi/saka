@@ -8,6 +8,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -46,12 +47,12 @@ type Service struct {
 	// audit writes the record of every group change, in the transaction that
 	// changes the group. A deletion and the record of it commit together, so
 	// the log cannot describe a group that still exists.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	return &Service{
 		pool:  pool,
 		repo:  NewRepository(),
@@ -134,9 +135,9 @@ func (s *Service) CreateUserGroup(ctx context.Context, params CreateParams) (Gro
 		}
 		created = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventGroupCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceGroup,
 			ResourceID:   id.UUID(),
 			Payload: map[string]string{
@@ -185,9 +186,9 @@ func (s *Service) UpdateUserGroup(ctx context.Context, id string, params CreateP
 		}
 		updated = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventGroupUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceGroup,
 			ResourceID:   groupID.UUID(),
 			Payload: map[string]string{
@@ -234,9 +235,9 @@ func (s *Service) DeleteUserGroup(ctx context.Context, id string) error {
 			return ErrGroupNotFound
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventGroupDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceGroup,
 			ResourceID:   groupID.UUID(),
 			Payload: map[string]string{
@@ -279,9 +280,9 @@ func (s *Service) SetUserGroupMembers(ctx context.Context, id string, memberIDs 
 		}
 		updated = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventGroupMembersUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceGroup,
 			ResourceID:   groupID.UUID(),
 			Payload: map[string]string{
@@ -366,9 +367,9 @@ func (s *Service) UpdateUserGroups(ctx context.Context, id string, groupIDs []st
 		}
 		groups = read
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventUserGroupsUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"group_ids": fmt.Sprint(len(ids)),

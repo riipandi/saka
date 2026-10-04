@@ -11,6 +11,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -69,7 +70,7 @@ type Service struct {
 	// renewal must not drift apart, which is why they are one vocabulary.
 	issuer Issuer
 	users  *user.Service
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	log    *slog.Logger
 
 	// settings reads the inactivity bound the database owns. Nil keeps the
@@ -131,7 +132,7 @@ func (s *Service) inactivityTimeout(ctx context.Context) time.Duration {
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, issuer Issuer, users *user.Service, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, issuer Issuer, users *user.Service, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	return &Service{
 		pool:   pool,
 		repo:   NewRepository(),
@@ -199,9 +200,9 @@ func (s *Service) SignOut(ctx context.Context, callerSession string, callerID st
 
 		outcome = SignedOut{Expired: !row.ExpiresAt.After(now)}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventSignOut,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       row.UserID.String(),
 			ResourceType: ResourceSession,
 			ResourceID:   sid.UUID(),
@@ -343,9 +344,9 @@ func (s *Service) RevokeSession(ctx context.Context, callerSession, callerID, ta
 			return nil
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventSessionRevoked,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       userID.String(),
 			ResourceType: ResourceSession,
 			ResourceID:   targetID.UUID(),
@@ -413,9 +414,9 @@ func (s *Service) revokeBulk(ctx context.Context, callerSession, callerID, reaso
 			return bulkErr
 		}
 		for _, row := range rows {
-			s.audit.Record(ctx, tx, audit.Entry{
+			s.audit.Record(ctx, tx, fwaudit.Entry{
 				Event:        audit.EventSessionRevoked,
-				Status:       audit.StatusSuccess,
+				Status:       fwaudit.StatusSuccess,
 				UserID:       userID.String(),
 				ResourceType: ResourceSession,
 				ResourceID:   row.ID.UUID(),
@@ -635,10 +636,10 @@ func (s *Service) revokeCompromised(ctx context.Context, tx datastore.Querier, s
 	if _, revokeErr := s.repo.Revoke(ctx, tx, spent.ID, nil, s.now()); revokeErr != nil {
 		return revokeErr
 	}
-	s.audit.Record(ctx, tx, audit.Entry{
+	s.audit.Record(ctx, tx, fwaudit.Entry{
 		Event:        audit.EventSessionRevoked,
-		Trigger:      audit.TriggerSystem,
-		Status:       audit.StatusFailed,
+		Trigger:      fwaudit.TriggerSystem,
+		Status:       fwaudit.StatusFailed,
 		UserID:       spent.UserID.String(),
 		ResourceType: "session",
 		ResourceID:   spent.ID.UUID(),

@@ -8,6 +8,7 @@ import (
 
 	"go.jetify.com/typeid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -75,7 +76,7 @@ func (s *Service) renameCredential(ctx context.Context, userID uuid.UUID, creden
 	}
 	row.Name = name
 
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:        event,
 		UserID:       userID.String(),
 		ResourceType: "webauthn_credential",
@@ -151,7 +152,7 @@ func (s *Service) deleteCredential(ctx context.Context, userID uuid.UUID, creden
 		return txErr
 	}
 
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:        event,
 		UserID:       userID.String(),
 		ResourceType: "webauthn_credential",

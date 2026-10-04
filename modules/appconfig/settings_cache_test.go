@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -35,7 +35,7 @@ func cachedSettingsWith(t *testing.T, defs []SettingDef) (*Settings, cache.Cache
 
 	pool := migratedPool(t)
 	cipher := mustCipher(t)
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	kvCache := cache.NewMemory(0, defaultTestTTL)
 	settings, err := newSettings(pool, cipher, recorder, defs, kvCache)
 	require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestASealedValueIsNeverCached(t *testing.T) {
 	// A catalog of one sealed item, built the way the constructor accepts:
 	// the shipped catalog publishes nothing sealed, but a deployment's
 	// feature may declare one.
-	sealed, err := newSettings(pool, mustCipher(t), audit.NewRecorder(slog.New(slog.DiscardHandler)),
+	sealed, err := newSettings(pool, mustCipher(t), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)),
 		[]SettingDef{{Key: "secret.token", Default: "", Sealed: true}}, kvCache)
 	require.NoError(t, err)
 

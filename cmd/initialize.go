@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/urfave/cli/v3"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
@@ -158,7 +159,7 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		signingAlgorithm = crypto.DefaultSignatureAlgorithm
 	}
 
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	var results []seeders.Result
 	var provisionedKid string
 	err = pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
@@ -176,9 +177,9 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 			}
 		}
 		if provisionedKid != "" {
-			recorder.Record(ctx, tx, audit.Entry{
+			recorder.Record(ctx, tx, fwaudit.Entry{
 				Event:  audit.EventJwksProvisioned,
-				Status: audit.StatusSuccess,
+				Status: fwaudit.StatusSuccess,
 				Payload: map[string]string{
 					"kid":       provisionedKid,
 					"algorithm": signingAlgorithm,
@@ -211,9 +212,9 @@ func runInitialize(ctx context.Context, cmd *cli.Command) error {
 		if grantErr := grantAdministrator(ctx, tx, id.String()); grantErr != nil {
 			return grantErr
 		}
-		recorder.Record(ctx, tx, audit.Entry{
+		recorder.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventAccountCreated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: id.String(),
 			Payload: map[string]string{
 				"username": username,

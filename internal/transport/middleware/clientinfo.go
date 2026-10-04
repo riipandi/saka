@@ -5,7 +5,7 @@ import (
 
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 
-	"github.com/riipandi/saka/internal/audit"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 )
 
 // FingerprintHeader is the header the frontend sends its browser fingerprint
@@ -29,7 +29,7 @@ const FingerprintHeader = "X-Device-Fingerprint"
 // It is mounted once, on the router that holds every route and every
 // procedure, rather than per surface: the facts come from the HTTP request in
 // both cases, and a second mount is a second place to forget. The context it
-// fills is read through audit.ClientFromContext, which is what keeps a
+// fills is read through fwaudit.ClientFromContext, which is what keeps a
 // service from taking four parameters it only passes on.
 //
 // The address is resolved by the framework resolver and read back through
@@ -40,12 +40,12 @@ func ClientInfo(trustedProxyHeaders []string) func(http.Handler) http.Handler {
 	resolve := fwmiddleware.ClientIPResolver(trustedProxyHeaders)
 	return func(next http.Handler) http.Handler {
 		return resolve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			info := audit.ClientInfo{
+			info := fwaudit.ClientInfo{
 				IPAddress:   fwmiddleware.ClientIP(r),
 				UserAgent:   r.Header.Get("User-Agent"),
 				Fingerprint: r.Header.Get(FingerprintHeader),
 			}
-			next.ServeHTTP(w, r.WithContext(audit.WithClientInfo(r.Context(), info)))
+			next.ServeHTTP(w, r.WithContext(fwaudit.WithClientInfo(r.Context(), info)))
 		}))
 	}
 }

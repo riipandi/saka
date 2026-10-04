@@ -6,8 +6,8 @@ import (
 	"time"
 
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // MfaDisabledNoticeName is the queue the MFA-removal notices run on.

@@ -8,8 +8,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/internal/audit"
 
 	"uuid"
 
@@ -209,7 +209,7 @@ func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Requ
 // CompleteSignIn spends the pending bridge plus the second factor on the
 // session.
 func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[authnv1.CompleteSignInRequest]) (*connect.Response[authnv1.CompleteSignInResponse], error) {
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 
 	var code string
 	var passkey *PasskeyAssertion

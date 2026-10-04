@@ -7,6 +7,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -142,9 +143,9 @@ func (s *Service) offboard(ctx context.Context, binding LinkedAccount, provider 
 				return endErr
 			}
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventUserBanned,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: binding.UserID.String(),
 			Payload: map[string]string{
 				"reason":         reason,

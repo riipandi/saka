@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // ProtocolCleanupName is the queue the OAuth/OIDC protocol state's

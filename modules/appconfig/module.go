@@ -24,11 +24,11 @@ import (
 
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -45,7 +45,7 @@ import (
 var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		mail := do.MustInvoke[*fwmailer.Service](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		return NewService(pool, recorder, mail, log), nil
@@ -53,7 +53,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Settings, error) {
 		cfg := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		kvCache := do.MustInvoke[cache.Cache](i)
 		cipher, err := settingsCipher(cfg.App.SecretKey)
 		if err != nil {

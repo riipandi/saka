@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // ScimSyncName is the queue the outbound provisioning passes run on.

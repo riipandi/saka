@@ -19,11 +19,12 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -78,7 +79,7 @@ func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Serv
 
 	return NewService(
 		pool,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)),
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)),
 		testQueue(t, pool),
 		fetch,
 		testSecretKey(t),
@@ -216,7 +217,7 @@ func TestEmissionMatchesSubscriptions(t *testing.T) {
 	// The emission runs inside the caller's transaction, the way the audit
 	// recorder hands the record's surface over.
 	err = pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
-		service.AuditRecorded(ctx, tx, audit.Entry{Event: audit.EventSignIn})
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: audit.EventSignIn})
 		return nil
 	})
 	require.NoError(t, err)
@@ -231,7 +232,7 @@ func TestEmissionMatchesSubscriptions(t *testing.T) {
 	// A second emission of another event costs each subscriber one more
 	// delivery: every happening is delivered, not folded.
 	err = pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
-		service.AuditRecorded(ctx, tx, audit.Entry{Event: audit.EventAccountCreated})
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: audit.EventAccountCreated})
 		return nil
 	})
 	require.NoError(t, err)
@@ -422,7 +423,7 @@ func emitOne(t *testing.T, service *Service, webhookID uuid.UUID, event string) 
 
 	var deliveryID string
 	err := service.pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
-		service.AuditRecorded(ctx, tx, audit.Entry{Event: event})
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: event})
 		rows, _, listErr := service.repo.ListDeliveries(ctx, tx, &webhookID, mustWireEvent(t, event), 0, 1)
 		if listErr != nil {
 			return listErr

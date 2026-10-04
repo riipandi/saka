@@ -10,6 +10,7 @@ import (
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -99,9 +100,9 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, userID uuid.UUID, nam
 		if createErr := s.repo.CreateTotp(ctx, tx, row); createErr != nil {
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventMfaEnrollmentStarted,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"totp_id": totpIDString(row.ID),
@@ -182,9 +183,9 @@ func (s *Service) ConfirmTotpEnrollment(ctx context.Context, userID uuid.UUID, t
 			clearCodes = codes
 		}
 		// The activation and its record commit together.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventMfaEnrollmentConfirmed,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"totp_id":     totpIDString(row.ID),
@@ -297,9 +298,9 @@ func (s *Service) DeleteTotpEnrollment(ctx context.Context, userID uuid.UUID, to
 		if recErr := s.repo.DeleteAllRecoveryForUser(ctx, tx, userID); recErr != nil {
 			return recErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventMfaDisabled,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"totp_id": totpIDString(row.ID),

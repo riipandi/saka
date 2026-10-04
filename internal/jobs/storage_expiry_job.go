@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // StorageUploadExpiryName is the queue the session expiry runs on.

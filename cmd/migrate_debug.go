@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/migration"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/database/seeders"
@@ -48,7 +49,7 @@ in the binary.`,
 
 // runMigrateCreate writes one migration file and reports where it landed.
 func runMigrateCreate(_ context.Context, cmd *cli.Command) error {
-	created, err := database.CreateMigration(database.CreateOptions{
+	created, err := migration.CreateMigration(migration.CreateOptions{
 		Dir:  cmd.String("dir"),
 		Name: cmd.StringArg("name"),
 	})
@@ -60,7 +61,7 @@ func runMigrateCreate(_ context.Context, cmd *cli.Command) error {
 	return p.Printf("%s %s (version %s)\n",
 		created.Path,
 		p.Green("created"),
-		p.Dim(fmt.Sprintf("%0*d", database.MigrationPrefixWidth, created.Version)))
+		p.Dim(fmt.Sprintf("%0*d", migration.MigrationPrefixWidth, created.Version)))
 }
 
 var migrateResetCmd = &cli.Command{
@@ -306,10 +307,10 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	p := printext.NewPalette(cmd.Root().Writer)
-	report := newReporter(p, migrationStateWidth(string(database.ProgressRolledBack)))
+	report := newReporter(p, migrationStateWidth(string(migration.ProgressRolledBack)))
 
-	migrator, dsn, closeDB, err := openMigrator(ctx, cfg,
-		database.MigratorOptions{Progress: report.progress})
+	migrators, dsn, closeDB, err := openMigrators(ctx, cfg,
+		migration.MigratorOptions{Progress: report.progress})
 	if err != nil {
 		return err
 	}
@@ -325,14 +326,20 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("the --seed flag needs --up: seeding writes rows onto the schema the re-apply builds")
 	}
 
-	applied, err := migrator.Applied(ctx)
-	if err != nil {
-		return err
+	totalApplied := 0
+	appliedBySet := make([][]migration.MigrationStatus, len(migrators))
+	for i, migrator := range migrators {
+		applied, err := migrator.Applied(ctx)
+		if err != nil {
+			return err
+		}
+		appliedBySet[i] = applied
+		totalApplied += len(applied)
 	}
 
 	// Nothing to roll back. Without --up that is the whole answer, because
 	// there is no up half to run either.
-	if len(applied) == 0 && !reapply {
+	if totalApplied == 0 && !reapply {
 		return printStatusLine(p, "no applied migrations")
 	}
 
@@ -340,8 +347,11 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 		if err = reportTarget(p, dsn); err != nil {
 			return err
 		}
-		if err = planReset(ctx, migrator, p, applied, reapply); err != nil {
-			return err
+		// The rollback half consumes the composition in reverse.
+		for i := len(migrators) - 1; i >= 0; i-- {
+			if err = planReset(ctx, migrators[i], p, appliedBySet[i], reapply); err != nil {
+				return err
+			}
 		}
 		if !seed {
 			return nil
@@ -350,14 +360,19 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// A fresh database has no rollback to do, so --up is a plain apply.
-	if len(applied) == 0 {
+	if totalApplied == 0 {
 		if err = reportTarget(p, dsn); err != nil {
 			return err
 		}
 		var didApply bool
-		didApply, err = applyResetUp(ctx, cmd, migrator, p, report)
-		if err != nil {
-			return err
+		for _, migrator := range migrators {
+			didApply, err = applyResetUp(ctx, cmd, migrator, p, report)
+			if err != nil {
+				return err
+			}
+			if !didApply {
+				break
+			}
 		}
 		// A refused apply or a database with nothing pending left the schema
 		// where it was, so the seed half has nothing it can rely on.
@@ -367,10 +382,10 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 		return seedAfterReset(ctx, cmd, p)
 	}
 
-	question := fmt.Sprintf("roll back all %d %s?", len(applied), printext.Plural(len(applied), "migration"))
+	question := fmt.Sprintf("roll back all %d %s?", totalApplied, printext.Plural(totalApplied, "migration"))
 	if reapply {
 		question = fmt.Sprintf("roll back all %d %s and re-apply them?",
-			len(applied), printext.Plural(len(applied), "migration"))
+			totalApplied, printext.Plural(totalApplied, "migration"))
 	}
 	proceed, err := confirm(p, cmd, terminalCheck(cmd), question)
 	if err != nil {
@@ -378,32 +393,40 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	}
 	if !proceed {
 		return printStatusLine(p, "%d %s left applied",
-			len(applied), printext.Plural(len(applied), "migration"))
+			totalApplied, printext.Plural(totalApplied, "migration"))
 	}
 
 	if err = reportTarget(p, dsn); err != nil {
 		return err
 	}
 
-	rolled, err := migrator.Down(ctx, len(applied))
-	if err != nil {
-		if writeErr := report.failed(); writeErr != nil {
-			return writeErr
+	rolled := 0
+	for i := len(migrators) - 1; i >= 0; i-- {
+		if len(appliedBySet[i]) == 0 {
+			continue
 		}
-		return err
+		results, err := migrators[i].Down(ctx, len(appliedBySet[i]))
+		if err != nil {
+			if writeErr := report.failed(); writeErr != nil {
+				return writeErr
+			}
+			return err
+		}
+		rolled += len(results)
+
+		// The rollback emptied the version table down to its sentinel but left
+		// the identity sequence where it was, so rewind it before the re-apply
+		// records anything. Without this every reset pushes the next id further
+		// away.
+		if err := migrators[i].ResetIdentity(ctx); err != nil {
+			return err
+		}
 	}
 	if err := report.failed(); err != nil {
 		return err
 	}
 
-	// The rollback emptied the version table down to its sentinel but left the
-	// identity sequence where it was, so rewind it before the re-apply records
-	// anything. Without this every reset pushes the next id further away.
-	if err := migrator.ResetIdentity(ctx); err != nil {
-		return err
-	}
-
-	if err := printSummary(p, len(rolled), "rolled back", "migration", report.elapsed()); err != nil {
+	if err := printSummary(p, rolled, "rolled back", "migration", report.elapsed()); err != nil {
 		return err
 	}
 
@@ -420,18 +443,22 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 	// The re-apply is timed on its own and uses its own state column, so its
 	// summary reports the up half rather than the whole reset. The reporter is
 	// restarted in place because the migrator holds its progress callback.
-	report.restart(migrationStateWidth(string(database.ProgressApplied)))
-	reapplied, err := migrator.Up(ctx)
-	if err != nil {
-		if writeErr := report.failed(); writeErr != nil {
-			return writeErr
+	report.restart(migrationStateWidth(string(migration.ProgressApplied)))
+	reapplied := 0
+	for _, migrator := range migrators {
+		applied, err := migrator.Up(ctx)
+		if err != nil {
+			if writeErr := report.failed(); writeErr != nil {
+				return writeErr
+			}
+			return err
 		}
-		return err
+		reapplied += len(applied)
 	}
 	if err := report.failed(); err != nil {
 		return err
 	}
-	if err := printSummary(p, len(reapplied), "applied", "migration", report.elapsed()); err != nil {
+	if err := printSummary(p, reapplied, "applied", "migration", report.elapsed()); err != nil {
 		return err
 	}
 	if !seed {
@@ -448,7 +475,7 @@ func runMigrateReset(ctx context.Context, cmd *cli.Command) error {
 func applyResetUp(
 	ctx context.Context,
 	cmd *cli.Command,
-	migrator *database.Migrator,
+	migrator *migration.Migrator,
 	p printext.Palette,
 	report *reporter,
 ) (bool, error) {
@@ -472,7 +499,7 @@ func applyResetUp(
 
 	// This half only applies, so it needs the apply column width, not the
 	// rollback width the reporter was built with for the reset half.
-	report.restart(migrationStateWidth(string(database.ProgressApplied)))
+	report.restart(migrationStateWidth(string(migration.ProgressApplied)))
 
 	results, err := migrator.Up(ctx)
 	if err != nil {
@@ -514,9 +541,9 @@ func seedAfterReset(ctx context.Context, cmd *cli.Command, p printext.Palette) e
 // rollback half is skipped when the database has nothing applied.
 func planReset(
 	ctx context.Context,
-	migrator *database.Migrator,
+	migrator *migration.Migrator,
 	p printext.Palette,
-	applied []database.MigrationStatus,
+	applied []migration.MigrationStatus,
 	reapply bool,
 ) error {
 	if len(applied) > 0 {
@@ -553,7 +580,7 @@ var migrationCheck = database.Validate
 
 // printValidation reports the outcome and returns an error when the migrations
 // are not valid, so the process exits non-zero in CI.
-func printValidation(p printext.Palette, report database.ValidationReport, elapsed time.Duration) error {
+func printValidation(p printext.Palette, report migration.ValidationReport, elapsed time.Duration) error {
 	for _, issue := range report.Issues {
 		if err := p.Printf("%s\n", p.Red(issue.String())); err != nil {
 			return err

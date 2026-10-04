@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -38,11 +39,11 @@ var ErrTooManyPendingRequests = errors.New("devicelogin: the pairing cap for thi
 type Service struct {
 	repo    *Repository
 	users   *user.Service
-	audit   *audit.Recorder
+	audit   *fwaudit.Recorder
 	baseURL string
 }
 
-func NewService(pool *datastore.Postgres, users *user.Service, recorder *audit.Recorder, baseURL string) *Service {
+func NewService(pool *datastore.Postgres, users *user.Service, recorder *fwaudit.Recorder, baseURL string) *Service {
 	return &Service{
 		repo:    NewRepository(pool),
 		users:   users,
@@ -152,9 +153,9 @@ func (s *Service) Decide(ctx context.Context, code string, decision Decision, ca
 	// back; a caller whose subject cannot parse is refused before this
 	// line by the guard's bearer middleware.
 	approverUUID, _ := user.UUIDFromWire(caller.UserID)
-	s.audit.Record(ctx, s.repo.pool, audit.Entry{
+	s.audit.Record(ctx, s.repo.pool, fwaudit.Entry{
 		Event:  event,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: approverUUID.String(),
 		Payload: map[string]string{
 			"request_id": req.ID.String(),

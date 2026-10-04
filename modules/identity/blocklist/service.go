@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -33,13 +34,13 @@ var (
 type Service struct {
 	pool  *datastore.Postgres
 	repo  *Repository
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -92,9 +93,9 @@ func (s *Service) Add(ctx context.Context, adminID uuid.UUID, pattern string) (E
 		}
 
 		if inserted {
-			s.audit.Record(ctx, tx, audit.Entry{
+			s.audit.Record(ctx, tx, fwaudit.Entry{
 				Event:        audit.EventBlocklistEntryAdded,
-				Status:       audit.StatusSuccess,
+				Status:       fwaudit.StatusSuccess,
 				UserID:       adminID.String(),
 				ResourceType: ResourceBlocklistEntry,
 				ResourceID:   entry.ID.String(),
@@ -131,9 +132,9 @@ func (s *Service) Remove(ctx context.Context, id uuid.UUID) error {
 			return ErrEntryNotFound
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventBlocklistEntryRemoved,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceBlocklistEntry,
 			ResourceID:   id.String(),
 			Payload: map[string]string{

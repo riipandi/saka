@@ -6,11 +6,12 @@ import (
 	"log/slog"
 	"time"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/apikey"
 )
 
@@ -135,7 +136,7 @@ func apiKeyExpiryScan(ctx context.Context, pool *datastore.Postgres, client *que
 
 	// The scan is an application act, not a request, so its record carries
 	// no client facts and the trigger is the system's.
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 
 	for _, key := range keys {
 		if key.OwnerEmail == "" {
@@ -167,10 +168,10 @@ func apiKeyExpiryScan(ctx context.Context, pool *datastore.Postgres, client *que
 			continue
 		}
 
-		recorder.Record(ctx, pool, audit.Entry{
+		recorder.Record(ctx, pool, fwaudit.Entry{
 			Event:        audit.EventAPIKeyExpiryEmailSent,
-			Trigger:      audit.TriggerSystem,
-			Status:       audit.StatusSuccess,
+			Trigger:      fwaudit.TriggerSystem,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       key.Key.UserID.String(),
 			ResourceType: apikey.ResourceAPIKey,
 			ResourceID:   key.Key.ID.String(),

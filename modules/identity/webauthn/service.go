@@ -18,9 +18,9 @@ import (
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 	"github.com/huandu/go-sqlbuilder"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/modules/identity/signin"
 )
@@ -154,7 +154,7 @@ type Service struct {
 	issuer   issuer
 	settings SettingsReader
 	engine   *gowebauthn.WebAuthn
-	audit    *audit.Recorder
+	audit    *fwaudit.Recorder
 	log      *slog.Logger
 	now      func() time.Time
 
@@ -237,7 +237,7 @@ func (s *Service) WithDelivery(mail *fwmailer.Service, enqueuer codeEnqueuer) *S
 // the origin is the base URL itself. This is load-bearing — credentials are
 // bound to the RP ID, so changing the deployment origin silently orphans
 // every passkey ever enrolled. The docs must say so.
-func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, issuer issuer, settings SettingsReader, recorder *audit.Recorder, log *slog.Logger) (*Service, error) {
+func NewService(cfg config.Config, pool *datastore.Postgres, repo *Repository, issuer issuer, settings SettingsReader, recorder *fwaudit.Recorder, log *slog.Logger) (*Service, error) {
 	origin := strings.TrimSuffix(cfg.App.BaseURL, "/")
 	host, err := rpIDFrom(origin)
 	if err != nil {

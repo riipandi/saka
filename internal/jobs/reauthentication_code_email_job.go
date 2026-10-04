@@ -8,8 +8,8 @@ import (
 	"time"
 
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/identity/webauthn"
 )
 

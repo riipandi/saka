@@ -10,6 +10,7 @@ import (
 
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -75,7 +76,7 @@ type Service struct {
 	pool    *datastore.Postgres
 	repo    *Repository
 	cipher  *crypto.Cipher
-	audit   *audit.Recorder
+	audit   *fwaudit.Recorder
 	fetcher DiscoveryFetcher
 	log     *slog.Logger
 
@@ -167,7 +168,7 @@ func (s *Service) providerFor(conn Connection) (Provider, error) {
 // discovery validation unavailable — a custom connection that rides a
 // discovery document is refused until the outbound client is wired, the
 // state a bare wiring is in.
-func NewService(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, fetcher DiscoveryFetcher, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *fwaudit.Recorder, fetcher DiscoveryFetcher, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -496,10 +497,10 @@ func (s *Service) record(ctx context.Context, tx datastore.Querier, event string
 		out[key] = value
 	}
 	out["connection_id"] = FormatID(conn.ID)
-	s.audit.Record(ctx, tx, audit.Entry{
+	s.audit.Record(ctx, tx, fwaudit.Entry{
 		Event:        event,
-		Trigger:      audit.TriggerUser,
-		Status:       audit.StatusSuccess,
+		Trigger:      fwaudit.TriggerUser,
+		Status:       fwaudit.StatusSuccess,
 		ResourceType: ResourceOAuthConnection,
 		Payload:      out,
 	})

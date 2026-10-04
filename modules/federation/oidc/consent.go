@@ -8,6 +8,7 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -209,9 +210,9 @@ func (s *Service) RevokeMyAuthorizedClient(ctx context.Context, userID, clientID
 			return err
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcConsentRevoked,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			// The client id is the operator's word, not a row UUID, so the
 			// payload carries it beside the account.
@@ -248,9 +249,9 @@ func (s *Service) EndSession(ctx context.Context, userID, clientID, sessionID st
 			return err
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventOidcSessionEnded,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceOidcClient,
 			Payload:      map[string]string{"client_id": clientID, "user_id": userID},
 		})

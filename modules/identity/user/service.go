@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/framework/webutil"
@@ -58,7 +59,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of every account change, in the transaction
 	// that makes the change.
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	hasher *crypto.PasswordHasher
 	log    *slog.Logger
 	now    func() time.Time
@@ -130,7 +131,7 @@ type banNotifier interface {
 // NewService builds the service. The database writes run in one transaction
 // the service opens over the pool, so an account and its credential commit
 // together or not at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger, pictures *storage.Manager) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger, pictures *storage.Manager) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -475,9 +476,9 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 		}
 
 		created = s.view(row)
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventAccountCreated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: id.String(),
 			Payload: map[string]string{
 				"username": row.Username,
@@ -609,9 +610,9 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 		// record says the row moved, this one says the handle did — the
 		// old name is the payload, the new one the row.
 		if usernameChanged {
-			s.audit.Record(ctx, tx, audit.Entry{
+			s.audit.Record(ctx, tx, fwaudit.Entry{
 				Event:  audit.EventUsernameChanged,
-				Status: audit.StatusSuccess,
+				Status: fwaudit.StatusSuccess,
 				UserID: userID.String(),
 				Payload: map[string]string{
 					"username":     username,
@@ -620,9 +621,9 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 				},
 			})
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventAccountUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"username": row.Username,
@@ -691,9 +692,9 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 		if !deleted {
 			return ErrUserNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAccountDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceUser,
 			ResourceID:   userID.String(),
 			Payload: map[string]string{
@@ -829,9 +830,9 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 				}
 			}
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventAccountUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"username": row.Username,
@@ -963,9 +964,9 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 		if !deleted {
 			return ErrUserNotFound
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAccountDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceUser,
 			ResourceID:   userID.String(),
 			Payload: map[string]string{

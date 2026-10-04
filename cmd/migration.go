@@ -6,26 +6,33 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/migration"
+	fwqueue "github.com/riipandi/saka/framework/queue"
+	fwscheduler "github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/printext"
 )
 
-// openMigrator opens the single-connection migration handle and loads the
-// migrations embedded in the binary. The returned close function releases the
-// handle and is always non-nil on success. The DSN is returned so the caller can
-// name the database it is about to change.
-func openMigrator(
+// openMigrators composes the migration sets the binary runs — the
+// application's own and every framework package's — and opens one migrator
+// per set over the single-connection handle, in the order they apply. The
+// returned close function releases the handle and is always non-nil on
+// success. The DSN is returned so the caller can name the database it is
+// about to change.
+func openMigrators(
 	ctx context.Context,
 	cfg config.Config,
-	opts database.MigratorOptions,
-) (*database.Migrator, string, func(), error) {
+	opts migration.MigratorOptions,
+) ([]*migration.Migrator, string, func(), error) {
 	dsn, err := requireDatabaseURL(cfg)
 	if err != nil {
 		return nil, "", nil, err
@@ -36,12 +43,22 @@ func openMigrator(
 		return nil, "", nil, err
 	}
 
-	migrator, err := database.NewMigrator(ctx, db, opts)
+	sets, err := migration.Compose(database.Schema(), fwqueue.Schema(), fwscheduler.Schema(), fwaudit.Schema())
 	if err != nil {
 		_ = db.Close()
 		return nil, "", nil, err
 	}
-	return migrator, dsn, func() { _ = db.Close() }, nil
+
+	migrators := make([]*migration.Migrator, 0, len(sets))
+	for _, set := range sets {
+		migrator, err := migration.NewMigrator(ctx, db, set, opts)
+		if err != nil {
+			_ = db.Close()
+			return nil, "", nil, err
+		}
+		migrators = append(migrators, migrator)
+	}
+	return migrators, dsn, func() { _ = db.Close() }, nil
 }
 
 // databaseOptions is the pool and probe configuration a command opens a handle
@@ -66,7 +83,7 @@ func databaseOptions(ctx context.Context, cfg config.Config) datastore.PostgresO
 
 // printPending reports the migrations the database has not applied yet. Each
 // line carries a "-" in the time column and no duration, because nothing has run.
-func printPending(p printext.Palette, pending []database.MigrationStatus) error {
+func printPending(p printext.Palette, pending []migration.MigrationStatus) error {
 	if len(pending) == 0 {
 		return printStatusLine(p, "no pending migrations")
 	}
@@ -84,10 +101,16 @@ func printPending(p printext.Palette, pending []database.MigrationStatus) error 
 	return printSummary(p, len(pending), "pending", "migration", 0)
 }
 
+// printSetHeader names the migration set the rows under it belong to, so a
+// composed run reports every row with its owner.
+func printSetHeader(p printext.Palette, name string) error {
+	return p.Printf("%s\n", p.Paint(printext.Yellow, name))
+}
+
 // printRollback reports the migrations a rollback would consume, newest first.
 // The state column reads "rollback", not "rolled back": a dry run describes work
 // that has not happened.
-func printRollback(p printext.Palette, selected []database.MigrationStatus) error {
+func printRollback(p printext.Palette, selected []migration.MigrationStatus) error {
 	rows := make([]migrationRow, 0, len(selected))
 	for _, status := range selected {
 		rows = append(rows, migrationRow{
@@ -117,13 +140,13 @@ const migrationTimestampWidth = len(migrationTimestamp)
 //
 // No duration is shown: the recorded time says when a migration ran, not how
 // long it took, and this command does not run anything to find out.
-func printStatus(p printext.Palette, statuses []database.MigrationStatus, version int64) error {
+func printStatus(p printext.Palette, statuses []migration.MigrationStatus, version int64) error {
 	applied := 0
 	rows := make([]migrationRow, 0, len(statuses))
 	for _, status := range statuses {
 		state := statePending
 		if status.Applied {
-			state = string(database.ProgressApplied)
+			state = string(migration.ProgressApplied)
 			applied++
 		}
 		rows = append(rows, migrationRow{
@@ -136,7 +159,7 @@ func printStatus(p printext.Palette, statuses []database.MigrationStatus, versio
 
 	// One state column for the whole list, sized from the words this list
 	// actually uses.
-	if err := printMigrationRows(p, migrationStateWidth(statePending, string(database.ProgressApplied)), rows); err != nil {
+	if err := printMigrationRows(p, migrationStateWidth(statePending, string(migration.ProgressApplied)), rows); err != nil {
 		return err
 	}
 
@@ -168,9 +191,9 @@ func versionCountStyle(applied, total int) printext.Colour {
 // lastRun returns the migration that ran most recently. Comparing timestamps
 // rather than taking the highest version keeps the answer right when
 // --allow-out-of-order applied an older version last.
-func lastRun(statuses []database.MigrationStatus) (database.MigrationStatus, bool) {
+func lastRun(statuses []migration.MigrationStatus) (migration.MigrationStatus, bool) {
 	var (
-		last database.MigrationStatus
+		last migration.MigrationStatus
 		ok   bool
 	)
 	for _, status := range statuses {
@@ -224,10 +247,10 @@ func runMigrateUp(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	p := printext.NewPalette(cmd.Root().Writer)
-	report := newReporter(p, migrationStateWidth(string(database.ProgressApplied)))
+	report := newReporter(p, migrationStateWidth(string(migration.ProgressApplied)))
 
-	migrator, dsn, closeDB, err := openMigrator(ctx, cfg,
-		database.MigratorOptions{Progress: report.progress})
+	migrators, dsn, closeDB, err := openMigrators(ctx, cfg,
+		migration.MigratorOptions{Progress: report.progress})
 	if err != nil {
 		return err
 	}
@@ -237,50 +260,89 @@ func runMigrateUp(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	pending, err := migrator.Pending(ctx)
-	if err != nil {
-		return err
+	// --to caps what this run applies to the app set — its versions are the
+	// sequence an operator names. The framework sets own their own version
+	// spaces and always run to head; capping them by the app's version number
+	// would be a category mistake.
+	totalPending, totalSelected := 0, 0
+	type setPlan struct {
+		migrator *migration.Migrator
+		target   int64
+		selected int
+	}
+	plans := make([]setPlan, 0, len(migrators))
+	for i, migrator := range migrators {
+		setPending, listErr := migrator.Pending(ctx)
+		if listErr != nil {
+			return listErr
+		}
+		target := migrator.HighestVersion()
+		selected := len(pendingUpTo(setPending, target))
+		if i == 0 {
+			// The app set is the sequence the operator's --to names.
+			if requested := cmd.Uint64("to"); requested > 0 {
+				if requested > math.MaxInt64 {
+					return fmt.Errorf("database: --to=%d exceeds the maximum migration version", requested)
+				}
+				target = int64(requested)
+				selected = len(pendingUpTo(setPending, target))
+			}
+		}
+		totalPending += len(setPending)
+		totalSelected += selected
+		plans = append(plans, setPlan{migrator: migrator, target: target, selected: selected})
 	}
 	if cmd.Bool("dry-run") {
-		return printPending(p, pending)
-	}
-
-	// --to caps what this run applies; migration version 0 is goose's sentinel,
-	// never a target, so an unset --to means "everything".
-	target := migrator.HighestVersion()
-	if requested := cmd.Uint64("to"); requested > 0 {
-		if requested > math.MaxInt64 {
-			return fmt.Errorf("database: --to=%d exceeds the maximum migration version", requested)
+		for _, plan := range plans {
+			setPending, listErr := plan.migrator.Pending(ctx)
+			if listErr != nil {
+				return listErr
+			}
+			if printErr := printSetHeader(p, plan.migrator.Name()); printErr != nil {
+				return printErr
+			}
+			if printErr := printPending(p, pendingUpTo(setPending, plan.target)); printErr != nil {
+				return printErr
+			}
 		}
-		target = int64(requested)
+		return nil
 	}
-	selected := pendingUpTo(pending, target)
 
-	if len(selected) == 0 {
-		return printNothingToApply(p, pending, target)
+	if totalSelected == 0 {
+		return printStatusLine(p, "no pending migrations across %d sets", len(plans))
 	}
 
 	apply, err := confirm(p, cmd, terminalCheck(cmd),
-		fmt.Sprintf("apply %d pending %s?", len(selected), printext.Plural(len(selected), "migration")))
+		fmt.Sprintf("apply %d pending %s?", totalSelected, printext.Plural(totalSelected, "migration")))
 	if err != nil {
 		return err
 	}
 	if !apply {
 		return printStatusLine(p, "%d pending %s left unapplied",
-			len(selected), printext.Plural(len(selected), "migration"))
+			totalSelected, printext.Plural(totalSelected, "migration"))
 	}
 
-	results, err := migrator.UpTo(ctx, target)
-	if err != nil {
-		if writeErr := report.failed(); writeErr != nil {
-			return writeErr
+	applied := 0
+	for _, plan := range plans {
+		if plan.selected == 0 {
+			continue
 		}
-		return err
+		if err := printSetHeader(p, plan.migrator.Name()); err != nil {
+			return err
+		}
+		results, err := plan.migrator.UpTo(ctx, plan.target)
+		if err != nil {
+			if writeErr := report.failed(); writeErr != nil {
+				return writeErr
+			}
+			return err
+		}
+		applied += len(results)
 	}
 	if err := report.failed(); err != nil {
 		return err
 	}
-	return printSummary(p, len(results), "applied", "migration", report.elapsed())
+	return printSummary(p, applied, "applied", "migration", report.elapsed())
 }
 
 // runMigrateDown rolls back the most recent migrations. --dry-run lists them
@@ -297,10 +359,10 @@ func runMigrateDown(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	p := printext.NewPalette(cmd.Root().Writer)
-	report := newReporter(p, migrationStateWidth(string(database.ProgressRolledBack)))
+	report := newReporter(p, migrationStateWidth(string(migration.ProgressRolledBack)))
 
-	migrator, dsn, closeDB, err := openMigrator(ctx, cfg,
-		database.MigratorOptions{Progress: report.progress})
+	migrators, dsn, closeDB, err := openMigrators(ctx, cfg,
+		migration.MigratorOptions{Progress: report.progress})
 	if err != nil {
 		return err
 	}
@@ -310,19 +372,52 @@ func runMigrateDown(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	applied, err := migrator.Applied(ctx)
-	if err != nil {
-		return err
+	// The rollback consumes the composition in reverse: a set whose tables
+	// reference another set's rows lets go first.
+	slices.Reverse(migrators)
+
+	totalApplied := 0
+	type setPlan struct {
+		migrator *migration.Migrator
+		count    int
 	}
-	if len(applied) == 0 {
+	plans := make([]setPlan, 0, len(migrators))
+	budget := count
+	for _, migrator := range migrators {
+		setApplied, listErr := migrator.Applied(ctx)
+		if listErr != nil {
+			return listErr
+		}
+		if len(setApplied) == 0 {
+			continue
+		}
+		// A count above what the database has rolls back everything, which is
+		// the only sensible reading. The count is a global budget spent in
+		// reverse composition order: one rollback of three goes audit,
+		// scheduler, queue — never three per set.
+		take := min(budget, len(setApplied))
+		budget -= take
+		totalApplied += len(setApplied)
+		plans = append(plans, setPlan{migrator: migrator, count: take})
+	}
+	if totalApplied == 0 {
 		return printStatusLine(p, "no applied migrations")
 	}
 
-	// A count above what the database has rolls back everything, which is the
-	// only sensible reading.
-	count = min(count, len(applied))
 	if cmd.Bool("dry-run") {
-		return printRollback(p, applied[:count])
+		for _, plan := range plans {
+			setApplied, listErr := plan.migrator.Applied(ctx)
+			if listErr != nil {
+				return listErr
+			}
+			if printErr := printSetHeader(p, plan.migrator.Name()); printErr != nil {
+				return printErr
+			}
+			if printErr := printRollback(p, setApplied[:plan.count]); printErr != nil {
+				return printErr
+			}
+		}
+		return nil
 	}
 
 	proceed, err := confirm(p, cmd, terminalCheck(cmd),
@@ -334,24 +429,34 @@ func runMigrateDown(ctx context.Context, cmd *cli.Command) error {
 		return printStatusLine(p, "%d %s left applied", count, printext.Plural(count, "migration"))
 	}
 
-	results, err := migrator.Down(ctx, count)
-	if err != nil {
-		if writeErr := report.failed(); writeErr != nil {
-			return writeErr
+	rolled := 0
+	for _, plan := range plans {
+		if plan.count == 0 {
+			continue
 		}
-		return err
+		if err := printSetHeader(p, plan.migrator.Name()); err != nil {
+			return err
+		}
+		results, err := plan.migrator.Down(ctx, plan.count)
+		if err != nil {
+			if writeErr := report.failed(); writeErr != nil {
+				return writeErr
+			}
+			return err
+		}
+		rolled += len(results)
+
+		// A rollback deleted rows from the version table but left its identity
+		// sequence where it was. Rewinding it after every rollback keeps the
+		// recorded ids dense instead of leaving a widening gap behind each cycle.
+		if err := plan.migrator.ResetIdentity(ctx); err != nil {
+			return err
+		}
 	}
 	if err := report.failed(); err != nil {
 		return err
 	}
-
-	// A rollback deleted rows from the version table but left its identity
-	// sequence where it was. Rewinding it after every rollback keeps the recorded
-	// ids dense instead of leaving a widening gap behind each cycle.
-	if err := migrator.ResetIdentity(ctx); err != nil {
-		return err
-	}
-	return printSummary(p, len(results), "rolled back", "migration", report.elapsed())
+	return printSummary(p, rolled, "rolled back", "migration", report.elapsed())
 }
 
 // runMigrateStatus lists every embedded migration and whether the database has
@@ -362,7 +467,7 @@ func runMigrateStatus(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	migrator, dsn, closeDB, err := openMigrator(ctx, cfg, database.MigratorOptions{})
+	migrators, dsn, closeDB, err := openMigrators(ctx, cfg, migration.MigratorOptions{})
 	if err != nil {
 		return err
 	}
@@ -373,15 +478,28 @@ func runMigrateStatus(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	statuses, err := migrator.Status(ctx)
-	if err != nil {
-		return err
+	for _, migrator := range migrators {
+		statuses, err := migrator.Status(ctx)
+		if err != nil {
+			return err
+		}
+		version, err := migrator.Version(ctx)
+		if err != nil {
+			return err
+		}
+		if err := printSetHeader(p, migrator.Name()); err != nil {
+			return err
+		}
+		if err := printStatus(p, statuses, version); err != nil {
+			return err
+		}
+		if migrator != migrators[len(migrators)-1] {
+			if err := p.Printf("\n"); err != nil {
+				return err
+			}
+		}
 	}
-	version, err := migrator.Version(ctx)
-	if err != nil {
-		return err
-	}
-	return printStatus(p, statuses, version)
+	return nil
 }
 
 // runMigrateVersion prints the version the database sits on, which is the
@@ -396,13 +514,14 @@ func runMigrateVersion(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	migrator, _, closeDB, err := openMigrator(ctx, cfg, database.MigratorOptions{})
+	migrators, _, closeDB, err := openMigrators(ctx, cfg, migration.MigratorOptions{})
 	if err != nil {
 		return err
 	}
 	defer closeDB()
 
-	version, err := migrator.Version(ctx)
+	// The app set's version is the number the scripts read.
+	version, err := migrators[0].Version(ctx)
 	if err != nil {
 		return err
 	}
@@ -411,25 +530,14 @@ func runMigrateVersion(ctx context.Context, cmd *cli.Command) error {
 }
 
 // pendingUpTo keeps the migrations that a run targeting version would apply.
-func pendingUpTo(pending []database.MigrationStatus, version int64) []database.MigrationStatus {
-	selected := make([]database.MigrationStatus, 0, len(pending))
+func pendingUpTo(pending []migration.MigrationStatus, version int64) []migration.MigrationStatus {
+	selected := make([]migration.MigrationStatus, 0, len(pending))
 	for _, status := range pending {
 		if status.Version <= version {
 			selected = append(selected, status)
 		}
 	}
 	return selected
-}
-
-// printNothingToApply explains why a run applied nothing. An empty result under
-// --to is not the same as an up-to-date database, and saying "no pending
-// migrations" then would be wrong.
-func printNothingToApply(p printext.Palette, pending []database.MigrationStatus, target int64) error {
-	if len(pending) == 0 {
-		return printStatusLine(p, "no pending migrations")
-	}
-	return printStatusLine(p, "nothing to apply up to version %05d; %s",
-		target, p.Yellow(fmt.Sprintf("%d %s pending above it", len(pending), printext.Plural(len(pending), "migration"))))
 }
 
 // isTerminal reports whether the confirmation prompt has a user behind it.
@@ -470,18 +578,23 @@ func requireMigrated(ctx context.Context, cfg config.Config) error {
 	}
 	defer func() { _ = db.Close() }()
 
-	migrator, err := database.NewMigrator(ctx, db, database.MigratorOptions{})
+	sets, err := migration.Compose(database.Schema(), fwqueue.Schema(), fwscheduler.Schema(), fwaudit.Schema())
 	if err != nil {
 		return err
 	}
-
-	pending, err := migrator.Pending(ctx)
-	if err != nil {
-		return err
-	}
-	if len(pending) > 0 {
-		return fmt.Errorf("database: %d %s pending; run migrate:up first",
-			len(pending), printext.Plural(len(pending), "migration"))
+	for _, set := range sets {
+		migrator, err := migration.NewMigrator(ctx, db, set, migration.MigratorOptions{})
+		if err != nil {
+			return err
+		}
+		pending, err := migrator.Pending(ctx)
+		if err != nil {
+			return err
+		}
+		if len(pending) > 0 {
+			return fmt.Errorf("database: %d %s pending in set %q; run migrate:up first",
+				len(pending), printext.Plural(len(pending), "migration"), set.Name)
+		}
 	}
 	return nil
 }

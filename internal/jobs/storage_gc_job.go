@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // StorageGCName is the queue the garbage collection runs on.

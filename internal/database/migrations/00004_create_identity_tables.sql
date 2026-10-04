@@ -254,39 +254,6 @@ CREATE TABLE IF NOT EXISTS public.device_login_requests (
 ) USING heap;
 
 
--- --------------------------------------------------------
--- Table: public.audit_logs — track user actions and system events
--- --------------------------------------------------------
-
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_action_status') THEN
-    CREATE TYPE public.audit_action_status AS ENUM ('success', 'failed', 'pending', 'unknown');
-END IF; END$$;
-
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_event_trigger') THEN
-    CREATE TYPE public.audit_event_trigger AS ENUM ('user', 'system', 'external');
-END IF; END$$;
-
-CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
-    event TEXT NOT NULL,
-    trigger_type public.audit_event_trigger NOT NULL,
-    action_status public.audit_action_status DEFAULT 'pending',
-    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    ip_address INET,
-    user_agent TEXT,
-    device_fingerprint TEXT,
-    country TEXT,
-    city TEXT,
-    resource_type TEXT,
-    resource_id UUID,
-    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-) USING heap;
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs USING btree (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON public.audit_logs USING btree (event);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs USING btree (user_id);
-
 -- The archive triggers rest here, after every table they name exists.
 CREATE TRIGGER trg_user_groups_deleted_record AFTER DELETE ON public.user_groups FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
 CREATE TRIGGER trg_signup_tokens_deleted_record AFTER DELETE ON public.signup_tokens FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
@@ -303,9 +270,6 @@ DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
 DROP TRIGGER IF EXISTS trg_user_passwords_updated_at ON public.user_passwords;
 DROP TRIGGER IF EXISTS trg_user_groups_updated_at ON public.user_groups;
 
-DROP INDEX IF EXISTS idx_audit_logs_user_id;
-DROP INDEX IF EXISTS idx_audit_logs_event;
-DROP INDEX IF EXISTS idx_audit_logs_created_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;
@@ -319,7 +283,6 @@ DROP INDEX IF EXISTS idx_users_display_name;
 DROP INDEX IF EXISTS idx_user_passwords_updated_at;
 DROP INDEX IF EXISTS idx_user_passwords_created_at;
 
-DROP TABLE IF EXISTS public.audit_logs;
 DROP TABLE IF EXISTS public.device_login_requests;
 DROP TABLE IF EXISTS public.known_devices;
 DROP TABLE IF EXISTS public.account_restrictions;
@@ -332,7 +295,5 @@ DROP TABLE IF EXISTS public.user_groups;
 DROP TABLE IF EXISTS public.user_passwords;
 DROP TABLE IF EXISTS public.users;
 
-DROP TYPE IF EXISTS public.audit_action_status;
-DROP TYPE IF EXISTS public.audit_event_trigger;
 
 -- +goose StatementEnd

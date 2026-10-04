@@ -32,6 +32,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
@@ -184,7 +185,7 @@ type Service struct {
 	sealer    Sealer
 	generate  PairGenerator
 	algorithm string
-	recorder  *audit.Recorder
+	recorder  *fwaudit.Recorder
 
 	// configured is auth.jwt_algorithm, empty when the deployment lets the
 	// material decide.
@@ -201,7 +202,7 @@ type Service struct {
 // and the operator recovers with jwks:generate. recorder may be nil — a
 // record is best effort, and an invalidation that cannot be recorded has
 // still restored signing.
-func (s *Service) WithSealer(sealer Sealer, generate PairGenerator, algorithm string, recorder *audit.Recorder) *Service {
+func (s *Service) WithSealer(sealer Sealer, generate PairGenerator, algorithm string, recorder *fwaudit.Recorder) *Service {
 	s.sealer = sealer
 	s.generate = generate
 	s.algorithm = algorithm
@@ -675,9 +676,9 @@ func (s *Service) invalidateStaleSeals(ctx context.Context) (bool, error) {
 		"kid", pair.KeyID, "algorithm", pair.Algorithm, "retired", retired)
 	if s.recorder != nil {
 		q := s.sealer.Querier()
-		s.recorder.Record(ctx, q, audit.Entry{
+		s.recorder.Record(ctx, q, fwaudit.Entry{
 			Event:  audit.EventJwksInvalidated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			Payload: map[string]string{
 				"kid":       pair.KeyID,
 				"algorithm": pair.Algorithm,

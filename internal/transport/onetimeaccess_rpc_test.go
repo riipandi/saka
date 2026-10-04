@@ -13,15 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
-	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/onetimeaccess"
@@ -41,7 +40,7 @@ func oneTimeAccessPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
@@ -91,9 +90,9 @@ func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *da
 	require.NoError(t, err)
 
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		jwks.NewService(cfg, nil, nil, nil), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	service := onetimeaccess.NewService(cfg, pool, issuer,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), mail, client, nil)
 
 	return transport.NewRouter(transport.Options{
 		Config:        cfg,

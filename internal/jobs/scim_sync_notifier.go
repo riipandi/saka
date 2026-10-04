@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 )
 
 // ScimSyncNotifier is the adapter between the features' change seams and

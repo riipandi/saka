@@ -16,12 +16,12 @@ import (
 	"go.jetify.com/typeid"
 
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/session"
@@ -45,7 +45,7 @@ func sessionPool(t *testing.T) *datastore.Postgres {
 
 	migrationDB, err := datastore.OpenMigrationDB(t.Context(), datastore.PostgresOptions{DSN: dsn})
 	require.NoError(t, err)
-	migrator, err := database.NewMigrator(t.Context(), migrationDB, database.MigratorOptions{})
+	migrator, err := openTestMigrators(t, migrationDB)
 	require.NoError(t, err)
 	_, err = migrator.Up(t.Context())
 	require.NoError(t, err)
@@ -76,17 +76,17 @@ func newSessionRouter(t *testing.T, auth transport.Authenticator, pool *datastor
 	cfg := config.Default()
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		jwks.NewService(cfg, nil, nil, nil), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 	users := user.NewService(pool, nil, nil, nil)
 	service := session.NewService(pool, issuer, users,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 
 	// The step-up proofs are spent by the webauthn feature's consumer, built
 	// over the same pool; the settings reader is nil because the consumption
 	// reads no setting.
 	cfg.App.BaseURL = "http://localhost:3080"
 	reauth, err := webauthn.NewService(cfg, pool, webauthn.NewRepository(), issuer, nil,
-		audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	require.NoError(t, err)
 
 	return transport.NewRouter(transport.Options{
@@ -119,7 +119,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.SecretKey = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
 	issuer := signin.NewService(cfg, pool, signin.NewRepository(pool),
-		jwks.NewService(cfg, nil, nil, nil), audit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
+		jwks.NewService(cfg, nil, nil, nil), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	account := signin.Account{ID: mustUUID(t, hermioneSessionOwner), Username: "hermione",
 		Email: "hermione@example.com", DisplayName: "Hermione Granger"}
 	result, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderPassword,

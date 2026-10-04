@@ -13,11 +13,12 @@ import (
 
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/queue"
-	"github.com/riipandi/saka/internal/scheduler"
 )
 
 // errInternal is the one wire answer an internal failure carries. The cause
@@ -43,11 +44,11 @@ type rpcQueueService struct {
 	// action is a single statement, so the record rides the pool rather than
 	// a transaction the handler does not own.
 	db    datastore.Querier
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 }
 
-func newRPCQueueService(client *queue.Client, db datastore.Querier, audit *audit.Recorder, log *slog.Logger) *rpcQueueService {
+func newRPCQueueService(client *queue.Client, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcQueueService {
 	return &rpcQueueService{client: client, db: db, audit: audit, log: log}
 }
 
@@ -62,10 +63,10 @@ func (s *rpcQueueService) internalFailure(ctx context.Context, what string, err 
 // surface may be absent — a bare test router — and recording never is a
 // condition of the action.
 func (s *rpcQueueService) record(ctx context.Context, event, resourceID string, payload map[string]string) {
-	s.audit.Record(ctx, s.db, audit.Entry{
+	s.audit.Record(ctx, s.db, fwaudit.Entry{
 		Event:        event,
-		Trigger:      audit.TriggerUser,
-		Status:       audit.StatusSuccess,
+		Trigger:      fwaudit.TriggerUser,
+		Status:       fwaudit.StatusSuccess,
 		ResourceType: resourceQueueTask,
 		ResourceID:   resourceID,
 		Payload:      payload,
@@ -335,11 +336,11 @@ func (s *rpcQueueService) engine() error {
 type rpcSchedulerService struct {
 	scheduler *scheduler.Scheduler
 	db        datastore.Querier
-	audit     *audit.Recorder
+	audit     *fwaudit.Recorder
 	log       *slog.Logger
 }
 
-func newRPCSchedulerService(s *scheduler.Scheduler, db datastore.Querier, audit *audit.Recorder, log *slog.Logger) *rpcSchedulerService {
+func newRPCSchedulerService(s *scheduler.Scheduler, db datastore.Querier, audit *fwaudit.Recorder, log *slog.Logger) *rpcSchedulerService {
 	return &rpcSchedulerService{scheduler: s, db: db, audit: audit, log: log}
 }
 
@@ -400,10 +401,10 @@ func (s *rpcSchedulerService) RunNow(ctx context.Context, req *connect.Request[s
 	// The record names the job by the state row's own identifier: the wire
 	// id decoded back to the UUID the column holds.
 	if raw, decodeErr := scheduler.UUIDFromWire(req.Msg.GetId()); decodeErr == nil {
-		s.audit.Record(ctx, s.db, audit.Entry{
+		s.audit.Record(ctx, s.db, fwaudit.Entry{
 			Event:        audit.EventSchedulerJobRunNow,
-			Trigger:      audit.TriggerUser,
-			Status:       audit.StatusSuccess,
+			Trigger:      fwaudit.TriggerUser,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: resourceSchedulerJob,
 			ResourceID:   raw.String(),
 		})

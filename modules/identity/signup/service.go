@@ -10,6 +10,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -63,7 +64,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of the account this flow creates, in the same
 	// transaction, so the account and its record commit together.
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	hasher *crypto.PasswordHasher
 	log    *slog.Logger
 	now    func() time.Time
@@ -237,7 +238,7 @@ func (p signupPolicy) stampVerifiedAt(at time.Time) *time.Time {
 // NewService builds the service. The database writes run in one transaction
 // the service opens over the pool, so the account, its credential, and the
 // token's use commit together or not at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -508,9 +509,9 @@ func (s *Service) Signup(ctx context.Context, params Params) (user.UserView, err
 		// The account, its credential, the token's use, and this record
 		// commit together: a rolled-back sign-up must not leave a record
 		// claiming an account exists.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventAccountCreated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"username": read.Username,

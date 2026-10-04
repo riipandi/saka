@@ -10,6 +10,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
@@ -41,7 +42,7 @@ var (
 type Service struct {
 	pool   *datastore.Postgres
 	repo   *Repository
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	log    *slog.Logger
 	broker *Broker
 
@@ -57,7 +58,7 @@ type Service struct {
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -138,9 +139,9 @@ func (s *Service) Create(ctx context.Context, creator uuid.UUID, params CreatePa
 		if createErr != nil {
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventNotificationCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       creator.String(),
 			ResourceType: ResourceNotification,
 			Payload: map[string]string{
@@ -187,9 +188,9 @@ func (s *Service) CreateSystemNotice(ctx context.Context, userID uuid.UUID, titl
 		if createErr := s.repo.Create(ctx, tx, row, []uuid.UUID{userID}, nil); createErr != nil {
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventNotificationCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceNotification,
 			Payload: map[string]string{
 				"category":      CategorySystem,
@@ -349,9 +350,9 @@ func (s *Service) Cancel(ctx context.Context, admin uuid.UUID, id uuid.UUID) err
 			return nil
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventNotificationCancelled,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       admin.String(),
 			ResourceType: ResourceNotification,
 			ResourceID:   id.String(),

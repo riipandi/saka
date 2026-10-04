@@ -6,8 +6,8 @@ import (
 	"time"
 
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/mailer"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // EmailChangeRequestEmailName is the queue the confirm-link messages run on.

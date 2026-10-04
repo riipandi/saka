@@ -9,6 +9,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -126,9 +127,9 @@ func (s *Service) SetAllowedOidcClients(ctx context.Context, id string, clientID
 		if setErr := s.repo.SetAllowedClients(ctx, tx, IDToUUID(groupID), clientIDs); setErr != nil {
 			return setErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventGroupAllowedClientsUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceGroup,
 			ResourceID:   groupID.UUID(),
 			Payload:      map[string]string{"client_count": fmt.Sprintf("%d", len(clientIDs))},

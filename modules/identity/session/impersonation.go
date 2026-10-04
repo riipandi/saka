@@ -9,6 +9,7 @@ import (
 
 	"go.jetify.com/typeid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	appauthz "github.com/riipandi/saka/internal/authz"
@@ -66,7 +67,7 @@ var ErrNotImpersonating = errors.New("session: the caller is not impersonating")
 // The audit record is written in the same transaction the session row is:
 // a delegation that rolled back must not appear to have happened.
 func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername, targetWire, reason string) (Refreshed, error) {
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 	targetID, err := user.UUIDFromWire(targetWire)
 	if err != nil {
 		return Refreshed{}, ErrTargetNotFound
@@ -131,9 +132,9 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 		if createErr := s.repo.Create(ctx, tx, row); createErr != nil {
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventImpersonationStarted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       targetID.String(),
 			ResourceType: ResourceSession,
 			ResourceID:   sessionID.UUID(),
@@ -189,7 +190,7 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 // in the transaction that ends the delegation, with the user_id naming the
 // target so the started/stopped pair reads together.
 func (s *Service) StopImpersonating(ctx context.Context, callerSession string, caller *jwtutils.Caller) (Refreshed, error) {
-	client := audit.ClientFromContext(ctx)
+	client := fwaudit.ClientFromContext(ctx)
 	if caller == nil || caller.ActorID == "" {
 		return Refreshed{}, ErrNotImpersonating
 	}
@@ -267,9 +268,9 @@ func (s *Service) StopImpersonating(ctx context.Context, callerSession string, c
 		}); createErr != nil {
 			return createErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventImpersonationStopped,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       row.UserID.String(),
 			ResourceType: ResourceSession,
 			ResourceID:   sid.UUID(),

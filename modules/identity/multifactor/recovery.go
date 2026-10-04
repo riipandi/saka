@@ -6,6 +6,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -56,9 +57,9 @@ func (s *Service) RegenerateRecoveryCodes(ctx context.Context, userID uuid.UUID,
 		if writeErr := s.writeRecoverySet(ctx, tx, userID, codes, now); writeErr != nil {
 			return writeErr
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventMfaRecoveryRegenerated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"count": fmt.Sprint(len(codes)),
@@ -116,9 +117,9 @@ func (s *Service) DisableMfa(ctx context.Context, userID uuid.UUID, code string)
 		}
 		// The removal and its record commit together: a disabled state that
 		// reads back has the record that explains it.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventMfaDisabled,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 		})
 		return nil
@@ -192,9 +193,9 @@ func (s *Service) AdminDisableMfa(ctx context.Context, targetUserID uuid.UUID, r
 		}
 		// The removal and its record commit together, the way the
 		// self-service disable writes its own.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:   audit.EventMfaDisabled,
-			Status:  audit.StatusSuccess,
+			Status:  fwaudit.StatusSuccess,
 			UserID:  targetUserID.String(),
 			Payload: payload,
 		})
@@ -235,9 +236,9 @@ func (s *Service) VerifyRecoveryCode(ctx context.Context, userID uuid.UUID, code
 		return ErrCodeInvalid
 	}
 
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventMfaRecoveryVerified,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: userID.String(),
 	})
 	return nil

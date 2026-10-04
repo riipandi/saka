@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 )
@@ -62,7 +63,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the lock's and the unlock's records, in the transaction
 	// that wrote the rows.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
 	// settings reads the lockout policy at call time. Nil keeps the
@@ -74,7 +75,7 @@ type Service struct {
 }
 
 // NewService builds the feature over the pool and the shared recorder.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -205,9 +206,9 @@ func (s *Service) RegisterFailure(ctx context.Context, userID uuid.UUID, email, 
 		if expiresAt != nil {
 			payload["expires_at"] = expiresAt.Format(time.RFC3339)
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:   audit.EventUserLocked,
-			Status:  audit.StatusSuccess,
+			Status:  fwaudit.StatusSuccess,
 			UserID:  userID.String(),
 			Payload: payload,
 		})
@@ -250,9 +251,9 @@ func (s *Service) Unlock(ctx context.Context, userID uuid.UUID, actorID *uuid.UU
 		if actorID != nil {
 			payload["actor"] = actorID.String()
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:   audit.EventUserUnlocked,
-			Status:  audit.StatusSuccess,
+			Status:  fwaudit.StatusSuccess,
 			UserID:  userID.String(),
 			Payload: payload,
 		})

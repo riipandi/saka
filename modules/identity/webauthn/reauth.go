@@ -10,6 +10,7 @@ import (
 
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -112,7 +113,7 @@ func (s *Service) SendReauthenticationCode(ctx context.Context, userID uuid.UUID
 	// The record follows the queue's acceptance, on the pool rather than a
 	// transaction: the enqueue is already committed, and a record inside a
 	// transaction that rolled back after it would understate what happened.
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventWebauthnReauthenticationCodeSent,
 		UserID: userID.String(),
 		Payload: map[string]string{
@@ -180,7 +181,7 @@ func (s *Service) Reauthenticate(ctx context.Context, userID uuid.UUID, password
 		return "", time.Time{}, err
 	}
 
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventWebauthnReauthenticationGranted,
 		UserID: resolved.String(),
 		Payload: map[string]string{
@@ -287,7 +288,7 @@ func (s *Service) ConsumeReauthentication(ctx context.Context, caller *jwtutils.
 	if !spent {
 		return ErrProofRefused
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventWebauthnReauthenticationConsumed,
 		UserID: userID.String(),
 	})

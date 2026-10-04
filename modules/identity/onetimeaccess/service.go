@@ -9,12 +9,13 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -102,7 +103,7 @@ type Service struct {
 	// sign-in feature's rules; the exchange contributes the code it consumed
 	// into the same transaction.
 	signin *signin.Service
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	mail   *fwmailer.Service
 	queue  *queue.Client
 	// baseURL is the origin the email's link is built against.
@@ -120,7 +121,7 @@ type Service struct {
 // NewService builds the service. The mailer and the queue are the
 // infrastructure the composition root resolves; the signin service is the
 // issuer the exchange opens the session through.
-func NewService(cfg config.Config, pool *datastore.Postgres, issuer *signin.Service, recorder *audit.Recorder, mail *fwmailer.Service, client *queue.Client, log *slog.Logger) *Service {
+func NewService(cfg config.Config, pool *datastore.Postgres, issuer *signin.Service, recorder *fwaudit.Recorder, mail *fwmailer.Service, client *queue.Client, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -178,7 +179,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 // open. A device token the code was issued beside must come back exact; a
 // mismatch leaves the code spendable, because the caller's mistake is not the
 // code's spend.
-func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client audit.ClientInfo) (signin.Result, error) {
+func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client fwaudit.ClientInfo) (signin.Result, error) {
 	hash := crypto.HashHexToken(rawCode)
 	var result signin.Result
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
@@ -389,9 +390,9 @@ func (s *Service) issueEmailCode(ctx context.Context, account Account, ttl time.
 	// accepted it, on the pool rather than a transaction: the enqueue is
 	// already committed, and a record inside a transaction that rolled back
 	// after it would understate what happened.
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventOneTimeAccessEmailSent,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: account.ID.String(),
 		Payload: map[string]string{
 			"email": account.Email,

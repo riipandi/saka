@@ -21,14 +21,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/framework/storage"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/federation/customclaim"
 	"github.com/riipandi/saka/modules/federation/oidc"
@@ -93,7 +93,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		users := do.MustInvoke[*user.Service](i)
 		pictures := do.MustInvoke[*storage.Manager](i)
 		claims := do.MustInvoke[*customclaim.Service](i)
@@ -143,14 +143,14 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*customclaim.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		return customclaim.NewService(pool, recorder, log), nil
 	}),
 
 	do.Lazy(func(i do.Injector) (*scimsync.Service, error) {
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		httpFetcher := do.MustInvoke[*fetcher.Client](i)
 		c := do.MustInvoke[*config.Config](i)
 		// The cipher unseals a provider token for the sync and seals a

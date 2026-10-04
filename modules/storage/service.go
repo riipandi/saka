@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/storage"
 	"github.com/riipandi/saka/internal/audit"
@@ -64,7 +65,7 @@ type Service struct {
 	// audit writes the record of every bucket change, in the transaction
 	// that changes the bucket. A removal and the record of it commit
 	// together, so the log cannot describe a bucket that still exists.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	// settings reads the default-bucket setting at call time. Nil keeps the
 	// engine's built-in default — the state a bare wiring is in.
@@ -76,7 +77,7 @@ type Service struct {
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger) *Service {
 	return &Service{
 		pool:  pool,
 		repo:  NewRepository(),
@@ -162,9 +163,9 @@ func (s *Service) Create(ctx context.Context, actor string, params CreateParams)
 		}
 		created = row
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventStorageBucketCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       actor,
 			ResourceType: ResourceBucket,
 			ResourceID:   id.String(),
@@ -221,9 +222,9 @@ func (s *Service) Update(ctx context.Context, actor, name string, params UpdateP
 		}
 		updated = row
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventStorageBucketUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       actor,
 			ResourceType: ResourceBucket,
 			ResourceID:   row.ID.String(),
@@ -269,9 +270,9 @@ func (s *Service) Delete(ctx context.Context, actor, name string) error {
 			return delErr
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventStorageBucketDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			UserID:       actor,
 			ResourceType: ResourceBucket,
 			ResourceID:   row.ID.String(),

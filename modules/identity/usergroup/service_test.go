@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -30,7 +31,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 // table the writer fills.
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
+	return NewService(pool, fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), slog.New(slog.DiscardHandler))
 }
 
 // seedAccount inserts an account directly, the way a fixture does, and

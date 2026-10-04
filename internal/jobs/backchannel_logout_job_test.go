@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/queue"
 )
 
 // The back-channel logout delivery: the token rides the form member the

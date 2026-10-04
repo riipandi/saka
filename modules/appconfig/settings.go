@@ -12,6 +12,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
@@ -515,7 +516,7 @@ type Setting struct {
 type Settings struct {
 	pool   *datastore.Postgres
 	cipher *crypto.Cipher
-	audit  *audit.Recorder
+	audit  *fwaudit.Recorder
 	// defs is the catalog ordered by key — the order every listing answers
 	// in — and byKey is the lookup the reads and writes resolve with.
 	defs  []SettingDef
@@ -541,14 +542,14 @@ const (
 // A nil cipher is a deployment without a secret key: reads and plain writes// serve, sealed writes are refused at the call site. A catalog that asks
 // for the impossible — a public item that rests sealed — is refused here,
 // so the run fails before the surface opens.
-func NewSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, cache cache.Cache) (*Settings, error) {
+func NewSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *fwaudit.Recorder, cache cache.Cache) (*Settings, error) {
 	return newSettings(pool, cipher, recorder, Catalog(), cache)
 }
 
 // newSettings builds the feature over an explicit catalog. It is the
 // constructor's body, separate so a test can drive a catalog the shipped
 // one does not carry. A nil cache serves every read uncached.
-func newSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *audit.Recorder, defs []SettingDef, cache cache.Cache) (*Settings, error) {
+func newSettings(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *fwaudit.Recorder, defs []SettingDef, cache cache.Cache) (*Settings, error) {
 	ordered := slices.Clone(defs)
 	slices.SortFunc(ordered, func(a, b SettingDef) int { return strings.Compare(a.Key, b.Key) })
 	settings := &Settings{
@@ -798,9 +799,9 @@ func (s *Settings) UpdateFor(ctx context.Context, callerID, key, value string) (
 		if def.Sealed {
 			payload["sealed"] = "true"
 		}
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventSettingUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: callerID,
 			// The key is not a UUID, so it cannot name the resource column —
 			// the payload carries it, with the flags and never the value.
@@ -841,9 +842,9 @@ func (s *Settings) ResetFor(ctx context.Context, callerID, key string) (Setting,
 			return nil
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventSettingReset,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: callerID,
 			// The key is not a UUID — the payload carries it.
 			Payload: map[string]string{"key": key},

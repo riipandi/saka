@@ -13,6 +13,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/urfave/cli/v3"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/authz"
@@ -120,7 +121,7 @@ func runAdminResetPassword(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("admin:reset-password: hash credential: %w", err)
 	}
 
-	recorder := audit.NewRecorder(slog.New(slog.DiscardHandler))
+	recorder := fwaudit.NewRecorder(slog.New(slog.DiscardHandler))
 	var ended int
 	err = pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		// The sessions die with the credential they were minted against —
@@ -136,9 +137,9 @@ func runAdminResetPassword(ctx context.Context, cmd *cli.Command) error {
 		if setErr := repo.SetPasswordHash(ctx, tx, account.ID, hash); setErr != nil {
 			return setErr
 		}
-		recorder.Record(ctx, tx, audit.Entry{
+		recorder.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventPasswordReset,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: account.ID.String(),
 			Payload: map[string]string{
 				"username": account.Username,

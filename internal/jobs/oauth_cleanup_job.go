@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
-	"github.com/riipandi/saka/internal/queue"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/modules/identity/oauthsso"
 )
 

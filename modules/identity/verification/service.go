@@ -8,11 +8,12 @@ import (
 	"time"
 	"uuid"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
@@ -90,7 +91,7 @@ type Service struct {
 	repo *Repository
 	// audit writes the record of a verification that completed, in the
 	// transaction that consumes the token.
-	audit   *audit.Recorder
+	audit   *fwaudit.Recorder
 	mail    *fwmailer.Service
 	queue   *queue.Client
 	baseURL string
@@ -113,7 +114,7 @@ type Service struct {
 // NewService builds the service. The mailer and the queue are the
 // infrastructure the composition root resolves: the procedure writes the
 // token row and enqueues, the queue owns the SMTP attempt and its retries.
-func NewService(pool *datastore.Postgres, mail *fwmailer.Service, client *queue.Client, recorder *audit.Recorder, baseURL string, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, mail *fwmailer.Service, client *queue.Client, recorder *fwaudit.Recorder, baseURL string, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -182,9 +183,9 @@ func (s *Service) SendEmail(ctx context.Context, userID uuid.UUID) error {
 	// transaction because the enqueue is already committed: a task queue is
 	// durable on its own, and a record inside a transaction that rolled back
 	// after the enqueue would understate what happened.
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventEmailVerificationSent,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: account.ID.String(),
 		Payload: map[string]string{
 			"email": account.Email,
@@ -224,9 +225,9 @@ func (s *Service) DeliverForSignup(ctx context.Context, userID uuid.UUID, email,
 	}).Save(); err != nil {
 		return fmt.Errorf("verification: enqueue: %w", err)
 	}
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventEmailVerificationSent,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: userID.String(),
 		Payload: map[string]string{
 			"email":  email,
@@ -271,9 +272,9 @@ func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 		}
 		// The stamp and the record commit together: an address that reads as
 		// verified must have a record saying when it became so.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventEmailVerified,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: token.UserID.String(),
 		})
 		return nil
@@ -480,9 +481,9 @@ func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newE
 		return fmt.Errorf("verification: change enqueue: %w", err)
 	}
 
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:  audit.EventEmailChangeRequested,
-		Status: audit.StatusSuccess,
+		Status: fwaudit.StatusSuccess,
 		UserID: account.ID.String(),
 		Payload: map[string]string{
 			"old_email": account.Email,
@@ -566,9 +567,9 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error
 
 		// The move and the record commit together: an account whose address
 		// reads as changed must have a record saying when it did.
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventEmailChanged,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: token.UserID.String(),
 			Payload: map[string]string{
 				"old_email": account.Email,

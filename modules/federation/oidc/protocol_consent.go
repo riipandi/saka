@@ -12,6 +12,7 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 )
@@ -97,9 +98,9 @@ func encodeScopeJSON(scopes []string) []byte {
 // fail the flow the account just completed. The device and user codes
 // never ride the record.
 func (s *Service) recordDeviceAuthorization(ctx context.Context, userID, clientID string) {
-	s.audit.Record(ctx, s.pool, audit.Entry{
+	s.audit.Record(ctx, s.pool, fwaudit.Entry{
 		Event:        audit.EventOidcDeviceAuthorized,
-		Status:       audit.StatusSuccess,
+		Status:       fwaudit.StatusSuccess,
 		ResourceType: ResourceOidcClient,
 		Payload:      map[string]string{"client_id": clientID, "user_id": userID},
 	})

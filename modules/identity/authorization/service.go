@@ -16,6 +16,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/webutil"
@@ -64,7 +65,7 @@ type Service struct {
 	// audit writes the record of every change, in the transaction that
 	// changes it. A grant and the record of it commit together, so the log
 	// cannot describe a grant that does not exist.
-	audit *audit.Recorder
+	audit *fwaudit.Recorder
 	log   *slog.Logger
 	now   func() time.Time
 
@@ -91,7 +92,7 @@ func fingerprint(parts ...string) string {
 
 // NewService builds the service over the shared pool. A nil cache serves
 // every read uncached.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, log *slog.Logger, cache cache.Cache) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, log *slog.Logger, cache cache.Cache) *Service {
 	return &Service{
 		pool:  pool,
 		repo:  NewRepository(),
@@ -227,9 +228,9 @@ func (s *Service) CreateRole(ctx context.Context, params CreateParams) (RoleDeta
 		}
 		created = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventRoleCreated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceRole,
 			ResourceID:   id.UUID(),
 			Payload: map[string]string{
@@ -287,9 +288,9 @@ func (s *Service) UpdateRole(ctx context.Context, id string, params CreateParams
 		}
 		updated = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventRoleUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceRole,
 			ResourceID:   roleID.UUID(),
 			Payload: map[string]string{
@@ -343,9 +344,9 @@ func (s *Service) DeleteRole(ctx context.Context, id string) error {
 			return ErrRoleNotFound
 		}
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventRoleDeleted,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceRole,
 			ResourceID:   roleID.UUID(),
 			Payload: map[string]string{
@@ -398,9 +399,9 @@ func (s *Service) SetRolePermissions(ctx context.Context, id string, slugs []str
 		}
 		updated = detail
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventRolePermissionsUpdated,
-			Status:       audit.StatusSuccess,
+			Status:       fwaudit.StatusSuccess,
 			ResourceType: ResourceRole,
 			ResourceID:   roleID.UUID(),
 			Payload: map[string]string{
@@ -472,9 +473,9 @@ func (s *Service) SetUserRoles(ctx context.Context, id string, roleIDs []string,
 		}
 		roles = read
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventUserRolesUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"role_count": fmt.Sprint(len(ids)),
@@ -618,9 +619,9 @@ func (s *Service) SetUserPermissions(ctx context.Context, id string, slugs []str
 		}
 		granted = read
 
-		s.audit.Record(ctx, tx, audit.Entry{
+		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:  audit.EventUserPermissionsUpdated,
-			Status: audit.StatusSuccess,
+			Status: fwaudit.StatusSuccess,
 			UserID: userID.String(),
 			Payload: map[string]string{
 				"permission_count": fmt.Sprint(len(slugs)),

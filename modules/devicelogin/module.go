@@ -6,9 +6,9 @@ import (
 	"github.com/samber/do/v2"
 
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/kernel"
-	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/modules/identity/user"
 )
@@ -55,7 +55,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		users := do.MustInvoke[*user.Service](i)
-		recorder := do.MustInvoke[*audit.Recorder](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
 		return NewService(pool, users, recorder, c.App.BaseURL), nil
 	}),
 
