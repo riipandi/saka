@@ -387,6 +387,9 @@ func TestPreviewBuildsTheClaimMapsForTheAccount(t *testing.T) {
 	assert.Equal(t, "Hermione Granger", idToken["name"])
 	assert.Equal(t, true, idToken["email_verified"])
 	assert.Equal(t, []string{"gryffindor"}, idToken["groups"])
+	// The Standard Claims the account holds: no picture — the stub names
+	// none — and the change stamp, the creation stamp the stub carries
+	// (its zero instant, the shape a stub answers).
 	assert.Equal(t, idToken, userInfo, "the userinfo answers the profile the id token names")
 
 	assert.Equal(t, "https://idp.example.com", accessToken["iss"])
@@ -397,6 +400,10 @@ func TestPreviewBuildsTheClaimMapsForTheAccount(t *testing.T) {
 	// it is, the group's parsed as the JSON document it names.
 	assert.Equal(t, "vine", idToken["wand"])
 	assert.Equal(t, "gryffindor-tower", idToken["common_room"])
+
+	// The change stamp the stub never named answers the creation instant
+	// it carried — the same fallback the issuance minted.
+	assert.Equal(t, time.Time{}.Unix(), idToken["updated_at"])
 
 	// The client's own absence and the account's are different refusals.
 	_, _, _, err = service.Preview(t.Context(), "unknown-client", accountWire)

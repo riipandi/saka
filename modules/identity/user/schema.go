@@ -30,6 +30,11 @@ type UserSchema struct {
 	Disabled        bool       `db:"disabled"`
 	EmailVerifiedAt *time.Time `db:"email_verified_at"`
 	CreatedAt       time.Time  `db:"created_at"`
+	// UpdatedAt is the account's change stamp — the trigger
+	// trg_users_updated_at writes it on every update, and rows never
+	// updated since creation carry NULL. The OIDC profile claims answer it
+	// as the Standard Claim updated_at.
+	UpdatedAt *time.Time `db:"updated_at"`
 	// The ban read-model: the active ban restriction's view, joined from
 	// public.account_restrictions by the reads that answer it. No insert
 	// or update writes these — the ban's storage is the restriction row,

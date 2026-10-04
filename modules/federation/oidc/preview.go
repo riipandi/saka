@@ -85,6 +85,16 @@ func (s *Service) Preview(ctx context.Context, clientID, wireUserID string) (map
 	if account.LastName != nil && *account.LastName != "" {
 		profile["family_name"] = *account.LastName
 	}
+	if account.Picture != "" {
+		// The same Standard Claim facts the issuance mints: the preview
+		// must never name a shape the token would not carry.
+		profile["picture"] = account.Picture
+	}
+	updated := account.UpdatedAt
+	if updated == nil {
+		updated = &account.CreatedAt
+	}
+	profile["updated_at"] = updated.Unix()
 
 	now := s.now()
 	access := map[string]any{

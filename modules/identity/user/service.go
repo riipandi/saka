@@ -390,14 +390,18 @@ type UserView struct {
 	Disabled      bool
 	EmailVerified bool
 	CreatedAt     time.Time
-	BannedAt      *time.Time
-	BanExpires    *time.Time
-	BanReason     *string
-	// AvatarURL is the account's picture's public URL — the storage
+	// UpdatedAt is when the account's information last changed — the
+	// trigger's stamp, NULL for an account no update has touched. The
+	// OIDC profile claims answer it as the Standard Claim updated_at.
+	UpdatedAt  *time.Time
+	BannedAt   *time.Time
+	BanExpires *time.Time
+	BanReason  *string
+	// Picture is the account's picture's public URL — the storage
 	// serving origin plus the referenced object's bucket and key. Empty
 	// when the account has no picture: the client shows its bundled
 	// default, the picture the read route answers by redirect.
-	AvatarURL string
+	Picture string
 }
 
 // CreateUser creates an account directly, without a signup token. The
@@ -891,7 +895,7 @@ func WireView(user UserView) *identityv1.User {
 		BanReason:     user.BanReason,
 		// The picture's public URL, empty when the account has none — the
 		// client's bundled default answers for it.
-		AvatarUrl: user.AvatarURL,
+		AvatarUrl: user.Picture,
 		// The document is the read-side view of the stored preferences; a
 		// client that wants the locale or the timezone reads it here.
 		Metadata: &identityv1.UserMetadata{
@@ -990,6 +994,7 @@ func view(row UserSchema) UserView {
 		Disabled:      row.Disabled,
 		EmailVerified: row.EmailVerifiedAt != nil,
 		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
 		BannedAt:      row.BannedAt,
 		BanExpires:    row.BanExpires,
 		BanReason:     row.BanReason,
@@ -1003,7 +1008,7 @@ func view(row UserSchema) UserView {
 func (s *Service) view(row UserSchema) UserView {
 	mapped := view(row)
 	if row.PictureBucket != nil && row.PictureKey != nil && s.assetsURL != "" {
-		mapped.AvatarURL = strings.TrimSuffix(s.assetsURL, "/") + "/" + *row.PictureBucket + "/" + *row.PictureKey
+		mapped.Picture = strings.TrimSuffix(s.assetsURL, "/") + "/" + *row.PictureBucket + "/" + *row.PictureKey
 	}
 	return mapped
 }

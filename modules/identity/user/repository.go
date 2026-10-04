@@ -33,7 +33,7 @@ func NewRepository() *Repository {
 // picture's, and these columns are their views.
 var UserColumns = []string{
 	"u.id", "u.username", "u.email", "u.first_name", "u.last_name", "u.display_name",
-	"u.metadata", "u.disabled", "u.email_verified_at", "u.created_at",
+	"u.metadata", "u.disabled", "u.email_verified_at", "u.created_at", "u.updated_at",
 	"ar.started_at AS banned_at", "ar.expires_at AS ban_expires", "ar.reason AS ban_reason",
 	"b.name AS picture_bucket", "so.key AS picture_key",
 	"u.self_delete_override",
@@ -64,7 +64,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 	err := scan(
 		&row.ID, &username, &row.Email, &firstName, &lastName,
 		&row.DisplayName, &row.Metadata, &row.Disabled,
-		&row.EmailVerifiedAt, &row.CreatedAt,
+		&row.EmailVerifiedAt, &row.CreatedAt, &row.UpdatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &pictureBucket, &pictureKey,
 		&row.SelfDeleteOverride,
 	)

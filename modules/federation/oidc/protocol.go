@@ -432,6 +432,7 @@ var protectedClaimKeys = map[string]struct{}{
 	"at_hash": {}, "c_hash": {}, "s_hash": {},
 	"given_name": {}, "family_name": {}, "name": {}, "display_name": {},
 	"preferred_username": {}, "picture": {}, "email": {}, "email_verified": {},
+	"updated_at":      {},
 	"groups":          {},
 	"saka:token_type": {},
 }
@@ -482,6 +483,21 @@ func subjectClaims(ctx context.Context, service *Service, claims ClaimSource, gr
 		if view.Username != "" {
 			result["preferred_username"] = view.Username
 		}
+		if view.Picture != "" {
+			// picture is the Standard Claim name for the account's
+			// portrait — the composed public URL, absent for an account
+			// with no picture rather than an empty string.
+			result["picture"] = view.Picture
+		}
+		// updated_at is a JSON number, seconds since the Unix epoch — the
+		// representation §5.1 names. A NULL stamp is the account no update
+		// has touched: its information last changed when it was created,
+		// so the claim falls back to the creation stamp.
+		updated := view.UpdatedAt
+		if updated == nil {
+			updated = &view.CreatedAt
+		}
+		result["updated_at"] = updated.Unix()
 	}
 	if slices.Contains(scopes, "email") && view.Email != "" {
 		result["email"] = view.Email
