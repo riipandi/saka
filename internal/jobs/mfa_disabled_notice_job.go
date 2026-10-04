@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -42,15 +43,15 @@ func (t MfaDisabledNoticeTask) Config() queue.QueueConfig {
 }
 
 // mfaDisabledNoticeProcessor renders the template and submits one message.
-func mfaDisabledNoticeProcessor(ctx context.Context, task MfaDisabledNoticeTask, mail *mailer.Service) error {
+func mfaDisabledNoticeProcessor(ctx context.Context, task MfaDisabledNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("mfa_disabled_notice: task carries no address")
 	}
-	return mail.Send(ctx, mailer.Request{
+	return mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Two-factor authentication was removed from your account",
 		Template: mailer.TemplateMfaDisabledNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.MfaDisabledNoticeData{
 				Name:   task.DisplayName,

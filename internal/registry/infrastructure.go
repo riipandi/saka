@@ -14,6 +14,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
@@ -226,10 +227,10 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			return audit.NewRecorder(log), nil
 		}),
 
-		do.Lazy(func(i do.Injector) (*mailer.Service, error) {
+		do.Lazy(func(i do.Injector) (*fwmailer.Service, error) {
 			c := do.MustInvoke[*config.Config](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			client, err := mailer.New(*c, log)
+			client, err := fwmailer.New(c.MailerOptions(), log)
 			if err != nil {
 				return nil, err
 			}
@@ -240,7 +241,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			if err != nil {
 				return nil, err
 			}
-			return mailer.NewService(client, templates), nil
+			return fwmailer.NewService(client, templates), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (storage.Store, error) {
@@ -286,7 +287,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			pool := do.MustInvoke[*datastore.Postgres](i)
 			log := do.MustInvoke[*slog.Logger](i)
 			uploader := do.MustInvoke[*storage.Manager](i)
-			mailer := do.MustInvoke[*mailer.Service](i)
+			mailer := do.MustInvoke[*fwmailer.Service](i)
 			var encryptor *crypto.Cipher
 			if c.Queue.Encrypt {
 				// Validation refuses an encrypted queue without a usable secret,

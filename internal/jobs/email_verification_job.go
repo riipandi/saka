@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -51,15 +52,15 @@ func (t EmailVerificationTask) Config() queue.QueueConfig {
 }
 
 // emailVerificationProcessor renders the template and submits one message.
-func emailVerificationProcessor(ctx context.Context, task EmailVerificationTask, mail *mailer.Service, baseURL string) error {
+func emailVerificationProcessor(ctx context.Context, task EmailVerificationTask, mail *fwmailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
 		return errors.New("email_verification: task carries no address or code")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Verify your email address",
 		Template: mailer.TemplateEmailVerification,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.EmailVerificationData{
 				UserFullName:     task.DisplayName,

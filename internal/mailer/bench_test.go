@@ -4,18 +4,19 @@ import (
 	"io"
 	"testing"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
 )
 
-func benchView() mailer.View {
-	return mailer.View{Data: mailer.PasswordResetData{
+func benchView() fwmailer.View {
+	return fwmailer.View{Data: mailer.PasswordResetData{
 		Email:     "neveu@example.com",
 		ResetCode: "expecto-patronum",
 	}}
 }
 
-func benchTemplates(b *testing.B) *mailer.Templates {
+func benchTemplates(b *testing.B) *fwmailer.Templates {
 	b.Helper()
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(config.Default()))
 	if err != nil {
@@ -49,7 +50,7 @@ func BenchmarkRenderToPasswordReset(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if err := templates.RenderTo(io.Discard, mailer.TemplatePasswordReset, mailer.BodyHTML, view); err != nil {
+		if err := templates.RenderTo(io.Discard, mailer.TemplatePasswordReset, fwmailer.BodyHTML, view); err != nil {
 			b.Fatal(err)
 		}
 	}

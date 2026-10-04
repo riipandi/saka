@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -50,15 +51,15 @@ func (t UserBannedEmailTask) Config() queue.QueueConfig {
 }
 
 // userBannedProcessor renders the template and submits one message.
-func userBannedProcessor(ctx context.Context, task UserBannedEmailTask, mail *mailer.Service) error {
+func userBannedProcessor(ctx context.Context, task UserBannedEmailTask, mail *fwmailer.Service) error {
 	if task.Email == "" || task.Reason == "" {
 		return errors.New("user_banned_email: task carries no address or reason")
 	}
-	return mail.Send(ctx, mailer.Request{
+	return mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your account has been suspended",
 		Template: mailer.TemplateUserBanned,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.UserBannedData{
 				Name:      task.DisplayName,
@@ -94,15 +95,15 @@ func (t UserUnbannedEmailTask) Config() queue.QueueConfig {
 }
 
 // userUnbannedProcessor renders the template and submits one message.
-func userUnbannedProcessor(ctx context.Context, task UserUnbannedEmailTask, mail *mailer.Service) error {
+func userUnbannedProcessor(ctx context.Context, task UserUnbannedEmailTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("user_unbanned_email: task carries no address")
 	}
-	return mail.Send(ctx, mailer.Request{
+	return mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your account has been reinstated",
 		Template: mailer.TemplateUserUnbanned,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.UserUnbannedData{
 				Name: task.DisplayName,

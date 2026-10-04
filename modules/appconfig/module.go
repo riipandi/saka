@@ -27,9 +27,9 @@ import (
 	"github.com/riipandi/saka/framework/cache"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/pkg/crypto"
 )
 
@@ -46,7 +46,7 @@ var Package = do.Package(
 	do.Lazy(func(i do.Injector) (*Service, error) {
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		mail := do.MustInvoke[*mailer.Service](i)
+		mail := do.MustInvoke[*fwmailer.Service](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		return NewService(pool, recorder, mail, log), nil
 	}),

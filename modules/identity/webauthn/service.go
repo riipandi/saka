@@ -19,9 +19,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/modules/identity/signin"
 )
 
@@ -162,7 +162,7 @@ type Service struct {
 	// enqueue seam internal/jobs satisfies. Either nil leaves the code
 	// path answering unavailable — the proof types a caller still holds
 	// keep working.
-	mail     *mailer.Service
+	mail     *fwmailer.Service
 	codeMail codeEnqueuer
 
 	// totpEnrollments is the post-construction seam to the second factor's
@@ -225,7 +225,7 @@ func (s *Service) passkeyNoticeFrom(account *signin.Account, userID uuid.UUID, c
 // and checks the SMTP configuration, the enqueuer — internal/jobs's
 // notifier — carries the message. Nil either keeps the code proof answering
 // unavailable while the password and passkey proofs go on working.
-func (s *Service) WithDelivery(mail *mailer.Service, enqueuer codeEnqueuer) *Service {
+func (s *Service) WithDelivery(mail *fwmailer.Service, enqueuer codeEnqueuer) *Service {
 	s.mail = mail
 	s.codeMail = enqueuer
 	return s

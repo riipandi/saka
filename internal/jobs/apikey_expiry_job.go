@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
@@ -104,7 +105,7 @@ func (t APIKeyExpiryEmailTask) Config() queue.QueueConfig {
 // A disabled switch is not an error: the pass finds nothing asked of it and
 // re-enqueues its successor, so turning the reminder off and on again leaves
 // the schedule alive.
-func apiKeyExpiryScanProcessor(ctx context.Context, task APIKeyExpiryScanTask, pool *datastore.Postgres, client *queue.Client, enabled bool, mail *mailer.Service) error {
+func apiKeyExpiryScanProcessor(ctx context.Context, task APIKeyExpiryScanTask, pool *datastore.Postgres, client *queue.Client, enabled bool, mail *fwmailer.Service) error {
 	if enabled && mail != nil {
 		if err := apiKeyExpiryScan(ctx, pool, client); err != nil {
 			return err
@@ -183,7 +184,7 @@ func apiKeyExpiryScan(ctx context.Context, pool *datastore.Postgres, client *que
 }
 
 // apiKeyExpiryEmailProcessor renders the template and submits one message.
-func apiKeyExpiryEmailProcessor(ctx context.Context, task APIKeyExpiryEmailTask, mail *mailer.Service) error {
+func apiKeyExpiryEmailProcessor(ctx context.Context, task APIKeyExpiryEmailTask, mail *fwmailer.Service) error {
 	if task.Email == "" || task.ExpiresAt == "" {
 		return errors.New("api_key_expiry_email: task carries no address or expiry")
 	}
@@ -193,11 +194,11 @@ func apiKeyExpiryEmailProcessor(ctx context.Context, task APIKeyExpiryEmailTask,
 		return errors.New("api_key_expiry_email: task carries an unreadable expiry")
 	}
 
-	if err := mail.Send(ctx, mailer.Request{
+	if err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your API key expires soon",
 		Template: mailer.TemplateAPIKeyExpiringSoon,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.APIKeyExpiringSoonData{
 				Name:       task.DisplayName,

@@ -7,6 +7,7 @@ import (
 	fcache "github.com/riipandi/saka/framework/cache"
 	fetcher "github.com/riipandi/saka/framework/fetcher"
 	flogger "github.com/riipandi/saka/framework/logger"
+	fmailer "github.com/riipandi/saka/framework/mailer"
 	fobserver "github.com/riipandi/saka/framework/observer"
 )
 
@@ -135,4 +136,21 @@ func headers(in map[string]string) map[string]string {
 		out[name] = value
 	}
 	return out
+}
+
+// MailerOptions maps the mailer section onto the SMTP engine's options.
+// The notifications section stays schema-side: gating a notice is a feature
+// decision, not an engine input.
+func (c Config) MailerOptions() fmailer.Options {
+	return fmailer.Options{
+		FromEmail:              c.Mailer.FromEmail,
+		FromName:               c.Mailer.FromName,
+		SMTPHost:               c.Mailer.SMTPHost,
+		SMTPPort:               c.Mailer.SMTPPort,
+		SMTPUsername:           c.Mailer.SMTPUsername,
+		SMTPPassword:           c.Mailer.SMTPPassword,
+		SMTPSecure:             c.Mailer.SMTPSecure,
+		SMTPAllowPlaintextAuth: c.Mailer.SMTPAllowPlaintextAuth,
+		Timeout:                c.Mailer.Timeout,
+	}
 }

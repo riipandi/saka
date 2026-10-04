@@ -12,26 +12,25 @@ import (
 	"net/mail"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/emersion/go-smtp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
-func testConfig() config.Config {
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost = "smtp.example.com"
-	cfg.Mailer.SMTPPort = 587
-	cfg.Mailer.FromEmail = "owl-post@example.com"
-	cfg.Mailer.FromName = "Saka Mailer Test"
-	return cfg
+func testOptions() Options {
+	return Options{
+		SMTPHost:  "smtp.example.com",
+		SMTPPort:  587,
+		FromEmail: "owl-post@example.com",
+		FromName:  "Hogwarts Mailer Test",
+	}
 }
 
 func testMailer(t *testing.T) *Mailer {
 	t.Helper()
-	client, err := New(testConfig(), nil)
+	client, err := New(testOptions(), nil)
 	require.NoError(t, err)
 	return client
 }
@@ -247,7 +246,7 @@ func TestEnvelopeRefusesAnEmptyMessage(t *testing.T) {
 }
 
 func TestSendReportsAnUnconfiguredMailer(t *testing.T) {
-	client, err := New(config.Default(), nil)
+	client, err := New(Options{}, nil)
 	require.NoError(t, err)
 
 	assert.False(t, client.Configured())
@@ -260,10 +259,11 @@ func TestSendReportsAnUnconfiguredMailer(t *testing.T) {
 func TestSendRefusesWithoutAServer(t *testing.T) {
 	// The port is not listening, so the dial fails rather than hanging: the
 	// class a caller matches says the server was never reached.
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost = "127.0.0.1"
-	cfg.Mailer.SMTPPort = 1
-	client, err := New(cfg, nil)
+	opts := Options{
+		SMTPHost: "127.0.0.1",
+		SMTPPort: 1,
+	}
+	client, err := New(opts, nil)
 	require.NoError(t, err)
 
 	err = client.Send(t.Context(), Message{
@@ -335,10 +335,10 @@ func TestAddressIsHostAndPort(t *testing.T) {
 }
 
 func TestStringHidesTheCredential(t *testing.T) {
-	cfg := testConfig()
-	cfg.Mailer.SMTPUsername = "bot"
-	cfg.Mailer.SMTPPassword = "hunter2"
-	client, err := New(cfg, nil)
+	opts := testOptions()
+	opts.SMTPUsername = "bot"
+	opts.SMTPPassword = "hunter2"
+	client, err := New(opts, nil)
 	require.NoError(t, err)
 
 	text := client.String()
@@ -348,13 +348,29 @@ func TestStringHidesTheCredential(t *testing.T) {
 }
 
 func TestNewRefusesAHostWithoutAPort(t *testing.T) {
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost = "smtp.example.com"
-	cfg.Mailer.SMTPPort = 0
-
-	_, err := New(cfg, nil)
+	_, err := New(Options{SMTPHost: "smtp.example.com"}, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "smtp_port")
+	assert.Contains(t, err.Error(), "the port must be set when a host is")
+}
+
+// fixtureTemplates builds the template set the envelope tests render with: a
+// minimal name/body pair written into an fs.FS the test owns, so the engine is
+// exercised without this binary's embedded catalog.
+func fixtureTemplates(t *testing.T) *Templates {
+	t.Helper()
+	fsys := fstest.MapFS{
+		"email/password-reset_html.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}<!DOCTYPE html><p>Reset code: {{.Data.ResetCode}}</p>{{end}}`)},
+		"email/password-reset_text.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}Reset code: {{.Data.ResetCode}}{{end}}`)},
+		"email/test-email_html.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}<!DOCTYPE html><p>Hello {{.Data.Email}}</p>{{end}}`)},
+		"email/test-email_text.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}Hello {{.Data.Email}}{{end}}`)},
+	}
+	templates, err := NewTemplatesFS(fsys, Sender{AppName: "Hogwarts", LogoURL: "https://cdn.example.com/logo.svg"})
+	require.NoError(t, err)
+	return templates
 }
 
 // decodeQuotedPrintable is the check the receiving client performs: the body
@@ -389,16 +405,15 @@ func mustBody(t *testing.T, html, text string) bodySource {
 // envelope asks the template for one rendering at a time, straight into the
 // writer, so no rendered string exists on the send path.
 func TestTemplatedBodyIsStreamedNotBuffered(t *testing.T) {
-	templates, err := NewTemplates(SenderFrom(config.Default()))
-	require.NoError(t, err)
+	templates := fixtureTemplates(t)
 
 	m := testMailer(t)
 	raw, err := renderTemplateMessage(t, m, templates, Message{
 		To:      []string{"neveu@example.com"},
 		Subject: "Reset your password",
-	}, TemplatePasswordReset, View{Data: PasswordResetData{
-		Email:     "neveu@example.com",
-		ResetCode: "expecto-patronum",
+	}, "password-reset", View{Data: map[string]any{
+		"Email":     "neveu@example.com",
+		"ResetCode": "expecto-patronum",
 	}})
 	require.NoError(t, err)
 
@@ -417,19 +432,18 @@ func TestTemplatedBodyIsStreamedNotBuffered(t *testing.T) {
 // TestRenderToMatchesRender proves the streaming and buffered forms produce the
 // same bytes, so a caller can pick either without changing the message.
 func TestRenderToMatchesRender(t *testing.T) {
-	templates, err := NewTemplates(SenderFrom(config.Default()))
-	require.NoError(t, err)
-	view := View{Data: PasswordResetData{
-		Email:     "neveu@example.com",
-		ResetCode: "expecto-patronum",
+	templates := fixtureTemplates(t)
+	view := View{Data: map[string]any{
+		"Email":     "neveu@example.com",
+		"ResetCode": "expecto-patronum",
 	}}
 
-	buffered, err := templates.Render(TemplatePasswordReset, view)
+	buffered, err := templates.Render("password-reset", view)
 	require.NoError(t, err)
 
 	var html, text bytes.Buffer
-	require.NoError(t, templates.RenderTo(&html, TemplatePasswordReset, BodyHTML, view))
-	require.NoError(t, templates.RenderTo(&text, TemplatePasswordReset, BodyText, view))
+	require.NoError(t, templates.RenderTo(&html, "password-reset", BodyHTML, view))
+	require.NoError(t, templates.RenderTo(&text, "password-reset", BodyText, view))
 
 	assert.Equal(t, buffered.HTML, html.String())
 	assert.Equal(t, buffered.Text, text.String())
@@ -439,10 +453,9 @@ func TestRenderToMatchesRender(t *testing.T) {
 // HTML rendering and no text rendering is not reachable through the embedded
 // set, but the lookup must still refuse rather than panic.
 func TestRenderToRefusesAnUnknownKind(t *testing.T) {
-	templates, err := NewTemplates(SenderFrom(config.Default()))
-	require.NoError(t, err)
+	templates := fixtureTemplates(t)
 
-	err = templates.RenderTo(&bytes.Buffer{}, TemplateTestEmail, BodyKind("xml"), View{})
+	err := templates.RenderTo(&bytes.Buffer{}, "test-email", BodyKind("xml"), View{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "xml")
 

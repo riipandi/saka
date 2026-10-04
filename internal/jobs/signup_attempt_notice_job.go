@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -37,15 +38,15 @@ func (t SignupAttemptNoticeTask) Config() queue.QueueConfig {
 }
 
 // signupAttemptNoticeProcessor renders the template and submits one message.
-func signupAttemptNoticeProcessor(ctx context.Context, task SignupAttemptNoticeTask, mail *mailer.Service) error {
+func signupAttemptNoticeProcessor(ctx context.Context, task SignupAttemptNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("signup_attempt_existing_email: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Sign-up attempt for your email",
 		Template: mailer.TemplateSignupAttemptNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.SignupAttemptNoticeData{
 				Name:  task.DisplayName,

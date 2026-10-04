@@ -35,12 +35,12 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/health"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/storage"
@@ -168,7 +168,7 @@ func newServer(i do.Injector) (*http.Server, error) {
 func Prewarm(ctx context.Context, i do.Injector) error {
 	for _, resolve := range []func(do.Injector) error{
 		func(i do.Injector) error { _, err := do.Invoke[*fetcher.Client](i); return err },
-		func(i do.Injector) error { _, err := do.Invoke[*mailer.Service](i); return err },
+		func(i do.Injector) error { _, err := do.Invoke[*fwmailer.Service](i); return err },
 		func(i do.Injector) error { _, err := do.Invoke[*queue.Client](i); return err },
 		func(i do.Injector) error { _, err := do.Invoke[*scheduler.Scheduler](i); return err },
 		func(i do.Injector) error {

@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/mailer"
@@ -115,13 +116,13 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) (*Serv
 	if configured {
 		cfg.Mailer.SMTPHost = "localhost"
 	}
-	mail, err := mailer.New(cfg, nil)
+	mail, err := fwmailer.New(cfg.MailerOptions(), nil)
 	require.NoError(t, err)
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
 	enqueuer := &countingEnqueuer{}
-	service := NewService(pool, mailer.NewService(mail, templates), nil, "http://localhost:3080", nil).
+	service := NewService(pool, fwmailer.NewService(mail, templates), nil, "http://localhost:3080", nil).
 		WithEnqueuer(enqueuer)
 	return service, enqueuer
 }

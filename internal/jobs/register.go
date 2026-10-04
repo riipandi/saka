@@ -7,7 +7,7 @@ import (
 
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
-	"github.com/riipandi/saka/internal/mailer"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/internal/storage"
@@ -31,7 +31,7 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, oauthOffboarder OAuthOffboarder, signupSweeper SignupTokenSweeper, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *fwmailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, oauthOffboarder OAuthOffboarder, signupSweeper SignupTokenSweeper, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool, signupSweeper)
 	}))

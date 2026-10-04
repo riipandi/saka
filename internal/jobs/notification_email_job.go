@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/modules/notification"
 )
@@ -22,7 +23,7 @@ import (
 // The task type and its queue live with the notification they name; this
 // is the application logic the queue runs, and the mailer is the one
 // dependency it needs that the notification package does not carry.
-func notificationEmailProcessor(ctx context.Context, task notification.NotificationEmailTask, pool *datastore.Postgres, mail *mailer.Service) error {
+func notificationEmailProcessor(ctx context.Context, task notification.NotificationEmailTask, pool *datastore.Postgres, mail *fwmailer.Service) error {
 	if mail == nil {
 		return errors.New("notification_email: mailer missing")
 	}
@@ -58,11 +59,11 @@ func notificationEmailProcessor(ctx context.Context, task notification.Notificat
 		}
 
 		for _, recipient := range recipients {
-			if err := mail.Send(ctx, mailer.Request{
+			if err := mail.Send(ctx, fwmailer.Request{
 				To:       []string{recipient.Email},
 				Subject:  row.Title,
 				Template: mailer.TemplateAnnouncement,
-				View: mailer.View{Data: mailer.AnnouncementData{
+				View: fwmailer.View{Data: mailer.AnnouncementData{
 					Name:  recipient.DisplayName,
 					Topic: derefString(row.Topic),
 					Title: row.Title,

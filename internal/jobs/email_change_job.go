@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -52,15 +53,15 @@ func (t EmailChangeRequestEmailTask) Config() queue.QueueConfig {
 }
 
 // emailChangeRequestProcessor renders the template and submits one message.
-func emailChangeRequestProcessor(ctx context.Context, task EmailChangeRequestEmailTask, mail *mailer.Service, baseURL string) error {
+func emailChangeRequestProcessor(ctx context.Context, task EmailChangeRequestEmailTask, mail *fwmailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
 		return errors.New("email_change_request: task carries no address or code")
 	}
-	return mail.Send(ctx, mailer.Request{
+	return mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Confirm your new email address",
 		Template: mailer.TemplateEmailChangeRequest,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.EmailChangeRequestData{
 				Name:        task.DisplayName,
@@ -133,7 +134,7 @@ func (t EmailChangeNoticeTask) Config() queue.QueueConfig {
 
 // emailChangeNoticeProcessor renders the kind's template and submits one
 // message.
-func emailChangeNoticeProcessor(ctx context.Context, task EmailChangeNoticeTask, mail *mailer.Service) error {
+func emailChangeNoticeProcessor(ctx context.Context, task EmailChangeNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("email_change_notice: task carries no address")
 	}
@@ -142,7 +143,7 @@ func emailChangeNoticeProcessor(ctx context.Context, task EmailChangeNoticeTask,
 		OldEmail: task.OldEmail,
 		NewEmail: task.NewEmail,
 	}
-	view := mailer.View{Email: task.Email, Data: data}
+	view := fwmailer.View{Email: task.Email, Data: data}
 	subject := ""
 	template := ""
 	switch task.Kind {
@@ -155,5 +156,5 @@ func emailChangeNoticeProcessor(ctx context.Context, task EmailChangeNoticeTask,
 	default:
 		return errors.New("email_change_notice: task carries an unknown kind")
 	}
-	return mail.Send(ctx, mailer.Request{To: []string{task.Email}, Subject: subject, Template: template, View: view})
+	return mail.Send(ctx, fwmailer.Request{To: []string{task.Email}, Subject: subject, Template: template, View: view})
 }

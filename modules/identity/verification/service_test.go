@@ -20,6 +20,7 @@ import (
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/internal/jobs"
@@ -319,8 +320,8 @@ func readMessageBody(t *testing.T, mailpit *conttest.Mailpit, id string) string 
 
 // mailerService builds the service the flow sends through: the mailer over
 // the configuration and the compiled templates beside it.
-func mailerService(cfg config.Config) (*mailer.Service, error) {
-	m, err := mailer.New(cfg, nil)
+func mailerService(cfg config.Config) (*fwmailer.Service, error) {
+	m, err := fwmailer.New(cfg.MailerOptions(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +329,7 @@ func mailerService(cfg config.Config) (*mailer.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return mailer.NewService(m, templates), nil
+	return fwmailer.NewService(m, templates), nil
 }
 
 // host and port split the address Mailpit reports.

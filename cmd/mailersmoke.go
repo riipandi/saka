@@ -12,6 +12,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	fconfig "github.com/riipandi/saka/framework/config"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/pkg/printext"
@@ -69,7 +70,7 @@ func runMailerSmoke(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	client, err := mailer.New(cfg, nil)
+	client, err := fwmailer.New(cfg.MailerOptions(), nil)
 	if err != nil {
 		return err
 	}
@@ -89,12 +90,12 @@ func runMailerSmoke(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	started := time.Now()
-	service := mailer.NewService(client, templates)
-	err = service.Send(ctx, mailer.Request{
+	service := fwmailer.NewService(client, templates)
+	err = service.Send(ctx, fwmailer.Request{
 		To:       []string{recipient},
 		Subject:  cmd.String("subject"),
 		Template: cmd.String("template"),
-		View:     mailer.View{Email: recipient, Data: map[string]string{"email": recipient}},
+		View:     fwmailer.View{Email: recipient, Data: map[string]string{"email": recipient}},
 	})
 	if err != nil {
 		return err

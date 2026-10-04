@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/printext"
@@ -58,16 +59,16 @@ func (t OneTimeAccessEmailTask) Config() queue.QueueConfig {
 }
 
 // oneTimeAccessProcessor renders the template and submits one message.
-func oneTimeAccessProcessor(ctx context.Context, task OneTimeAccessEmailTask, mail *mailer.Service, baseURL string) error {
+func oneTimeAccessProcessor(ctx context.Context, task OneTimeAccessEmailTask, mail *fwmailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
 		return errors.New("one_time_access_email: task carries no address or code")
 	}
 
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your login code",
 		Template: mailer.TemplateOneTimeAccess,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.OneTimeAccessData{
 				Code:             task.Token,

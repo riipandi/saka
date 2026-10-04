@@ -1,14 +1,16 @@
-package mailer_test
+package mailer
 
 import (
 	"context"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -16,25 +18,23 @@ import (
 
 	"encoding/json/v2"
 
-	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
 // startMailer points the configuration at the shared Mailpit container and
 // builds the mailer against it. The container requires a Docker daemon, so a run
 // without one skips rather than fails.
-func startMailer(t *testing.T) (*mailer.Service, *testutils.Mailpit) {
+func startMailer(t *testing.T) (*Service, *testutils.Mailpit) {
 	t.Helper()
 
 	server := testutils.StartMailpit(t.Context(), t)
-	cfg := mailpitConfig(t, server)
+	opts := mailpitOptions(t, server)
 
-	client, err := mailer.New(cfg, nil)
+	client, err := New(opts, nil)
 	require.NoError(t, err)
-	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
+	templates, err := NewTemplatesFS(fixtureFS(), Sender{AppName: "Hogwarts", LogoURL: "https://cdn.example.com/logo.svg"})
 	require.NoError(t, err)
-	return mailer.NewService(client, templates), server
+	return NewService(client, templates), server
 }
 
 // mailpitHostPort splits the container's SMTP address into the two fields the
@@ -49,17 +49,31 @@ func mailpitHostPort(t *testing.T, server *testutils.Mailpit) (string, int) {
 	return host, port
 }
 
-// mailpitConfig is the configuration that reaches the container.
-func mailpitConfig(t *testing.T, server *testutils.Mailpit) config.Config {
+// mailpitOptions is the option set that reaches the container.
+func mailpitOptions(t *testing.T, server *testutils.Mailpit) Options {
 	t.Helper()
 
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost, cfg.Mailer.SMTPPort = mailpitHostPort(t, server)
-	cfg.Mailer.SMTPUsername = server.Username
-	cfg.Mailer.SMTPPassword = server.Password
-	cfg.Mailer.FromEmail = "no-reply@saka.test"
-	cfg.Mailer.FromName = "Hogwarts Express"
-	return cfg
+	host, port := mailpitHostPort(t, server)
+	return Options{
+		SMTPHost:     host,
+		SMTPPort:     port,
+		SMTPUsername: server.Username,
+		SMTPPassword: server.Password,
+		FromEmail:    "no-reply@hogwarts.test",
+		FromName:     "Hogwarts Express",
+	}
+}
+
+// fixtureFS is the template set the integration test renders with: a minimal
+// name/body pair in an fs.FS the test owns, so the engine is exercised without
+// this binary's embedded catalog.
+func fixtureFS() fs.FS {
+	return fstest.MapFS{
+		"email/test-email_html.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}<!DOCTYPE html><p>{{.AppName}}: hello {{.Data.Email}}</p>{{end}}`)},
+		"email/test-email_text.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}{{.AppName}}: hello {{.Data.Email}}{{end}}`)},
+	}
 }
 
 func TestSendDeliversATemplatedMessage(t *testing.T) {
@@ -67,27 +81,24 @@ func TestSendDeliversATemplatedMessage(t *testing.T) {
 	// and hand it to a real SMTP server.
 	service, server := startMailer(t)
 
-	recipient := "neveu@saka.test"
+	recipient := "neveu@hogwarts.test"
 	subject := uniqueSubject("mailer smoke")
-	require.NoError(t, service.Send(t.Context(), mailer.Request{
+	require.NoError(t, service.Send(t.Context(), Request{
 		To:       []string{recipient},
 		Subject:  subject,
-		Template: mailer.TemplatePasswordReset,
-		View: mailer.View{Data: mailer.PasswordResetData{
-			Email:     recipient,
-			ResetCode: "expecto-patronum",
-		}},
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": recipient}},
 	}))
 
 	message := awaitMessage(t, server, subject)
 	assert.Equal(t, subject, message.Subject)
 	assert.Contains(t, message.Visible(), recipient)
 
-	// The HTML rendering is what the recipient sees, so the link has to arrive
-	// intact and the identity has to be there.
+	// The HTML rendering is what the recipient sees, so the data has to arrive
+	// rendered and the sender identity has to be there.
 	detail := fetchMessage(t, server, message.ID)
-	assert.Contains(t, detail.HTML, "expecto-patronum")
-	assert.Contains(t, detail.HTML, "Saka")
+	assert.Contains(t, detail.HTML, recipient)
+	assert.Contains(t, detail.HTML, "Hogwarts")
 	assert.NotContains(t, detail.HTML, "{{")
 }
 
@@ -95,25 +106,25 @@ func TestSendReachesBlindRecipientsWithoutShowingThem(t *testing.T) {
 	service, server := startMailer(t)
 
 	subject := uniqueSubject("mailer bcc")
-	require.NoError(t, service.Send(t.Context(), mailer.Request{
-		To:       []string{"primary@saka.test"},
-		Bcc:      []string{"blind@saka.test"},
+	require.NoError(t, service.Send(t.Context(), Request{
+		To:       []string{"primary@hogwarts.test"},
+		Bcc:      []string{"blind@hogwarts.test"},
 		Subject:  subject,
-		Template: mailer.TemplateTestEmail,
-		View:     mailer.View{Email: "primary@saka.test"},
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": "primary@hogwarts.test"}},
 	}))
 
 	message := awaitMessage(t, server, subject)
-	assert.ElementsMatch(t, []string{"primary@saka.test", "blind@saka.test"}, message.Delivered(),
+	assert.ElementsMatch(t, []string{"primary@hogwarts.test", "blind@hogwarts.test"}, message.Delivered(),
 		"a blind recipient is still delivered to")
 
 	// Mailpit parses the message the way a receiving client does, so the
 	// headers it reports are the headers that were sent.
-	assert.Equal(t, []string{"primary@saka.test"}, message.Visible(),
+	assert.Equal(t, []string{"primary@hogwarts.test"}, message.Visible(),
 		"a blind recipient must not appear in the headers")
 
 	detail := fetchMessage(t, server, message.ID)
-	assert.NotContains(t, detail.Text, "blind@saka.test",
+	assert.NotContains(t, detail.Text, "blind@hogwarts.test",
 		"a blind recipient must not appear in the message")
 }
 
@@ -122,21 +133,21 @@ func TestSendReportsRejectedCredentials(t *testing.T) {
 	// classification function.
 	_, server := startMailer(t)
 
-	cfg := mailpitConfig(t, server)
-	cfg.Mailer.SMTPPassword = "wrong-password"
-	client, err := mailer.New(cfg, nil)
+	opts := mailpitOptions(t, server)
+	opts.SMTPPassword = "wrong-password"
+	client, err := New(opts, nil)
 	require.NoError(t, err)
-	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
+	templates, err := NewTemplatesFS(fixtureFS(), Sender{AppName: "Hogwarts", LogoURL: "https://cdn.example.com/logo.svg"})
 	require.NoError(t, err)
 
-	err = mailer.NewService(client, templates).Send(t.Context(), mailer.Request{
-		To:       []string{"neveu@saka.test"},
+	err = NewService(client, templates).Send(t.Context(), Request{
+		To:       []string{"neveu@hogwarts.test"},
 		Subject:  "should not arrive",
-		Template: mailer.TemplateTestEmail,
-		View:     mailer.View{Email: "neveu@saka.test"},
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": "neveu@hogwarts.test"}},
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, mailer.ErrAuth)
+	assert.ErrorIs(t, err, ErrAuth)
 }
 
 func TestSendAllowsPlaintextCredentialsToALoopbackServer(t *testing.T) {
@@ -145,17 +156,15 @@ func TestSendAllowsPlaintextCredentialsToALoopbackServer(t *testing.T) {
 	// is needed.
 	server := testutils.StartMailpit(t.Context(), t)
 
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost, cfg.Mailer.SMTPPort = mailpitHostPort(t, server)
-	cfg.Mailer.SMTPUsername = server.Username
-	cfg.Mailer.SMTPPassword = server.Password
+	host, port := mailpitHostPort(t, server)
+	opts := Options{SMTPHost: host, SMTPPort: port, SMTPUsername: server.Username, SMTPPassword: server.Password}
 
-	client, err := mailer.New(cfg, nil)
+	client, err := New(opts, nil)
 	require.NoError(t, err)
 
 	subject := uniqueSubject("mailer loopback plaintext")
-	require.NoError(t, client.Send(t.Context(), mailer.Message{
-		To:      []string{"neveu@saka.test"},
+	require.NoError(t, client.Send(t.Context(), Message{
+		To:      []string{"neveu@hogwarts.test"},
 		Subject: subject,
 		Text:    "Hello",
 	}))

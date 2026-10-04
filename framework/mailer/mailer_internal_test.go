@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -47,27 +46,28 @@ func TestAuthenticateRefusesAPlaintextSessionToARemoteHost(t *testing.T) {
 	defer conn.Close()
 
 	session := smtp.NewClient(conn)
-	require.NoError(t, session.Hello("saka.test"))
+	require.NoError(t, session.Hello("hogwarts.test"))
 	_, encrypted := session.TLSConnectionState()
 	require.False(t, encrypted, "the container must serve a plaintext session for this test to mean anything")
 
-	cfg := config.Default()
-	// The container is reached over loopback; the configuration names a remote
+	// The container is reached over loopback; the options name a remote
 	// server, which is the case the guard exists for.
-	cfg.Mailer.SMTPHost = "smtp.example.com"
-	cfg.Mailer.SMTPPort = 587
-	cfg.Mailer.SMTPUsername = server.Username
-	cfg.Mailer.SMTPPassword = server.Password
+	opts := Options{
+		SMTPHost:     "smtp.example.com",
+		SMTPPort:     587,
+		SMTPUsername: server.Username,
+		SMTPPassword: server.Password,
+	}
 
-	client, err := New(cfg, nil)
+	client, err := New(opts, nil)
 	require.NoError(t, err)
 
 	err = client.authenticate(session)
 	assert.ErrorIs(t, err, ErrInsecureAuth)
 
 	// The same session, with the opt-in, is allowed through to the server.
-	cfg.Mailer.SMTPAllowPlaintextAuth = true
-	allowed, err := New(cfg, nil)
+	opts.SMTPAllowPlaintextAuth = true
+	allowed, err := New(opts, nil)
 	require.NoError(t, err)
 	assert.NoError(t, allowed.authenticate(session))
 }

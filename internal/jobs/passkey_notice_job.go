@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/identity/webauthn"
@@ -74,15 +75,15 @@ func (t PasskeyRemovedNoticeTask) Config() queue.QueueConfig {
 }
 
 // passkeyAddedNoticeProcessor renders the template and submits one message.
-func passkeyAddedNoticeProcessor(ctx context.Context, task PasskeyAddedNoticeTask, mail *mailer.Service) error {
+func passkeyAddedNoticeProcessor(ctx context.Context, task PasskeyAddedNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("passkey_added_notice: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "A passkey was added to your account",
 		Template: mailer.TemplatePasskeyAddedNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.PasskeyNoticeData{
 				Name:           task.DisplayName,
@@ -100,15 +101,15 @@ func passkeyAddedNoticeProcessor(ctx context.Context, task PasskeyAddedNoticeTas
 
 // passkeyRemovedNoticeProcessor renders the template and submits one
 // message.
-func passkeyRemovedNoticeProcessor(ctx context.Context, task PasskeyRemovedNoticeTask, mail *mailer.Service) error {
+func passkeyRemovedNoticeProcessor(ctx context.Context, task PasskeyRemovedNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("passkey_removed_notice: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "A passkey was removed from your account",
 		Template: mailer.TemplatePasskeyRemovedNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.PasskeyNoticeData{
 				Name:           task.DisplayName,

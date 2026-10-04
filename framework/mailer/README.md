@@ -1,12 +1,13 @@
 # Mailer
 
-Mailer is saka's outbound email path. One `*Service` pairs an SMTP client with the React Email
-templates compiled into the binary; the composition root builds it from `config.Mailer` and the
-process logger.
+The mailer engine's outbound email path. One `*Service` pairs an SMTP client with a caller-supplied
+`fs.FS` of compiled email templates, built from typed options and the process logger. The schema
+mapping, the embedded template set, and the template catalog live in the app binding
+(`internal/mailer`).
 
 > **Relation to the registry:** `internal/registry` registers the service, `serve` resolves it
 > before the listener opens, and a feature receives it. It does not construct one. The mailer is
-> optional — an empty `mailer.smtp_host` builds a mailer that refuses to send, and that is not a
+> optional — an empty host builds a mailer that refuses to send, and that is not a
 > deployment failure.
 
 ## Features
@@ -19,14 +20,14 @@ process logger.
   command, so a rendered message is never held as a string on the send path
 - **Blind recipients stay blind** — `Bcc` is an envelope recipient only and is never written into
   the headers
-- **Encrypted where possible** — implicit TLS (`mailer.smtp_secure`) or STARTTLS when the server
+- **Encrypted where possible** — implicit TLS (the options' secure flag) or STARTTLS when the server
   advertises it; a server offering neither is sent to in the clear and reported as a warning
 - **A credential never travels in the clear** — authentication over an unencrypted connection is
   refused with `ErrInsecureAuth` unless the server is on this machine or
-  `mailer.smtp_allow_plaintext_auth` is set. `go-sasl` has no such guard (the stdlib's `net/smtp`
+  the plaintext-auth opt-in is set. `go-sasl` has no such guard (the stdlib's `net/smtp`
   does, inside `PlainAuth`), so it is enforced here before the password is offered
-- **One attempt budget** — `mailer.timeout` bounds the dial, the handshake, every command, and the
-  message body. The caller's context ends the session
+- **One attempt budget** — the options' timeout bounds the dial, the handshake, every command, and
+  the message body. The caller's context ends the session
 - **Errors a caller can match** — `ErrNotConfigured`, `ErrNetwork`, `ErrTimeout`, `ErrCanceled`,
   `ErrAuth`, `ErrInsecureAuth`, `ErrRejected`, `ErrTemporary` (`errors.Is`)
 - **No credentials in a log line** — the target is `host:port`; the username and the password are
@@ -46,7 +47,7 @@ err := service.Send(ctx, mailer.Request{
     Template: mailer.TemplatePasswordReset,
     View: mailer.View{Data: mailer.PasswordResetData{
         Email:     "andi@example.com",
-        ResetLink: "https://app.example.com/reset?token=…",
+        ResetCode: "expecto-patronum",
     }},
 })
 ```
@@ -105,7 +106,7 @@ Durations in the config file are seconds.
 ## Authentication safety
 
 `go-sasl` sends the password as soon as the server asks for it, with no opinion about the transport.
-The stdlib's `net/smtp` refuses that case inside `PlainAuth`; `internal/mailer` refuses it in
+The stdlib's `net/smtp` refuses that case inside `PlainAuth`; the engine refuses it in
 `authenticate`, before any mechanism is chosen:
 
 - a session over TLS (implicit or STARTTLS) is always allowed;

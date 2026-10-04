@@ -23,8 +23,6 @@ import (
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
 // Message is one email to send. HTML and Text are alternative bodies of the
@@ -45,23 +43,23 @@ type Message struct {
 // Mailer submits messages to the configured SMTP server. It is safe for
 // concurrent use; every Send opens and closes its own session.
 type Mailer struct {
-	settings config.Mailer
+	settings Options
 	log      *slog.Logger
 }
 
-// New builds the mailer the configuration describes.
+// New builds the mailer the options describe.
 //
-// A missing smtp_host is not an error: the mailer is then unconfigured and every
+// A missing smtp host is not an error: the mailer is then unconfigured and every
 // Send reports ErrNotConfigured. log may be nil, which discards the lines a test
 // is not reading.
-func New(cfg config.Config, log *slog.Logger) (*Mailer, error) {
+func New(opts Options, log *slog.Logger) (*Mailer, error) {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	if cfg.Mailer.SMTPHost != "" && cfg.Mailer.SMTPPort <= 0 {
-		return nil, errors.New("mailer: smtp_port must be set when smtp_host is")
+	if opts.SMTPHost != "" && opts.SMTPPort <= 0 {
+		return nil, errors.New("mailer: the port must be set when a host is")
 	}
-	return &Mailer{settings: cfg.Mailer, log: log}, nil
+	return &Mailer{settings: opts, log: log}, nil
 }
 
 // Configured reports whether a mail server is named. A command that sends mail
@@ -277,10 +275,14 @@ func (m *Mailer) tlsConfig() *tls.Config {
 
 // limit bounds each command and the message body. The library's own defaults are
 // RFC 5321's (five minutes a command, twelve a submission), which is far longer
-// than a submission this process makes should ever take.
+// than a submission this process makes should ever take. A zero Timeout means no
+// explicit bound: the library's defaults stand, because a zero deadline is an
+// immediate one, not an absent one.
 func (m *Mailer) limit(client *smtp.Client) *smtp.Client {
-	client.CommandTimeout = m.settings.Timeout
-	client.SubmissionTimeout = m.settings.Timeout
+	if m.settings.Timeout > 0 {
+		client.CommandTimeout = m.settings.Timeout
+		client.SubmissionTimeout = m.settings.Timeout
+	}
 	return client
 }
 
@@ -332,7 +334,7 @@ func encrypted(client *smtp.Client) bool {
 // server offers STARTTLS is only known once it has been asked, and a
 // configuration that refused every remote host with credentials would reject the
 // ordinary submission server.
-func credentialIsSafe(settings config.Mailer, sessionEncrypted bool) bool {
+func credentialIsSafe(settings Options, sessionEncrypted bool) bool {
 	return sessionEncrypted || settings.SMTPAllowPlaintextAuth || isLoopbackHost(settings.SMTPHost)
 }
 

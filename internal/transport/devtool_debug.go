@@ -20,7 +20,7 @@ import (
 	"go.jetify.com/typeid"
 
 	"github.com/riipandi/saka/framework/webutil"
-	"github.com/riipandi/saka/web"
+	appweb "github.com/riipandi/saka/web"
 )
 
 func mountDevtool(r chi.Router, injector do.Injector) {

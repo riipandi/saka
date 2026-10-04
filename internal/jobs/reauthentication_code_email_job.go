@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/identity/webauthn"
@@ -56,16 +57,16 @@ func (t ReauthenticationCodeEmailTask) Config() queue.QueueConfig {
 }
 
 // reauthenticationCodeProcessor renders the template and submits one message.
-func reauthenticationCodeProcessor(ctx context.Context, task ReauthenticationCodeEmailTask, mail *mailer.Service) error {
+func reauthenticationCodeProcessor(ctx context.Context, task ReauthenticationCodeEmailTask, mail *fwmailer.Service) error {
 	if task.Email == "" || task.Token == "" {
 		return errors.New("reauthentication_code_email: task carries no address or code")
 	}
 
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Confirm it is you",
 		Template: mailer.TemplateReauthenticationCode,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.ReauthenticationCodeData{
 				Code:             task.Token,

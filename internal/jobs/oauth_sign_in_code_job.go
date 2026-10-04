@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -81,15 +82,15 @@ func (n OAuthSignInCodeNotifier) DeliverSignInCode(ctx context.Context, email, p
 }
 
 // oauthSignInCodeProcessor renders the template and submits one message.
-func oauthSignInCodeProcessor(ctx context.Context, task OAuthSignInCodeTask, mail *mailer.Service) error {
+func oauthSignInCodeProcessor(ctx context.Context, task OAuthSignInCodeTask, mail *fwmailer.Service) error {
 	if task.Email == "" || task.Code == "" {
 		return errors.New("oauth_sign_in_code: task carries no address or code")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Finish signing in",
 		Template: mailer.TemplateOAuthSignInCode,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.OAuthSignInCodeData{
 				ProviderName:     task.ProviderName,

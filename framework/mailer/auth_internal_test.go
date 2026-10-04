@@ -5,8 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/riipandi/saka/internal/config"
 )
 
 func TestIsLoopbackHost(t *testing.T) {
@@ -51,7 +49,7 @@ func TestCredentialIsSafe(t *testing.T) {
 		"private host over plaintext": {host: "192.168.1.10", want: false},
 	}
 	for name, tc := range cases {
-		settings := config.Default().Mailer
+		var settings Options
 		settings.SMTPHost = tc.host
 		settings.SMTPAllowPlaintextAuth = tc.allowPlain
 		assert.Equal(t, tc.want, credentialIsSafe(settings, tc.encrypted), name)
@@ -62,13 +60,14 @@ func TestAuthenticateRefusesPlaintextToARemoteHost(t *testing.T) {
 	// The guard runs before the mechanism is chosen, so a nil session — which
 	// reports as unencrypted — is refused rather than dereferenced. The raw
 	// sentinel is what authenticate returns; send is what classifies it.
-	cfg := config.Default()
-	cfg.Mailer.SMTPHost = "smtp.example.com"
-	cfg.Mailer.SMTPPort = 587
-	cfg.Mailer.SMTPUsername = "bot"
-	cfg.Mailer.SMTPPassword = "hunter2"
+	opts := Options{
+		SMTPHost:     "smtp.example.com",
+		SMTPPort:     587,
+		SMTPUsername: "bot",
+		SMTPPassword: "hunter2",
+	}
 
-	client, err := New(cfg, nil)
+	client, err := New(opts, nil)
 	require.NoError(t, err)
 
 	err = client.authenticate(nil)
@@ -91,7 +90,7 @@ func TestClassifyKeepsTheInsecureAuthReason(t *testing.T) {
 func TestAuthenticateSkipsAnUnconfiguredCredential(t *testing.T) {
 	// No username means nothing to authenticate with, so the guard does not
 	// even look at the transport.
-	client, err := New(config.Default(), nil)
+	client, err := New(Options{}, nil)
 	require.NoError(t, err)
 
 	assert.NoError(t, client.authenticate(nil))

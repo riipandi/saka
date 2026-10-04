@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/mailer"
 )
 
 // fakeCodeEnqueuer records the code deliveries the service hands over.
@@ -29,11 +29,11 @@ func delivery(service *Service) (*Service, *fakeCodeEnqueuer) {
 	cfg := config.Default()
 	cfg.Mailer.SMTPHost = "smtp.example.test"
 	cfg.Mailer.SMTPPort = 25
-	mail, err := mailer.New(cfg, nil)
+	mail, err := fwmailer.New(cfg.MailerOptions(), nil)
 	if err != nil {
 		panic(err)
 	}
-	service.WithDelivery(mailer.NewService(mail, nil), enqueuer)
+	service.WithDelivery(fwmailer.NewService(mail, nil), enqueuer)
 	return service, enqueuer
 }
 

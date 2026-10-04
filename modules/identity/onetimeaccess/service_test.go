@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -148,8 +149,8 @@ func (c *testAESCipher) Decrypt(encoded string) (string, error) {
 // mailerService builds the mailer the tests enqueue through: any SMTP host
 // makes it report configured, and no connection is dialed until a message is
 // submitted.
-func mailerService(cfg config.Config) (*mailer.Service, error) {
-	m, err := mailer.New(cfg, nil)
+func mailerService(cfg config.Config) (*fwmailer.Service, error) {
+	m, err := fwmailer.New(cfg.MailerOptions(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +158,7 @@ func mailerService(cfg config.Config) (*mailer.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return mailer.NewService(m, templates), nil
+	return fwmailer.NewService(m, templates), nil
 }
 
 // seedUser writes an account row directly, so the tests drive the flow's own

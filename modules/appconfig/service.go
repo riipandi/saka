@@ -8,6 +8,7 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -40,14 +41,14 @@ type Service struct {
 	// audit writes the record of a message that left, on the pool: the send
 	// is not a database change, so there is no transaction to ride.
 	audit *audit.Recorder
-	mail  *mailer.Service
+	mail  *fwmailer.Service
 	log   *slog.Logger
 }
 
 // NewService builds the service. The mailer is the infrastructure the
 // composition root resolves; its configuration decides whether the
 // procedure can serve at all.
-func NewService(pool *datastore.Postgres, recorder *audit.Recorder, mail *mailer.Service, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, recorder *audit.Recorder, mail *fwmailer.Service, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -86,11 +87,11 @@ func (s *Service) SendTestEmail(ctx context.Context, callerID uuid.UUID, to stri
 		recipient = account.Email
 	}
 
-	if err := s.mail.Send(ctx, mailer.Request{
+	if err := s.mail.Send(ctx, fwmailer.Request{
 		To:       []string{recipient},
 		Subject:  testEmailSubject,
 		Template: mailer.TemplateTestEmail,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: recipient,
 			Data:  mailer.TestEmailData{Email: recipient},
 		},

@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
 )
 
 // sender is the identity every template renders with.
-func sender() mailer.Sender {
+func sender() fwmailer.Sender {
 	return mailer.SenderFrom(config.Default())
 }
 
@@ -54,8 +55,8 @@ func TestNewTemplatesParsesTheEmbeddedSet(t *testing.T) {
 // fixtures is one value per template, holding every field that template names.
 // The render fails on a field the value does not have, so a renamed field in a
 // template is caught here rather than by an empty string in a sent message.
-func fixtures() map[string]mailer.View {
-	return map[string]mailer.View{
+func fixtures() map[string]fwmailer.View {
+	return map[string]fwmailer.View{
 		mailer.TemplateAPIKeyExpiringSoon: {Data: mailer.APIKeyExpiringSoonData{
 			Name: "Andi", APIKeyName: "deploy key", ExpiresAt: "2 January 2026",
 		}},
@@ -135,7 +136,7 @@ func TestEveryTemplateRendersBothBodies(t *testing.T) {
 }
 
 func TestRenderedBodiesCarryTheIdentityAndTheData(t *testing.T) {
-	templates, err := mailer.NewTemplates(mailer.Sender{AppName: "Saka", LogoURL: "https://cdn.example.com/logo.svg"})
+	templates, err := mailer.NewTemplates(fwmailer.Sender{AppName: "Saka", LogoURL: "https://cdn.example.com/logo.svg"})
 	require.NoError(t, err)
 
 	body, err := templates.Render(mailer.TemplatePasswordReset, fixtures()[mailer.TemplatePasswordReset])
@@ -155,7 +156,7 @@ func TestHTMLBodyEscapesUntrustedValues(t *testing.T) {
 	templates, err := mailer.NewTemplates(sender())
 	require.NoError(t, err)
 
-	body, err := templates.Render(mailer.TemplateEmailVerification, mailer.View{
+	body, err := templates.Render(mailer.TemplateEmailVerification, fwmailer.View{
 		Data: mailer.EmailVerificationData{
 			UserFullName:     `<script>alert(1)</script>`,
 			VerificationCode: "expecto-patronum",
@@ -174,7 +175,7 @@ func TestUnknownTemplateIsRefused(t *testing.T) {
 	templates, err := mailer.NewTemplates(sender())
 	require.NoError(t, err)
 
-	_, err = templates.Render("no-such-template", mailer.View{})
+	_, err = templates.Render("no-such-template", fwmailer.View{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no-such-template")
 	// The message names what is available, so the typo is fixed without reading

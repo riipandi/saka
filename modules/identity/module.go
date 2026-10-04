@@ -29,11 +29,11 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/appconfig"
@@ -406,7 +406,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		mail := do.MustInvoke[*mailer.Service](i)
+		mail := do.MustInvoke[*fwmailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		settings := do.MustInvoke[*appconfig.Settings](i)
@@ -431,7 +431,7 @@ var Package = do.Package(
 		pool := do.MustInvoke[*datastore.Postgres](i)
 		issuer := do.MustInvoke[*signin.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
-		mail := do.MustInvoke[*mailer.Service](i)
+		mail := do.MustInvoke[*fwmailer.Service](i)
 		client := do.MustInvoke[*queue.Client](i)
 		return onetimeaccess.NewService(*c, pool, issuer, recorder, mail, client, log), nil
 	}),
@@ -511,7 +511,7 @@ var Package = do.Package(
 		// seam, the way the password recovery service takes its notifier:
 		// the delivery is optional wiring, and a nil pair leaves the
 		// password and passkey proofs working.
-		if mail := do.MustInvoke[*mailer.Service](i); mail != nil {
+		if mail := do.MustInvoke[*fwmailer.Service](i); mail != nil {
 			service.WithDelivery(mail, jobs.NewReauthenticationCodeNotifier(
 				do.MustInvoke[*queue.Client](i), log))
 		}
@@ -542,7 +542,7 @@ var Package = do.Package(
 		c := do.MustInvoke[*config.Config](i)
 		log := do.MustInvoke[*slog.Logger](i)
 		pool := do.MustInvoke[*datastore.Postgres](i)
-		mail := do.MustInvoke[*mailer.Service](i)
+		mail := do.MustInvoke[*fwmailer.Service](i)
 		recorder := do.MustInvoke[*audit.Recorder](i)
 		client := do.MustInvoke[*queue.Client](i)
 		sessions := do.MustInvoke[*session.Service](i)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -43,15 +44,15 @@ func (t UserLockedNoticeTask) Config() queue.QueueConfig {
 }
 
 // userLockedNoticeProcessor renders the template and submits one message.
-func userLockedNoticeProcessor(ctx context.Context, task UserLockedNoticeTask, mail *mailer.Service) error {
+func userLockedNoticeProcessor(ctx context.Context, task UserLockedNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("user_locked_notice: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your account was locked",
 		Template: mailer.TemplateUserLocked,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.UserLockedData{
 				Name:      task.DisplayName,

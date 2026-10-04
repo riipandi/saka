@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
@@ -28,7 +29,7 @@ import (
 // expiryPool opens a migrated database and a queue client whose processors
 // are wired the way a serve run wires them, with the reminder switch the test
 // asks for.
-func expiryPool(t *testing.T, enabled bool, mail *mailer.Service) (*datastorePostgres, *queue.Client) {
+func expiryPool(t *testing.T, enabled bool, mail *fwmailer.Service) (*datastorePostgres, *queue.Client) {
 	t.Helper()
 
 	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
@@ -152,7 +153,7 @@ func TestTheExpiryScanQueuesNoSuccessorWhenTheScanFails(t *testing.T) {
 	dead.Shutdown(context.Background())
 
 	scanErr := apiKeyExpiryScanProcessor(t.Context(), APIKeyExpiryScanTask{}, dead, client, true,
-		&mailer.Service{})
+		&fwmailer.Service{})
 	require.Error(t, scanErr, "a failed scan must report the failure")
 
 	// No successor: the pending row is what a committed successor would be,
@@ -189,7 +190,7 @@ func mustOwnerID(t *testing.T, pool *datastore.Postgres, username string) uuid.U
 }
 
 // startExpiryMailer builds the mailer over the shared Mailpit container.
-func startExpiryMailer(t *testing.T) (*mailer.Service, *testutils.Mailpit) {
+func startExpiryMailer(t *testing.T) (*fwmailer.Service, *testutils.Mailpit) {
 	t.Helper()
 
 	server := testutils.StartMailpit(t.Context(), t)
@@ -202,13 +203,13 @@ func startExpiryMailer(t *testing.T) (*mailer.Service, *testutils.Mailpit) {
 	cfg.Mailer.SMTPPort = smtpPort
 	cfg.Mailer.SMTPUsername = server.Username
 	cfg.Mailer.SMTPPassword = server.Password
-	cfg.Mailer.FromEmail = "no-reply@saka.test"
+	cfg.Mailer.FromEmail = "no-reply@hogwarts.test"
 
-	client, err := mailer.New(cfg, nil)
+	client, err := fwmailer.New(cfg.MailerOptions(), nil)
 	require.NoError(t, err)
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
-	return mailer.NewService(client, templates), server
+	return fwmailer.NewService(client, templates), server
 }
 
 // expiryMarkCount reads how many times a key carries the reminder stamp.

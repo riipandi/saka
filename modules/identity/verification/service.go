@@ -9,9 +9,9 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 )
@@ -91,7 +91,7 @@ type Service struct {
 	// audit writes the record of a verification that completed, in the
 	// transaction that consumes the token.
 	audit   *audit.Recorder
-	mail    *mailer.Service
+	mail    *fwmailer.Service
 	queue   *queue.Client
 	baseURL string
 	log     *slog.Logger
@@ -113,7 +113,7 @@ type Service struct {
 // NewService builds the service. The mailer and the queue are the
 // infrastructure the composition root resolves: the procedure writes the
 // token row and enqueues, the queue owns the SMTP attempt and its retries.
-func NewService(pool *datastore.Postgres, mail *mailer.Service, client *queue.Client, recorder *audit.Recorder, baseURL string, log *slog.Logger) *Service {
+func NewService(pool *datastore.Postgres, mail *fwmailer.Service, client *queue.Client, recorder *audit.Recorder, baseURL string, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
@@ -76,11 +77,11 @@ func newOneTimeAccessRouter(t *testing.T, auth transport.Authenticator, pool *da
 	// processors registered and its workers never started, so an enqueue
 	// stays pending for the assertions to read.
 	cfg.Mailer.SMTPHost = "localhost"
-	m, err := mailer.New(cfg, nil)
+	m, err := fwmailer.New(cfg.MailerOptions(), nil)
 	require.NoError(t, err)
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
-	mail := mailer.NewService(m, templates)
+	mail := fwmailer.NewService(m, templates)
 
 	client, err := queue.NewClient(queue.ClientConfig{
 		Store:        pool,

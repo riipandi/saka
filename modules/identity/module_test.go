@@ -18,9 +18,9 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/framework/fetcher"
 	"github.com/riipandi/saka/framework/kernel"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/appconfig"
@@ -43,7 +43,7 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		// registry resolves; the area test pins the forwarding, not the
 		// mail or queue wiring, so nils stand in for what the composition
 		// root guarantees to be present.
-		do.Eager[*mailer.Service](nil),
+		do.Eager[*fwmailer.Service](nil),
 		do.Eager[*queue.Client](nil),
 		// The user feature stages its pictures into the engine; nil stands
 		// in for the wiring the composition root guarantees, and the picture

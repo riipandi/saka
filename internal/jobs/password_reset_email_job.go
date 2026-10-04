@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 )
@@ -42,15 +43,15 @@ func (t PasswordResetEmailTask) Config() queue.QueueConfig {
 }
 
 // passwordResetProcessor renders the template and submits one message.
-func passwordResetProcessor(ctx context.Context, task PasswordResetEmailTask, mail *mailer.Service, baseURL string) error {
+func passwordResetProcessor(ctx context.Context, task PasswordResetEmailTask, mail *fwmailer.Service, baseURL string) error {
 	if task.Email == "" || task.Token == "" {
 		return errors.New("password_reset_email: task carries no address or code")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Reset your password",
 		Template: mailer.TemplatePasswordReset,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.PasswordResetData{
 				Email:     task.Email,
@@ -96,15 +97,15 @@ func (t PasswordChangedNoticeTask) Config() queue.QueueConfig {
 
 // passwordChangedNoticeProcessor renders the template and submits one
 // message.
-func passwordChangedNoticeProcessor(ctx context.Context, task PasswordChangedNoticeTask, mail *mailer.Service) error {
+func passwordChangedNoticeProcessor(ctx context.Context, task PasswordChangedNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("password_changed_notice: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your password was changed",
 		Template: mailer.TemplatePasswordChangedNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.PasswordChangedNoticeData{
 				Name:  task.DisplayName,
@@ -149,15 +150,15 @@ func (t PasswordRemovedNoticeTask) Config() queue.QueueConfig {
 
 // passwordRemovedNoticeProcessor renders the template and submits one
 // message.
-func passwordRemovedNoticeProcessor(ctx context.Context, task PasswordRemovedNoticeTask, mail *mailer.Service) error {
+func passwordRemovedNoticeProcessor(ctx context.Context, task PasswordRemovedNoticeTask, mail *fwmailer.Service) error {
 	if task.Email == "" {
 		return errors.New("password_removed_notice: task carries no address")
 	}
-	err := mail.Send(ctx, mailer.Request{
+	err := mail.Send(ctx, fwmailer.Request{
 		To:       []string{task.Email},
 		Subject:  "Your password was removed",
 		Template: mailer.TemplatePasswordRemovedNotice,
-		View: mailer.View{
+		View: fwmailer.View{
 			Email: task.Email,
 			Data: mailer.PasswordRemovedNoticeData{
 				Name:  task.DisplayName,

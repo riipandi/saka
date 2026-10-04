@@ -11,9 +11,6 @@ import (
 	"slices"
 	"strings"
 	texttemplate "text/template"
-
-	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/web"
 )
 
 // Body is the two renderings of one message. Both are produced for every
@@ -38,32 +35,14 @@ type View struct {
 	Data any
 }
 
-// Sender is the identity every template renders with. It is resolved from the
-// configuration once, so a template never reads the configuration itself.
+// Sender is the identity every template renders with. It is resolved by the
+// caller once, so a template never reads the configuration itself.
 type Sender struct {
 	AppName string
 	LogoURL string
 }
 
-// SenderFrom resolves the identity from the configuration.
-//
-// The logo is an absolute URL, because a mail client fetches it from outside
-// this process. The public origin is `app.base_url`: the application serves the
-// bundle the image ships in, so its own origin is always right. `app.assets_url`
-// is the fallback for a deployment that publishes its assets on another origin
-// and names no public base URL.
-func SenderFrom(cfg config.Config) Sender {
-	origin := cfg.App.BaseURL
-	if origin == "" {
-		origin = cfg.App.AssetsURL
-	}
-	return Sender{
-		AppName: config.AppName,
-		LogoURL: strings.TrimSuffix(origin, "/") + "/images/logoEmail.svg",
-	}
-}
-
-// Templates renders the React Email templates embedded in the binary.
+// Templates renders the React Email templates a caller supplies as an fs.FS.
 //
 // The HTML and the text rendering of a template are parsed as one unit, so a
 // template that cannot be parsed fails construction rather than a send. The
@@ -76,11 +55,6 @@ type Templates struct {
 	// not, and a plain-text body must not arrive HTML-escaped.
 	html map[string]*htmltemplate.Template
 	text map[string]*texttemplate.Template
-}
-
-// NewTemplates parses the templates embedded in this binary.
-func NewTemplates(sender Sender) (*Templates, error) {
-	return NewTemplatesFS(web.EmailTemplates, sender)
 }
 
 // NewTemplatesFS parses the templates under dir of fsys. The directory layout is

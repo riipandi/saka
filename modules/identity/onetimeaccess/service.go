@@ -10,10 +10,10 @@ import (
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/jobs"
-	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -103,7 +103,7 @@ type Service struct {
 	// into the same transaction.
 	signin *signin.Service
 	audit  *audit.Recorder
-	mail   *mailer.Service
+	mail   *fwmailer.Service
 	queue  *queue.Client
 	// baseURL is the origin the email's link is built against.
 	baseURL string
@@ -120,7 +120,7 @@ type Service struct {
 // NewService builds the service. The mailer and the queue are the
 // infrastructure the composition root resolves; the signin service is the
 // issuer the exchange opens the session through.
-func NewService(cfg config.Config, pool *datastore.Postgres, issuer *signin.Service, recorder *audit.Recorder, mail *mailer.Service, client *queue.Client, log *slog.Logger) *Service {
+func NewService(cfg config.Config, pool *datastore.Postgres, issuer *signin.Service, recorder *audit.Recorder, mail *fwmailer.Service, client *queue.Client, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}

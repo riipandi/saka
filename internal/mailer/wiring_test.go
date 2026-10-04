@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/registry"
@@ -28,17 +29,17 @@ func TestRegistryWiresTheService(t *testing.T) {
 		}
 	})
 
-	service, err := do.Invoke[*mailer.Service](injector)
+	service, err := do.Invoke[*fwmailer.Service](injector)
 	require.NoError(t, err)
 	require.NotNil(t, service)
 
 	assert.False(t, service.Configured())
 	assert.ErrorIs(t,
-		service.Send(t.Context(), mailer.Request{Template: mailer.TemplateTestEmail}),
-		mailer.ErrNotConfigured)
+		service.Send(t.Context(), fwmailer.Request{Template: mailer.TemplateTestEmail}),
+		fwmailer.ErrNotConfigured)
 
 	// The templates are the embedded set, not an empty placeholder.
-	body, err := service.Templates().Render(mailer.TemplateTestEmail, mailer.View{
+	body, err := service.Templates().Render(mailer.TemplateTestEmail, fwmailer.View{
 		Email: "neveu@example.com",
 		Data:  mailer.TestEmailData{Email: "neveu@example.com"},
 	})

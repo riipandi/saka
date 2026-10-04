@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
@@ -59,12 +60,12 @@ func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	cfg.Mailer.SMTPPort = port(mailpit.SMTPAddr)
 	cfg.Mailer.SMTPUsername = mailpit.Username
 	cfg.Mailer.SMTPPassword = mailpit.Password
-	mail, err := mailer.New(cfg, nil)
+	mail, err := fwmailer.New(cfg.MailerOptions(), nil)
 	require.NoError(t, err)
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
+	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
 }
 
 // unconfiguredService builds the service the way a deployment without an
@@ -74,12 +75,12 @@ func unconfiguredService(t *testing.T, pool *datastore.Postgres) *Service {
 
 	cfg := config.Default()
 	cfg.Mailer.SMTPHost = ""
-	mail, err := mailer.New(cfg, nil)
+	mail, err := fwmailer.New(cfg.MailerOptions(), nil)
 	require.NoError(t, err)
 	templates, err := mailer.NewTemplates(mailer.SenderFrom(cfg))
 	require.NoError(t, err)
 
-	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), mailer.NewService(mail, templates), nil)
+	return NewService(pool, audit.NewRecorder(slog.New(slog.DiscardHandler)), fwmailer.NewService(mail, templates), nil)
 }
 
 func host(addr string) string {
