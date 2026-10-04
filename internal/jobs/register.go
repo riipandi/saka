@@ -31,7 +31,7 @@ import (
 // feature switch, AND-ed with the notice flag the deployment's cost decision
 // carries: the scan is seeded only when both agree, and a scan a deployment
 // did not ask for would remind nobody and still cost a query a day.
-func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, signupSweeper SignupTokenSweeper, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
+func Register(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, mail *mailer.Service, pool *datastore.Postgres, baseURL string, expiryEmailEnabled bool, apiKeyExpiringNoticeEnabled bool, notices NoticePublisher, scimSyncer ScimSyncer, oauthOffboarder OAuthOffboarder, signupSweeper SignupTokenSweeper, webhookRunner WebhookRunner, http *fetcher.Client, log *slog.Logger) {
 	client.Register(queue.NewQueue[CleanupTask](func(ctx context.Context, task CleanupTask) error {
 		return cleanupProcessor(ctx, task, pool, signupSweeper)
 	}))
@@ -163,6 +163,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 			return (&scimSyncProcessor{syncer: scimSyncer, log: log}).Process(ctx, task)
 		}))
 	}
+	// The offboarding pass registers unconditionally: a container without
+	// the identity area answers a nil seam, and the processor skips its
+	// probe rather than failing the queue.
+	client.Register(queue.NewQueue[OAuthOffboardingTask](func(ctx context.Context, task OAuthOffboardingTask) error {
+		return (&oauthOffboardingProcessor{offboarder: oauthOffboarder, batch: DefaultOffboardingBatch, log: log}).Process(ctx, task)
+	}))
 }
 
 // Seeder seeds the recurring jobs. It is a service of its own — not a side
@@ -242,6 +248,14 @@ func (s *Seeder) Seed(ctx context.Context) error {
 		if err := s.seedOnce(ctx, ScimSyncName, scimSyncSeed(DefaultScimSyncInterval), DefaultScimSyncInterval); err != nil {
 			return err
 		}
+	}
+	// The offboarding schedule seeds unconditionally: the pass skips when
+	// the identity area is absent, and a schedule that starts when the
+	// area arrives needs no reseeding.
+	if err := s.seedOnce(ctx, OAuthOffboardingName,
+		oauthOffboardingSeed(DefaultOAuthOffboardingInterval),
+		DefaultOAuthOffboardingInterval); err != nil {
+		return err
 	}
 	if s.uploader == nil {
 		return nil

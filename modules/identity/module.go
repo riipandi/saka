@@ -665,6 +665,15 @@ var Package = do.Package(
 		if tokenPosts != nil {
 			service = service.WithTokenPoster(tokenPosts)
 		}
+		// The offboarding's writes ride the same seam: the ban row and
+		// the session lifecycle, satisfied structurally — the services
+		// are the interfaces the feature names, no adapters.
+		if gates := do.MustInvoke[*restrictions.Service](i); gates != nil {
+			service = service.WithBanEnforcer(gates)
+		}
+		if sessions := do.MustInvoke[*session.Service](i); sessions != nil {
+			service = service.WithSessionEnder(sessions)
+		}
 		return service.WithProviders(oauthsso.ProviderSet{
 			Builtin: map[string]oauthsso.Provider{
 				builtin.Google.Slug: builtin.NewGoogle(),

@@ -105,6 +105,11 @@ type Service struct {
 	// profiles is the account-write seam the mapping's refresh runs
 	// through — the user module owns the row. Nil skips the refresh.
 	profiles profileApplier
+	// bans and ender are the offboarding's writes: the restrictions row
+	// and the session lifecycle, satisfied structurally by their own
+	// features' services.
+	bans  banApplier
+	ender sessionEnder
 
 	// baseURL is the origin the redirect URI and the SPA redirect are
 	// built from, wired after construction with the base URL.

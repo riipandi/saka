@@ -27,6 +27,7 @@ import (
 	"github.com/riipandi/saka/modules/federation/scimsync"
 	"github.com/riipandi/saka/modules/identity"
 	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/oauthsso"
 	"github.com/riipandi/saka/modules/identity/signup"
 	"github.com/riipandi/saka/modules/notification"
 	"github.com/riipandi/saka/modules/webhook"
@@ -79,6 +80,28 @@ func (s lazyScimSyncer) SyncAll(ctx context.Context) error {
 		return nil
 	}
 	return service.SyncAll(ctx)
+}
+
+// lazyOAuthOffboarder resolves the identity area's oauthsso service at
+// task-run time, the way the SCIM passes resolve theirs: the queue
+// registers before the area's wiring is ordered, and the pass must not
+// depend on that order. A container without the oauthsso feature answers
+// nil here — the pass is skipped rather than failed.
+type lazyOAuthOffboarder struct {
+	injector do.Injector
+}
+
+// OffboardPass runs one offboarding pass.
+func (s lazyOAuthOffboarder) OffboardPass(ctx context.Context, batch int) error {
+	service, err := do.Invoke[*oauthsso.Service](s.injector)
+	if err != nil || service == nil {
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	_, err = service.OffboardPass(ctx, batch)
+	return err
 }
 
 // lazyWebhookRunner resolves the webhook area's service at task-run time,
@@ -295,7 +318,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			// passes resolve the sync service the same lazy way: the
 			// federation area's provider builds it, and this wiring must
 			// not order the two around each other either.
-			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i}, lazyScimSyncer{i}, signup.NewRepository(), lazyWebhookRunner{i}, do.MustInvoke[*fetcher.Client](i), log)
+			jobs.Register(client, c.Queue.CleanupInterval, uploader, mailer, pool, c.App.BaseURL, c.Auth.ExpiryEmailEnabled, c.Mailer.Notifications.APIKeyExpiringNoticeEnabled, lazyPublisher{i}, lazyScimSyncer{i}, lazyOAuthOffboarder{i}, signup.NewRepository(), lazyWebhookRunner{i}, do.MustInvoke[*fetcher.Client](i), log)
 
 			// The upload's after-sync hook rides here rather than on the
 			// manager's provider: the hook enqueues through the client this

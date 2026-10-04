@@ -33,7 +33,7 @@ func expiryPool(t *testing.T, enabled bool, mail *mailer.Service) (*datastorePos
 
 	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
 	pool, client := migratedClient(t, dsn)
-	Register(client, time.Hour, nil, mail, pool, "", enabled, true, nil, nil, nil, nil, nil, nil)
+	Register(client, time.Hour, nil, mail, pool, "", enabled, true, nil, nil, nil, nil, nil, nil, nil)
 	return pool, client
 }
 
@@ -139,7 +139,7 @@ func TestTheExpiryScanQueuesNoSuccessorWhenTheScanFails(t *testing.T) {
 
 	dsn := testutils.StartPostgres(t.Context(), t).NewDatabase(t)
 	pool, client := migratedClient(t, dsn)
-	Register(client, time.Hour, nil, nil, pool, "", true, true, nil, nil, nil, nil, nil, nil)
+	Register(client, time.Hour, nil, nil, pool, "", true, true, nil, nil, nil, nil, nil, nil, nil)
 
 	// A second pool on the same database, closed before the call: the scan's
 	// list is refused, while the client's own pool stays live for the

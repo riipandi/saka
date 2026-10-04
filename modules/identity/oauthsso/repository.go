@@ -15,6 +15,7 @@ import (
 
 	"github.com/riipandi/saka/database/entity"
 	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 
@@ -594,6 +595,57 @@ func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier
 		return LinkedAccountView{}, err
 	}
 	return view, nil
+}
+
+// OffboardCandidates lists the bindings the offboarding probe can judge:
+// a refresh token present (the provider without one is uncheckable, the
+// pass's fail-open skip), and the holder not already banned — an account
+// the pass offboarded in an earlier hour must not earn a fresh ban row and
+// a fresh audit record every pass. Oldest first, bounded to the batch the
+// pass asks for.
+func (r *Repository) OffboardCandidates(ctx context.Context, db datastore.Querier, limit int) ([]LinkedAccountView, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(linkedAccountViewColumns)
+	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
+	sb.Where(
+		"l.refresh_token <> ''",
+		fmt.Sprintf(
+			"NOT EXISTS (SELECT 1 FROM %s ar WHERE ar.user_id = l.user_id AND ar.kind = '%s' AND ar.lifted_at IS NULL)",
+			entity.TableAccountRestrictions, restrictions.KindBan),
+	)
+	sb.OrderBy("l.created_at")
+	sb.Limit(limit)
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LinkedAccountView
+	for rows.Next() {
+		view, scanErr := scanLinkedAccountView(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		out = append(out, view)
+	}
+	return out, rows.Err()
+}
+
+// CountTokenlessBindings answers how many bindings carry no refresh token —
+// the pass's fail-open skip, named in the log rather than judged.
+func (r *Repository) CountTokenlessBindings(ctx context.Context, db datastore.Querier) (int, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("count(*)")
+	sb.From(entity.TableOAuthLinkedAccounts)
+	sb.Where(sb.Equal("refresh_token", ""))
+	query, args := sb.Build()
+	var count int
+	if err := db.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // KeepsAnotherCredential answers whether the account still holds a way

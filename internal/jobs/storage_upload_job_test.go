@@ -27,7 +27,7 @@ func TestStorageUploadJobSyncsAStagedFile(t *testing.T) {
 		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
-	Register(client, time.Hour, manager, nil, pool, "", false, false, nil, nil, nil, nil, nil, nil)
+	Register(client, time.Hour, manager, nil, pool, "", false, false, nil, nil, nil, nil, nil, nil, nil)
 
 	data := bytes.Repeat([]byte("queued"), 40)
 	require.NoError(t, manager.Stage(t.Context(), "devbucket", "uploads/report.bin", bytes.NewReader(data), nil))
