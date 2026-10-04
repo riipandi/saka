@@ -177,16 +177,17 @@ var ProcedureRules = map[string]Entry{
 	// in from outside, the way the OIDC client surface beside it is.
 	// Unlinking is the sensitive write: the step-up proof names the
 	// holder, the way the second-factor disable does.
-	authnv1connect.OAuthSSOServiceBeginSignInProcedure:           {Rule: Public},
-	authnv1connect.OAuthSSOServiceContinueSignInProcedure:        {Rule: Public},
-	authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure:     {Rule: Public},
-	authnv1connect.OAuthSSOServiceListConnectionsProcedure:       {Rule: Admin},
-	authnv1connect.OAuthSSOServiceGetConnectionProcedure:         {Rule: Admin},
-	authnv1connect.OAuthSSOServiceCreateConnectionProcedure:      {Rule: Admin},
-	authnv1connect.OAuthSSOServiceUpdateConnectionProcedure:      {Rule: Admin},
-	authnv1connect.OAuthSSOServiceDeleteConnectionProcedure:      {Rule: Admin},
-	authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure: {Rule: Session},
-	authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure:      {Rule: Session, StepUp: true},
+	authnv1connect.OAuthSSOServiceBeginSignInProcedure:            {Rule: Public},
+	authnv1connect.OAuthSSOServiceContinueSignInProcedure:         {Rule: Public},
+	authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure:      {Rule: Public},
+	authnv1connect.OAuthSSOServiceListConnectionsProcedure:        {Rule: Admin},
+	authnv1connect.OAuthSSOServiceGetConnectionProcedure:          {Rule: Admin},
+	authnv1connect.OAuthSSOServiceCreateConnectionProcedure:       {Rule: Admin},
+	authnv1connect.OAuthSSOServiceUpdateConnectionProcedure:       {Rule: Admin},
+	authnv1connect.OAuthSSOServiceDeleteConnectionProcedure:       {Rule: Admin},
+	authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure:  {Rule: Session},
+	authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure:       {Rule: Session, StepUp: true},
+	authnv1connect.OAuthSSOServiceGetLinkedAccountTokensProcedure: {Rule: Session},
 
 	// The refresh is the sign-in a caller makes with the pair's other half:
 	// the credential the procedure spends is the body's refresh token, and

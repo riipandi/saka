@@ -1094,6 +1094,15 @@ service OAuthSSOService {
   // no password and no passkey is refused until a password is set — an
   // account with no way back in cannot be created by its holder's hand.
   rpc UnlinkConnection(UnlinkConnectionRequest) returns (UnlinkConnectionResponse);
+
+  // GetLinkedAccountTokens answers the provider tokens the calling
+  // account's binding carries: the access token the holder presents to
+  // the provider's API as themselves, the refresh token that outlives it,
+  // and the instant the access token dies when the provider named one.
+  // The tokens leave their seal only here — the reads beside it answer
+  // metadata alone. A foreign or unknown binding answers not_found, the
+  // same refusal a missing one carries.
+  rpc GetLinkedAccountTokens(GetLinkedAccountTokensRequest) returns (GetLinkedAccountTokensResponse);
 }
 
 // ---- OAuth SSO: the flow ----
@@ -1576,4 +1585,42 @@ message UnlinkConnectionResponse {
 
   // message is the human-readable sentence describing what the call did.
   string message = 2;
+}
+
+// GetLinkedAccountTokensRequest names the binding whose provider tokens
+// the caller reads.
+message GetLinkedAccountTokensRequest {
+  // linked_account_id is the binding's TypeID (`olink_…`), and it must
+  // be the caller's own — the account is the claims' subject.
+  string linked_account_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetLinkedAccountTokensResponse carries the binding's provider tokens,
+// opened from their seal for this one answer. A binding the provider
+// answered no tokens for carries empty fields, not an error — the empty
+// is the fact.
+message GetLinkedAccountTokensResponse {
+  // access_token is the provider's access token, presentable to the
+  // provider's API as the holder.
+  string access_token = 1;
+
+  // refresh_token is the provider's refresh token, the credential that
+  // outlives the access token at the provider.
+  string refresh_token = 2;
+
+  // expires_at is when the access token dies, when the provider named
+  // an expiry; absent when it did not.
+  optional google.protobuf.Timestamp expires_at = 3;
+
+  // connection_id is the binding's connection, `oconn_…`.
+  string connection_id = 4;
+
+  // provider is the connection's slug.
+  string provider = 5;
+
+  // status is the outcome word the client checks — success.
+  string status = 6;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 7;
 }

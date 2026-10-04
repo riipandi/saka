@@ -2,6 +2,7 @@ package oauthsso
 
 import (
 	"testing"
+	"time"
 
 	"uuid"
 
@@ -158,4 +159,60 @@ func TestUnlinkRefusesAForeignBindingWithANotFound(t *testing.T) {
 
 	err := service.UnlinkLinkedAccount(t.Context(), foreign, fixture.binding.LinkedAccount.ID)
 	assert.ErrorIs(t, err, ErrLinkedAccountNotFound)
+}
+
+func TestTheHoldersBindingAnswersItsOpenedTokens(t *testing.T) {
+	pool := migratedPool(t)
+	service := resolutionService(t, pool)
+	fixture := seededBinding(t, service, "hogwarts")
+
+	// The tokens rest sealed on the row, exactly the shape the bind
+	// wrote: an expiry the provider named rides beside them.
+	sealedAccess, err := service.seal("provider-access-token")
+	require.NoError(t, err)
+	sealedRefresh, err := service.seal("provider-refresh-token")
+	require.NoError(t, err)
+	expires := time.Now().Add(time.Hour).Truncate(time.Microsecond)
+	mustExec(t, pool,
+		`UPDATE public.oauth_linked_accounts
+		 SET access_token = $1, refresh_token = $2, access_expires_at = $3
+		 WHERE id = $4`,
+		sealedAccess, sealedRefresh, expires, fixture.binding.LinkedAccount.ID)
+
+	tokens, err := service.GetLinkedAccountTokens(t.Context(), fixture.userID, fixture.binding.LinkedAccount.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "provider-access-token", tokens.AccessToken)
+	assert.Equal(t, "provider-refresh-token", tokens.RefreshToken)
+	require.NotNil(t, tokens.ExpiresAt)
+	assert.True(t, expires.Equal(*tokens.ExpiresAt))
+	assert.Equal(t, fixture.binding.LinkedAccount.ConnectionID, tokens.ConnectionID)
+	assert.Equal(t, fixture.binding.Provider, tokens.Provider)
+}
+
+func TestAForeignBindingAnswersNotFoundOnTheTokenRead(t *testing.T) {
+	pool := migratedPool(t)
+	service := resolutionService(t, pool)
+	fixture := seededBinding(t, service, "hogwarts")
+	foreign := seedAccount(t, pool, "flitwick@hogwarts.example", false)
+
+	_, err := service.GetLinkedAccountTokens(t.Context(), foreign, fixture.binding.LinkedAccount.ID)
+	assert.ErrorIs(t, err, ErrLinkedAccountNotFound)
+
+	_, err = service.GetLinkedAccountTokens(t.Context(), fixture.userID, uuid.New())
+	assert.ErrorIs(t, err, ErrLinkedAccountNotFound)
+}
+
+func TestTheTokenlessBindingAnswersEmptyFields(t *testing.T) {
+	pool := migratedPool(t)
+	service := resolutionService(t, pool)
+	fixture := seededBinding(t, service, "hogwarts")
+
+	// The provider answered no tokens for the scopes asked: the empty
+	// columns are the fact the row stores, and the read answers them as
+	// they lie rather than refusing.
+	tokens, err := service.GetLinkedAccountTokens(t.Context(), fixture.userID, fixture.binding.LinkedAccount.ID)
+	require.NoError(t, err)
+	assert.Empty(t, tokens.AccessToken)
+	assert.Empty(t, tokens.RefreshToken)
+	assert.Nil(t, tokens.ExpiresAt)
 }

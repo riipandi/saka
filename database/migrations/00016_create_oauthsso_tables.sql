@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS public.oauth_linked_accounts (
     profile JSONB NOT NULL DEFAULT '{}'::jsonb,
     access_token TEXT NOT NULL DEFAULT '' CHECK (access_token = '' OR access_token LIKE 'enc:%'),
     refresh_token TEXT NOT NULL DEFAULT '' CHECK (refresh_token = '' OR refresh_token LIKE 'enc:%'),
+    -- When the stored access token dies, named by the provider's
+    -- expires_in at the write that stored it. NULL when the provider
+    -- answered no expiry: the token's age is then unknown, and the read
+    -- that needs a live token refreshes first.
+    access_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT NULL,
     UNIQUE (connection_id, provider_account_id)

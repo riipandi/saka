@@ -122,6 +122,8 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure],
 		"the area must forward its features' procedures to the RPC router")
+	assert.True(t, claimed[authnv1connect.OAuthSSOServiceGetLinkedAccountTokensProcedure],
+		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserGroupServiceListUserGroupsProcedure],
 		"the area must forward its features' procedures to the RPC router")
 	assert.True(t, claimed[identityv1connect.UserGroupServiceGetUserGroupProcedure],

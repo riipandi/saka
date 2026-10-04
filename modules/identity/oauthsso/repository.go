@@ -186,7 +186,8 @@ const flowColumns = `id, connection_id, state_hash, flow_token_hash, nonce, code
 	access_token, refresh_token, redirect_to, created_at, expires_at`
 
 const linkedAccountColumns = `id, user_id, connection_id, provider_account_id, email,
-	email_verified, profile, access_token, refresh_token, created_at, updated_at`
+	email_verified, profile, access_token, refresh_token, access_expires_at,
+	created_at, updated_at`
 
 // maxWrongCodes is the three-strikes ceiling the email code's stage
 // keeps — the same rule the other single-use bridges keep.
@@ -488,7 +489,8 @@ func scanLinkedAccountView(row interface{ Scan(dest ...any) error }) (LinkedAcco
 	err := row.Scan(&view.LinkedAccount.ID, &view.LinkedAccount.UserID, &view.LinkedAccount.ConnectionID,
 		&view.LinkedAccount.ProviderAccountID, &view.LinkedAccount.Email, &view.LinkedAccount.EmailVerified,
 		&view.LinkedAccount.Profile, &view.LinkedAccount.AccessToken, &view.LinkedAccount.RefreshToken,
-		&view.LinkedAccount.CreatedAt, &view.LinkedAccount.UpdatedAt, &view.Provider)
+		&view.LinkedAccount.AccessExpiresAt, &view.LinkedAccount.CreatedAt, &view.LinkedAccount.UpdatedAt,
+		&view.Provider)
 	if err != nil {
 		return LinkedAccountView{}, err
 	}
@@ -501,7 +503,7 @@ func scanLinkedAccount(row pgx.Row) (LinkedAccount, error) {
 	var account LinkedAccount
 	err := row.Scan(&account.ID, &account.UserID, &account.ConnectionID, &account.ProviderAccountID,
 		&account.Email, &account.EmailVerified, &account.Profile, &account.AccessToken,
-		&account.RefreshToken, &account.CreatedAt, &account.UpdatedAt)
+		&account.RefreshToken, &account.AccessExpiresAt, &account.CreatedAt, &account.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return LinkedAccount{}, datastore.ErrNoRows
 	}
@@ -525,7 +527,7 @@ type LinkedAccountView struct {
 // provider slug riding last.
 const linkedAccountViewColumns = `l.id, l.user_id, l.connection_id, l.provider_account_id,
 	l.email, l.email_verified, l.profile, l.access_token, l.refresh_token,
-	l.created_at, l.updated_at, c.provider`
+	l.access_expires_at, l.created_at, l.updated_at, c.provider`
 
 // LinkedAccountsByUser reads the caller's bindings, oldest first. The
 // join carries the connection's slug; a connection deleted cascades its

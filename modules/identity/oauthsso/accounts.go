@@ -3,6 +3,7 @@ package oauthsso
 import (
 	"context"
 	"errors"
+	"time"
 
 	"uuid"
 
@@ -84,6 +85,61 @@ func (s *Service) UnlinkLinkedAccount(ctx context.Context, userID, linkedID uuid
 		})
 		return nil
 	})
+}
+
+// LinkedAccountTokens is the holder's read of one binding's provider
+// tokens, opened from their seal for this one answer. A token the
+// provider never minted answers empty — the empty is the fact, not an
+// error — and an expiry the provider did not name answers absent.
+type LinkedAccountTokens struct {
+	AccessToken  string
+	RefreshToken string
+	ExpiresAt    *time.Time
+	ConnectionID uuid.UUID
+	Provider     string
+}
+
+// GetLinkedAccountTokens reads the calling account's binding and opens
+// the tokens it carries. A foreign binding is a missing one — the same
+// `not_found` the unlink answers keeps the procedure from naming whose
+// bindings exist — and the read touches no write.
+func (s *Service) GetLinkedAccountTokens(ctx context.Context, userID, linkedID uuid.UUID) (LinkedAccountTokens, error) {
+	binding, err := s.repo.LinkedAccountByID(ctx, s.pool, linkedID)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return LinkedAccountTokens{}, ErrLinkedAccountNotFound
+	}
+	if err != nil {
+		return LinkedAccountTokens{}, err
+	}
+	if binding.LinkedAccount.UserID != userID {
+		return LinkedAccountTokens{}, ErrLinkedAccountNotFound
+	}
+
+	access, err := s.openToken(binding.LinkedAccount.AccessToken)
+	if err != nil {
+		return LinkedAccountTokens{}, err
+	}
+	refresh, err := s.openToken(binding.LinkedAccount.RefreshToken)
+	if err != nil {
+		return LinkedAccountTokens{}, err
+	}
+	return LinkedAccountTokens{
+		AccessToken:  access,
+		RefreshToken: refresh,
+		ExpiresAt:    binding.LinkedAccount.AccessExpiresAt,
+		ConnectionID: binding.LinkedAccount.ConnectionID,
+		Provider:     binding.Provider,
+	}, nil
+}
+
+// openToken opens one sealed token column. The empty column is the
+// provider that minted nothing — it answers empty, the fact the row
+// stores, rather than a seal error.
+func (s *Service) openToken(sealed string) (string, error) {
+	if sealed == "" {
+		return "", nil
+	}
+	return s.unseal(sealed)
 }
 
 // wireLinkedID renders the binding's identifier in its wire form for

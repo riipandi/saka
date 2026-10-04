@@ -67,6 +67,7 @@ func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	r.Handle(authnv1connect.OAuthSSOServiceDeleteConnectionProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceGetLinkedAccountTokensProcedure, connectHandler)
 }
 
 // rpcHandler is the transport mapping of the OAuth SSO procedures. The
@@ -387,6 +388,41 @@ func (h *rpcHandler) UnlinkConnection(ctx context.Context, req *connect.Request[
 		Status:  responder.StatusSuccess,
 		Message: "the linked account was removed",
 	}), nil
+}
+
+// GetLinkedAccountTokens answers the calling account's binding with the
+// provider tokens it carries, opened from their seal. A foreign or
+// unknown binding answers not_found, the same answer either way.
+func (h *rpcHandler) GetLinkedAccountTokens(ctx context.Context, req *connect.Request[authnv1.GetLinkedAccountTokensRequest]) (*connect.Response[authnv1.GetLinkedAccountTokensResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
+	linkedID, err := ParseLinkedAccountID(req.Msg.LinkedAccountId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+	}
+
+	tokens, err := h.service.GetLinkedAccountTokens(ctx, userID, linkedID)
+	switch {
+	case errors.Is(err, ErrLinkedAccountNotFound):
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+	case err != nil:
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the provider tokens could not be read"))
+	}
+
+	answer := &authnv1.GetLinkedAccountTokensResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		ConnectionId: FormatID(tokens.ConnectionID),
+		Provider:     tokens.Provider,
+		Status:       responder.StatusSuccess,
+		Message:      "the provider tokens were read",
+	}
+	if tokens.ExpiresAt != nil {
+		answer.ExpiresAt = timestamppb.New(*tokens.ExpiresAt)
+	}
+	return connect.NewResponse(answer), nil
 }
 
 // paramsOf maps a create's wire fields onto the service's words.

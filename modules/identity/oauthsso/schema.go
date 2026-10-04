@@ -245,8 +245,12 @@ type LinkedAccount struct {
 	Profile           []byte
 	AccessToken       string
 	RefreshToken      string
-	CreatedAt         time.Time
-	UpdatedAt         *time.Time
+	// AccessExpiresAt is when the stored access token dies, named by the
+	// provider's expires_in at the write that stored it. NULL when the
+	// provider answered no expiry.
+	AccessExpiresAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       *time.Time
 }
 
 // Flow is one row of entity.TableOAuthFlows: an authorization-code ceremony in
