@@ -520,21 +520,3 @@ const (
 	// the connection and the provider account id.
 	EventOauthSsoAccountUnlinked = "oauthsso_account_unlinked"
 )
-
-// The trigger values the trigger_type column's enum allows. A record this
-// application writes is always triggered by a caller or by the application
-// itself; `external` is left for a record a third party causes, and nothing
-// writes it today.
-const (
-	TriggerUser   = "user"
-	TriggerSystem = "system"
-)
-
-// The action_status values the column's enum allows. A record is written when
-// the action completed or when it was refused; `pending` and `unknown` are in
-// the enum but nothing writes them, because a record is written once, after
-// the outcome is known.
-const (
-	StatusSuccess = "success"
-	StatusFailed  = "failed"
-)
