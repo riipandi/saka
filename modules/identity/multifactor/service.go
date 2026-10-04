@@ -25,8 +25,8 @@ import (
 	"github.com/pquerna/otp/totp"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/signin"
 	"github.com/riipandi/saka/pkg/crypto"
 )

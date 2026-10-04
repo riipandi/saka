@@ -14,9 +14,9 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/blocklist"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/signin"

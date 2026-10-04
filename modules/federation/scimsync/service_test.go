@@ -13,8 +13,8 @@ import (
 
 	"uuid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"

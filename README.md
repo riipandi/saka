@@ -82,7 +82,7 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
   [`internal/observer/README.md`](./internal/observer/README.md).
 - **Health** — `task health` and `GET /api/healthz` report the same aggregated status
   (postgres, storage; optional checks are reported but never fail the aggregate). Details:
-  [`internal/health/README.md`](./internal/health/README.md).
+  [`framework/health/README.md`](./framework/health/README.md).
 - **Cache & key-value store** — the cache is off by default; the optional Valkey backend
   (`kvstore.enable`) is never required. Details: [`internal/cache/README.md`](./internal/cache/README.md).
 - **Outbound HTTP** — one client for external services, with timeouts, retries, and a

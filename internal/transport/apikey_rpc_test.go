@@ -13,12 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apikeyv1connect "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1/apikeyv1connect"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/health"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/internal/health"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/apikey"
@@ -263,7 +264,7 @@ func TestTheAPIKeyAuthenticatesThroughTheHeader(t *testing.T) {
 // empty set a non-administrator's does not.
 func adminRoles(admin bool) []string {
 	if admin {
-		return []string{jwtutils.AdministratorRole}
+		return []string{appauthz.AdministratorRole}
 	}
 	return nil
 }

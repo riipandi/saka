@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/envfile"
 	"github.com/riipandi/saka/pkg/testutils"
 )

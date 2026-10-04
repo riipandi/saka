@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // MigratedPostgres answers a pool over a fresh, fully migrated database:

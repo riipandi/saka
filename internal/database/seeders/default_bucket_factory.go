@@ -8,8 +8,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // DefaultBucketSeederName is the name this seeder reports under.

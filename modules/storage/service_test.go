@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	storagev1connect "github.com/riipandi/saka/codegen/proto/go/saka/storage/v1/storagev1connect"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 

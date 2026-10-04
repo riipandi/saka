@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/health"
 	"github.com/riipandi/saka/pkg/envfile"
 	"github.com/riipandi/saka/pkg/testutils"
 )

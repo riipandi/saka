@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/session"
 )
 

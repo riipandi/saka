@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 

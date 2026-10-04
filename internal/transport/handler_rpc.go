@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
-	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/internal/queue"
 )
 

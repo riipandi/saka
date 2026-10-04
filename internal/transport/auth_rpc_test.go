@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/health"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/health"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"

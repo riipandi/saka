@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/health"
+	"github.com/riipandi/saka/framework/health"
 )
 
 // storageResult runs the data directory check on dir and returns its detail.
@@ -159,15 +158,13 @@ func relativeToWorkingDir(t *testing.T, path string) string {
 	return relative
 }
 
-// The default must match the storage.local_path default the CLI and Taskfile use.
-func TestStorageDefaultDataDir(t *testing.T) {
-	assert.Equal(t, "storage", config.DefaultDataDir)
-}
-
-// The check must work against the directory this repository actually uses, so a
-// broken default is caught here rather than at deploy time.
+// The check must work against the directory a data-directory convention
+// names — "storage", the default `internal/config` resolves for
+// `storage.local_path` — so a broken default is caught here rather than at
+// deploy time. The literal keeps the framework free of the app's config
+// import; the value's home and its sync with the CLI are the app's tests.
 func TestStorageCheckOnRepositoryDataDir(t *testing.T) {
-	detail := storageResult(t, repoPath(t, config.DefaultDataDir))
+	detail := storageResult(t, repoPath(t, "storage"))
 
 	assert.Equal(t, health.StatusUp, detail.Status, detail.Error)
 }

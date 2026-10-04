@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"uuid"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // ProviderProfile is the profile facts an identity source answered for

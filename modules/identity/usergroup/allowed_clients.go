@@ -9,9 +9,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // ErrClientUnknown is an allowlist replacement naming a client that does

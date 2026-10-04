@@ -18,7 +18,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/modules/devicelogin"
 	"github.com/riipandi/saka/modules/identity/multifactor"

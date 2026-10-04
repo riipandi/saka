@@ -1,7 +1,6 @@
 package authz
 
 import (
-	"slices"
 	"testing"
 )
 
@@ -47,37 +46,48 @@ func TestGrantsAnswersAcrossTheHeldSet(t *testing.T) {
 	}
 }
 
-func TestTheCatalogCarriesEverySlugTheGrammarAllows(t *testing.T) {
-	catalog := CatalogBySlug()
-	if len(catalog) == 0 {
-		t.Fatal("the catalog must not be empty")
-	}
-	for slug := range catalog {
-		if !ValidSlug(slug) {
-			t.Errorf("catalog slug %q is not a slug the grammar accepts", slug)
-		}
-	}
-	if _, ok := catalog["user:*:assign_role"]; !ok {
-		t.Error("the user resource must carry assign_role")
-	}
-	for slug := range catalog {
-		if slug == "user:usr_1:read" {
-			t.Error("a per-instance slug is minted at the feature, never cataloged")
-		}
-	}
-}
+// TestAConstructedCatalogIsComposable builds the engine the way a second
+// binary would: from its own resource table, with no other dependency in
+// sight (decision 16).
+func TestAConstructedCatalogIsComposable(t *testing.T) {
+	catalog := NewCatalog([]Resource{
+		{
+			Name:        "widget",
+			Actions:     []string{"read", "create"},
+			Description: "a widget",
+		},
+		{
+			Name:        "gadget",
+			Actions:     []string{"read"},
+			Description: "a gadget",
+		},
+	})
 
-func TestTheAdministratorRoleHoldsTheWholeCatalog(t *testing.T) {
-	for _, role := range SystemRoles {
-		if role.Slug != AdministratorRole {
-			continue
-		}
-		for _, slug := range AllSlugs() {
-			if !slices.Contains(role.Permissions, slug) {
-				t.Errorf("the administrator role must hold %q", slug)
-			}
-		}
+	if got, want := len(catalog.Permissions()), 3; got != want {
+		t.Fatalf("Permissions() = %d entries, want %d", got, want)
 	}
+	if slug := catalog.Permissions()[0].Slug; slug != "widget:*:read" {
+		t.Errorf("the first entry is %q, want widget:*:read", slug)
+	}
+	if _, ok := catalog.BySlug()["gadget:*:read"]; !ok {
+		t.Error("BySlug must index every constructed resource")
+	}
+	slugs := catalog.AllSlugs()
+	if len(slugs) != 3 || slugs[2] != "gadget:*:read" {
+		t.Errorf("AllSlugs() = %v, want the catalog order", slugs)
+	}
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("a duplicate slug must fail construction")
+			}
+		}()
+		NewCatalog([]Resource{
+			{Name: "widget", Actions: []string{"read"}},
+			{Name: "widget", Actions: []string{"read"}},
+		})
+	}()
 }
 
 func TestValidSlugRejectsWhatTheGrammarDoesNotDeclare(t *testing.T) {

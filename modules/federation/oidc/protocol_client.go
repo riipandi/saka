@@ -8,7 +8,7 @@ import (
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // clientStore is the goidc.DCRManager over the oidc_clients rows — the

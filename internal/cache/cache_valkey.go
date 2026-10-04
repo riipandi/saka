@@ -6,7 +6,7 @@ import (
 
 	"github.com/valkey-io/valkey-go"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // ValkeyKeyPrefix namespaces the keys the cache owns inside the shared

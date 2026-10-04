@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/fetcher"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/appconfig"

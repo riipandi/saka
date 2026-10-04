@@ -9,8 +9,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The catalog keys the lockout policy reads. The catalog owns the names;

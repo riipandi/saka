@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/storage"
 	"github.com/riipandi/saka/modules/identity/usergroup"
 	"github.com/riipandi/saka/pkg/responder"

@@ -3,6 +3,7 @@ package appconfig
 import (
 	"net/http"
 
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/pkg/jwtutils"
 	"github.com/riipandi/saka/pkg/responder"
 )
@@ -27,6 +28,6 @@ import (
 func (m *Module) serveConfiguration(w http.ResponseWriter, r *http.Request) {
 	caller, _ := jwtutils.CallerFrom(r.Context())
 
-	responder.Success(w, r, http.StatusOK, m.config.Published(caller.IsAdministrator()),
+	responder.Success(w, r, http.StatusOK, m.config.Published(caller.HasRole(appauthz.AdministratorRole)),
 		responder.WithMessage("the application configuration"))
 }

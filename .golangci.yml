@@ -5,6 +5,7 @@ version: "2"
 linters:
   default: none
   enable:
+    - depguard # Import boundaries: the framework layer stands alone
     - errcheck # Ensure errors are checked and handled
     - govet # Go's official vet tool for catching suspicious constructs
     - staticcheck # Advanced static analysis, catches bugs and code smells
@@ -12,6 +13,19 @@ linters:
     - unused # Finds unused variables, functions, and imports
     - gosec # Basic security checks (recommended to keep enabled)
   settings:
+    depguard:
+      rules:
+        framework-standalone:
+          # The framework layer is composable: a framework package must be
+          # constructible without the application. Importing internal/ or
+          # modules/ would couple every engine to this binary's composition.
+          files:
+            - "**/saka/framework/**"
+          deny:
+            - pkg: github.com/riipandi/saka/internal
+              desc: the framework never imports the application composition
+            - pkg: github.com/riipandi/saka/modules
+              desc: the framework never imports a feature module
     errcheck:
       check-type-assertions: true
     staticcheck:

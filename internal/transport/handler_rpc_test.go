@@ -17,9 +17,9 @@ import (
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
 	"github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
+	"github.com/riipandi/saka/framework/health"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/health"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/transport"
 )
 

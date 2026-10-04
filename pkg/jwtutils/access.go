@@ -7,8 +7,6 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-
-	"github.com/riipandi/saka/internal/authz"
 )
 
 // AccessClaims are the private claims an access token carries. The subject is
@@ -70,11 +68,6 @@ type AccessClaims struct {
 // under. It is written once, because the sign-in that answers token_type and
 // the renewal that answers it again must spell the same word.
 const BearerScheme = "Bearer"
-
-// AdministratorRole is the role name the guard's admin rule reads. It is
-// aliased from internal/authz so a caller's question and the policy's answer
-// spell it the same way.
-const AdministratorRole = authz.AdministratorRole
 
 // CredentialKind names the channel a caller proved itself through. The kind
 // is not a claim a token carries — it is how the caller arrived — so it lives
@@ -154,22 +147,6 @@ func (c *Caller) ActsFor(userID string) bool {
 // was signed is invisible to it until the token is renewed.
 func (c *Caller) HasRole(role string) bool {
 	return c != nil && slices.Contains(c.Roles, role)
-}
-
-// IsAdministrator reports whether the caller holds the administrator role —
-// the standing grant the guard's admin rule reads and every administrative
-// surface answers to. It is the role claim, not a claim of its own: a token
-// that carried `is_admin` would answer a question the role set already
-// answers, and the two would drift.
-func (c *Caller) IsAdministrator() bool {
-	return c.HasRole(AdministratorRole)
-}
-
-// HasPermission reports whether the caller's effective grants satisfy the
-// requirement — a role's permission or a direct grant, matched with the
-// wildcard the slug grammar allows in the instance position.
-func (c *Caller) HasPermission(requirement string) bool {
-	return c != nil && authz.Grants(c.Permissions, requirement)
 }
 
 // SigningKeySource supplies the material the process signs and verifies its

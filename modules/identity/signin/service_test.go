@@ -19,10 +19,10 @@ import (
 	"connectrpc.com/connect"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/modules/identity/restrictions"
 	"github.com/riipandi/saka/modules/identity/session"

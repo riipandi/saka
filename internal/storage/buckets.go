@@ -8,7 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // DefaultBucketName is the bucket every storage feature writes into until an

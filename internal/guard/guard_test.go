@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
@@ -24,7 +25,7 @@ func caller(userID string, admin bool) *jwtutils.Caller {
 // empty set a non-administrator's does not.
 func adminRoles(admin bool) []string {
 	if admin {
-		return []string{jwtutils.AdministratorRole}
+		return []string{appauthz.AdministratorRole}
 	}
 	return nil
 }

@@ -9,8 +9,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The visibility roll the sync applies is the OIDC authorization's own: a

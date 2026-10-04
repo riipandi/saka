@@ -8,8 +8,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // The queue's own tables, created by database/migrations/00008. The engine

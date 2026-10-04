@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -26,7 +26,7 @@ func newTestPostgres(t *testing.T) *datastore.Postgres {
 	container := testutils.StartPostgres(t.Context(), t)
 	pg, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{
 		DSN:             container.DSN,
-		ApplicationName: "saka-test",
+		ApplicationName: "hogwarts-test",
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { pg.Shutdown(context.Background()) })
@@ -323,7 +323,7 @@ func TestPostgresAppliesSessionDefaults(t *testing.T) {
 
 	assert.Equal(t, datastore.PgSearchPath, searchPath)
 	assert.Equal(t, datastore.PgTimezone, timezone)
-	assert.Equal(t, "saka-test", applicationName)
+	assert.Equal(t, "hogwarts-test", applicationName)
 }
 
 // Session parameters must survive connection reuse. pgxpool resets a recycled

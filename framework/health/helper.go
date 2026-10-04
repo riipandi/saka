@@ -248,7 +248,7 @@ func countStyle(down int) printext.Style {
 // The shape is a flat list, one fact per line, so it greps and pipes without
 // column padding to strip:
 //
-//	name: saka
+//	name: hogwarts
 //	version: 0.0.0
 //	uptime: 3 hours
 //	status: healthy

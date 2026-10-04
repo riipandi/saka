@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/registry"
 	"github.com/riipandi/saka/internal/transport/middleware"
 	"github.com/riipandi/saka/modules/identity/jwks"

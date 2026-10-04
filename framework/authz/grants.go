@@ -2,50 +2,11 @@ package authz
 
 import "strings"
 
-// The role names the seed creates and the guard reads. A system role is a
-// row the application depends on: the API refuses to delete or rename one,
-// because the surface that mints tokens assumes the administrator role
-// exists.
-const (
-	// AdministratorRole is the system role that stands above the permission
-	// catalog. It carries every permission, and it is what the guard's
-	// admin rule reads from a caller's claims.
-	AdministratorRole = "administrator"
-)
-
-// SystemRoles are the roles the seed creates, with the permissions each
-// holds. The administrator holds the whole catalog; a deployment that wants
-// a narrower standing role mints it as a custom one through the API.
-var SystemRoles = []struct {
-	Name        string
-	Slug        string
-	Description string
-	Permissions []string
-}{
-	{
-		Name:        "Administrator",
-		Slug:        AdministratorRole,
-		Description: "Full access to every administrative surface. The role the bootstrap grants.",
-		Permissions: AllSlugs(),
-	},
-}
-
-// AllSlugs lists every catalog slug, in catalog order. It is the grant set
-// of the administrator role and the seed's input.
-func AllSlugs() []string {
-	permissions := Catalog()
-	out := make([]string, 0, len(permissions))
-	for _, permission := range permissions {
-		out = append(out, permission.Slug)
-	}
-	return out
-}
-
 // Match reports whether a held permission satisfies a requirement.
 //
 // The requirement names one instance; the grant may name the wildcard. The
 // segments compare exactly except the middle one, where `*` in the grant
-// stands for any instance. A grant the catalog does not declare still
+// stands for any instance. A grant a catalog does not declare still
 // matches — the catalog is the seed's input, not the matcher's gate —
 // because a slug minted beside a feature must keep working after a catalog
 // entry is renamed away under it.

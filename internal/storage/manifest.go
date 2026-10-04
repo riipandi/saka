@@ -11,7 +11,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // File status values. A file is pending while its bytes travel, ready once

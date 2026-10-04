@@ -7,8 +7,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // defaultOffboardBatch bounds the pass when the caller names no batch —

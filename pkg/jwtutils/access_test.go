@@ -73,7 +73,6 @@ func TestAccessVerifierRoundTripsTheClaims(t *testing.T) {
 	assert.Equal(t, "hermione@example.com", verified.Private.Email)
 	assert.Equal(t, "hermione", verified.Private.Username)
 	assert.True(t, caller.HasRole("administrator"))
-	assert.True(t, caller.IsAdministrator())
 	assert.Equal(t, "sess_01abc", verified.Private.SessionID)
 }
 
@@ -152,10 +151,7 @@ func TestNewCallerKeepsTheSubjectAndTheClaims(t *testing.T) {
 
 	assert.Equal(t, "0197abc", caller.UserID)
 	assert.Equal(t, "hermione", caller.Username)
-	assert.True(t, caller.IsAdministrator())
-	assert.True(t, caller.HasPermission("user:usr_9:ban"))
-	assert.True(t, caller.HasPermission("user:usr_9:read"))
-	assert.False(t, caller.HasPermission("user:usr_9:delete"))
+	assert.True(t, caller.HasRole("administrator"))
 	assert.False(t, caller.IsImpersonating())
 }
 

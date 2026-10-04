@@ -11,8 +11,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // Repository reads and writes the session rows the lifecycle procedures

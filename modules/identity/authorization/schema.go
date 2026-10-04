@@ -8,7 +8,7 @@ import (
 
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/framework/authz"
 	"github.com/riipandi/saka/pkg/strutils"
 )
 

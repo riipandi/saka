@@ -6,7 +6,7 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // The composition root hands these two to samber/do, which stops a service by

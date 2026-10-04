@@ -6,9 +6,10 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
-	"github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/framework/authz"
+	"github.com/riipandi/saka/framework/datastore"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // AuthorizationSeederName is the name this seeder reports under. The
@@ -18,7 +19,7 @@ const AuthorizationSeederName = "AuthorizationSeeder"
 
 // AdministratorRoleName is the role slug the seed's default account is
 // granted, exported for the report a test asserts against.
-const AdministratorRoleName = authz.AdministratorRole
+const AdministratorRoleName = appauthz.AdministratorRole
 
 // Authorization returns the seeder for the permission catalog and the
 // system roles.
@@ -44,7 +45,7 @@ func applyAuthorization(
 	q datastore.Querier,
 	dryRun bool,
 ) (created, skipped []string, err error) {
-	for _, permission := range authz.Catalog() {
+	for _, permission := range appauthz.Catalog() {
 		inserted, insertErr := insertPermission(ctx, q, permission, dryRun)
 		if insertErr != nil {
 			return nil, nil, insertErr
@@ -56,7 +57,7 @@ func applyAuthorization(
 		}
 	}
 
-	for _, role := range authz.SystemRoles {
+	for _, role := range appauthz.SystemRoles {
 		roleID, insertErr := insertSystemRole(ctx, q, role.Name, role.Slug, role.Description, "system", dryRun)
 		if insertErr != nil {
 			return nil, nil, insertErr

@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/responder"
 	"github.com/riipandi/saka/pkg/testutils"
 )

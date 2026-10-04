@@ -21,8 +21,8 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/robfig/cron/v3"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 )
 

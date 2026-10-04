@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/pkg/testutils"

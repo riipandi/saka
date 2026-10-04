@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/pkg/testutils"
 )
 
@@ -17,7 +17,7 @@ func TestValkeyAnswersAPing(t *testing.T) {
 
 	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{
 		URL:             backend.URL,
-		ApplicationName: "saka-test",
+		ApplicationName: "hogwarts-test",
 	})
 	require.NoError(t, err)
 	defer v.Shutdown(context.Background())
@@ -64,7 +64,7 @@ func TestValkeyFailsFastOnAnUnreachableServer(t *testing.T) {
 }
 
 func TestValkeyRejectsAMalformedURL(t *testing.T) {
-	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{URL: "postgres://localhost:5432/saka"})
+	v, err := datastore.NewValkey(t.Context(), datastore.ValkeyOptions{URL: "postgres://localhost:5432/hogwarts"})
 	require.Error(t, err)
 	assert.Nil(t, v)
 }

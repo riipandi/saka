@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/fetcher"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/internal/queue"

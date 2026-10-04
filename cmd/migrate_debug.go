@@ -9,10 +9,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/internal/database/seeders"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/printext"
 )

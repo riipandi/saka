@@ -9,8 +9,9 @@ import (
 
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -92,7 +93,7 @@ func (s *Service) ImpersonateUser(ctx context.Context, callerID, callerUsername,
 	if grantsErr != nil {
 		return Refreshed{}, grantsErr
 	}
-	if slices.Contains(targetRoles, jwtutils.AdministratorRole) {
+	if slices.Contains(targetRoles, appauthz.AdministratorRole) {
 		return Refreshed{}, ErrTargetAdmin
 	}
 	if view.Disabled || bannedAt(view, now) {

@@ -6,10 +6,10 @@ import (
 	"github.com/samber/do/v2"
 
 	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 

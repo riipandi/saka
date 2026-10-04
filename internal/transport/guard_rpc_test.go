@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/health"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/health"
-	"github.com/riipandi/saka/internal/kernel"
 	"github.com/riipandi/saka/internal/transport"
 	"github.com/riipandi/saka/modules/identity/session"
 	"github.com/riipandi/saka/modules/identity/signup"

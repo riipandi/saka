@@ -18,7 +18,7 @@ import (
 
 	notificationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/notification/v1/notificationv1connect"
 	systemv1connect "github.com/riipandi/saka/codegen/proto/go/saka/system/v1/systemv1connect"
-	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/transport/middleware"
 )
 

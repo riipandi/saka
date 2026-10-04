@@ -8,9 +8,9 @@ import (
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 

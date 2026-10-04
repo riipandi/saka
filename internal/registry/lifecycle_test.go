@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/database"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/registry"
 	"github.com/riipandi/saka/modules/identity/jwks"
 	"github.com/riipandi/saka/pkg/crypto"
@@ -110,9 +110,9 @@ func TestPrewarmResolvesEveryBlockingService(t *testing.T) {
 	// watcher belongs to Runners — resolved there when storage.watch.enable
 	// is on, and its construction cannot fail on a dependency.
 	cold := map[string]string{
-		"*github.com/riipandi/saka/internal/datastore.Valkey": "opt-in backend, disabled in this run",
-		"github.com/riipandi/saka/internal/cache.Cache":       "module-facing, cold until a feature resolves it",
-		"*github.com/riipandi/saka/internal/storage.Watcher":  "runner-owned, not on the prewarm walk",
+		"*github.com/riipandi/saka/framework/datastore.Valkey": "opt-in backend, disabled in this run",
+		"github.com/riipandi/saka/internal/cache.Cache":        "module-facing, cold until a feature resolves it",
+		"*github.com/riipandi/saka/internal/storage.Watcher":   "runner-owned, not on the prewarm walk",
 	}
 
 	invoked := make(map[string]bool)

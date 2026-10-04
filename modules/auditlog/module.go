@@ -17,9 +17,9 @@ import (
 
 	"github.com/samber/do/v2"
 
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
-	"github.com/riipandi/saka/internal/kernel"
 )
 
 // ModuleName is the name the area reports under.

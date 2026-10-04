@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/riipandi/saka/framework/authz"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
@@ -171,7 +173,7 @@ func Admin(caller *jwtutils.Caller, _ Target) error {
 	if caller == nil {
 		return ErrUnauthenticated
 	}
-	if !caller.IsAdministrator() {
+	if !caller.HasRole(appauthz.AdministratorRole) {
 		return ErrAdminRequired
 	}
 	return nil
@@ -247,7 +249,7 @@ func Permission(requirement string) Rule {
 		if caller == nil {
 			return ErrUnauthenticated
 		}
-		if !caller.HasPermission(requirement) {
+		if !authz.Grants(caller.Permissions, requirement) {
 			return ErrPermissionRequired
 		}
 		return nil

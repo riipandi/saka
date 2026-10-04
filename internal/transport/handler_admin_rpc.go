@@ -13,8 +13,8 @@ import (
 
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/queue"
 	"github.com/riipandi/saka/internal/scheduler"
 	"github.com/riipandi/saka/pkg/responder"

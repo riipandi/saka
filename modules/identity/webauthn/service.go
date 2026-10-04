@@ -18,9 +18,9 @@ import (
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/config"
-	"github.com/riipandi/saka/internal/datastore"
 	"github.com/riipandi/saka/internal/mailer"
 	"github.com/riipandi/saka/modules/identity/signin"
 )

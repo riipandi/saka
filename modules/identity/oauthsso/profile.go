@@ -8,7 +8,7 @@ import (
 
 	"uuid"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/modules/identity/user"
 )
 

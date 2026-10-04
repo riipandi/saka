@@ -5,7 +5,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riipandi/saka/internal/datastore"
+	"github.com/riipandi/saka/framework/datastore"
 )
 
 // Task is a task that can be placed into a queue for execution. Any type

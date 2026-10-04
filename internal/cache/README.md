@@ -59,7 +59,7 @@ with a miss and drops every write.
 ## Requirements
 
 - Go >= 1.27 (`maphash`, `slices`/`maps` idioms)
-- `internal/datastore` — only for the kvstore driver, only when the backend is enabled
+- `framework/datastore` — only for the kvstore driver, only when the backend is enabled
 
 ## Wiring
 

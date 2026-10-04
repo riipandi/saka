@@ -10,8 +10,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/database/entity"
-	"github.com/riipandi/saka/internal/datastore"
 )
 
 // ErrNoRows re-exports the datastore's sentinel so callers answer one

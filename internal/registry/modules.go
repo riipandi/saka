@@ -3,7 +3,7 @@ package registry
 import (
 	"github.com/samber/do/v2"
 
-	"github.com/riipandi/saka/internal/kernel"
+	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/modules/apikey"
 	"github.com/riipandi/saka/modules/appconfig"
 	"github.com/riipandi/saka/modules/auditlog"
