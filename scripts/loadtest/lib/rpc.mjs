@@ -73,13 +73,13 @@ export function get(t, path, token) {
 // a refused call naming the old path.
 export const procedures = {
   signIn: '/saka.authn.v1.AuthService/SignIn',
-  getSession: '/saka.authn.v1.AuthService/GetSession',
-  listSessions: '/saka.authn.v1.AuthService/ListSessions',
-  refresh: '/saka.authn.v1.AuthService/Refresh',
+  getSession: '/saka.authn.v1.SessionService/GetSession',
+  listSessions: '/saka.authn.v1.SessionService/ListSessions',
+  refresh: '/saka.authn.v1.SessionService/Refresh',
   listNotifications: '/saka.notification.v1.NotificationService/ListNotifications',
   auditlogList: '/saka.auditlog.v1.AuditLogService/List',
-  listQueues: '/saka.system.v1.SystemService/ListQueues',
-  listTasks: '/saka.system.v1.SystemService/ListTasks',
+  listQueues: '/saka.system.v1.QueueService/ListQueues',
+  listTasks: '/saka.system.v1.QueueService/ListTasks',
   createBucket: '/saka.storage.v1.BucketService/CreateBucket'
 }
 

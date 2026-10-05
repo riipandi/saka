@@ -96,7 +96,7 @@ function loadScenarios(profile) {
       'admin-queues': 2,
       signin: 2
     }
-    return Object.fromEntries(
+    const scenarios = Object.fromEntries(
       Object.entries(weights)
         .filter(([name]) => !only.length || only.includes(name))
         .map(([name, weight]) => [
@@ -104,6 +104,12 @@ function loadScenarios(profile) {
         shape(profile, name, { ...spec, stages: stages(Math.ceil(50 / 12) * weight) })
       ])
     )
+    // The serial refresh rides every profile — its rotations are the write
+    // path the reads above lean on.
+    if (!only.length || only.includes('refresh')) {
+      scenarios.refresh = { executor: 'constant-vus', vus: 1, duration: '4m30s', exec: 'refresh' }
+    }
+    return scenarios
   }
   // stress: arrival rates per scenario, ramped — the shape that finds
   // where the surface bends.
@@ -123,15 +129,17 @@ function loadScenarios(profile) {
     'admin-queues': [2, 15],
     signin: [1, 8]
   }
-  return Object.fromEntries(
-    Object.entries(rates).map(([name, [from, to]]) => [
+  const scenarios = Object.fromEntries(
+    Object.entries(rates)
+      .filter(([name]) => !only.length || only.includes(name))
+      .map(([name, [from, to]]) => [
       name,
       shape(profile, name, {
         ...spec,
         startRate: from,
         stages: [
-          { duration: '2m', target: to / 2 },
-          { duration: '3m', target: to / 2 },
+          { duration: '2m', target: Math.round(to / 2) },
+          { duration: '3m', target: Math.round(to / 2) },
           { duration: '2m', target: to },
           { duration: '3m', target: to },
           { duration: '1m', target: 0 }
@@ -139,6 +147,12 @@ function loadScenarios(profile) {
       })
     ])
   )
+  // The serial refresh rides every profile — one VU rotating its own pair,
+  // paced by the exec's sleep, for the length of the run.
+  if (!only.length || only.includes('refresh')) {
+    scenarios.refresh = { executor: 'constant-vus', vus: 1, duration: '11m', exec: 'refresh' }
+  }
+  return scenarios
 }
 
 // ---------------------------------------------------------------------------
