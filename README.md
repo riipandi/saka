@@ -138,6 +138,21 @@ SCIM, the conformance profiles, the debug utilities, the API reference,
 and [acknowledgements](./docs/acknowledgements.md) — the projects Saka
 adapted.
 
+## Why Saka?
+
+The name is Indonesian. A **saka** is the main pillar of a traditional
+house — in Javanese homes, the *saka guru*: the four posts that hold up
+the entire roof. Take them away and nothing above stands. That is what
+this project wants to be for your product: the load-bearing part you
+shouldn't have to rebuild — accounts, sign-in, sessions, permissions —
+so you can spend your effort on the rooms people actually live in.
+
+There is a friendlier echo, too. In Sundanese, **sakahayang** means
+"whatever you like, anything at all" — and that is the other half of the
+promise: a boilerplate that bends to what *you* want to build. Use the
+auth core and grow a product on it, deploy it as a pure identity
+provider, or take the modules you need. Sakahayang.
+
 ## License
 
 This project licensed under the [Apache License 2.0][license-apache].
