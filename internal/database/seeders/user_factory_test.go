@@ -93,7 +93,7 @@ func TestUserSeederCreatesTheDefaultAccount(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results, 7)
+	require.Len(t, results, 8)
 	assert.Equal(t, seeders.UserSeederName, results[1].Name)
 	// The default account leads the list; the scenario accounts follow it,
 	// the scenario-role grants close it, and the direct permission grant
@@ -194,7 +194,7 @@ func TestUserSeederIsIdempotent(t *testing.T) {
 
 	assert.Empty(t, second[1].Created)
 	assert.Len(t, second[1].Skipped, len(seeders.ScenarioEmails)+1)
-	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
+	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool), "the conformance suite account rides the full seed")
 	assert.Equal(t, hash, storedHash(t, pool), "a skipped account must keep its password")
 }
 
@@ -213,7 +213,7 @@ func TestUserSeederTreatsEmailCaseSensitively(t *testing.T) {
 
 	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+5)
 	assert.Empty(t, results[1].Skipped)
-	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool))
+	assert.Equal(t, len(seeders.ScenarioEmails)+3, userCount(t, pool), "the conformance suite account rides the full seed")
 }
 
 // A conflict on the username alone must also leave the existing account in
@@ -231,7 +231,7 @@ func TestUserSeederKeepsAccountWithConflictingUsername(t *testing.T) {
 	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+3,
 		"only the scenario accounts are new; the conflicting admin stays")
 	assert.Len(t, results[1].Skipped, 1)
-	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
+	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool), "the conformance suite account rides the full seed")
 }
 
 // --dry-run must report the work without doing it.
@@ -249,7 +249,7 @@ func TestUserSeederDryRunWritesNothing(t *testing.T) {
 
 	assert.Empty(t, results[1].Created)
 	assert.Len(t, results[1].Skipped, len(seeders.ScenarioEmails)+1)
-	assert.Equal(t, len(seeders.ScenarioEmails)+1, userCount(t, pool))
+	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool), "the conformance suite account rides the full seed")
 }
 
 // A failing seeder must abort the run and roll back what earlier seeders wrote,
@@ -320,8 +320,8 @@ func TestUserSeederWritesEveryBanScenario(t *testing.T) {
 			count(*) FILTER (WHERE ar.user_id IS NOT NULL AND ar.expires_at IS NOT NULL AND ar.expires_at <= now())
 		FROM public.users u LEFT JOIN public.account_restrictions ar
 			ON ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL
-		WHERE u.email <> $1`,
-		seeders.DefaultUser.Email).Scan(&free, &bannedLive, &bannedPast))
+		WHERE u.email <> $1 AND u.email <> $2`,
+		seeders.DefaultUser.Email, seeders.SuiteAccount.Email).Scan(&free, &bannedLive, &bannedPast))
 
 	assert.Equal(t, 2, free, "two scenarios hold no ban at all")
 	assert.Equal(t, 2, bannedLive, "one permanent and one inside its window")

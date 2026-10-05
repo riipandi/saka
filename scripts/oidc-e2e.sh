@@ -319,6 +319,18 @@ PLAIN_REDIRECT=$(curl -s -o /dev/null -w '%{redirect_url}' \
     -H "Authorization: Bearer $ACCESS")
 contains "pkce: plain method refused" "$PLAIN_REDIRECT" "error=invalid_request"
 
+# The PKCE requirement rides the client kind: a public client's code
+# request without a challenge is refused, a confidential client's is not —
+# the shape the Basic OP certification profile names.
+NO_PKCE=$(curl -s -o /dev/null -w '%{redirect_url}' \
+    "$BASE/oidc/authorize?response_type=code&client_id=$PUB_ID&scope=openid&state=s7&redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Fauth%2Fcallback" \
+    -H "Authorization: Bearer $ACCESS")
+contains "pkce: public client without challenge refused" "$NO_PKCE" "error=invalid_request"
+CONF_NO_PKCE=$(curl -s -o /dev/null -w '%{redirect_url}' \
+    "$BASE/oidc/authorize?response_type=code&client_id=$CLIENT_ID&scope=openid&state=s8&redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Fauth%2Fcallback" \
+    -H "Authorization: Bearer $ACCESS")
+contains "pkce: confidential client without challenge answered a code" "$CONF_NO_PKCE" "code="
+
 # The deployment-wide ledger read is a page, not the whole table.
 LEDGER=$(curl -s "$BASE/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients" \
     -H "Authorization: Bearer $ACCESS" -H 'Content-Type: application/json' \

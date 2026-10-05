@@ -33,7 +33,9 @@ type Result struct {
 // record an earlier one created. The authorization seeder runs first — the
 // user seeder grants its default account the administrator role the moment
 // the account exists, and the grant names a role row. The settings seeder
-// depends on nothing but the migration, so it closes the list.
+// depends on nothing but the migration, so it closes the list; the
+// conformance-suite seeder rides before it — its rows are rehearsal
+// fixtures, not settings — and names no record but its own.
 //
 // All returns every seeder in the order they must run: a seeder may depend on a
 // record an earlier one created. The authorization seeder runs first — the
@@ -45,7 +47,7 @@ type Result struct {
 // half, and a development seed resolves that from the environment. Callers
 // that can seal append it through SeedJWKS.
 func All() []Seeder {
-	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), DefaultBucket(), Settings()}
+	return []Seeder{Authorization(), User(), UserGroup(), APIKey(), Notification(), DefaultBucket(), ConformanceSuite(), Settings()}
 }
 
 // SeedJWKS returns All plus the JWKS provisioning seeder. It answers All

@@ -98,8 +98,7 @@ func TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface(t *testing.T) {
 		provider.WithAuthCodeGrant(provider.AuthCodeGrantConfig{
 			ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
 		},
-			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256},
-				provider.WithPKCERequired()),
+			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256}),
 		),
 	)
 	require.NoError(t, err)

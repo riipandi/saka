@@ -46,6 +46,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261003_0700.md` | Hardening: enumeration, lockout, security notifications |
 | `plan-20261003_2359.md` | Storage revamp: buckets, `/storage` mount, tus, signed links — the decisions list (esp. 17–21) is the binding record for the storage engine |
 | `plan-20261004_1800.md` | Framework extraction: the reusable engines into `framework/`, composable behind typed Options, `database/` into `internal/`, per-package migration sets — the decisions list (D1–D18) is the binding record for the framework boundary |
+| `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — `awaiting-approval` until the owner says run |
 
 ## Handovers (`.llms/handover/`)
 

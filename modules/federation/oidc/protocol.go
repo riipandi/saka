@@ -151,9 +151,12 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithAuthCodeLifetime(protocolAuthCodeLifetimeSecs),
 			// RFC 9700 §4.1.3: the verifier must be the S256 challenge —
 			// plain is the method the specification tells servers to stop
-			// offering, so the provider does not.
-			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256},
-				provider.WithPKCERequired()),
+			// offering, so the provider does not. The requirement itself
+			// rides the client: the engine refuses a code request from a
+			// public client that carries no challenge (OAuth 2.1's rule),
+			// while a confidential client may omit PKCE — the Basic OP
+			// profile the certification runs names requests without one.
+			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256}),
 			// Third-party initiated login: the authorization response carries
 			// the iss parameter (RFC 9207), so a relying party that linked
 			// the browser here can tell the answer apart from any other

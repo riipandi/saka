@@ -13,13 +13,13 @@ tasks:
         if command -v mkcert >/dev/null 2>&1; then
           mkcert -key-file {{.CERT_DIR}}/localhost_key.pem \
             -cert-file {{.CERT_DIR}}/localhost_crt.pem \
-            localhost 127.0.0.1 ::1 host.docker.internal "*.localhost.test"
+            localhost 127.0.0.1 ::1 host.docker.internal "*.localhost.test" localhost.emobix.co.uk
         else
           openssl req -x509 -newkey rsa:2048 -sha256 -days 825 -nodes \
             -keyout {{.CERT_DIR}}/localhost_key.pem \
             -out {{.CERT_DIR}}/localhost_crt.pem \
             -subj "/CN=localhost" \
-            -addext "subjectAltName=DNS:localhost,DNS:host.docker.internal,DNS:*.localhost.test,IP:127.0.0.1,IP:0:0:0:0:0:0:0:1"
+            -addext "subjectAltName=DNS:localhost,DNS:host.docker.internal,DNS:*.localhost.test,DNS:localhost.emobix.co.uk,IP:127.0.0.1,IP:0:0:0:0:0:0:0:1"
         fi
       - openssl x509 -in {{.CERT_DIR}}/localhost_crt.pem -noout -subject -ext subjectAltName
 
@@ -32,6 +32,11 @@ tasks:
           exit 0
         fi
         mkcert -install
+
+  cert:conformance:
+    desc: Build the PKCS12 truststore the conformance suite's JVM imports
+    cmds:
+      - ./scripts/cert-conformance.sh
 
   rpc:generate:
     desc: Generate Go + TypeScript from api/connect/*.proto

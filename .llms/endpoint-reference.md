@@ -582,9 +582,10 @@ before any grant, consent, or device approval (`modules/federation/oidc`
 `completeAuthentication`), fail-closed on the flag-or-roll rule. `pkce_supported`
 is stamped when a client presents a
 code challenge the requirement did not demand. PKCE is enforced for public
-clients; `S256` is the only accepted challenge method — `plain` is refused
-at the authorize endpoint (RFC 9700 §4.1.3), and the discovery document
-names `["S256"]` alone.
+clients — a confidential client may omit the challenge, which is the
+request shape the Basic OP certification profile sends; `S256` is the only
+accepted challenge method — `plain` is refused at the authorize endpoint
+(RFC 9700 §4.1.3), and the discovery document names `["S256"]` alone.
 
 **Third-party initiated login.** A relying party links the browser
 straight to `GET /oidc/authorize` with its own `client_id`, an optional

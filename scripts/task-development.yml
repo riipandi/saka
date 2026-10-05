@@ -16,6 +16,16 @@ tasks:
     desc: Run the Saka server (debug build)
     cmd: go run -tags debug ./cmd --env-file=.env.local serve {{.CLI_ARGS}}
 
+  conformance:up:
+    desc: Start the OIDF conformance suite stack (mongodb, server, its nginx on :8443)
+    dir: container
+    cmd: docker compose -f compose-dev.yaml up -d mongodb server conformance-nginx
+
+  conformance:run:
+    desc: Run one conformance plan against the local issuer — needs the suite stack up, a seeded database (migrate:seed), and the release binary serving the harness config
+    dir: packages/e2e-tests
+    cmd: node conformance/run.mjs {{.CLI_ARGS}}
+
   email:dev:
     desc: Run React Email dev UI (:3030)
     cmd: pnpm exec vp run email#dev
