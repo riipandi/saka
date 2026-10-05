@@ -61,6 +61,7 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 - `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects).
 - `audit-20260929_1613.md` — federation, device flow, SCIM.
 - `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
+- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s.
 
 ## Product docs (`docs/`)
 
