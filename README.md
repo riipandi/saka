@@ -1,3 +1,5 @@
+# The foundation for what's next
+
 [![Go](https://img.shields.io/badge/Go-1.27-blue.svg?logo=Go&logoColor=white)](https://go.dev)
 [![PostgreSQL](https://img.shields.io/badge/Postgres-18-blue.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
@@ -9,11 +11,12 @@
 
 ---
 
-**Saka is a project boilerplate with authentication built in.** Clone it,
-and the hardest part of a new product — accounts, sign-in, sessions,
-permissions — already works, tried and tested. Build your product around
-the auth core; or deploy it standalone as a pure identity provider for
-your other applications.
+**Saka** — an enterprise-ready solid foundation for scalable applications,
+unified identity, and modular architecture. A project boilerplate with
+authentication built in: clone it, and the hardest part of a new product
+— accounts, sign-in, sessions, permissions — already works, tried and
+tested. Build your product around the auth core; or deploy it standalone
+as a pure identity provider for your other applications.
 
 The auth works in both directions out of the box:
 
