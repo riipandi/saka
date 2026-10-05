@@ -17,9 +17,9 @@ tasks:
     cmd: go run -tags debug ./cmd --env-file=.env.local serve {{.CLI_ARGS}}
 
   conformance:up:
-    desc: Start the OIDF conformance suite stack (mongodb, server, its nginx on :8443)
+    desc: Start the OIDF conformance suite stack (mongodb, server, its nginx on :8443) — container/compose-mock.yaml
     dir: container
-    cmd: docker compose -f compose-dev.yaml up -d mongodb server conformance-nginx
+    cmd: docker compose -f compose-mock.yaml up -d
 
   conformance:run:
     desc: Run one conformance plan against the local issuer — needs the suite stack up, a seeded database (migrate:seed), and the release binary serving the harness config
