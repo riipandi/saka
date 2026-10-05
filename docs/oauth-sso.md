@@ -104,3 +104,7 @@ provider logos, and it does not expose provider tokens to other users.
 Single sign-in for organizations with their own identity provider *is*
 supported — that is the custom OpenID Connect connection — but SAML and
 directory synchronization remain out of scope.
+
+---
+
+Back to [Documentation Index](./index.md)

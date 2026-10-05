@@ -42,3 +42,7 @@ delete, inspect. The resumable protocol's discovery answers without a
 credential; everything else is authenticated. The route tables:
 [API endpoints](api-endpoint.md#storage-buckets-saka-only) and
 [Resumable uploads](api-endpoint.md#resumable-uploads-tus-saka-only).
+
+---
+
+Back to [Documentation Index](./index.md)

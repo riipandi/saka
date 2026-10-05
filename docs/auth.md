@@ -103,3 +103,7 @@ is identical to a known one, so it cannot enumerate accounts either.
 Where next: [OAuth SSO](oauth-sso.md) adds the external-provider methods;
 the machine-facing surface for everything above is
 [API endpoints](api-endpoint.md).
+
+---
+
+Back to [Documentation Index](./index.md)

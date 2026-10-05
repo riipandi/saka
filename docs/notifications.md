@@ -29,3 +29,7 @@ deduplication applies until idempotency keys land (a known, deferred
 improvement; see [API endpoints](api-endpoint.md) "Future Improvements").
 
 The machine-facing surface: [API endpoints](api-endpoint.md#notifications).
+
+---
+
+Back to [Documentation Index](./index.md)

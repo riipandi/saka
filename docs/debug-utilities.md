@@ -54,3 +54,7 @@ is below the features.
 `task config:validate`, the certificate tasks, the compose stacks, the
 conformance driver. The [contributing guide](contributing.md) carries
 the everyday set.
+
+---
+
+Back to [Documentation Index](./index.md)

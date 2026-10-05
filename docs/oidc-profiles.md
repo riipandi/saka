@@ -124,3 +124,7 @@ repository's development notes. For this page, the short version:
 | Implicit / Hybrid flows | no | — | dropped by the standard |
 | Front-channel logout / Session management | no | — | dropped by design |
 | Sign in with Google / GitHub / custom | yes | not yet | keep |
+
+---
+
+Back to [Documentation Index](./index.md)

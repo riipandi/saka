@@ -48,4 +48,8 @@ Read [the deployment guide](deployment.md) before serving a real
 deployment, and [the product guide](product-guide.md) for what is already
 built in.
 
+---
+
+Back to [Documentation Index](./index.md)
+
 [pull-requests-docs]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork

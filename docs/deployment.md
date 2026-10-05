@@ -66,3 +66,7 @@ fly ips list -a saka
 # Assign custom domain
 fly certs create app.example.com -a saka
 ```
+
+---
+
+Back to [Documentation Index](./index.md)

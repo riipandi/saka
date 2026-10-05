@@ -90,3 +90,7 @@ resolves the file against the environment, validates every rule, and
 reports unresolved interpolations — the check to run before a deploy or
 a certification rehearsal. `task config:generate` writes the sample a
 fresh checkout starts from.
+
+---
+
+Back to [Documentation Index](./index.md)

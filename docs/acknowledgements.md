@@ -9,6 +9,7 @@ Saka stands on ideas others built first. This page names them.
 | [Pocket ID](https://github.com/pocket-id/pocket-id) | The reference implementation the whole identity surface ports: the OIDC provider's behavior, the passkey-first design, the audit vocabulary, the settings and email shapes | The OpenID provider, the account surfaces; every deliberate departure is recorded in the development notes |
 | [Clerk](https://clerk.com) | The sign-in flow semantics: one flow that signs in, links, or creates — with the pauses (verified email, missing names) and the second-factor bridge | [OAuth SSO](oauth-sso.md) and the account lifecycle flows |
 | [Backlite](https://github.com/mikestefanello/backlite) | The durable queue's core design (MIT), adapted for PostgreSQL and this architecture | The queue engine (`framework/queue`) |
+| [tus](https://tus.io/protocols/resumable-upload) / [tusd](https://github.com/tus/tusd) | The resumable-upload protocol (tus 1.0.0 — core, creation-with-upload, termination, expiration), with the handler adapted from tusd's approach for this engine | The resumable-upload surface (`framework/storage/tus.go`, `tus_handler.go`, served at `/api/uploads`) |
 | [River](https://github.com/riverqueue/river) | The periodic-job shape the scheduler follows — minus the leader election and the Pro-only durable state | The scheduler (`framework/scheduler`) |
 | [robfig/cron](https://github.com/robfig/cron) | The cron spec parser and schedule arithmetic | The scheduler's timing |
 
@@ -46,3 +47,7 @@ Saka stands on ideas others built first. This page names them.
 Saka is maintained by [Aris Ripandi](https://github.com/riipandi) — with
 thanks to every contributor of the projects above, whose public work
 made a boilerplate like this possible.
+
+---
+
+Back to [Documentation Index](./index.md)

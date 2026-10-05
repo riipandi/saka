@@ -249,3 +249,7 @@ which is how upstream Pocket ID expresses the same rule (`/users/me` beside
 `/users/{id}`). A **delegated (impersonated) caller** is refused on every
 `Self` request even when the subject matches — a delegation reaches the
 administrative surface, never the requests that belong to the account.
+
+---
+
+Back to [Documentation Index](./index.md)

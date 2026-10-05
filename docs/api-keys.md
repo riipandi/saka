@@ -38,3 +38,7 @@ the deployment holds and who owns each.
 | A one-off guest | A one-time access code | [Authentication](auth.md) |
 
 The route table: [API endpoints](api-endpoint.md#api-key).
+
+---
+
+Back to [Documentation Index](./index.md)

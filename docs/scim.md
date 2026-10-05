@@ -38,3 +38,7 @@ The typical fit: an OIDC client whose organization also runs a directory
 Saka, and nobody creates the same employee twice. The machine-facing
 surface is small on purpose: attach, adjust, sync, remove —
 [API endpoints](api-endpoint.md#scim-provisioning).
+
+---
+
+Back to [Documentation Index](./index.md)

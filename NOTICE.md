@@ -24,6 +24,12 @@ Copyright held by the project's contributors.
 - **[River](https://github.com/riverqueue/river)** (MIT) — the
   scheduler's periodic-job shape follows River's design; the
   implementation is Saka's own, on top of robfig/cron.
+- **[tus](https://tus.io/protocols/resumable-upload)** /
+  **[tusd](https://github.com/tus/tusd)** (MIT) — the resumable-upload
+  protocol is adopted as a specification (tus 1.0.0 core +
+  `creation-with-upload`, `termination`, `expiration`) and implemented
+  in-house in `framework/storage`, with the HTTP handler following
+  tusd's approach; the `tusd/pkg/handler` library itself is not used.
 
 ## Third-party libraries
 

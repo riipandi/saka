@@ -488,3 +488,7 @@ different payload is refused, the original response is replayed with an
 `X-Idempotency-Replayed: true` header, and `SignIn`/`Refresh` are never replayed (a cached
 response would be a stored credential). Interim mitigation: client-side dedup in the SPA and the
 per-IP rate limit both surfaces already sit behind.
+
+---
+
+Back to [Documentation Index](./index.md)

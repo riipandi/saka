@@ -67,3 +67,7 @@ carries over to subaddressed variants, and the refusal reads as the
 generic "sign-up is not available" — the blocklist never becomes an
 account enumerator. An optional switch extends the lists to sign-ins.
 The route table: [API endpoints](api-endpoint.md#blocklist-saka-only).
+
+---
+
+Back to [Documentation Index](./index.md)

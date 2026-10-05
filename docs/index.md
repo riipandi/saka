@@ -40,7 +40,7 @@ Authentication ships in both directions:
 | Provisioning to directories | [SCIM](scim.md) | Per-client provisioning targets, when passes run, extra token claims |
 | The deployment's knobs | [Configuration](configuration.md) | The config file's precedence, secrets, the settings catalog |
 | The signals | [Observability](observability.md) | Health vs readiness, logs, traces and metrics, the operations console |
-| Standing on others' work | [Acknowledgements](acknowledgements.md) | The projects Saka adapted — Pocket ID, Clerk, Backlite, and the building blocks |
+| Standing on others' work | [Acknowledgements](acknowledgements.md) | The projects Saka adapted — Pocket ID, Clerk, Backlite, tus/tusd, and the building blocks |
 | The machine-facing contract | [API endpoints](api-endpoint.md), [API responses](api-response.md) | Every procedure and route, and the one contract both transports share |
 
 ## Reference

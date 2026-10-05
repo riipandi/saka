@@ -84,3 +84,7 @@ Saka is rehearsed against the OpenID Foundation's conformance suite, run
 locally over TLS: the Basic OP, Config OP, RP-Initiated OP, and
 Back-Channel OP profiles all pass. The hosted certification run is the
 project owner's; its runbook lives with the development notes.
+
+---
+
+Back to [Documentation Index](./index.md)

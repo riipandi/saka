@@ -55,3 +55,7 @@ construction, its vocabulary is a closed set in code, and its retention
 is a deployment setting applied by a scheduled job. It is not a log
 aggregator; the operational logs above are the machine's, the audit log
 is the users'.
+
+---
+
+Back to [Documentation Index](./index.md)

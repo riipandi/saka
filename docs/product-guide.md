@@ -155,3 +155,7 @@ first-class citizens:
 - [Acknowledgements](acknowledgements.md) — the projects Saka adapted
 - [Deployment](deployment.md) — running Saka yourself
 - [Contributing](contributing.md) — joining the project
+
+---
+
+Back to [Documentation Index](./index.md)

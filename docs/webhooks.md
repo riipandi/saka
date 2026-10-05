@@ -41,3 +41,7 @@ signing secret; fire the test delivery; and read the delivery history —
 per endpoint or across all of them. The event catalog is listable. Every
 procedure is administrative, and the full route table is
 [API endpoints](api-endpoint.md#webhooks-saka-only).
+
+---
+
+Back to [Documentation Index](./index.md)
