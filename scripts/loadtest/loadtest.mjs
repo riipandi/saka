@@ -100,9 +100,9 @@ function loadScenarios(profile) {
       Object.entries(weights)
         .filter(([name]) => !only.length || only.includes(name))
         .map(([name, weight]) => [
-        name,
-        shape(profile, name, { ...spec, stages: stages(Math.ceil(50 / 12) * weight) })
-      ])
+          name,
+          shape(profile, name, { ...spec, stages: stages(Math.ceil(50 / 12) * weight) })
+        ])
     )
     // The serial refresh rides every profile — its rotations are the write
     // path the reads above lean on.
@@ -133,19 +133,19 @@ function loadScenarios(profile) {
     Object.entries(rates)
       .filter(([name]) => !only.length || only.includes(name))
       .map(([name, [from, to]]) => [
-      name,
-      shape(profile, name, {
-        ...spec,
-        startRate: from,
-        stages: [
-          { duration: '2m', target: Math.round(to / 2) },
-          { duration: '3m', target: Math.round(to / 2) },
-          { duration: '2m', target: to },
-          { duration: '3m', target: to },
-          { duration: '1m', target: 0 }
-        ]
-      })
-    ])
+        name,
+        shape(profile, name, {
+          ...spec,
+          startRate: from,
+          stages: [
+            { duration: '2m', target: Math.round(to / 2) },
+            { duration: '3m', target: Math.round(to / 2) },
+            { duration: '2m', target: to },
+            { duration: '3m', target: to },
+            { duration: '1m', target: 0 }
+          ]
+        })
+      ])
   )
   // The serial refresh rides every profile — one VU rotating its own pair,
   // paced by the exec's sleep, for the length of the run.
@@ -276,7 +276,7 @@ export function storageGet(data) {
   check(res, { 'storage serves the object': (r) => r.status === 200 })
 }
 
-export function teardown(data) {
+export function teardown() {
   // Nothing to tear down: the fixture object is left in place (its key is
   // stable, so the next run re-serves it), and the sessions the runs
   // opened age out under the session policy.

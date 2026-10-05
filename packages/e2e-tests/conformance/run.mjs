@@ -35,8 +35,6 @@ if (!planName) {
 }
 const variant = process.argv[3] ? JSON.parse(process.argv[3]) : undefined
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
 async function main() {
   await health(suiteBase)
   console.log(`suite:   ${suiteBase}`)

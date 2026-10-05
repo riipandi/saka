@@ -26,7 +26,9 @@ function b64(input) {
   for (const ch of input) bytes.push(ch.codePointAt(0))
   let out = ''
   for (let i = 0; i < bytes.length; i += 3) {
-    const b0 = bytes[i], b1 = bytes[i + 1], b2 = bytes[i + 2]
+    const b0 = bytes[i],
+      b1 = bytes[i + 1],
+      b2 = bytes[i + 2]
     out += b64alphabet[b0 >> 2]
     out += b64alphabet[((b0 & 3) << 4) | ((b1 ?? 0) >> 4)]
     out += b1 === undefined ? '=' : b64alphabet[((b1 & 15) << 2) | ((b2 ?? 0) >> 6)]

@@ -24,8 +24,6 @@ export const PROFILE = __ENV.K6_PROFILE || 'smoke'
 const VUS = Number(__ENV.K6_VUS || 0) || 50
 const DURATION = __ENV.K6_DURATION || ''
 
-const p = (...percentiles) => percentiles.map((q) => ({ threshold: `p(${q})` }))
-
 export const profiles = {
   smoke: {
     executor: 'constant-vus',
