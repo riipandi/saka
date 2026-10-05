@@ -6,6 +6,9 @@ It speaks the standard protocols (OIDC Core, OAuth 2.0/2.1) so any
 standards-compliant application can connect — a web app, a mobile app, a
 CLI tool, or another service acting on a user's behalf.
 
+New here? Start with [Profiles](profiles.md) — what Saka supports, what it
+deliberately doesn't, and why, in plain terms.
+
 ## What an application can do
 
 **Sign users in with authorization codes.** An application redirects the
