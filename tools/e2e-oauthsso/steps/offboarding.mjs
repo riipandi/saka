@@ -45,7 +45,7 @@ export async function run() {
       staged.status === 200,
       JSON.stringify(staged.body).slice(0, 160)
     )
-    sql(`UPDATE oauth_linked_accounts SET refresh_token = (
+    sql(`UPDATE oauth_accounts SET refresh_token = (
       SELECT client_secret FROM oauth_connections WHERE provider = 'mock-custom')
       WHERE user_id = (SELECT id FROM users WHERE email = 'offboard-ernie@hogwarts.example')`)
     const restored = await rpc(
@@ -80,7 +80,7 @@ export async function run() {
       Boolean(user?.banned_at),
       JSON.stringify(user ?? {}).slice(0, 200)
     )
-    const bindings = sql(`SELECT count(*) FROM oauth_linked_accounts
+    const bindings = sql(`SELECT count(*) FROM oauth_accounts
       WHERE user_id = (SELECT id FROM users WHERE email = 'offboard-ernie@hogwarts.example')`)
     check('14e. the binding stays', bindings === '1', bindings)
     const auditRow = sql(`SELECT payload::text FROM audit_logs

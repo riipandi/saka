@@ -66,7 +66,7 @@ driver, because the in-process one is coherent on a single node alone.
 
 - **Single-binary deployment**: backend, frontend, email templates, and
   migrations in one Go binary
-- **API**: ConnectRPC (snake_case JSON) + REST, type-safe by code
+- **API**: ConnectRPC + REST, type-safe by code
   generation; wire-level documentation in `docs/`
 - **Storage**: buckets, resumable (tus) uploads, local or S3-compatible
   backends, signed links
@@ -90,11 +90,11 @@ driver, because the in-process one is coherent on a single node alone.
 
 ## Quick Start
 
-Read the [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on contributing to this project.
+Read the [Contributing Guide](./docs/contributing.md) for detailed guidelines on contributing to this project.
 
 ### Up and Running
 
-Requirements: Go 1.27+, Node 24.21+, pnpm, and Docker.
+Requirements: Go 1.27+, Node 24.21+, pnpm, Task, and Docker.
 
 ```sh
 # Clone the repository
@@ -114,9 +114,8 @@ task dev                  # the dev loop: Vite + HMR behind the Go proxy
 
 **The application will be accessible at:**
 
-- Application: <http://localhost:3080> (API and frontend on one origin)
-- Mail inbox: <http://localhost:8025> (Mailpit)
-- Health: <http://localhost:3080/healthz>
+- Application: <http://localhost:3080>
+- Mailpit inbox: <http://localhost:8025>
 
 **The task runner.** Run `task`: it lists everything available, from the
 dev loop and the checks to the compose stacks and the database tools.

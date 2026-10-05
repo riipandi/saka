@@ -310,7 +310,7 @@ func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int
 func (r *Repository) LinkedAccountByProvider(ctx context.Context, db datastore.Querier, connectionID uuid.UUID, providerAccountID string) (LinkedAccount, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountColumns)
-	sb.From(entity.TableOAuthLinkedAccounts)
+	sb.From(entity.TableOAuthAccounts)
 	sb.Where(sb.Equal("connection_id", connectionID), sb.Equal("provider_account_id", providerAccountID))
 	query, args := sb.Build()
 	return scanLinkedAccount(db.QueryRow(ctx, query, args...))
@@ -323,7 +323,7 @@ func (r *Repository) LinkedAccountByProvider(ctx context.Context, db datastore.Q
 func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Querier, row LinkedAccount) error {
 	row.ID = uuid.NewV7()
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
-	ib.InsertInto(entity.TableOAuthLinkedAccounts)
+	ib.InsertInto(entity.TableOAuthAccounts)
 	ib.Cols("id", "user_id", "connection_id", "provider_account_id", "email", "email_verified", "profile", "access_token", "refresh_token", "access_expires_at")
 	ib.Values(row.ID, row.UserID, row.ConnectionID, row.ProviderAccountID, row.Email,
 		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken, row.AccessExpiresAt)
@@ -341,7 +341,7 @@ func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Queri
 // store the stale half.
 func (r *Repository) UpdateBindingTokens(ctx context.Context, db datastore.Querier, id uuid.UUID, sealedAccess, sealedRefresh string, expiresAt *time.Time) error {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
-	ub.Update(entity.TableOAuthLinkedAccounts)
+	ub.Update(entity.TableOAuthAccounts)
 	ub.Set(
 		ub.Assign("access_token", sealedAccess),
 		ub.Assign("refresh_token", sealedRefresh),
@@ -558,7 +558,7 @@ const linkedAccountViewColumns = `l.id, l.user_id, l.connection_id, l.provider_a
 func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) ([]LinkedAccountView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountViewColumns)
-	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.From(entity.TableOAuthAccounts + " l")
 	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
 	sb.Where(sb.Equal("l.user_id", userID))
 	sb.OrderBy("l.created_at")
@@ -583,7 +583,7 @@ func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Quer
 func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier, id uuid.UUID) (LinkedAccountView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountViewColumns)
-	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.From(entity.TableOAuthAccounts + " l")
 	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
 	sb.Where(sb.Equal("l.id", id))
 	query, args := sb.Build()
@@ -606,7 +606,7 @@ func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier
 func (r *Repository) OffboardCandidates(ctx context.Context, db datastore.Querier, limit int) ([]LinkedAccountView, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(linkedAccountViewColumns)
-	sb.From(entity.TableOAuthLinkedAccounts + " l")
+	sb.From(entity.TableOAuthAccounts + " l")
 	sb.Join(entity.TableOAuthConnections+" c", "c.id = l.connection_id")
 	sb.Where(
 		"l.refresh_token <> ''",
@@ -638,7 +638,7 @@ func (r *Repository) OffboardCandidates(ctx context.Context, db datastore.Querie
 func (r *Repository) CountTokenlessBindings(ctx context.Context, db datastore.Querier) (int, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select("count(*)")
-	sb.From(entity.TableOAuthLinkedAccounts)
+	sb.From(entity.TableOAuthAccounts)
 	sb.Where(sb.Equal("refresh_token", ""))
 	query, args := sb.Build()
 	var count int
@@ -655,7 +655,7 @@ func (r *Repository) CountTokenlessBindings(ctx context.Context, db datastore.Qu
 func (r *Repository) KeepsAnotherCredential(ctx context.Context, db datastore.Querier, userID, excludeID uuid.UUID) (bool, error) {
 	var others int
 	err := db.QueryRow(ctx, `SELECT
-		    (SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1 AND id <> $2)
+		    (SELECT count(*) FROM public.oauth_accounts WHERE user_id = $1 AND id <> $2)
 		  + (SELECT count(*) FROM public.user_passwords WHERE user_id = $1)
 		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID, excludeID).
 		Scan(&others)
@@ -673,7 +673,7 @@ func (r *Repository) KeepsAnotherCredential(ctx context.Context, db datastore.Qu
 func (r *Repository) HoldsAlternativeCredential(ctx context.Context, db datastore.Querier, userID uuid.UUID) (bool, error) {
 	var others int
 	err := db.QueryRow(ctx, `SELECT
-		    (SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1)
+		    (SELECT count(*) FROM public.oauth_accounts WHERE user_id = $1)
 		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID).
 		Scan(&others)
 	if err != nil {
@@ -688,7 +688,7 @@ func (r *Repository) HoldsAlternativeCredential(ctx context.Context, db datastor
 // the unlink removed.
 func (r *Repository) DeleteLinkedAccount(ctx context.Context, db datastore.Querier, id, userID uuid.UUID) (bool, error) {
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
-	sb.DeleteFrom(entity.TableOAuthLinkedAccounts)
+	sb.DeleteFrom(entity.TableOAuthAccounts)
 	sb.Where(sb.Equal("id", id), sb.Equal("user_id", userID))
 	query, args := sb.Build()
 	return execAffected(ctx, db, query, args...)

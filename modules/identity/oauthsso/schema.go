@@ -84,7 +84,7 @@ type LinkedAccountIDPrefix struct{}
 // Prefix reports the TypeID prefix.
 func (LinkedAccountIDPrefix) Prefix() string { return "olink" }
 
-// LinkedAccountID is the typed identifier of one row of entity.TableOAuthLinkedAccounts.
+// LinkedAccountID is the typed identifier of one row of entity.TableOAuthAccounts.
 type LinkedAccountID = typeid.TypeID[LinkedAccountIDPrefix]
 
 // IDFromUUID wraps the connection row's UUID into the wire form. It is
@@ -222,7 +222,7 @@ type Connection struct {
 // BuiltIn reports whether the connection's endpoints are the code's own.
 func (c Connection) BuiltIn() bool { return c.Kind == KindBuiltin }
 
-// LinkedAccount is one row of entity.TableOAuthLinkedAccounts: a provider identity
+// LinkedAccount is one row of entity.TableOAuthAccounts: a provider identity
 // bound to an account. The tokens rest sealed exactly as the flow row
 // carried them — an empty value is the provider that answered none.
 type LinkedAccount struct {

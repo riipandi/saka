@@ -22,6 +22,30 @@ x-common: &common
     retries: 3
 
 services:
+  # The mock identity providers the OAuth SSO E2E runs against. One
+  # mock-oauth2-server carries both simulations as issuerIds.
+  # 
+  # The identity the login page's username answers with: one config
+  # serves both issuers, and the subject prefixes pick the branch —
+  # `unverified-*` carries an unverified address, `nonames-*` no
+  # given/family claims, anything else the verified shape.
+  #
+  # https://localhost:3220/google/.well-known/openid-configuration
+  # https://localhost:3220/github/.well-known/openid-configuration
+  mock-oauth2:
+    <<: *common
+    image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION:-6.0}
+    platform: linux/amd64
+    hostname: mock-oauth2
+    expose: ["8080"]
+    volumes: ["./mock-oauth2.json:/app/config.json:ro"]
+    environment:
+      JSON_CONFIG_PATH: /app/config.json
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/isalive || exit 1"]
+
   # The OpenID Foundation conformance suite, local rehearsal stack: the
   # prebuilt images the suite's own docker-compose-prebuilt.yml names. The
   # service names — server, mongodb — are the ones the suite's baked nginx
@@ -65,14 +89,14 @@ services:
       mongodb: { condition: service_healthy }
     mem_limit: 1536m
 
+  # The baked self-signed certificate yields to the mkcert pair
+  # `task cert:generate` writes — localhost.emobix.co.uk is one of its
+  # names — so a browser the local CA trusts reaches the suite UI without
+  # an ignore-errors exception.
   conformance-nginx:
     <<: *common
     image: registry.gitlab.com/openid/conformance-suite/nginx:${CONFORMANCE_SUITE_VERSION:-latest}
     ports: ["8443:8443"]
-    # The baked self-signed certificate yields to the mkcert pair
-    # `task cert:generate` writes — localhost.emobix.co.uk is one of its
-    # names — so a browser the local CA trusts reaches the suite UI without
-    # an ignore-errors exception.
     volumes:
       - "../storage/config/localhost_crt.pem:/etc/ssl/certs/nginx-selfsigned.crt:ro"
       - "../storage/config/localhost_key.pem:/etc/ssl/private/nginx-selfsigned.key:ro"

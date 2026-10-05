@@ -35,7 +35,7 @@ CREATE TRIGGER trg_oauth_connections_updated_at BEFORE UPDATE ON public.oauth_co
 CREATE TRIGGER trg_oauth_connections_deleted_record AFTER DELETE ON public.oauth_connections FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
 
 -- --------------------------------------------------------
--- Table: public.oauth_linked_accounts — one provider identity bound to
+-- Table: public.oauth_accounts — one provider identity bound to
 -- an account. The binding is unique per connection and provider account
 -- id: the same external identity cannot ride two rows under one
 -- connection, while the same account may hold several connections.
@@ -44,7 +44,7 @@ CREATE TRIGGER trg_oauth_connections_deleted_record AFTER DELETE ON public.oauth
 -- asked.
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.oauth_linked_accounts (
+CREATE TABLE IF NOT EXISTS public.oauth_accounts (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     connection_id UUID NOT NULL REFERENCES public.oauth_connections(id) ON DELETE CASCADE,
@@ -64,11 +64,11 @@ CREATE TABLE IF NOT EXISTS public.oauth_linked_accounts (
     UNIQUE (connection_id, provider_account_id)
 ) USING heap;
 
-CREATE INDEX IF NOT EXISTS idx_oauth_linked_accounts_user_id ON public.oauth_linked_accounts USING btree (user_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_linked_accounts_email ON public.oauth_linked_accounts USING btree (lower(email));
+CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id ON public.oauth_accounts USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_accounts_email ON public.oauth_accounts USING btree (lower(email));
 
-CREATE TRIGGER trg_oauth_linked_accounts_updated_at BEFORE UPDATE ON public.oauth_linked_accounts FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
-CREATE TRIGGER trg_oauth_linked_accounts_deleted_record AFTER DELETE ON public.oauth_linked_accounts FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
+CREATE TRIGGER trg_oauth_accounts_updated_at BEFORE UPDATE ON public.oauth_accounts FOR EACH ROW EXECUTE FUNCTION fn_updated_at_value();
+CREATE TRIGGER trg_oauth_accounts_deleted_record AFTER DELETE ON public.oauth_accounts FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
 
 -- --------------------------------------------------------
 -- Table: public.oauth_flows — one row per authorization-code ceremony.
@@ -136,16 +136,16 @@ CREATE INDEX IF NOT EXISTS idx_oauth_flows_user_id ON public.oauth_flows USING b
 
 DROP INDEX IF EXISTS idx_oauth_flows_user_id;
 DROP INDEX IF EXISTS idx_oauth_flows_expires_at;
-DROP INDEX IF EXISTS idx_oauth_linked_accounts_email;
-DROP INDEX IF EXISTS idx_oauth_linked_accounts_user_id;
+DROP INDEX IF EXISTS idx_oauth_accounts_email;
+DROP INDEX IF EXISTS idx_oauth_accounts_user_id;
 
-DROP TRIGGER IF EXISTS trg_oauth_linked_accounts_deleted_record ON public.oauth_linked_accounts;
-DROP TRIGGER IF EXISTS trg_oauth_linked_accounts_updated_at ON public.oauth_linked_accounts;
+DROP TRIGGER IF EXISTS trg_oauth_accounts_deleted_record ON public.oauth_accounts;
+DROP TRIGGER IF EXISTS trg_oauth_accounts_updated_at ON public.oauth_accounts;
 DROP TRIGGER IF EXISTS trg_oauth_connections_deleted_record ON public.oauth_connections;
 DROP TRIGGER IF EXISTS trg_oauth_connections_updated_at ON public.oauth_connections;
 
 DROP TABLE IF EXISTS public.oauth_flows;
-DROP TABLE IF EXISTS public.oauth_linked_accounts;
+DROP TABLE IF EXISTS public.oauth_accounts;
 DROP TABLE IF EXISTS public.oauth_connections;
 
 -- +goose StatementEnd

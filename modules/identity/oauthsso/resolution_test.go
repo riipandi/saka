@@ -197,7 +197,7 @@ func TestContinueSignInSignsTheBoundAccountIn(t *testing.T) {
 	// rides an account.
 	userID := seedAccount(t, pool, "hermione@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-1', 'hermione@hogwarts.example', true)`, userID, flow.ConnectionID)
 
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
@@ -231,7 +231,7 @@ func TestContinueSignInLinksAVerifiedAddressToItsAccount(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1 AND provider_account_id = 'prov-2'`, userID).
+		`SELECT count(*) FROM public.oauth_accounts WHERE user_id = $1 AND provider_account_id = 'prov-2'`, userID).
 		Scan(&count))
 	assert.Equal(t, 1, count, "the binding the verified address earned is on the table")
 
@@ -355,7 +355,7 @@ func TestContinueSignInCreatesTheJITAccountOnAnOpenMode(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts l
+		`SELECT count(*) FROM public.oauth_accounts l
 		 JOIN public.users u ON u.id = l.user_id WHERE u.email = $1 AND l.provider_account_id = 'prov-6'`,
 		"neville@hogwarts.example").Scan(&count))
 	assert.Equal(t, 1, count)
@@ -448,7 +448,7 @@ func TestTheDisabledLinkingKeepsTheVerifiedAddressOut(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts`).Scan(&count))
+		`SELECT count(*) FROM public.oauth_accounts`).Scan(&count))
 	assert.Zero(t, count)
 }
 
@@ -462,7 +462,7 @@ func TestTheMFAForkAnswersTheBridgeNotASession(t *testing.T) {
 	})
 	userID := seedAccount(t, pool, "potter@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-11', 'potter@hogwarts.example', true)`, userID, flow.ConnectionID)
 
 	service.mfa.(*stubGate).confirmed[userID] = true
@@ -484,7 +484,7 @@ func TestTheRacedContinueLosesTheFlowRow(t *testing.T) {
 	})
 	userID := seedAccount(t, pool, "dumbledore@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-12', 'dumbledore@hogwarts.example', true)`, userID, flow.ConnectionID)
 
 	first, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
@@ -508,7 +508,7 @@ func TestASeededBindingRidesPastTheEmailGates(t *testing.T) {
 	})
 	userID := seedAccount(t, pool, "snape@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-13', 'snape@hogwarts.example', true)`, userID, flow.ConnectionID)
 
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})

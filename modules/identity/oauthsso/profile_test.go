@@ -125,7 +125,7 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 	require.NoError(t, err)
 	userID := seedAccount(t, pool, "hermione@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-20', 'hermione@hogwarts.example', true)`, userID, created.ID)
 
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: firstToken})
@@ -245,7 +245,7 @@ func TestThePictureFailureKeepsTheSignIn(t *testing.T) {
 	})
 	userID := seedAccount(t, pool, "hannah@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-23', 'hannah@hogwarts.example', true)`, userID, flow.ConnectionID)
 
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})

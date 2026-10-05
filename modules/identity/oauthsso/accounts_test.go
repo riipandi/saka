@@ -34,14 +34,14 @@ func seededBinding(t *testing.T, service *Service, provider string) linkedAccoun
 	})
 	userID := seedAccount(t, pool, "grint@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, $3, 'grint@hogwarts.example', true)`,
 		userID, flow.ConnectionID, "prov-"+provider)
 
 	binding, err := service.repo.LinkedAccountByID(t.Context(), pool, func() uuid.UUID {
 		var id uuid.UUID
 		require.NoError(t, pool.QueryRow(t.Context(),
-			`SELECT id FROM public.oauth_linked_accounts WHERE user_id = $1`, userID).Scan(&id))
+			`SELECT id FROM public.oauth_accounts WHERE user_id = $1`, userID).Scan(&id))
 		return id
 	}())
 	require.NoError(t, err)
@@ -55,14 +55,14 @@ func TestListLinkedAnswersOnlyTheCallerRowsOldestFirst(t *testing.T) {
 
 	// A second binding, newer: the listing must order by the bind time.
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified, created_at)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified, created_at)
 		 VALUES ($1, $2, 'prov-hogwarts-2', 'grint@hogwarts.example', true, now() + interval '1 hour')`,
 		fixture.userID, fixture.flow.ConnectionID)
 
 	// A foreign binding on a foreign account: never the caller's rows.
 	foreign := seedAccount(t, pool, "flitwick@hogwarts.example", false)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-foreign', 'flitwick@hogwarts.example', true)`,
 		foreign, fixture.flow.ConnectionID)
 
@@ -85,7 +85,7 @@ func TestUnlinkRemovesTheBindingAndRecordsTheChange(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts WHERE id = $1`,
+		`SELECT count(*) FROM public.oauth_accounts WHERE id = $1`,
 		fixture.binding.LinkedAccount.ID).Scan(&count))
 	assert.Zero(t, count, "the binding left the table")
 
@@ -113,7 +113,7 @@ func TestUnlinkRefusesTheLastCredentialOfAPasswordlessAccount(t *testing.T) {
 
 	var count int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts WHERE id = $1`,
+		`SELECT count(*) FROM public.oauth_accounts WHERE id = $1`,
 		fixture.binding.LinkedAccount.ID).Scan(&count))
 	assert.Equal(t, 1, count, "the refused unlink leaves the binding")
 
@@ -147,7 +147,7 @@ func TestUnlinkCountsASecondBindingAsAWayBackIn(t *testing.T) {
 
 	// The second binding, not the password, is the way back in.
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-hogwarts-2', 'grint@hogwarts.example', true)`,
 		fixture.userID, fixture.flow.ConnectionID)
 
@@ -177,7 +177,7 @@ func TestTheHoldersBindingAnswersItsOpenedTokens(t *testing.T) {
 	require.NoError(t, err)
 	expires := time.Now().Add(time.Hour).Truncate(time.Microsecond)
 	mustExec(t, pool,
-		`UPDATE public.oauth_linked_accounts
+		`UPDATE public.oauth_accounts
 		 SET access_token = $1, refresh_token = $2, access_expires_at = $3
 		 WHERE id = $4`,
 		sealedAccess, sealedRefresh, expires, fixture.binding.LinkedAccount.ID)
@@ -270,7 +270,7 @@ func TestTheExpiredReadRefreshesAndRotates(t *testing.T) {
 	require.NoError(t, err)
 	expired := time.Now().Add(-time.Hour)
 	mustExec(t, pool,
-		`UPDATE public.oauth_linked_accounts
+		`UPDATE public.oauth_accounts
 		 SET access_token = $1, refresh_token = $2, access_expires_at = $3
 		 WHERE id = $4`,
 		sealedAccess, sealedRefresh, expired, fixture.binding.LinkedAccount.ID)
@@ -286,7 +286,7 @@ func TestTheExpiredReadRefreshesAndRotates(t *testing.T) {
 	// grant the endpoint received named the refresh token in the clear.
 	var storedAccess, storedRefresh string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT access_token, refresh_token FROM public.oauth_linked_accounts WHERE id = $1`,
+		`SELECT access_token, refresh_token FROM public.oauth_accounts WHERE id = $1`,
 		fixture.binding.LinkedAccount.ID).Scan(&storedAccess, &storedRefresh))
 	assert.Equal(t, "fresh-access", mustOpen(t, service, storedAccess))
 	assert.Equal(t, "rotated-refresh", mustOpen(t, service, storedRefresh))
@@ -304,7 +304,7 @@ func TestTheLiveReadAnswersTheStoredTokensWithoutARefresh(t *testing.T) {
 	require.NoError(t, err)
 	live := time.Now().Add(time.Hour)
 	mustExec(t, pool,
-		`UPDATE public.oauth_linked_accounts
+		`UPDATE public.oauth_accounts
 		 SET access_token = $1, refresh_token = $2, access_expires_at = $3
 		 WHERE id = $4`,
 		sealedAccess, sealedRefresh, live, fixture.binding.LinkedAccount.ID)
@@ -337,7 +337,7 @@ func TestTheFailedRefreshKeepsTheStoredAnswer(t *testing.T) {
 			sealedRefresh, err := service.seal("live-refresh")
 			require.NoError(t, err)
 			mustExec(t, pool,
-				`UPDATE public.oauth_linked_accounts
+				`UPDATE public.oauth_accounts
 				 SET access_token = $1, refresh_token = $2, access_expires_at = now() - interval '1 hour'
 				 WHERE id = $3`,
 				sealedAccess, sealedRefresh, fixture.binding.LinkedAccount.ID)
@@ -390,7 +390,7 @@ func TestTheSecondSignInRefreshesTheBindingTokens(t *testing.T) {
 	require.NoError(t, err)
 	userID := seedAccount(t, pool, "padma@hogwarts.example", true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified)
 		 VALUES ($1, $2, 'prov-rotor', 'padma@hogwarts.example', true)`, userID, created.ID)
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: firstToken})
 	require.NoError(t, err)
@@ -401,7 +401,7 @@ func TestTheSecondSignInRefreshesTheBindingTokens(t *testing.T) {
 	readTokens := func() {
 		require.NoError(t, pool.QueryRow(t.Context(),
 			`SELECT access_token, refresh_token, access_expires_at
-			 FROM public.oauth_linked_accounts WHERE user_id = $1`, userID).
+			 FROM public.oauth_accounts WHERE user_id = $1`, userID).
 			Scan(&storedAccess, &storedRefresh, &storedExpiry))
 	}
 	readTokens()

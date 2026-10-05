@@ -61,7 +61,7 @@ func offboardingFixtureFor(t *testing.T, service *Service, email, providerAccoun
 	require.NoError(t, err)
 	userID := seedAccount(t, pool, email, true)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email, email_verified, access_token, refresh_token, access_expires_at)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email, email_verified, access_token, refresh_token, access_expires_at)
 		 VALUES ($1, $2, $3, $4, true, $5, $6, now() - interval '1 hour')`,
 		userID, created.ID, providerAccountID, email,
 		mustSeal(t, service, "stale-access"), mustSeal(t, service, "live-refresh"))
@@ -79,7 +79,7 @@ func mustBindingID(t *testing.T, pool *datastore.Postgres, userID uuid.UUID) uui
 	t.Helper()
 	var id uuid.UUID
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT id FROM public.oauth_linked_accounts WHERE user_id = $1`, userID).Scan(&id))
+		`SELECT id FROM public.oauth_accounts WHERE user_id = $1`, userID).Scan(&id))
 	return id
 }
 
@@ -126,7 +126,7 @@ func TestTheDeadIdentityOffboardsItsAccount(t *testing.T) {
 	// The binding row stays: the ban, not the unlink, is the offboard.
 	var bindings int
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT count(*) FROM public.oauth_linked_accounts WHERE user_id = $1`, fixture.userID).Scan(&bindings))
+		`SELECT count(*) FROM public.oauth_accounts WHERE user_id = $1`, fixture.userID).Scan(&bindings))
 	assert.Equal(t, 1, bindings)
 }
 
@@ -146,7 +146,7 @@ func TestTheLiveIdentityRotatesAndSurvives(t *testing.T) {
 
 	var storedAccess string
 	require.NoError(t, pool.QueryRow(t.Context(),
-		`SELECT access_token FROM public.oauth_linked_accounts WHERE id = $1`,
+		`SELECT access_token FROM public.oauth_accounts WHERE id = $1`,
 		fixture.bindingID).Scan(&storedAccess))
 	assert.Equal(t, "fresh-access", mustOpen(t, service, storedAccess))
 }

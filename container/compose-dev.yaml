@@ -102,44 +102,22 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "nc -vz 127.0.0.1 8025 || exit 1"]
 
-  # The mock identity providers the OAuth SSO E2E runs against. One
-  # mock-oauth2-server carries both simulations as issuerIds.
-  # 
-  # The identity the login page's username answers with: one config
-  # serves both issuers, and the subject prefixes pick the branch —
-  # `unverified-*` carries an unverified address, `nonames-*` no
-  # given/family claims, anything else the verified shape.
-  #
-  # https://localhost:3220/google/.well-known/openid-configuration
-  # https://localhost:3220/github/.well-known/openid-configuration
-  mock-oauth2:
-    <<: *common
-    image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION:-6.0}
-    platform: linux/amd64
-    hostname: mock-oauth2
-    expose: ["8080"]
-    volumes: ["./mock-oauth2.json:/app/config.json:ro"]
-    environment:
-      JSON_CONFIG_PATH: /app/config.json
-    shm_size: 256m # set shared memory limit
-    mem_limit: 512m # set memory limit
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/isalive || exit 1"]
-
   nginx:
     <<: *common
     # image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-slim}
     image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-otel}
     hostname: nginx
     ports: ["9180:9180", "3443:3443", "3220:3220"]
-    volumes: ["../storage/config:/etc/nginx/certs:ro", "../.storage/nginx_logs:/var/log/nginx:rw", "./mock-assets:/srv/mock:ro"]
+    volumes:
+      - "../storage/config:/etc/nginx/certs:ro"
+      - "../.storage/nginx_logs:/var/log/nginx:rw"
+      - "./mock-assets:/srv/mock:ro"
     configs: [{ source: nginx_config, target: /etc/nginx/templates/default.conf.template }]
     shm_size: 32m # set shared memory limit
     mem_limit: 64m # set memory limit
     healthcheck:
       test: ["CMD", "nc", "-vz", "127.0.0.1", "9180"]
     depends_on:
-      mock-oauth2: { condition: service_started }
       silo: { condition: service_started }
 
 configs:

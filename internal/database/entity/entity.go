@@ -26,7 +26,7 @@ const (
 	TableOAuthConnections             = "public.oauth_connections"
 	TableOAuthFlows                   = "public.oauth_flows"
 	TableOAuthJtis                    = "public.oauth_jtis"
-	TableOAuthLinkedAccounts          = "public.oauth_linked_accounts"
+	TableOAuthAccounts                = "public.oauth_accounts"
 	TableOAuthSessions                = "public.oauth_sessions"
 	TableOIDCClients                  = "public.oidc_clients"
 	TableOIDCClientsAllowedUserGroups = "public.oidc_clients_allowed_user_groups"

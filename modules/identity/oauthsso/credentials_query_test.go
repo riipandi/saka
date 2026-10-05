@@ -34,7 +34,7 @@ func TestHoldsAlternativeCredentialAnswersTheBindings(t *testing.T) {
 		`INSERT INTO public.oauth_connections (kind, provider, display_name, client_id, client_secret, enabled)
 		 VALUES ('builtin', 'github', 'GitHub', 'client', 'enc:sealed', true)`)
 	mustExec(t, pool,
-		`INSERT INTO public.oauth_linked_accounts (user_id, connection_id, provider_account_id, email)
+		`INSERT INTO public.oauth_accounts (user_id, connection_id, provider_account_id, email)
 		 VALUES ($1, (SELECT id FROM public.oauth_connections WHERE provider = 'github'), 'provider-1', 'neveu@hogwarts.example')`, userID)
 
 	kept, err := repo.HoldsAlternativeCredential(t.Context(), pool, userID)

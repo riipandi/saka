@@ -75,8 +75,8 @@ export async function run() {
 
     // The columns rest sealed: the row's access token is the `enc:` form,
     // and the opened answer appears nowhere in it.
-    const sealed = sql(`SELECT access_token FROM oauth_linked_accounts WHERE id = (
-      SELECT l.id FROM oauth_linked_accounts l
+    const sealed = sql(`SELECT access_token FROM oauth_accounts WHERE id = (
+      SELECT l.id FROM oauth_accounts l
       JOIN users u ON u.id = l.user_id
       WHERE u.email = 'tokens-ernie@hogwarts.example')`)
     check(
