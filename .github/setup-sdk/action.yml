@@ -24,14 +24,13 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v7
+    - name: Setup Vite+ (vp)
+      uses: voidzero-dev/setup-vp@v1.21.1
       with:
         node-version: ${{ inputs.nodeVersion }}
-
-    - uses: pnpm/action-setup@v6
-      with:
-        run_install: false
+        cache-dependency-path: "pnpm-lock.yaml"
         cache: true
+        run-install: false
 
     # Restoring node_modules directly skips the pnpm link step entirely;
     # the pnpm store cache above only accelerates a cold install.

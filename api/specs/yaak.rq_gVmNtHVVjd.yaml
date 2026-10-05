@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_gVmNtHVVjd
+createdAt: 2026-10-02T20:13:25.567663
+updatedAt: 2026-10-02T23:46:05.776110
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication: {}
+authenticationType: none
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "flow_token": "",
+      "given_name": "Hermione",
+      "family_name": "Granger"
+    }
+bodyType: null
+description: 'Completes a flow the callback paused in the names stage: the given and family names the provider did not supply. The flow token is the credential; the answer is the token pair, or the MFA bridge when the account keeps a confirmed second factor. Guard: public (rate: auth).'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Continue OAuth sign in'
+sortPriority: 912.2222222222222
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/ContinueSignIn
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

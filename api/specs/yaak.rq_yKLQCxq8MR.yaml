@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_yKLQCxq8MR
+createdAt: 2026-09-28T09:24:57.917897
+updatedAt: 2026-09-28T10:13:20.746280
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "key": "product.name"
+    }
+bodyType: application/json
+description: |-
+  Removes one setting override, so the item answers its catalog default again. An item already at its default answers unchanged.
+
+  Saka procedure saka.settings.v1.SettingsService/Reset. Guard: admin.
+
+  Parameters:
+  - key (body, required): the setting catalog key
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Reset setting to default'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/Reset
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

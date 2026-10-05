@@ -2,18 +2,24 @@ type: http_request
 model: http_request
 id: rq_nHnRejV6X6
 createdAt: 2026-09-19T12:31:58.368649
-updatedAt: 2026-09-19T14:58:15.641832
+updatedAt: 2026-09-28T14:56:57.569215
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Answers the display facts a sign-in page renders: the name, the description, the launch URL, whether a logo waits behind its endpoint, and whether the client demands a fresh sign-in.
+
+  Saka procedure saka.federation.v1.OidcClientService/GetClientMeta. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client's identifier
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +30,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Get client metadata
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/GetClientMeta
-urlParameters: []
+name: '[Pocket ID] Get client metadata'
+sortPriority: 9000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/GetClientMeta
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

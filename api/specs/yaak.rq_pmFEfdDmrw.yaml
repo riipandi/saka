@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_pmFEfdDmrw
+createdAt: 2026-10-01T11:15:16.075345
+updatedAt: 2026-10-01T11:15:16.075346
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: |-
+    {}
+bodyType: application/json
+description: |-
+  Delete the currently authenticated account. The global self-delete setting arms the door and the account's override column answers for it; a refused caller answers not_found, the same shape an unknown account earns. The row is archived by the soft-delete trigger, the sessions die with their foreign keys, and the audit record names the account.
+
+  Parameters: none
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Delete my account'
+sortPriority: 11500.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/DeleteMyAccount
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_2awNdBDVaz
+createdAt: 2026-09-26T18:43:37.842667
+updatedAt: 2026-09-26T18:49:24.904521
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: |-
+  Lifts the named account's ban as a unit — start instant, expiry, and reason together — and queues a reinstatement notice to the account's address. An account that is not banned is the same success: the state the caller asked for is the state the row is in. An unknown or malformed identifier answers `not_found`.
+
+  Saka-only surface, modeled on Better Auth's `unban-user` admin operation.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: eT9QswW2fV
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: txS5q8CCP6
+method: POST
+name: '[Saka] Unban user'
+sortPriority: 27000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UnbanUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

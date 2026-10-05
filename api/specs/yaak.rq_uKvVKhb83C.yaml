@@ -2,18 +2,21 @@ type: http_request
 model: http_request
 id: rq_uKvVKhb83C
 createdAt: 2026-09-13T06:23:05.989227
-updatedAt: 2026-09-14T09:47:22.905108
+updatedAt: 2026-09-29T12:51:00.378508
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YNuU3gaJNQ
 authentication: {}
 authenticationType: null
 body: {}
 bodyType: null
-description: Returns the OpenID Connect discovery document with endpoints and capabilities
+description: |-
+  The OpenID Connect discovery document: issuer, the protocol endpoints (/oidc/authorize, /oidc/token, /oidc/userinfo, /oidc/end-session, /oidc/introspect, /oidc/par), jwks_uri at /.well-known/jwks.json, the supported scopes, claims, response types, and grant types.
+
+  Endpoint: `GET /.well-known/openid-configuration`
 headers: []
 method: GET
-name: Get OpenID Connect discovery configuration
-sortPriority: 0.0
+name: '[Pocket ID] Get OpenID Connect discovery configuration'
+sortPriority: 2.0
 url: ${[ apiBaseURL ]}/.well-known/openid-configuration
 urlParameters: []
 settingSendCookies:

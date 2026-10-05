@@ -2,30 +2,59 @@ type: http_request
 model: http_request
 id: rq_omxxaSMWV2
 createdAt: 2026-09-18T18:41:27.267187
-updatedAt: 2026-09-19T19:44:16.452602
+updatedAt: 2026-09-27T08:34:43.563635
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5ohk34DQsY
 authentication: {}
 authenticationType: null
 body:
   bodyType: application/json
-  text: '{}'
+  text: |-
+    {
+      "page": 1,
+      "limit": 25,
+      "sort_by": "created_at",
+      "sort_order": "SORT_ORDER_DESC"
+    }
 bodyType: application/json
-description: List the caller's API keys over /rpc with a valid bearer — 200 with {apiKeys, metadata}.
+description: |-
+  List the caller's own API keys with pagination and sorting.
+
+  Parameters:
+  - page (body, optional): One-based page number
+  - limit (body, optional): Page size
+  - sort_by (body, optional): One of name, created_at, expires_at, last_used_at; absent orders newest first
+  - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: rRTDbEndus
+  id: mpK7MwdheY
 - enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: jIUKHFdtaQ
+  id: QF6qYXqaw2
 method: POST
-name: List API keys
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApiKeyService/List
-urlParameters: []
+name: '[Pocket ID] List API keys'
+sortPriority: 74.07407407407406
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys
+urlParameters:
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

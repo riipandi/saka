@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_moX399gVYw
 createdAt: 2026-09-19T12:34:35.681759
-updatedAt: 2026-09-19T14:54:54.010655
+updatedAt: 2026-09-29T01:37:32.646789
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_Uf3pbN2b4K
 authentication: {}
@@ -13,7 +13,7 @@ body:
       "id": "REPLACE_PROVIDER_ID"
     }
 bodyType: application/json
-description: ''
+description: 'Run one provisioning pass now: the client''s visible accounts and groups are created, updated, and removed on the remote until it matches the local snapshot. The answer carries the counts the pass produced. The pass also runs hourly and, debounced, after account or group changes.\n\nUpstream: Pocket ID''s POST /api/scim/service-provider/{id}/sync.\n\nParameters:\n- id (body, required): the provider''s identifier, raw UUID form'
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +24,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Sync SCIM service provider
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Sync
-urlParameters: []
+name: '[Pocket ID] Sync SCIM service provider'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/Sync
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

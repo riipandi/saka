@@ -2,18 +2,26 @@ type: http_request
 model: http_request
 id: rq_wAibn2TsRe
 createdAt: 2026-09-19T12:34:10.928958
-updatedAt: 2026-09-19T14:56:11.341412
+updatedAt: 2026-09-26T17:17:27.605998
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_iMD6Wv2JMZ
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body:
+  bodyType: application/json
   text: |-
     {
-      "id": "REPLACE_GROUP_ID"
+      "id": "${[ response.body.path(request='rq_UcqfuDYCPx', behavior='always', ttl='0', result='first', join=', ', path='$.groups[0].id') ]}"
     }
 bodyType: application/json
-description: ''
+description: |-
+  One group with its members.
+
+  Ported from Pocket ID `GET /api/user-groups/{id}` as the `saka.identity.v1.UserGroupService/GetUserGroup` procedure.
+
+  Parameters:
+  - id (body, required): user group ID in its wire TypeID form (`ugrp_...`), not the row's UUID — the UUID never leaves the server. Member ids stay the account's `user_` TypeID. An identifier that names no group — unknown or malformed — answers `not_found`.
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +32,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Get user group by ID
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/GetGroup
-urlParameters: []
+name: '[Pocket ID] Get user group by ID'
+sortPriority: 4333.333333333333
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/GetUserGroup
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

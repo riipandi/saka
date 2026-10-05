@@ -2,9 +2,9 @@ type: http_request
 model: http_request
 id: rq_MjrASsLUFe
 createdAt: 2026-09-19T12:32:34.117451
-updatedAt: 2026-09-19T17:36:22.946662
+updatedAt: 2026-09-26T14:38:44.542155
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_eXRcxMKbSw
+folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
@@ -14,7 +14,19 @@ body:
       "limit": 20
     }
 bodyType: application/json
-description: ''
+description: |-
+  The clients the calling account may authorize: every client whose allowed-groups roll is empty, plus the restricted ones the account's groups admit it to.
+
+  Procedure: `saka.federation.v1.OidcConsentService/ListMyClients`
+
+  Mirror of Pocket ID `GET /api/oidc/users/me/clients`.
+
+  Parameters:
+  - pagination[page] (query, optional): Page number for pagination
+  - pagination[limit] (query, optional): Number of items per page
+  - sort[column] (query, optional): Column to sort by
+  - sort[direction] (query, optional): Sort direction (asc or desc)
+  - filters[hasLaunchURL] (query, optional): Filter clients by whether a launch URL is configured
 headers:
 - enabled: true
   name: Content-Type
@@ -25,10 +37,30 @@ headers:
   value: '1'
   id: null
 method: POST
-name: List accessible OIDC clients for current user
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/ListMyClients
-urlParameters: []
+name: '[Pocket ID] List accessible OIDC clients for current user'
+sortPriority: 16333.333333333334
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListMyClients
+urlParameters:
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
+- enabled: false
+  name: filters[hasLaunchURL]
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

@@ -2,19 +2,28 @@ type: http_request
 model: http_request
 id: rq_6wDThW2DXa
 createdAt: 2026-09-18T20:58:00.984820
-updatedAt: 2026-09-19T18:11:37.543020
+updatedAt: 2026-09-26T17:17:46.171950
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_iMD6Wv2JMZ
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body:
+  bodyType: application/json
   text: |-
     {
-      "name": "${[ faker.string.alphanumeric(options='{"length": 10}') ]}",
-      "display_name": "${[ faker.company.name() ]}"
+      "name": "gryffindor",
+      "display_name": "Gryffindor"
     }
 bodyType: application/json
-description: The name is generated per run with Faker; a user group name must match the username pattern, so only letters and digits are used.
+description: |-
+  Create a group. The name is unique.
+
+  Ported from Pocket ID `POST /api/user-groups` as the `saka.identity.v1.UserGroupService/CreateUserGroup` procedure.
+
+  Parameters:
+  - name (body, required): 2-255 characters, unique
+  - display_name (body, required): 2-50 characters
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +34,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Create user group
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/CreateGroup
+name: '[Pocket ID] Create user group'
+sortPriority: 2000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/CreateUserGroup
 urlParameters: []
 settingSendCookies:
   enabled: false

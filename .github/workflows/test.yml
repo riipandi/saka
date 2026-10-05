@@ -27,7 +27,6 @@ concurrency:
 
 env:
   CI: true
-  LEFTHOOK: 0
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: true
   CGO_ENABLED: 0
 
@@ -43,7 +42,7 @@ jobs:
         # (runner-images #9460/#13505) — deliberately not used. On macOS,
         # testutils.SkipWithoutDocker skips the container tests instead of
         # failing them. To restore full macOS coverage, host the runner on
-        # real hardware with OrbStack/Docker (labels: [self-hosted, macOS])
+        # real hardware with Docker (labels: [self-hosted, macOS])
         # and drop this distinction — no QEMU needed there.
         # Empty on push/pull_request; on workflow_dispatch the `os` input
         # restricts the matrix to a single platform.
@@ -79,6 +78,20 @@ jobs:
           fi
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+      # Vite Task cache (@ref: https://viteplus.dev/guide/github-actions-cache).
+      # Restored after install because package installation can recreate
+      # node_modules. The rolling primary key keeps entries immutable; the
+      # restore prefix picks the newest cache for this OS/arch. Task inputs
+      # (sources, lockfiles) stay out of the key — Vite Task fingerprints them.
+      - name: Restore Vite Task cache
+        id: vite-task-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vite-task-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate ConnectRPC code
         run: |
           go mod download
@@ -93,9 +106,9 @@ jobs:
         run: go install gotest.tools/gotestsum@v1.13.0
 
       - name: Generate email template
-        run: pnpm exec vite build
+        run: pnpm exec vp build
         env:
-          TANGO_SKIP_GO: 1
+          SKIP_GO_BUILD: 1
 
       - name: Setup golangci-lint toolchain
         uses: golangci/golangci-lint-action@v9
@@ -115,9 +128,9 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Mirrors `task typecheck` (Taskfile.yml).
+      # Cached through `vp run` (vite.config.ts run.tasks).
       - name: Type check (TypeScript)
-        run: pnpm exec tsc -b --noEmit
+        run: vp run typecheck
         env:
           NODE_ENV: production
 
@@ -135,14 +148,24 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Mirrors `task test:go:debug` (Taskfile.yml).
       - name: Run unit tests (backend, debug tags)
         run: gotestsum --format testname -- -tags debug ./cmd/... ./database/...
         env:
           NODE_ENV: production
 
-      # Mirrors `task build` (Taskfile.yml).
+      # Mirrors `task build` (Taskfile.yml): the frontend bundle and the
+      # derived assets.json land first, then both binaries embed them.
       - name: Build application binaries
-        run: pnpm exec vite build
+        run: |
+          pnpm exec vp build
+          go build -tags "debug,noasm,nounsafe" -trimpath -o build/debug/saka ./cmd
+          go build -tags "release,noasm,nounsafe" -trimpath -o build/release/saka ./cmd
         env:
           NODE_ENV: production
+
+      - name: Save Vite Task cache
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}

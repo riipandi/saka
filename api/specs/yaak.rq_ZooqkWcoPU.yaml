@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_ZooqkWcoPU
+createdAt: 2026-09-25T10:33:41.216165
+updatedAt: 2026-09-26T18:47:27.383914
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: '{}'
+bodyType: application/json
+description: |-
+  Send the verification email to the currently authenticated user's address on record. An already-verified account is refused; the email itself is sent by the durable queue.
+
+  Ported from Pocket ID `POST /api/users/me/send-email-verification` as the `saka.identity.v1.EmailVerificationService/SendEmail` procedure.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Send email verification'
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.EmailVerificationService/SendEmail
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_MubLWnYjGg
+createdAt: 2026-10-02T20:13:25.904789
+updatedAt: 2026-10-02T20:13:25.904790
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication:
+  bearer:
+    token: ${[ accessToken ]}
+  type: bearer
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "linked_account_id": "olink_"
+    }
+bodyType: null
+description: 'Removes one of the calling account''s linked connections. Unlinking the last credential of an account that keeps no password and no passkey is refused until a password is set. Guard: session, step-up.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Unlink OAuth connection'
+sortPriority: 920.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/UnlinkConnection
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

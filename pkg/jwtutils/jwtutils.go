@@ -2,9 +2,8 @@
 package jwtutils
 
 import (
+	"encoding/json/v2"
 	"time"
-
-	jsonv2 "encoding/json/v2"
 
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
@@ -58,9 +57,9 @@ func decodePrivate[T any](tok jwt.Token) (T, error) {
 		return claims, dec.DecodePrivateClaims(params)
 	}
 
-	raw, err := jsonv2.Marshal(params)
+	raw, err := json.Marshal(params)
 	if err != nil {
 		return claims, err
 	}
-	return claims, jsonv2.Unmarshal(raw, &claims)
+	return claims, json.Unmarshal(raw, &claims)
 }

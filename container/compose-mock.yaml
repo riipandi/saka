@@ -1,0 +1,116 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+# The mock and rehearsal stacks: services a developer starts beside the
+# application, not part of the deployment the app ships as. The OpenID
+# Foundation conformance suite lives here — its three services run under
+# their own project when started alone, and share the intranet when the
+# dev stack brings them up.
+
+x-common: &common
+  networks: ["intranet"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
+    - "saka.localhost.test:host-gateway"
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  cpus: 1.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
+
+services:
+  # The mock identity providers the OAuth SSO E2E runs against. One
+  # mock-oauth2-server carries both simulations as issuerIds.
+  # 
+  # The identity the login page's username answers with: one config
+  # serves both issuers, and the subject prefixes pick the branch —
+  # `unverified-*` carries an unverified address, `nonames-*` no
+  # given/family claims, anything else the verified shape.
+  #
+  # https://localhost:3220/google/.well-known/openid-configuration
+  # https://localhost:3220/github/.well-known/openid-configuration
+  mock-oauth2:
+    <<: *common
+    image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION:-6.0}
+    platform: linux/amd64
+    hostname: mock-oauth2
+    expose: ["8080"]
+    volumes: ["./mock-oauth2.json:/app/config.json:ro"]
+    environment:
+      JSON_CONFIG_PATH: /app/config.json
+    shm_size: 256m # set shared memory limit
+    mem_limit: 512m # set memory limit
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/isalive || exit 1"]
+
+  # The OpenID Foundation conformance suite, local rehearsal stack: the
+  # prebuilt images the suite's own docker-compose-prebuilt.yml names. The
+  # service names — server, mongodb — are the ones the suite's baked nginx
+  # upstream resolves, so they are not ours to rename.
+  #
+  # The suite's JVM does not read the system trust store, so the PKCS12
+  # bundle `task cert:conformance` builds from the local CA rides in as
+  # the truststore via JAVA_TOOL_OPTIONS — that is how the suite's
+  # server-to-server calls verify the TLS issuer at
+  # https://saka.localhost.test:3443 (the nginx proxy front, extra_hosts
+  # mapping the name to the host where the proxy's port is published).
+  #
+  # https://localhost.emobix.co.uk:8443 — the suite UI (a browser on the
+  # host needs `127.0.0.1 localhost.emobix.co.uk` in /etc/hosts, or the
+  # conformance driver's --host-resolver-rules mapping).
+  mongodb:
+    <<: *common
+    image: docker.io/library/mongo:${MONGODB_VERSION:-6.0.13}
+    volumes: ["conformance_mongo_data:/data/db:rw"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 })' | grep -q ok"]
+
+  server:
+    <<: *common
+    image: registry.gitlab.com/openid/conformance-suite:${CONFORMANCE_SUITE_VERSION:-latest}
+    expose: ["8080"]
+    environment:
+      BASE_URL: https://localhost.emobix.co.uk:8443
+      OIDC_GOOGLE_CLIENTID: ${OIDC_GOOGLE_CLIENTID:-google-client}
+      OIDC_GOOGLE_SECRET: ${OIDC_GOOGLE_SECRET:-google-secret}
+      OIDC_GITLAB_CLIENTID: ${OIDC_GITLAB_CLIENTID:-gitlab-client}
+      OIDC_GITLAB_SECRET: ${OIDC_GITLAB_SECRET:-gitlab-secret}
+      SPRING_PROFILES_ACTIVE: dev
+      JAVA_TOOL_OPTIONS: >-
+        -Djavax.net.ssl.trustStore=/etc/saka/truststore.p12
+        -Djavax.net.ssl.trustStorePassword=changeit
+        -Djavax.net.ssl.trustStoreType=PKCS12
+    volumes: ["../storage/config/conformance-trust.p12:/etc/saka/truststore.p12:ro"]
+    depends_on:
+      mongodb: { condition: service_healthy }
+    mem_limit: 1536m
+
+  # The baked self-signed certificate yields to the mkcert pair
+  # `task cert:generate` writes — localhost.emobix.co.uk is one of its
+  # names — so a browser the local CA trusts reaches the suite UI without
+  # an ignore-errors exception.
+  conformance-nginx:
+    <<: *common
+    image: registry.gitlab.com/openid/conformance-suite/nginx:${CONFORMANCE_SUITE_VERSION:-latest}
+    ports: ["8443:8443"]
+    volumes:
+      - "../storage/config/localhost_crt.pem:/etc/ssl/certs/nginx-selfsigned.crt:ro"
+      - "../storage/config/localhost_key.pem:/etc/ssl/private/nginx-selfsigned.key:ro"
+    networks:
+      intranet:
+        aliases: ["localhost.emobix.co.uk"]
+    depends_on:
+      server: { condition: service_started }
+    mem_limit: 128m
+
+volumes:
+  conformance_mongo_data:
+
+networks:
+  intranet:
+    driver: bridge
+    enable_ipv6: false

@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_Tdua2xnsYQ
+createdAt: 2026-09-26T18:07:22.412572
+updatedAt: 2026-09-26T18:14:56.185355
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_YFXTtzfvhT
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Ends the delegated session the access token names and answers a fresh pair on the administrator's own account — leaving a delegation is signing back in to the caller's real identity.
+
+  It is the one procedure an impersonated caller may call: the guard rule requires the delegation instead of refusing it, the way out of a borrowed identity must not be closed. The actor claims are checked against the session row's `impersonated_by` — a forged pair on a plain session answers `not_found`. A caller whose token carries no delegation answers `failed_precondition`. Both the ending and the new session are audited (`impersonation_stopped`, user_id naming the target so the started/stopped pair reads together).
+
+  Saka-only surface.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: FyE6XsvNBI
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: DCYwXPzwRH
+method: POST
+name: '[Saka] Stop impersonating'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/StopImpersonating
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

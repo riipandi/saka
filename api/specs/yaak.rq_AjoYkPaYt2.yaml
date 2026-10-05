@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_AjoYkPaYt2
+createdAt: 2026-09-28T20:29:03.987502
+updatedAt: 2026-10-05T17:45:50.898497
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_jyTw5r8X2o
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "user_id": "REPLACE_USER_WIRE"
+    }
+bodyType: application/json
+description: |-
+  One account's consent ledger. Administrative.
+
+  Procedure: `saka.federation.v1.OidcConsentService/ListUserAuthorizedClients`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: '[Pocket ID] List authorized clients for a user'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListUserAuthorizedClients
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

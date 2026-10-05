@@ -2,19 +2,30 @@ type: http_request
 model: http_request
 id: rq_ykxJHjw3fT
 createdAt: 2026-09-13T16:07:52.475216
-updatedAt: 2026-09-18T10:25:08.370366
+updatedAt: 2026-09-28T22:36:01.921315
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R5pypBKj8u
 authentication: {}
-authenticationType: null
+authenticationType: none
 body:
   bodyType: application/json
   text: '{}'
 bodyType: null
-description: Create a short-lived request that can be approved from another authenticated device
-headers: []
+description: |-
+  Opens one pairing request for the passkey-less sign-in: the code renders on another device's screen, the pairing cookie stays with the creating browser. Saka-only; upstream's shape kept.
+
+  Endpoint: `POST /api/device-login/requests`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
 method: POST
-name: Create device login request
+name: '[Saka] Create device login request'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/api/device-login/requests
 urlParameters: []

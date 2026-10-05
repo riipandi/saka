@@ -2,18 +2,24 @@ type: http_request
 model: http_request
 id: rq_749ksx8zrN
 createdAt: 2026-09-19T12:32:22.291930
-updatedAt: 2026-09-19T14:57:57.141674
+updatedAt: 2026-09-28T14:57:10.362765
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_dMv3SV2esq
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Answers a client's secrets as their views — prefixes, windows, and whether each still authenticates. The values never travel: they exist only in the response that created them, and only their SHA-256 hashes are stored.
+
+  Saka procedure saka.federation.v1.OidcClientService/ListSecrets. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +30,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: List client secrets
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/ListSecrets
-urlParameters: []
+name: '[Pocket ID] List client secrets'
+sortPriority: 13000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/ListSecrets
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

@@ -1,0 +1,67 @@
+type: http_request
+model: http_request
+id: rq_bSCjmRmosc
+createdAt: 2026-09-25T10:33:41.108464
+updatedAt: 2026-09-26T18:47:27.387380
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ userId ]}"
+    }
+bodyType: application/json
+description: |-
+  Reset a specific user's profile picture to the default.
+
+  Ported from Pocket ID `DELETE /api/users/{id}/profile-picture` as the
+  `ResetProfilePicture` procedure. Requires a Bearer token of the account's
+  owner or an administrator; the account falls back to the bundled default
+  picture the read answers with.
+
+  Parameters:
+  - id (string, required): User ID
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: Z4W2qBaiP4
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: E0tGzXIfnW
+method: POST
+name: '[Pocket ID] Reset user profile picture'
+sortPriority: 18000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/ResetProfilePicture
+urlParameters:
+- enabled: true
+  name: id
+  value: ${[ userId ]}
+  id: Y3vUFWg4vc
+- enabled: true
+  name: ''
+  value: ''
+  id: 5n9IRhvyst
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

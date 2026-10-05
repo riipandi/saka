@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_M2M6Ujaing
 createdAt: 2026-09-19T01:09:16.494579
-updatedAt: 2026-09-19T14:55:05.292298
+updatedAt: 2026-09-28T22:38:37.385880
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R5pypBKj8u
 authentication: {}
@@ -11,10 +11,13 @@ body:
   bodyType: application/json
   text: |-
     {
-      "user_code": "P7JMQ95R"
+      "code": "${[ response.body.path(request='rq_ykxJHjw3fT', behavior='smart', ttl='0', result='first', join=', ', path='$.user_code') ]}"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Answers the request the presented code names: the code in its display form, the requesting browser's address and agent, and the instant the request dies. Guard: session.
+
+  Procedure: `saka.authn.v1.DeviceApprovalService/Inspect`
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +28,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Inspect device login request
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.DeviceApprovalService/GetPendingRequest
+name: '[Saka] Inspect device login request'
+sortPriority: 555.5555555555555
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.DeviceApprovalService/Inspect
 urlParameters: []
 settingSendCookies:
   enabled: false

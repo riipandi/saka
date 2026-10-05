@@ -2,18 +2,26 @@ type: http_request
 model: http_request
 id: rq_vYd6seXbio
 createdAt: 2026-09-19T12:34:10.919346
-updatedAt: 2026-09-19T14:53:38.476934
+updatedAt: 2026-09-26T14:33:26.299381
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5ohk34DQsY
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body:
+  bodyType: application/json
   text: |-
     {
-      "id": "REPLACE_KEY_ID"
+      "id": "${[ response.body.path(request='rq_eZUVSnB5ze', behavior='smart', ttl='0', result='first', join=', ', path='$.[0].id') ]}"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Mark one of the caller's own keys revoked. The revocation is a stamp, not a deletion, and revoking an already-revoked key is the same success.
+
+  Ported from Pocket ID `DELETE /api/api-keys/{id}` as the `saka.apikey.v1.ApiKeyService/RevokeAPIKey` procedure.
+
+  Parameters:
+  - id (body, required): the key row's ID
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +32,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Revoke API key
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApiKeyService/Delete
-urlParameters: []
+name: '[Pocket ID] Revoke API key'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

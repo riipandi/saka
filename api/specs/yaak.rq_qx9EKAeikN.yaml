@@ -2,19 +2,29 @@ type: http_request
 model: http_request
 id: rq_qx9EKAeikN
 createdAt: 2026-09-18T18:41:18.754165
-updatedAt: 2026-09-19T19:09:05.358741
+updatedAt: 2026-09-26T14:33:28.076613
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5ohk34DQsY
-authentication: {}
-authenticationType: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body:
+  bodyType: application/json
   text: |-
     {
-      "name": "yaak-${[ faker.string.alphanumeric(options='{"length": 10}') ]}",
-      "expires_at": "2027-01-01T00:00:00Z"
+      "name": "yaak-key",
+      "expires_at": "2030-01-01T00:00:00Z"
     }
 bodyType: application/json
-description: The key name is generated per run; API key names are unique per user, so a fixed name makes the second send answer already_exists.
+description: |-
+  Issue a key for the caller's own account. The raw key exists in the response alone; only its hash is stored.
+
+  Ported from Pocket ID `POST /api/api-keys` as the `saka.apikey.v1.ApiKeyService/CreateAPIKey` procedure.
+
+  Parameters:
+  - name (body, required): 3-64 characters, unique per owner
+  - description (body, optional)
+  - expires_at (body, required): RFC 3339, must lie in the future
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +35,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Create API key
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApiKeyService/Create
+name: '[Pocket ID] Create API key'
+sortPriority: 222.2222222222222
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey
 urlParameters: []
 settingSendCookies:
   enabled: false

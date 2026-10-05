@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+tasks:
+  test:
+    desc: Run all tests (Go + frontend)
+    deps: [rpc:generate]
+    cmds:
+      - task: test:go
+      - task: test:ui
+
+  test:go:
+    desc: Run Go unit tests (pass packages or flags after `--`)
+    cmd: gotestsum --format testname -- {{.CLI_ARGS | default "$(go list ./... | egrep -v '(/test|/codegen)$$')"}}
+
+  test:e2e:
+    desc: Run the Playwright passkey ladder (Chromium; needs the pgsql container)
+    cmd: pnpm exec vp run e2e-tests#test
+
+  test:ui:
+    desc: Run frontend unit tests
+    cmd: pnpm exec vitest run {{.CLI_ARGS}}
+
+  test:sdk:
+    desc: Run unit tests for API Client
+    cmd: pnpm exec vitest run --project api-client {{.CLI_ARGS}}
+
+  coverage:
+    desc: Run Go tests with coverage report
+    cmds:
+      - |
+        gotestsum --format testname -- \
+        -covermode=atomic -coverprofile=.output/coverage.out \
+        $(go list ./... | egrep -v '(/test|/codegen)$$')
+      - go tool cover -func=.output/coverage.out | tail -1
+
+  coverage:report:
+    desc: Open HTML coverage report in browser (detailed line coverage)
+    deps: [coverage]
+    cmds:
+      - go tool cover -html=.output/coverage.out
+
+  bench:loadtest:
+    desc: Run the k6 load test against a running server (needs a seeded db — see scripts/loadtest/README.md)
+    preconditions:
+      - sh: command -v k6
+        msg: k6 is not installed — see https://grafana.com/docs/k6/latest/set-up/install-k6/
+    cmds:
+      - k6 run -e K6_PROFILE={{.K6_PROFILE | default "smoke"}} -e K6_TARGET={{.K6_TARGET | default "http://localhost:3080"}} {{.CLI_ARGS}} scripts/loadtest/loadtest.mjs

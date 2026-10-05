@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_uAAgTkXYnP
 createdAt: 2026-09-19T12:32:56.629883
-updatedAt: 2026-09-19T18:35:16.790115
+updatedAt: 2026-09-26T14:34:08.432201
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_LLg3fisc5c
 authentication: {}
@@ -10,13 +10,18 @@ authenticationType: null
 body:
   text: |-
     {
-      "page": {
-        "page": 1,
-        "limit": 20
-      }
+      "page": 1,
+      "limit": 20
     }
 bodyType: application/json
-description: ListAuditLogsRequest carries a nested PageRequest, so the window stays an object here.
+description: |-
+  List the caller's own audit records, newest first. Self-service: the account is the token's own subject, and a delegated (impersonated) caller is refused.
+
+  Guard: Authenticated.
+
+  Mirror of Pocket ID `GET /api/audit-logs`.
+
+  The `user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server. A record's `resource_id` is the resource's own UUID form (a session's, a group's), not the account's TypeID.
 headers:
 - enabled: true
   name: Content-Type
@@ -27,10 +32,26 @@ headers:
   value: '1'
   id: null
 method: POST
-name: List audit logs
+name: '[Pocket ID] List audit logs'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.AuditLogService/List
-urlParameters: []
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/List
+urlParameters:
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

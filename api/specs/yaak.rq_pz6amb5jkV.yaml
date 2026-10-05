@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_pz6amb5jkV
+createdAt: 2026-09-28T09:24:49.759335
+updatedAt: 2026-09-28T10:13:40.027880
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Answers every catalog item with its effective value (the override when one rests, the default when not), the default carried alongside, ordered by key.
+
+  Saka procedure saka.settings.v1.SettingsService/List. Guard: admin. Sealed items are opened - the administrator reads values in the clear.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] List all settings'
+sortPriority: 111.1111111111111
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/List
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

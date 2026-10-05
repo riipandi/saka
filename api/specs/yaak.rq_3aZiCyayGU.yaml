@@ -2,16 +2,18 @@ type: http_request
 model: http_request
 id: rq_3aZiCyayGU
 createdAt: 2026-09-19T00:34:24.838883
-updatedAt: 2026-09-19T14:58:03.442763
+updatedAt: 2026-09-28T15:05:40.945834
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
-  bodyType: application/json
   text: '{}'
 bodyType: application/json
-description: ''
+description: |-
+  Answers one page of the OIDC clients, newest first unless the caller sorts otherwise (sort_by: id, name, created_at). search narrows by name. Every client carries its secrets' views — prefixes and windows, never the values — and the groups its restriction names.
+
+  Saka procedure saka.federation.v1.OidcClientService/ListClients. Guard: admin.
 headers:
 - enabled: true
   name: Content-Type
@@ -22,10 +24,30 @@ headers:
   value: '1'
   id: null
 method: POST
-name: List OIDC clients
+name: '[Pocket ID] List OIDC clients'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/ListClients
-urlParameters: []
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/ListClients
+urlParameters:
+- enabled: false
+  name: search
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

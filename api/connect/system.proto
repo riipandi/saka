@@ -1,39 +1,612 @@
-// Canonical internal RPC contract for transport-owned system surfaces.
-// The public health endpoints stay REST; HealthService exists only as
-// the Connect transport smoke target.
+// The contract for the surfaces the transport itself owns.
+//
+// The public health endpoints stay on HTTP (`/healthz` liveness and
+// `/api/healthz` readiness); HealthService answers the same readiness result
+// to a client that speaks ConnectRPC.
 syntax = "proto3";
 
-package tango.system.v1;
+package saka.system.v1;
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/system/v1;systemv1";
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
 
-// HealthService is the transport smoke target for the /rpc mount.
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/system/v1;systemv1";
+
+// HealthService reports the availability of the dependencies the process runs
+// on.
 service HealthService {
+  // Check answers the current readiness. A healthy system answers the result;
+  // an unhealthy one fails with `unavailable`, and the error message names the
+  // checks that are down.
   rpc Check(CheckRequest) returns (CheckResponse);
 }
 
-// VersionService exposes the deployed build metadata. Current mirrors
-// the REST route's session requirement; Latest answers the cached
-// release tag anonymously.
-service VersionService {
-  rpc Current(CurrentRequest) returns (CurrentResponse);
-  rpc Latest(LatestRequest) returns (LatestResponse);
-}
-
-message CurrentRequest {}
-
-message CurrentResponse {
-  string current_version = 1;
-}
-
-message LatestRequest {}
-
-message LatestResponse {
-  string latest_version = 1;
-}
-
+// CheckRequest is empty: the check set is fixed at startup, and the caller
+// chooses nothing about it.
 message CheckRequest {}
 
+// CheckResponse is the readiness document. It carries the same facts the
+// `/api/healthz` body publishes, so the two surfaces never disagree. Status
+// travels as the connect code (`unavailable` on an unhealthy system) and the
+// correlation id as a response header — the protocol, not the body.
 message CheckResponse {
+  // status is the aggregated availability, `healthy` or `unhealthy`.
   string status = 1;
+
+  // details holds one entry per check, in check-name order.
+  repeated CheckDetail details = 2;
+
+  // took_ms is how long the whole check call took.
+  double took_ms = 3;
+}
+
+// AppConfigService is the administrative surface over the deployment's
+// application configuration. Pocket ID keeps the surface behind
+// `/api/application-configuration`; Saka serves the configuration reads
+// over REST at `GET /api/configuration` — public subset without a
+// credential, the full document to an administrator — and keeps the
+// interactive procedures here.
+service AppConfigService {
+  // TestEmail sends one templated test message through the configured
+  // mailer. The send is synchronous: the response says the message left
+  // this process, and an SMTP failure is the call's failure, so the
+  // administrator learns whether the configuration works while the
+  // settings screen is still open. An unconfigured mailer refuses the
+  // procedure rather than pretending to have sent anything.
+  //
+  // The message goes to the caller's address on record unless the request
+  // names one, so an administrator can prove the path to a mailbox they
+  // hold without touching another account.
+  rpc TestEmail(TestEmailRequest) returns (TestEmailResponse);
+}
+
+message TestEmailRequest {
+  // to is the address the message goes to when present. Empty means the
+  // caller's own address on record.
+  optional string to = 1 [(buf.validate.field).string.email = true];
+}
+
+// TestEmailResponse is empty: acceptance says the message was rendered and
+// submitted, not that a mailbox accepted it.
+message TestEmailResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// QueueService is the administrative surface over the embedded task queue.
+// It answers the same facts the queue's own tables hold — the pending rows
+// the dispatcher claims, and the archive a finished task lands in — and the
+// control actions an operations screen performs: cancel a waiting task,
+// replay the dead pile, or flush a table. Every procedure is administrative;
+// the guard refuses a caller without the administrator role.
+service QueueService {
+  // ListQueues reports one summary per registered queue: the configuration
+  // it was registered with, and the live row counts pending and dead. A
+  // queue no task ever named still answers, its counts at zero.
+  rpc ListQueues(ListQueuesRequest) returns (ListQueuesResponse);
+
+  // ListTasks answers one page of the pending table — the tasks waiting for
+  // a worker, running, or past their wait — newest first. The rows carry no
+  // payload; GetTask inspects one task's content.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+
+  // GetTask reports one task's state across the two tables, and the decoded
+  // payload when the task is not yet archived past its retention. A task
+  // neither table names answers not_found.
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+
+  // ListDeadTasks answers one page of the archive's failures: the tasks
+  // that exhausted their attempts and kept their payload, not yet expired
+  // under their queue's retention. They are the replay's raw material.
+  rpc ListDeadTasks(ListDeadTasksRequest) returns (ListDeadTasksResponse);
+
+  // CancelTask removes one unclaimed task from the pending table. A claimed
+  // task is in flight — its worker may already be halfway through it — and
+  // answers `failed_precondition` rather than pretending it was stopped.
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
+  // ReplayDeadTasks re-enqueues the dead tasks a queue's archive still
+  // carries, each under a fresh identity with a fresh attempt budget, and
+  // reports how many went back. A dead task whose queue did not retain its
+  // payload cannot come back; it stays for the cleanup to expire.
+  rpc ReplayDeadTasks(ReplayDeadTasksRequest) returns (ReplayDeadTasksResponse);
+
+  // FlushPendingTasks removes every unclaimed task and reports how many
+  // went. Claimed tasks are in flight, so they finish their lifecycle
+  // instead of vanishing under a worker.
+  rpc FlushPendingTasks(FlushPendingTasksRequest) returns (FlushPendingTasksResponse);
+
+  // FlushCompletedTasks removes every completed record, retention
+  // notwithstanding, and reports how many went.
+  rpc FlushCompletedTasks(FlushCompletedTasksRequest) returns (FlushCompletedTasksResponse);
+}
+
+// ListQueuesRequest pages and filters the registered queues, the way the
+// account list does. The queue set is the process's own registry; the counts
+// make every row's worth.
+message ListQueuesRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // search narrows the page to the queues whose name contains the term,
+  // case-insensitively. Absent means every queue.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the key the page orders by. Absent, the name orders the
+  // page ascending.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "pending",
+      "dead"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListQueuesResponse is the page of queue summaries and its pagination
+// block.
+message ListQueuesResponse {
+  // queues is the page.
+  repeated QueueSummary queues = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// QueueSummary is one queue's configuration and live counts.
+message QueueSummary {
+  // name is the queue's registered name.
+  string name = 1;
+
+  // max_attempts is the attempt budget a task of this queue runs under.
+  int32 max_attempts = 2;
+
+  // timeout_ms is the per-execution context deadline, 0 when none.
+  int64 timeout_ms = 3;
+
+  // retention_seconds is how long completed tasks stay archived, absent
+  // when the queue does not retain them.
+  optional int64 retention_seconds = 4;
+
+  // retention_only_failed is true when the queue archives only its
+  // failures.
+  bool retention_only_failed = 5;
+
+  // pending is the number of unclaimed tasks in the queue.
+  int64 pending = 6;
+
+  // dead is the number of failed tasks the archive holds.
+  int64 dead = 7;
+}
+
+// ListTasksRequest filters and pages the pending table. An absent queue
+// name answers every queue's rows.
+// ListTasksRequest pages and filters the pending table. An absent queue
+// name answers every queue's rows.
+message ListTasksRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // queue narrows the page to one queue's rows.
+  optional string queue = 3;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "priority",
+      "attempts",
+      "wait_until"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means descending — the newest
+  // task first, the way the list answers by default.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListTasksResponse is the page of pending tasks and its pagination block.
+message ListTasksResponse {
+  // tasks is the page.
+  repeated PendingTask tasks = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// PendingTask is one row of the pending table: a task waiting for a worker,
+// running, or past its wait.
+message PendingTask {
+  // id is the task's identifier.
+  string id = 1;
+
+  // queue is the queue the task belongs to.
+  string queue = 2;
+
+  // attempts is the number of times the task has been claimed.
+  int32 attempts = 3;
+
+  // priority is the claim order weight; a higher number is claimed first.
+  int32 priority = 4;
+
+  // state is the task's own state: `pending`, or `running` while a worker
+  // holds the claim. The response-level `status` is the call's outcome.
+  string state = 5;
+
+  // wait_until is when the task becomes claimable, absent when it already
+  // is.
+  optional google.protobuf.Timestamp wait_until = 6;
+
+  // claimed_at is when the running task was claimed, absent when waiting.
+  optional google.protobuf.Timestamp claimed_at = 7;
+
+  // created_at is when the task was enqueued.
+  google.protobuf.Timestamp created_at = 8;
+
+  // last_executed_at is when the last claim was released, absent on a task
+  // no attempt has touched.
+  optional google.protobuf.Timestamp last_executed_at = 9;
+}
+
+// GetTaskRequest names one task.
+message GetTaskRequest {
+  // id is the task's identifier in its wire form, a TypeID (`que_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetTaskResponse is one task's full view: its state, and the payload as
+// the queue stored it — the stored bytes a sealing deployment wrote are
+// opened, so the body is always the task's own JSON.
+message GetTaskResponse {
+  // id is the task's identifier.
+  string id = 1;
+
+  // queue is the queue the task belongs to, absent when the task is not
+  // in the pending table.
+  optional string queue = 2;
+
+  // state is the task's own state: `pending`, `running`, `success`, or
+  // `failure`. The response-level `status` is the call's outcome.
+  string state = 3;
+
+  // attempts is the number of times the task has been claimed.
+  optional int32 attempts = 4;
+
+  // payload is the task's own JSON document, absent when the archive no
+  // longer holds it.
+  optional bytes payload = 5;
+
+  // error is the failure message of the last attempt, present on a failed
+  // task.
+  optional string error = 6;
+
+  // last_duration_ms is how long the last execution took.
+  optional double last_duration_ms = 7;
+
+  // created_at is when the task was enqueued.
+  optional google.protobuf.Timestamp created_at = 8;
+
+  // last_executed_at is when the last attempt ran.
+  optional google.protobuf.Timestamp last_executed_at = 9;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 10;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 11;
+}
+
+// ListDeadTasksRequest pages and filters the archive's failures. An absent
+// queue name answers every queue's dead.
+message ListDeadTasksRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // queue narrows the page to one queue's dead.
+  optional string queue = 3;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, oldest first — the replay reads the pile in the order
+  // it piled up.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "attempts",
+      "last_executed_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListDeadTasksResponse is the page of archived failures and its pagination
+// block.
+message ListDeadTasksResponse {
+  // tasks is the page.
+  repeated DeadTask tasks = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// DeadTask is one archived failure: a task that exhausted its attempts and
+// kept its payload for the replay.
+message DeadTask {
+  // id is the archived record's identifier — not the task's original one.
+  string id = 1;
+
+  // queue is the queue the task belonged to.
+  string queue = 2;
+
+  // attempts is the attempt budget the task exhausted.
+  int32 attempts = 3;
+
+  // error is the failure message of the last attempt.
+  optional string error = 4;
+
+  // expires_at is when the archive retires the record, absent when the
+  // queue retains it forever.
+  optional google.protobuf.Timestamp expires_at = 5;
+
+  // last_executed_at is when the last attempt ran.
+  google.protobuf.Timestamp last_executed_at = 6;
+
+  // created_at is when the task was originally enqueued.
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// CancelTaskRequest names the waiting task to remove.
+message CancelTaskRequest {
+  // id is the task's identifier in its wire form, a TypeID (`que_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// CancelTaskResponse is the outcome of the cancel: a cancelled task answers
+// success; a claimed one fails with `failed_precondition`, an unknown one
+// with `not_found`.
+message CancelTaskResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ReplayDeadTasksRequest names the queue whose dead pile returns, or every
+// queue when absent.
+message ReplayDeadTasksRequest {
+  // queue narrows the replay to one queue's dead.
+  optional string queue = 1;
+}
+
+// ReplayDeadTasksResponse reports how many dead tasks went back to the
+// pending table.
+message ReplayDeadTasksResponse {
+  // replayed is the number of tasks re-enqueued.
+  int64 replayed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// FlushPendingTasksRequest is empty: the flush removes every unclaimed
+// task the pending table holds.
+message FlushPendingTasksRequest {}
+
+// FlushPendingTasksResponse reports how many waiting tasks went.
+message FlushPendingTasksResponse {
+  // flushed is the number of tasks removed.
+  int64 flushed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// FlushCompletedTasksRequest is empty: the flush removes every archived
+// record, retention notwithstanding.
+message FlushCompletedTasksRequest {}
+
+// FlushCompletedTasksResponse reports how many archived records went.
+message FlushCompletedTasksResponse {
+  // flushed is the number of records removed.
+  int64 flushed = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// SchedulerService is the administrative surface over the durable cron
+// scheduler. Its state is the scheduler_jobs table — one row per registered
+// job, `next_due` the claim cursor — and its one control action re-enqueues
+// a job's task on demand, without touching the schedule. Every procedure is
+// administrative; the guard refuses a caller without the administrator
+// role.
+service SchedulerService {
+  // ListJobs reports one entry per registered job, in name order: the cron
+  // spec it fires on, when the claim cursor says it is next due, and when
+  // it last fired.
+  rpc ListJobs(ListSchedulerJobsRequest) returns (ListSchedulerJobsResponse);
+
+  // RunNow enqueues a job's task immediately, without advancing the job's
+  // schedule: the next tick fires on time. A job the process never
+  // registered answers not_found.
+  rpc RunNow(RunSchedulerJobNowRequest) returns (RunSchedulerJobNowResponse);
+}
+
+// ListSchedulerJobsRequest pages and filters the scheduler's state rows.
+message ListSchedulerJobsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // search narrows the page to the jobs whose name or whose cron spec
+  // contains the term, case-insensitively. Absent means every job.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the name orders
+  // the page ascending.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "next_due",
+      "updated_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListSchedulerJobsResponse is the page of scheduler jobs and its
+// pagination block.
+message ListSchedulerJobsResponse {
+  // jobs is the page.
+  repeated SchedulerJob jobs = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// SchedulerJob is one registered job's durable state.
+message SchedulerJob {
+  // id is the job's identifier in its wire form, a TypeID (`scd_…`)
+  // encoded from the state row's UUID — the UUID never leaves the server.
+  string id = 1;
+
+  // name is the job's registered name: its display and its unique key.
+  string name = 2;
+
+  // spec is the cron expression the job fires on.
+  string spec = 3;
+
+  // next_due is when the claim cursor says the job fires next.
+  google.protobuf.Timestamp next_due = 4;
+
+  // last_fired is when the job last won a claim, absent when it never
+  // fired.
+  optional google.protobuf.Timestamp last_fired = 5;
+
+  // updated_at is when the state row last moved.
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// RunSchedulerJobNowRequest names the job to run now.
+message RunSchedulerJobNowRequest {
+  // id is the job's identifier in its wire form, a TypeID (`scd_…`)
+  // encoded from the state row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RunSchedulerJobNowResponse is the outcome of the run-now: an enqueued
+// tick answers success; an unknown job answers not_found.
+message RunSchedulerJobNowResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// CheckDetail is the outcome of one dependency check.
+message CheckDetail {
+  // name identifies the dependency: a generic word such as `database` or
+  // `storage`, never a product name and never an address.
+  string name = 1;
+  // status is the component's own availability: `up` or `down`.
+  string status = 2;
+  // target names what was inspected, and stays empty on a surface a caller
+  // outside the machine reads.
+  string target = 3;
+  // error is the failure message, empty when the check passed.
+  string error = 4;
+  // optional marks a check that is reported without affecting the aggregate.
+  bool optional = 5;
+  // took_ms is how long this check took.
+  double took_ms = 6;
 }

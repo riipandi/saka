@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_tMEGAXFqho
+createdAt: 2026-10-02T11:35:04.485965
+updatedAt: 2026-10-02T11:36:23.918569
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Delivers a single-use reverification code to the caller's own email address — the proof an account with no password and no passkey holds. One live code per account: a resend inside the one-minute cooldown is refused, past it the newest code replaces the old. The code is spent by Reauthenticate's email_code proof.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: PNfI3wsBrh
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: dIi9zbj28h
+method: POST
+name: '[Saka] Send reauthentication code'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

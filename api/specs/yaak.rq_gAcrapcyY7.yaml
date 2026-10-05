@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_gAcrapcyY7
+createdAt: 2026-09-25T23:15:21.957558
+updatedAt: 2026-09-26T14:34:08.435443
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_LLg3fisc5c
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  The values the administrative filters can take: the distinct events the table holds and the accounts that appear in it, so a filter control is built from what is there rather than from a list the client keeps in step with the server.
+
+  Guard: Admin.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Audit log filter options'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/FilterOptions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

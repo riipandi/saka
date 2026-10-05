@@ -13,7 +13,7 @@ import (
 func TestPasswordHasherDefaultsToScrypt(t *testing.T) {
 	hasher := NewPasswordHasher()
 
-	hash, err := hasher.Hash("correct horse battery staple")
+	hash, err := hasher.Hash("expecto-patronum-horcrux")
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasPrefix(hash, "$scrypt$N=65536,r=8,p=1$"), hash)
@@ -22,14 +22,14 @@ func TestPasswordHasherDefaultsToScrypt(t *testing.T) {
 func TestPasswordHasherVerifyScrypt(t *testing.T) {
 	hasher := NewPasswordHasher()
 
-	hash, err := hasher.Hash("correct horse battery staple")
+	hash, err := hasher.Hash("expecto-patronum-horcrux")
 	require.NoError(t, err)
 
-	ok, err := hasher.Verify("correct horse battery staple", hash)
+	ok, err := hasher.Verify("expecto-patronum-horcrux", hash)
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	ok, err = hasher.Verify("incorrect horse", hash)
+	ok, err = hasher.Verify("expelliarmus-wrong", hash)
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
@@ -39,16 +39,16 @@ func TestPasswordHasherVerifyArgon2id(t *testing.T) {
 		WithAlgorithm(AlgorithmArgon2id).
 		WithArgon2Cost(8192, 2, 2)
 
-	hash, err := hasher.Hash("correct horse battery staple")
+	hash, err := hasher.Hash("expecto-patronum-horcrux")
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasPrefix(hash, "$argon2id$v=19$m=8192,t=2,p=2$"), hash)
 
-	ok, err := hasher.Verify("correct horse battery staple", hash)
+	ok, err := hasher.Verify("expecto-patronum-horcrux", hash)
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	ok, err = hasher.Verify("incorrect horse", hash)
+	ok, err = hasher.Verify("expelliarmus-wrong", hash)
 	require.NoError(t, err)
 	assert.False(t, ok)
 }

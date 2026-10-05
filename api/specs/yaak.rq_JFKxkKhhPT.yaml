@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_JFKxkKhhPT
+createdAt: 2026-10-01T18:57:08.883805
+updatedAt: 2026-10-01T19:07:41.938751
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "page": 1,
+      "limit": 10,
+      "sort_by": "name",
+      "sort_order": "asc"
+    }
+bodyType: application/json
+description: |-
+  Queue surface — one summary per registered queue: configuration and live pending/dead counts (page/limit, search, sort).
+
+  Admin only. saka built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] List task queues with live counts (queue)'
+sortPriority: 111.1111111111111
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ListQueues
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

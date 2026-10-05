@@ -1,0 +1,65 @@
+type: http_request
+model: http_request
+id: rq_wg4uzzVujB
+createdAt: 2026-09-26T15:42:28.424373
+updatedAt: 2026-09-26T18:47:27.389792
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: |-
+    {
+      "username": "ada_lovelace",
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "display_name": "Ada Lovelace",
+      "locale": "en-US"
+    }
+bodyType: application/json
+description: |-
+  Update the currently authenticated user's information: the display surface, and the username while the change toggle admits it (absent keeps the current handle; a taken one answers already-exists). The email and the role are the administrative surface's (`UserService/UpdateUser`). Ported from Pocket ID `PUT /api/users/me` as the `saka.identity.v1.UserService/UpdateCurrentUser` procedure.
+
+  Parameters:
+  - username (body, optional): New handle; required shape enforced in the service
+  - first_name (body, required): Given name
+  - last_name (body, required): Family name
+  - display_name (body, required): Display name
+  - locale (body, optional): Locale tag
+
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Update current user'
+sortPriority: 11000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UpdateCurrentUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

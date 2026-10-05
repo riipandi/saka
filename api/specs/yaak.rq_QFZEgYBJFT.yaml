@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_QFZEgYBJFT
+createdAt: 2026-09-30T01:59:38.785476
+updatedAt: 2026-09-30T02:12:14.236594
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_d23um6bp9P
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: '[Saka] Answer the webhook event catalog: every event a receiver can subscribe to, with the sentence that says what happened. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: List Webhook Event Types
+sortPriority: 4137.631458619113
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/ListEventTypes
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

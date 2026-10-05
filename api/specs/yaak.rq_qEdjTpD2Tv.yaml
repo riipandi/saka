@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_qEdjTpD2Tv
+createdAt: 2026-10-02T20:13:16.187442
+updatedAt: 2026-10-02T23:46:01.691740
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication: {}
+authenticationType: none
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "connection": "google"
+    }
+bodyType: null
+description: 'Opens the authorization-code flow for the named connection and answers the provider''s authorize URL the browser navigates to. An unknown or disabled connection answers not_found. Guard: public.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Begin OAuth sign in'
+sortPriority: 911.1111111111112
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OAuthSSOService/BeginSignIn
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

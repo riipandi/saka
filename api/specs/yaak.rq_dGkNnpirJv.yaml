@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_dGkNnpirJv
+createdAt: 2026-09-26T21:00:43.981386
+updatedAt: 2026-09-26T21:24:32.704520
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_ZsR2s3GrGS
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "token": "${[ response.body.path(request='rq_hDhGcgXbMq', behavior='smart', ttl='0', result='first', join=', ', path='$.reset_token') ]}",
+      "new_password": "${[ prompt.text(label='Password', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='${[ password ]}', placeholder='Password', password=true) ]}",
+      "terminate_sessions": true
+    }
+bodyType: application/json
+description: '[Saka] Spends a reset token from the reset email on a new password. The token is the whole credential — the caller carries none. The new password must meet the account policy (min 8 chars, 3 of 4 classes, or a 16+ char passphrase) and must differ from the current one. terminate_sessions (default true) revokes every live session once the reset commits; send false to keep them. Unknown, expired, and spent tokens answer permission_denied with one message; a same-password reset answers invalid_argument.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: HJKITsQESS
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: RAhkbRYAMg
+method: POST
+name: '[Saka] Finalize password recovery'
+sortPriority: 333.3333333333333
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

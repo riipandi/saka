@@ -1,0 +1,195 @@
+// The one-time access contract: a short code that signs its holder in without
+// a password.
+//
+// An administrator issues a code for one account (to hand to its owner, whose
+// credential is lost or not yet set) or sends it by email; an account holder
+// asks for the email themselves from the sign-in page. The exchange is the
+// procedure the frontend reaches with the code the email linked to: it answers
+// the same token pair a password sign-in does, under a session whose provider
+// names how it was opened.
+//
+// The code is a credential shown once and stored only as a hash, the way the
+// refresh token and the verification token are. The email path pairs it with a
+// device token the requester holds and the exchange demands back, so a code
+// read out of a mailbox alone signs nobody in.
+syntax = "proto3";
+
+package saka.authn.v1;
+
+import "authn.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1;authnv1";
+
+// OneTimeAccessService issues and consumes the codes that sign an account in
+// without its password.
+service OneTimeAccessService {
+  // CreateToken issues a code for one account, for an administrator to hand
+  // over. The code exists in the response alone.
+  rpc CreateToken(CreateOneTimeAccessTokenRequest) returns (CreateOneTimeAccessTokenResponse);
+
+  // ExchangeToken consumes a code and signs its holder in. It is the one
+  // procedure of this service a caller reaches without a credential.
+  rpc ExchangeToken(ExchangeOneTimeAccessTokenRequest) returns (ExchangeOneTimeAccessTokenResponse);
+
+  // RequestEmailAsAdmin sends the code to one account's address, for an
+  // administrator whose target cannot reach the sign-in page.
+  rpc RequestEmailAsAdmin(RequestOneTimeAccessEmailAsAdminRequest) returns (RequestOneTimeAccessEmailAsAdminResponse);
+
+  // RequestEmail sends the code to the address the caller names. An address
+  // no account holds answers success all the same, so the procedure cannot
+  // tell a caller which addresses exist.
+  rpc RequestEmail(RequestOneTimeAccessEmailRequest) returns (RequestOneTimeAccessEmailResponse);
+}
+
+// CreateOneTimeAccessTokenRequest names the account and the code's window.
+message CreateOneTimeAccessTokenRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // ttl_seconds is how long the code works, between one minute and a day.
+  // Unset means fifteen minutes, the window the email path uses.
+  optional int32 ttl_seconds = 2 [(buf.validate.field).int32 = {
+    gte: 60
+    lte: 86400
+  }];
+}
+
+// CreateOneTimeAccessTokenResponse is the issued code.
+message CreateOneTimeAccessTokenResponse {
+  // token is the code. Show it once: only its hash is stored, so it cannot
+  // be read back.
+  string token = 1;
+
+  // expires_at is the instant the code stops working, RFC 3339.
+  string expires_at = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ExchangeOneTimeAccessTokenRequest carries the code and, for a code the
+// email path issued, the device token the requester holds.
+message ExchangeOneTimeAccessTokenRequest {
+  // token is the code the email linked to or the administrator handed over.
+  // The generated forms are six or twelve characters.
+  string token = 1 [(buf.validate.field).string = {
+    min_len: 6
+    max_len: 12
+  }];
+
+  // device_token is the value the email request answered. A code that was
+  // issued beside one refuses to work without it, and a mismatch leaves the
+  // code spendable — the mistake is the caller's, not the code's.
+  optional string device_token = 2 [(buf.validate.field).string.max_len = 64];
+}
+
+// ExchangeOneTimeAccessTokenResponse is the token pair a password sign-in
+// answers with, for the account the code named.
+message ExchangeOneTimeAccessTokenResponse {
+  // access_token is the Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the refresh token's lifetime in seconds — the
+  // window the session row was written with.
+  int32 refresh_expires_in = 9;
+
+  // refresh_token is the long-lived credential of the session the exchange
+  // opened.
+  string refresh_token = 4;
+
+  // session_id is the TypeID (`sess_…`) of the session row the refresh token
+  // is stored under.
+  string session_id = 5;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 6;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 7;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 8;
+
+  // mfa_required is true when the account keeps a confirmed authenticator:
+  // no tokens were issued, and the caller finishes the sign-in through
+  // MultifactorService.CompleteSignIn with the pending token — the same
+  // fork a password sign-in answers. Every token field above is empty in
+  // that case.
+  bool mfa_required = 10;
+
+  // mfa_pending_token is the short-lived bridge the exchange minted.
+  string mfa_pending_token = 11;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 12;
+}
+
+// RequestOneTimeAccessEmailAsAdminRequest names the account and the email
+// code's window.
+message RequestOneTimeAccessEmailAsAdminRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // ttl_seconds is how long the emailed code works, between one minute and a
+  // day. Unset means fifteen minutes.
+  optional int32 ttl_seconds = 2 [(buf.validate.field).int32 = {
+    gte: 60
+    lte: 86400
+  }];
+}
+
+// RequestOneTimeAccessEmailAsAdminResponse reports the message was handed to
+// the queue, not that it was delivered.
+message RequestOneTimeAccessEmailAsAdminResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// RequestOneTimeAccessEmailRequest is the sign-in page's ask.
+message RequestOneTimeAccessEmailRequest {
+  // email is the address the code should go to.
+  string email = 1 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 254
+    email: true
+  }];
+
+  reserved 2; // formerly redirect_path: the login code is typed, never linked
+}
+
+// RequestOneTimeAccessEmailResponse carries the device token the exchange
+// will demand back. It answers the same shape whether the address names an
+// account or not, so the response is not the disclosure the address list
+// would be.
+message RequestOneTimeAccessEmailResponse {
+  // device_token is the value to hold until the exchange. Useless without
+  // the code, which travels by email alone.
+  string device_token = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}

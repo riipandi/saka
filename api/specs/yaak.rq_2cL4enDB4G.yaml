@@ -1,0 +1,36 @@
+type: http_request
+model: http_request
+id: rq_2cL4enDB4G
+createdAt: 2026-10-02T23:38:24.363442
+updatedAt: 2026-10-02T23:45:51.813435
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TofiUEyN5c
+authentication: {}
+authenticationType: none
+body: {}
+bodyType: null
+description: 'The browser flow''s first hop: writes the pending flow row — state hash, sealed PKCE verifier, nonce — and answers the provider''s authorize URL as a 302 redirect. The provider slug is the connection''s own word (google, github, or a custom connection''s slug); an unknown or disabled connection answers the same not_found-shaped redirect, so the endpoint is not a connection enumerator. The browser walks the URL; a client only inspects the Location header. Guard: public.'
+headers: []
+method: GET
+name: '[Saka] Start OAuth flow (REST)'
+sortPriority: 912.1
+url: ${[ apiBaseURL ]}/oauth/google/start
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: true
+  value: false
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,625 @@
+package signin
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"regexp"
+	"testing"
+	"time"
+	"uuid"
+
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.jetify.com/typeid"
+
+	"connectrpc.com/connect"
+
+	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/modules/identity/jwks"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	"github.com/riipandi/saka/modules/identity/session"
+	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
+	"github.com/riipandi/saka/pkg/jwtutils"
+	conttest "github.com/riipandi/saka/pkg/testutils"
+)
+
+// The HMAC secret a test deployment signs with: 32 bytes of hex, the form
+// key:generate writes for HS256. No key pair is configured, which is the
+// one-stack deployment.
+const testSecretHex = "0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210"
+
+func migratedPool(t *testing.T) *datastore.Postgres {
+	t.Helper()
+
+	return testutils.MigratedPostgres(t, "signin_test")
+}
+
+// testConfig is the one-stack configuration: the HMAC secret alone signs.
+func testConfig() config.Config {
+	cfg := config.Default()
+	cfg.Auth.SecretKey = testSecretHex
+	return cfg
+}
+
+// testService builds the service over a real pool and a real key-set service.
+func testService(t *testing.T, pool *datastore.Postgres) *Service {
+	t.Helper()
+	return NewService(testConfig(), pool, NewRepository(pool), jwks.NewService(testConfig(), nil, nil, nil), nil, nil)
+}
+
+type accountFixture struct {
+	username     string
+	email        string
+	passwordHash string
+	disabled     bool
+	bannedAt     *time.Time
+	banExpires   *time.Time
+	// unverified leaves the verification column unstamped — the state the
+	// sign-up's verification gate leaves an account in. The default fixture
+	// is verified: these tests exercise the sign-in, not the gate.
+	unverified bool
+	// noUsername leaves the username column NULL — the state the open-mode
+	// sign-up leaves an account in when the address is all it has. The
+	// identity the sign-in judges is the email alone.
+	noUsername bool
+}
+
+// createAccount writes a user and its password straight into the tables, the
+// fixture the sign-in reads back through the repository.
+func createAccount(t *testing.T, pool *datastore.Postgres, username, email, password string, mutate func(*accountFixture)) uuid.UUID {
+	t.Helper()
+
+	hash, err := crypto.NewPasswordHasher().Hash(password)
+	require.NoError(t, err)
+
+	fixture := accountFixture{username: username, email: email, passwordHash: hash}
+	if mutate != nil {
+		mutate(&fixture)
+	}
+
+	id := uuid.NewV7()
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(entity.TableUsers)
+	ib.Cols("id", "username", "email", "display_name", "disabled", "email_verified_at")
+	var verifiedAt any = time.Now().UTC()
+	if fixture.unverified {
+		verifiedAt = nil
+	}
+	var usernameValue any = fixture.username
+	if fixture.noUsername {
+		usernameValue = nil
+	}
+	ib.Values(id, usernameValue, fixture.email, "Hogwarts Student", fixture.disabled, verifiedAt)
+	query, args := ib.Build()
+	_, err = pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+
+	// The ban state is a restriction row — the storage the sign-in's join
+	// reads. The fixture's instants carry the window: a past expiry is the
+	// expired lift the read answers, a future or absent one the ban in
+	// force.
+	if fixture.bannedAt != nil {
+		rb := sqlbuilder.PostgreSQL.NewInsertBuilder()
+		rb.InsertInto(entity.TableAccountRestrictions)
+		rb.Cols("user_id", "kind", "started_at", "expires_at")
+		rb.Values(id, "ban", *fixture.bannedAt, fixture.banExpires)
+		query, args = rb.Build()
+		_, err = pool.Exec(t.Context(), query, args...)
+		require.NoError(t, err)
+	}
+
+	pb := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	pb.InsertInto(entity.TableUserPasswords)
+	pb.Cols("user_id", "password_hash")
+	pb.Values(id, fixture.passwordHash)
+	query, args = pb.Build()
+	_, err = pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+	return id
+}
+
+// The username-less account signs in by its email alone: the open-mode
+// sign-up leaves the column NULL, and the scan that read it as a string
+// once turned every such sign-in into a 500 — the regression this pins.
+func TestASignInWithoutAUsernameOpensTheSession(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	const password = "expecto-patronum"
+	userID := createAccount(t, pool, "", "nameless@example.com", password,
+		func(f *accountFixture) { f.noUsername = true })
+
+	result, err := service.SignIn(ctx, Params{
+		Identity:  "nameless@example.com",
+		Password:  password,
+		UserAgent: "signin_test/1",
+		IPAddress: "192.0.2.30",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.User.Username)
+	assert.NotEmpty(t, result.AccessToken)
+	assert.NotEmpty(t, result.RefreshToken)
+
+	// The bridge's completion reads the same row by identifier — the same
+	// NULL rides every account read, not just the identity lookup.
+	again, err := service.repo.FindAccountByID(ctx, userID)
+	require.NoError(t, err)
+	assert.Empty(t, again.Username)
+}
+
+func TestSignInIssuesTheTokenPair(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	const password = "expecto-patronum"
+	userID := createAccount(t, pool, "hermione", "hermione@example.com", password, nil)
+
+	result, err := service.SignIn(ctx, Params{
+		Identity:  "hermione@example.com",
+		Password:  password,
+		UserAgent: "signin_test/1",
+		IPAddress: "192.0.2.10",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, TokenType, result.TokenType)
+	assert.Equal(t, "hermione@example.com", result.User.Email)
+	assert.NotEmpty(t, result.RefreshToken)
+	assert.Equal(t, int32(testConfig().Auth.AccessTTL.Seconds()), result.AccessExpiresIn)
+	assert.Equal(t, int32((7 * 24 * time.Hour).Seconds()), result.RefreshExpiresIn)
+
+	// The session identifier is the typed id, and the refresh token is
+	// stored under its hash alone.
+	require.Regexp(t, regexp.MustCompile(`^sess_[a-z0-9]{26}$`), result.SessionID)
+	sid, err := typeid.Parse[session.SessionID](result.SessionID)
+	require.NoError(t, err)
+	sum := sha256.Sum256([]byte(result.RefreshToken))
+
+	// The access token verifies against the same material the deployment
+	// signs with: the issuer from configuration, the subject the account.
+	cfg := testConfig()
+	keys := jwks.NewService(cfg, nil, nil, nil)
+	key, err := keys.HMACKey(ctx)
+	require.NoError(t, err)
+	algorithm, err := keys.HMACAlgorithm()
+	require.NoError(t, err)
+	assert.Equal(t, jwa.HS256(), algorithm)
+
+	verifier, err := jwtutils.NewVerifier[jwtutils.AccessClaims](key, algorithm)
+	require.NoError(t, err)
+	verified, err := verifier.
+		WithIssuer(cfg.Auth.Issuer).
+		Verify(result.AccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, user.FormatID(userID), verified.Subject,
+		"the subject is the wire form: the row's UUID never leaves the server")
+	assert.Equal(t, result.SessionID, verified.Private.SessionID)
+	assert.Equal(t, "hermione@example.com", verified.Private.Email)
+	assert.Empty(t, verified.Private.Roles)
+
+	// The refresh token is not stored in the clear, the caller address
+	// reached the row, the row lives under the typed id, and the provider
+	// names the credential kind.
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("token_hash", "user_agent", "remember", "provider", "host(ip_address)", "id")
+	sb.From(entity.TableSessions)
+	sb.Where(sb.Equal("user_id", userID))
+	query, args := sb.Build()
+	var tokenHash, userAgent, provider string
+	var remember bool
+	var ipAddress *string
+	var rowID string
+	require.NoError(t, pool.QueryRow(ctx, query, args...).Scan(&tokenHash, &userAgent, &remember, &provider, &ipAddress, &rowID))
+	assert.Equal(t, hex.EncodeToString(sum[:]), tokenHash, "the row must hold the hash, not the token")
+	assert.Equal(t, "signin_test/1", userAgent)
+	assert.False(t, remember)
+	assert.Equal(t, ProviderPassword, provider)
+	require.NotNil(t, ipAddress)
+	assert.Equal(t, "192.0.2.10", *ipAddress)
+	assert.Equal(t, sid.UUID(), rowID)
+
+	// The account records the sign-in.
+	lb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	lb.Select("last_login_at")
+	lb.From(entity.TableUsers)
+	lb.Where(lb.Equal("id", userID))
+	query, args = lb.Build()
+	var lastLogin *time.Time
+	require.NoError(t, pool.QueryRow(ctx, query, args...).Scan(&lastLogin))
+	assert.NotNil(t, lastLogin)
+}
+
+func TestSignInAcceptsUsernameCaseInsensitively(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+
+	_, err := service.SignIn(t.Context(), Params{Identity: "HERMIONE", Password: "expecto-patronum"})
+	require.NoError(t, err)
+}
+
+func TestSignInHidesWhichHalfFailed(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+
+	for name, params := range map[string]Params{
+		"unknown email":        {Identity: "nobody@example.com", Password: "expecto-patronum"},
+		"unknown username":     {Identity: "nobody", Password: "expecto-patronum"},
+		"wrong password":       {Identity: "hermione@example.com", Password: "wrong horse"},
+		"cased email mismatch": {Identity: "ADA@EXAMPLE.COM", Password: "expecto-patronum"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := service.SignIn(t.Context(), params)
+			// The email is matched exactly, the way its unique index is,
+			// so a cased variant of a live address is just unknown.
+			require.ErrorIs(t, err, ErrInvalidCredentials)
+		})
+	}
+}
+
+func TestSignInRefusesTheStatesThatCannotSignIn(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	now := time.Now()
+
+	hourAgo := now.Add(-time.Hour)
+	minuteAgo := now.Add(-time.Minute)
+	hourAhead := now.Add(time.Hour)
+
+	cases := []struct {
+		name    string
+		mutate  func(*accountFixture)
+		wantErr error
+	}{
+		{
+			name:    "disabled",
+			mutate:  func(f *accountFixture) { f.disabled = true },
+			wantErr: ErrAccountDisabled,
+		},
+		{
+			name:    "banned_forever",
+			mutate:  func(f *accountFixture) { f.bannedAt = &hourAgo },
+			wantErr: ErrAccountBanned,
+		},
+		{
+			name: "banned_window",
+			mutate: func(f *accountFixture) {
+				f.bannedAt = &minuteAgo
+				f.banExpires = &hourAhead
+			},
+			wantErr: ErrAccountBanned,
+		},
+		{
+			name: "ban_expired",
+			mutate: func(f *accountFixture) {
+				f.bannedAt = &hourAgo
+				f.banExpires = &minuteAgo
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			createAccount(t, pool, tc.name, tc.name+"@example.com", "expecto-patronum", tc.mutate)
+
+			result, err := service.SignIn(t.Context(), Params{Identity: tc.name, Password: "expecto-patronum"})
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotEmpty(t, result.AccessToken)
+		})
+	}
+}
+
+func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+
+	result, err := service.SignIn(t.Context(), Params{Identity: "hermione", Password: "expecto-patronum"})
+	require.NoError(t, err)
+
+	sid, err := typeid.Parse[session.SessionID](result.SessionID)
+	require.NoError(t, err)
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("ip_address")
+	sb.From(entity.TableSessions)
+	sb.Where(sb.Equal("id", sid.UUID()))
+	query, args := sb.Build()
+	var ip *string
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&ip))
+	assert.Nil(t, ip)
+}
+
+// TestRememberSelectsTheConfiguredLifetime pins the session bound to the
+// settings catalog, not to constants: the remembered and the non-remembered
+// path share session.max_lifetime, so either sign-in writes the same window
+// and the flag only records the caller's choice on the row.
+func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+
+	cfg := testConfig()
+	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
+	service.WithSessionSettings(stubSettingReader{seconds: int64((2 * time.Hour).Seconds())})
+
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+
+	for name, params := range map[string]Params{
+		"short window": {Identity: "hermione", Password: "expecto-patronum"},
+		"long window":  {Identity: "hermione", Password: "expecto-patronum", Remember: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, err := service.SignIn(t.Context(), params)
+			require.NoError(t, err)
+
+			sid, err := typeid.Parse[session.SessionID](result.SessionID)
+			require.NoError(t, err)
+
+			sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+			sb.Select("remember", "created_at", "expires_at")
+			sb.From(entity.TableSessions)
+			sb.Where(sb.Equal("id", sid.UUID()))
+			query, args := sb.Build()
+			var remember bool
+			var createdAt, expiresAt time.Time
+			require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&remember, &createdAt, &expiresAt))
+
+			lifetime := expiresAt.Sub(createdAt)
+			assert.Equal(t, params.Remember, remember)
+			assert.Equal(t, 2*time.Hour, lifetime)
+		})
+	}
+}
+
+// stubSettingReader answers the duration keys with one value and the
+// boolean keys with one flag: the mint's view of the catalog in a test.
+type stubSettingReader struct {
+	seconds     int64
+	mfaRequired bool
+}
+
+func (s stubSettingReader) GetInt64(context.Context, string) (int64, error) {
+	return s.seconds, nil
+}
+
+func (s stubSettingReader) GetString(context.Context, string) (string, error) {
+	return "", errors.New("no string settings in this test")
+}
+
+func (s stubSettingReader) GetBool(_ context.Context, key string) (bool, error) {
+	if key == SettingMFARequired {
+		return s.mfaRequired, nil
+	}
+	return false, nil
+}
+
+func TestSessionLifetimeFallsBackWhenUnreadable(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	cfg := testConfig()
+	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
+	service.WithSessionSettings(stubSettingReader{seconds: 0}) // out of bounds
+
+	assert.Equal(t, sessionMaxLifetimeDefault, service.sessionLifetime(t.Context()))
+	assert.Equal(t, sessionMaxLifetimeDefault, service.SessionLifetime(t.Context(), true))
+}
+
+func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
+	cases := []struct {
+		err  error
+		code connect.Code
+	}{
+		{ErrInvalidCredentials, connect.CodeUnauthenticated},
+		{ErrAccountDisabled, connect.CodePermissionDenied},
+		{ErrAccountBanned, connect.CodePermissionDenied},
+	}
+	for _, tc := range cases {
+		assert.Equal(t, tc.code, connect.CodeOf(mapError(tc.err)), "%v", tc.err)
+	}
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(mapError(errors.New("boom"))))
+}
+
+func TestRPCSignInRefusesAnIncompleteCredential(t *testing.T) {
+	handler := &rpcHandler{service: nil} // the guard runs before the service
+	request := connect.NewRequest(&authnv1.SignInRequest{})
+	_, err := handler.SignIn(t.Context(), request)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
+// keyedSettings is the gate double that answers each catalog key its own
+// state, with the allowlist's value alongside.
+type keyedSettings struct {
+	values    map[string]bool
+	allowlist string
+}
+
+func (s keyedSettings) GetInt64(context.Context, string) (int64, error) {
+	return 0, errors.New("no int settings in this test")
+}
+
+func (s keyedSettings) GetString(_ context.Context, key string) (string, error) {
+	if key == SettingAccessAllowlist {
+		return s.allowlist, nil
+	}
+	return "", errors.New("no string settings in this test")
+}
+
+func (s keyedSettings) GetBool(_ context.Context, key string) (bool, error) {
+	on, ok := s.values[key]
+	if !ok {
+		return false, errors.New("unreadable setting")
+	}
+	return on, nil
+}
+
+// blockingList is the blocklist double: it blocks the one address, and it
+// can fail its read on demand.
+type blockingList struct {
+	address string
+	failing bool
+}
+
+func (b *blockingList) Blocked(_ context.Context, address string) (bool, error) {
+	if b.failing {
+		return false, errors.New("the blocklist read failed")
+	}
+	return address == b.address, nil
+}
+
+// TestIssueSessionTheListsApplyAtSignIn pins the sign-in gate's table: the
+// toggles on and a blocked address is refused before anything mints, the
+// allowlist rescues its own, the toggles off or a failed read or an
+// unwired gate lets the sign-in pass — the lists' fail-open stance.
+func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	blocked := &blockingList{address: "hermione@example.com"}
+	ctx := t.Context()
+	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
+	issue := func(service *Service) error {
+		account, err := service.repo.FindAccountByIdentity(ctx, "hermione@example.com")
+		require.NoError(t, err)
+		_, err = service.IssueSession(ctx, pool, account, ProviderPassword, audit.EventSignIn, SessionParams{})
+		return err
+	}
+
+	base := func(toggles map[string]bool) *Service {
+		service := testService(t, pool)
+		service.WithSessionSettings(keyedSettings{values: toggles})
+		service.WithBlocklist(blocked)
+		return service
+	}
+
+	// Both toggles on and a blocked address: refused, whatever the
+	// credential proved.
+	err := issue(base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	}))
+	assert.ErrorIs(t, err, ErrSigninRestricted)
+
+	// The allowlist rescues its own even when the blocklist names it.
+	rescued := testService(t, pool)
+	rescued.WithSessionSettings(keyedSettings{
+		values: map[string]bool{
+			SettingAccessBlocklistEnabled:          true,
+			SettingAccessBlocklistAppliesToSignins: true,
+			SettingAccessAllowlistEnabled:          true,
+		},
+		allowlist: "hermione@example.com",
+	})
+	rescued.WithBlocklist(blocked)
+	assert.NoError(t, issue(rescued))
+
+	// The sign-in toggle off: the lists stay a sign-up matter.
+	off := base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: false,
+	})
+	assert.NoError(t, issue(off))
+
+	// A failed read lets the sign-in pass.
+	failing := base(map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	})
+	failing.WithBlocklist(&blockingList{address: "hermione@example.com", failing: true})
+	assert.NoError(t, issue(failing))
+
+	// An unwired gate is the bare wiring: nothing blocks.
+	unwired := testService(t, pool)
+	unwired.WithSessionSettings(keyedSettings{values: map[string]bool{
+		SettingAccessBlocklistEnabled:          true,
+		SettingAccessBlocklistAppliesToSignins: true,
+	}})
+	assert.NoError(t, issue(unwired))
+}
+
+// lockoutSettings is the restrictions feature's policy stub: five attempts
+// — the reader's floor — and a one-hour window.
+type lockoutSettings struct{}
+
+func (lockoutSettings) GetBool(_ context.Context, key string) (bool, error) {
+	return key == "lockout.enabled", nil
+}
+
+func (lockoutSettings) GetString(_ context.Context, key string) (string, error) {
+	switch key {
+	case "lockout.max_attempts":
+		return "5", nil
+	case "lockout.duration":
+		return "1h", nil
+	}
+	return "", errors.New("unreadable setting")
+}
+
+// TestTheLockoutAnswersTheCredentialError pins the lockout's refusal
+// shape: the account the failed-attempt policy locked answers the same
+// generic credential error a wrong password does — never the ban's answer,
+// never a success — so the lockout cannot become the oracle its trip would
+// hand the attacker. The account's address learns of the lock through the
+// notice, not the response.
+func TestTheLockoutAnswersTheCredentialError(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	const password = "expecto-patronum"
+	id := createAccount(t, pool, "rlangdon", "langdon@example.com", password, nil)
+	service := testService(t, pool).WithRestrictions(
+		restrictions.NewService(pool, nil, nil).WithSettings(lockoutSettings{}))
+
+	// The streak trips the bound: five wrong passwords lock the account.
+	for range 5 {
+		_, err := service.SignIn(t.Context(), Params{
+			Identity: "langdon@example.com", Password: "wrong-password-1",
+		})
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+	}
+
+	// The correct credential earns the same refusal — and nothing else.
+	_, err := service.SignIn(t.Context(), Params{
+		Identity: "langdon@example.com", Password: password,
+	})
+	assert.ErrorIs(t, err, ErrInvalidCredentials,
+		"the locked account's answer is the credential error, not the ban's, not a success")
+
+	// The lockout row is the response the wire never carries.
+	row, err := restrictions.NewRepository().ActiveRow(t.Context(), pool, id, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, row)
+	assert.Equal(t, restrictions.KindLockout, row.Kind)
+}

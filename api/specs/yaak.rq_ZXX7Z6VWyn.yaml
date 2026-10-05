@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_ZXX7Z6VWyn
+createdAt: 2026-09-27T11:44:29.707598
+updatedAt: 2026-09-27T11:47:44.981512
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: '[Saka] Answer the roles one account actively holds. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: N8aAbsJkVW
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: prqZxqGePa
+method: POST
+name: List User Roles
+sortPriority: 7000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/ListUserRoles
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

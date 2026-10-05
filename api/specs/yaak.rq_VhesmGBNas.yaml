@@ -2,18 +2,18 @@ type: http_request
 model: http_request
 id: rq_VhesmGBNas
 createdAt: 2026-09-19T12:32:22.306194
-updatedAt: 2026-09-19T14:57:33.557768
+updatedAt: 2026-09-29T01:36:38.478183
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WkFGw2eWkx
+folderId: fl_Uf3pbN2b4K
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "clientId": "REPLACE_CLIENT_ID"
     }
 bodyType: application/json
-description: ''
+description: 'Read the SCIM service provider one client syncs to. The token never appears here: it is sealed at rest and only the Create answer carries it once.\n\nUpstream: Pocket ID''s GET /api/oidc/clients/{id}/scim-service-provider; saka folds it into ScimProviderService as GetByClient keyed by clientId.\n\nParameters:\n- clientId (body, required): the OIDC client, raw UUID form'
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +24,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Get SCIM service provider for a client
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/GetScimProvider
-urlParameters: []
+name: '[Pocket ID] Get SCIM service provider'
+sortPriority: 12000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/GetByClient
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

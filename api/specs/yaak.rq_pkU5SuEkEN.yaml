@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_pkU5SuEkEN
 createdAt: 2026-09-19T12:34:22.910639
-updatedAt: 2026-09-19T14:54:51.938845
+updatedAt: 2026-09-29T01:37:17.182292
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_Uf3pbN2b4K
 authentication: {}
@@ -13,7 +13,7 @@ body:
       "id": "REPLACE_PROVIDER_ID"
     }
 bodyType: application/json
-description: ''
+description: 'Remove a provisioning target. The remote data the sync pushed stays where it is; deleting the row only ends the sync.\n\nUpstream: Pocket ID''s DELETE /api/scim/service-provider/{id}.\n\nParameters:\n- id (body, required): the provider''s identifier, raw UUID form'
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +24,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Delete SCIM service provider
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.ScimProviderService/Delete
-urlParameters: []
+name: '[Pocket ID] Delete SCIM service provider'
+sortPriority: 1000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.ScimProviderService/Delete
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

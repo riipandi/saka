@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_eik9ua9AvF
+createdAt: 2026-09-27T11:44:29.575321
+updatedAt: 2026-09-28T11:28:57.743092
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}",
+      "name": "Content Editor",
+      "description": "Edits the content"
+    }
+bodyType: application/json
+description: '[Saka] Replace a role name and description. The slug and the type do not move, and a system role refuses the change. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: GZTuaqMvUn
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: M6euhqnz6N
+method: POST
+name: Update Role
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/UpdateRole
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

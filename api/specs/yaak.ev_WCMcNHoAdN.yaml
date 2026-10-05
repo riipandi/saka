@@ -3,7 +3,7 @@ model: environment
 id: ev_WCMcNHoAdN
 workspaceId: wk_kBiMYTkhPP
 createdAt: 2026-09-13T08:08:50.987531
-updatedAt: 2026-09-18T18:57:20.914128
+updatedAt: 2026-09-26T12:28:02.620893
 name: Development
 public: true
 base: false
@@ -13,18 +13,18 @@ variables:
 - enabled: true
   name: apiBaseURL
   value: http://localhost:3080
-  id: gzWyHcyqwP
+  id: thTEajV9Ny
 - enabled: true
-  name: accessToken
-  value: dummy
-  id: DQy850JbsC
+  name: identity
+  value: admin@example.com
+  id: kZ3aiH2q4m
 - enabled: true
-  name: refreshToken
-  value: dummy
-  id: b0K5YS67Js
+  name: password
+  value: '@dmin123'
+  id: xw8XKFxEZU
 - enabled: true
-  name: apiKey
-  value: sk_dummy
-  id: SFzggKe5V4
+  name: remember
+  value: 'true'
+  id: PAg0maRGjY
 color: null
-sortPriority: 0.0
+sortPriority: 0.1

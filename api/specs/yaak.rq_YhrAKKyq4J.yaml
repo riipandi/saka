@@ -2,15 +2,21 @@ type: http_request
 model: http_request
 id: rq_YhrAKKyq4J
 createdAt: 2026-09-19T12:33:32.171637
-updatedAt: 2026-09-19T14:53:57.342922
+updatedAt: 2026-09-28T10:13:20.746963
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
 authenticationType: null
 body:
-  text: '{}'
+  text: |-
+    {
+      "to": "${[ identity ]}"
+    }
 bodyType: application/json
-description: ''
+description: |-
+  Send a test email to verify email configuration.
+
+  Mirror of Pocket ID `POST /api/application-configuration/test-email`. Synchronous: an SMTP failure is the call's failure. Empty body sends to the caller's address on record; `{"to":"..."}` redirects it.
 headers:
 - enabled: true
   name: Content-Type
@@ -21,9 +27,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Send test email
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApplicationConfigurationService/TestEmail
+name: '[Pocket ID] Send test email'
+sortPriority: 5000.0
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.AppConfigService/TestEmail
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_A7hNwu3WhZ
+createdAt: 2026-09-28T09:24:57.962718
+updatedAt: 2026-09-28T11:27:32.683285
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "nocache": false
+    }
+bodyType: application/json
+description: |-
+  Answers the catalog items an unauthenticated client may read: only the ones flagged public, names and values.
+
+  Saka procedure saka.settings.v1.SettingsService/ListPublic. Guard: public. A public item never rests sealed - the catalog refuses the pair - so this read never carries a ciphertext.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 4WTiIsqC2W
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: F6VtbjDnkv
+method: POST
+name: '[Saka] List public settings'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/ListPublic
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Project-owned pre-commit hook, run by the Vite+ dispatcher
+# (core.hooksPath → .vite-hooks/_). Committed; the dispatcher and the _/
+# shims are generated and never edited.
+
+# Staged-file checks from the `staged` block in vite.config.ts: vp check
+# --fix (oxlint + oxfmt) for the JS/TS/CSS/JSON files, gofmt for the Go
+# sources. Fixed files are re-staged.
+vp staged
+
+# The Yaak export is committed, so a credential typed into a request body
+# would land in git; the guard rejects literals and accepts REPLACE_*
+# placeholders and ${[ env_var ]} references.
+yaak_files=$(git diff --cached --name-only --diff-filter=ACM -- 'api/specs/*.yaml')
+if [ -n "$yaak_files" ]; then
+    ./scripts/check-yaak-secrets.sh $yaak_files
+fi

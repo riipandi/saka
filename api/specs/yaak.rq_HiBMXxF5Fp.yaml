@@ -1,0 +1,60 @@
+type: http_request
+model: http_request
+id: rq_HiBMXxF5Fp
+createdAt: 2026-09-28T09:24:57.873922
+updatedAt: 2026-09-28T10:13:30.771754
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_tw8Gigobcd
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "key": "product.name",
+      "value": "Hogwarts",
+      "sensitive": false,
+      "public": true
+    }
+bodyType: application/json
+description: |-
+  Replaces one setting value. The write is an upsert over the catalog key; the flags (sealed, public) are the catalog, not the request.
+
+  Saka procedure saka.settings.v1.SettingsService/Update. Guard: admin.
+
+  A sealed item (per the catalog) encrypts the value at rest (AES-256-GCM, enc: prefix).
+
+  Parameters:
+  - key (body, required): the setting catalog key
+  - value (body, required): the value in the clear
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Update setting'
+sortPriority: 333.3333333333333
+url: ${[ apiBaseURL ]}/rpc/saka.settings.v1.SettingsService/Update
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

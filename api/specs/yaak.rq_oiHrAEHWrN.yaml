@@ -2,18 +2,24 @@ type: http_request
 model: http_request
 id: rq_oiHrAEHWrN
 createdAt: 2026-09-19T12:32:10.501420
-updatedAt: 2026-09-19T14:57:52.444010
+updatedAt: 2026-09-28T14:57:07.086744
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_SRs9gwLx8j
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Removes a client's logo; the logo endpoint then answers not found. A client without a logo is the same success that records nothing — the state it names is the one it is in.
+
+  Saka procedure saka.federation.v1.OidcClientService/DeleteLogo. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +30,18 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Delete client logo
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/DeleteLogo
-urlParameters: []
+name: '[Pocket ID] Delete client logo'
+sortPriority: 6000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/DeleteLogo
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+- enabled: false
+  name: light
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

@@ -2,28 +2,34 @@ type: http_request
 model: http_request
 id: rq_vbNNicT9VF
 createdAt: 2026-09-19T12:32:10.505776
-updatedAt: 2026-09-19T15:38:43.799818
+updatedAt: 2026-09-28T20:48:06.974875
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_SRs9gwLx8j
+folderId: fl_jyTw5r8X2o
 authentication: {}
-authenticationType: null
+authenticationType: none
 body: {}
 bodyType: null
-description: ''
+description: |-
+  Answers a client's logo as the raw image bytes — the asset the OIDC sign-in page fetches through an <img> tag, so the read is public and carries no envelope. A client without a logo, or an unknown one, answers 404, never a substitute. The cache holds briefly, because an update changes the bytes.
+
+  Saka-only REST route beside the saka.federation.v1.OidcClientService surface. Guard: public.
+
+  Parameters:
+  - clientId (path): the client's identifier
 headers: []
 method: GET
-name: Get client logo
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/api/oidc/clients/:clientId/logo
+name: '[Pocket ID] Get client logo'
+sortPriority: 7000.0
+url: ${[ apiBaseURL ]}/oidc/clients/:clientId/logo
 urlParameters:
 - enabled: true
-  name: :clientId
-  value: dummy
-  id: path-placeholder:1
-- enabled: true
-  name: ''
+  name: id
+  value: REPLACE_ID
+  id: null
+- enabled: false
+  name: light
   value: ''
-  id: jykJTSMzTM
+  id: null
 settingSendCookies:
   enabled: false
   value: true

@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_wjbHFxBW3g
+createdAt: 2026-10-01T18:57:43.159545
+updatedAt: 2026-10-01T19:07:50.521662
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Queue surface — re-enqueues the dead tasks under fresh identities; answers how many went back.
+
+  Admin only. saka built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Replay failed tasks (queue)'
+sortPriority: 4111.111111111111
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ReplayDeadTasks
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

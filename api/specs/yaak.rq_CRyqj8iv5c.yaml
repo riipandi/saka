@@ -2,18 +2,27 @@ type: http_request
 model: http_request
 id: rq_CRyqj8iv5c
 createdAt: 2026-09-19T12:32:22.296754
-updatedAt: 2026-09-19T14:57:58.598217
+updatedAt: 2026-09-28T14:57:13.596690
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_dMv3SV2esq
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal",
+      "expires_at": "2027-01-01T00:00:00Z"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Mints one more secret for a client. Several live secrets are legitimate — a rotation is an addition followed by a deletion, never a swap. Absent a value, a 32-character alphanumeric secret is drawn; a supplied one must carry at least 16 characters of the same alphabet. The raw value is shown exactly once.
+
+  Saka procedure saka.federation.v1.OidcClientService/CreateSecret. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client
+  - secret (body, optional): the value to store, 16-128 alphanumeric characters
+  - expires_at (body, optional): when the secret stops authenticating
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +33,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Create client secret
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/CreateSecret
-urlParameters: []
+name: '[Pocket ID] Create client secret'
+sortPriority: 14000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/CreateSecret
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

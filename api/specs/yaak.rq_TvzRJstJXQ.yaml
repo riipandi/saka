@@ -1,0 +1,39 @@
+type: http_request
+model: http_request
+id: rq_TvzRJstJXQ
+createdAt: 2026-09-25T10:24:47.267979
+updatedAt: 2026-09-26T14:50:55.957282
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_dp4vR24das
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: |-
+  Readiness probe at /api/healthz: the aggregated availability of the dependencies the process runs on, with one entry per check in check-name order.
+
+  saka built-in; no Pocket ID counterpart.
+headers: []
+method: GET
+name: '[Saka] System Health Check via REST'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/api/healthz
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

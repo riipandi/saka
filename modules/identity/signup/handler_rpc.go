@@ -3,222 +3,215 @@ package signup
 import (
 	"context"
 	"errors"
-	"net/http"
-	"strings"
+	"math"
 	"time"
 
 	"connectrpc.com/connect"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/rpcerr"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/modules/identity"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/pkg/responder"
-	"github.com/riipandi/tango/pkg/validate"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/go-chi/chi/v5"
+
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/modules/identity/user"
 )
 
-// RPCService returns the Connect registration for the signup surface:
-// signup and the initial-admin setup are anonymous; the signup-token
-// administration resolves the bearer and demands an admin, guarded
-// per procedure because one service mixes the two.
-func (s *Service) RPCService(access kernel.AccessAuthenticator) (string, http.Handler) {
-	admin := map[string]bool{
-		identityv1connect.SignupServiceListSignupTokensProcedure:  true,
-		identityv1connect.SignupServiceCreateSignupTokenProcedure: true,
-		identityv1connect.SignupServiceDeleteSignupTokenProcedure: true,
-	}
-	opts := append(rpcerr.Options(), connect.WithInterceptors(middleware.RPCPrincipalGuard(access, admin, nil)))
-	prefix, handler := identityv1connect.NewSignupServiceHandler(&signupRPC{service: s}, opts...)
-	return prefix, handler
-}
+// ModuleName is the name this feature reports under. The area it belongs to
+// qualifies it, so the name is the feature alone.
+const ModuleName = "signup"
 
-type signupRPC struct {
+// Module serves the sign-up and signup-token procedures. Everything it
+// answers is an RPC procedure, so its HTTP mount is empty by construction.
+type Module struct {
 	service *Service
 }
 
-func (h *signupRPC) Signup(ctx context.Context, req *connect.Request[identityv1.SignupRequest]) (*connect.Response[identityv1.SignedIn], error) {
-	params := SignUpRequest{
-		Username:  req.Msg.GetUsername(),
-		Email:     req.Msg.GetEmail(),
-		FirstName: req.Msg.GetFirstName(),
-		LastName:  req.Msg.GetLastName(),
-		Token:     req.Msg.GetToken(),
-	}
-	if err := params.Validate(); err != nil {
-		return nil, validationError(err)
-	}
-
-	result, err := h.service.SignUp(ctx, params, false)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return h.signedIn(ctx, result), nil
+// NewModule builds the module over the sign-up service.
+func NewModule(service *Service) *Module {
+	return &Module{service: service}
 }
 
-func (h *signupRPC) GetSetupAvailability(_ context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[identityv1.GetSetupAvailabilityResponse], error) {
-	available, err := h.service.SetupAvailable(context.Background())
-	if err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	return connect.NewResponse(&identityv1.GetSetupAvailabilityResponse{Available: available}), nil
+// Name reports the module in composition reports.
+func (m *Module) Name() string { return ModuleName }
+
+// Mount registers the endpoints on the HTTP router. The feature serves no
+// plain HTTP route: a procedure is POST-only on the RPC surface.
+func (m *Module) Mount(r chi.Router) {}
+
+// MountRPC registers the procedures on the RPC router. The handler options
+// are the transport's — the shared snake_case codec and the panic boundary —
+// so the procedures answer exactly like the transport's own. Each procedure
+// is registered at its own path: the generated handler answers a path under
+// its prefix it does not know with a plain-text 404, which a Connect client
+// cannot read.
+func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
+	_, handler := identityv1connect.NewSignupServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(identityv1connect.SignupServiceSignupProcedure, handler)
+	r.Handle(identityv1connect.SignupServiceCreateSignupTokenProcedure, handler)
+	r.Handle(identityv1connect.SignupServiceListSignupTokensProcedure, handler)
+	r.Handle(identityv1connect.SignupServiceDeleteSignupTokenProcedure, handler)
 }
 
-func (h *signupRPC) SetupInitialAdmin(ctx context.Context, req *connect.Request[identityv1.SetupInitialAdminRequest]) (*connect.Response[identityv1.SignedIn], error) {
-	params := SignUpRequest{
-		Username: req.Msg.GetUsername(),
-		Email:    req.Msg.GetEmail(),
-	}
-	if err := params.Validate(); err != nil {
-		return nil, validationError(err)
-	}
-
-	result, err := h.service.SignUp(ctx, params, true)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return h.signedIn(ctx, result), nil
+// rpcHandler is the transport mapping of the procedures. The service carries
+// the rules; this type carries the connect codes.
+type rpcHandler struct {
+	service *Service
 }
 
-func (h *signupRPC) ListSignupTokens(ctx context.Context, req *connect.Request[commonv1.PageRequest]) (*connect.Response[identityv1.ListSignupTokensResponse], error) {
-	tokens, err := h.service.ListTokens(ctx)
+// newRPCHandler builds the handler over the service.
+func newRPCHandler(service *Service) identityv1connect.SignupServiceHandler {
+	return &rpcHandler{service: service}
+}
+
+// Signup creates an account from a signup token.
+func (h *rpcHandler) Signup(ctx context.Context, req *connect.Request[identityv1.SignupRequest]) (*connect.Response[identityv1.SignupResponse], error) {
+	body := req.Msg
+
+	account, err := h.service.Signup(ctx, Params{
+		Username:  body.Username,
+		Email:     body.Email,
+		Password:  body.Password,
+		Token:     body.Token,
+		FirstName: body.GetFirstName(),
+		LastName:  body.GetLastName(),
+	})
 	if err != nil {
-		return nil, rpcerr.Internal("internal error")
+		return nil, mapError(err)
 	}
-	page, limit := rpcerr.NormalizePage(int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
-	total := len(tokens)
-	if start := responder.Offset(page, limit); start > 0 || !responder.All(page, limit) {
-		if start >= total {
-			tokens = nil
-		} else {
-			tokens = tokens[start:min(start+limit, total)]
-		}
-	}
-	out := make([]*identityv1.SignupToken, 0, len(tokens))
-	for _, t := range tokens {
-		out = append(out, tokenProto(t))
-	}
-	return connect.NewResponse(&identityv1.ListSignupTokensResponse{
-		Tokens:   out,
-		Metadata: rpcerr.ListMetadata(ctx, page, limit, total),
+
+	return connect.NewResponse(&identityv1.SignupResponse{
+		User: user.WireView(account),
+
+		Status:  webutil.StatusSuccess,
+		Message: "the account was created",
 	}), nil
 }
 
-func (h *signupRPC) CreateSignupToken(ctx context.Context, req *connect.Request[identityv1.CreateSignupTokenRequest]) (*connect.Response[identityv1.SignupTokenSecret], error) {
-	var ttl time.Duration
-	if req.Msg.Ttl != nil && *req.Msg.Ttl != "" {
-		parsed, err := time.ParseDuration(req.Msg.GetTtl())
-		if err != nil {
-			return nil, rpcerr.InvalidArgument("ttl must be a duration (e.g. 24h)")
-		}
-		ttl = parsed
-	}
-
-	token, raw, err := h.service.CreateToken(ctx, CreateParams{
-		TTL:        ttl,
-		UsageLimit: int(req.Msg.GetUsageLimit()),
-		GroupIDs:   req.Msg.GetUserGroupIds(),
+// CreateSignupToken issues a signup token. The procedure is administrative:
+// the transport authenticated the caller, and the claims decide the role.
+func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request[identityv1.CreateSignupTokenRequest]) (*connect.Response[identityv1.CreateSignupTokenResponse], error) {
+	body := req.Msg
+	created, err := h.service.CreateSignupToken(ctx, CreateTokenParams{
+		TTL:        time.Duration(body.TtlSeconds) * time.Second,
+		UsageLimit: body.GetUsageLimit(),
+		GroupIDs:   body.GetUserGroupIds(),
 	})
 	if err != nil {
-		return nil, rpcerr.Internal("failed to create token")
+		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.SignupTokenSecret{TokenInfo: tokenProto(*token), Token: raw}), nil
+
+	return connect.NewResponse(&identityv1.CreateSignupTokenResponse{
+		Token:    tokenView(created.Token),
+		RawToken: created.RawToken,
+
+		Status:  webutil.StatusSuccess,
+		Message: "the signup token was created",
+	}), nil
 }
 
-func (h *signupRPC) DeleteSignupToken(ctx context.Context, req *connect.Request[identityv1.DeleteSignupTokenRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := identity.ParseID[SignupTokenID](req.Msg.GetTokenId())
+// ListSignupTokens answers the issued tokens with their pagination block.
+func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[identityv1.ListSignupTokensRequest]) (*connect.Response[identityv1.ListSignupTokensResponse], error) {
+	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, rpcerr.NotFound("token not found")
+		return nil, mapError(err)
 	}
-	if err := h.service.DeleteToken(ctx, id); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil, rpcerr.NotFound("token not found")
-		}
-		return nil, rpcerr.Internal("internal error")
+
+	views := make([]*identityv1.SignupToken, 0, len(tokens))
+	for _, token := range tokens {
+		views = append(views, tokenView(token))
 	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
+	return connect.NewResponse(&identityv1.ListSignupTokensResponse{
+		Tokens:   views,
+		Metadata: listMetadata(pagination),
+
+		Status:  webutil.StatusSuccess,
+		Message: "the signup tokens were listed",
+	}), nil
 }
 
-// signedIn maps the signup result onto the shared response; the
-// session and access tokens travel in the body.
-func (h *signupRPC) signedIn(ctx context.Context, result *Result) *connect.Response[identityv1.SignedIn] {
-	resp := connect.NewResponse(signedInProto(result))
-	resp.Msg.SessionToken = result.Token
-	resp.Msg.SessionId = result.Session.ID
-	if access, _, err := h.service.sessions.IssueAccess(ctx, principalFromResolve(result.User, result.Session)); err == nil {
-		resp.Msg.AccessToken = access
+// DeleteSignupToken revokes an issued token.
+func (h *rpcHandler) DeleteSignupToken(ctx context.Context, req *connect.Request[identityv1.DeleteSignupTokenRequest]) (*connect.Response[identityv1.DeleteSignupTokenResponse], error) {
+	if err := h.service.DeleteSignupToken(ctx, req.Msg.Id); err != nil {
+		return nil, mapError(err)
 	}
-	return resp
+	return connect.NewResponse(&identityv1.DeleteSignupTokenResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the signup token was deleted",
+	}), nil
 }
 
-// signedInProto maps the domain result onto the shared message.
-func signedInProto(result *Result) *identityv1.SignedIn {
-	return &identityv1.SignedIn{
-		User:    user.ProtoView(result.User),
-		Pending: false,
-	}
-}
-
-// principalFromResolve rebuilds the principal from a Resolve call.
-func principalFromResolve(u user.User, se session.Session) kernel.Principal {
-	return kernel.Principal{
-		SessionID: se.ID,
-		UserID:    u.ID.String(),
-		Username:  u.Username,
-		Email:     u.Email,
-		Provider:  se.Provider,
-		IsAdmin:   u.IsAdmin,
-	}
-}
-
-// tokenView maps the token row onto the wire message; the hash never
-// leaves the store.
-func tokenProto(t SignupToken) *identityv1.SignupToken {
+// tokenView maps the service's token view onto the wire message.
+func tokenView(token TokenView) *identityv1.SignupToken {
 	return &identityv1.SignupToken{
-		Id:         t.ID.String(),
-		UsageLimit: rpcerr.ToInt32(t.UsageLimit),
-		UsageCount: rpcerr.ToInt32(t.UsageCount),
-		CreatedAt:  t.CreatedAt.UTC().Format(time.RFC3339),
-		ExpiresAt:  t.ExpiresAt.UTC().Format(time.RFC3339),
-		UserGroups: t.GroupIDs,
+		Id:           token.ID,
+		UsageLimit:   token.UsageLimit,
+		UsageCount:   token.UsageCount,
+		CreatedAt:    token.CreatedAt.Format(time.RFC3339),
+		ExpiresAt:    token.ExpiresAt.Format(time.RFC3339),
+		UserGroupIds: token.GroupIDs,
 	}
 }
 
-// rpcError maps signup domain sentinels onto Connect codes.
-func rpcError(err error) error {
-	var cerr *connect.Error
-	if errors.As(err, &cerr) {
-		return cerr
+// listMetadata maps the responder's pagination onto the shared block. The
+// wire fields are optional, so an unknown range is absent rather than zero.
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
+	meta := &commonv1.ListMetadata{}
+	set := func(dst **int32, src *int) {
+		if src == nil {
+			return
+		}
+		// The wire field is int32; a total beyond it saturates rather than
+		// wrapping, and no page the rules allow can reach the bound.
+		value := *src
+		if value > math.MaxInt32 || value < math.MinInt32 {
+			value = math.MaxInt32
+		}
+		*dst = ptr(int32(value))
 	}
+	set(&meta.Page, p.Page)
+	set(&meta.Limit, p.Limit)
+	set(&meta.TotalPages, p.TotalPages)
+	set(&meta.TotalItems, p.TotalItems)
+	set(&meta.FirstItemIndex, p.FirstItemIndex)
+	set(&meta.LastItemIndex, p.LastItemIndex)
+	return meta
+}
+
+// ptr hands the setters an addressable value.
+func ptr[T any](value T) *T {
+	return &value
+}
+
+// mapError translates the service's failures into the codes the Connect
+// protocol carries. The internal ones are collapsed to one answer whose text
+// names nothing a caller could aim at. A malformed field never reaches the
+// service: the transport's validate interceptor refuses it with the typed
+// violation details the contracts carry.
+func mapError(err error) error {
 	switch {
-	case errors.Is(err, ErrSetupCompleted):
-		return rpcerr.AlreadyExists("initial setup has already been completed")
-	case errors.Is(err, user.ErrDuplicate):
-		return rpcerr.AlreadyExists(err.Error())
-	case errors.Is(err, user.ErrInvalidUsername), errors.Is(err, user.ErrInvalidEmail):
-		return rpcerr.InvalidArgument(err.Error())
-	case errors.Is(err, ErrNotFound):
-		// Enumeration-safe: an unknown, expired, and exhausted signup
-		// token are indistinguishable.
-		return rpcerr.Unauthenticated("signup token is invalid or expired")
-	case errors.Is(err, ErrExhausted):
-		return rpcerr.PermissionDenied("signup token usage limit reached")
-	case errors.Is(err, ErrInvalidIDs):
-		return rpcerr.InvalidArgument("unknown user group id")
+	case errors.Is(err, ErrInvalidToken):
+		return connect.NewError(connect.CodePermissionDenied, errors.New("signup token is invalid or expired"))
+	case errors.Is(err, ErrAccountExists):
+		return connect.NewError(connect.CodeAlreadyExists, errors.New("account already exists"))
+	case errors.Is(err, ErrSignupNotAllowed):
+		return connect.NewError(connect.CodeNotFound, errors.New("sign-up is not available"))
+	case errors.Is(err, ErrUsernameRequired):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is required"))
+	case errors.Is(err, ErrUsernameInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is invalid"))
+	case errors.Is(err, ErrTokenNotFound):
+		return connect.NewError(connect.CodeNotFound, errors.New("signup token not found"))
+	case isPasswordPolicy(err):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
-		return rpcerr.Internal("internal error")
+		return connect.NewError(connect.CodeInternal, errors.New("sign-up failed"))
 	}
 }
 
-// validationError maps ozzo field errors onto invalid_argument.
-func validationError(verr error) error {
-	parts := make([]string, 0, 4)
-	for _, fe := range validate.FieldErrors(verr) {
-		parts = append(parts, fe.Field+": "+fe.Message)
-	}
-	return rpcerr.InvalidArgument("validation failed: " + strings.Join(parts, "; "))
+// isPasswordPolicy reports whether the failure is the credential policy's
+// refusal. The rule lives in the password package, so the check does too —
+// the handler maps the answer without learning the policy's rules.
+func isPasswordPolicy(err error) bool {
+	return errors.Is(err, password.ErrWeakPassword) || errors.Is(err, password.ErrBreachedPassword)
 }

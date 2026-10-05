@@ -1,0 +1,39 @@
+type: http_request
+model: http_request
+id: rq_SMi9SsYagg
+createdAt: 2026-09-28T22:24:37.926745
+updatedAt: 2026-09-28T22:24:37.926745
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: |-
+  The browser's entry point: with `?user_code=` the flow resumes into the SPA interaction (sign-in, then consent); without one the SPA renders the entry form. The approval completes at `POST /oidc/device/{callback}`.
+
+  Endpoint: `GET,POST /oidc/device[/{callback}]`
+headers: []
+method: GET
+name: '[Saka] Verify device code'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/device
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

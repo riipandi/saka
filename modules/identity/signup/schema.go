@@ -1,20 +1,18 @@
-// Package signup implements application-based self-service sign-up
-// flows (create + approve) with rate-limited endpoints.
 package signup
 
-import "go.jetify.com/typeid"
-
-// Typed IDs for the signup and invitation tables: UUIDv7 suffix,
-// snake_case prefix matching the singular table name.
-type (
-	signupTokenPrefix struct{}
-
-	SignupTokenID = typeid.TypeID[signupTokenPrefix]
-
-	invitationPrefix struct{}
-
-	InvitationID = typeid.TypeID[invitationPrefix]
+import (
+	"time"
+	"uuid"
 )
 
-func (signupTokenPrefix) Prefix() string { return "signup_token" }
-func (invitationPrefix) Prefix() string  { return "invitation" }
+// SignupToken is one row of entity.TableSignupTokens, the view the feature reads and
+// the operators manage. The raw token is not a field: only its hash is
+// stored. GroupIDs are the groups its sign-ups join.
+type SignupToken struct {
+	ID         uuid.UUID
+	UsageLimit int32
+	UsageCount int32
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	GroupIDs   []uuid.UUID
+}

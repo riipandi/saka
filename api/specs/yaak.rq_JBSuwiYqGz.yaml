@@ -1,0 +1,59 @@
+type: http_request
+model: http_request
+id: rq_JBSuwiYqGz
+createdAt: 2026-09-25T10:33:42.197240
+updatedAt: 2026-09-26T18:47:27.387151
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "token": "${[ response.body.path(request='rq_U5vZq9PD9f', behavior='smart', ttl='0', result='first', join=', ', path='$.token') ]}"
+    }
+bodyType: application/json
+description: |-
+  Consume a one-time access code and sign its holder in. Anonymous by design: the code is the credential. The response is the token pair a password sign-in answers with.
+
+  Mirror of Pocket ID `POST /api/one-time-access-token/{token}`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/ExchangeToken`.
+
+  Body:
+  - token: the code the email linked to (6 or 12 characters)
+  - device_token: optional; required when the code came from the public email request
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Exchange one-time access token'
+sortPriority: 20000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken
+urlParameters:
+- enabled: true
+  name: ''
+  value: ''
+  id: VqTSwDstEW
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

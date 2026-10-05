@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_JnqG9ZCE8V
+createdAt: 2026-09-25T10:33:42.035450
+updatedAt: 2026-09-26T18:47:27.387773
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "email": "${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=', ', path='$.user.email') ]}"
+    }
+bodyType: application/json
+description: |-
+  Send a one-time access code to the address the caller names, from the sign-in page. An address no account holds answers the same success, so the procedure cannot enumerate addresses. The code is typed on the sign-in screen — there is no link to click. The response carries the device token the exchange demands back. Refused while `auth.one_time_access_email_as_unauthenticated_enabled` is off.
+
+  Mirror of Pocket ID `POST /api/one-time-access-email`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/RequestEmail`.
+
+  Body:
+  - email: the address the code should go to
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Request one-time access email'
+sortPriority: 22000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

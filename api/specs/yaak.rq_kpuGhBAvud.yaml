@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_kpuGhBAvud
+createdAt: 2026-09-28T20:45:10.286013
+updatedAt: 2026-09-28T20:47:48.205352
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: none
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: id_token_hint
+    value: REPLACE_ID_TOKEN
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+  - enabled: true
+    name: post_logout_redirect_uri
+    value: https://rp.example/logged-out
+bodyType: application/x-www-form-urlencoded
+description: |-
+  RP-initiated logout: verifies the id_token_hint (issuer, skew, the id-token type claim), revokes the account's grants and tokens for that client, and honors a registered post_logout_redirect_uri. Answers GET and POST.
+
+  Endpoint: `GET,POST /oidc/end-session`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: null
+method: GET
+name: '[Pocket ID] End session'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/end-session
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

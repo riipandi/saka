@@ -2,18 +2,24 @@ type: http_request
 model: http_request
 id: rq_JJM6p4NuM3
 createdAt: 2026-09-19T12:31:58.362266
-updatedAt: 2026-09-19T14:58:12.291329
+updatedAt: 2026-09-28T14:56:47.249721
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID"
+      "id": "hogwarts-portal"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Removes a client. The authorization codes, sessions, grants, and group restrictions that name it die with it, by the schema's cascades. An unknown client is the not-found refusal.
+
+  Saka procedure saka.federation.v1.OidcClientService/DeleteClient. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client to remove
 headers:
 - enabled: true
   name: Content-Type
@@ -24,10 +30,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Delete OIDC client
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/DeleteClient
-urlParameters: []
+name: '[Pocket ID] Delete OIDC client'
+sortPriority: 2000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/DeleteClient
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

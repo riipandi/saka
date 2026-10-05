@@ -2,20 +2,26 @@ type: http_request
 model: http_request
 id: rq_BeqhVDndGG
 createdAt: 2026-09-19T12:32:10.497118
-updatedAt: 2026-09-19T14:57:50.593095
+updatedAt: 2026-09-28T14:57:04.149560
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_SRs9gwLx8j
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID",
-      "content_type": "image/png",
-      "data": "REPLACE_BASE64_IMAGE"
+      "id": "hogwarts-portal",
+      "logo": "iVBORw0KGgoAAAANSUhEUg=="
     }
 bodyType: application/json
-description: ''
+description: |-
+  Replaces a client's logo. The bytes travel base64-encoded in the RPC body, at most 2 MiB; the kind is read off the magic bytes — a PNG, JPEG, or WebP only, an SVG refused, because the format is a script host. The raw image answers the logo endpoint.
+
+  Saka procedure saka.federation.v1.OidcClientService/UploadLogo. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client
+  - logo (body, required): the image bytes, base64-encoded
 headers:
 - enabled: true
   name: Content-Type
@@ -26,10 +32,18 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Update client logo
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UploadLogo
-urlParameters: []
+name: '[Pocket ID] Update client logo'
+sortPriority: 8000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/UploadLogo
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+- enabled: false
+  name: light
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

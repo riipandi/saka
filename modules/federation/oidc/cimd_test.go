@@ -1,153 +1,195 @@
 package oidc
 
-// cimd_test.go drives the CIMD-lite surface through the generated
-// Connect contract against a stub metadata document server: create-
-// with-url materializes the document, refresh rewrites document-owned
-// columns, the allowlist denies unknown URLs, and admin updates never
-// clobber document-owned columns.
-
 import (
 	"context"
-	"crypto/tls"
-	jsonv2 "encoding/json/v2"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
 )
 
-// testTLSInsecure accepts the stub server's self-signed cert.
-var testTLSInsecure = &tls.Config{InsecureSkipVerify: true}
-
-func connectError(t *testing.T, err error) *connect.Error {
+// metadataServer serves one metadata document and answers its URL — the
+// client id a CIMD client carries.
+func metadataServer(t *testing.T, document string) *httptest.Server {
 	t.Helper()
-	require.Error(t, err)
-	var cerr *connect.Error
-	require.True(t, errors.As(err, &cerr), "must decode as *connect.Error")
-	return cerr
-}
-
-// metadataServer serves one document (TLS — the fetcher enforces
-// https) and counts fetches.
-func metadataServer(t *testing.T, doc map[string]any) (*httptest.Server, *int) {
-	t.Helper()
-	fetches := 0
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metadata.json", func(w http.ResponseWriter, _ *http.Request) {
-		fetches++
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = jsonv2.MarshalWrite(w, doc)
-	})
-	server := httptest.NewTLSServer(mux)
+		_, _ = w.Write([]byte(document))
+	}))
 	t.Cleanup(server.Close)
-	server.TLS = testTLSInsecure
-	return server, &fetches
+	return server
 }
 
-func cimdStack(t *testing.T, docServer *httptest.Server, allowAll bool) (*Service, Store) {
-	t.Helper()
-	service, store, _ := testStack(t)
-	service.metadataFetcher = fetcherAdapter{}
-	if allowAll {
-		service.cimdAllowlist = func() []string { return []string{docServer.URL + "/*"} }
-	}
-	return service, store
+// validDocument is a document the validation accepts: public-client
+// authentication, an initiating grant, one absolute redirect.
+const validDocument = `{
+	"client_name": "Hogwarts Portal",
+	"redirect_uris": ["https://portal.hogwarts.example/callback"],
+	"token_endpoint_auth_method": "none",
+	"grant_types": ["authorization_code", "refresh_token"]
+}`
+
+// TestCIMDMaterializesFromTheDocument covers the first-seen write: the
+// allowlist is judged before anything is fetched, the document's rules are
+// held, and the materialized client is public with PKCE forced on.
+func TestCIMDMaterializesFromTheDocument(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	server := metadataServer(t, validDocument)
+
+	// An empty allowlist is the feature off: nothing is fetched.
+	_, err := service.FetchCIMDClient(t.Context(), server.URL)
+	assert.ErrorIs(t, err, ErrCIMDNotAllowed)
+
+	// The allowlist is judged before the fetch: a URL it does not name
+	// costs no request.
+	service.WithCIMDAllowlist([]string{"https://*.hogwarts.example/*"})
+	_, err = service.FetchCIMDClient(t.Context(), server.URL)
+	assert.ErrorIs(t, err, ErrCIMDNotAllowed)
+
+	// The wildcard allowlist lets the local document through.
+	service.WithCIMDAllowlist([]string{"*"}).WithCIMDFetcher(stubFetcher{})
+	materialized, err := service.MaterializeCIMDClient(t.Context(), server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, server.URL, materialized.ID, "the identifier IS the document's URL")
+	assert.Equal(t, ClientTypeCIMD, materialized.ClientType)
+	assert.True(t, materialized.IsPublic)
+	assert.True(t, materialized.PkceEnabled, "a client that cannot keep a secret authenticates with PKCE")
+	assert.Equal(t, "Hogwarts Portal", materialized.Name)
+	assert.Equal(t, []string{"authorization_code", "refresh_token"}, materialized.MetadataGrantTypes)
+	assert.Empty(t, materialized.Secrets, "no secret ever traveled")
+
+	// A second materialization is the same answer, not an overwrite.
+	again, err := service.MaterializeCIMDClient(t.Context(), server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, materialized.CreatedAt, again.CreatedAt)
 }
 
-// fetcherAdapter adapts the fetcher package's SendRaw without
-// importing it (the test uses a TLS-skip client for the stub server).
-type fetcherAdapter struct{}
-
-func (fetcherAdapter) SendRaw(ctx context.Context, method, url string, _ map[string]string, _ []byte) (int, []byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		return 0, nil, err
-	}
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: testTLSInsecure}}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer resp.Body.Close()
-	buf := make([]byte, MaxMetadataDocument+1)
-	n, _ := resp.Body.Read(buf)
-	return resp.StatusCode, buf[:n], nil
+// stubFetcher answers the mutable document the test owns — the same
+// document the metadata server's handler serves, so both faces of the
+// fetch agree.
+type stubFetcher struct {
+	document *string
+	status   int
 }
 
-// TestRPCIMDClientLifecycle drives create-with-url, refresh, and the
-// document-ownership rule through the generated contract.
-func TestRPCIMDClientLifecycle(t *testing.T) {
-	// One shared document map: the server encodes THIS instance, so
-	// later mutations are visible to the fetcher.
-	docMap := map[string]any{
-		"client_id":                  "https://rp.example/metadata.json",
-		"client_name":                "Metadata RP",
-		"redirect_uris":              []string{"https://rp.example/callback"},
+func (s stubFetcher) Do(_ context.Context, _ string) (int, []byte, error) {
+	document := validDocument
+	if s.document != nil {
+		document = *s.document
+	}
+	status := s.status
+	if status == 0 {
+		status = 200
+	}
+	return status, []byte(document), nil
+}
+
+// TestRefreshRewritesTheClientFromTheDocument covers the refresh: the
+// operator's force bypasses every cache and rewrites what the document
+// names — and only a CIMD client has a document to re-fetch.
+func TestRefreshRewritesTheClientFromTheDocument(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	// The document changes under the client: the mutable stub answers what
+	// its `document` field carries, and the test swaps it between calls.
+	document := validDocument
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(document))
+	}))
+	t.Cleanup(server.Close)
+
+	service.WithCIMDAllowlist([]string{"*"}).WithCIMDFetcher(stubFetcher{document: &document})
+
+	materialized, err := service.MaterializeCIMDClient(t.Context(), server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, "Hogwarts Portal", materialized.Name)
+
+	// A registered client has no document behind it.
+	owner := seedAccount(t, pool, "hermione")
+	issued, err := service.Create(t.Context(), owner, createParams("Hogwarts SPA"))
+	require.NoError(t, err)
+	_, err = service.RefreshCIMDClient(t.Context(), issued.Client.ID)
+	assert.ErrorIs(t, err, ErrClientNotCIMD)
+
+	// The document changed under the CIMD client; the refresh rewrites the
+	// document-named fields and sets the re-fetch deadline.
+	document = `{
+		"client_name": "Ravenclaw Portal",
+		"redirect_uris": ["https://ravenclaw.hogwarts.example/callback"],
 		"token_endpoint_auth_method": "none",
-		"grant_types":                []string{"authorization_code", "refresh_token"},
+		"grant_types": ["authorization_code"]
+	}`
+	refreshed, err := service.RefreshCIMDClient(t.Context(), materialized.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Ravenclaw Portal", refreshed.Name)
+	assert.Equal(t, []string{"https://ravenclaw.hogwarts.example/callback"}, refreshed.CallbackURLs)
+	assert.Equal(t, []string{"authorization_code"}, refreshed.MetadataGrantTypes)
+	assert.NotNil(t, refreshed.MetadataExpiresAt, "the refresh sets the document's re-fetch deadline")
+}
+
+// TestTheDocumentRulesRefuseWhatTheSurfaceWouldNotSign covers the
+// validation: the authentication method, the initiating grant, the
+// response types, and the redirect URIs are each held where upstream holds
+// them.
+func TestTheDocumentRulesRefuseWhatTheSurfaceWouldNotSign(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.WithCIMDAllowlist([]string{"*"})
+
+	cases := []struct {
+		name     string
+		document string
+	}{
+		{
+			name:     "a confidential authentication method",
+			document: `{"client_name": "X", "redirect_uris": ["https://x.example/cb"], "token_endpoint_auth_method": "client_secret_basic"}`,
+		},
+		{
+			name:     "no initiating grant",
+			document: `{"client_name": "X", "redirect_uris": ["https://x.example/cb"], "token_endpoint_auth_method": "none", "grant_types": ["client_credentials"]}`,
+		},
+		{
+			name:     "an unsupported response type",
+			document: `{"client_name": "X", "redirect_uris": ["https://x.example/cb"], "token_endpoint_auth_method": "none", "response_types": ["token"]}`,
+		},
+		{
+			name:     "no redirect uris",
+			document: `{"client_name": "X", "token_endpoint_auth_method": "none"}`,
+		},
+		{
+			name:     "a wildcard redirect uri",
+			document: `{"client_name": "X", "redirect_uris": ["https://x.example/*"], "token_endpoint_auth_method": "none"}`,
+		},
+		{
+			name:     "a script-host scheme",
+			document: `{"client_name": "X", "redirect_uris": ["javascript:alert(1)"], "token_endpoint_auth_method": "none"}`,
+		},
 	}
-	server, fetches := metadataServer(t, docMap)
-	service, store := cimdStack(t, server, false) // allowlist NOT configured yet
-	h := &clientRPC{service: service}
-	ctx := t.Context()
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := metadataServer(t, testCase.document)
+			// The stub answers the case's own document — the server URL
+			// only names the client id. The With* wiring mutates the
+			// shared service in place and returns it.
+			document := testCase.document
+			service.WithCIMDFetcher(stubFetcher{document: &document})
+			_, err := service.MaterializeCIMDClient(t.Context(), server.URL)
+			assert.ErrorIs(t, err, ErrCIMDDocumentInvalid)
+		})
+	}
+}
 
-	createURL := server.URL + "/metadata.json"
-
-	// Default deny: the allowlist getter is nil → invalid_argument.
-	_, err := h.CreateClient(ctx, connect.NewRequest(&federationv1.CreateOidcClientRequest{
-		MetadataUrl: &createURL,
-	}))
-	require.Error(t, err)
-	assert.Equal(t, connect.CodeInvalidArgument, connectError(t, err).Code())
-
-	// Now allow it: create materializes the document.
-	service.cimdAllowlist = func() []string { return []string{server.URL + "/*"} }
-	created, err := h.CreateClient(ctx, connect.NewRequest(&federationv1.CreateOidcClientRequest{
-		MetadataUrl: &createURL,
-	}))
-	require.NoError(t, err)
-	assert.Equal(t, "Metadata RP", created.Msg.GetClient().GetName())
-	assert.Equal(t, "cimd", created.Msg.GetClient().GetClientType())
-	assert.Equal(t, server.URL+"/metadata.json", created.Msg.GetClient().GetMetadataUrl())
-	assert.True(t, created.Msg.GetClient().GetIsPublic())
-	assert.Equal(t, 1, *fetches)
-
-	// Update the document server-side, then refresh.
-	docMap["client_name"] = "Refreshed RP"
-	refreshed, err := h.RefreshClient(ctx, connect.NewRequest(&federationv1.GetOidcClientRequest{
-		ClientId: created.Msg.GetClient().GetId(),
-	}))
-	require.NoError(t, err)
-	assert.Equal(t, "Refreshed RP", refreshed.Msg.GetName())
-	assert.Equal(t, 2, *fetches)
-
-	// Admin update must NOT write back document-owned columns: an
-	// update carrying a stale name leaves the refreshed name intact.
-	updated, err := h.UpdateClient(ctx, connect.NewRequest(&federationv1.UpdateOidcClientRequest{
-		ClientId:    created.Msg.GetClient().GetId(),
-		Name:        "Stale Admin Name",
-		Description: &[]string{"Admin note"}[0],
-	}))
-	require.NoError(t, err)
-
-	clientID, err := OIDCParseClientID(created.Msg.GetClient().GetId())
-	require.NoError(t, err)
-	fresh, err := store.GetClient(ctx, clientID)
-	require.NoError(t, err)
-	assert.Equal(t, "Refreshed RP", fresh.Name, "metadata owns name")
-	assert.Equal(t, "Admin note", fresh.Description, "description stays locally managed")
-	_ = updated
-
-	// Refresh on a standard client → invalid_argument.
-	standard := clientFixture(ctx, t, store, "std-"+stamp())
-	_, err = h.RefreshClient(ctx, connect.NewRequest(&federationv1.GetOidcClientRequest{
-		ClientId: standard.ID.String(),
-	}))
-	assert.Equal(t, connect.CodeInvalidArgument, connectError(t, err).Code())
+// TestURLPatternsMatchTheGrammarTheAllowlistIsWrittenIn covers the
+// matcher: the wildcards the CIMD allowlist and the callback lists share.
+func TestURLPatternsMatchTheGrammarTheAllowlistIsWrittenIn(t *testing.T) {
+	assert.True(t, MatchesAnyURLPattern([]string{"*"}, "https://anything.example/anywhere"))
+	assert.True(t, MatchesAnyURLPattern([]string{"https://*.hogwarts.example/*"}, "https://portal.hogwarts.example/cb"))
+	assert.False(t, MatchesAnyURLPattern([]string{"https://*.hogwarts.example/*"}, "https://portal.ministry.example/cb"))
+	assert.False(t, MatchesAnyURLPattern(nil, "https://portal.hogwarts.example"), "an empty allowlist never matches")
+	assert.True(t, MatchesAnyURLPattern([]string{"https://x.example"}, "https://x.example"), "an exact string is its own pattern")
 }

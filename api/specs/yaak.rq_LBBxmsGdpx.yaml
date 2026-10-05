@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_LBBxmsGdpx
+createdAt: 2026-09-27T10:14:47.500296
+updatedAt: 2026-09-27T10:54:45.720773
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_kgrwkQQuFE', behavior='smart', ttl='0', result='first', join=', ', path='$.notifications[0].id') ]}"
+    }
+bodyType: application/json
+description: '[Saka] Read one notification''s full view, with the audiences its kind names. id is the notification''s TypeID (ntf_...). Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: tSn7bC90jM
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: GzKF6AnQEX
+method: POST
+name: Get Notification
+sortPriority: 61.72839506172839
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/GetNotification
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

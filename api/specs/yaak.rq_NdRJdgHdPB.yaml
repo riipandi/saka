@@ -1,0 +1,63 @@
+type: http_request
+model: http_request
+id: rq_NdRJdgHdPB
+createdAt: 2026-09-25T10:33:40.889166
+updatedAt: 2026-09-26T18:47:27.387581
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=b64'LCA', path=b64'JC51c2Vyc1sxXS5pZA') ]}"
+    }
+bodyType: application/json
+description: |-
+  Remove an account. The database trigger archives the removed row. An administrator cannot delete the account they are signed in with.
+
+  Ported from Pocket ID `DELETE /api/users/{id}` as the `saka.identity.v1.UserService/DeleteUser` procedure.
+
+  Parameters:
+  - id (body, required): User ID
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Delete user'
+sortPriority: 15000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/DeleteUser
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

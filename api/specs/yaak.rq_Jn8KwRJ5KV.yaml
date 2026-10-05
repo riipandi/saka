@@ -2,17 +2,20 @@ type: http_request
 model: http_request
 id: rq_Jn8KwRJ5KV
 createdAt: 2026-09-13T06:23:09.469126
-updatedAt: 2026-09-14T09:47:15.987176
+updatedAt: 2026-09-29T12:50:57.927639
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YNuU3gaJNQ
 authentication: {}
 authenticationType: null
 body: {}
 bodyType: null
-description: Returns the JSON Web Key Set used for token verification
+description: |-
+  Returns the JSON Web Key Set used for token verification
+
+  Mirror of Pocket ID `GET /.well-known/jwks.json`.
 headers: []
 method: GET
-name: Get JSON Web Key Set (JWKS)
+name: '[Pocket ID] Get JSON Web Key Set (JWKS)'
 sortPriority: 0.0
 url: ${[ apiBaseURL ]}/.well-known/jwks.json
 urlParameters: []

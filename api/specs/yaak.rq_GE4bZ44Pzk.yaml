@@ -1,0 +1,58 @@
+type: http_request
+model: http_request
+id: rq_GE4bZ44Pzk
+createdAt: 2026-09-28T16:43:55.302507
+updatedAt: 2026-09-28T16:43:55.302507
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_auMsw4bdee
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "cclm_replace_with_claim_id",
+      "key": "common_room",
+      "value": "gryffindor-tower"
+    }
+bodyType: application/json
+description: |-
+  Replaces one of a group's claims — key and value together. A claim row the user surface owns is refused.
+
+  Saka procedure saka.federation.v1.CustomClaimService/UpdateGroupClaim. Guard: admin.
+
+  Parameters:
+  - id (body, required): the claim row's identifier, a TypeID (cclm_...)
+  - key (body, required): the claim's new name
+  - value (body, required): the claim's new value
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Update group custom claim'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/UpdateGroupClaim
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

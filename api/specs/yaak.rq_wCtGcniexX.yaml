@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_wCtGcniexX
+createdAt: 2026-09-28T16:41:48.020284
+updatedAt: 2026-09-28T16:41:48.020285
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_auMsw4bdee
+authentication: {}
+authenticationType: null
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Answers the custom-claim keys already in use, ordered by how often they carry — the autocomplete list a claim form offers.
+
+  Saka procedure saka.federation.v1.CustomClaimService/Suggest. Guard: admin.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Get custom claim suggestions'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.CustomClaimService/Suggest
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

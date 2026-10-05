@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_kgrwkQQuFE
+createdAt: 2026-09-27T10:14:47.551378
+updatedAt: 2026-09-27T11:48:41.121241
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_R9H6pBQjVK
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "page": 1,
+      "limit": 25,
+      "sort_by": "created_at",
+      "sort_order": "desc"
+    }
+bodyType: application/json
+description: '[Saka] Answer one page of every notification the deployment holds, newest first, cancelled ones included. page is one-based; limit is 1-100; sort_by is one of category, topic, title, created_at (absent orders by created_at, newest first); sort_order is asc or desc; category narrows the page to system or announcement. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: arbKQNExGS
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: TkRcBsNWE3
+method: POST
+name: List All Notifications
+sortPriority: 37.03703703703703
+url: ${[ apiBaseURL ]}/rpc/saka.notification.v1.NotificationService/ListAllNotifications
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

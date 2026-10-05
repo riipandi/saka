@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_BMKxG5DHHf
+createdAt: 2026-10-01T18:57:42.931201
+updatedAt: 2026-10-01T19:07:38.078858
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "page": 1,
+      "limit": 20,
+      "sort_by": "created_at",
+      "sort_order": "desc"
+    }
+bodyType: application/json
+description: |-
+  Queue surface — one page of the pending table, newest first. Rows carry no payload; Get task detail inspects one.
+
+  Admin only. saka built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] List pending tasks (queue)'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.QueueService/ListTasks
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

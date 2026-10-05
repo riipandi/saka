@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+tasks:
+  docker:build:
+    desc: Build the Docker image
+    vars:
+      BUILD_HASH:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo dev
+      BUILD_DATE:
+        sh: date -u +%Y-%m-%dT%H:%M:%SZ
+    cmds:
+      - |
+          docker build -f ./deploy/Dockerfile . \
+          --build-arg DISTROLESS_TAG=debug-nonroot \
+          --build-arg BUILD_VERSION={{.APP_VERSION}} \
+          --build-arg BUILD_HASH={{.BUILD_HASH}} \
+          --build-arg BUILD_DATE={{.BUILD_DATE}} \
+          -t {{.IMAGE}}:{{.APP_VERSION}}-dev \
+          -t {{.IMAGE}}:latest-dev {{.CLI_ARGS}}
+      - docker image list --filter reference={{.IMAGE}}:*
+
+  docker:run:
+    desc: Run the Docker image
+    cmd: |
+      docker run --network=host --rm -it \
+      --env-file=.env.local -v $(pwd)/storage:/srv/storage \
+      {{.CLI_ARGS}} {{.IMAGE}}:latest-dev
+
+  docker:shell:
+    desc: Open a shell in the Docker image
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: --entrypoint /busybox/sh
+
+  docker:push:
+    desc: Push the Docker image
+    cmd: docker push {{.IMAGE}}:latest-dev && docker push {{.IMAGE}}:{{.APP_VERSION}}-dev
+
+  docker:prune:
+    desc: Remove the Docker image
+    cmd: docker image rm --force $(docker image list --filter reference={{.IMAGE}}:* -q)
+
+  docker:images:
+    desc: List project Docker images
+    cmd: docker image list --filter reference={{.IMAGE}}:*
+
+  docker:check:
+    desc: Scan the Docker image for vulnerabilities
+    cmd: grype --scope all-layers {{.IMAGE}}:latest-dev

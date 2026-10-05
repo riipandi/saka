@@ -3,13 +3,13 @@
         "action": "remove",
         "files": [
             ".agent",
-            ".docs",
+            ".llms",
             "docs",
-            "LICENSE-APACHE",
-            "LICENSE-MIT",
+            "LICENSE",
+            "AGENTS.md",
             "DEPLOY.md",
-            "README.md",
-            "AGENTS.md"
+            "NOTICE.md",
+            "README.md"
         ]
     }
 ]

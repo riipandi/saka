@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_YFfdJoPZVR
+createdAt: 2026-09-27T11:44:29.834967
+updatedAt: 2026-09-27T11:51:13.027824
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
+      "permission_slugs": [
+        "notification:*:create"
+      ]
+    }
+bodyType: application/json
+description: '[Saka] Replace the direct grants one account carries. A direct grant is the exception: prefer a role. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: eGvFuNMPxQ
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 0wxTnIZwcG
+method: POST
+name: Set User Permissions
+sortPriority: 8444.444444444445
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/SetUserPermissions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

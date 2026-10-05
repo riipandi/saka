@@ -1,112 +1,530 @@
-// Webhook RPCs: endpoint registration, secret lifecycle, and delivery
-// inspection. Outbound webhook delivery (HMAC signature, retries,
-// canonical body) remains a plain HTTP contract at the receiver.
+// The webhook contract: the outbound event surface saka carries and Pocket
+// ID does not.
+//
+// A webhook endpoint is a destination an administrator registers: a URL, a
+// method, optional custom headers, and the event names it subscribes to.
+// Every audit event the deployment writes is a candidate delivery — mapped
+// onto the dot-named event catalog this contract serves — and an endpoint
+// that lists no event names, or lists the `*` wildcard, receives every one
+// of them.
+//
+// Deliveries are signed. The signing secret is shown exactly once, in the
+// creation and rotation responses, and stored only sealed, so a database
+// leak cannot forge a signature. A delivery's body is the exact canonical
+// bytes every retry re-signs, and the attempt rows carry the redacted
+// response metadata, never a response body.
 syntax = "proto3";
 
-package tango.webhook.v1;
+package saka.webhook.v1;
 
+import "buf/validate/validate.proto";
 import "common.proto";
-import "google/protobuf/empty.proto";
-import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/webhook/v1;webhookv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/webhook/v1;webhookv1";
 
-// Webhook is one registered endpoint. The plaintext signing secret is
-// present only in create and rotate responses, exactly once.
-message Webhook {
-  string id = 1;
-  string name = 2;
-  optional string description = 3;
-  string endpoint = 4;
-  string method = 5;
-  map<string, string> headers = 6;
-  bool enabled = 7;
-  repeated string event_types = 8;
-  optional string secret = 9;
-  string created_at = 10;
-  optional string updated_at = 11;
-}
-
-// Delivery is one outbound delivery attempt record.
-message Delivery {
-  string id = 1;
-  optional string webhook_id = 2;
-  optional string event = 3;
-  optional int32 http_status = 4;
-  optional google.protobuf.Struct response = 5;
-  int32 attempts = 6;
-  bool succeeded = 7;
-  optional string error = 8;
-  string created_at = 9;
-  optional string delivered_at = 10;
-}
-
-// WebhookService administers endpoints and reads deliveries.
+// WebhookService manages the delivery endpoints and reads what they were
+// sent. Every procedure is administrative: an endpoint receives the
+// deployment's event stream, which is a deployment-wide decision.
 service WebhookService {
-  rpc List(common.v1.PageRequest) returns (ListWebhooksResponse);
-  rpc Create(CreateWebhookRequest) returns (Webhook);
-  rpc Get(GetWebhookRequest) returns (Webhook);
-  rpc Update(UpdateWebhookRequest) returns (Webhook);
-  rpc Delete(DeleteWebhookRequest) returns (google.protobuf.Empty);
-  rpc RotateSecret(GetWebhookRequest) returns (RotateSecretResponse);
+  // List answers one page of the endpoints, newest first. The `enabled` and
+  // `event` filters narrow the page; the signing secrets are never present.
+  rpc List(ListWebhooksRequest) returns (ListWebhooksResponse);
+
+  // Create registers an endpoint and mints its signing secret. The secret
+  // exists in this response alone.
+  rpc Create(CreateWebhookRequest) returns (CreateWebhookResponse);
+
+  // Get answers one endpoint's view. It carries no secret field.
+  rpc Get(GetWebhookRequest) returns (GetWebhookResponse);
+
+  // Update rewrites an endpoint. Every field is optional and an absent field
+  // keeps its stored value.
+  rpc Update(UpdateWebhookRequest) returns (UpdateWebhookResponse);
+
+  // Delete removes an endpoint. Its deliveries survive with the endpoint's
+  // identifier nulled, so the history outlives the destination.
+  rpc Delete(DeleteWebhookRequest) returns (DeleteWebhookResponse);
+
+  // RotateSecret replaces an endpoint's signing secret. The new plaintext is
+  // shown exactly once; deliveries made after the rotation sign with it, and
+  // the stored ciphertext is never answered again.
+  rpc RotateSecret(RotateWebhookSecretRequest) returns (RotateWebhookSecretResponse);
+
+  // Test queues one `webhook.test` delivery to the endpoint, the way a
+  // receiver proves its side of the contract.
   rpc Test(TestWebhookRequest) returns (TestWebhookResponse);
-  rpc ListDeliveries(ListDeliveriesRequest) returns (ListDeliveriesResponse);
-  rpc ListAllDeliveries(common.v1.PageRequest) returns (ListDeliveriesResponse);
+
+  // ListDeliveries answers one page of an endpoint's deliveries, newest
+  // first, each carrying its latest attempt when one exists.
+  rpc ListDeliveries(ListWebhookDeliveriesRequest) returns (ListWebhookDeliveriesResponse);
+
+  // ListAllDeliveries answers one page of every delivery the deployment
+  // holds, newest first, narrowed by the `event` filter when one is given.
+  // The attempts name response metadata only — never a response body.
+  rpc ListAllDeliveries(ListAllWebhookDeliveriesRequest) returns (ListAllWebhookDeliveriesResponse);
+
+  // ListEventTypes answers the webhook event catalog: every event a
+  // receiver can subscribe to, with the sentence that says what happened.
+  // The catalog is the whole contract — a subscription naming an event
+  // outside it is refused.
+  rpc ListEventTypes(ListWebhookEventTypesRequest) returns (ListWebhookEventTypesResponse);
 }
 
-message ListWebhooksResponse {
-  repeated Webhook webhooks = 1;
-  common.v1.ResponseMetadata metadata = 2;
-}
-
-message CreateWebhookRequest {
-  string name = 1;
-  optional string description = 2;
-  string endpoint = 3;
-  optional string method = 4;
-  map<string, string> headers = 5;
-  optional bool enabled = 6;
-  repeated string event_types = 7;
-}
-
-message GetWebhookRequest {
+// Webhook is an endpoint's view. It never carries the signing secret: the
+// raw value is the create and rotate responses' `secret` field alone.
+message Webhook {
+  // id is the endpoint row's identifier, in its wire form: the prefix
+  // names what it identifies, the database column stays a UUID.
   string id = 1;
-}
 
-message UpdateWebhookRequest {
-  string id = 1;
-  optional string name = 2;
+  // name is the label the administrator gave the endpoint. It is unique
+  // deployment-wide.
+  string name = 2;
+
+  // description is the optional note the endpoint carries.
   optional string description = 3;
-  optional string endpoint = 4;
-  optional string method = 5;
+
+  // endpoint is the destination URL a delivery is sent to.
+  string endpoint = 4;
+
+  // method is the HTTP method the delivery uses.
+  string method = 5;
+
+  // headers are the custom headers every delivery carries. They cannot
+  // override the signature set.
   map<string, string> headers = 6;
-  optional bool enabled = 7;
+
+  // enabled says whether the endpoint receives events.
+  bool enabled = 7;
+
+  // event_types are the event names the endpoint subscribes to. The list
+  // holds the event catalog's names, or the `*` wildcard; an empty list
+  // receives every event.
   repeated string event_types = 8;
+
+  // created_at is the registration instant.
+  google.protobuf.Timestamp created_at = 9;
+
+  // updated_at is the last field-changing write, absent when the row was
+  // never updated.
+  optional google.protobuf.Timestamp updated_at = 10;
 }
 
+// WebhookDelivery is one event's delivery to one endpoint. The body is the
+// exact canonical bytes every attempt signs and sends; it is never carried
+// on the wire view.
+message WebhookDelivery {
+  // id is the delivery row's identifier, in its wire form.
+  string id = 1;
+
+  // webhook_id is the endpoint the delivery was made for, absent when the
+  // endpoint has been deleted — the delivery outlives its destination.
+  optional string webhook_id = 2;
+
+  // event is the event name the delivery carries.
+  string event = 3;
+
+  // status is the delivery's state: `pending`, `succeeded`, or `failed`.
+  string status = 4;
+
+  // attempt_count is how many attempts the delivery has cost so far.
+  int32 attempt_count = 5;
+
+  // created_at is the instant the delivery was made.
+  google.protobuf.Timestamp created_at = 6;
+
+  // delivered_at is the instant an attempt succeeded, absent while none has.
+  optional google.protobuf.Timestamp delivered_at = 7;
+
+  // latest_attempt is the most recent attempt's record, absent when the
+  // delivery has not been attempted yet.
+  optional WebhookDeliveryAttempt latest_attempt = 8;
+}
+
+// WebhookDeliveryAttempt is one try's redacted record. The response metadata
+// is what an operator needs to see; the response body is never stored.
+message WebhookDeliveryAttempt {
+  // id is the attempt row's identifier, in its wire form.
+  string id = 1;
+
+  // attempt_number counts the attempts of its delivery from one.
+  int32 attempt_number = 2;
+
+  // response_status is the HTTP status the receiver answered, absent when
+  // the attempt failed before an answer existed.
+  optional int32 response_status = 3;
+
+  // error is the transport failure the attempt died of, absent when the
+  // receiver answered.
+  optional string error = 4;
+
+  // duration_ms is how long the attempt took.
+  optional int32 duration_ms = 5;
+
+  // response is the redacted response metadata the attempt carried.
+  map<string, string> response = 6;
+
+  // created_at is the instant the attempt began.
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// EventTypes is the subscription list an update replaces wholesale. The
+// wrapper exists because a repeated field cannot be optional: an absent
+// field keeps the stored list, and a present one — even empty — replaces it.
+message EventTypes {
+  // event_types are the event names: catalog names, or the `*` wildcard.
+  repeated string event_types = 1 [(buf.validate.field).repeated.items = {
+    string: {pattern: "^(\\*|[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+)$"}
+  }];
+}
+
+// HeaderSet is the custom-header map an update replaces wholesale. The
+// wrapper exists because a map field cannot be optional: an absent field
+// keeps the stored set, and a present one — even empty — replaces it.
+message HeaderSet {
+  // headers are the custom headers every delivery carries. Header names are
+  // token characters, values are printable ASCII without a line break; the
+  // signature set cannot be named here.
+  map<string, string> headers = 1 [(buf.validate.field).map = {
+    keys: {
+      string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
+    }
+    values: {
+      string: {
+        pattern: "^[ -~]*$"
+        max_len: 512
+      }
+    }
+  }];
+}
+
+// ListWebhooksRequest carries the page and the filters. Both filters unset
+// answer every endpoint; both page fields unset answer the first
+// default-sized page.
+message ListWebhooksRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // enabled narrows the page to endpoints in that state.
+  optional bool enabled = 3;
+
+  // event narrows the page to the endpoints subscribed to that event name —
+  // by an exact entry, the `*` wildcard, or an empty subscription list.
+  optional string event = 4 [(buf.validate.field).string.pattern = "^(\\*|[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+)$"];
+}
+
+// ListWebhooksResponse is the page of endpoints.
+message ListWebhooksResponse {
+  // webhooks are the endpoints, newest first.
+  repeated Webhook webhooks = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// CreateWebhookRequest carries the new endpoint's registration.
+message CreateWebhookRequest {
+  // name is the endpoint's label: 3-100 characters of ASCII letters,
+  // digits, dashes, and underscores. It is unique deployment-wide.
+  string name = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_-]{3,100}$"];
+
+  // description is the optional note the endpoint carries.
+  optional string description = 2 [(buf.validate.field).string.max_len = 255];
+
+  // endpoint is the destination URL a delivery is sent to. It must be an
+  // absolute http or https URL.
+  string endpoint = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.pattern = "^https?://"
+  ];
+
+  // method is the HTTP method the delivery uses.
+  string method = 4 [(buf.validate.field).string = {
+    in: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ]
+  }];
+
+  // headers are the custom headers every delivery carries. Header names are
+  // token characters, values are printable ASCII without a line break; the
+  // signature set cannot be named here.
+  map<string, string> headers = 5 [(buf.validate.field).map = {
+    keys: {
+      string: {pattern: "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"}
+    }
+    values: {
+      string: {
+        pattern: "^[ -~]*$"
+        max_len: 512
+      }
+    }
+  }];
+
+  // event_types are the event names the endpoint subscribes to: event
+  // catalog names, or the `*` wildcard. An absent or empty list receives
+  // every event.
+  repeated string event_types = 6 [(buf.validate.field).repeated.items = {
+    string: {pattern: "^(\\*|[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+)$"}
+  }];
+}
+
+// CreateWebhookResponse is the created endpoint and its signing secret.
+message CreateWebhookResponse {
+  // webhook is the endpoint's view.
+  Webhook webhook = 1;
+
+  // secret is the signing secret, shown exactly once. Deliveries sign with
+  // it; losing it means rotating the secret and re-registering the
+  // receiver.
+  string secret = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// GetWebhookRequest names the endpoint to read.
+message GetWebhookRequest {
+  // id is the endpoint row's identifier.
+  string id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
+}
+
+// GetWebhookResponse is one endpoint's view.
+message GetWebhookResponse {
+  // webhook is the endpoint's view.
+  Webhook webhook = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateWebhookRequest names the endpoint and the fields to rewrite. Every
+// field but the identifier is optional, and an absent field keeps its stored
+// value.
+message UpdateWebhookRequest {
+  // id is the endpoint row's identifier.
+  string id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
+
+  // description is the note the endpoint carries. Absent keeps the stored
+  // note; present-but-empty clears it.
+  optional string description = 2 [(buf.validate.field).string.max_len = 255];
+
+  // endpoint is the destination URL a delivery is sent to.
+  optional string endpoint = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.pattern = "^https?://"
+  ];
+
+  // method is the HTTP method the delivery uses.
+  optional string method = 4 [(buf.validate.field).string = {
+    in: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ]
+  }];
+
+  // headers are the custom headers every delivery carries. Present replaces
+  // the whole set.
+  optional HeaderSet headers = 5;
+
+  // enabled says whether the endpoint receives events.
+  optional bool enabled = 6;
+
+  // event_types are the event names the endpoint subscribes to. Present
+  // replaces the whole list; an empty list receives every event.
+  optional EventTypes event_types = 7;
+}
+
+// UpdateWebhookResponse is the endpoint's view after the rewrite.
+message UpdateWebhookResponse {
+  // webhook is the endpoint's view.
+  Webhook webhook = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteWebhookRequest names the endpoint to remove.
 message DeleteWebhookRequest {
-  string id = 1;
+  // id is the endpoint row's identifier.
+  string id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
 }
 
-// RotateSecretResponse carries the new signing secret exactly once.
-message RotateSecretResponse {
-  string secret = 1;
+// DeleteWebhookResponse is empty: a successful deletion says so with the
+// protocol, and an unknown identifier answers the not-found code.
+message DeleteWebhookResponse {
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
+// RotateWebhookSecretRequest names the endpoint whose signing secret is
+// replaced.
+message RotateWebhookSecretRequest {
+  // id is the endpoint row's identifier.
+  string id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
+}
+
+// RotateWebhookSecretResponse is the endpoint's view and its new secret.
+message RotateWebhookSecretResponse {
+  // webhook is the endpoint's view after the rotation.
+  Webhook webhook = 1;
+
+  // secret is the new signing secret, shown exactly once. Deliveries made
+  // after the rotation sign with it; receivers verify with the value this
+  // response carried.
+  string secret = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// TestWebhookRequest names the endpoint the test delivery goes to.
 message TestWebhookRequest {
-  string id = 1;
+  // id is the endpoint row's identifier.
+  string id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
 }
 
+// TestWebhookResponse is empty: the delivery is queued, not yet sent, so the
+// answer names the queueing and the deliveries list names the outcome.
 message TestWebhookResponse {
-  string delivery_id = 1;
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-message ListDeliveriesRequest {
-  string webhook_id = 1;
-  common.v1.PageRequest page = 2;
+// ListWebhookDeliveriesRequest carries the endpoint's page. Both page fields
+// unset answer the first default-sized page.
+message ListWebhookDeliveriesRequest {
+  // webhook_id is the endpoint the page is scoped to, in its wire form.
+  string webhook_id = 1 [(buf.validate.field).string.pattern = "^whk_[0-9a-z]{26}$"];
+
+  // page is the one-based page number.
+  optional int32 page = 2 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 3 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
 }
 
-message ListDeliveriesResponse {
-  repeated Delivery deliveries = 1;
-  common.v1.ResponseMetadata metadata = 2;
+// ListWebhookDeliveriesResponse is the page of one endpoint's deliveries.
+message ListWebhookDeliveriesResponse {
+  // deliveries are the endpoint's deliveries, newest first.
+  repeated WebhookDelivery deliveries = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ListAllWebhookDeliveriesRequest carries the administrative page. The event
+// filter narrows it; both page fields unset answer the first default-sized
+// page.
+message ListAllWebhookDeliveriesRequest {
+  // event narrows the page to the deliveries of that event name.
+  optional string event = 1 [(buf.validate.field).string.pattern = "^(\\*|[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+)$"];
+
+  // page is the one-based page number.
+  optional int32 page = 2 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 3 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+}
+
+// ListAllWebhookDeliveriesResponse is the page of every delivery.
+message ListAllWebhookDeliveriesResponse {
+  // deliveries are the deliveries, newest first.
+  repeated WebhookDelivery deliveries = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// WebhookEventType is one entry of the event catalog: the wire name a
+// receiver subscribes to and the sentence that says what happened.
+message WebhookEventType {
+  // name is the wire name — the body's `event` field and the
+  // X-Webhook-Event header's value.
+  string name = 1 [(buf.validate.field).string.pattern = "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"];
+
+  // description is the one-sentence meaning of the event.
+  string description = 2;
+}
+
+// ListWebhookEventTypesRequest is empty: the catalog is the same for every
+// caller.
+message ListWebhookEventTypesRequest {}
+
+// ListWebhookEventTypesResponse is the whole catalog, in the order the
+// deployment declares it.
+message ListWebhookEventTypesResponse {
+  // event_types are the catalog entries.
+  repeated WebhookEventType event_types = 1;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }

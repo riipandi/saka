@@ -8,10 +8,15 @@ version: v2
 modules:
   - path: api/connect
 
-# The plan pins contracts flat in api/connect/*.proto — one folder,
-# module-owning package names — and shared request messages
-# (PageRequest, Get*Request) are reused across RPCs. The directory
-# rules below contradict that flat layout by design.
+# protovalidate's constraint options are the declarative validation the RPC
+# surface enforces through connectrpc.com/validate; the well-known file comes
+# from the Buf Schema Registry as a module dependency.
+deps:
+  - buf.build/bufbuild/protovalidate
+
+# The contracts live flat in api/connect/*.proto: one folder, and a package
+# per area rather than a directory per package. The directory rules below
+# contradict that flat layout by design.
 lint:
   use:
     - STANDARD

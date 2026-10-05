@@ -1,0 +1,56 @@
+type: http_request
+model: http_request
+id: rq_RZ4HSoJBXM
+createdAt: 2026-09-26T19:47:06.023527
+updatedAt: 2026-09-26T20:05:48.076678
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "totp_id": "${[ response.body.path(request='rq_TqXu366GwX', behavior='smart', ttl='0', result='first', join=', ', path='$.totp_id') ]}",
+      "code": "${[ otp.generate(secret='${[ response.body.path(request=\'rq_TqXu366GwX\', behavior=\'smart\', ttl=\'0\', result=\'first\', join=\', \', path=\'$.secret\') ]}', inputFormat='Base32', type='totp', algorithm='SHA1', digits='6', period='30', window='1') ]}"
+    }
+bodyType: application/json
+description: |-
+  Activates the enrollment once the authenticator's current code verifies against its secret — the proof the account really holds the device the QR code was shown to.
+
+  The account's **first** confirmation also writes its recovery set; the response carries the 10 recovery codes **in the clear exactly once** — their hashed rows are all that survive the call. Later enrollments answer no codes.
+
+  Guard: the handler carries the rule the tables cannot express — a session caller runs on its own token, and a caller the `mfa.required` gate routed here presents the enrollment bridge in the optional `pending_token` field.
+
+  A wrong code answers `unauthenticated` and the ceremony stays open until its expiry.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: EIKf5NjXEJ
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: Vg23J4KItU
+method: POST
+name: '[Saka] Confirm TOTP enrollment'
+sortPriority: 2000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/ConfirmTotpEnrollment
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

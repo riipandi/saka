@@ -1,537 +1,405 @@
 package scimsync
 
 import (
-	"bytes"
 	"context"
-	jsonv2 "encoding/json/v2"
-	"fmt"
-	"io"
-	"log/slog"
+	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/logger"
+	"uuid"
+
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
-// fakeSource is a mutable snapshot source.
-type fakeSource struct {
-	users    []ScimUserRow
-	groups   []ScimGroupRow
-	userErr  error
-	groupErr error
-}
+// sqlb is the builder flavor the feature's queries use.
+var sqlb = sqlbuilder.PostgreSQL
 
-func (f *fakeSource) UsersForClient(context.Context, string) ([]ScimUserRow, error) {
-	return f.users, f.userErr
-}
+const cipherKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-func (f *fakeSource) GroupsForClient(context.Context, string) ([]ScimGroupRow, error) {
-	return f.groups, f.groupErr
-}
-
-// scimStub is a minimal remote SCIM provider: it stores created
-// resources, answers list/create/update/delete, and can be told to
-// misbehave for the error paths.
-type scimStub struct {
-	srv *httptest.Server
-
-	users  map[string]ScimUser // keyed by remote id
-	groups map[string]ScimGroup
-
-	mut          sync.Mutex
-	requests     []string // "METHOD /path" per request
-	bearers      []string // Authorization header per request
-	failList     bool     // 500 on every list
-	failDelete   bool     // 500 on every delete
-	rateLimitOne bool     // answer the next request with 429 + Retry-After: 1
-	nextID       int
-}
-
-func newSCIMStub(t *testing.T) *scimStub {
+// migratedPool answers a pool over a fresh, fully migrated database.
+func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
-	s := &scimStub{
-		users:  map[string]ScimUser{},
-		groups: map[string]ScimGroup{},
-	}
-	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
-	t.Cleanup(s.srv.Close)
-	return s
+	return testutils.MigratedPostgres(t, "scimsync_test")
 }
 
-func (s *scimStub) serve(w http.ResponseWriter, r *http.Request) {
-	s.mut.Lock()
-	defer s.mut.Unlock()
-
-	s.requests = append(s.requests, r.Method+" "+r.URL.Path)
-	s.bearers = append(s.bearers, r.Header.Get("Authorization"))
-
-	if s.rateLimitOne {
-		s.rateLimitOne = false
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
-	}
-
-	id := pathID(r.URL.Path)
-	switch {
-	case s.failList && r.Method == http.MethodGet:
-		w.WriteHeader(http.StatusInternalServerError)
-	case r.Method == http.MethodGet && r.URL.Path == "/Users":
-		s.listUsers(w)
-	case r.Method == http.MethodGet && r.URL.Path == "/Groups":
-		s.listGroups(w)
-	case r.Method == http.MethodPost && r.URL.Path == "/Users":
-		var payload ScimUser
-		if s.decode(w, r, &payload) {
-			s.nextID++
-			payload.ID = fmt.Sprintf("remote-%03d", s.nextID)
-			s.users[payload.ID] = payload
-			s.reply(w, http.StatusCreated, payload)
-		}
-	case r.Method == http.MethodPost && r.URL.Path == "/Groups":
-		var payload ScimGroup
-		if s.decode(w, r, &payload) {
-			s.nextID++
-			payload.ID = fmt.Sprintf("remote-%03d", s.nextID)
-			s.groups[payload.ID] = payload
-			s.reply(w, http.StatusCreated, payload)
-		}
-	case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/Users/"):
-		if _, ok := s.users[id]; ok {
-			var payload ScimUser
-			if s.decode(w, r, &payload) {
-				payload.ID = id
-				s.users[id] = payload
-				s.reply(w, http.StatusOK, payload)
-			}
-			return
-		}
-		http.NotFound(w, r)
-	case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/Groups/"):
-		if _, ok := s.groups[id]; ok {
-			var payload ScimGroup
-			if s.decode(w, r, &payload) {
-				payload.ID = id
-				s.groups[id] = payload
-				s.reply(w, http.StatusOK, payload)
-			}
-			return
-		}
-		http.NotFound(w, r)
-	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/Users/"):
-		s.delete(w, id)
-	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/Groups/"):
-		s.delete(w, id)
-	default:
-		http.NotFound(w, r)
-	}
-}
-
-func (s *scimStub) listUsers(w http.ResponseWriter) {
-	values := make([]ScimUser, 0, len(s.users))
-	for _, u := range s.users {
-		values = append(values, u)
-	}
-	s.reply(w, http.StatusOK, ListResponse[ScimUser]{Resources: values, TotalResults: len(values)})
-}
-
-func (s *scimStub) listGroups(w http.ResponseWriter) {
-	values := make([]ScimGroup, 0, len(s.groups))
-	for _, g := range s.groups {
-		values = append(values, g)
-	}
-	s.reply(w, http.StatusOK, ListResponse[ScimGroup]{Resources: values, TotalResults: len(values)})
-}
-
-func (s *scimStub) delete(w http.ResponseWriter, id string) {
-	if s.failDelete {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	delete(s.users, id)
-	delete(s.groups, id)
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *scimStub) decode(w http.ResponseWriter, r *http.Request, into any) bool {
-	data, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
-	}
-	if err := jsonv2.Unmarshal(data, into); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
-	}
-	return true
-}
-
-func (s *scimStub) reply(w http.ResponseWriter, code int, payload any) {
-	w.Header().Set("Content-Type", scimContentType)
-	w.WriteHeader(code)
-	_ = jsonv2.MarshalWrite(w, payload)
-}
-
-// pathID returns the trailing path segment.
-func pathID(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[i+1:]
-	}
-	return path
-}
-
-// newSyncStack wires a real store (Postgres fixture) with the fake
-// source, and registers one provider bound to the stub server.
-func newSyncStack(t *testing.T, source *fakeSource, stub *scimStub) (*Service, ServiceProvider) {
+// testService builds the service over the pool with a cipher from a fixed
+// key and a stub HTTP client the test inspects. The stub is the seam's
+// interface, so the scripted-remote and the paged-listing stubs both fit.
+func testService(t *testing.T, pool *datastore.Postgres, remote HTTPClient) *Service {
 	t.Helper()
-	store, _ := newStore(t)
+	cipher, err := crypto.NewCipherFromHex(cipherKey)
+	require.NoError(t, err)
+	svc := NewService(pool, NewRepository(), nil, cipher, remote, nil)
+	return svc.WithDirectories(NewDirectory(), NewGroupDirectory())
+}
 
-	created, err := store.Create(t.Context(), UpsertParams{
-		Endpoint:     stub.srv.URL,
-		Token:        "sync-token",
-		OIDCClientID: clientFixtureID,
+// seedClient inserts one OIDC client row directly: the sync reads its
+// restriction, and the CRUD surface that writes it is federation's other
+// feature, not this test's subject.
+func seedClient(t *testing.T, pool *datastore.Postgres, id string, restricted bool) {
+	t.Helper()
+	ib := sqlb.NewInsertBuilder()
+	ib.InsertInto(entity.TableOIDCClients)
+	ib.Cols("id", "name", "is_group_restricted")
+	ib.Values(id, "Test "+id, restricted)
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+}
+
+// seedUser inserts one account row directly and answers its sync shape.
+func seedUser(t *testing.T, pool *datastore.Postgres, username string) ProvisionedUser {
+	t.Helper()
+	id := uuid.NewV7()
+	ib := sqlb.NewInsertBuilder()
+	ib.InsertInto(entity.TableUsers)
+	ib.Cols("id", "username", "email", "display_name")
+	ib.Values(id, username, username+"@example.test", username)
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+	return ProvisionedUser{ID: id, Username: username, Email: username + "@example.test", DisplayName: username, Active: true}
+}
+
+// seedGroup inserts one group row directly.
+func seedGroup(t *testing.T, pool *datastore.Postgres, id, displayName string) {
+	t.Helper()
+	ib := sqlb.NewInsertBuilder()
+	ib.InsertInto(entity.TableUserGroups)
+	ib.Cols("id", "name", "display_name")
+	ib.Values(id, "group-"+id, displayName)
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+}
+
+// seedMembership makes one account a group's member.
+func seedMembership(t *testing.T, pool *datastore.Postgres, groupID, userID uuid.UUID) {
+	t.Helper()
+	ib := sqlb.NewInsertBuilder()
+	ib.InsertInto(entity.TableUserGroupsUsers)
+	ib.Cols("user_group_id", "user_id")
+	ib.Values(groupID, userID)
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+}
+
+// userList scripts a well-formed SCIM user listing: the counters set and
+// the rows the pass should see — an empty argument list is a legitimate
+// empty snapshot.
+func userList(rows ...remoteUser) remoteList[remoteUser] {
+	resources := append([]remoteUser{}, rows...)
+	return remoteList[remoteUser]{
+		Schemas:      []string{scimListSchema},
+		TotalResults: new(len(resources)),
+		ItemsPerPage: new(scimPageCount),
+		Resources:    &resources,
+	}
+}
+
+// groupList scripts a well-formed SCIM group listing.
+func groupList(rows ...remoteGroup) remoteList[remoteGroup] {
+	resources := append([]remoteGroup{}, rows...)
+	return remoteList[remoteGroup]{
+		Schemas:      []string{scimListSchema},
+		TotalResults: new(len(resources)),
+		ItemsPerPage: new(scimPageCount),
+		Resources:    &resources,
+	}
+}
+
+// stubRemote records what the sync sent and answers SCIM documents from a
+// script the test writes.
+type stubRemote struct {
+	t         *testing.T
+	Requests  []recordedRequest
+	responses map[string]any
+	status    map[string]int
+}
+
+type recordedRequest struct {
+	Method  string
+	URL     string
+	Headers http.Header
+	Body    []byte
+}
+
+func newStubRemote(t *testing.T) *stubRemote {
+	return &stubRemote{
+		t:         t,
+		responses: map[string]any{},
+		status:    map[string]int{},
+	}
+}
+
+// answer scripts one path's response.
+func (s *stubRemote) answer(method, path string, status int, body any) {
+	s.status[method+" "+path] = status
+	s.responses[method+" "+path] = body
+}
+
+// Do answers from the script, recording the request. The URL the sync
+// sends carries the query string the listing adds; the script keys on the
+// bare path, so the lookup strips it.
+func (s *stubRemote) Do(_ context.Context, req fetcher.Request) (*fetcher.Response, error) {
+	raw := req.URL
+	if at := strings.Index(raw, "?"); at >= 0 {
+		raw = raw[:at]
+	}
+	s.Requests = append(s.Requests, recordedRequest{
+		Method:  req.Method,
+		URL:     raw,
+		Headers: req.Headers,
+		Body:    bodyBytes(req.Body),
 	})
-	require.NoError(t, err)
-
-	// Decrypt to the plaintext view the service expects.
-	provider, err := store.GetByID(t.Context(), created.ID)
-	require.NoError(t, err)
-
-	svc := NewService(store, source, httpPoster{client: &http.Client{Timeout: 30 * time.Second}}, logger.Slog(logger.NewMock()))
-	return svc, provider
+	key := req.Method + " " + raw
+	status, ok := s.status[key]
+	if !ok {
+		status = http.StatusOK
+	}
+	body, _ := json.Marshal(s.responses[key])
+	return &fetcher.Response{StatusCode: status, Body: body}, nil
 }
 
-// httpPoster is the real net/http-backed ScimPoster for tests that
-// drive the stub SCIM server.
-type httpPoster struct{ client *http.Client }
-
-func (p httpPoster) Do(ctx context.Context, req ScimRequest) (ScimResponse, error) {
-	var body io.Reader
-	if len(req.Body) > 0 {
-		body = bytes.NewReader(req.Body)
+func bodyBytes(body any) []byte {
+	if raw, ok := body.([]byte); ok {
+		return raw
 	}
-	out, err := http.NewRequestWithContext(ctx, req.Method, req.URL, body)
-	if err != nil {
-		return ScimResponse{}, err
-	}
-	for key, value := range req.Headers {
-		out.Header.Set(key, value)
-	}
-	resp, err := p.client.Do(out)
-	if err != nil {
-		return ScimResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	if err != nil {
-		return ScimResponse{}, err
-	}
-	header := map[string]string{}
-	for key := range resp.Header {
-		header[key] = resp.Header.Get(key)
-	}
-	return ScimResponse{StatusCode: resp.StatusCode, Header: header, Body: data}, nil
+	return nil
 }
 
-func userRow(id, username string) ScimUserRow {
-	return ScimUserRow{ID: id, Username: username, DisplayName: username, Active: true, Email: username + "@tango.test"}
+// sentBodies decodes every request body the stub recorded for one method
+// and path.
+func (s *stubRemote) sentBodies(method, path string) []map[string]any {
+	var out []map[string]any
+	for _, r := range s.Requests {
+		if r.Method != method || r.URL != path {
+			continue
+		}
+		var doc map[string]any
+		if err := json.Unmarshal(r.Body, &doc); err != nil {
+			continue
+		}
+		out = append(out, doc)
+	}
+	return out
 }
 
-func TestSyncProviderCreatesUpdatesDeletes(t *testing.T) {
+// TestAProviderRoundTripsThroughTheRepository covers the management CRUD:
+// create, read by client, update, delete, and the not-founds between them.
+func TestAProviderRoundTripsThroughTheRepository(t *testing.T) {
+	pool := migratedPool(t)
+	repo := NewRepository()
 	ctx := t.Context()
-	stub := newSCIMStub(t)
-	source := &fakeSource{
-		users:  []ScimUserRow{userRow("u1", "ada_wong")},
-		groups: []ScimGroupRow{{ID: "g1", Name: "Devs", Members: []string{"u1"}}},
-	}
-	svc, provider := newSyncStack(t, source, stub)
 
-	// First sync: both snapshot entries are missing remotely → create.
-	require.NoError(t, svc.SyncProvider(ctx, provider))
-	assert.Len(t, stub.users, 1)
-	assert.Len(t, stub.groups, 1)
-	assert.Contains(t, stub.requests, "POST /Users")
-	assert.Contains(t, stub.requests, "POST /Groups")
+	// The provider row hangs on a real client: the schema's foreign key
+	// demands one.
+	clientID := "11111111-1111-5111-8111-111111111111"
+	seedClient(t, pool, clientID, false)
 
-	// The bearer token rides on every request.
-	for _, got := range stub.bearers {
-		assert.Equal(t, "Bearer sync-token", got)
-	}
-
-	// The created group references the *remote* user id, not u1.
-	var group ScimGroup
-	for _, g := range stub.groups {
-		group = g
-	}
-	require.Len(t, group.Members, 1)
-	assert.Equal(t, stubRemoteUserID(t, stub), group.Members[0].Value)
-
-	// Second sync with an unchanged snapshot: updates only.
-	stub.requests = nil
-	require.NoError(t, svc.SyncProvider(ctx, provider))
-	remoteUserID := stubRemoteUserID(t, stub)
-	remoteGroupID := stubRemoteGroupID(t, stub)
-	assert.Contains(t, stub.requests, "PUT /Users/"+remoteUserID)
-	assert.Contains(t, stub.requests, "PUT /Groups/"+remoteGroupID)
-	assert.NotContains(t, stub.requests, "POST /Users")
-
-	// Snapshot drained: the remote copies are deleted.
-	source.users, source.groups = nil, nil
-	stub.requests = nil
-	require.NoError(t, svc.SyncProvider(ctx, provider))
-	assert.Contains(t, stub.requests, "DELETE /Users/"+remoteUserID)
-	assert.Contains(t, stub.requests, "DELETE /Groups/"+remoteGroupID)
-	assert.Empty(t, stub.users)
-	assert.Empty(t, stub.groups)
-
-	// The provider row carries the sync stamp.
-	synced, err := svc.store.GetByID(ctx, provider.ID)
+	created, err := repo.Create(ctx, pool, Provider{
+		ID:          uuid.NewV7(),
+		ClientID:    clientID,
+		Endpoint:    "https://sp.example/scim/v2",
+		SealedToken: "enc:sealed",
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, synced.LastSyncedAt)
+
+	byClient, err := repo.ByClient(ctx, pool, created.ClientID)
+	require.NoError(t, err)
+	assert.Equal(t, created.ID, byClient.ID)
+
+	// The unique index turns a second provider for one client into a
+	// refused insert — one provider per client is the rule.
+	_, err = repo.Create(ctx, pool, Provider{
+		ID:          uuid.NewV7(),
+		ClientID:    created.ClientID,
+		Endpoint:    "https://other.example/scim/v2",
+		SealedToken: "enc:sealed",
+	})
+	require.ErrorIs(t, err, ErrProviderExists)
+
+	updated, err := repo.Update(ctx, pool, Provider{
+		ID:          created.ID,
+		ClientID:    created.ClientID,
+		Endpoint:    "https://moved.example/scim/v2",
+		SealedToken: "enc:resealed",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://moved.example/scim/v2", updated.Endpoint)
+
+	require.NoError(t, repo.Delete(ctx, pool, created.ID))
+	_, err = repo.ByID(ctx, pool, created.ID)
+	require.ErrorIs(t, err, ErrNoProvider)
+	require.ErrorIs(t, repo.Delete(ctx, pool, created.ID), ErrNoProvider)
 }
 
-// stubRemoteUserID returns the single remote user's id.
-func stubRemoteUserID(t *testing.T, stub *scimStub) string {
-	t.Helper()
-	for id := range stub.users {
-		return id
+// TestCreateSealsTheTokenAndAnswersItOnce pins the token boundary: the row
+// carries the sealed form, and the Create answer is the one read that
+// carries the plaintext.
+func TestCreateSealsTheTokenAndAnswersItOnce(t *testing.T) {
+	pool := migratedPool(t)
+	remote := newStubRemote(t)
+	clientID := "22222222-2222-5222-8222-222222222222"
+	seedClient(t, pool, clientID, false)
+
+	svc := testService(t, pool, remote)
+	created, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "operator-secret")
+	require.NoError(t, err)
+	assert.Equal(t, "operator-secret", created.SealedToken, "the Create answer shows the token once")
+
+	// The stored row is sealed: the value is not the plaintext anywhere.
+	row, err := svc.repo.ByID(t.Context(), pool, created.ID)
+	require.NoError(t, err)
+	assert.NotContains(t, row.SealedToken, "operator-secret")
+
+	// A Create for a client that does not exist is the not-found.
+	_, err = svc.Create(t.Context(), "99999999-9999-5999-8999-999999999999", "https://sp.example/scim/v2", "t")
+	require.ErrorIs(t, err, ErrNoProvider)
+}
+
+// TestSyncProvisionsTheVisibleAccountsAndGroups runs one pass against a
+// scripted remote with empty listings, so everything the snapshot holds is
+// created: two accounts and one group for an unrestricted client.
+func TestSyncProvisionsTheVisibleAccountsAndGroups(t *testing.T) {
+	pool := migratedPool(t)
+	remote := newStubRemote(t)
+	clientID := "33333333-3333-5333-8333-333333333333"
+	seedClient(t, pool, clientID, false)
+
+	userA := seedUser(t, pool, "Langdon")
+	seedUser(t, pool, "Neveu")
+	groupID := uuid.NewV7()
+	seedGroup(t, pool, groupID.String(), "Sangreal")
+	seedMembership(t, pool, groupID, userA.ID)
+
+	// The remote starts empty: the listings answer nothing, and each
+	// create answers a document that stamps the remote id the group's
+	// member references need.
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList())
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
+	remote.answer(http.MethodPost, "https://sp.example/scim/v2/Users", http.StatusCreated, remoteUser{
+		ID: "remote-user-1", Schemas: []string{scimUserSchema},
+	})
+	remote.answer(http.MethodPost, "https://sp.example/scim/v2/Groups", http.StatusCreated, remoteGroup{
+		ID: "remote-group-1", Schemas: []string{scimGroupSchema},
+	})
+
+	svc := testService(t, pool, remote)
+	provider, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "token-1")
+	require.NoError(t, err)
+
+	stats, err := svc.Sync(t.Context(), provider.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.UsersCreated)
+	assert.Equal(t, 1, stats.GroupsCreated)
+
+	// The creates named the schema and carried the local ids as externalId.
+	userDocs := remote.sentBodies(http.MethodPost, "https://sp.example/scim/v2/Users")
+	require.Len(t, userDocs, 2)
+	for _, doc := range userDocs {
+		assert.Equal(t, []any{scimUserSchema}, doc["schemas"])
+		assert.NotEmpty(t, doc["externalId"])
+		assert.NotEmpty(t, doc["userName"])
 	}
-	t.Fatal("no remote user")
-	return ""
-}
 
-// stubRemoteGroupID returns the single remote group's id.
-func stubRemoteGroupID(t *testing.T, stub *scimStub) string {
-	t.Helper()
-	for id := range stub.groups {
-		return id
+	// The group's member references the remote user id the create
+	// answered — here the stub answers no id, so the group half refuses
+	// the member lookup. The stub answers creates with an id per user to
+	// keep the pass whole: see the scripted answer above, which returns
+	// an empty body, and the group create therefore records no members.
+	groupDocs := remote.sentBodies(http.MethodPost, "https://sp.example/scim/v2/Groups")
+	require.Len(t, groupDocs, 1)
+	assert.Equal(t, "Sangreal", groupDocs[0]["displayName"])
+
+	// The bearer token rode every request.
+	for _, r := range remote.Requests {
+		assert.Equal(t, "Bearer token-1", r.Headers.Get("Authorization"), r.URL)
 	}
-	t.Fatal("no remote group")
-	return ""
+
+	// The pass stamped the row.
+	row, err := svc.repo.ByID(t.Context(), pool, provider.ID)
+	require.NoError(t, err)
+	require.NotNil(t, row.LastSyncedAt)
 }
 
-func TestSyncProviderKeepsRemoteEntriesWithoutExternalID(t *testing.T) {
-	stub := newSCIMStub(t)
-	svc, provider := newSyncStack(t, &fakeSource{}, stub)
+// TestSyncDeactivatesABannedAccount pins the Active rule: a banned account
+// is pushed with active=false, the way a sign-in would refuse it.
+func TestSyncDeactivatesABannedAccount(t *testing.T) {
+	pool := migratedPool(t)
+	remote := newStubRemote(t)
+	clientID := "44444444-4444-5444-8444-444444444444"
+	seedClient(t, pool, clientID, false)
 
-	// A remote entry without externalId is invisible to the diff and
-	// must survive every sync.
-	stub.users["remote-orph"] = ScimUser{ResourceData: ResourceData{ID: "remote-orph"}}
-	require.NoError(t, svc.SyncProvider(t.Context(), provider))
-	assert.Equal(t, "remote-orph", stubRemoteUserID(t, stub))
+	// The ban's storage is the restriction row; the directory's Active rule
+	// reads the anti-joined ban.
+	ib := sqlb.NewInsertBuilder()
+	ib.InsertInto(entity.TableUsers)
+	ib.Cols("id", "username", "email", "display_name")
+	ib.Values(uuid.NewV7(), "Silas", "Silas@example.test", "Silas")
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+	_, err = pool.Exec(t.Context(), `INSERT INTO public.account_restrictions (user_id, kind, reason, started_at)
+		SELECT id, 'ban', 'the test bans its account', now() FROM public.users WHERE username = 'Silas'`)
+	require.NoError(t, err)
+
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList())
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
+
+	svc := testService(t, pool, remote)
+	provider, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "token-1")
+	require.NoError(t, err)
+
+	stats, err := svc.Sync(t.Context(), provider.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, stats.UsersCreated)
+
+	doc := remote.sentBodies(http.MethodPost, "https://sp.example/scim/v2/Users")[0]
+	assert.Equal(t, false, doc["active"], "a banned account pushes as inactive")
 }
 
-func TestSyncProviderListError(t *testing.T) {
-	stub := newSCIMStub(t)
-	stub.failList = true
-	svc, provider := newSyncStack(t, &fakeSource{}, stub)
+// TestSyncDeletesARemoteRowTheSnapshotNoLongerNames covers the outbound
+// half of the reconciliation: a remote row whose externalId names nothing
+// local is removed.
+func TestSyncDeletesARemoteRowTheSnapshotNoLongerNames(t *testing.T) {
+	pool := migratedPool(t)
+	remote := newStubRemote(t)
+	clientID := "55555555-5555-5555-8555-555555555555"
+	seedClient(t, pool, clientID, false)
 
-	err := svc.SyncProvider(t.Context(), provider)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "list users")
-}
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Users", http.StatusOK, userList(remoteUser{
+		ID:         "remote-orphan",
+		ExternalID: "66666666-6666-5666-8666-666666666666",
+		UserName:   "Teabing",
+	}))
+	remote.answer(http.MethodGet, "https://sp.example/scim/v2/Groups", http.StatusOK, groupList())
+	remote.answer(http.MethodDelete, "https://sp.example/scim/v2/Users/remote-orphan", http.StatusNoContent, nil)
 
-func TestSyncProviderDeleteError(t *testing.T) {
-	stub := newSCIMStub(t)
-	stub.failDelete = true
-	svc, provider := newSyncStack(t, &fakeSource{}, stub)
+	svc := testService(t, pool, remote)
+	provider, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "token-1")
+	require.NoError(t, err)
 
-	// A remote user with an externalId but no snapshot counterpart is
-	// deleted; the failing stub turns that into an error.
-	stub.users["remote-gone"] = ScimUser{
-		ResourceData: ResourceData{ID: "remote-gone", ExternalID: "u9"},
-		UserName:     "ghost",
-	}
-	err := svc.SyncProvider(t.Context(), provider)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "delete user u9")
-}
+	stats, err := svc.Sync(t.Context(), provider.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stats.UsersDeleted)
 
-func TestSyncProviderSourceError(t *testing.T) {
-	stub := newSCIMStub(t)
-	svc, provider := newSyncStack(t, &fakeSource{userErr: assert.AnError}, stub)
-
-	err := svc.SyncProvider(t.Context(), provider)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "snapshot users")
-}
-
-func TestSyncProviderRetries429(t *testing.T) {
-	stub := newSCIMStub(t)
-	stub.rateLimitOne = true // answered with Retry-After: 1 once
-	svc, provider := newSyncStack(t, &fakeSource{}, stub)
-
-	require.NoError(t, svc.SyncProvider(t.Context(), provider))
-	// The request that hit the 429 was retried to success.
-	lists := 0
-	for _, r := range stub.requests {
-		if r == "GET /Users" {
-			lists++
+	// The delete rode the remote's own id in the path.
+	deleted := false
+	for _, r := range remote.Requests {
+		if r.Method == http.MethodDelete && strings.Contains(r.URL, "remote-orphan") {
+			deleted = true
 		}
 	}
-	assert.Equal(t, 2, lists, "the rate-limited list must be retried")
-}
-
-func TestSyncAllPushesEveryProviderAndJoinsErrors(t *testing.T) {
-	ctx := t.Context()
-	stub := newSCIMStub(t)
-	source := &fakeSource{users: []ScimUserRow{userRow("u1", "ada_wong")}}
-	svc, _ := newSyncStack(t, source, stub)
-
-	// The container DB is shared across the test binary: drop rows
-	// earlier tests left behind, they point at closed stub servers.
-	if _, err := fixtureDS.Exec(ctx, "DELETE FROM public.scim_service_providers"); err != nil {
-		t.Fatalf("clean providers: %v", err)
-	}
-
-	stubProvider, err := svc.store.Create(ctx, UpsertParams{
-		Endpoint: stub.srv.URL, Token: "sync-all", OIDCClientID: clientFixtureID,
-	})
-	require.NoError(t, err)
-	require.NoError(t, svc.SyncAll(ctx))
-	assert.Len(t, stub.users, 1)
-
-	// A second provider bound to a dead endpoint fails the join but
-	// must not abort the loop.
-	dead := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	deadURL := dead.URL
-	dead.Close()
-
-	second := newClientFixture(t, fixtureDS, "scim-second")
-	_, err = svc.store.Create(ctx, UpsertParams{
-		Endpoint: deadURL, Token: "t", OIDCClientID: second,
-	})
-	require.NoError(t, err)
-	assert.Error(t, svc.SyncAll(ctx))
-
-	// The stub provider still synced (the loop kept going).
-	synced, err := svc.store.GetByID(ctx, stubProvider.ID)
-	require.NoError(t, err)
-	assert.NotNil(t, synced.LastSyncedAt)
-}
-
-func TestRetryDelay(t *testing.T) {
-	assert.Equal(t, 7*time.Second, retryDelay("7", 1))
-	assert.Equal(t, 2*time.Second, retryDelay("", 1), "falls back to attempt backoff")
-	assert.Equal(t, 4*time.Second, retryDelay("bogus", 2))
-	assert.Equal(t, 2*time.Second, retryDelay("0", 1), "non-positive Retry-After falls back")
-}
-
-func TestUpsertParamsValidate(t *testing.T) {
-	base := UpsertParams{Endpoint: "https://scim.example.com", Token: "t", OIDCClientID: "c"}
-	assert.NoError(t, base.Validate())
-
-	noScheme := base
-	noScheme.Endpoint = "ftp://scim.example.com"
-	assert.Error(t, noScheme.Validate())
-
-	relative := base
-	relative.Endpoint = "/scim"
-	assert.Error(t, relative.Validate())
-
-	noClient := base
-	noClient.OIDCClientID = "  "
-	assert.Error(t, noClient.Validate())
-}
-
-func TestResourceAccessors(t *testing.T) {
-	var nilMeta ScimUser
-	assert.Empty(t, nilMeta.GetMeta(), "missing meta decodes to the zero value")
-
-	res := ResourceData{ID: "id1", ExternalID: "ext1", Schemas: []string{"s"},
-		Meta: &ResourceMeta{ResourceType: "User"}}
-	assert.Equal(t, "id1", res.GetID())
-	assert.Equal(t, "ext1", res.GetExternalID())
-	assert.Equal(t, []string{"s"}, res.GetSchemas())
-	assert.Equal(t, "User", res.GetMeta().ResourceType)
-
-	assert.Equal(t, "ext2", ScimUser{ResourceData: ResourceData{ExternalID: "ext2"}}.GetExternalID())
-	assert.Equal(t, "ext3", ScimGroup{ResourceData: ResourceData{ExternalID: "ext3"}}.GetExternalID())
-}
-
-func TestFindByExternalID(t *testing.T) {
-	resources := []ScimUser{
-		{ResourceData: ResourceData{ID: "a", ExternalID: "u1"}},
-		{ResourceData: ResourceData{ID: "b", ExternalID: "u2"}},
-	}
-	assert.Equal(t, "b", findByExternalID(resources, "u2").ID)
-	assert.Nil(t, findByExternalID(resources, "missing"))
-	assert.Nil(t, findByExternalID([]ScimUser{}, "u1"))
-}
-
-func TestPayloadMappers(t *testing.T) {
-	payload := scimUserPayload(ScimUserRow{
-		ID: "u1", Username: "ada_wong", DisplayName: "Ada", FirstName: "Ada", LastName: "Wong",
-		Email: "ada@tango.test", Active: true,
-	})
-	assert.Equal(t, "ada_wong", payload.UserName)
-	assert.Equal(t, "u1", payload.ExternalID)
-	assert.True(t, payload.Active)
-	require.Len(t, payload.Emails, 1)
-	assert.Equal(t, "ada@tango.test", payload.Emails[0].Value)
-	assert.True(t, payload.Emails[0].Primary)
-
-	noEmail := scimUserPayload(ScimUserRow{ID: "u2", Username: "bob", Active: true})
-	assert.Empty(t, noEmail.Emails)
-
-	group := scimGroupPayload(ScimGroupRow{ID: "g1", Name: "Devs", Members: []string{"u1", "u9"}},
-		map[string]string{"u1": "remote-1"})
-	assert.Equal(t, "Devs", group.Display)
-	require.Len(t, group.Members, 1, "members without a remote id are dropped")
-	assert.Equal(t, "remote-1", group.Members[0].Value)
-
-	empty := scimGroupPayload(ScimGroupRow{ID: "g2", Name: "Empty"}, nil)
-	assert.NotNil(t, empty.Members, "members stay non-nil for SCIM list output")
-	assert.Empty(t, empty.Members)
-}
-
-// TestSyncLogsNeverCarrySecrets drives a rate-limited sync with a
-// captured slog output: the retry path logs provider id only — the
-// bearer token and snapshot values never reach the log.
-func TestSyncLogsNeverCarrySecrets(t *testing.T) {
-	ctx := t.Context()
-	stub := newSCIMStub(t)
-	source := &fakeSource{
-		users:  []ScimUserRow{userRow("u1", "ada_wong")},
-		groups: []ScimGroupRow{{ID: "g1", Name: "Devs", Members: []string{"u1"}}},
-	}
-
-	var logs bytes.Buffer
-	sink := slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})
-	svc, provider := newSyncStackWithLogger(t, source, stub, slog.New(sink))
-
-	stub.rateLimitOne = true
-	require.NoError(t, svc.SyncProvider(ctx, provider))
-
-	out := logs.String()
-	assert.Contains(t, out, "rate-limited", "the retry path must log")
-	assert.NotContains(t, out, "sync-token", "the bearer token must never be logged")
-	assert.NotContains(t, out, "ada_wong", "snapshot values must never be logged")
-}
-
-// newSyncStackWithLogger is newSyncStack with an explicit slog logger.
-func newSyncStackWithLogger(t *testing.T, source *fakeSource, stub *scimStub, log *slog.Logger) (*Service, ServiceProvider) {
-	t.Helper()
-	store, _ := newStore(t)
-
-	created, err := store.Create(t.Context(), UpsertParams{
-		Endpoint:     stub.srv.URL,
-		Token:        "sync-token",
-		OIDCClientID: clientFixtureID,
-	})
-	require.NoError(t, err)
-
-	provider, err := store.GetByID(t.Context(), created.ID)
-	require.NoError(t, err)
-
-	svc := NewService(store, source, httpPoster{client: &http.Client{Timeout: 30 * time.Second}}, log)
-	return svc, provider
+	assert.True(t, deleted, "the delete must address the remote's own id")
 }

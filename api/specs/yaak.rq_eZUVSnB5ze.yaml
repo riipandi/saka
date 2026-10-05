@@ -1,0 +1,46 @@
+type: http_request
+model: http_request
+id: rq_eZUVSnB5ze
+createdAt: 2026-09-26T02:23:21.206399
+updatedAt: 2026-09-26T14:33:35.257832
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5ohk34DQsY
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: application/json
+description: 'One page of every API key the deployment holds, newest first, revoked ones included. Saka-only: upstream carries no administrative view over its keys, so this request is the [Saka] surface, not a mirror.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: zKdxu9yBBd
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: xx0V0FuBgG
+method: POST
+name: '[Saka] List all API keys'
+sortPriority: 3666.6666666666665
+url: ${[ apiBaseURL ]}/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

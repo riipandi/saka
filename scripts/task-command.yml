@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+tasks:
+  config:generate:
+    desc: Write a starter app.config.json
+    cmd: go run -tags debug ./cmd config:generate {{.CLI_ARGS}}
+
+  config:validate:
+    desc: Check app.config.json and the variables it references
+    cmd: go run -tags debug ./cmd config:validate {{.CLI_ARGS}}
+
+  config:print:
+    desc: Print the resolved configuration (secrets redacted; add -- --source)
+    cmd: go run -tags debug ./cmd config:print --env-file=.env.local {{.CLI_ARGS}}
+
+  key:generate:
+    desc: Generate application secret keys
+    cmd: go run -tags debug ./cmd key:generate {{.CLI_ARGS}}
+
+  jwks:generate:
+    desc: Generate a signing key pair for the OAuth provider (public.jwks)
+    cmd: go run -tags debug ./cmd jwks:generate --env-file=.env.local {{.CLI_ARGS}}
+
+  health:
+    desc: Check application health (add -- --json or -- --short)
+    cmd: go run -tags debug ./cmd health --env-file=.env.local {{.CLI_ARGS}}
+
+  mailer:smoke:
+    desc: Send one templated email (pass --to=<address> after --)
+    cmd: go run -tags debug ./cmd --env-file=.env.local mailer:smoke {{.CLI_ARGS}}

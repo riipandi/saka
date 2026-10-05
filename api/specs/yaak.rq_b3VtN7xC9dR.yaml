@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_b3VtN7xC9dR
+createdAt: 2026-10-03T07:30:00
+updatedAt: 2026-10-03T07:30:00
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: |-
+  Lifts the named account's open lockout — the automated restriction the failed-attempt policy writes when a sign-in run trips lockout.max_attempts. The lockout row is lifted and the account's failed-attempt streak starts fresh. An account with no open lockout is the same success. A ban is not a lockout and this procedure does not touch one — Unban user owns that. An unknown or malformed identifier answers `not_found`.
+
+  Saka-only surface, the admin unlock Clerk pairs with its lockout.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+- enabled: true
+  name: Authorization
+  value: Bearer {{[ accessToken ]}}
+  id: null
+method: POST
+name: '[Saka] Unlock user'
+sortPriority: 28000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UnlockUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

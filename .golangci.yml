@@ -5,6 +5,7 @@ version: "2"
 linters:
   default: none
   enable:
+    - depguard # Import boundaries: the framework layer stands alone
     - errcheck # Ensure errors are checked and handled
     - govet # Go's official vet tool for catching suspicious constructs
     - staticcheck # Advanced static analysis, catches bugs and code smells
@@ -12,6 +13,19 @@ linters:
     - unused # Finds unused variables, functions, and imports
     - gosec # Basic security checks (recommended to keep enabled)
   settings:
+    depguard:
+      rules:
+        framework-standalone:
+          # The framework layer is composable: a framework package must be
+          # constructible without the application. Importing internal/ or
+          # modules/ would couple every engine to this binary's composition.
+          files:
+            - "**/saka/framework/**"
+          deny:
+            - pkg: github.com/riipandi/saka/internal
+              desc: the framework never imports the application composition
+            - pkg: github.com/riipandi/saka/modules
+              desc: the framework never imports a feature module
     errcheck:
       check-type-assertions: true
     staticcheck:
@@ -32,24 +46,33 @@ linters:
         - ^net/url.URL$
         - ^os/exec.Cmd$
         - ^reflect.StructField$
-        - ^github.com/riipandi/tango/pkg/.*$
-        - ^github.com/riipandi/tango/modules/.*$
-        # - ^github.com/prometheus/client_golang/.+Opts$
-        # - ^github.com/testcontainers/testcontainers-go.+Request$
-        # - ^github.com/testcontainers/testcontainers-go.FromDockerfile$
-        # - ^github.com/ory/dockertest/v3.*$
+        - ^github.com/riipandi/saka/modules/.*$
+        - ^github.com/riipandi/saka/pkg/.*$
+        - ^github.com/aws/aws-sdk-go-v2/.*$
+        - ^github.com/testcontainers/testcontainers-go.+Request$
+        - ^github.com/testcontainers/testcontainers-go.FromDockerfile$
+        - ^github.com/urfave/cli/v3.*$
+        - ^gopkg.in/yaml.v3.Node$
         # - ^golang.org/x/tools/go/analysis.Analyzer$
-        # - ^gopkg.in/yaml.v3.Node$
-        # - ^github.com/urfave/cli/v3.*$
+        # - ^github.com/prometheus/client_golang/.+Opts$
         # - ^github.com/ClickHouse/clickhouse-go/v2.*$
-        # - ^github.com/aws/aws-sdk-go-v2/.*$
     gosec:
       excludes:
         - G101
         - G102
         - G107
+        # G203 (template.HTML) is the Vite integration's contract: the shell
+        # embeds the fragment built from the build manifest and the dev
+        # server URL — neither carries request input — through the one
+        # trustedHead helper; every page-named value stays escaped.
+        - G203
+        # G401/G505 (sha1) are the Pwned Passwords range API's contract: the
+        # k-anonymity query is the SHA-1 of the password, five hex characters
+        # of it on the wire. The primitive is the protocol, not a chosen cipher.
+        - G401
+        - G505
     funlen:
-      lines: 100
+      lines: 120
       statements: 50
       ignore-comments: true
     gocognit:
@@ -67,7 +90,9 @@ linters:
               reason: gofrs' package was not go module before v5
     govet:
       disable:
-        - fieldalignment # Disable struct field alignment warnings to allow easier refactoring and avoid unnecessary churn in PRs.
+        # Disable struct field alignment warnings to allow easier
+        # refactoring and avoid unnecessary churn in PRs.
+        - fieldalignment
       enable-all: true
     inamedparam:
       skip-single-param: true
@@ -80,11 +105,6 @@ linters:
         - funlen
         - gocognit
         - lll
-    # sloglint:
-    #   no-global: all
-    #   context: scope
-    # perfsprint:
-    #   strconcat: false
   exclusions:
     generated: lax
     presets:
@@ -110,6 +130,17 @@ linters:
           - noctx
           - wrapcheck
         path: _test\.go
+      - linters:
+          - gosec
+        # G710 flags the two redirects the OAuth flow exists to make. The
+        # start hands the browser to the provider's authorize URL, which
+        # the operator's connection row — not the caller — names: the
+        # request's provider segment only keys the row lookup, and the
+        # redirect URI inside it is built from the row's own slug. The
+        # callback hands the browser back to the SPA route under the
+        # configured base URL, carrying a token the server minted at the
+        # consume. No request value reaches a redirect target.
+        path: modules/identity/oauthsso/handler\.go
     paths:
       - third_party$
       - builtin$

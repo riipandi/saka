@@ -1,0 +1,33 @@
+package appconfig
+
+import (
+	"net/http"
+
+	"github.com/riipandi/saka/framework/webutil"
+	appauthz "github.com/riipandi/saka/internal/authz"
+	"github.com/riipandi/saka/pkg/jwtutils"
+)
+
+// serveConfiguration answers `GET /api/configuration`: the deployment's
+// resolved configuration, the JSON file's view of the world.
+//
+// The scope follows the caller. Without a credential the endpoint answers
+// the public subset — the facts a login screen shows. With an
+// administrator's bearer token it answers every non-secret setting the
+// process runs on. The route is public on the guard's books, so the
+// middleware authenticates opportunistically: a token is verified when
+// presented, and an anonymous caller is never refused. The scope widening
+// here is not a gate — the endpoint answers to everyone — which is why the
+// check reads the caller's own claims instead of a rule in the tables.
+//
+// The secrets cross only through the redaction path publish.go builds
+// them from: a set secret is `[redacted]`, an unset one omitted, the
+// datastore URLs reduced to host:port/database — in either scope. The
+// configuration is resolved once at startup, so the answer describes the
+// running process, not the file on disk.
+func (m *Module) serveConfiguration(w http.ResponseWriter, r *http.Request) {
+	caller, _ := jwtutils.CallerFrom(r.Context())
+
+	webutil.Success(w, r, http.StatusOK, m.config.Published(caller.HasRole(appauthz.AdministratorRole)),
+		webutil.WithMessage("the application configuration"))
+}

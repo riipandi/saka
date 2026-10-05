@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_ok5MJXrvn5
+createdAt: 2026-09-26T18:43:37.789036
+updatedAt: 2026-09-26T18:49:10.705553
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
+      "reason": "Repeated violations of the community guidelines",
+      "expiresAt": "2026-12-31T23:59:59Z"
+    }
+bodyType: application/json
+description: |-
+  Applies a ban to the named account: the start instant is now, the reason is required (it travels to the account in the notification and to the audit record), and `expiresAt` is optional — absent, the ban never lifts by itself. Every live session the account holds is ended in the same transaction, and a suspension notice is queued to the account's address.
+
+  An unknown or malformed identifier answers `not_found`; an expiry in the past answers `invalid_argument`; an already-banned account is the same success, with the reason and expiry replaced and the live sessions ended again. An access token already issued keeps working until its own expiry — the statelessness the protocol settles — but the refresh token dies here.
+
+  Saka-only surface, modeled on Better Auth's `ban-user` admin operation.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: TRqKQv0SJ7
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: XT88Kz6r5K
+method: POST
+name: '[Saka] Ban user'
+sortPriority: 26000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/BanUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

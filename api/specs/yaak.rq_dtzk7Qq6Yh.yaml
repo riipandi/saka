@@ -2,15 +2,18 @@ type: http_request
 model: http_request
 id: rq_dtzk7Qq6Yh
 createdAt: 2026-09-19T12:32:22.310714
-updatedAt: 2026-09-19T14:57:43.113502
+updatedAt: 2026-09-26T14:38:59.295825
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_eXRcxMKbSw
+folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
   text: '{}'
 bodyType: application/json
-description: ''
+description: |-
+  Withdraw the calling account's consent for one client. The client's live grants and tokens for the account die with the ledger row.
+
+  Procedure: `saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient`
 headers:
 - enabled: true
   name: Content-Type
@@ -21,10 +24,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Revoke authorization for an OIDC client
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcConsentService/RevokeMyAuthorizedClient
-urlParameters: []
+name: '[Pocket ID] Revoke authorization for an OIDC client'
+sortPriority: 16267.489711934157
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient
+urlParameters:
+- enabled: true
+  name: clientId
+  value: REPLACE_CLIENTID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

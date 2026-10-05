@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_CVVVbBzhzg
+createdAt: 2026-09-28T20:29:03.899740
+updatedAt: 2026-10-05T17:46:27.964237
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/json
+  text: '{}'
+bodyType: application/json
+description: |-
+  The calling account's consent ledger: each authorized client with the scopes the consent covers and the last-use instant.
+
+  Procedure: `saka.federation.v1.OidcConsentService/ListMyAuthorizedClients`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: '[Pocket ID] List authorized clients for current user'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListMyAuthorizedClients
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

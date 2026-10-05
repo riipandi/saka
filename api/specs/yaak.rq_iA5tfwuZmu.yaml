@@ -2,19 +2,26 @@ type: http_request
 model: http_request
 id: rq_iA5tfwuZmu
 createdAt: 2026-09-19T12:32:10.485547
-updatedAt: 2026-09-19T14:58:17.291935
+updatedAt: 2026-09-28T14:57:00.909292
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID",
-      "user_id": "REPLACE_USER_ID"
+      "id": "hogwarts-portal",
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Answers the claim maps a client would receive for one account — id token, access token, userinfo — built from the account as it stands. No token is minted and none of the claims are secrets; the custom claims join when the customclaim feature lands.
+
+  Saka procedure saka.federation.v1.OidcClientService/PreviewClient. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client
+  - user_id (body, required): the account to preview, in its wire form (usr_...)
 headers:
 - enabled: true
   name: Content-Type
@@ -25,10 +32,22 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Preview OIDC client data for user
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/PreviewClient
-urlParameters: []
+name: '[Pocket ID] Preview OIDC client data for user'
+sortPriority: 10000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/PreviewClient
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+- enabled: true
+  name: userId
+  value: REPLACE_USERID
+  id: null
+- enabled: false
+  name: scopes
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

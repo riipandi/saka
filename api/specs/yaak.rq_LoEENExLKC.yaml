@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_LoEENExLKC
 createdAt: 2026-09-19T12:33:32.164794
-updatedAt: 2026-09-19T14:53:59.580732
+updatedAt: 2026-09-28T10:13:20.747537
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
 authentication: {}
@@ -10,23 +10,26 @@ authenticationType: null
 body:
   text: |-
     {
-      "app_name": "Tango"
+      "app_name": "Saka"
     }
 bodyType: application/json
-description: ''
+description: |-
+  Mirror of Pocket ID PUT /api/application-configuration.
+
+  Excluded in Saka: the system configuration source is the JSON file, resolved once at startup - there is no write surface. The runtime-editable settings are saka.settings.v1.SettingsService.
 headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: null
+  id: qS27uPhSQe
 - enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: null
+  id: thiHzC4Ki6
 method: POST
-name: Update application configurations
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.admin.v1.ApplicationConfigurationService/Update
+name: '[Pocket ID] Update application configurations (excluded)'
+sortPriority: 7000.0
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.AppConfigService/Update
 urlParameters: []
 settingSendCookies:
   enabled: false

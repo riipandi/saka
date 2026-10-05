@@ -2,19 +2,26 @@ type: http_request
 model: http_request
 id: rq_UcqfuDYCPx
 createdAt: 2026-09-19T12:34:10.925104
-updatedAt: 2026-09-19T18:33:22.472590
+updatedAt: 2026-09-26T11:05:55.346395
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_iMD6Wv2JMZ
 authentication: {}
 authenticationType: null
 body:
-  text: |-
-    {
-      "page": 1,
-      "limit": 20
-    }
+  bodyType: application/json
+  text: '{}'
 bodyType: application/json
-description: ListGroups takes a flat PageRequest; the nested object form predates the pagination alignment with the REST envelope.
+description: |-
+  One page of the groups, optionally filtered and sorted.
+
+  Ported from Pocket ID `GET /api/user-groups` as the `saka.identity.v1.UserGroupService/ListUserGroups` procedure.
+
+  Parameters:
+  - page (body, optional): one-based page number
+  - limit (body, optional): page size
+  - search (body, optional): matched against the name and the display name
+  - sort_by (body, optional): name | display_name | user_count | created_at
+  - sort_order (body, optional): ASC | DESC
 headers:
 - enabled: true
   name: Content-Type
@@ -25,10 +32,30 @@ headers:
   value: '1'
   id: null
 method: POST
-name: List user groups
+name: '[Pocket ID] List user groups'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.UserGroupService/ListGroups
-urlParameters: []
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/ListUserGroups
+urlParameters:
+- enabled: false
+  name: search
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
 settingSendCookies:
   enabled: false
   value: true

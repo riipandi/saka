@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_wnQNwuqPez
+createdAt: 2026-09-26T21:00:44.046969
+updatedAt: 2026-09-26T21:25:32.706560
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_ZsR2s3GrGS
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='always', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: '[Saka] Administrator trigger for the password reset email on a named account. The administrator never sees or sets the password — the token goes to the account address, and its holder completes the reset through Reset Password. The same 60s cooldown applies. Requires Admin; an impersonating administrator is refused.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 6u02eHnSAw
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: DzCM2paJmW
+method: POST
+name: '[Saka] Reset user password (admin)'
+sortPriority: 1000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

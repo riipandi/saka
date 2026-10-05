@@ -1,0 +1,786 @@
+package config_test
+
+import (
+	"strconv"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/riipandi/saka/internal/config"
+)
+
+// resolveAndValidate is the pair a caller that needs the whole configuration
+// uses: Load merges the sources, Validate checks the result.
+func resolveAndValidate(t *testing.T, opts config.Options) (config.Config, error) {
+	t.Helper()
+
+	cfg, err := config.Load(opts)
+	if err != nil {
+		return config.Config{}, err
+	}
+	return cfg, cfg.Validate()
+}
+
+// resolveFile validates the configuration a file body resolves to.
+func resolveFile(t *testing.T, extra string) error {
+	t.Helper()
+
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, extra),
+		Environ:    baseEnv(),
+	})
+	return err
+}
+
+func TestValidationReportsEveryProblem(t *testing.T) {
+	// A missing DSN and an impossible port: both must be reported at once, so a
+	// file with several mistakes is fixed in one pass.
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{"auth": {"secret_key": "env:AUTH_SECRET_KEY"}, "server": {"port": 0}}`),
+		Environ:    []string{"AUTH_SECRET_KEY=" + secret},
+	})
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "database.url")
+	assert.Contains(t, err.Error(), "server.port")
+}
+
+func TestValidationRejectsBadDriver(t *testing.T) {
+	err := resolveFile(t, `"cache": {"driver": "bogus", "enable": true}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "cache.driver")
+}
+
+func TestValidationAcceptsAConfigWithNoSigningMaterial(t *testing.T) {
+	// The asymmetric signing key is the database's (saka initialize
+	// provisions it) and the HMAC secret is optional, so a config naming
+	// neither is a valid deployment: the key pairs come from the rows.
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`),
+		Environ:    []string{"DATABASE_URL=" + dsn, "PUBLIC_BASE_URL=http://localhost:3080"},
+	})
+	require.NoError(t, err)
+}
+
+func TestValidationRejectsMinAboveMax(t *testing.T) {
+	err := resolveFile(t, `"database": {"min_conns": 20, "max_conns": 5}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "database.min_conns")
+}
+
+func TestValidationRestrictsTheExposureAidsToDevelopment(t *testing.T) {
+	// The raw reset token and the decrypted authenticator secret hand an
+	// account's credential to anyone who can reach the response, so the
+	// flags are development aids: any other mode is a refused run.
+	err := resolveFile(t, `"app": {"mode": "production", "expose_reset_token": true}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.expose_reset_token")
+
+	err = resolveFile(t, `"app": {"mode": "staging", "expose_totp_secret": true}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.expose_totp_secret")
+}
+
+func TestValidationAcceptsTheExposureAidsInDevelopment(t *testing.T) {
+	// The default mode is development, so the flags answer their aid.
+	err := resolveFile(t, `"app": {"expose_reset_token": true, "expose_totp_secret": true}`)
+	require.NoError(t, err)
+}
+
+func TestValidationRejectsAConnectWaitWithoutAttemptsOrInterval(t *testing.T) {
+	// The wait is what makes the startup survive a database that is still
+	// starting; zero attempts would disable it and zero interval would turn
+	// the attempts into a busy loop, so neither is a value a file may set.
+	err := resolveFile(t, `"database": {"connect_attempts": 0, "connect_retry_interval": 0}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "database.connect_attempts")
+	assert.Contains(t, err.Error(), "database.connect_retry_interval")
+}
+
+func TestValidationAcceptsAValidConfiguration(t *testing.T) {
+	require.NoError(t, resolveFile(t, ""))
+}
+
+func TestValidationRejectsAnInvalidModeName(t *testing.T) {
+	err := resolveFile(t, `"app": {"mode": "prod"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.mode")
+}
+
+// The mailer is optional, so a configuration that names no SMTP host is valid:
+// that is what lets a local checkout run without a mail server.
+func TestValidationAcceptsAnUnconfiguredMailer(t *testing.T) {
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, ""),
+		Environ:    baseEnv(),
+	})
+	require.NoError(t, err)
+
+	assert.Empty(t, cfg.Mailer.SMTPHost)
+	assert.Equal(t, "mailer@example.com", cfg.Mailer.FromEmail)
+	assert.Equal(t, "Saka Mailer", cfg.Mailer.FromName)
+	assert.Equal(t, 587, cfg.Mailer.SMTPPort)
+}
+
+func TestValidationRejectsAnInvalidSenderAddress(t *testing.T) {
+	err := resolveFile(t, `"mailer": {"from_email": "not-an-address"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "mailer.from_email")
+}
+
+func TestValidationRejectsAPasswordWithoutAUsername(t *testing.T) {
+	// A password that authenticates nothing is a mistake, not a setting.
+	err := resolveFile(t, `"mailer": {"smtp_password": "hunter2"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "mailer.smtp_username")
+}
+
+func TestValidationRejectsANonPositiveMailerTimeout(t *testing.T) {
+	// A submission with no budget would wait out the library's own five-minute
+	// default, which is not a bound this process chose.
+	err := resolveFile(t, `"mailer": {"timeout": 0}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "mailer.timeout")
+}
+
+func TestValidationAcceptsRemoteCredentialsWithoutTLS(t *testing.T) {
+	// The configuration cannot know whether the server offers STARTTLS, so a
+	// remote host with credentials is valid. Refusing it here would reject the
+	// ordinary submission server; the decision is made on the session, where
+	// the answer exists (mailer.ErrInsecureAuth).
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, `"mailer": {"smtp_host": "smtp.example.com", "smtp_username": "bot", "smtp_password": "hunter2"}`),
+		Environ:    baseEnv(),
+	})
+	require.NoError(t, err)
+	assert.False(t, cfg.Mailer.SMTPSecure)
+	assert.False(t, cfg.Mailer.SMTPAllowPlaintextAuth)
+}
+
+func TestRedactedHidesTheSMTPPassword(t *testing.T) {
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, `"mailer": {"smtp_username": "bot", "smtp_password": "hunter2"}`),
+		Environ:    baseEnv(),
+	})
+	require.NoError(t, err)
+
+	redacted := cfg.Redacted()
+
+	assert.Equal(t, "[redacted]", redacted.Mailer.SMTPPassword)
+	assert.Equal(t, "bot", redacted.Mailer.SMTPUsername, "a username is not a secret")
+	assert.NotContains(t, redacted.String(), "hunter2")
+}
+
+func TestRedactedHidesSecrets(t *testing.T) {
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, ""),
+		Environ:    baseEnv(),
+	})
+	require.NoError(t, err)
+
+	redacted := cfg.Redacted()
+
+	assert.Equal(t, "[redacted]", redacted.Auth.SecretKey)
+	assert.NotContains(t, redacted.Database.URL, "pass")
+	assert.Contains(t, redacted.Database.URL, "localhost:5432/saka")
+	assert.NotContains(t, cfg.String(), "pass", "String must not leak the password")
+}
+
+func TestRedactedLeavesNothingBehind(t *testing.T) {
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: configFile(t, `"app": {"secret_key": "env:APP_SECRET_KEY"}`),
+		Environ:    append(baseEnv(), "APP_SECRET_KEY="+secret),
+	})
+	require.NoError(t, err)
+
+	redacted := cfg.Redacted()
+
+	assert.Empty(t, redacted.Origin("database.url"), "Origins must be dropped with the secrets")
+	for _, secret := range []string{cfg.App.SecretKey, cfg.Auth.SecretKey, cfg.Database.URL} {
+		assert.NotContains(t, redacted.String(), secret)
+	}
+}
+
+func TestKeysMatchTheStruct(t *testing.T) {
+	keys := config.Keys()
+	require.NotEmpty(t, keys)
+
+	assert.Contains(t, keys, "storage.local_path")
+	assert.Contains(t, keys, "app.mode")
+	assert.Contains(t, keys, "database.url")
+	assert.Contains(t, keys, "server.port")
+	assert.Contains(t, keys, "auth.access_ttl")
+	assert.IsIncreasing(t, keys, "Keys must be sorted")
+}
+
+func TestMaskedKeepsTheEndsOfALongSecret(t *testing.T) {
+	// The whole point of masking: two keys that look alike can be told apart,
+	// while nothing usable is revealed.
+	cfg := config.Default()
+	cfg.App.SecretKey = secret
+
+	assert.Equal(t, secret[:4]+"****"+secret[len(secret)-4:], cfg.Masked().App.SecretKey)
+}
+
+func TestMaskedHidesAShortSecretCompletely(t *testing.T) {
+	// Keeping eight of a twelve-character password would leave most of it
+	// readable, so a value below the floor is hidden in full.
+	for _, password := range []string{"hunter2", "0123456789abcde"} {
+		cfg := config.Default()
+		cfg.Mailer.SMTPPassword = password
+
+		assert.Equal(t, "[redacted]", cfg.Masked().Mailer.SMTPPassword, password)
+	}
+
+	cfg := config.Default()
+	cfg.Mailer.SMTPPassword = "0123456789abcdef"
+	assert.Equal(t, "0123****cdef", cfg.Masked().Mailer.SMTPPassword)
+}
+
+func TestMaskedLeavesAnEmptySecretEmpty(t *testing.T) {
+	// An unset secret must read as unset, not as a masked value: the difference
+	// is the whole answer when a key is missing.
+	assert.Empty(t, config.Default().Masked().App.SecretKey)
+	assert.Empty(t, config.Default().Masked().Auth.SecretKey)
+}
+
+func TestMaskedReducesTheDSNRatherThanMaskingIt(t *testing.T) {
+	// A connection string is a composite value: revealing part of the string
+	// says nothing, while the host is the part a reader needs.
+	cfg := config.Default()
+	cfg.Database.URL = "postgresql://user:sup3rs3cret@localhost:5432/saka?sslmode=disable"
+
+	masked := cfg.Masked()
+
+	assert.Equal(t, "localhost:5432/saka", masked.Database.URL)
+	assert.NotContains(t, masked.Database.URL, "sup3rs3cret")
+}
+
+func TestMaskedAndRedactedAreDifferent(t *testing.T) {
+	// Two renderings, two jobs. Masked is for a report the operator runs, and
+	// shows enough to trace a value; Redacted is the fail-safe behind a log
+	// line, and shows nothing at all.
+	cfg := config.Default()
+	cfg.App.SecretKey = secret
+
+	assert.NotEqual(t, cfg.Masked().App.SecretKey, cfg.Redacted().App.SecretKey)
+	assert.Equal(t, "[redacted]", cfg.Redacted().App.SecretKey)
+	assert.NotContains(t, cfg.String(), secret[:4], "a log line must not show part of a key")
+}
+
+func TestValidationAcceptsACacheDriverWithTheBackendOff(t *testing.T) {
+	// The cache is the one feature that may point at a switched-off backend:
+	// a cache that cannot reach its server is not a broken system, it is a
+	// run without caching — the driver bypasses to no-op at start-up, so
+	// this is accepted rather than reported.
+	err := resolveFile(t, `"cache": {"driver": "kvstore", "enable": true}`)
+	require.NoError(t, err)
+}
+
+func TestValidationNamesEveryKVDriverThatDisagrees(t *testing.T) {
+	err := resolveFile(t,
+		`"rate_limit": {"driver": "kvstore"}, `+
+			`"auth": {"session_driver": "kvstore"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+
+	// One message naming both beats two messages naming one each.
+	for _, key := range []string{"rate_limit.driver", "auth.session_driver"} {
+		assert.Contains(t, err.Error(), key)
+	}
+}
+
+func TestValidationAcceptsAKVDriverWithTheBackendOn(t *testing.T) {
+	err := resolveFile(t, `"rate_limit": {"driver": "kvstore"}, "auth": {"session_driver": "kvstore"}, "kvstore": {"enable": true}`)
+	assert.NoError(t, err)
+}
+
+func TestValidationSkipsTheCacheSectionWhileDisabled(t *testing.T) {
+	// The default state: the cache is off, so a driver that would be dead
+	// weight is not reported and no budget is held to anything.
+	require.NoError(t, resolveFile(t, `"cache": {"driver": "kvstore", "ttl": 0}`))
+}
+
+func TestValidationAcceptsADisabledKVStore(t *testing.T) {
+	// The default state: nothing points at the backend and it is switched off.
+	require.NoError(t, resolveFile(t, ""))
+}
+
+func TestValidationChecksTheKVURLOnlyWhenEnabled(t *testing.T) {
+	// A disabled backend is never dialled, so its URL is not held to anything.
+	// Holding it would report a problem in a part of the file that is off.
+	require.NoError(t, resolveFile(t, `"kvstore": {"enable": false, "url": "not-a-url"}`))
+
+	err := resolveFile(t, `"kvstore": {"enable": true, "url": "not-a-url"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "kvstore.url")
+}
+
+func TestValidationAcceptsTheURLGrammarTheClientAccepts(t *testing.T) {
+	// Validation must not be stricter than the client, or it rejects a URL that
+	// would have connected. These are the forms redis.ParseURL accepts: the
+	// default port, an explicit port, TLS, a database index, a missing host
+	// (defaulted to localhost:6379), and a unix socket.
+	for _, rawURL := range []string{
+		"redis://localhost",
+		"redis://localhost:6379",
+		"redis://default:securedb@localhost:6379",
+		"rediss://cache.example.com:6380",
+		"redis://localhost:6379/3",
+		"redis://localhost:6379/0?dial_timeout=3&max_retries=2",
+		"redis://",
+		"unix:///var/run/valkey.sock",
+	} {
+		body := `"kvstore": {"enable": true, "url": ` + strconv.Quote(rawURL) + `}`
+		assert.NoError(t, resolveFile(t, body), rawURL)
+	}
+}
+
+func TestValidationRejectsAURLTheClientWouldReject(t *testing.T) {
+	for _, rawURL := range []string{
+		"http://localhost:6379",      // not a key-value scheme
+		"redis://localhost:6379/a",   // the path must be a database number
+		"redis://localhost:6379/1/2", // at most one segment
+		"unix://",                    // a unix socket needs its path
+		"redis://localhost:6379/%20", // an empty database number
+	} {
+		body := `"kvstore": {"enable": true, "url": ` + strconv.Quote(rawURL) + `}`
+		assert.Error(t, resolveFile(t, body), rawURL)
+	}
+}
+
+func TestRedactKVURLNamesTheServerWithoutThePassword(t *testing.T) {
+	assert.Equal(t, "localhost:6379", config.RedactKVURL("redis://default:securedb@localhost:6379"))
+	assert.Equal(t, "cache.example.com:6380/1", config.RedactKVURL("rediss://u:p@cache.example.com:6380/1"))
+	assert.Equal(t, "localhost:6379", config.RedactKVURL("redis://"),
+		"a missing host is what the client defaults, not a hidden URL")
+	assert.Equal(t, "", config.RedactKVURL(""))
+}
+
+func TestRedactedHidesTheKVPassword(t *testing.T) {
+	cfg := config.Default()
+	cfg.KVStore.URL = "redis://default:sup3rs3cret@localhost:6379"
+
+	for name, rendered := range map[string]config.Config{
+		"Redacted": cfg.Redacted(),
+		"Masked":   cfg.Masked(),
+	} {
+		assert.NotContains(t, rendered.KVStore.URL, "sup3rs3cret", name)
+		assert.Contains(t, rendered.KVStore.URL, "localhost:6379", name)
+	}
+	assert.NotContains(t, cfg.String(), "sup3rs3cret")
+}
+
+func TestValidationLeavesTheS3SectionAloneOnTheLocalDriver(t *testing.T) {
+	// The default deployment writes to disk and never dials an object store, so
+	// its S3 settings are not held to anything: a user keeping credentials
+	// there for a later switch must still be able to run.
+	require.NoError(t, resolveFile(t, `"storage": {"driver": "local"}`))
+
+	// Even a value that would be refused on the S3 driver is ignored.
+	require.NoError(t, resolveFile(t, `"storage": {"driver": "local",
+		"s3": {"endpoint_url": "not-a-url"}}`))
+}
+
+func TestValidationRequiresTheS3SettingsWhenTheDriverIsS3(t *testing.T) {
+	// Switching the driver on is what makes the section live, and the keys a
+	// request cannot be made without are then required.
+	//
+	// The region is not among them: it has a concrete default, so an unset
+	// variable leaves a usable value rather than an empty one. Neither is
+	// the bucket: the buckets table is the bucket list, and the section
+	// carries no bucket key at all.
+	err := resolveFile(t, `"storage": {"driver": "s3"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+
+	for _, key := range []string{
+		"storage.s3.access_key",
+		"storage.s3.secret_key",
+	} {
+		assert.Contains(t, err.Error(), key)
+	}
+	assert.NotContains(t, err.Error(), "storage.s3.region")
+}
+
+func TestValidationFallsBackToARegionTheClientWillAccept(t *testing.T) {
+	// A region cannot be empty: the client refuses to resolve an endpoint
+	// without one, so every request fails, even against a service that ignores
+	// the region such as MinIO. An unset variable therefore leaves a usable
+	// value rather than an empty one, and the run works.
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"storage": {"driver": "s3",
+				"s3": {"region": "env:STORAGE_S3_REGION",
+					"access_key": "s3admin", "secret_key": "s3passw0rd"}}
+		}`),
+		Environ: baseEnv(),
+	})
+	require.NoError(t, err)
+
+	// An explicitly empty region is a different matter: the user named the key
+	// and gave it no value, which the client would reject at request time.
+	err = resolveFile(t, `"storage": {"driver": "s3",
+		"s3": {"region": "",
+			"access_key": "k", "secret_key": "s"}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "storage.s3.region")
+}
+
+func TestValidationNamesTheUnsetS3Variable(t *testing.T) {
+	// A key left at its default because its variable is unset is reported by
+	// variable name, which is what a user has to fix.
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"storage": {"driver": "s3",
+				"s3": {"region": "us-east-1",
+					"access_key": "env:STORAGE_S3_ACCESS_KEY",
+					"secret_key": "env:STORAGE_S3_SECRET_KEY"}}
+		}`),
+		Environ: baseEnv(),
+	})
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "STORAGE_S3_ACCESS_KEY variable is not set")
+}
+
+func TestValidationAcceptsAnS3Deployment(t *testing.T) {
+	err := resolveFile(t, `"storage": {"driver": "s3",
+		"s3": {"region": "us-east-1",
+			"access_key": "s3admin", "secret_key": "s3passw0rd"}}`)
+	assert.NoError(t, err)
+}
+
+func TestValidationAcceptsAnAWSStyleDeploymentWithoutAnEndpoint(t *testing.T) {
+	// An empty endpoint means AWS, reached through the region alone; that is a
+	// complete configuration, not a missing one.
+	err := resolveFile(t, `"storage": {"driver": "s3",
+		"s3": {"region": "eu-west-1",
+			"access_key": "AKIAEXAMPLE", "secret_key": "s3passw0rd",
+			"force_path_style": false}}`)
+	assert.NoError(t, err)
+}
+
+func TestValidationRejectsAnS3EndpointThatIsNotAURL(t *testing.T) {
+	err := resolveFile(t, `"storage": {"driver": "s3",
+		"s3": {"region": "us-east-1",
+			"access_key": "k", "secret_key": "s",
+			"endpoint_url": "localhost:9100"}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "storage.s3.endpoint_url")
+}
+
+func TestValidationLeavesTheFileSinkAloneUntilTheTransportNamesIt(t *testing.T) {
+	// The console is the only sink by default, so the rotation settings are not
+	// read: a container that logs to stdout must not be told to configure a
+	// rotation it never uses.
+	require.NoError(t, resolveFile(t, `"log": {"file": {"max_size": 0, "max_backups": 0, "max_age": 0}}`))
+}
+
+func TestValidationRefusesARotationThatNeverDeletes(t *testing.T) {
+	// A file sink that keeps every rotated file fills a disk quietly, so the one
+	// combination that does that is refused where the sink is named.
+	err := resolveFile(t, `"log": {"transport": ["console", "file"],
+		"file": {"max_backups": 0, "max_age": 0}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "log.file")
+
+	// Either limit on its own is a retention policy.
+	assert.NoError(t, resolveFile(t, `"log": {"transport": ["file"], "file": {"max_backups": 3, "max_age": 0}}`))
+	assert.NoError(t, resolveFile(t, `"log": {"transport": ["file"], "file": {"max_backups": 0, "max_age": 7}}`))
+}
+
+func TestValidationRejectsANonPositiveFileSize(t *testing.T) {
+	err := resolveFile(t, `"log": {"transport": ["file"], "file": {"max_size": 0}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "log.file.max_size")
+}
+
+func TestValidationRejectsATransportThatIsNotASink(t *testing.T) {
+	// A name no sink matches would leave the run with fewer destinations than
+	// the file asks for, which is the failure the list exists to prevent.
+	err := resolveFile(t, `"log": {"transport": ["console", "syslog"]}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "log.transport")
+	assert.Contains(t, err.Error(), "syslog")
+}
+
+func TestValidationRejectsARepeatedTransport(t *testing.T) {
+	// Naming one twice says nothing a reader can act on, and the second entry
+	// would build a second sink writing the same lines.
+	err := resolveFile(t, `"log": {"transport": ["console", "console"]}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "log.transport")
+}
+
+func TestValidationRequiresATransport(t *testing.T) {
+	// An empty list is a logger that writes nowhere, which is never what a
+	// deployment meant.
+	err := resolveFile(t, `"log": {"transport": []}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "log.transport")
+}
+
+func TestValidationAcceptsEveryTransportTogether(t *testing.T) {
+	// Naming several is the point of the list: the terminal stays readable while
+	// the same entries go to a file and to a collector.
+	err := resolveFile(t, `"log": {"transport": ["console", "file", "otlp"],
+		"otlp": {"endpoint": "http://localhost:4318"}}`)
+	assert.NoError(t, err)
+}
+
+func TestAListDirectiveResolvesToTheTransportsItNames(t *testing.T) {
+	// The whole path: a comma-separated variable reaches the slice field as the
+	// entries it names, which is what lets a deployment switch a sink on without
+	// editing the file. `LOG_TRANSPORT=console,file,otlp` is the form an
+	// environment variable can carry, and the one the docs advertise.
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"log": {"transport": "env:LOG_TRANSPORT"}
+		}`),
+		Environ: append(baseEnv(), "LOG_TRANSPORT=console,file,otlp"),
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"console", "file", "otlp"}, cfg.Log.Transport)
+}
+
+func TestASpaceSeparatedDirectiveIsNotAList(t *testing.T) {
+	// Space is not the separator: a value with spaces in it is one name, which
+	// validation then refuses by name rather than silently reading one sink out
+	// of a string that named three.
+	_, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"log": {"transport": "env:LOG_TRANSPORT"}
+		}`),
+		Environ: append(baseEnv(), "LOG_TRANSPORT=console file otlp"),
+	})
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "console file otlp")
+}
+
+func TestValidationChecksTheOTLPEndpointOnlyWhenASignalIsOn(t *testing.T) {
+	// A collector the run never dials is not held to anything: a console-only
+	// run may carry an address for a later switch without it stopping the run.
+	require.NoError(t, resolveFile(t, `"log": {"transport": ["console"]}, "otel": {"endpoint": "not-a-url"}`))
+
+	err := resolveFile(t, `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "not-a-url"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "otel.endpoint")
+
+	// The same address is checked when a signal other than logs is switched on,
+	// because all three share it.
+	err = resolveFile(t, `"otel": {"endpoint": "not-a-url", "tracing": {"enable": true}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "otel.endpoint")
+}
+
+func TestValidationFallsBackToAnEndpointTheExporterWillDial(t *testing.T) {
+	// The endpoint has a concrete default, so an unset variable leaves a usable
+	// value rather than an empty one: an unset OTEL_ENDPOINT must not stop a
+	// deployment whose collector is on the default port.
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"log": {"transport": ["otlp"]},
+			"otel": {"endpoint": "env:OTEL_ENDPOINT"}
+		}`),
+		Environ: baseEnv(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, config.DefaultOTLPEndpoint, cfg.OTEL.Endpoint)
+}
+
+func TestValidationAcceptsAnOTLPDeployment(t *testing.T) {
+	// Both schemes are valid: the endpoint's scheme is what decides whether the
+	// connection is TLS, so there is no second setting to keep in step with it.
+	for _, endpoint := range []string{"http://localhost:4318", "https://collector.example.com:4318"} {
+		body := `"log": {"transport": ["otlp"]}, "otel": {"endpoint": ` + strconv.Quote(endpoint) + `}`
+		assert.NoError(t, resolveFile(t, body), endpoint)
+	}
+}
+
+func TestValidationHoldsTheEndpointToAURL(t *testing.T) {
+	// The exporters dial HTTP only, so the address is held to a URL: a value
+	// that would fail at the first export fails here instead, beside the key
+	// that caused it.
+	err := resolveFile(t, `"log": {"transport": ["otlp"]}, "otel": {"endpoint": "localhost:4318"}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "must be an absolute http or https URL")
+
+	assert.NoError(t, resolveFile(t,
+		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "http://localhost:4318"}`))
+	assert.NoError(t, resolveFile(t,
+		`"log": {"transport": ["otlp"]}, "otel": {"endpoint": "https://collector.example.com:4318"}`))
+}
+
+func TestValidationAcceptsHeadersInBothForms(t *testing.T) {
+	// A JSON object is what a config file writes, and the specification's own
+	// comma-separated string is what a directive resolves to. Both must reach
+	// the field the exporters read.
+	cfg, err := resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"log": {"transport": ["otlp"]},
+			"otel": {"headers": {"authorization": "Bearer token", "x-tenant": "acme"}}
+		}`),
+		Environ: baseEnv(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"authorization": "Bearer token",
+		"x-tenant":      "acme",
+	}, cfg.OTEL.Headers, "a JSON object must survive as a map")
+
+	cfg, err = resolveAndValidate(t, config.Options{
+		ConfigFile: writeConfig(t, `{
+			"database": {"url": "env:DATABASE_URL"},
+			"auth": {"secret_key": "env:AUTH_SECRET_KEY"},
+			"log": {"transport": ["otlp"]},
+			"otel": {"headers": "env:OTEL_HEADERS"}
+		}`),
+		Environ: append(baseEnv(), "OTEL_HEADERS=authorization=Bearer token,x-tenant=acme"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"authorization": "Bearer token",
+		"x-tenant":      "acme",
+	}, cfg.OTEL.Headers, "a comma-separated directive must become the same map")
+}
+
+func TestRedactedHidesHeaderValuesButKeepsTheirNames(t *testing.T) {
+	// A header value is a secret: an authorization token is why the key exists,
+	// and a value that must not be logged cannot be told from one that may. The
+	// names are kept, because a name says which credential is missing without
+	// revealing it.
+	cfg := config.Default()
+	cfg.OTEL.Headers = map[string]string{"authorization": "Bearer super-secret"}
+
+	redacted := cfg.Redacted()
+	require.Contains(t, redacted.OTEL.Headers, "authorization")
+	assert.NotContains(t, redacted.OTEL.Headers["authorization"], "super-secret")
+
+	masked := cfg.Masked()
+	assert.NotContains(t, masked.OTEL.Headers["authorization"], "super-secret")
+}
+
+func TestCollectorEndpointCarriesTheScheme(t *testing.T) {
+	// One endpoint is shared by the three signals, and the exporters dial it as
+	// written. The scheme is what decides TLS.
+	cfg := config.Default()
+	cfg.OTEL.Endpoint = "http://collector.example.com:4318"
+	assert.Equal(t, "http://collector.example.com:4318", cfg.CollectorEndpoint())
+	assert.False(t, cfg.CollectorSecure())
+
+	cfg.OTEL.Endpoint = "https://collector.example.com:4318"
+	assert.Equal(t, "https://collector.example.com:4318", cfg.CollectorEndpoint())
+	assert.True(t, cfg.CollectorSecure())
+}
+
+func TestRedactedLeavesTheLogTargetsAlone(t *testing.T) {
+	// Neither the transport list nor the collector address is a credential, and
+	// a report that hid them could not say where the logs go.
+	cfg := config.Default()
+	cfg.Log.Transport = []string{"console", "otlp"}
+	cfg.OTEL.Endpoint = "https://collector.example.com:4318"
+
+	redacted := cfg.Redacted()
+
+	assert.Equal(t, cfg.Log.Transport, redacted.Log.Transport)
+	assert.Equal(t, cfg.OTEL.Endpoint, redacted.OTEL.Endpoint)
+}
+
+func TestRedactedHidesTheS3Credentials(t *testing.T) {
+	cfg := config.Default()
+	cfg.Storage.S3.AccessKey = "AKIAIOSFODNN7EXAMPLE"
+	cfg.Storage.S3.SecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+	for name, rendered := range map[string]config.Config{
+		"Redacted": cfg.Redacted(),
+		"Masked":   cfg.Masked(),
+	} {
+		assert.NotContains(t, rendered.Storage.S3.AccessKey, "AKIAIOSFODNN7EXAMPLE", name)
+		assert.NotContains(t, rendered.Storage.S3.SecretKey, "wJalrXUtnFEMI", name)
+	}
+	assert.NotContains(t, cfg.String(), "wJalrXUtnFEMI")
+
+	// The endpoint is not a secret: a report that hid it could not say which
+	// store it was describing.
+	assert.Equal(t, cfg.Storage.S3.EndpointURL, cfg.Redacted().Storage.S3.EndpointURL)
+}
+
+func TestValidationAcceptsTheDefaultCORSPolicy(t *testing.T) {
+	require.NoError(t, resolveFile(t, ""))
+}
+
+func TestValidationAcceptsAWildcardWithoutCredentials(t *testing.T) {
+	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["*"], "allow_credentials": false}}`)
+	require.NoError(t, err)
+}
+
+func TestValidationRejectsWildcardWithCredentials(t *testing.T) {
+	// The CORS specification forbids the combination: a browser refuses the
+	// answer, so a run that held it would be quietly closed.
+	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["*"], "allow_credentials": true}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "server.cors.allow_credentials")
+}
+
+func TestValidationRejectsAnOriginThatIsNotOne(t *testing.T) {
+	// A path is not part of an origin, so it can never match what a browser
+	// sends; accepting it would silently close the policy.
+	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["http://localhost:3080/app"]}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "server.cors.allowed_origins")
+}
+
+func TestValidationRejectsABadHeaderName(t *testing.T) {
+	err := resolveFile(t, `"server": {"cors": {"allowed_headers": ["content type"]}}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "server.cors.allowed_headers")
+}
+
+// TestTheAlgorithmMaterialRuleIsShared pins that the exported material rule
+// and the validation agree: a mismatch Validate refuses is the same one
+// jwks.Service answers, and an unset algorithm is every caller's nil. The
+// asymmetric half's material is the database's signing row — not visible to
+// the config — so only the HMAC leg carries a refusal here.
+func TestTheAlgorithmMaterialRuleIsShared(t *testing.T) {
+	cases := []struct {
+		name      string
+		algorithm string
+		secretKey string
+		want      string
+	}{
+		{"unset is nil", "", "", ""},
+		{"hs with secret", "HS256", "configured", ""},
+		{"hs without secret", "HS256", "", `auth.jwt_algorithm: "HS256" requires auth.secret_key`},
+		{"asymmetric names no config material", "ES256", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := config.JWTAlgorithmMaterialError(tc.algorithm, tc.secretKey)
+			if tc.want == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tc.want, err.Error())
+		})
+	}
+
+	// The deployment path reaches the same rule through checkAuth: a file
+	// naming an algorithm without its material fails validation with the
+	// shared message. The empty secret_key overrides the base body's, so the
+	// file is one that names HS256 without the material it requires.
+	err := resolveFile(t, `"auth": {"jwt_algorithm": "HS256", "secret_key": ""}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), `auth.jwt_algorithm: "HS256" requires auth.secret_key`)
+}

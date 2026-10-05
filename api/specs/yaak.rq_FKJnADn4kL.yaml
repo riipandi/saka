@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_FKJnADn4kL
+createdAt: 2026-09-25T23:15:13.717881
+updatedAt: 2026-09-26T14:34:08.434644
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_LLg3fisc5c
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ userId ]}",
+      "page": 1,
+      "limit": 20
+    }
+bodyType: application/json
+description: |-
+  List one account's audit records, newest first: the administrative view of a single account, where `List` is the caller's own view of theirs.
+
+  Guard: Admin.
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] List audit logs for a user'
+sortPriority: 2000.0
+url: ${[ apiBaseURL ]}/rpc/saka.auditlog.v1.AuditLogService/ListForUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

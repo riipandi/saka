@@ -1,0 +1,63 @@
+type: http_request
+model: http_request
+id: rq_gsXdUgyJTd
+createdAt: 2026-09-28T20:44:57.290666
+updatedAt: 2026-09-28T20:47:38.675336
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: none
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: response_type
+    value: code
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+  - enabled: true
+    name: redirect_uri
+    value: https://rp.example/callback
+  - enabled: true
+    name: scope
+    value: openid profile
+  - enabled: true
+    name: code_challenge_method
+    value: S256
+  - enabled: true
+    name: code_challenge
+    value: REPLACE_S256_CHALLENGE
+bodyType: application/x-www-form-urlencoded
+description: |-
+  The OAuth authorization endpoint. A browser redirect; the provider either answers `code=` at the redirect_uri or redirects into the SPA interaction flow when no live account session rides the cookie.
+
+  Endpoint: `GET,POST /oidc/authorize`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: null
+method: GET
+name: '[Pocket ID] Authorize'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/authorize
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

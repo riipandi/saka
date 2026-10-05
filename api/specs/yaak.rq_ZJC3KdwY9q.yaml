@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_ZJC3KdwY9q
+createdAt: 2026-09-26T15:42:43.830015
+updatedAt: 2026-09-26T18:47:27.385999
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: null
+description: |-
+  Reset the currently authenticated user's profile picture to the bundled default.
+
+  Ported from Pocket ID `DELETE /api/users/me/profile-picture`. Saka answers it at the same REST route, guarded by the authenticated caller itself. Resetting an account without a picture is a no-op.
+
+  Parameters: none
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: DELETE
+name: '[Pocket ID] Reset current user''s profile picture'
+sortPriority: 12000.0
+url: ${[ apiBaseURL ]}/api/users/me/profile-picture
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

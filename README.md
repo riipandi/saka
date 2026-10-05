@@ -1,148 +1,170 @@
-<img src="https://i.imgur.com/vJfIiId.png" alt="banner" align="left" height="240" />
-
-Starter project template with [Go][golang], [Kong][kong] (CLI), [Koanf][koanf] (config), [chi][go-chi],
-[React][react], and [TanStack][tanstack] (Router, Query, Store). This aims to make you able to quickly
-create awesome app without having to bother with the initial setup.
+# The foundation for what's next
 
 [![Go](https://img.shields.io/badge/Go-1.27-blue.svg?logo=Go&logoColor=white)](https://go.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/Postgres-18-blue.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19-blue.svg?logo=react)](https://react.dev)
-[![Go Report Card](https://goreportcard.com/badge/github.com/riipandi/tango)](https://goreportcard.com/report/github.com/riipandi/tango)
-[![Contributions](https://img.shields.io/badge/Contributions-welcome-blue.svg?color=gray)](https://github.com/riipandi/tango/graphs/contributors)
-<!-- [![Release](https://img.shields.io/github/v/release/riipandi/tango?logo=docker&logoColor=white)](https://github.com/riipandi/tango/releases) -->
-<!-- [![CI Test](https://github.com/riipandi/tango/actions/workflows/test.yml/badge.svg)](https://github.com/riipandi/tango/actions/workflows/test.yml) -->
-<!-- [![CI Release](https://github.com/riipandi/tango/actions/workflows/release.yml/badge.svg)](https://github.com/riipandi/tango/actions/workflows/release.yml) -->
+[![Release](https://img.shields.io/github/v/release/riipandi/saka?logo=docker&logoColor=white)](https://github.com/riipandi/saka/releases)
+[![Contribution](https://img.shields.io/badge/Contributions-welcome-gray.svg?labelColor=green)](https://github.com/riipandi/saka/graphs/contributors)
+<!-- [![CI Test](https://github.com/riipandi/saka/actions/workflows/test.yml/badge.svg)](https://github.com/riipandi/saka/actions/workflows/test.yml) -->
+<!-- [![CI Release](https://github.com/riipandi/saka/actions/workflows/release.yml/badge.svg)](https://github.com/riipandi/saka/actions/workflows/release.yml) -->
 
 ---
 
-```bash
-pnpm dlx tiged riipandi/tango myapp-name
-```
+**Saka**: an enterprise-ready foundation for scalable applications,
+unified identity, and modular architecture. A project boilerplate with
+authentication and authorization built in. Clone it, and the hardest
+part of a new product (accounts, sign-in, sessions, permissions) already
+works, tried and tested. Build your product around the auth core, or
+deploy it standalone as a pure identity provider for your other
+applications.
 
-> [!NOTE]
-> This project is a template I use for my personal use, so you may encounter bugs.
-> Please review the release notes thoroughly before updating, as breaking changes can occur!
+The auth works in both directions out of the box:
 
-## 🏁 Quick Start
+- **Saka as the IdP**: other applications sign their users in with Saka
+  accounts over OpenID Connect.
+- **Saka as the SSO client**: users sign in to Saka itself with Google,
+  GitHub, or any OpenID Connect provider you connect.
 
-You will need [`Go >= 1.27`][golang], [`Node.js >= 24.21`][nodejs], [`PNPM >= 12.3`][pnpm],
-and [`Docker >= 20.10`][docker] installed on your machine.
+The architecture is a **modular monolith**: features live in isolated
+modules with clear domain boundaries, while deployment stays a single
+binary. It follows the [twelve-factor app](https://12factor.net/)
+methodology (strict config separation, stateless processes, backing
+service abstraction) with two honest footnotes: the configuration
+lives in one JSON file (the environment feeds it values but is not a
+config layer), and scaling past one instance asks for the Valkey cache
+driver, because the in-process one is coherent on a single node alone.
 
-1. Install Go toolchain binaries (lint, migrate, release): `task deps`
-2. Find and replace `tango`, `Tango`, and `MyApplication` strings in the source files.
-3. Install application dependencies: `pnpm install`
-4. Create env file for development: `cp .env.example .env.local`
-5. Start the local Postgres: `docker compose up -d pgsql`
-6. Generate application secrets: `task secrets:generate -- --apply`
-7. Run database migrations: `task db:migrate`
-8. Run the project in development mode: `task dev`
+> [!WARNING]
+> This project is under active development, so you may encounter bugs.
+> Please review the release notes thoroughly before updating, as breaking
+> changes can occur. Use at your own risk!
 
-Vite serves the frontend on `:3000` and proxies `/api/*` to Go on `:3080`.
-Go files are watched and auto-rebuilt.
+## Features
 
-### Available tasks
+**The auth core**, the part most projects build last and regret:
 
-| Command           | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `task dev`        | Vite dev server (:3000) + Go API server (:3080) |
-| `task run`        | Run the Go server directly (debug build)        |
-| `task build`      | Build frontend + Go binary (single file)        |
-| `task start`      | Run the production binary                       |
-| `task db:migrate` | Run database migrations                         |
-| `task test`       | Run tests (frontend and backend)                |
-| `task lint`       | Run all linters (Go + JS)                       |
+- **Built-in authentication**: password, passkeys (WebAuthn), one-time
+  email codes, device pairing login: every account may carry several
+- **MFA**: TOTP with printable recovery codes, honored on *every* sign-in
+  path; step-up proofs for sensitive actions
+- **OAuth SSO**: sign in with Google, GitHub, or custom OpenID Connect
+  connections (discovery-based), with account linking, JIT sign-up, and
+  email-code verification gates
+- **OpenID provider**: other apps sign in with Saka accounts: code flow
+  with PKCE S256, PAR, device flow, refresh rotation, introspection,
+  revocation, RP-initiated and back-channel logout; the four certification
+  profiles rehearse green against the OpenID Foundation suite
+- **Sessions**: multi-device with per-session revocation, admin
+  impersonation (delegated, audited), anti-enumeration recovery flows
+- **Authorization**: role and permission grants checked against a catalog;
+  users, groups, sign-up modes (open/invite/closed), blocklist
+- **API keys**: machine credentials with shown-once secrets, renewal, and
+  soft revocation
 
-### Generate Certificates
+**The platform around it:**
+
+- **Single-binary deployment**: backend, frontend, email templates, and
+  migrations in one Go binary
+- **API**: ConnectRPC + REST, type-safe by code
+  generation; wire-level documentation in `docs/`
+- **Storage**: buckets, resumable (tus) uploads, local or S3-compatible
+  backends, signed links
+- **Webhooks**: signed (HMAC-SHA256) event deliveries with retries and an
+  SSRF guard
+- **Notifications**: in-product announcements with audiences, receipts,
+  and a live stream
+- **SCIM**: outbound provisioning per client (hourly + change-driven)
+- **Audit log**: every security-relevant act, retained by policy
+- **Observability**: structured logs, OpenTelemetry traces and metrics
+  (Prometheus endpoint), health/readiness
+- **Database**: PostgreSQL (pgx), goose migrations with UUIDv7 keys
+- **Testing**: Testcontainers integration tests, wire-level E2E ladders,
+  a k6 load test, and the conformance-suite driver
+- **Developer workflow**: `task` runner, Docker Compose dev stack
+  (Postgres, Mailpit, optional Valkey), debug-build devtools, and a
+  [Vite+](https://viteplus.dev) monorepo integrated with the Go server:
+  Vite compiles and HMR-serves the frontend while the Go binary rebuilds
+  on change, one origin in development ([the monorepo
+  guide](https://viteplus.dev/guide/monorepo))
+
+## Quick Start
+
+Read the [Contributing Guide](./docs/contributing.md) for detailed guidelines on contributing to this project.
+
+### Up and Running
+
+Requirements: Go 1.27+, Node 24.21+, pnpm, Task, and Docker.
 
 ```sh
-# Generate local development certificates
-mkdir -p storage/certs && mkcert
-  -key-file storage/certs/localhost_key.pem \
-  -cert-file storage/certs/localhost_crt.pem \
-  localhost 127.0.0.1 ::1 host.docker.internal \
-  "*.localhost.test"
+# Clone the repository
+git clone https://github.com/riipandi/saka
+cd saka
 
-# Install the local CA in the system trust store.
-mkcert -install
+pnpm install              # frontend dependencies
+task deps                 # Go toolchain binaries (golangci-lint, goose, …)
+task config:generate      # write app.config.json, then fill in the secrets
+
+cp .env.example .env.local && edit .env.local
+
+task compose:up           # start local dev services (postgres, mailpit, …)
+task db:initialize        # migrations + system seed + first administrator
+task dev                  # the dev loop: Vite + HMR behind the Go proxy
 ```
 
-## 🏗 Architecture
+**The application will be accessible at:**
 
-A modular monolith: one binary, features are self-contained modules.
+- Application: <http://localhost:3080>
+- Mailpit inbox: <http://localhost:8025>
 
-| Path                                | Purpose                                                             |
-| ----------------------------------- | ------------------------------------------------------------------- |
-| `cmd/launcher`                      | CLI entry (`serve`, `db migrate`, `secrets`) via Kong               |
-| `internal/kernel`                   | Module contract + registry (routes, middleware, start/stop)         |
-| `internal/registry`                 | Wires modules and shared dependencies                               |
-| `internal/config`                   | Koanf layering: defaults ← env file ← system env ← flags            |
-| `internal/datastore`                | Postgres pool, health, transactions                                 |
-| `internal/transport`                | HTTP server, middleware, SPA serving                                |
-| `internal/logger`                   | LogLayer logging incl. the task queue adapter                       |
-| `modules/*`                         | Feature modules, each owning its schema and store                   |
-| `internal/queue`                         | Built-in Postgres-backed in-process task queue (see below)          |
-| `pkg/*{crypto,jwtutils,responder}*` | Shared building blocks: secret crypto, JWT (jwx), response envelope |
-| `pkg/testutils`                     | Test helpers: shared testcontainers Postgres                        |
-| `database/migrations`               | Goose SQL migrations, the single source of schema truth             |
+**The task runner.** Run `task`: it lists everything available, from the
+dev loop and the checks to the compose stacks and the database tools.
+The tasks are defined in the [`Taskfile.yml`](./Taskfile.yml), which
+composes the per-area files under [`scripts/`](./scripts) (`task-build`,
+`task-database`, `task-container`, and friends); the same commands the
+CLI mirrors.
 
-Typed identifiers (`user_*, audit_*`) come from `go.jetify.com/typeid`.
+## Documentation
 
-### Task queue
+- [Product guide](./docs/product-guide.md): the whole product in one walk
+- [Authentication](./docs/auth.md): the sign-in methods, MFA, sessions, in depth
+- [OAuth SSO](./docs/oauth-sso.md): connecting external providers
+- [OpenID provider](./docs/oidc.md): how other apps sign in with Saka
+- [Configuration](./docs/configuration.md): the config file, secrets, settings
+- [Deployment](./docs/deployment.md): running Saka for real
 
-Background jobs run on the built-in queue (`internal/queue`), owned by
-tango and originally based on [backlite][backlite] (MIT): a type-safe,
-Postgres-backed queue that executes inside the app process — no broker
-needed. Queues are registered in the registry, tasks are plain Go types
-encoded with `encoding/json/v2`, and the schema lives in
-`database/migrations/00010_create_queue_tables.sql` (`queue_tasks`,
-`queue_tasks_completed`).
+More in [`docs`](./docs): storage, webhooks, notifications, API keys,
+SCIM, the conformance profiles, the debug utilities, the API reference,
+and [acknowledgements](./docs/acknowledgements.md), the projects Saka
+adapted.
 
-Configuration via env (see `.env.example`):
+## Why Saka?
 
-| Key                      | Default | Description                                    |
-| ------------------------ | ------- | ---------------------------------------------- |
-| `QUEUE_WORKERS`          | `4`     | Goroutines executing tasks concurrently        |
-| `QUEUE_RELEASE_AFTER`    | `300`   | Seconds before a stuck claimed task is retried |
-| `QUEUE_CLEANUP_INTERVAL` | `21600` | Seconds between expired-task cleanups          |
+*Saka* is Indonesian for the main pillar of a house, the one beam
+everything above rests on. Every product has one: accounts, sign-in,
+sessions, permissions. It is the part nobody sees when it works, and
+nobody forgets when it fails. Saka ships that pillar built, tested, and
+ready, so your effort goes to the rooms, not the frame.
 
-## 🚀 Deployment
+And the language keeps offering it: *sakahayang*, Sundanese for
+"whatever you like"; *sakarepmu*, Javanese for "up to you". The freedom
+the foundation gives you. Nothing here is locked: the code is open, the
+protocols are the standards (OpenID Connect, OAuth, SCIM, WebAuthn) that
+every client library already speaks, and the features are modules.
+Keep them, change them, or leave them. Build whatever you like; the
+pillar holds.
 
-Build the image with `docker build -f deploy/Dockerfile .` and read the
-[Deployment Guidelines](./docs/deployment.md) for detailed documentation.
+## License
 
-## 📚 References
-
-- [Choosing the Right Go Web Framework](https://brunoscheufler.com/blog/2019-04-26-choosing-the-right-go-web-framework)
-- [How To Structure A Golang Project](https://blog.boot.dev/golang/golang-project-structure)
-- [What's the best way to do authentication in modern applications](https://neciudan.dev/most-secure-way-to-store-auth-token)
-
-## 🪪 License
-
-Licensed under either of [Apache License 2.0][license-apache] or [MIT license][license-mit] at your option.
-
-> Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you,
-> as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-
-Copyrights in this project are retained by their contributors.
-
-See the [LICENSE-APACHE](./LICENSE-APACHE) and [LICENSE-MIT](./LICENSE-MIT) files for more information.
+This project licensed under the [Apache License 2.0][license-apache].
+See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md), which names the
+projects whose code and ideas Saka builds on.
 
 ---
 
-<sub>🤫 Psst! If you like my work you can support me via [GitHub sponsors](https://github.com/sponsors/riipandi).</sub>
+<sub>If you like my work, you can support me via [GitHub sponsors](https://github.com/sponsors/riipandi).</sub>
 
 [![Creator Badge](https://badgen.net/badge/icon/by%20Aris%20Ripandi?label&color=black&labelColor=black)][riipandi-x]
 
-[docker]: https://docs.docker.com/engine/install/
-[go-chi]: https://github.com/go-chi/chi
-[golang]: https://go.dev/doc/install
-[kong]: https://github.com/alecthomas/kong
-[koanf]: https://github.com/knadh/koanf
-[backlite]: https://github.com/mikestefanello/backlite
 [license-apache]: https://choosealicense.com/licenses/apache-2.0/
-[license-mit]: https://choosealicense.com/licenses/mit/
-[nodejs]: https://nodejs.org/en/download
-[pnpm]: https://pnpm.io/installation
-[react]: https://react.dev/
 [riipandi-x]: https://twitter.com/intent/follow?screen_name=riipandi
-[tanstack]: https://tanstack.com/

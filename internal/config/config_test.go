@@ -1,303 +1,198 @@
-package config
+package config_test
 
 import (
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+
+	fconfig "github.com/riipandi/saka/framework/config"
+	"github.com/riipandi/saka/internal/config"
 )
 
-// writeEnvFile creates a temporary dotenv file.
-func writeEnvFile(t *testing.T, content string) string {
+// dsn is a valid Postgres connection string, so a test that only exercises
+// precedence does not fail validation for an unrelated reason.
+const dsn = "postgresql://user:pass@localhost:5432/saka?sslmode=disable"
+
+// secret is a 64-character hex string, the shape of APP_SECRET_KEY.
+const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+// baseBody is the smallest config file that satisfies validation. It is
+// interpolated rather than literal, so no test file holds a credential, and it
+// doubles as the example of how a secret is meant to be written.
+const baseBody = `"database": {"url": "env:DATABASE_URL"}, "auth": {"secret_key": "env:AUTH_SECRET_KEY"}`
+
+// baseEnv is the environment that baseBody resolves from. PUBLIC_BASE_URL
+// rides along because Validate requires an issuer, and the loader fills an
+// unset one from this variable.
+func baseEnv() []string {
+	return []string{
+		"DATABASE_URL=" + dsn,
+		"AUTH_SECRET_KEY=" + secret,
+		"PUBLIC_BASE_URL=http://localhost:3080",
+	}
+}
+
+// writeConfig writes a JSON config file and returns its path.
+func writeConfig(t *testing.T, body string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), ".env.test")
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	path := filepath.Join(t.TempDir(), "app.config.json")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 	return path
 }
 
-func TestLoadDefaults(t *testing.T) {
-	cfg, err := Load(LoadOptions{})
+// configFile writes a config file holding the base keys plus extra, a JSON
+// object of further keys. Sections are merged, so a test states only the keys it
+// is about and can extend database or auth without repeating them.
+func configFile(t *testing.T, extra string) string {
+	t.Helper()
+
+	doc := map[string]any{
+		"database": map[string]any{"url": "env:DATABASE_URL"},
+		"auth":     map[string]any{"secret_key": "env:AUTH_SECRET_KEY"},
+	}
+	if extra != "" {
+		var more map[string]any
+		require.NoError(t, json.Unmarshal([]byte("{"+extra+"}"), &more))
+		mergeDoc(doc, more)
+	}
+
+	body, err := json.Marshal(doc, jsontext.WithIndent("    "))
+	require.NoError(t, err)
+	return writeConfig(t, string(body))
+}
+
+// mergeDoc copies every key of src into dst, recursing when both sides hold an
+// object so a fragment can add one leaf to a section the base already defines.
+func mergeDoc(dst, src map[string]any) {
+	for key, value := range src {
+		srcChild, ok := value.(map[string]any)
+		if !ok {
+			dst[key] = value
+			continue
+		}
+		dstChild, ok := dst[key].(map[string]any)
+		if !ok {
+			dst[key] = srcChild
+			continue
+		}
+		mergeDoc(dstChild, srcChild)
+	}
+}
+
+// load resolves a configuration from a file body and the base environment plus
+// extra variables. It fails the test when resolution fails, which is the
+// outcome every caller but the error tests wants.
+func load(t *testing.T, body string, extra ...string) config.Config {
+	t.Helper()
+
+	cfg, err := config.Load(config.Options{
+		ConfigFile: writeConfig(t, body),
+		Environ:    append(baseEnv(), extra...),
+	})
+	require.NoError(t, err)
+	return cfg
+}
+
+// writeEnvFile writes a dotenv file and returns its path.
+func writeEnvFile(t *testing.T, body string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), ".env.local")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	return path
+}
+
+func TestDefaultsAreValid(t *testing.T) {
+	cfg := load(t, "{"+baseBody+"}")
+
+	defaults := config.Default()
+	require.Equal(t, defaults.Server.Port, cfg.Server.Port)
+	require.Equal(t, defaults.Storage.LocalPath, cfg.Storage.LocalPath)
+	require.Equal(t, defaults.Log.Level, cfg.Log.Level)
+	require.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
+}
+
+func TestIssuerFallsBackToPublicBaseURL(t *testing.T) {
+	// An issuer no source set takes PUBLIC_BASE_URL: the origin the
+	// deployment is published at is the value a token consumer checks the
+	// claim against. The fallback is a resolution rule, not a layer, so
+	// Origin keeps reporting that no source set the key.
+	path := configFile(t, "")
+	environ := append([]string{"PUBLIC_BASE_URL=https://saka.example"}, baseEnv()...)
+
+	cfg, err := config.Load(config.Options{ConfigFile: path, Environ: environ})
 	require.NoError(t, err)
 
-	assert.Equal(t, "localhost", cfg.Host)
-	assert.Equal(t, 3080, cfg.Port)
-	assert.Equal(t, "development", cfg.App.Mode)
-	assert.Equal(t, "storage", cfg.App.DataDir)
-	assert.Equal(t, "storage/logs/app.log", cfg.LogFile())
-	assert.Equal(t, "storage/backup", cfg.BackupDir())
-	assert.Equal(t, "storage/keys", cfg.KeysDir())
-	assert.Equal(t, "structured", cfg.App.LogFormat)
-	assert.Equal(t, "http://localhost:3000", cfg.Public.BaseURL)
-	assert.NotEmpty(t, cfg.Database.URL)
+	assert.Equal(t, "https://saka.example", cfg.Auth.Issuer)
+	assert.Equal(t, fconfig.LayerDefault, cfg.Origin("auth.issuer"),
+		"the fallback is a resolution rule, not a layer")
 }
 
-func TestLoadEnvOverrides(t *testing.T) {
-	t.Setenv("PORT", "9999")
-	t.Setenv("APP_LOG_LEVEL", "debug")
-	t.Setenv("APP_DATA_DIR", "/srv/data")
-
-	cfg, err := Load(LoadOptions{})
-	require.NoError(t, err)
-
-	assert.Equal(t, 9999, cfg.Port)
-	assert.Equal(t, "debug", cfg.App.LogLevel)
-	assert.Equal(t, "/srv/data", cfg.App.DataDir)
-	assert.Equal(t, "/srv/data/logs/app.log", cfg.LogFile())
-	assert.Equal(t, "/srv/data/backup", cfg.BackupDir())
-	assert.Equal(t, "/srv/data/keys", cfg.KeysDir())
-}
-
-func TestLoadDataDirOverride(t *testing.T) {
-	cfg, err := Load(LoadOptions{Overrides: map[string]any{
-		"app.data_dir": "/tmp/custom",
-	}})
-	require.NoError(t, err)
-
-	assert.Equal(t, "/tmp/custom/logs/app.log", cfg.LogFile())
-	assert.Equal(t, "/tmp/custom/backup", cfg.BackupDir())
-}
-
-func TestLoadEnvFileLayer(t *testing.T) {
-	path := writeEnvFile(t, "PORT=1234\nAPP_LOG_LEVEL=debug\n")
-
-	cfg, err := Load(LoadOptions{EnvFile: path})
-	require.NoError(t, err)
-
-	assert.Equal(t, 1234, cfg.Port)
-	assert.Equal(t, "debug", cfg.App.LogLevel)
-}
-
-func TestLoadSystemEnvOverridesEnvFile(t *testing.T) {
-	// The system environment overrides the dotenv file.
-	t.Setenv("PORT", "7777")
-	path := writeEnvFile(t, "PORT=1234\nAPP_LOG_LEVEL=debug\n")
-
-	cfg, err := Load(LoadOptions{EnvFile: path})
-	require.NoError(t, err)
-
-	assert.Equal(t, 7777, cfg.Port, "system environment must win over --env-file")
-	assert.Equal(t, "debug", cfg.App.LogLevel)
-}
-
-func TestLoadEnvFileMissing(t *testing.T) {
-	_, err := Load(LoadOptions{EnvFile: "/nonexistent/tango/.env"})
-	require.ErrorContains(t, err, "load env file")
-}
-
-func TestLoadOverridesWinOverEverything(t *testing.T) {
-	t.Setenv("HOST", "from-env")
-	path := writeEnvFile(t, "PORT=1234\n")
-
-	cfg, err := Load(LoadOptions{
-		EnvFile: path,
-		Overrides: map[string]any{
-			"host": "0.0.0.0",
-			"port": 4321,
-		},
+func TestEnvironmentAloneCannotSetAKey(t *testing.T) {
+	// The environment alone cannot set a key: with a file that says nothing
+	// about the port, every key keeps its default. This is the guarantee that a
+	// stray export cannot change a run.
+	cfg, err := config.Load(config.Options{
+		ConfigFile: configFile(t, ""),
+		Environ:    append(baseEnv(), "SERVER_PORT=9999"),
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "0.0.0.0", cfg.Host)
-	assert.Equal(t, 4321, cfg.Port, "overrides must win over env file and env")
+	require.Equal(t, config.Default().Server, cfg.Server)
+	require.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
 }
 
-func TestLoadEmptyEnvIsUnset(t *testing.T) {
-	t.Setenv("APP_MODE", "")
+func TestNamedConfigFileMustExist(t *testing.T) {
+	_, err := config.Load(config.Options{
+		ConfigFile: filepath.Join(t.TempDir(), "absent.json"),
+		Environ:    baseEnv(),
+	})
+	require.ErrorIs(t, err, fconfig.ErrNoConfigFile)
+}
 
-	cfg, err := Load(LoadOptions{})
+func TestDefaultConfigFileInWorkingDirectory(t *testing.T) {
+	// The file is the source of truth, so the default location is looked up in
+	// the working directory when no source names one.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, fconfig.DefaultConfigFile),
+		[]byte("{"+baseBody+`, "server": {"port": 7777}}`),
+		0o600,
+	))
+	t.Chdir(dir)
+
+	cfg, err := config.Load(config.Options{Environ: baseEnv()})
 	require.NoError(t, err)
 
-	assert.Equal(t, "development", cfg.App.Mode, "empty env must not shadow the default")
+	require.Equal(t, 7777, cfg.Server.Port)
+	require.Equal(t, fconfig.LayerConfigFile, cfg.Origin("server.port"))
 }
 
-func TestLoadTrustedOrigins(t *testing.T) {
-	t.Setenv("PUBLIC_TRUSTED_ORIGINS", "http://a.test,http://b.test")
+func TestMissingDefaultConfigFileIsAnError(t *testing.T) {
+	// A run with no configuration is not a configuration anyone chose, so the
+	// absence is reported rather than silently falling back to the defaults.
+	t.Chdir(t.TempDir())
 
-	cfg, err := Load(LoadOptions{})
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"http://a.test", "http://b.test"}, cfg.Public.TrustedOrigins)
+	_, err := config.Load(config.Options{Environ: baseEnv()})
+	require.ErrorIs(t, err, fconfig.ErrNoConfigFile)
 }
 
-func TestLoadNullPathPrefix(t *testing.T) {
-	cfg, err := Load(LoadOptions{Overrides: map[string]any{
-		"storage.s3_path_prefix": "null",
-	}})
-	require.NoError(t, err)
-	assert.Nil(t, cfg.Storage.S3PathPrefix, "literal null must decode to nil")
+func TestConfigPathPrecedence(t *testing.T) {
+	fromFlag := "/from/flag.json"
+	fromEnv := "/from/env.json"
 
-	cfg, err = Load(LoadOptions{Overrides: map[string]any{
-		"storage.s3_path_prefix": "tenant-a",
-	}})
-	require.NoError(t, err)
-	require.NotNil(t, cfg.Storage.S3PathPrefix)
-	assert.Equal(t, "tenant-a", *cfg.Storage.S3PathPrefix)
-}
-
-func TestLoadEnvFileIgnoresUnboundKeys(t *testing.T) {
-	path := writeEnvFile(t, "HOME=/leaking\nPORT=4400\n")
-
-	cfg, err := Load(LoadOptions{EnvFile: path})
-	require.NoError(t, err)
-
-	assert.Equal(t, 4400, cfg.Port)
-	assert.Equal(t, "localhost", cfg.Host, "unbound keys must not leak into config")
-}
-
-func TestLoadEnvFileRejectsUnknownKeys(t *testing.T) {
-	path := writeEnvFile(t, "AUTH_ACCESS_TOKEN_EXPIRED=900\n")
-
-	_, err := Load(LoadOptions{EnvFile: path})
-	require.ErrorContains(t, err, "unknown config key", "typos must fail fast, not silently default")
-}
-
-func TestValidateProductionRequiresSecrets(t *testing.T) {
-	base := LoadOptions{Overrides: map[string]any{
-		"app.mode":               "production",
-		"database.url":           "postgresql://localhost/db",
-		"public.healthcheck_url": "https://upstream.test",
-	}}
-
-	// Production must reject missing secrets.
-	_, err := Load(base)
-	require.Error(t, err)
-	for _, key := range []string{"app.secret_key", "auth.secret_key", "auth.private_key", "auth.public_key"} {
-		assert.Contains(t, err.Error(), key)
-	}
-
-	// Supplying all four secrets makes the config valid.
-	base.Overrides["app.secret_key"] = "s3cret"
-	base.Overrides["auth.secret_key"] = "s3cret"
-	base.Overrides["auth.private_key"] = "priv"
-	base.Overrides["auth.public_key"] = "pub"
-	_, err = Load(base)
-	require.NoError(t, err)
-}
-
-func TestValidateRejectsInvalidValues(t *testing.T) {
-	cases := []struct {
-		name      string
-		overrides map[string]any
-		wantErr   string
-	}{
-		{
-			name:      "port too high",
-			overrides: map[string]any{"port": 70000},
-			wantErr:   "port: 70000 out of range",
-		},
-		{
-			name:      "bad mode",
-			overrides: map[string]any{"app.mode": "prodaksen"},
-			wantErr:   `app.mode: invalid value "prodaksen"`,
-		},
-		{
-			name:      "bad log format",
-			overrides: map[string]any{"app.log_format": "xml"},
-			wantErr:   `app.log_format: invalid value "xml"`,
-		},
-		{
-			name:      "bad log transport",
-			overrides: map[string]any{"app.log_transport": "syslog"},
-			wantErr:   `app.log_transport: invalid value "syslog"`,
-		},
-		{
-			name:      "bad log level",
-			overrides: map[string]any{"app.log_level": "loud"},
-			wantErr:   `app.log_level: invalid value "loud"`,
-		},
-		{
-			name:      "bad database scheme",
-			overrides: map[string]any{"database.url": "mysql://localhost/db"},
-			wantErr:   `database.url: unsupported scheme "mysql"`,
-		},
-		{
-			name:      "bad base url scheme",
-			overrides: map[string]any{"public.base_url": "ftp://localhost"},
-			wantErr:   `public.base_url: unsupported scheme "ftp"`,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := Load(LoadOptions{Overrides: tc.overrides})
-			require.ErrorContains(t, err, tc.wantErr)
-		})
-	}
-}
-
-func TestDefaultsAreComplete(t *testing.T) {
-	// Every leaf without an intentional default must be set.
-	intentionallyEmpty := map[string]bool{
-		"app.secret_key":               true,
-		"auth.private_key":             true,
-		"auth.public_key":              true,
-		"auth.secret_key":              true,
-		"auth.github_client_id":        true,
-		"auth.github_client_secret":    true,
-		"auth.google_client_id":        true,
-		"auth.google_client_secret":    true,
-		"mailer.smtp_username":         true,
-		"mailer.smtp_password":         true,
-		"public.trusted_origins":       true, // nil = no extra origins
-		"storage.s3_access_key_id":     true, // credentials stay out of code
-		"storage.s3_secret_access_key": true,
-		"storage.s3_path_prefix":       true, // nil = no prefix
-	}
-
-	var walk func(value reflect.Value, prefix string)
-	walk = func(value reflect.Value, prefix string) {
-		structType := value.Type()
-		for i := range structType.NumField() {
-			field := structType.Field(i)
-			name := field.Tag.Get("koanf")
-			if name == "" {
-				continue
-			}
-			path := name
-			if prefix != "" {
-				path = prefix + "." + name
-			}
-
-			fieldValue := value.Field(i)
-			if field.Type.Kind() == reflect.Struct {
-				walk(fieldValue, path)
-				continue
-			}
-			if intentionallyEmpty[path] || field.Type.Kind() == reflect.Bool {
-				// false is a valid boolean default.
-				continue
-			}
-			assert.False(t, fieldValue.IsZero(), "defaultConfig.%s must have a default value", path)
-		}
-	}
-	walk(reflect.ValueOf(defaultConfig), "")
-}
-
-func TestEnvExampleInSync(t *testing.T) {
-	// Keep .env.example in sync with the config schema.
-	data, err := os.ReadFile("../../.env.example")
-	require.NoError(t, err)
-
-	documented := map[string]bool{}
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		name, _, found := strings.Cut(line, "=")
-		require.True(t, found, "malformed line in .env.example: %q", line)
-
-		key, _ := envTransform(name, "probe")
-		require.NotEmpty(t, key, "env %q in .env.example is not a bound key", name)
-		require.True(t, validKeys[key], "env %q maps to unknown key %q", name, key)
-		documented[key] = true
-	}
-
-	for key := range validKeys {
-		assert.True(t, documented[key], "key %q is missing from .env.example", key)
-	}
+	require.Equal(t, fromFlag, fconfig.ConfigPath(
+		fconfig.Options{ConfigFile: fromFlag},
+		[]string{fconfig.FileEnv + "=" + fromEnv}))
+	require.Equal(t, fromEnv, fconfig.ConfigPath(
+		fconfig.Options{},
+		[]string{fconfig.FileEnv + "=" + fromEnv}))
+	require.Equal(t, fconfig.DefaultConfigFile, fconfig.ConfigPath(fconfig.Options{}, nil))
 }

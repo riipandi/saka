@@ -1,5 +1,8 @@
+import { resolve } from 'node:path'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
+
+const excludedPath = ['node_modules', 'packages/*/node_modules', 'tests-e2e', 'e2e-tests']
 
 export default defineConfig({
   test: {
@@ -8,14 +11,14 @@ export default defineConfig({
         ? [['github-actions']]
         : [
             ['default'],
-            ['json', { outputFile: './.output/tests-results/vitest-results.json' }],
-            ['html', { outputDir: './.output/tests-results' }]
+            ['json', { outputFile: resolve('.output/tests-results/vitest-results.json') }],
+            ['html', { outputDir: resolve('.output/tests-results') }]
           ],
     browser: { traceView: true },
     coverage: {
       provider: 'v8',
       reporter: ['html-spa', 'text-summary'],
-      reportsDirectory: './.output/tests-results/coverage',
+      reportsDirectory: resolve('.output/tests-results/coverage'),
       include: ['./api/client/**/*.{js,ts}'],
       cleanOnRerun: true,
       clean: true,
@@ -37,7 +40,7 @@ export default defineConfig({
           environment: 'node',
           env: loadEnv('test', process.cwd(), ''),
           include: ['./api/client/**/*.test.ts'],
-          exclude: ['node_modules', 'tests-e2e'],
+          exclude: excludedPath,
           globals: true
         }
       },
@@ -47,8 +50,19 @@ export default defineConfig({
         test: {
           name: 'app',
           environment: 'happy-dom',
-          include: ['./app/**/*.test.ts'],
-          exclude: ['node_modules', 'tests-e2e'],
+          include: ['./packages/webapp/**/*.test.ts'],
+          exclude: excludedPath,
+          globals: true
+        }
+      },
+      {
+        extends: true,
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: 'plugins',
+          environment: 'node',
+          include: ['./packages/plugins/**/*.test.ts'],
+          exclude: excludedPath,
           globals: true
         }
       }

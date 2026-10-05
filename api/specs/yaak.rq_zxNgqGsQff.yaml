@@ -1,0 +1,56 @@
+type: http_request
+model: http_request
+id: rq_zxNgqGsQff
+createdAt: 2026-09-25T10:33:41.055291
+updatedAt: 2026-10-03T22:56:59.869102
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: binary
+description: |-
+  Update a specific user's profile picture.
+
+  Ported from Pocket ID `PUT /api/users/{id}/profile-picture` — the write
+  stays a REST route, because a file upload is a browser's form job, not a
+  protocol procedure. Requires a Bearer token of the account's owner or an
+  administrator; the body is the raw image bytes, checked against their
+  magic bytes — PNG, JPEG, or WebP, at most 2 MiB. The engine stages the
+  bytes and lands them on the storage backend through the durable queue.
+
+  Parameters:
+  - id (path, required): User ID
+  - data (bytes, required): base64-encoded image bytes
+headers: []
+method: PUT
+name: '[Pocket ID] Update user profile picture'
+sortPriority: 17000.0
+url: ${[ apiBaseURL ]}/api/users/${[ userId ]}/profile-picture
+urlParameters:
+- enabled: true
+  name: id
+  value: ${[ userId ]}
+  id: hImYmxMSI9
+- enabled: true
+  name: ''
+  value: ''
+  id: T3wkUzCUSR
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

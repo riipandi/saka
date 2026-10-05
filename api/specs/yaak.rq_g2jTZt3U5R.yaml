@@ -1,0 +1,59 @@
+type: http_request
+model: http_request
+id: rq_g2jTZt3U5R
+createdAt: 2026-10-02T11:48:01.177339
+updatedAt: 2026-10-02T11:48:01.177339
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "new_password": ""
+    }
+bodyType: application/json
+description: |-
+  Sets the signed-in account's first password credential — the self-service an account created without one holds. The proof is the step-up token the guard consumes from the X-Saka-Reauthentication header (Reauthenticate by password, passkey, or the email code SendReauthenticationCode sent); an account that already holds a password is refused with failed_precondition. The password must meet the account's policy — min length, the character rules, and the breach corpus; the strength floor is the frontend's to show.
+
+  Guard: Session + step-up.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+- enabled: true
+  name: Authorization
+  value: Bearer {{[ accessToken ]}}
+  id: null
+- enabled: true
+  name: X-Saka-Reauthentication
+  value: '{{[ reauthenticationToken ]}}'
+  id: null
+method: POST
+name: '[Saka] Add password (first credential)'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/AddPassword
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

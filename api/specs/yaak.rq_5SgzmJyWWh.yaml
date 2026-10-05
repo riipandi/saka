@@ -2,20 +2,20 @@ type: http_request
 model: http_request
 id: rq_5SgzmJyWWh
 createdAt: 2026-09-18T19:38:03.314271
-updatedAt: 2026-09-20T10:26:38.483763
+updatedAt: 2026-09-26T21:57:27.788304
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_vJemVfyfFL
+folderId: fl_YFXTtzfvhT
 authentication: {}
-authenticationType: null
+authenticationType: none
 body:
   text: |-
     {
-      "identity": "${[ identity ]}",
-      "password": "${[ password ]}",
+      "identity": "${[ prompt.text(label='Identity', store='none', namespace='${[ctx.workspace()]}', ttl='0', placeholder='Email or username', defaultValue='${[ identity ]}') ]}",
+      "password": "${[ prompt.text(label='Password', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='${[ password ]}', placeholder='Password', password=true) ]}",
       "remember": ${[ remember ]}
     }
 bodyType: application/json
-description: 'Credentials come from the `identity` and `password` environment variables, so the request needs no editing per environment. `remember` selects the session duration: true issues a long-lived session, false a short one.'
+description: 'Verifies the primary credential and issues the token pair — or, for an account keeping a confirmed TOTP authenticator, the MFA challenge: mfa_required=true with a short-lived mfa_pending_token (5 min) and no tokens. The caller finishes via [Saka] Complete MFA sign-in with the pending token plus a TOTP or recovery code. While the deployment''s `mfa.required` setting stands, an account holding no confirmed factor answers mfa_required=true with mfa_enrollment_required=true instead — the pending token admits the TOTP enrollment pair (its optional `pending_token` field), and the sign-in completes through the same Complete MFA sign-in after the confirm. A wrong identity and a wrong password answer the same failure, so the endpoint does not disclose which half was wrong.'
 headers:
 - enabled: true
   name: Content-Type
@@ -26,9 +26,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Sign in with password
+name: '[Saka] Sign in with password'
 sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.identity.v1.AuthService/SignIn
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.AuthService/SignIn
 urlParameters: []
 settingSendCookies:
   enabled: false

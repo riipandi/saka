@@ -1,12 +1,13 @@
 /.idea
 /.pnp
 /.husky
+/.atlas
 .pnp.js
 .DS_Store
 .DS_Store?
 .sentryclirc
+coverage.out
 /coverage
-/coverage.out
 /[Tt]emp/
 /[Tt]mp/
 /vendor/
@@ -24,6 +25,7 @@ npm-debug.log*
 !.vscode/launch.json
 !.vscode/mcp.json
 !.vscode/tasks.json
+
 *.bak
 
 # SQLite
@@ -33,7 +35,6 @@ npm-debug.log*
 
 # Envars
 .env.*
-!.env.example
 compose.env*
 !compose.env.example
 .*.vars
@@ -46,6 +47,7 @@ release/
 output/
 /out/
 .react-email/
+.tanstack/
 .build/
 .data
 .cache
@@ -62,14 +64,12 @@ vitest.config.*
 vitest.workspace.*
 !vitest.workspace.ts
 
-# TanStack Router
-.tanstack/
-routeTree.gen.ts
-routes.gen.ts
-
 # Disable this line in your real app
 /playwright/.cache/
 /playwright-report/
+/test-results/
+/e2e-tests/.auth/
+/e2e-tests/.output/
 /tests-results/
 /blob-report/
 .playwright/
@@ -93,11 +93,11 @@ audit.json
 sbom-*
 
 # Generated files
-/api/docs.go
-/api/swagger.json
-/api/swagger.yaml
+config.schema.json
+routeTree.gen.ts
+routes.gen.ts
+app.*.json*
 /codegen/
-.rpc-gen.stamp
 *.gen.ts
 *.gen.go
 

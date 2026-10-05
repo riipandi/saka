@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_pUsTGJwyQM
+createdAt: 2026-09-28T17:32:22.557911
+updatedAt: 2026-09-28T17:32:22.557911
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_jyTw5r8X2o
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "https://portal.hogwarts.example/.well-known/oauth-client"
+    }
+bodyType: application/json
+description: |-
+  Forces a re-fetch of a CIMD client's metadata document, bypassing every cache — the operator's answer to a document that changed under it. Only a metadata-document client (client_type cimd, the id IS the document's URL) refreshes; a registered client is refused. The allowlist is judged again at the fetch.
+
+  Saka procedure saka.federation.v1.OidcClientService/RefreshClient. Guard: admin.
+
+  Parameters:
+  - id (body, required): the CIMD client's identifier — the metadata document's URL
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Refresh client metadata document'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/RefreshClient
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

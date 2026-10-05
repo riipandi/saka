@@ -1,0 +1,47 @@
+type: http_request
+model: http_request
+id: rq_p234B85Ztv
+createdAt: 2026-09-26T11:36:51.083266
+updatedAt: 2026-09-26T11:43:38.365710
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_YFXTtzfvhT
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  One page of the account's sessions, newest first, ended ones included, the caller's own marked. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+
+  Parameters:
+  - page (body, optional): one-based page number
+  - limit (body, optional): page size
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: aKQQ2gYz8X
+method: POST
+name: '[Saka] List sessions'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/ListSessions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

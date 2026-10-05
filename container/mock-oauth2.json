@@ -1,0 +1,124 @@
+{
+    "interactiveLogin": true,
+    "tokenCallbacks": [
+        {
+            "issuerId": "google",
+            "tokenExpiry": 3600,
+            "requestMappings": [
+                {
+                    "requestParam": "subject",
+                    "match": "^unverified-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": false,
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts"
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": "^nonames-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": ".*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true,
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts"
+                    }
+                }
+            ]
+        },
+        {
+            "issuerId": "github",
+            "tokenExpiry": 3600,
+            "requestMappings": [
+                {
+                    "requestParam": "subject",
+                    "match": "^unverified-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": false,
+                        "name": "${subject} Hogwarts"
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": "^nonames-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": ".*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "email": "${subject}@hogwarts.example",
+                        "email_verified": true,
+                        "name": "${subject} Hogwarts"
+                    }
+                }
+            ]
+        },
+        {
+            "issuerId": "custom",
+            "tokenExpiry": 3600,
+            "requestMappings": [
+                {
+                    "requestParam": "subject",
+                    "match": "^noverify-.*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "user_uuid": "uuid-${subject}",
+                        "mail": "${subject}@hogwarts.example",
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts",
+                        "handle": "hh_${subject}",
+                        "second_given": "Minerva",
+                        "dept": "gryffindor",
+                        "house": "hufflepuff",
+                        "photo": "https://localhost:3220/mock-avatar/minerva.png"
+                    }
+                },
+                {
+                    "requestParam": "subject",
+                    "match": ".*",
+                    "claims": {
+                        "sub": "${subject}",
+                        "aud": ["${clientId}"],
+                        "user_uuid": "uuid-${subject}",
+                        "mail": "${subject}@hogwarts.example",
+                        "mail_verified": true,
+                        "given_name": "${subject}",
+                        "family_name": "Hogwarts",
+                        "handle": "hh_${subject}",
+                        "second_given": "Minerva",
+                        "dept": "gryffindor",
+                        "house": "hufflepuff",
+                        "photo": "https://localhost:3220/mock-avatar/minerva.png"
+                    }
+                }
+            ]
+        }
+    ]
+}

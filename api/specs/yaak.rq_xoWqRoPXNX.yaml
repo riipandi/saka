@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_xoWqRoPXNX
+createdAt: 2026-09-28T20:29:03.944202
+updatedAt: 2026-10-05T17:40:30.320956
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_jyTw5r8X2o
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "page": 1,
+      "limit": 50
+    }
+bodyType: application/json
+description: |-
+  The deployment-wide ledger: every consent with its account named in the wire form. Paginated — page is one-based, limit caps at 100; both unset answer the first default-sized page, and the response carries the flat metadata block (page, limit, total_pages, item range).
+
+  Procedure: `saka.federation.v1.OidcConsentService/ListAllAuthorizedClients`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: '[Pocket ID] List every authorized client'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,528 +1,439 @@
 package user
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"net/http"
-	"strings"
+	"math"
+	"strconv"
+	"time"
 
 	"connectrpc.com/connect"
-	"github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	identityv1 "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1"
-	identityv1connect "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1/identityv1connect"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/rpcerr"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/modules/identity"
-	"github.com/riipandi/tango/pkg/validate"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/go-chi/chi/v5"
+
+	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
+	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	identityv1connect "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
+	"github.com/riipandi/saka/framework/webutil"
+	"github.com/riipandi/saka/modules/identity/password"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
-// GroupBinding is the neutral user↔group projection: the group
-// fields the binding surface needs, without importing the usergroup
-// package (which imports this one).
-type GroupBinding struct {
-	ID          string
-	Name        string
-	DisplayName string
-	CreatedAt   string
-	UpdatedAt   *string
-}
+// ModuleName is the name this feature reports under. The area it belongs to
+// qualifies it, so the name is the feature alone.
+const ModuleName = "user"
 
-// CredentialView is the neutral WebAuthn credential projection for
-// the admin/self management surface.
-type CredentialView struct {
-	ID              string
-	Name            string
-	CredentialID    string // base64url of the raw credential id
-	AttestationType string
-	Transport       []string
-	BackupEligible  bool
-	BackupState     bool
-	CreatedAt       string
-	LastUsedAt      *string
-}
-
-// GroupBindingPort serves the user↔group bindings; implemented by
-// the usergroup feature over its stores.
-type GroupBindingPort interface {
-	// GroupsForUser lists the groups the user belongs to.
-	GroupsForUser(ctx context.Context, userID UserID) ([]GroupBinding, error)
-	// ReplaceGroupsForUser atomically rebinds the user to exactly
-	// the named group IDs.
-	ReplaceGroupsForUser(ctx context.Context, userID UserID, groupIDs []string) error
-}
-
-// CredentialAdminPort serves the WebAuthn credential management
-// surface; implemented by the passkey feature.
-type CredentialAdminPort interface {
-	// CredentialsForUser lists the user's registered credentials.
-	CredentialsForUser(ctx context.Context, userID UserID) ([]CredentialView, error)
-	// RenameCredential updates one credential's display name;
-	// unknown IDs surface ErrNotFound.
-	RenameCredential(ctx context.Context, userID UserID, credentialID, name string) (*CredentialView, error)
-	// DeleteCredential removes one credential; unknown IDs surface
-	// ErrNotFound.
-	DeleteCredential(ctx context.Context, userID UserID, credentialID string) error
-}
-
-// BindRPCPorts wires the cross-feature ports the Connect surface
-// needs; called by the composition root after every feature exists.
-func (s *Service) BindRPCPorts(groups GroupBindingPort, credentials CredentialAdminPort) {
-	s.groupPort = groups
-	s.credentialPort = credentials
-}
-
-// RPCService returns the Connect registration for the user surface:
-// the procedure prefix and the handler. Admin CRUD and the self
-// profile mix in one service, so the guard is per procedure; the
-// access authenticator comes from the composition root. The self
-// procedures refuse a machine credential — a leaked key must not edit
-// its owner's profile.
-func (s *Service) RPCService(auth kernel.AccessAuthenticator) (string, http.Handler) {
-	admin := map[string]bool{
-		identityv1connect.UserServiceListUsersProcedure:                true,
-		identityv1connect.UserServiceGetUserProcedure:                  true,
-		identityv1connect.UserServiceCreateUserProcedure:               true,
-		identityv1connect.UserServiceUpdateUserProcedure:               true,
-		identityv1connect.UserServiceDeleteUserProcedure:               true,
-		identityv1connect.UserServiceUpdateProfilePictureProcedure:     true,
-		identityv1connect.UserServiceDeleteProfilePictureProcedure:     true,
-		identityv1connect.UserServiceListUserGroupsProcedure:           true,
-		identityv1connect.UserServiceReplaceUserGroupsProcedure:        true,
-		identityv1connect.UserServiceListWebAuthnCredentialsProcedure:  true,
-		identityv1connect.UserServiceUpdateWebAuthnCredentialProcedure: true,
-		identityv1connect.UserServiceDeleteWebAuthnCredentialProcedure: true,
-	}
-	self := map[string]bool{
-		identityv1connect.UserServiceUpdateMeProcedure:               true,
-		identityv1connect.UserServiceUpdateMyProfilePictureProcedure: true,
-		identityv1connect.UserServiceDeleteMyProfilePictureProcedure: true,
-	}
-	opts := append(rpcerr.Options(), connect.WithInterceptors(
-		middleware.RPCMachineDenied(self),
-		middleware.RPCPrincipalGuard(auth, admin, self),
-	))
-	prefix, handler := identityv1connect.NewUserServiceHandler(&userRPC{service: s}, opts...)
-	return prefix, handler
-}
-
-type userRPC struct {
+// Module serves the account administration procedures: the RPC surface, and
+// the REST routes the picture read and write claim. Authentication is the
+// transport's bearer middleware for both — the module reads the claims the
+// context carries, it never verifies a token itself.
+type Module struct {
 	service *Service
 }
 
-// principalID resolves the caller's own user ID from the guarded
-// context.
-func (h *userRPC) principalID(ctx context.Context) (UserID, error) {
-	principal, ok := middleware.PrincipalFromContext(ctx)
-	if !ok {
-		return UserID{}, rpcerr.Unauthenticated("authentication required")
-	}
-	id, err := identity.ParseID[UserID](principal.UserID)
-	if err != nil {
-		return UserID{}, rpcerr.Unauthenticated("authentication required")
-	}
-	return id, nil
+// NewModule builds the module over the account service.
+func NewModule(service *Service) *Module {
+	return &Module{service: service}
 }
 
-// savePicture stores raw bytes as the user's profile picture; the
-// blob write and column update mirror the REST multipart flow, with
-// the extension derived from the detected content type.
-func (s *Service) savePicture(ctx context.Context, id UserID, image []byte) (User, error) {
-	if s.images == nil {
-		return User{}, rpcerr.Unimplemented("profile pictures are not wired")
-	}
-	if len(image) > maxPictureUpload {
-		return User{}, rpcerr.InvalidArgument("file too large")
-	}
-	ext := pictureExtFromBytes(image)
-	if ext == "" {
-		return User{}, rpcerr.InvalidArgument("unsupported_file_type")
-	}
+// Name reports the module in composition reports.
+func (m *Module) Name() string { return ModuleName }
 
-	picturePath := "profile-pictures/" + id.String() + ext
-	if err := s.images.Save(ctx, picturePath, bytes.NewReader(image)); err != nil {
-		return User{}, rpcerr.Internal("internal error")
-	}
-	if err := s.store.SetProfilePicturePath(ctx, id, &picturePath); err != nil {
-		_ = s.images.Delete(ctx, picturePath)
-		return User{}, rpcError(err)
-	}
-	u, err := s.store.GetByID(ctx, id)
-	if err != nil {
-		return User{}, rpcError(err)
-	}
-	return u, nil
+// MountRPC registers the procedures on the RPC router. The handler options
+// are the transport's — the shared snake_case codec and the panic boundary —
+// so the procedures answer exactly like the transport's own. Each procedure
+// is registered at its own path: the generated handler answers a path under
+// its prefix it does not know with a plain-text 404, which a Connect client
+// cannot read.
+func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
+	_, handler := identityv1connect.NewUserServiceHandler(newRPCHandler(m.service), opts...)
+	r.Handle(identityv1connect.UserServiceListUsersProcedure, handler)
+	r.Handle(identityv1connect.UserServiceGetUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceCreateUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceUpdateUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceDeleteUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceResetProfilePictureProcedure, handler)
+	r.Handle(identityv1connect.UserServiceGetCurrentUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceUpdateCurrentUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceDeleteMyAccountProcedure, handler)
+	r.Handle(identityv1connect.UserServiceAddPasswordProcedure, handler)
+	r.Handle(identityv1connect.UserServiceRemovePasswordProcedure, handler)
+	r.Handle(identityv1connect.UserServiceBanUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceUnbanUserProcedure, handler)
+	r.Handle(identityv1connect.UserServiceUnlockUserProcedure, handler)
 }
 
-// clearPicture drops the user's profile picture; a missing blob
-// stays a success.
-func (s *Service) clearPicture(ctx context.Context, id UserID) (User, error) {
-	if s.images == nil {
-		return User{}, rpcerr.Unimplemented("profile pictures are not wired")
-	}
-	u, err := s.store.GetByID(ctx, id)
-	if err != nil {
-		return User{}, rpcError(err)
-	}
-	if err := s.store.SetProfilePicturePath(ctx, id, nil); err != nil {
-		return User{}, rpcError(err)
-	}
-	if u.ProfilePicturePath != nil {
-		_ = s.images.Delete(ctx, *u.ProfilePicturePath)
-	}
-	return s.store.GetByID(ctx, id)
+// rpcHandler is the transport mapping of the procedures. The service carries
+// the rules; this type carries the connect codes.
+type rpcHandler struct {
+	service *Service
 }
 
-// pictureExtFromBytes sniffes the allowlisted image type from the
-// first bytes.
-func pictureExtFromBytes(image []byte) string {
-	switch http.DetectContentType(image) {
-	case "image/png":
-		return ".png"
-	case "image/jpeg":
-		return ".jpg"
-	case "image/webp":
-		return ".webp"
-	default:
-		return ""
-	}
+// newRPCHandler builds the handler over the service.
+func newRPCHandler(service *Service) identityv1connect.UserServiceHandler {
+	return &rpcHandler{service: service}
 }
 
-// targetID parses a path user ID; TypeID-only, unknown shapes 404.
-func targetID(raw string) (UserID, error) {
-	id, err := identity.ParseID[UserID](raw)
+// ListUsers answers one page of the accounts.
+func (h *rpcHandler) ListUsers(ctx context.Context, req *connect.Request[identityv1.ListUsersRequest]) (*connect.Response[identityv1.ListUsersResponse], error) {
+	// Absent a sort order the page answers newest first, the way the list
+	// read before the sort key existed.
+	ascending := req.Msg.GetSortOrder() == "asc"
+	users, pagination, err := h.service.ListUsers(ctx, req.Msg.GetSearch(), req.Msg.GetSortBy(), ascending, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return UserID{}, rpcerr.NotFound("user not found")
+		return nil, mapError(err)
 	}
-	return id, nil
-}
 
-func (h *userRPC) ListUsers(ctx context.Context, req *connect.Request[commonv1.PageRequest]) (*connect.Response[identityv1.ListUsersResponse], error) {
-	page, limit := rpcerr.NormalizePage(int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
-	users, total, err := h.service.List(ctx, ListParams{
-		Query: req.Msg.GetQuery(),
-		Page:  Page{Page: page, Limit: limit},
-	})
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	out := make([]*identityv1.User, 0, len(users))
-	for _, u := range users {
-		out = append(out, ProtoView(u))
+	views := make([]*identityv1.User, 0, len(users))
+	for _, user := range users {
+		views = append(views, WireView(user))
 	}
 	return connect.NewResponse(&identityv1.ListUsersResponse{
-		Users:    out,
-		Metadata: rpcerr.ListMetadata(ctx, page, limit, total),
+		Users:    views,
+		Metadata: listMetadata(pagination),
+		Status:   webutil.StatusSuccess,
+		Message:  "the users were listed",
 	}), nil
 }
 
-func (h *userRPC) GetUser(ctx context.Context, req *connect.Request[identityv1.GetUserRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := targetID(req.Msg.GetUserId())
+// GetUser answers one account.
+func (h *rpcHandler) GetUser(ctx context.Context, req *connect.Request[identityv1.GetUserRequest]) (*connect.Response[identityv1.GetUserResponse], error) {
+	user, err := h.service.GetUser(ctx, req.Msg.Id)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	u, err := h.service.GetByID(ctx, id)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.GetUserResponse{
+		User:    WireView(user),
+		Status:  webutil.StatusSuccess,
+		Message: "the user was fetched",
+	}), nil
 }
 
-// derefText maps a proto optional string onto the plain string the
-// create params use (nil → empty, matching the REST payload).
-func derefText(v *string) string {
-	if v == nil {
-		return ""
+// CreateUser creates an account directly, without a signup token.
+func (h *rpcHandler) CreateUser(ctx context.Context, req *connect.Request[identityv1.CreateUserRequest]) (*connect.Response[identityv1.CreateUserResponse], error) {
+	body := req.Msg
+	user, err := h.service.CreateUser(ctx, CreateParams{
+		Username:      body.Username,
+		Email:         body.Email,
+		Password:      body.GetPassword(),
+		FirstName:     body.GetFirstName(),
+		LastName:      body.GetLastName(),
+		DisplayName:   body.GetDisplayName(),
+		Locale:        body.GetLocale(),
+		Disabled:      body.GetDisabled(),
+		EmailVerified: body.GetEmailVerified(),
+		GroupIDs:      body.GetUserGroupIds(),
+	})
+	if err != nil {
+		return nil, mapError(err)
 	}
-	return *v
+	return connect.NewResponse(&identityv1.CreateUserResponse{
+		User:    WireView(user),
+		Status:  webutil.StatusSuccess,
+		Message: "the user was created",
+	}), nil
 }
 
-func (h *userRPC) CreateUser(ctx context.Context, req *connect.Request[identityv1.CreateUserRequest]) (*connect.Response[identityv1.User], error) {
-	params := CreateParams{
-		Username:    req.Msg.GetUsername(),
-		Email:       req.Msg.GetEmail(),
-		FirstName:   derefText(req.Msg.FirstName),
-		LastName:    derefText(req.Msg.LastName),
-		DisplayName: derefText(req.Msg.DisplayName),
-		IsAdmin:     req.Msg.GetIsAdmin(),
+// UpdateUser replaces an account's fields.
+func (h *rpcHandler) UpdateUser(ctx context.Context, req *connect.Request[identityv1.UpdateUserRequest]) (*connect.Response[identityv1.UpdateUserResponse], error) {
+	body := req.Msg
+	params := UpdateParams{
+		Username:    body.Username,
+		Email:       body.Email,
+		FirstName:   body.FirstName,
+		LastName:    body.LastName,
+		DisplayName: body.DisplayName,
+		Locale:      body.Locale,
+		Timezone:    body.Timezone,
+		Disabled:    body.Disabled,
+		BanReason:   optional(body.GetBanReason()),
 	}
-	// Validate normalizes the fields and derives the display name.
-	if _, verr := params.Validate(); verr != nil {
-		return nil, validationError(verr)
+	if body.BanExpires != nil {
+		at := body.BanExpires.AsTime()
+		params.BanExpiresAt = &at
 	}
-	u, err := h.service.Create(ctx, params)
+	user, err := h.service.UpdateUser(ctx, body.Id, params)
 	if err != nil {
-		return nil, rpcError(err)
+		return nil, mapError(err)
 	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.UpdateUserResponse{
+		User:    WireView(user),
+		Status:  webutil.StatusSuccess,
+		Message: "the user was updated",
+	}), nil
 }
 
-func (h *userRPC) UpdateUser(ctx context.Context, req *connect.Request[identityv1.UpdateUserRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := targetID(req.Msg.GetUserId())
+// BanUser applies a ban to one account.
+func (h *rpcHandler) BanUser(ctx context.Context, req *connect.Request[identityv1.BanUserRequest]) (*connect.Response[identityv1.BanUserResponse], error) {
+	params := BanParams{Reason: req.Msg.Reason}
+	if req.Msg.ExpiresAt != nil {
+		at := req.Msg.ExpiresAt.AsTime()
+		params.ExpiresAt = &at
+	}
+	outcome, err := h.service.BanUser(ctx, req.Msg.Id, params)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	params := AdminUpdateParams{
-		Email:       optionalText(req.Msg.Email),
-		FirstName:   optionalText(req.Msg.FirstName),
-		LastName:    optionalText(req.Msg.LastName),
-		DisplayName: optionalText(req.Msg.DisplayName),
-		IsAdmin:     optionalBool(req.Msg.IsAdmin),
-		Disabled:    optionalBool(req.Msg.Disabled),
-	}
-	if verr := validateAdminUpdate(params); verr != nil {
-		return nil, validationError(verr)
-	}
-	u, err := h.service.Update(ctx, id, params)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.BanUserResponse{
+		User:    WireView(outcome.User),
+		Status:  webutil.StatusSuccess,
+		Message: banMessage(outcome.User, outcome.EndedSessions),
+	}), nil
 }
 
-func (h *userRPC) DeleteUser(ctx context.Context, req *connect.Request[identityv1.DeleteUserRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := targetID(req.Msg.GetUserId())
+// UnbanUser lifts one account's ban.
+func (h *rpcHandler) UnbanUser(ctx context.Context, req *connect.Request[identityv1.UnbanUserRequest]) (*connect.Response[identityv1.UnbanUserResponse], error) {
+	outcome, err := h.service.UnbanUser(ctx, req.Msg.Id)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	if err := h.service.Delete(ctx, id); err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
+	return connect.NewResponse(&identityv1.UnbanUserResponse{
+		User:    WireView(outcome.User),
+		Status:  webutil.StatusSuccess,
+		Message: "the ban was lifted",
+	}), nil
 }
 
-func (h *userRPC) UpdateMe(ctx context.Context, req *connect.Request[identityv1.UpdateProfileRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := h.principalID(ctx)
+// UnlockUser lifts one account's open lockout — the automated restriction
+// the failed-attempt policy writes. The administrative counterpart of the
+// sign-in's own expiry: the row lifts, the streak it answered for starts
+// fresh, and the audit record names the account. A ban is not a lockout;
+// UnbanUser owns that.
+func (h *rpcHandler) UnlockUser(ctx context.Context, req *connect.Request[identityv1.UnlockUserRequest]) (*connect.Response[identityv1.UnlockUserResponse], error) {
+	outcome, err := h.service.UnlockUser(ctx, req.Msg.Id)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	params := UpdateProfileParams{
-		FirstName:   optionalText(req.Msg.FirstName),
-		LastName:    optionalText(req.Msg.LastName),
-		DisplayName: optionalText(req.Msg.DisplayName),
-		AvatarURL:   optionalText(req.Msg.AvatarUrl),
-		Locale:      optionalText(req.Msg.Locale),
-	}
-	u, err := h.service.store.UpdateProfile(ctx, id, params)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.UnlockUserResponse{
+		User:    WireView(outcome),
+		Status:  webutil.StatusSuccess,
+		Message: "the lockout was lifted",
+	}), nil
 }
 
-// UpdateMyProfilePicture stores the caller's own picture from raw
-// bytes; validation (type, size) lives in the picture helper.
-func (h *userRPC) UpdateMyProfilePicture(ctx context.Context, req *connect.Request[identityv1.UpdateMyProfilePictureRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := h.principalID(ctx)
-	if err != nil {
-		return nil, err
+// banMessage answers the sentence the response carries: the expiry names
+// itself when there is one, and the ended sessions are counted so the
+// caller sees what the ban did beyond the row.
+func banMessage(subject UserView, ended int) string {
+	word := "the ban was applied"
+	if subject.BannedAt != nil && subject.BanExpires != nil {
+		word = "the ban was applied until " + subject.BanExpires.Format(time.RFC3339)
+	} else if subject.BannedAt != nil {
+		word = "the ban was applied without an end date"
 	}
-	u, err := h.service.savePicture(ctx, id, req.Msg.GetImage())
-	if err != nil {
-		return nil, rpcError(err)
+	if ended > 0 {
+		return word + "; " + strconv.Itoa(ended) + " live session(s) were ended"
 	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return word
 }
 
-func (h *userRPC) DeleteMyProfilePicture(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[identityv1.User], error) {
-	id, err := h.principalID(ctx)
-	if err != nil {
-		return nil, err
+// DeleteUser removes an account.
+func (h *rpcHandler) DeleteUser(ctx context.Context, req *connect.Request[identityv1.DeleteUserRequest]) (*connect.Response[identityv1.DeleteUserResponse], error) {
+	// The guard has already established that the caller is an administrator,
+	// so the claims are here and the name they carry is what the service
+	// compares the target against: an administrator may not delete the
+	// account they are signed in as.
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	u, err := h.service.clearPicture(ctx, id)
-	if err != nil {
-		return nil, rpcError(err)
+
+	if err := h.service.DeleteUser(ctx, req.Msg.Id, caller.Username); err != nil {
+		return nil, mapError(err)
 	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.DeleteUserResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the user was deleted",
+	}), nil
 }
 
-func (h *userRPC) UpdateProfilePicture(ctx context.Context, req *connect.Request[identityv1.UpdateProfilePictureRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
+// ResetProfilePicture removes an account's picture. The procedure is
+// self-service: the guard has already established that the account the
+// request names is the caller's own.
+func (h *rpcHandler) ResetProfilePicture(ctx context.Context, req *connect.Request[identityv1.ResetProfilePictureRequest]) (*connect.Response[identityv1.ResetProfilePictureResponse], error) {
+	if err := h.service.ResetProfilePicture(ctx, req.Msg.Id); err != nil {
+		return nil, mapError(err)
 	}
-	u, err := h.service.savePicture(ctx, id, req.Msg.GetImage())
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.ResetProfilePictureResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the profile picture was reset",
+	}), nil
 }
 
-func (h *userRPC) DeleteProfilePicture(ctx context.Context, req *connect.Request[identityv1.DeleteProfilePictureRequest]) (*connect.Response[identityv1.User], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
+// GetCurrentUser answers the account the caller is. The request carries no
+// target: the subject the bearer middleware verified is the account read.
+func (h *rpcHandler) GetCurrentUser(ctx context.Context, req *connect.Request[identityv1.GetCurrentUserRequest]) (*connect.Response[identityv1.GetCurrentUserResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	u, err := h.service.clearPicture(ctx, id)
+	user, err := h.service.GetCurrentUser(ctx, caller.UserID)
 	if err != nil {
-		return nil, rpcError(err)
+		return nil, mapError(err)
 	}
-	return connect.NewResponse(ProtoView(u)), nil
+	return connect.NewResponse(&identityv1.GetCurrentUserResponse{
+		User:    WireView(user),
+		Status:  webutil.StatusSuccess,
+		Message: "the current user was fetched",
+	}), nil
 }
 
-func (h *userRPC) ListUserGroups(ctx context.Context, req *connect.Request[identityv1.ListUserGroupsRequest]) (*connect.Response[identityv1.ListUserGroupsResponse], error) {
-	id, err := targetID(req.Msg.GetUserId())
+// UpdateCurrentUser replaces the signed-in account's own profile fields.
+// The request carries no identifier on purpose: the caller is the account,
+// and a target the request named would be a second identity to disagree.
+func (h *rpcHandler) UpdateCurrentUser(ctx context.Context, req *connect.Request[identityv1.UpdateCurrentUserRequest]) (*connect.Response[identityv1.UpdateCurrentUserResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	body := req.Msg
+	user, err := h.service.UpdateCurrentUser(ctx, caller.UserID, ProfileParams{
+		Username:    body.Username,
+		FirstName:   body.FirstName,
+		LastName:    body.LastName,
+		DisplayName: body.DisplayName,
+		Locale:      body.Locale,
+		Timezone:    body.Timezone,
+	})
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	if h.service.groupPort == nil {
-		return nil, rpcerr.Unimplemented("user groups are not wired")
+	return connect.NewResponse(&identityv1.UpdateCurrentUserResponse{
+		User:    WireView(user),
+		Status:  webutil.StatusSuccess,
+		Message: "the current user was updated",
+	}), nil
+}
+
+// DeleteMyAccount removes the signed-in account itself. The request carries
+// no identifier on purpose — the caller is the account — and a delegated
+// caller is refused at the boundary: the impersonating administrator is not
+// the account, and the account's own removal is not a delegate's choice.
+func (h *rpcHandler) DeleteMyAccount(ctx context.Context, req *connect.Request[identityv1.DeleteMyAccountRequest]) (*connect.Response[identityv1.DeleteMyAccountResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	bindings, err := h.service.groupPort.GroupsForUser(ctx, id)
-	if err != nil {
-		return nil, rpcError(err)
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
 	}
-	out := make([]*identityv1.UserGroup, 0, len(bindings))
-	for _, g := range bindings {
-		view := &identityv1.UserGroup{
-			Id:          g.ID,
-			Name:        g.Name,
-			DisplayName: g.DisplayName,
-			CreatedAt:   g.CreatedAt,
+	if err := h.service.DeleteMyAccount(ctx, caller.UserID); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.DeleteMyAccountResponse{
+		Status: webutil.StatusSuccess, Message: "the account was deleted",
+	}), nil
+}
+
+// AddPassword sets the caller's first password credential. The proof rode
+// the X-Saka-Reauthentication header the guard consumed; the impersonating
+// administrator is refused at the boundary — the account's credential is
+// not a delegate's choice.
+func (h *rpcHandler) AddPassword(ctx context.Context, req *connect.Request[identityv1.AddPasswordRequest]) (*connect.Response[identityv1.AddPasswordResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
+	}
+	if err := h.service.AddPassword(ctx, caller.UserID, req.Msg.NewPassword); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.AddPasswordResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the password was added",
+	}), nil
+}
+
+// RemovePassword deletes the caller's password credential. The proof rode
+// the X-Saka-Reauthentication header the guard consumed; the impersonating
+// administrator is refused at the boundary — the account's credential is
+// not a delegate's choice. The chained refusal and the no-credential state
+// are failed preconditions: the caller is authenticated and named, the
+// account's state is what refuses.
+func (h *rpcHandler) RemovePassword(ctx context.Context, req *connect.Request[identityv1.RemovePasswordRequest]) (*connect.Response[identityv1.RemovePasswordResponse], error) {
+	caller, ok := jwtutils.CallerFrom(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if caller.IsImpersonating() {
+		return nil, mapError(ErrUserNotFound)
+	}
+	if err := h.service.RemovePassword(ctx, caller.UserID); err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&identityv1.RemovePasswordResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the password was removed",
+	}), nil
+}
+
+// listMetadata maps the responder's pagination onto the shared block. The
+// wire fields are optional, so an unknown range is absent rather than zero.
+func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
+	meta := &commonv1.ListMetadata{}
+	set := func(dst **int32, src *int) {
+		if src == nil {
+			return
 		}
-		if g.UpdatedAt != nil {
-			view.UpdatedAt = g.UpdatedAt
+		// The wire field is int32; a total beyond it saturates rather than
+		// wrapping, and no page the rules allow can reach the bound.
+		value := *src
+		if value > math.MaxInt32 || value < math.MinInt32 {
+			value = math.MaxInt32
 		}
-		out = append(out, view)
+		*dst = new(int32(value))
 	}
-	return connect.NewResponse(&identityv1.ListUserGroupsResponse{Groups: out}), nil
+	set(&meta.Page, p.Page)
+	set(&meta.Limit, p.Limit)
+	set(&meta.TotalPages, p.TotalPages)
+	set(&meta.TotalItems, p.TotalItems)
+	set(&meta.FirstItemIndex, p.FirstItemIndex)
+	set(&meta.LastItemIndex, p.LastItemIndex)
+	return meta
 }
 
-func (h *userRPC) ReplaceUserGroups(ctx context.Context, req *connect.Request[identityv1.ReplaceUserGroupsRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if h.service.groupPort == nil {
-		return nil, rpcerr.Unimplemented("user groups are not wired")
-	}
-	if err := h.service.groupPort.ReplaceGroupsForUser(ctx, id, req.Msg.GetGroupIds()); err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *userRPC) ListWebAuthnCredentials(ctx context.Context, req *connect.Request[identityv1.ListWebAuthnCredentialsRequest]) (*connect.Response[identityv1.ListWebAuthnCredentialsResponse], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if h.service.credentialPort == nil {
-		return nil, rpcerr.Unimplemented("webauthn credentials are not wired")
-	}
-	credentials, err := h.service.credentialPort.CredentialsForUser(ctx, id)
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	out := make([]*identityv1.WebAuthnCredential, 0, len(credentials))
-	for _, c := range credentials {
-		out = append(out, credentialView(c))
-	}
-	return connect.NewResponse(&identityv1.ListWebAuthnCredentialsResponse{Credentials: out}), nil
-}
-
-func (h *userRPC) UpdateWebAuthnCredential(ctx context.Context, req *connect.Request[identityv1.UpdateWebAuthnCredentialRequest]) (*connect.Response[identityv1.WebAuthnCredential], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if h.service.credentialPort == nil {
-		return nil, rpcerr.Unimplemented("webauthn credentials are not wired")
-	}
-	credential, err := h.service.credentialPort.RenameCredential(ctx, id, req.Msg.GetCredentialId(), req.Msg.GetName())
-	if err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(credentialView(*credential)), nil
-}
-
-func (h *userRPC) DeleteWebAuthnCredential(ctx context.Context, req *connect.Request[identityv1.DeleteWebAuthnCredentialRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := targetID(req.Msg.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if h.service.credentialPort == nil {
-		return nil, rpcerr.Unimplemented("webauthn credentials are not wired")
-	}
-	if err := h.service.credentialPort.DeleteCredential(ctx, id, req.Msg.GetCredentialId()); err != nil {
-		return nil, rpcError(err)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-// credentialView maps the neutral projection onto the wire message.
-func credentialView(c CredentialView) *identityv1.WebAuthnCredential {
-	out := &identityv1.WebAuthnCredential{
-		Id:              c.ID,
-		Name:            &c.Name,
-		CredentialId:    c.CredentialID,
-		AttestationType: &c.AttestationType,
-		Transport:       c.Transport,
-		BackupEligible:  &c.BackupEligible,
-		BackupState:     &c.BackupState,
-		CreatedAt:       &c.CreatedAt,
-	}
-	if c.LastUsedAt != nil {
-		out.LastUsedAt = c.LastUsedAt
-	}
-	return out
-}
-
-// rpcError maps user domain sentinels onto Connect codes; connect
-// errors raised inside the service pass through unchanged.
-func rpcError(err error) error {
-	var cerr *connect.Error
-	if errors.As(err, &cerr) {
-		return cerr
-	}
+// mapError translates the service's failures into the codes the Connect
+// protocol carries. The internal ones are collapsed to one answer whose text
+// names nothing a caller could aim at. A malformed field never reaches the
+// service: the transport's validate interceptor refuses it with the typed
+// violation details the contracts carry.
+func mapError(err error) error {
 	switch {
-	case errors.Is(err, ErrNotFound):
-		return rpcerr.NotFound("user not found")
-	case errors.Is(err, ErrDuplicate):
-		return rpcerr.AlreadyExists(err.Error())
-	case errors.Is(err, ErrInvalidUsername), errors.Is(err, ErrInvalidEmail):
-		return rpcerr.InvalidArgument(err.Error())
+	case errors.Is(err, ErrUserNotFound):
+		return connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+	case errors.Is(err, ErrAccountExists):
+		return connect.NewError(connect.CodeAlreadyExists, errors.New("account already exists"))
+	case errors.Is(err, ErrSelfDeletion):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("an administrator cannot delete the account they are signed in with"))
+	case errors.Is(err, ErrBanInPast):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("the ban expiry is in the past"))
+	case errors.Is(err, ErrTimezoneInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown timezone"))
+	case errors.Is(err, ErrUsernameInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is invalid"))
+	case errors.Is(err, ErrGroupUnknown):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown user group"))
+	case errors.Is(err, ErrPicturesUnavailable):
+		return connect.NewError(connect.CodeUnavailable, errors.New("picture storage is not available"))
+	case errors.Is(err, password.ErrPasswordSet):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account already holds a password"))
+	case errors.Is(err, password.ErrNoPassword):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account holds no password"))
+	case errors.Is(err, password.ErrLastCredential):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("another way in is required before the password is removed"))
+	case errors.Is(err, ErrCredentialUnwired):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the credential side is not available"))
+	case isPasswordPolicy(err):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
-		return rpcerr.Internal("internal error")
+		return connect.NewError(connect.CodeInternal, errors.New("user operation failed"))
 	}
 }
 
-// validationError maps ozzo field errors onto invalid_argument.
-func validationError(verr error) error {
-	parts := make([]string, 0, 4)
-	for _, fe := range validate.FieldErrors(verr) {
-		parts = append(parts, fmt.Sprintf("%s: %s", fe.Field, fe.Message))
-	}
-	return rpcerr.InvalidArgument("validation failed: " + strings.Join(parts, "; "))
-}
-
-// validateAdminUpdate enforces the admin payload rules: a provided
-// email must parse, a provided display name must be non-empty.
-func validateAdminUpdate(params AdminUpdateParams) error {
-	if params.Email != nil {
-		if err := validation.Validate(*params.Email, is.Email); err != nil {
-			return validation.Errors{"email": err}
-		}
-	}
-	if params.DisplayName != nil && *params.DisplayName == "" {
-		return validation.Errors{"display_name": errors.New("must not be empty")}
-	}
-	return nil
-}
-
-// optionalText maps a proto optional string onto the *string the
-// domain params use — pointer identity is preserved (nil = keep).
-func optionalText(v *string) *string {
-	return v
-}
-
-// optionalBool maps a proto optional bool onto the *bool the domain
-// params use — pointer identity is preserved (nil = keep).
-func optionalBool(v *bool) *bool {
-	return v
+// isPasswordPolicy reports whether the failure is the credential policy's
+// refusal. The rule lives in the password package, so the check does too —
+// the handler maps the answer without learning the policy's rules.
+func isPasswordPolicy(err error) bool {
+	return errors.Is(err, password.ErrWeakPassword) || errors.Is(err, password.ErrBreachedPassword)
 }

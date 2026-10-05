@@ -1,0 +1,46 @@
+type: http_request
+model: http_request
+id: rq_vfgPA6zcB4
+createdAt: 2026-09-26T15:42:43.878964
+updatedAt: 2026-09-26T18:47:27.386485
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body: {}
+bodyType: binary
+description: |-
+  Update the currently authenticated user's profile picture. The body is the raw image bytes — PNG, JPEG, or WebP, at most 2 MiB.
+
+  Ported from Pocket ID `PUT /api/users/me/profile-picture`. Saka answers it at the same REST route, guarded by the authenticated caller itself.
+
+  Parameters: none
+
+  The account's row stores a reference to the stored `storage_objects` row (`picture_file_id`), not a path - the object row owns the location, so a backend or key change never rewrites the account table.
+
+headers: []
+method: PUT
+name: '[Pocket ID] Update current user''s profile picture'
+sortPriority: 13000.0
+url: ${[ apiBaseURL ]}/api/users/me/profile-picture
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

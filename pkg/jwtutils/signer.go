@@ -1,13 +1,13 @@
 package jwtutils
 
 import (
+	"encoding/json/v2"
 	"fmt"
 	"time"
 
-	jsonv2 "encoding/json/v2"
-
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
@@ -18,6 +18,7 @@ type Signer[T any] struct {
 	issuer    string
 	audience  []string
 	ttl       time.Duration
+	typ       string
 }
 
 // NewSigner builds a signer with the given key and algorithm.
@@ -83,6 +84,16 @@ func (s *Signer[T]) WithTTL(ttl time.Duration) *Signer[T] {
 	return &clone
 }
 
+// WithTyp sets the JOSE type member the compact token's header carries —
+// the discriminator a relying party reads before it reads the claims, the
+// way RFC 9068's at+jwt names an access token and the logout token
+// names itself logout+jwt. An empty typ (the default) sets no member.
+func (s *Signer[T]) WithTyp(typ string) *Signer[T] {
+	clone := *s
+	clone.typ = typ
+	return &clone
+}
+
 // Sign creates a compact JWT from the registered and private claims.
 func (s *Signer[T]) Sign(claims T, std Standard) (string, error) {
 	tok := jwt.New()
@@ -137,12 +148,12 @@ func (s *Signer[T]) Sign(claims T, std Standard) (string, error) {
 		}
 	}
 
-	flat, err := jsonv2.Marshal(claims)
+	flat, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
 	var private map[string]any
-	if unmarshalErr := jsonv2.Unmarshal(flat, &private); unmarshalErr != nil {
+	if unmarshalErr := json.Unmarshal(flat, &private); unmarshalErr != nil {
 		return "", unmarshalErr
 	}
 	for name, value := range private {
@@ -152,6 +163,21 @@ func (s *Signer[T]) Sign(claims T, std Standard) (string, error) {
 		if setErr := tok.Set(name, value); setErr != nil {
 			return "", setErr
 		}
+	}
+
+	// The JOSE type member is a header, not a claim: it rides the
+	// protected headers the signing options carry, so a discriminating
+	// verifier reads it before it reads any claim.
+	if s.typ != "" {
+		headers := jws.NewHeaders()
+		if headersErr := headers.Set(jws.TypeKey, s.typ); headersErr != nil {
+			return "", headersErr
+		}
+		signed, signErr := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key, jws.WithProtectedHeaders(headers)))
+		if signErr != nil {
+			return "", signErr
+		}
+		return string(signed), nil
 	}
 
 	signed, err := jwt.Sign(tok, jwt.WithKey(s.algorithm, s.key))

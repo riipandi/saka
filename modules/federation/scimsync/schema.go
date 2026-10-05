@@ -1,59 +1,36 @@
-// Package scimsync provisions users and groups to a remote SCIM server.
+// Package scimsync provisions the deployment's accounts and groups to
+// external applications that speak SCIM 2.0.
+//
+// Saka is the SCIM client here, not the server: one provider row per OIDC
+// client names a remote base URL and the bearer token the sync presents,
+// and one pass pushes the client's visible accounts and groups out until
+// the remote matches the local snapshot. The visibility roll is the OIDC
+// client's own: an unrestricted client provisions everyone, a restricted
+// one provisions its allowed groups' members.
 package scimsync
 
 import (
-	"errors"
-	"strings"
 	"time"
 
-	"go.jetify.com/typeid"
+	"uuid"
 )
 
-// Typed IDs for the SCIM tables: UUIDv7 suffix, snake_case prefix
-// matching the singular table name.
-type (
-	scimServiceProviderPrefix struct{}
+// The identity tables the visibility roll reads. The constants live in the
+// identity packages, but the adapters here take the columns directly — the
+// roll is one query, not the user package's CRUD.
+// ResourceProvider is the resource type an audit record names when the
+// change is about a provider row.
+const ResourceProvider = "scim_service_provider"
 
-	SCIMServiceProviderID = typeid.TypeID[scimServiceProviderPrefix]
-)
-
-func (scimServiceProviderPrefix) Prefix() string { return "scim_service_provider" }
-
-// errors mapped to HTTP by the transport layer.
-var (
-	ErrNotFound      = errors.New("scimsync: service provider not found")
-	ErrUnknownClient = errors.New("scimsync: OIDC client not found")
-	ErrDuplicate     = errors.New("scimsync: client already has a SCIM service provider")
-	ErrInvalidToken  = errors.New("scimsync: invalid bearer token")
-	ErrSyncFailed    = errors.New("scimsync: sync failed")
-)
-
-// ServiceProvider is one configured remote SCIM provider.
-type ServiceProvider struct {
-	ID           SCIMServiceProviderID `json:"id"`
-	Endpoint     string                `json:"endpoint"`
-	Token        string                `json:"token"` // shown once on write; empty on read
-	OIDCClientID string                `json:"oidc_client_id"`
-	LastSyncedAt *time.Time            `json:"last_synced_at,omitzero"`
-	CreatedAt    time.Time             `json:"created_at"`
-}
-
-// UpsertParams carries the fields a caller supplies.
-type UpsertParams struct {
-	Endpoint     string
-	Token        string
-	OIDCClientID string
-}
-
-// Validate checks the endpoint and client credentials.
-func (p UpsertParams) Validate() error {
-	p.Endpoint = strings.TrimSpace(p.Endpoint)
-	p.OIDCClientID = strings.TrimSpace(p.OIDCClientID)
-	if !strings.HasPrefix(p.Endpoint, "http://") && !strings.HasPrefix(p.Endpoint, "https://") {
-		return errors.New("endpoint must be an absolute http(s) URL")
-	}
-	if p.OIDCClientID == "" {
-		return errors.New("oidc client id is required")
-	}
-	return nil
+// Provider is one outbound provisioning target's row. The token column
+// holds the sealed `enc:` form the schema's check constraint demands; the
+// plaintext exists only in memory between an unseal and a request, and the
+// Create answer carries the operator's one look at it.
+type Provider struct {
+	ID           uuid.UUID  `db:"id"`
+	ClientID     string     `db:"oidc_client_id"`
+	Endpoint     string     `db:"endpoint"`
+	SealedToken  string     `db:"token"`
+	CreatedAt    time.Time  `db:"created_at"`
+	LastSyncedAt *time.Time `db:"last_synced_at"`
 }

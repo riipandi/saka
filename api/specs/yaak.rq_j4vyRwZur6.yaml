@@ -1,0 +1,79 @@
+type: http_request
+model: http_request
+id: rq_j4vyRwZur6
+createdAt: 2026-09-25T10:33:40.835356
+updatedAt: 2026-10-03T22:58:36.170676
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
+      "username": "hermione",
+      "email": "hermione@example.com",
+      "first_name": "Hermione",
+      "last_name": "Granger",
+      "display_name": "Hermione Granger",
+      "is_admin": false,
+      "disabled": false,
+      "email_verified": false
+    }
+bodyType: application/json
+description: |-
+  Replace an account's fields. Every field is specified: the names are mandatory, and an absent locale clears its column. The ban fields are one unit — ban_expires present applies the ban, absent lifts it.
+
+  Ported from Pocket ID `PUT /api/users/{id}` as the `saka.identity.v1.UserService/UpdateUser` procedure.
+
+  Parameters:
+  - id (body, required): User ID
+  - username (body, required): Account handle
+  - email (body, required): Account address
+  - first_name (body, required): Given name
+  - last_name (body, required): Family name
+  - display_name (body, required): Name the UI shows
+  - ban_expires (body, optional): RFC 3339 instant the ban lifts
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Update user'
+sortPriority: 14000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/UpdateUser
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,29 @@
+{
+    "name": "webapp",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vp dev",
+        "build": "vp build",
+        "preview": "vp preview"
+    },
+    "dependencies": {
+        "@simplewebauthn/browser": "^14.0.0",
+        "comlink": "^4.4.2",
+        "ofetch": "^1.5.1",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "zod": "^4.6.5"
+    },
+    "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "@vitejs/plugin-react": "catalog:",
+        "oxc-transform-react": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vite-plugin-comlink": "^5.3.0",
+        "vite-plus": "catalog:"
+    }
+}

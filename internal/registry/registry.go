@@ -1,386 +1,265 @@
-// Package registry wires feature modules and shared dependencies.
+// Package registry is the composition root: the one place the shared
+// dependencies are registered with samber/do and wired onto each other.
+//
+// The package is split along one boundary:
+//
+//   - infrastructure.go registers what the process runs on — the pool, the
+//     cache, the queue, the storage engine, the outbound client. It names no
+//     module, and importing one there would be visible in a one-line diff.
+//   - modules.go registers what the application mounts. An area owns its own
+//     wiring and reaches infrastructure only by invoking it from the
+//     container, so this file never names an area's internals — it holds the
+//     list, and a consumer can append to it.
+//   - this file joins the two. The router and the server are the only things
+//     that need both, so they are the only ones that name both.
+//
+// Each half is a `do.Package`, so `do.New` reads as the composition list
+// itself: the values the command owns, the infrastructure, the modules.
+//
+// Services are lazy: the pool and the health checker are built when the first
+// service that needs them is invoked, which is the moment serve resolves the
+// server. A dependency that cannot be built — a database that is down, a data
+// directory that cannot be used — fails that invocation, before the listener
+// opens.
 package registry
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"log/slog"
+	"net/http"
 	"time"
 
-	"go.jetify.com/typeid"
-
 	"github.com/go-chi/chi/v5"
+	"github.com/samber/do/v2"
 
-	"github.com/riipandi/tango/internal/config"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/jobs"
-	"github.com/riipandi/tango/internal/kernel"
-	"github.com/riipandi/tango/internal/logger"
-	"github.com/riipandi/tango/internal/mailer"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/modules/admin/apikey"
-	"github.com/riipandi/tango/modules/admin/appconfig"
-	"github.com/riipandi/tango/modules/admin/auditlog"
-	"github.com/riipandi/tango/modules/federation"
-	"github.com/riipandi/tango/modules/identity"
-	"github.com/riipandi/tango/modules/identity/session"
-	"github.com/riipandi/tango/modules/identity/user"
-	"github.com/riipandi/tango/modules/webhook"
-	"github.com/riipandi/tango/pkg/responder"
+	fwaudit "github.com/riipandi/saka/framework/audit"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/health"
+	fwmailer "github.com/riipandi/saka/framework/mailer"
+	fwmiddleware "github.com/riipandi/saka/framework/middleware"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/framework/scheduler"
+	"github.com/riipandi/saka/framework/storage"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/internal/jobs"
+	"github.com/riipandi/saka/internal/transport"
+	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/internal/transport/router"
 )
 
-// Deps are shared dependencies for modules.
-type Deps struct {
-	// Config is the loaded runtime configuration.
-	Config *config.Config
+// New registers the shared services of a serve run.
+//
+// The configuration, the logger, and the metrics handler are registered as
+// values because the command lifecycle owns them; they are services like any
+// other, so a provider below resolves them instead of closing over them.
+//
+// The areas of this application are mounted, followed by any the caller
+// passes. A consumer outside this repository therefore serves its own area
+// without editing this package — it appends to the list, and the last one to
+// claim a route wins.
+func New(ctx context.Context, cfg config.Config, metrics http.Handler, logger *slog.Logger, extra ...Area) *do.RootScope {
+	areas := append(Areas(), extra...)
 
-	// Logger is shared by modules.
-	Logger logger.Logger
-
-	// Fetcher is the shared outbound client.
-	Fetcher *fetcher.Fetcher
-
-	// Mailer is the shared email client.
-	Mailer mailer.Mailer
-
-	// DB is the shared Postgres store.
-	DB datastore.Store
+	return do.New(
+		do.Eager(&cfg),
+		do.Eager(logger),
+		do.Eager(metrics),
+		infrastructure(ctx),
+		areaPackages(areas),
+		// The area list is composition input, not a service — it reaches the
+		// router through this closure, the way the run's context reaches
+		// infrastructure.
+		do.Lazy(func(i do.Injector) (chi.Router, error) {
+			return newRouter(i, areas)
+		}),
+		do.Lazy(newServer),
+	)
 }
 
-// Runtime is the concrete composition root: it owns construction
-// order, route mounting, and start/stop lifecycle explicitly. Fields
-// are filled once by New and never mutated afterwards.
-type Runtime struct {
-	Queue      *queue.Module
-	Jobs       *jobs.Registry
-	AuditLog   *auditlog.Module
-	Identity   *identity.Module
-	Webhook    *webhook.Module
-	AppConfig  *appconfig.Module
-	Federation *federation.Module
+// newRouter builds the HTTP surface: the API, the static mount, and the
+// modules mounted on the root router.
+//
+// This is the join point, so it is the one provider that resolves from both
+// halves — the health checker and the limiter come from infrastructure, the
+// module list from the areas.
+func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
+	c := do.MustInvoke[*config.Config](i)
+	checker := do.MustInvoke[*health.Checker](i)
+	log := do.MustInvoke[*slog.Logger](i)
+	limiter := do.MustInvoke[fwmiddleware.Limiter](i)
+	metrics := do.MustInvoke[http.Handler](i)
 
-	// Route groups shared by the identity and federation surfaces.
-	identityGroups   identity.RouteGroups
-	federationGroups federation.RouteGroups
-
-	// sessions backs the RPC bearer authentication contract.
-	sessions *session.Service
-
-	// apiKeys resolves X-API-KEY machine credentials for the admin
-	// RPC surface.
-	apiKeys *apikey.Service
-}
-
-// New builds the runtime in registration order.
-func New(deps Deps) (*Runtime, error) {
-	if deps.DB == nil {
-		return nil, errors.New("registry: nil database store")
-	}
-
-	rt := &Runtime{}
-
-	// Register the queue first so it stops last.
-	queueClient, err := queue.NewClient(queue.ClientConfig{
-		Store:           deps.DB,
-		Logger:          logger.QueueLogger(deps.Logger),
-		NumWorkers:      deps.Config.Queue.Workers,
-		ReleaseAfter:    time.Duration(deps.Config.Queue.ReleaseAfter) * time.Second,
-		CleanupInterval: time.Duration(deps.Config.Queue.CleanupInterval) * time.Second,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("registry: task queue: %w", err)
-	}
-	rt.Queue = queue.New(queueClient)
-
-	// Register email and maintenance consumers; the version feed
-	// supplies VersionService.Latest over /rpc.
-	feed := newVersionFeed(deps)
-	rt.Jobs = jobs.NewRegistry(queueClient, deps.Mailer, deps.Logger, feed)
-
-	// Domain events fan out to audit and webhooks; both sinks are
-	// wired below, before the server can serve a request.
-	events := NewEventFanout(deps.Logger)
-	recorder := events.Recorder()
-
-	// The JWKS key service backs both the federation surface and the
-	// internal access-token signer.
-	keyService := newKeyService(deps)
-
-	// Register identity features: sessions first, then the audit
-	// module (its guards need sessions), then the guarded features.
-	idModule, groups, sessions, auditLog, apiAccess, apiKeys, blobStore, err := newIdentityFeatures(deps, rt.Jobs, recorder, keyService)
+	// The authenticator is built here, the join point, because it is the one
+	// place a transport need may name an area's service: the RPC surface
+	// verifies the tokens the identity area's key service signed, and the
+	// transport itself receives only the function, never the service.
+	mounted, err := mountAreas(i, areas)
 	if err != nil {
 		return nil, err
 	}
-	rt.Identity = idModule
-	rt.sessions = sessions
-	rt.apiKeys = apiKeys
-	rt.AuditLog = auditLog
-	events.audit = rt.AuditLog
 
-	// Register outbound webhooks.
-	rt.Webhook = newWebhookModule(deps, queueClient)
-	events.webhook = rt.Webhook
+	// The rate-limit classifier is the join of the guard's policy tables and
+	// the configuration's budgets: the guard names which procedure counts in
+	// which bucket, the configuration gives each bucket its numbers. A path
+	// the tables do not name is not counted, so the classified surface is a
+	// decision on record rather than a default every request falls into.
+	classes := map[string]fwmiddleware.RateClass{
+		guard.RateAuth: {
+			Name:   guard.RateAuth,
+			Policy: fwmiddleware.Policy{Limit: c.RateLimit.AuthLimit, Window: c.RateLimit.Window},
+		},
+		guard.RateDefault: {
+			Name:   guard.RateDefault,
+			Policy: fwmiddleware.Policy{Limit: c.RateLimit.Limit, Window: c.RateLimit.Window},
+		},
+	}
+	classify := func(path string) (fwmiddleware.RateClass, bool) {
+		bucket, ok := guard.RateBucketFor(path)
+		if !ok {
+			return fwmiddleware.RateClass{}, false
+		}
+		class, ok := classes[bucket]
+		return class, ok
+	}
 
-	rt.AppConfig = appconfig.New(rt.Jobs).
-		WithStore(appconfig.NewPostgresStore(deps.DB))
-
-	// Register the identity provider surface.
-	scimFeature, scimStore := withSCIMSync(deps)
-	rt.Federation = federation.New(
-		withOIDC(deps, rt.AuditLog, keyService, sessions, apiAccess, blobStore, rt.AppConfig, scimBindingLookup(scimStore)),
-		scimFeature,
-		keyService,
-		withDiscovery(deps, keyService),
-	)
-
-	registerRecurringJobs(deps, rt.Jobs, feed, rt.Webhook)
-
-	// The transport boundary mounts these groups; the runtime keeps
-	// the chains so every module shares one wiring.
-	rt.identityGroups = groups
-	rt.federationGroups = federation.RouteGroups{Admin: groups.Admin, Self: groups.Self}
-
-	return rt, nil
+	return router.NewRouter(router.Options{
+		Config:        *c,
+		Checker:       checker,
+		Metrics:       metrics,
+		Logger:        log,
+		RateLimiter:   limiter,
+		RateClassify:  classify,
+		Modules:       mounted,
+		Authenticator: do.MustInvoke[middleware.Authenticator](i),
+		// The step-up proofs are spent here, once per guarded call. The
+		// consumer is registered as the interface the guard defines — the
+		// registry never learns which feature mints the tokens.
+		Reauthentication: do.MustInvoke[guard.ReauthConsumer](i),
+		// The engines' own operational surface reads them the same way: the
+		// queue procedures answer from the client, the scheduler ones from
+		// its state rows. Their destructive procedures record through the
+		// pool and the recorder — the action is a single statement, so the
+		// record rides the pool.
+		QueueClient: do.MustInvoke[*queue.Client](i),
+		Scheduler:   do.MustInvoke[*scheduler.Scheduler](i),
+		DB:          do.MustInvoke[*datastore.Postgres](i),
+		Audit:       do.MustInvoke[*fwaudit.Recorder](i),
+		Injector:    i,
+	}), nil
 }
 
-// MountRoot mounts root-router routes (OIDC protocol endpoints,
-// discovery) in registration order.
-func (rt *Runtime) MountRoot(r chi.Router) {
-	rt.Federation.Routes(r)
+// newServer wraps the router in the configured HTTP server.
+func newServer(i do.Injector) (*http.Server, error) {
+	c := do.MustInvoke[*config.Config](i)
+	router := do.MustInvoke[chi.Router](i)
+	return transport.NewServer(*c, router), nil
 }
 
-// SessionAuthenticator exposes the session resolver for the RPC
-// bearer contract: `Authorization: Bearer <access-token>` resolves
-// through the same store the cookie session uses.
-func (rt *Runtime) SessionAuthenticator() kernel.AccessAuthenticator {
-	return rt.sessions
-}
-
-// MountRPC registers module-owned Connect services into the shared
-// /rpc handler tree. Registration order mirrors MountAPI.
-func (rt *Runtime) MountRPC(r chi.Router) {
-	auth := rt.SessionAuthenticator()
-	// Machine clients (X-API-KEY) reach the admin application API
-	// only: the chain resolves the credential into a principal before
-	// the guard runs and passes keyless requests through to the bearer
-	// path. Self-service and credential-lifecycle surfaces stay
-	// session-only, so a leaked key cannot rotate its owner's password
-	// or edit its owner's profile.
-	machine := middleware.RPCAPIKeyAuth(rt.apiKeys.Verify)
-
-	// Users: the surface mixes admin CRUD with self-service profile
-	// procedures, so the guard is per procedure inside the handler —
-	// and a machine credential is refused on the self procedures.
-	userPrefix, userHandler := rt.Identity.UserRPCService(auth)
-	r.Handle(userPrefix+"*", machine(userHandler))
-
-	// Groups: the whole surface is admin-only.
-	groupPrefix, groupHandler := rt.Identity.GroupRPCService()
-	r.Handle(groupPrefix+"*", machine(middleware.RPCAdminGuard(auth)(groupHandler)))
-
-	// Account: every procedure is self-service and session-only.
-	accountPrefix, accountHandler := rt.Identity.AccountRPCService()
-	r.Handle(accountPrefix+"*", middleware.RPCPrincipalAuth(auth)(accountHandler))
-
-	// API keys: session-authenticated and scoped to the caller. A
-	// machine credential may list and revoke its own keys, but minting
-	// or renewing demands a session so a leaked key cannot extend
-	// itself.
-	keyPrefix, keyHandler := rt.Identity.APIKeyRPCService()
-	r.Handle(keyPrefix+"*", machine(middleware.RPCPrincipalAuth(auth)(keyHandler)))
-
-	// Authentication lifecycle: the service mixes a public method
-	// (SignIn) with protected ones and guards its own procedures.
-	authPrefix, authHandler := rt.sessions.RPCService()
-	r.Handle(authPrefix+"*", authHandler)
-
-	// Signup: anonymous procedures plus admin token administration —
-	// the service resolves the principal per protected procedure.
-	signupPrefix, signupHandler := rt.Identity.SignupRPCService()
-	r.Handle(signupPrefix+"*", machine(signupHandler))
-
-	// MFA: the pending verification is anonymous (cookie credential);
-	// the lifecycle procedures resolve the bearer per procedure.
-	mfaPrefix, mfaHandler := rt.Identity.MfaRPCService()
-	r.Handle(mfaPrefix+"*", mfaHandler)
-
-	// One-time access: the anonymous email request plus admin minting
-	// and delivery, guarded per procedure. Minting and delivery stay
-	// session-only: they act on another account.
-	otaPrefix, otaHandler := rt.Identity.OneTimeAccessRPCService()
-	r.Handle(otaPrefix+"*", otaHandler)
-
-	// Email verification: every procedure is self-service and
-	// session-only.
-	emailvPrefix, emailvHandler := rt.Identity.EmailVerificationRPCService()
-	r.Handle(emailvPrefix+"*", middleware.RPCPrincipalAuth(auth)(emailvHandler))
-
-	// API registry: admin-only CRUD plus client grants.
-	apiPrefix, apiHandler := rt.Identity.APIAccessRPCService()
-	r.Handle(apiPrefix+"*", machine(middleware.RPCAdminGuard(auth)(apiHandler)))
-
-	// Custom claims: admin-only surface.
-	claimsPrefix, claimsHandler := rt.Identity.CustomClaimRPCService()
-	r.Handle(claimsPrefix+"*", machine(middleware.RPCAdminGuard(auth)(claimsHandler)))
-
-	// Audit logs: the self listing is any principal; the admin
-	// listing and filter facets guard per procedure.
-	auditPrefix, auditHandler := rt.AuditLog.RPCService(auth)
-	r.Handle(auditPrefix+"*", machine(auditHandler))
-
-	// Application configuration: reads, updates, and the test email
-	// are admin-only; the public bootstrap view is anonymous.
-	cfgPrefix, cfgHandler := rt.AppConfig.RPCService(auth)
-	r.Handle(cfgPrefix+"*", machine(cfgHandler))
-
-	// OIDC client administration: admin-only.
-	ocPrefix, ocHandler := rt.Federation.ClientRPCService()
-	r.Handle(ocPrefix+"*", machine(middleware.RPCAdminGuard(auth)(ocHandler)))
-
-	// Consents: self-service listing/revocation plus the admin-wide
-	// views — the per-procedure guard rides the handler.
-	consentPrefix, consentHandler := rt.Federation.ConsentRPCService()
-	r.Handle(consentPrefix+"*", machine(consentHandler))
-
-	// SCIM provider configuration: admin-only.
-	scimPrefix, scimHandler := rt.Federation.ScimRPCService()
-	r.Handle(scimPrefix+"*", machine(middleware.RPCAdminGuard(auth)(scimHandler)))
-
-	// Webhooks: admin-only registration and delivery inspection.
-	hookPrefix, hookHandler := rt.Webhook.RPCService()
-	r.Handle(hookPrefix+"*", machine(middleware.RPCAdminGuard(auth)(hookHandler)))
-
-	// Device approval: both procedures demand a signed-in principal.
-	// The browser ceremony never accepts a machine credential.
-	approvalPrefix, approvalHandler := rt.Identity.DeviceApprovalRPCService()
-	r.Handle(approvalPrefix+"*", middleware.RPCSessionAuth(auth)(approvalHandler))
-}
-
-// MountAPI mounts API routes in registration order. The webhook and
-// appconfig admin surfaces serve ConnectRPC exclusively; the appconfig
-// public bootstrap view is the retained REST read.
-func (rt *Runtime) MountAPI(api chi.Router) {
-	api.NotFound(responder.NotFoundJSON)
-	api.MethodNotAllowed(responder.MethodNotAllowedJSON)
-
-	rt.Identity.APIRoutes(api, rt.identityGroups)
-	rt.AppConfig.APIRoutes(api)
-	rt.Federation.APIRoutes(api, rt.federationGroups)
-}
-
-// Start starts lifecycle modules in registration order.
-func (rt *Runtime) Start(ctx context.Context) error {
-	for _, step := range []struct {
-		name string
-		run  func(context.Context) error
-	}{
-		{"queue", rt.Queue.Start},
-		{"jobs", rt.Jobs.Start},
-		{"federation", rt.Federation.Start},
+// Prewarm resolves every service a serve run blocks on and seeds the
+// recurring jobs: the components whose construction fails when a dependency
+// is down or a configuration is unusable. The command calls it after New and
+// before the listener opens, so such a failure is a failed run carrying the
+// service's own message, not a 500 on the first request. The runners resolve
+// here too — the scheduler's resolution claims onto a queue whose processors
+// were wired when the queue was built — and the router's resolution builds
+// the areas, whose Mount validates what they cannot work without. The
+// seeding runs last of the queue's steps, against the client it resolves.
+func Prewarm(ctx context.Context, i do.Injector) error {
+	for _, resolve := range []func(do.Injector) error{
+		func(i do.Injector) error { _, err := do.Invoke[*fetcher.Client](i); return err },
+		func(i do.Injector) error { _, err := do.Invoke[*fwmailer.Service](i); return err },
+		func(i do.Injector) error { _, err := do.Invoke[*queue.Client](i); return err },
+		func(i do.Injector) error { _, err := do.Invoke[*scheduler.Scheduler](i); return err },
+		func(i do.Injector) error {
+			seeder, err := do.Invoke[*jobs.Seeder](i)
+			if err != nil {
+				return err
+			}
+			return seeder.Seed(ctx)
+		},
+		func(i do.Injector) error { _, err := do.Invoke[chi.Router](i); return err },
+		func(i do.Injector) error { _, err := do.Invoke[*http.Server](i); return err },
 	} {
-		if err := step.run(ctx); err != nil {
-			return fmt.Errorf("start module %q: %w", step.name, err)
+		if err := resolve(i); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// Stop stops lifecycle modules in reverse order and joins errors.
-func (rt *Runtime) Stop(ctx context.Context) error {
-	var errs []error
-	for _, step := range []struct {
-		name string
-		run  func(context.Context) error
-	}{
-		{"federation", rt.Federation.Stop},
-		{"jobs", rt.Jobs.Stop},
-		{"queue", rt.Queue.Stop},
-	} {
-		if err := step.run(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("stop module %q: %w", step.name, err))
-		}
+// Runner is one long-running component of a serve run. Start launches the
+// component's work and returns; the component runs until the context the
+// command cancels on a signal, or until Stop. Stop is the drain: it waits,
+// inside the shutdown window, for the in-flight work to finish and reports
+// whether everything did. A nil Stop means the component ends with the run's
+// context or hands its drain to the container's shutdown walk.
+type Runner struct {
+	Name  string
+	Start func(ctx context.Context)
+	Stop  func(ctx context.Context) bool
+}
+
+// Runners are the long-running components of a serve run, in start order, and
+// the stop order is the reverse of it.
+//
+// This list is where the ordering a serve run depends on lives: the queue is
+// first, so the scheduler's first tick claims into a running dispatcher; the
+// scheduler stops before the listener drains, so no fire starts while the
+// listener is closing and a fire in flight joins the queue's own drain; the
+// staging watcher runs only when it is switched on, because a run that does
+// not watch stages nothing.
+func Runners(i do.Injector) ([]Runner, error) {
+	queueClient, err := do.Invoke[*queue.Client](i)
+	if err != nil {
+		return nil, err
 	}
-	return errors.Join(errs...)
-}
-
-// auditAdapter converts identity audit events into auditlog entries
-// and joins the caller's transaction when one is provided.
-func auditAdapter(audit *auditlog.Module) identity.Recorder {
-	return auditRecorder{audit: audit}
-}
-
-// auditRecorder adapts auditlog for identity features.
-type auditRecorder struct {
-	audit *auditlog.Module
-}
-
-func (a auditRecorder) Record(ctx context.Context, e identity.AuditEvent, exec datastore.Executor) {
-	entry := auditlog.Entry{
-		Event:   e.Action,
-		Trigger: auditlog.TriggerUser,
-		Status:  auditlog.StatusSuccess,
-		Payload: map[string]any{},
+	jobScheduler, err := do.Invoke[*scheduler.Scheduler](i)
+	if err != nil {
+		return nil, err
 	}
 
-	if actor, err := typeid.Parse[user.UserID](e.Actor); err == nil {
-		uuidText := actor.UUID()
-		entry.UserID = &uuidText
-	} else {
-		entry.Payload["actor"] = e.Actor
-	}
-	if target, err := typeid.Parse[user.UserID](e.Target); err == nil {
-		uuidText := target.UUID()
-		entry.ResourceType = "user"
-		entry.ResourceID = &uuidText
-	} else {
-		entry.Payload["target"] = e.Target
+	runners := []Runner{
+		// The queue outlives the listener, so its drain is the container's
+		// shutdown walk: Shutdown is what the injector calls, after the
+		// HTTP drain ends.
+		{Name: "queue", Start: queueClient.Start},
+		// The scheduler fires onto the queue, and a fire in flight finishes
+		// its enqueue here — an enqueued task is durable, so the queue's own
+		// drain after this cannot lose one.
+		{Name: "scheduler", Start: jobScheduler.Start, Stop: jobScheduler.Stop},
 	}
 
-	_ = a.audit.Record(ctx, &entry, exec)
-}
-
-// eventFanout forwards recorded events to audit and webhooks. Sinks
-// are wired during runtime construction, before any request can fire
-// an event.
-type eventFanout struct {
-	audit   *auditlog.Module
-	webhook *webhook.Module
-	log     logger.Logger
-}
-
-// NewEventFanout builds an event fan-out holder.
-func NewEventFanout(log logger.Logger) *eventFanout {
-	return &eventFanout{log: log}
-}
-
-// Recorder records identity events: one audit entry plus a webhook
-// emission per event. The exec joins the audit write to the caller's
-// transaction; webhook delivery stays best effort after commit.
-// Webhook failure is logged, never fatal.
-func (f *eventFanout) Recorder() identity.Recorder {
-	return fanoutRecorder{fanout: f}
-}
-
-// fanoutRecorder fans one identity event out to audit and webhooks.
-type fanoutRecorder struct {
-	fanout *eventFanout
-}
-
-func (r fanoutRecorder) Record(ctx context.Context, e identity.AuditEvent, exec datastore.Executor) {
-	if r.fanout.audit != nil {
-		auditAdapter(r.fanout.audit).Record(ctx, e, exec)
+	// The boot-time sweep re-enqueues the staging uploads a dead run left
+	// behind — the recovery the staging watcher's startup scan used to
+	// carry, read from the manifest instead of walked off the filesystem.
+	// It runs once and ends; its Start is synchronous because the work is
+	// short. A failure here is the run's failure, the same way a queue
+	// that cannot be built is.
+	manager, err := do.Invoke[*storage.Manager](i)
+	if err != nil {
+		return nil, err
 	}
-	if r.fanout.webhook == nil {
-		return
-	}
-	if err := r.fanout.webhook.Emit(ctx, e.Action, map[string]any{
-		"event":  e.Action,
-		"actor":  e.Actor,
-		"target": e.Target,
-	}); err != nil {
-		r.fanout.log.WithError(err).Error("webhook fan-out failed for event " + e.Action)
-	}
+	client := do.MustInvoke[*queue.Client](i)
+	log := do.MustInvoke[*slog.Logger](i)
+	runners = append(runners, Runner{
+		Name: "upload sweep",
+		Start: func(ctx context.Context) {
+			if _, err := jobs.SweepUploads(ctx, manager, client, log); err != nil {
+				log.ErrorContext(ctx, "serve: upload sweep failed", "err", err)
+				panic(err)
+			}
+		},
+	})
+	return runners, nil
 }
+
+// uptime is the computed health metadata: how long the process has been up.
+func uptime(_ context.Context) map[string]string {
+	return map[string]string{"uptime": time.Since(startTime).Round(time.Second).String()}
+}
+
+// startTime is when this process began, read once so every health report
+// measures the same clock.
+var startTime = time.Now()

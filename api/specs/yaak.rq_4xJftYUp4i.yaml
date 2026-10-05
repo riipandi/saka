@@ -1,0 +1,66 @@
+type: http_request
+model: http_request
+id: rq_4xJftYUp4i
+createdAt: 2026-09-25T10:33:40.779504
+updatedAt: 2026-09-26T18:50:06.669826
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}"
+    }
+bodyType: application/json
+description: |-
+  Retrieve one account by its identifier.
+
+  Ported from Pocket ID `GET /api/users/{id}` as the `saka.identity.v1.UserService/GetUser` procedure.
+
+  Parameters:
+  - id (body, required): User ID
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Get user by ID'
+sortPriority: 9000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/GetUser
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

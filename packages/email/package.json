@@ -1,0 +1,22 @@
+{
+    "name": "email",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "email dev --dir ./templates --port 3030",
+        "build": "vp build"
+    },
+    "dependencies": {
+        "@react-email/ui": "^6.11.0",
+        "react": "^19.3.0",
+        "react-email": "^6.11.0"
+    },
+    "devDependencies": {
+        "@types/react": "^19.3.0",
+        "tsx": "^4.23.15",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vite-plus": "catalog:"
+    }
+}

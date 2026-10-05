@@ -1,0 +1,35 @@
+type: folder
+model: folder
+id: fl_R9H6pBQjVK
+createdAt: 2026-09-27T10:14:18.811212
+updatedAt: 2026-09-27T10:16:50.337519
+workspaceId: wk_kBiMYTkhPP
+folderId: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+description: '[Saka] The notification surface: what an administrator publishes and what an account reads.'
+headers: []
+name: Notifications
+sortPriority: 15555.555555555557
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingRequestMessageSize:
+  enabled: false
+  value: 67108864
+settingHttpVersion:
+  enabled: false
+  value: auto

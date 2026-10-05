@@ -1,0 +1,1626 @@
+// The authentication contract: the procedures that establish who a caller is.
+//
+// Sign-in verifies the primary credential — an identifier that may be the
+// account's username or its email, plus the password — and answers the stateless
+// token pair the protocol section of the architecture settles: a Bearer access
+// token (a JWT the published key set verifies) and a refresh token whose only
+// server-side trace is a hashed row in `public.sessions`.
+//
+// The two transports answer one contract (docs/api-response.md): ConnectRPC
+// carries status over the protocol as a connect code, so this service reports
+// a failed credential as `unauthenticated` and a refused account as
+// `permission_denied`, both with the detail message naming the reason.
+syntax = "proto3";
+
+package saka.authn.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1;authnv1";
+
+// AuthService issues the credentials a caller presents on every later call.
+service AuthService {
+  // SignIn verifies the primary credential and issues the token pair.
+  //
+  // The identity matches the account's username (case-insensitive) or its
+  // email (matched exactly, the way the unique index does). A wrong
+  // identity and a wrong password answer the same failure, so the endpoint
+  // does not disclose which half was wrong.
+  //
+  // An account with a confirmed authenticator answers no tokens: the
+  // response carries the MFA challenge instead, and the tokens come from
+  // MultifactorService.CompleteSignIn once the second factor answers.
+  rpc SignIn(SignInRequest) returns (SignInResponse);
+}
+
+// PasswordRecoveryService is the forgot-password flow: the token that lets a
+// caller who lost the password back in, carried by an email through the
+// frontend.
+//
+// Pocket ID has no password recovery at all — passkey-only accounts never
+// lose a password — so this service is saka-only. The flow is the
+// email-verification shape: the raw token exists once in the email and once
+// in the request, the database stores only its hash, and an unknown, expired,
+// spent, and refused token answer the same failure. The token travels through
+// the frontend: the email links to a route that forwards it to
+// ResetPassword.
+service PasswordRecoveryService {
+  // ForgotPassword issues a reset token for the named account and enqueues
+  // the email. The answer is the same whether the account exists or not —
+  // the endpoint is not an account enumerator. Repeating the request inside
+  // the cooldown the last send opened refuses with resource_exhausted.
+  //
+  // When the deployment enables `app.expose_reset_token` — a development
+  // mode only aid, which validation refuses anywhere else — the response
+  // also carries the raw token, so a client can drive the reset without
+  // reading the email. It hands the account to anyone who knows the
+  // address, which is why the aid never leaves development.
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+
+  // ResetPassword spends a reset token on a new password. The token is the
+  // whole credential: the caller carries none, the same way VerifyEmail
+  // does. The new password must meet the account password policy and must
+  // not equal the current one. Success revokes every live session the
+  // account holds — a password reset means the old one is no longer
+  // trusted — unless the request asks otherwise.
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+
+  // AdminResetUserPassword lets an administrator trigger the same email on
+  // a named account: the administrator never sees or sets the password —
+  // the token goes to the account's address, and the holder completes the
+  // reset through ResetPassword. Impersonating administrators are refused.
+  rpc AdminResetUserPassword(AdminResetUserPasswordRequest) returns (AdminResetUserPasswordResponse);
+}
+
+// ForgotPasswordRequest names the account the reset email goes to.
+message ForgotPasswordRequest {
+  // email is the account's address, matched exactly the way its unique
+  // index does. The answer does not depend on whether it names an account.
+  string email = 1 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 255
+  }];
+}
+
+// ForgotPasswordResponse answers success whether the account exists or
+// not. The reset token is only present when the deployment enables
+// `app.expose_reset_token` — a development mode only aid.
+message ForgotPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+
+  // reset_token is the raw reset token, present only when the deployment
+  // enables `app.expose_reset_token` in the development mode. It is 64
+  // hexadecimal characters — URL-safe, no dashes or symbols — and is
+  // otherwise empty.
+  string reset_token = 3;
+}
+
+// ResetPasswordRequest carries the token the email linked to and the new
+// credential.
+message ResetPasswordRequest {
+  // token is the raw reset token, in clear text. It travels only over TLS
+  // and is never logged.
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // new_password is the credential the account answers with from now on.
+  // The account policy is enforced here in the service, so the refusal
+  // names the rule. A new password equal to the current one is refused.
+  string new_password = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+
+  // terminate_sessions revokes every live session the account holds once
+  // the reset commits. It defaults to true: a password reset means the old
+  // credential is no longer trusted. Send false to keep the sessions —
+  // a convenience for a caller who is resetting their own password while
+  // signed in elsewhere — and accept that a stolen session survives.
+  optional bool terminate_sessions = 3;
+}
+
+// ResetPasswordResponse is empty: the protocol carries the success.
+message ResetPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// AdminResetUserPasswordRequest names the account the reset email goes to.
+message AdminResetUserPasswordRequest {
+  // user_id is the account's wire-form identifier (user_…).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// AdminResetUserPasswordResponse is empty: the token went to the account's
+// address, never to the caller.
+message AdminResetUserPasswordResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// MultifactorService is the second factor: TOTP authenticators and the
+// recovery codes that stand in when every device is out of reach.
+//
+// Enrollment is a two-step ceremony on purpose. BeginTotpEnrollment writes an
+// unconfirmed authenticator the account can name, and ConfirmTotpEnrollment
+// turns it active only after a code read from the app proves the account
+// really holds the secret — a QR code shown to the wrong person is worthless
+// the moment the confirm step refuses the code it cannot generate.
+//
+// The sign-in bridge is a server-side row, not a claim: SignIn's password
+// success writes a short-lived pending token whose only trace is a hash, and
+// CompleteSignIn spends it — plus a TOTP code or a recovery code — on the
+// same token pair a plain sign-in would have issued.
+service MultifactorService {
+  // BeginTotpEnrollment writes an unconfirmed authenticator and answers the
+  // secret the app imports: the Base32 form and the otpauth:// URI the QR
+  // code renders. The secret is stored sealed (`enc:`) and never leaves the
+  // server again after this one answer.
+  rpc BeginTotpEnrollment(BeginTotpEnrollmentRequest) returns (BeginTotpEnrollmentResponse);
+
+  // ConfirmTotpEnrollment activates the named enrollment once the app's code
+  // verifies against its secret. The answer carries the account's recovery
+  // codes in the clear exactly once — their hashed rows are all that survive
+  // the call.
+  rpc ConfirmTotpEnrollment(ConfirmTotpEnrollmentRequest) returns (ConfirmTotpEnrollmentResponse);
+
+  // ListTotpEnrollments names the account's authenticators — the shape a
+  // settings page renders. It never carries a secret.
+  rpc ListTotpEnrollments(ListTotpEnrollmentsRequest) returns (ListTotpEnrollmentsResponse);
+
+  // DeleteTotpEnrollment removes one authenticator. The code field carries
+  // the proof the caller still holds a factor: a code from another confirmed
+  // authenticator, or a recovery code. A first enrollment needs no proof —
+  // deleting an unconfirmed row is how a mistyped start is thrown away.
+  rpc DeleteTotpEnrollment(DeleteTotpEnrollmentRequest) returns (DeleteTotpEnrollmentResponse);
+
+  // CompleteSignIn spends a pending token from SignIn plus the second factor
+  // — a TOTP code or a recovery code — on the full token pair. The guard
+  // leaves it Public: the pending token is the credential the password check
+  // minted, and it dies with its expiry or its failure budget.
+  rpc CompleteSignIn(CompleteSignInRequest) returns (CompleteSignInResponse);
+
+  // RegenerateRecoveryCodes rewrites the account's recovery set and answers
+  // the fresh codes in the clear exactly once. The code field proves the
+  // caller holds a factor; the old set dies with the call.
+  rpc RegenerateRecoveryCodes(RegenerateRecoveryCodesRequest) returns (RegenerateRecoveryCodesResponse);
+
+  // DisableMfa removes every authenticator and the recovery set — the way
+  // out when the account no longer wants the second factor. The code field
+  // proves the caller holds it; a stolen session alone cannot switch the
+  // protection off.
+  rpc DisableMfa(DisableMfaRequest) returns (DisableMfaResponse);
+
+  // VerifyRecoveryCode spends one recovery code as a standalone proof of
+  // identity — the step-up a sensitive client flow asks for without a new
+  // sign-in. The code is consumed exactly once, the way every use of a
+  // recovery code is; the remaining count drops by one.
+  rpc VerifyRecoveryCode(VerifyRecoveryCodeRequest) returns (VerifyRecoveryCodeResponse);
+
+  // AdminDisableMfa removes every authenticator and the recovery set of a
+  // named account — the operator's way in when the holder has lost every
+  // factor and cannot prove anything. The administrator carries no proof
+  // code: the administrative session is the authority, the audit record
+  // names it, and a notification is queued to the account's address. An
+  // account that holds no confirmed authenticator answers the
+  // failed-precondition code — there is nothing to disable.
+  rpc AdminDisableMfa(AdminDisableMfaRequest) returns (AdminDisableMfaResponse);
+}
+
+// SessionService is the lifecycle of the session a sign-in opened.
+//
+// The sign-in row is the server's one trace of a session: who opened it, from
+// where, and under which refresh token. These procedures keep that row honest
+// — ended sessions are stamped rather than forgotten, a caller can see the
+// sessions its account holds, and a refresh token that outlives its access
+// token has a procedure to spend it on. Every procedure is the caller's own:
+// the session the claims name is the one they act on, and a machine
+// credential — which has no session — is refused by the guard.
+service SessionService {
+  // SignOut ends the session the access token names. The row is stamped, the
+  // refresh token dies with it, and the access token keeps working until its
+  // own expiry — the statelessness the protocol settles: a logout that
+  // required a round trip per request would make every token a lookup.
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+
+  // GetSession answers the session the access token names and the account it
+  // belongs to — the "who am I" a client asks when it resumes. A session
+  // that has ended answers `unauthenticated`, which is the signal a
+  // resuming client needs.
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+
+  // ListSessions answers one page of the account's sessions, newest first,
+  // ended ones included, with the caller's own marked.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // RevokeSession ends one of the account's sessions. Ending the current one
+  // is what SignOut does; ending another is how a holder closes a device
+  // they no longer hold. A session that is not the account's answers the
+  // not-found code, and an already-ended one is the same success.
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+
+  // Refresh exchanges the refresh token for a fresh pair. The refresh token
+  // is rotated in place — the row keeps its identifier, the secret and the
+  // window are replaced — so the session a client opened keeps its identity
+  // across renewals. A spent, ended, or expired refresh token answers the
+  // same failure an unknown one does.
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+
+  // SignOutOtherSessions ends every live session of the account except the
+  // one the access token names — the holder closes every device but the one
+  // they are using. Each ended row is stamped and recorded; the response
+  // counts what the call actually ended.
+  rpc SignOutOtherSessions(SignOutOtherSessionsRequest) returns (SignOutOtherSessionsResponse);
+
+  // SignOutAllSessions ends every live session of the account, the one the
+  // access token names included. The access token itself keeps working until
+  // its own expiry — the statelessness the protocol settles — so a client
+  // that means to discard its credential should drop the token pair too.
+  rpc SignOutAllSessions(SignOutAllSessionsRequest) returns (SignOutAllSessionsResponse);
+
+  // ImpersonateUser opens a NEW session on the target account's behalf. The
+  // subject names the target, the actor claims name the administrator, and
+  // the session row records the delegation in `impersonated_by`. The window
+  // is fixed — one hour, whatever the account's normal lifetime is — and the
+  // refresh rotation keeps the delegation alive inside it. A target that is
+  // itself an administrator answers `permission_denied`: an administrator's
+  // identity is never worn by another, and the refusal does not confirm the
+  // target's role (an unknown target answers the same `not_found` any
+  // unfindable account does). The delegation is refused on self-service
+  // procedures by the guard table, and the whole life of the session is
+  // audited.
+  rpc ImpersonateUser(ImpersonateUserRequest) returns (ImpersonateUserResponse);
+
+  // StopImpersonating ends the delegated session the access token names and
+  // issues a fresh pair on the administrator's own account, so the caller
+  // resumes where their real identity left off. It is callable exactly while
+  // impersonating — the guard's `Authenticated` rule admits the delegated
+  // caller this one time, because refusing the way out would trap the actor
+  // inside the borrowed identity.
+  rpc StopImpersonating(StopImpersonatingRequest) returns (StopImpersonatingResponse);
+}
+
+// SignInRequest carries the credential and the session shape the caller asks
+// for.
+message SignInRequest {
+  // identity is the account's username or email address.
+  string identity = 1;
+
+  // password is the account's primary credential, in clear text. The field
+  // travels only over TLS and is never logged.
+  string password = 2;
+
+  // remember asks the refresh token to outlive the browser session. It
+  // defaults to false.
+  optional bool remember = 3;
+}
+
+// SignInResponse is the token pair and the account it was issued for —
+// or, when the account keeps a confirmed authenticator, the pending bridge
+// the second factor spends.
+message SignInResponse {
+  // mfa_required is true when the account keeps a confirmed authenticator:
+  // no tokens were issued, and the caller finishes the sign-in through
+  // MultifactorService.CompleteSignIn with the pending token. Every token
+  // field below is empty in that case.
+  bool mfa_required = 10;
+
+  // mfa_pending_token is the short-lived bridge the password check minted.
+  // It is presented to CompleteSignIn together with the second factor and
+  // has no other use.
+  string mfa_pending_token = 11;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 12;
+
+  // mfa_enrollment_required marks the `mfa.required` fork: the account kept
+  // no confirmed factor, so the pending token admits the enrollment
+  // endpoints (BeginTotpEnrollment / ConfirmTotpEnrollment with the token
+  // in `pending_token`) instead of CompleteSignIn — no tokens were issued,
+  // and the sign-in completes through CompleteSignIn after the confirm.
+  bool mfa_enrollment_required = 13;
+
+  // access_token is the Bearer JWT. It is short-lived and stateless: the
+  // caller sends it in the Authorization header and the server verifies it
+  // against the published key set without a round trip.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds. It is a
+  // 32-bit integer on purpose: protobuf's JSON mapping writes a 64-bit
+  // integer as a string, which no client reading a token lifetime expects.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the refresh token's lifetime in seconds — the
+  // window the session row was written with, the long or the short one by
+  // the remember flag the request carried.
+  int32 refresh_expires_in = 9;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token. It is exchanged for a fresh pair (a later procedure) and is
+  // stored server-side only as a hash, so a database leak cannot replay it.
+  string refresh_token = 4;
+
+  // session_id is the TypeID (`sess_…`) of the session row the refresh
+  // token is stored under. It is what a later revocation names.
+  string session_id = 5;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 6;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 7;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 8;
+}
+
+// AuthenticatedUser is the account view the tokens were issued for. It carries
+// the fields a client renders, not the row: no password hash, no ban bookkeeping.
+message AuthenticatedUser {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1;
+
+  // username is the account's handle, case preserved.
+  string username = 2;
+
+  // email is the account's address.
+  string email = 3;
+
+  // display_name is the name shown in the UI.
+  string display_name = 4;
+}
+
+// SignOutRequest is empty: the session it ends is the one the access token
+// names.
+message SignOutRequest {}
+
+// SignOutResponse is empty: a successful sign-out says so with the protocol.
+message SignOutResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// GetSessionRequest is empty: the session it reads is the one the access
+// token names.
+message GetSessionRequest {}
+
+// GetSessionResponse is the session and the account it belongs to.
+message GetSessionResponse {
+  // session is the session's view.
+  Session session = 1;
+
+  // user is the account the session belongs to.
+  AuthenticatedUser user = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// Session is the server's record of one sign-in. The request facts it carries
+// are what the row stored when it was opened — where the sign-in happened, so
+// a holder can recognise a device they never used.
+message Session {
+  // id is the session's TypeID (`sess_…`).
+  string id = 1;
+
+  // provider names how the session was opened — the password sign-in, a
+  // one-time access code.
+  string provider = 2;
+
+  // remember says whether the session holds the long lifetime.
+  bool remember = 3;
+
+  // user_agent is the agent string the sign-in request carried, absent when
+  // the request carried none.
+  optional string user_agent = 4;
+
+  // ip_address is the address the sign-in came from, absent when it was
+  // unknown.
+  optional string ip_address = 5;
+
+  // created_at is the instant the session was opened.
+  string created_at = 6;
+
+  // expires_at is when the session's refresh token stops renewing.
+  string expires_at = 7;
+
+  // refreshed_at is the last renewal, absent when the token was never spent.
+  optional string refreshed_at = 8;
+
+  // revoked_at is when the session ended, absent while it is live.
+  optional string revoked_at = 9;
+
+  // current says whether this is the session the access token names.
+  bool current = 10;
+}
+
+// ListSessionsRequest carries the page the caller asks for. Both fields unset
+// answer the first default-sized page.
+message ListSessionsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+}
+
+// ListSessionsResponse is the page of the account's sessions.
+message ListSessionsResponse {
+  // sessions are the sessions, newest first, ended ones included.
+  repeated Session sessions = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// RevokeSessionRequest names the session to end.
+message RevokeSessionRequest {
+  // id is the session's TypeID (`sess_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RevokeSessionResponse is empty: a successful revocation says so with the
+// protocol, and a session that is not the account's answers the not-found
+// code.
+message RevokeSessionResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// SignOutOtherSessionsRequest is empty: the account it acts on is the one
+// the access token names, and the session it keeps is the same one.
+message SignOutOtherSessionsRequest {}
+
+// SignOutOtherSessionsResponse counts what the call ended.
+message SignOutOtherSessionsResponse {
+  // revoked_count is how many sessions the call stamped. A call that found
+  // no other live session answers zero, and it is still a success.
+  int32 revoked_count = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// SignOutAllSessionsRequest is empty: the account it acts on is the one the
+// access token names.
+message SignOutAllSessionsRequest {}
+
+// SignOutAllSessionsResponse counts what the call ended.
+message SignOutAllSessionsResponse {
+  // revoked_count is how many sessions the call stamped, the caller's own
+  // included when it was still live. The access token is not invalidated by
+  // this count — it expires on its own.
+  int32 revoked_count = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// RefreshRequest carries the refresh token a sign-in or a renewal answered
+// with.
+message RefreshRequest {
+  // refresh_token is the credential being spent. It is stored server-side
+  // only as a hash, so the raw value travels in this field alone.
+  string refresh_token = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RefreshResponse is the fresh pair and the session it renews — the shape
+// SignIn answers with, because a client rotating its token treats the two the
+// same way.
+message RefreshResponse { // access_token is the new Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the new access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the renewal's refresh token lifetime in seconds —
+  // the window the rotation wrote.
+  int32 refresh_expires_in = 9;
+
+  // refresh_token is the replacement credential. The one this request spent
+  // is dead the moment this row is written.
+  string refresh_token = 4;
+
+  // session_id is the session the renewal kept.
+  string session_id = 5;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 6;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 7;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 8;
+}
+
+// ImpersonateUserRequest carries the target and the reason the audit row
+// keeps.
+message ImpersonateUserRequest {
+  // user is the target account's identifier in its wire form (`user_…`).
+  string user = 1 [(buf.validate.field).string.min_len = 1];
+
+  // reason is the human-readable sentence the audit row stores — what the
+  // administrator was investigating. It is required: a delegation without a
+  // stated purpose is the one an audit trail cannot explain.
+  string reason = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 500
+  ];
+}
+
+// ImpersonateUserResponse is the fresh pair the delegation answers with —
+// the same shape SignIn answers with, because a client entering an
+// impersonated session treats the two the same way.
+message ImpersonateUserResponse {
+  // access_token is the Bearer JWT naming the target as its subject and the
+  // administrator in its actor pair.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the delegation's fixed window in seconds — one
+  // hour, whatever the target's normal session lifetimes are.
+  int32 refresh_expires_in = 4;
+
+  // refresh_token is the credential that keeps the delegation alive. It is
+  // stored server-side only as a hash, under the session row the delegation
+  // opened.
+  string refresh_token = 5;
+
+  // session_id is the delegated session's TypeID (`sess_…`).
+  string session_id = 6;
+
+  // user is the target account the tokens name.
+  AuthenticatedUser user = 7;
+
+  // status is the outcome word the client checks — success.
+  string status = 8;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 9;
+}
+
+// StopImpersonatingRequest is empty: the delegation it ends is the one the
+// access token names.
+message StopImpersonatingRequest {}
+
+// StopImpersonatingResponse is the administrator's own fresh pair — the
+// shape SignIn answers with, because leaving a delegation is signing back in
+// to the caller's real account.
+message StopImpersonatingResponse {
+  // access_token is the administrator's new Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the administrator's new session window in seconds.
+  int32 refresh_expires_in = 4;
+
+  // refresh_token is the administrator's new refresh credential.
+  string refresh_token = 5;
+
+  // session_id is the administrator's new session's TypeID (`sess_…`).
+  string session_id = 6;
+
+  // user is the administrator's account the tokens name.
+  AuthenticatedUser user = 7;
+
+  // status is the outcome word the client checks — success.
+  string status = 8;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 9;
+}
+
+// ---- Multifactor: enrollment ----
+
+// BeginTotpEnrollmentRequest names the authenticator the account is enrolling.
+message BeginTotpEnrollmentRequest {
+  // name is the label the account's settings page renders for the device —
+  // "iPhone 17", "Aegis on tablet". It is display data, never a credential.
+  string name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // pending_token admits a caller the `mfa.required` gate routed to
+  // enrollment: the bridge the password check minted stands in for the
+  // access token the caller does not hold yet. A caller presenting a token
+  // omits the field.
+  optional string pending_token = 2;
+}
+
+// BeginTotpEnrollmentResponse answers the secret the authenticator imports.
+// This is the only call that ever carries it.
+message BeginTotpEnrollmentResponse {
+  // totp_id is the TypeID (`totp_…`) of the unconfirmed enrollment row. The
+  // confirm, and the delete of a mistyped start, name it.
+  string totp_id = 1;
+
+  // name is the label as the row stores it.
+  string name = 2;
+
+  // secret is the Base32 shared secret the app stores. It leaves the server
+  // here and never again: later reads answer the enrollment's metadata only.
+  string secret = 3;
+
+  // otpauth_uri is the `otpauth://totp/…` provisioning URI the QR code
+  // renders — issuer, account label, and every parameter the app needs.
+  string otpauth_uri = 4;
+
+  // expires_at is when the unconfirmed enrollment dies if never confirmed.
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+// ConfirmTotpEnrollmentRequest proves the app really holds the secret.
+message ConfirmTotpEnrollmentRequest {
+  // totp_id is the enrollment the app's code answers.
+  string totp_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is the six-digit value the authenticator renders right now.
+  string code = 2 [(buf.validate.field).string.pattern = "^[0-9]{6,8}$"];
+
+  // pending_token is the bridge the enrollment began with, presented again
+  // by the caller the `mfa.required` gate routed here. A caller presenting
+  // a token omits the field.
+  optional string pending_token = 3;
+}
+
+// ConfirmTotpEnrollmentResponse answers the recovery set in the clear once —
+// the hashed rows are all that survive the call.
+message ConfirmTotpEnrollmentResponse {
+  // totp_id is the now-confirmed enrollment.
+  string totp_id = 1;
+
+  // recovery_codes are the account's recovery codes in the clear, exactly
+  // once. The account stores them outside the server; later procedures
+  // answer counts, never values.
+  repeated string recovery_codes = 2;
+}
+
+// ListTotpEnrollmentsRequest is empty: the caller's own enrollments answer.
+message ListTotpEnrollmentsRequest {}
+
+// ListTotpEnrollmentsResponse carries the metadata a settings page renders.
+// It never carries a secret.
+message ListTotpEnrollmentsResponse {
+  // enrollments are the account's authenticators, confirmed and pending.
+  repeated TotpEnrollment enrollments = 1;
+}
+
+// TotpEnrollment is one authenticator's view: identity and state, and — only
+// when the development mode asks for it — the secret a debugging tool needs.
+message TotpEnrollment {
+  // totp_id is the enrollment's TypeID (`totp_…`).
+  string totp_id = 1;
+
+  // name is the label the enrollment carries.
+  string name = 2;
+
+  // confirmed_at is when the ceremony completed; absent while the row is
+  // still unconfirmed.
+  optional google.protobuf.Timestamp confirmed_at = 3;
+
+  // last_used_at is when the enrollment last answered a challenge; absent
+  // until its first one.
+  optional google.protobuf.Timestamp last_used_at = 4;
+
+  // created_at is when the enrollment began.
+  google.protobuf.Timestamp created_at = 5;
+
+  // secret is the decrypted Base32 shared secret the authenticator holds.
+  // It is present only when the deployment enables `app.expose_totp_secret`
+  // in the development mode — a debugging aid for enrollment tooling, and
+  // otherwise absent: the one answer BeginTotpEnrollment gave is the only
+  // channel the value travels through.
+  optional string secret = 6;
+}
+
+// DeleteTotpEnrollmentRequest names the row and carries the second-factor
+// proof the removal needs.
+message DeleteTotpEnrollmentRequest {
+  // totp_id is the enrollment to remove.
+  string totp_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is a code from another confirmed authenticator or a recovery code.
+  // Empty is accepted only while the account would keep no confirmed
+  // authenticator after this removal.
+  string code = 2 [(buf.validate.field).string.max_len = 64];
+}
+
+// DeleteTotpEnrollmentResponse confirms the removal.
+message DeleteTotpEnrollmentResponse {
+  // message is the human-readable sentence describing what the call did.
+  string message = 1;
+}
+
+// ---- Multifactor: the sign-in bridge ----
+
+// CompleteSignInRequest spends the pending bridge plus the second factor.
+// The factor is a TOTP or recovery code, or a passkey assertion over a
+// ceremony the sign-in begin answered — a credential with user verification
+// is a full second factor.
+message CompleteSignInRequest {
+  // pending_token is the bridge SignIn minted on the password success.
+  string pending_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // second_factor is the proof the caller completes the challenge with.
+  oneof second_factor {
+    // code is the authenticator's six-digit value, or one of the account's
+    // recovery codes.
+    string code = 2 [
+      (buf.validate.field).string.min_len = 1,
+      (buf.validate.field).string.max_len = 64
+    ];
+
+    // passkey is the assertion path: the ceremony handle BeginLogin
+    // answered and the credential JSON the browser produced.
+    PasskeyFactor passkey = 3;
+  }
+}
+
+// PasskeyFactor is the passkey half of the sign-in challenge.
+message PasskeyFactor {
+  // session_id is the ceremony handle BeginLogin answered.
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // credential is the PublicKeyCredential JSON the browser answered
+  // navigator.credentials.get with, passed through untouched.
+  string credential = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// CompleteSignInResponse is the token pair — the shape SignIn answers with on
+// a one-factor account, so a client entering the session treats the two alike.
+message CompleteSignInResponse {
+  // access_token is the Bearer JWT.
+  string access_token = 1;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 2;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 3;
+
+  // refresh_expires_in is the session window in seconds — the long or the
+  // short one by the remember flag the original SignIn carried.
+  int32 refresh_expires_in = 4;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token, stored server-side only as a hash.
+  string refresh_token = 5;
+
+  // session_id is the session's TypeID (`sess_…`).
+  string session_id = 6;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 7;
+
+  // status is the outcome word the client checks — success.
+  string status = 8;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 9;
+}
+
+// ---- Multifactor: recovery codes and the way out ----
+
+// RegenerateRecoveryCodesRequest carries the second-factor proof.
+message RegenerateRecoveryCodesRequest {
+  // code is a code from a confirmed authenticator or a current recovery
+  // code. An account that has never confirmed an enrollment is refused.
+  string code = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RegenerateRecoveryCodesResponse answers the fresh set in the clear once.
+message RegenerateRecoveryCodesResponse {
+  // recovery_codes are the new codes; the previous set is dead.
+  repeated string recovery_codes = 1;
+}
+
+// DisableMfaRequest carries the second-factor proof the switch-off needs.
+message DisableMfaRequest {
+  // code is a code from a confirmed authenticator or a recovery code.
+  string code = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DisableMfaResponse confirms every factor is gone.
+message DisableMfaResponse {
+  // message is the human-readable sentence describing what the call did.
+  string message = 1;
+}
+
+// VerifyRecoveryCodeRequest carries the code the caller proves itself with.
+message VerifyRecoveryCodeRequest {
+  // code is one unused recovery code, in the form xxxx-xxxx-xxxx. It is
+  // consumed on success — a code verified here cannot sign in with.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+}
+
+// VerifyRecoveryCodeResponse is empty: the protocol carries the proof.
+message VerifyRecoveryCodeResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// AdminDisableMfaRequest names the account whose second factor is removed
+// and the note the record keeps.
+message AdminDisableMfaRequest {
+  // user_id is the target account's wire-form identifier (`user_...`).
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // reason is why the second factor is being removed — the sentence the
+  // audit record and the notification keep. Optional, but a removal
+  // without a stated reason is the one an audit trail cannot explain.
+  optional string reason = 2 [(buf.validate.field).string.max_len = 500];
+}
+
+// AdminDisableMfaResponse is empty: the protocol carries the success, and
+// the removal is a matter of the record and the notification.
+message AdminDisableMfaResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// DeviceApprovalService is the approving side of the device login flow:
+// a browser that cannot sign itself in creates a pairing request over
+// REST, and the account holder — signed in on a device that can — reads
+// what the request names and answers it here. The service is saka-only;
+// upstream Pocket ID has no passkey-less sign-in to approve.
+service DeviceApprovalService {
+  // Inspect answers the request the presented user code names: the code
+  // as the device should render it, the requesting browser's address and
+  // agent, and the instant the request dies. An unknown, expired, or
+  // already-decided code answers not_found — the answer never says which.
+  rpc Inspect(InspectDeviceLoginRequest) returns (InspectDeviceLoginResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // Decide stamps the answer. A request decided once is decided forever:
+  // a second decision answers not_found, the same refusal an unknown
+  // code does. Approval names the deciding account in the row, so the
+  // creating browser's exchange mints the session for them.
+  rpc Decide(DecideDeviceLoginRequest) returns (DecideDeviceLoginResponse);
+}
+
+// InspectDeviceLoginRequest carries the code the requesting device
+// rendered — with or without its reading hyphen, in any case the
+// normalization folds.
+message InspectDeviceLoginRequest {
+  // code is the user code as typed: `XXXX-XXXX` or the bare eight
+  // characters.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 8,
+    (buf.validate.field).string.max_len = 9
+  ];
+}
+
+// InspectDeviceLoginResponse is the request's own facts, the view the
+// approving device renders before the human answers.
+message InspectDeviceLoginResponse {
+  // user_code is the code in its display form, `XXXX-XXXX`.
+  string user_code = 1;
+
+  // ip_address is the requesting browser's address as the create saw it.
+  string ip_address = 2;
+
+  // user_agent is the requesting browser's own word for itself.
+  string user_agent = 3;
+
+  // expires_at is the instant the request dies, unanswered requests
+  // included.
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// DecideDeviceLoginRequest carries the code and the answer.
+message DecideDeviceLoginRequest {
+  // code is the user code as typed, the same shape Inspect takes.
+  string code = 1 [
+    (buf.validate.field).string.min_len = 8,
+    (buf.validate.field).string.max_len = 9
+  ];
+
+  // decision is the answer: `approve` or `deny`, the only words the
+  // contract accepts.
+  string decision = 2 [(buf.validate.field).string = {
+    in: [
+      "approve",
+      "deny"
+    ]
+  }];
+}
+
+// DecideDeviceLoginResponse is empty: the protocol carries the success,
+// and the creating browser learns of the decision at its next exchange.
+message DecideDeviceLoginResponse {
+  // status is the outcome word the client checks — success; a failure
+  // never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// OAuthSSOService is the sign-in-with-a-provider surface: the builtin
+// Google and GitHub connections and the operator-configured custom OIDC
+// ones. The service is saka-only — upstream Pocket ID never signed an
+// account in through an external identity provider.
+//
+// The flow is a browser round trip: BeginSignIn answers the provider's
+// authorize URL the browser navigates to, the provider returns the browser
+// to the callback route (a REST surface beside the procedures, declared in
+// the guard's route table), and the resolution there either opens the
+// session or pauses the flow in a stage the client finishes here — the
+// email code, or the names the provider did not supply. The flow token is
+// the credential a paused stage is finished with; the caller that holds no
+// access token yet is exactly the caller these procedures serve.
+//
+// An account keeps several linked connections, and the linking rule is the
+// verified email: a provider-verified address links into the account that
+// holds it, an unverified one must prove itself with an email code first.
+service OAuthSSOService {
+  // BeginSignIn opens the authorization-code flow for the named connection:
+  // it writes the flow row — state, nonce, PKCE verifier — and answers the
+  // authorize URL the browser is sent to. An unknown or disabled connection
+  // answers not_found, the same answer an error elsewhere carries, so the
+  // endpoint is not a connection enumerator.
+  rpc BeginSignIn(BeginOAuthSignInRequest) returns (BeginOAuthSignInResponse);
+
+  // ContinueSignIn completes a flow the callback paused in a stage that
+  // needed more from the caller — the given and family names the provider
+  // did not supply, or nothing else when the stage only waited for this
+  // call. The flow token is the whole credential: the caller carries no
+  // access token, the same way the second-factor and email-verification
+  // completes are judged. The answer is the token pair, or the MFA bridge
+  // when the account keeps a confirmed second factor — the same shape the
+  // password sign-in pauses with.
+  rpc ContinueSignIn(ContinueOAuthSignInRequest) returns (ContinueOAuthSignInResponse);
+
+  // VerifySignInEmail spends the email code a flow in the verify_email
+  // stage waits for: the provider's address was not verified at the
+  // source, so the account it names must prove it holds the address
+  // before anything links or is created. The code is single-use and
+  // three wrong answers end the flow, the same rule the other bridges
+  // keep. The answer names the stage the flow moved to; the sign-in
+  // itself completes through ContinueSignIn.
+  rpc VerifySignInEmail(VerifyOAuthSignInEmailRequest) returns (VerifyOAuthSignInEmailResponse);
+
+  // ListConnections is the operator's view over every configured
+  // connection, builtin and custom. Secrets are never answered.
+  rpc ListConnections(ListOAuthConnectionsRequest) returns (ListOAuthConnectionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetConnection reads one connection by its identifier. Secrets are
+  // never answered.
+  rpc GetConnection(GetOAuthConnectionRequest) returns (GetOAuthConnectionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateConnection registers a connection. A custom connection carries
+  // its discovery URL or its manual endpoints; the discovery document is
+  // fetched and validated before the row is written. Builtin kinds take
+  // only their credentials — the endpoints are the code's own.
+  rpc CreateConnection(CreateOAuthConnectionRequest) returns (CreateOAuthConnectionResponse);
+
+  // UpdateConnection rewrites a connection's editable fields. The client
+  // secret is replaced only when the request carries a new one; an empty
+  // field keeps the stored secret.
+  rpc UpdateConnection(UpdateOAuthConnectionRequest) returns (UpdateOAuthConnectionResponse);
+
+  // DeleteConnection removes a connection and, through the foreign keys,
+  // the linked accounts and the live flows that rode it.
+  rpc DeleteConnection(DeleteOAuthConnectionRequest) returns (DeleteOAuthConnectionResponse);
+
+  // ListLinkedConnections answers the calling account's own linked
+  // connections: which providers it holds, under which connection, since
+  // when. The account is the claims' subject; the request names nothing.
+  rpc ListLinkedConnections(ListLinkedConnectionsRequest) returns (ListLinkedConnectionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UnlinkConnection removes one of the calling account's linked
+  // connections. Unlinking the last credential of an account that keeps
+  // no password and no passkey is refused until a password is set — an
+  // account with no way back in cannot be created by its holder's hand.
+  rpc UnlinkConnection(UnlinkConnectionRequest) returns (UnlinkConnectionResponse);
+
+  // GetLinkedAccountTokens answers the provider tokens the calling
+  // account's binding carries: the access token the holder presents to
+  // the provider's API as themselves, the refresh token that outlives it,
+  // and the instant the access token dies when the provider named one.
+  // The tokens leave their seal only here — the reads beside it answer
+  // metadata alone. A foreign or unknown binding answers not_found, the
+  // same refusal a missing one carries.
+  rpc GetLinkedAccountTokens(GetLinkedAccountTokensRequest) returns (GetLinkedAccountTokensResponse);
+}
+
+// ---- OAuth SSO: the flow ----
+
+// BeginOAuthSignInRequest names the connection the sign-in runs over.
+message BeginOAuthSignInRequest {
+  // connection is the connection's provider slug: `google`, `github`, or
+  // a custom connection's own slug.
+  string connection = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// BeginOAuthSignInResponse is the provider's authorize URL. The browser
+// navigates to it; the flow row it was minted for rests server-side.
+message BeginOAuthSignInResponse {
+  // authorize_url is the absolute URL the browser is redirected to.
+  string authorize_url = 1;
+
+  // status is the outcome word the client checks — success; a failure
+  // never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ContinueOAuthSignInRequest finishes a paused flow: the names the provider
+// did not supply. An account whose only pause was the names stage answers
+// immediately; the flow token is the credential the stage is judged by.
+message ContinueOAuthSignInRequest {
+  // flow_token is the handle the paused flow answers — the value the
+  // callback redirected the browser back with.
+  string flow_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // given_name is the account's given name, collected by the client when
+  // the flow paused for names. Empty on any other stage; the names stage
+  // judges their presence, which the contract cannot express.
+  string given_name = 2 [(buf.validate.field).string.max_len = 128];
+
+  // family_name is the account's family name, collected by the client
+  // when the flow paused for names. Empty on any other stage.
+  string family_name = 3 [(buf.validate.field).string.max_len = 128];
+}
+
+// ContinueOAuthSignInResponse is the paused flow's answer: the token pair
+// when the sign-in completed, or the MFA bridge when the account keeps a
+// confirmed second factor — the same fork the password sign-in pauses
+// with, and the same bridge MultifactorService.CompleteSignIn spends.
+message ContinueOAuthSignInResponse {
+  // mfa_required is true when the account keeps a confirmed
+  // authenticator: no tokens were issued, and the caller finishes the
+  // sign-in through MultifactorService.CompleteSignIn with the pending
+  // token. Every token field below is empty in that case.
+  bool mfa_required = 1;
+
+  // mfa_pending_token is the short-lived bridge the resolution minted.
+  // It is presented to CompleteSignIn together with the second factor
+  // and has no other use.
+  string mfa_pending_token = 2;
+
+  // mfa_pending_expires_at is when the bridge dies, for the countdown a
+  // challenge screen renders.
+  google.protobuf.Timestamp mfa_pending_expires_at = 3;
+
+  // access_token is the Bearer JWT.
+  string access_token = 4;
+
+  // token_type names the authorization scheme, always `Bearer`.
+  string token_type = 5;
+
+  // access_expires_in is the access token's lifetime in seconds.
+  int32 access_expires_in = 6;
+
+  // refresh_expires_in is the session window in seconds.
+  int32 refresh_expires_in = 7;
+
+  // refresh_token is the long-lived credential that outlives the access
+  // token, stored server-side only as a hash.
+  string refresh_token = 8;
+
+  // session_id is the session's TypeID (`sess_…`).
+  string session_id = 9;
+
+  // user is the account the tokens name.
+  AuthenticatedUser user = 10;
+
+  // status is the outcome word the client checks — success.
+  string status = 11;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 12;
+
+  // stage is the flow's new stage when no session opened and no bridge
+  // was owed: `verify_email` (the code request went out) or
+  // `require_names` (the names must be collected and the call repeated
+  // with them). Empty on a session or a bridge.
+  string stage = 13;
+}
+
+// VerifyOAuthSignInEmailRequest spends the email code a verify_email-stage
+// flow waits for.
+message VerifyOAuthSignInEmailRequest {
+  // flow_token is the handle the paused flow answers — the value the
+  // callback redirected the browser back with.
+  string flow_token = 1 [(buf.validate.field).string.min_len = 1];
+
+  // code is the single-use code the account received by email. The
+  // generated form is six or twelve characters.
+  string code = 2 [(buf.validate.field).string = {
+    min_len: 6
+    max_len: 12
+  }];
+}
+
+// VerifyOAuthSignInEmailResponse names the stage the flow moved to: the
+// email proven, the flow either waits for the names or is ready for the
+// sign-in to complete.
+message VerifyOAuthSignInEmailResponse {
+  // stage is the flow's new stage: `require_names` or `resolved`, the
+  // words the client drives ContinueSignIn from.
+  string stage = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// ---- OAuth SSO: the connection administration ----
+
+// OAuthConnection is one configured provider connection. The secret is
+// never carried — the responses read the row without it.
+message OAuthConnection {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1;
+
+  // kind is `builtin` (the endpoints are the code's own) or `custom`.
+  string kind = 2;
+
+  // provider is the connection's slug: `google`, `github`, or a custom
+  // connection's own word. One connection per slug.
+  string provider = 3;
+
+  // display_name is the name the sign-in page renders.
+  string display_name = 4;
+
+  // enabled connections accept new sign-ins; a disabled one answers
+  // not_found at BeginSignIn while keeping its linked accounts intact.
+  bool enabled = 5;
+
+  // discovery_url is the custom connection's OIDC discovery document —
+  // set when the endpoints are discovered, empty when they are manual.
+  string discovery_url = 6;
+
+  // endpoints are the custom connection's manual endpoints, empty for a
+  // builtin connection and for a discovered custom one.
+  OAuthEndpoints endpoints = 7;
+
+  // client_id is the credential the provider issued, public by protocol.
+  string client_id = 8;
+
+  // scopes are the space-separated scopes the authorize request asks for.
+  string scopes = 9;
+
+  // attribute_mapping is the custom connection's claim mapping — which
+  // userinfo or id_token claim answers the account's identity, address,
+  // verified flag, username, and picture.
+  OAuthAttributeMapping attribute_mapping = 10;
+
+  // custom_attributes are the operator-defined attributes the custom
+  // connection reads off the claims and lands on the account.
+  repeated OAuthCustomAttribute custom_attributes = 13;
+
+  // created_at is when the connection was registered.
+  google.protobuf.Timestamp created_at = 11;
+
+  // updated_at is when the connection was last rewritten.
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// OAuthEndpoints are the manual endpoints a custom connection carries when
+// it does not ride a discovery document.
+message OAuthEndpoints {
+  // authorization is the provider's authorization endpoint.
+  string authorization = 1;
+
+  // token is the provider's token endpoint.
+  string token = 2;
+
+  // userinfo is the provider's userinfo endpoint, when the claims come
+  // from the userinfo response rather than the id_token.
+  string userinfo = 3;
+
+  // jwks is the provider's key set, the document the id_token is
+  // verified against.
+  string jwks = 4;
+}
+
+// OAuthAttributeMapping names which provider claims answer the account's
+// fields on a custom connection. Every field is optional — an unset field
+// keeps the default claim name.
+message OAuthAttributeMapping {
+  // email is the claim the account's address is read from. The default is
+  // `email`.
+  string email = 1;
+
+  // given_name is the claim the account's given name is read from. The
+  // default is `given_name`.
+  string given_name = 2;
+
+  // family_name is the claim the account's family name is read from. The
+  // default is `family_name`.
+  string family_name = 3;
+
+  // subject is the claim the provider identity is read from. The default
+  // is `sub`, the standard's identifier.
+  string subject = 4;
+
+  // email_verified is the claim the address's proven flag is read from.
+  // The default is `email_verified`.
+  string email_verified = 5;
+
+  // email_verified_default is the proven flag a provider that answers no
+  // verified claim is held to. The default is false.
+  optional bool email_verified_default = 6;
+
+  // username is the claim the account's username is read from at the
+  // first sign-in. The default is `preferred_username`.
+  string username = 7;
+
+  // picture is the claim the account's picture is read from. The
+  // default is `picture`.
+  string picture = 8;
+}
+
+// OAuthCustomAttribute is one operator-defined attribute a custom
+// connection reads off the claims and lands on the account: the claim
+// the provider answers under `claim`, stored under `key`. An attribute
+// whose claim the provider does not answer lands nothing.
+message OAuthCustomAttribute {
+  // key is the stored word the attribute is read back by.
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 64
+  }];
+
+  // claim is the claim the value is read from.
+  string claim = 2 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 128
+  }];
+}
+
+// ListOAuthConnectionsRequest is empty: the listing answers every
+// connection, the way the operator's screens read them.
+message ListOAuthConnectionsRequest {}
+
+// ListOAuthConnectionsResponse carries the connections in slug order.
+message ListOAuthConnectionsResponse {
+  // connections are the configured connections, secrets never included.
+  repeated OAuthConnection connections = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// GetOAuthConnectionRequest names the connection by its identifier.
+message GetOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetOAuthConnectionResponse is the connection, secrets never included.
+message GetOAuthConnectionResponse {
+  // connection is the named connection.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateOAuthConnectionRequest registers a connection. A custom kind must
+// carry its discovery URL or all four manual endpoints; a builtin kind
+// must carry neither. The client secret is stored sealed.
+message CreateOAuthConnectionRequest {
+  // kind is `builtin` or `custom`.
+  string kind = 1 [(buf.validate.field).string = {
+    in: [
+      "builtin",
+      "custom"
+    ]
+  }];
+
+  // provider is the connection's slug: the builtin word for a builtin
+  // kind, the custom connection's own word otherwise.
+  string provider = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+
+  // display_name is the name the sign-in page renders.
+  string display_name = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 128
+  ];
+
+  // discovery_url is the custom connection's OIDC discovery document.
+  // Empty when the endpoints are manual, and always empty for a builtin
+  // kind.
+  string discovery_url = 4;
+
+  // endpoints are the manual endpoints, carried when the discovery URL
+  // is empty and the kind is custom.
+  OAuthEndpoints endpoints = 5;
+
+  // client_id is the credential the provider issued.
+  string client_id = 6 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 256
+  ];
+
+  // client_secret is the credential's other half, stored sealed. It is
+  // never answered back by any read.
+  string client_secret = 7 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 512
+  ];
+
+  // scopes are the space-separated scopes the authorize request asks
+  // for; empty keeps the connection's default set.
+  string scopes = 8;
+
+  // attribute_mapping is the custom connection's claim mapping.
+  OAuthAttributeMapping attribute_mapping = 9;
+
+  // custom_attributes are the operator-defined attributes the custom
+  // connection reads off the claims and lands on the account.
+  repeated OAuthCustomAttribute custom_attributes = 10;
+
+  // enabled registers the connection live; the default is false.
+  optional bool enabled = 11;
+}
+
+// CreateOAuthConnectionResponse is the stored connection, secrets never
+// included.
+message CreateOAuthConnectionResponse {
+  // connection is the connection as the row now holds it.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateOAuthConnectionRequest rewrites a connection's editable fields.
+// Every field is optional; an unset field keeps the stored value, and a
+// new client secret is carried only when the stored one is being replaced.
+message UpdateOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // display_name is the name the sign-in page renders.
+  optional string display_name = 2;
+
+  // discovery_url is the custom connection's OIDC discovery document;
+  // clearing it without manual endpoints refuses the update.
+  optional string discovery_url = 3;
+
+  // endpoints are the manual endpoints.
+  OAuthEndpoints endpoints = 4;
+
+  // client_id is the credential the provider issued.
+  optional string client_id = 5;
+
+  // client_secret replaces the stored one when set; it is never answered
+  // back by any read.
+  optional string client_secret = 6;
+
+  // scopes are the space-separated scopes the authorize request asks for.
+  optional string scopes = 7;
+
+  // attribute_mapping is the custom connection's claim mapping.
+  OAuthAttributeMapping attribute_mapping = 8;
+
+  // custom_attributes rewrite the operator-defined attribute set as a
+  // whole; unset keeps the stored set.
+  repeated OAuthCustomAttribute custom_attributes = 9;
+
+  // enabled turns the connection's sign-ins on or off.
+  optional bool enabled = 10;
+}
+
+// UpdateOAuthConnectionResponse is the connection as the row now holds it,
+// secrets never included.
+message UpdateOAuthConnectionResponse {
+  // connection is the rewritten connection.
+  OAuthConnection connection = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteOAuthConnectionRequest names the connection to remove.
+message DeleteOAuthConnectionRequest {
+  // id is the connection's TypeID (`oconn_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteOAuthConnectionResponse is empty of facts: the protocol carries
+// the success.
+message DeleteOAuthConnectionResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ---- OAuth SSO: the linked accounts ----
+
+// ListLinkedConnectionsRequest is empty: the account is the claims'
+// subject, and the answer is its own ledger.
+message ListLinkedConnectionsRequest {}
+
+// ListLinkedConnectionsResponse is the calling account's linked
+// connections, oldest first.
+message ListLinkedConnectionsResponse {
+  // linked_accounts are the providers the account holds.
+  repeated OAuthLinkedAccount linked_accounts = 1;
+
+  // status is the outcome word the client checks — success.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// OAuthLinkedAccount is one provider identity bound to an account.
+message OAuthLinkedAccount {
+  // id is the linked account's TypeID (`olink_…`).
+  string id = 1;
+
+  // connection_id is the connection the identity rode, `oconn_…`.
+  string connection_id = 2;
+
+  // provider is the connection's slug.
+  string provider = 3;
+
+  // email is the address the provider answered — the verified one when
+  // the linking rule accepted it.
+  string email = 4;
+
+  // created_at is when the identity was bound.
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// UnlinkConnectionRequest names the linked account to remove.
+message UnlinkConnectionRequest {
+  // linked_account_id is the linked account's TypeID (`olink_…`), and it
+  // must be the caller's own — the account is the claims' subject.
+  string linked_account_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// UnlinkConnectionResponse is empty of facts: the protocol carries the
+// success.
+message UnlinkConnectionResponse {
+  // status is the outcome word the client checks — success.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// GetLinkedAccountTokensRequest names the binding whose provider tokens
+// the caller reads.
+message GetLinkedAccountTokensRequest {
+  // linked_account_id is the binding's TypeID (`olink_…`), and it must
+  // be the caller's own — the account is the claims' subject.
+  string linked_account_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetLinkedAccountTokensResponse carries the binding's provider tokens,
+// opened from their seal for this one answer. A binding the provider
+// answered no tokens for carries empty fields, not an error — the empty
+// is the fact.
+message GetLinkedAccountTokensResponse {
+  // access_token is the provider's access token, presentable to the
+  // provider's API as the holder.
+  string access_token = 1;
+
+  // refresh_token is the provider's refresh token, the credential that
+  // outlives the access token at the provider.
+  string refresh_token = 2;
+
+  // expires_at is when the access token dies, when the provider named
+  // an expiry; absent when it did not.
+  optional google.protobuf.Timestamp expires_at = 3;
+
+  // connection_id is the binding's connection, `oconn_…`.
+  string connection_id = 4;
+
+  // provider is the connection's slug.
+  string provider = 5;
+
+  // status is the outcome word the client checks — success.
+  string status = 6;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 7;
+}

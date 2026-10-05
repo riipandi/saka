@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_YgFVgs8hnm
+createdAt: 2026-09-27T11:44:29.663186
+updatedAt: 2026-09-28T11:29:12.442649
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_MbztvSdMtC
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_WHbQCni7uE', behavior='smart', ttl='0', result='first', join=', ', path='$.roles[0].id') ]}",
+      "permission_slugs": [
+        "user:*:read",
+        "user:*:list"
+      ]
+    }
+bodyType: application/json
+description: '[Saka] Replace the permission set one role carries. Every slug must be cataloged; a system role set is the seed and refuses the change. Administrative: requires the admin role.'
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: PVyZTCxhpK
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: VShyMGRgXe
+method: POST
+name: Set Role Permissions
+sortPriority: 7111.111111111111
+url: ${[ apiBaseURL ]}/rpc/saka.authz.v1.AuthorizationService/SetRolePermissions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

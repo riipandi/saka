@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_S4iXik6imu
+createdAt: 2026-09-30T10:54:10.333943
+updatedAt: 2026-09-30T10:54:10.333943
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "session_id": "wcs_",
+      "credential": "",
+      "name": ""
+    }
+bodyType: application/json
+description: |-
+  Finishes the enrollment: the browser's attestation JSON is verified against the stored challenge, the credential's counter and backup flags are recorded, and both enrollment ceilings (passkey.max_credentials, mfa.max_enrollments) are judged at this moment — lowering a limit never unregisters an existing device. A synced-passkey attestation is refused when webauthn.allow_synced_passkeys is off. An empty name falls back to the authenticator model.
+
+  A failed verification costs the ceremony — start again.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Verify passkey registration'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

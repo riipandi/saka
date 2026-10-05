@@ -2,667 +2,557 @@ package webhook
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/database"
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/internal/fetcher"
-	"github.com/riipandi/tango/internal/jobs"
-	"github.com/riipandi/tango/internal/logger"
-	"github.com/riipandi/tango/internal/queue"
-	"github.com/riipandi/tango/pkg/crypto"
-	"github.com/riipandi/tango/pkg/testutils"
+	"uuid"
+
+	fwaudit "github.com/riipandi/saka/framework/audit"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/internal/audit"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
-// testStack is the real delivery stack over the shared test container:
-// Postgres store, queue client, AES cipher, and a controllable sender.
-type testStack struct {
-	Service *Service
-	Store   *PostgresStore
-	DB      datastore.Store
-	Queue   *queue.Client
-	Sender  *captureSender
+// The hex the test cipher builds from: sixty-four hex characters, the shape
+// the application secret carries.
+const testKeyHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+
+// testSecretKey derives a Cipher the way the area's provider does: from the
+// application secret's hex.
+func testSecretKey(t *testing.T) *crypto.Cipher {
+	t.Helper()
+
+	cipher, err := crypto.NewCipherFromHex(testKeyHex)
+	require.NoError(t, err)
+	return cipher
 }
 
-func newTestStack(t *testing.T, sender *captureSender) *testStack {
+// testQueue builds the queue client over the pool, with the delivery queue
+// registered to a processor that does nothing — the tests drive the
+// deliveries through RunDelivery directly, so the queue is here to carry the
+// enqueues the emission writes.
+func testQueue(t *testing.T, pool *datastore.Postgres) *queue.Client {
 	t.Helper()
-	ctx := t.Context()
-
-	pg := testutils.StartPostgres(ctx, t)
-	if _, err := database.MigrateUp(ctx, pg.DSN); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-
-	db, err := datastore.New(ctx, datastore.Options{DSN: pg.DSN})
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 
 	client, err := queue.NewClient(queue.ClientConfig{
-		Store:        db,
+		Store:        pool,
+		Logger:       slog.New(slog.DiscardHandler),
 		NumWorkers:   1,
-		ReleaseAfter: time.Hour,
+		ReleaseAfter: time.Minute,
 	})
 	require.NoError(t, err)
+	client.Register(queue.NewQueue[DeliverTask](func(ctx context.Context, task DeliverTask) error {
+		return nil
+	}))
+	return client
+}
 
-	// The container is shared: never let another test's rows leak in.
-	t.Cleanup(func() {
-		bg := context.Background()
-		_, _ = db.Exec(bg, "DELETE FROM queue_tasks")
-		_, _ = db.Exec(bg, "DELETE FROM queue_tasks_completed")
-		_, _ = db.Exec(bg, "DELETE FROM webhook_delivery_attempts")
-		_, _ = db.Exec(bg, "DELETE FROM webhook_deliveries")
-		_, _ = db.Exec(bg, "DELETE FROM webhook_endpoints")
-	})
+// testService builds the service over a migrated pool, with a real queue
+// (for the enqueues) and, when a receiver is given, a real fetcher (for the
+// attempts). The tests that read deliveries need the emission to have
+// written rows, so nothing here is a stub.
+func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Server) *Service {
+	t.Helper()
 
-	sealer, err := crypto.NewCipher(make([]byte, 32))
-	require.NoError(t, err)
+	var fetch *fetcher.Client
+	if receiver != nil {
+		fetchClient, err := fetcher.New(config.Default().FetcherOptions(), slog.New(slog.DiscardHandler))
+		require.NoError(t, err)
+		fetch = fetchClient
+	}
 
-	store := NewPostgresStore(db)
-	service := NewService(store, db, client, sealer, logger.NewMock(),
-		WithClock(func() time.Time { return time.Now().UTC() }),
-		WithSender(sender),
+	return NewService(
+		pool,
+		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)),
+		testQueue(t, pool),
+		fetch,
+		testSecretKey(t),
+		slog.New(slog.DiscardHandler),
+		// The test receivers are loopback httptest servers; the private
+		// network is the state the delivery tests need.
+		true,
 	)
-	service.RegisterQueue(client)
-
-	stack := &testStack{Service: service, Store: store, DB: db, Queue: client, Sender: sender}
-	t.Cleanup(func() {
-		// Draining the queue keeps a late delivery out of the next test.
-
-	})
-	return stack
 }
 
-// captureSender records every delivery and replays a scripted result
-// per call; the last scripted result repeats.
-type captureSender struct {
-	mu      sync.Mutex
-	script  []sendResult
-	calls   int
-	gotBody []byte
-	gotReq  OutboundDelivery
-	// latency simulates receiver latency so duration measurements
-	// have a non-zero floor.
-	latency time.Duration
-}
-
-type sendResult struct {
-	status int
-	body   string
-	err    error
-}
-
-func (s *captureSender) Send(_ context.Context, delivery OutboundDelivery) (int, []byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.calls++
-	s.gotReq = delivery
-	s.gotBody = delivery.Body
-
-	if s.latency > 0 {
-		time.Sleep(s.latency)
-	}
-
-	index := min(s.calls-1, len(s.script)-1)
-	result := s.script[index]
-	return result.status, []byte(result.body), result.err
-}
-
-func (s *captureSender) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.calls
-}
-
-func (s *captureSender) last() OutboundDelivery {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gotReq
-}
-
-// waitFor polls until the predicate holds or the timeout passes.
-func waitFor(t *testing.T, timeout time.Duration, predicate func() bool) bool {
+// migratedPool opens a database the migrations have built, so the webhook
+// tables exist.
+func migratedPool(t *testing.T) *datastore.Postgres {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if predicate() {
-			return true
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return predicate()
+	return testutils.MigratedPostgres(t, "webhook_test")
 }
 
-func okSender() *captureSender {
-	return &captureSender{script: []sendResult{{status: http.StatusOK, body: `{"ok":true}`}}}
+// receiver builds a test server that records what a delivery looked like
+// when it arrived, and answers the status the test asks for.
+type receiver struct {
+	server   *httptest.Server
+	header   http.Header
+	body     []byte
+	requests int
 }
 
-func (s *testStack) create(t *testing.T, name, endpoint string, events ...string) Webhook {
+// newReceiver answers a receiver that records one request's shape and
+// answers with the status given.
+func newReceiver(t *testing.T, status int) *receiver {
 	t.Helper()
-	hook, err := s.Service.Create(t.Context(), CreateParams{
+
+	r := &receiver{}
+	r.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.header = req.Header.Clone()
+		r.body, _ = io.ReadAll(req.Body)
+		r.requests++
+		w.WriteHeader(status)
+	}))
+	t.Cleanup(r.server.Close)
+	return r
+}
+
+// endpoint is a fixture registration: the receiver as its destination,
+// subscribed to the events the caller names.
+func endpoint(t *testing.T, service *Service, r *receiver, name string, events ...string) EndpointSchema {
+	t.Helper()
+
+	row, _, err := service.Create(t.Context(), CreateParams{
 		Name:       name,
-		Endpoint:   endpoint,
+		Endpoint:   r.server.URL,
+		Method:     http.MethodPost,
+		Headers:    map[string]string{"X-Tenant": "hogwarts"},
 		EventTypes: events,
 	})
 	require.NoError(t, err)
-	return hook
+	return row
 }
 
-// startQueue runs the dispatcher; the stack cleans it up.
-func (s *testStack) startQueue(t *testing.T) {
-	t.Helper()
-	s.Queue.Start(t.Context())
-}
+// TestCreateShowsTheSecretOnceAndRefusesADuplicateName pins the two halves
+// of the create: the secret is the response's alone, and the name is the
+// index's to police.
+func TestCreateShowsTheSecretOnceAndRefusesADuplicateName(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
 
-func (s *testStack) onlyDelivery(t *testing.T, id WebhookID) Delivery {
-	t.Helper()
-	logs, _, err := s.Store.ListDeliveries(t.Context(), ListParams{}, &id)
+	row, secret, err := service.Create(t.Context(), CreateParams{
+		Name:     "hogwarts-events",
+		Endpoint: r.server.URL,
+		Method:   http.MethodPost,
+	})
 	require.NoError(t, err)
-	require.Len(t, logs, 1)
-	return logs[0]
-}
+	assert.NotEmpty(t, secret, "the signing secret is the create response's alone")
+	assert.NotContains(t, secret, "enc:", "the response carries the plaintext, not the sealed form")
 
-func TestCreateStoresSecretEncryptedAndNeverReturnsItOnRead(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	hook := stack.create(t, "ci-endpoint", "https://example.test/hook", "user.created")
-	require.NotNil(t, hook.Secret, "create returns the plaintext secret once")
-	assert.Equal(t, "webhook", hook.ID.Prefix())
-
-	fetched, err := stack.Service.Get(ctx, hook.ID)
+	// The stored half is sealed: the ciphertext opens under the cipher and
+	// the plaintext matches, so a database leak cannot forge a signature.
+	stored, err := service.Get(t.Context(), row.ID)
 	require.NoError(t, err)
-	assert.Nil(t, fetched.Secret, "reads must not return the secret")
-
-	var stored *string
-	require.NoError(t, stack.DB.QueryRow(ctx,
-		"SELECT secret_enc FROM webhook_endpoints WHERE id = $1", hook.ID.UUID()).Scan(&stored))
-	require.NotNil(t, stored)
-	assert.NotEqual(t, *hook.Secret, *stored, "the secret must be ciphertext at rest")
-}
-
-func TestEmitWritesOutboxRowThenDeliversSignedBody(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	hook := stack.create(t, "outbox-endpoint", "https://example.test/hook", "user.created")
-
-	stack.startQueue(t)
-
-	require.NoError(t, stack.Service.Emit(ctx, "user.created", map[string]any{
-		"event":   "user.created",
-		"user_id": "user_01m2",
-	}))
-
-	// The outbox row is written before any delivery attempt.
-	pending := stack.onlyDelivery(t, hook.ID)
-	require.NotNil(t, pending.Event)
-	assert.Equal(t, "user.created", *pending.Event)
-
-	require.True(t, waitFor(t, 15*time.Second, func() bool { return stack.Sender.count() >= 1 }),
-		"the delivery must reach the sender")
-
-	delivery := stack.Sender.last()
-	assert.Equal(t, hook.Endpoint, delivery.URL)
-	assert.Equal(t, "POST", delivery.Method)
-	require.NoError(t, VerifySignature(delivery.Headers[SignatureHeader], delivery.Body, *hook.Secret, time.Now().UTC()))
-
-	require.True(t, waitFor(t, 15*time.Second, func() bool { return stack.onlyDelivery(t, hook.ID).Succeeded }),
-		"the attempt outcome must be recorded")
-
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.Equal(t, 1, recorded.Attempts)
-	require.NotNil(t, recorded.HTTPStatus)
-	assert.Equal(t, http.StatusOK, *recorded.HTTPStatus)
-	assert.Nil(t, recorded.Error)
-}
-
-func TestEmitSkipsUnsubscribedEvent(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	stack.create(t, "user-only", "https://example.test/hook", "user.created")
-
-	require.NoError(t, stack.Service.Emit(ctx, "api_key.created", map[string]any{"event": "api_key.created"}))
-
-	_, total, err := stack.Store.ListDeliveries(ctx, ListParams{}, nil)
+	require.NotNil(t, stored.SecretEnc)
+	decrypted, err := testSecretKey(t).Decrypt(*stored.SecretEnc)
 	require.NoError(t, err)
-	assert.Zero(t, total, "a non-subscriber gets no outbox row")
-	assert.Zero(t, stack.Sender.count())
+	assert.Equal(t, secret, decrypted)
+
+	_, _, err = service.Create(t.Context(), CreateParams{
+		Name:     "hogwarts-events",
+		Endpoint: r.server.URL,
+		Method:   http.MethodPost,
+	})
+	assert.ErrorIs(t, err, ErrEndpointExists)
 }
 
-func TestEmitReachesWildcardAndEmptySubscribers(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
+// TestCreateRefusesTheSignatureSetNames pins the header rule: a registration
+// that names a header the delivery contract owns is refused, because a
+// custom header that could shadow the signature set would let an endpoint
+// weaken what a receiver verifies against.
+func TestCreateRefusesTheSignatureSetNames(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
 
-	stack.create(t, "wildcard", "https://one.test/hook", AllEvents)
-	stack.create(t, "implicit", "https://two.test/hook")
-
-	require.NoError(t, stack.Service.Emit(ctx, "anything.happened", map[string]any{"event": "anything.happened"}))
-
-	_, total, err := stack.Store.ListDeliveries(ctx, ListParams{}, nil)
-	require.NoError(t, err)
-	assert.Equal(t, 2, total)
-}
-
-func TestSubscribersFiltering(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	stack.create(t, "user-events", "https://one.test/hook", "user.created", "user.deleted")
-	stack.create(t, "wildcard-events", "https://two.test/hook")
-	stack.create(t, "other-events", "https://three.test/hook", "api_key.created")
-
-	subscribers, err := stack.Store.Subscribers(ctx, "user.created")
-	require.NoError(t, err)
-
-	names := make([]string, 0, len(subscribers))
-	for _, hook := range subscribers {
-		names = append(names, hook.Name)
-	}
-	assert.ElementsMatch(t, []string{"user-events", "wildcard-events"}, names)
-}
-
-// TestRetryScheduleRecordsEveryAttempt drives the deliveries directly
-// instead of waiting out the queue's 30s backoff; the attempt budget
-// and the recorded outcome are the same either way.
-func TestRetryScheduleRecordsEveryAttempt(t *testing.T) {
-	sender := &captureSender{script: []sendResult{{status: http.StatusInternalServerError, body: `{"error":"boom"}`}}}
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
-
-	hook := stack.create(t, "failing-endpoint", "https://example.test/hook", AllEvents)
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
-	require.NoError(t, err)
-
-	for attempt := range WebhookMaxAttempts {
-		deliverErr := stack.Service.Deliver(ctx, WebhookDeliveryTask{
-			DeliveryID: deliveryID.String(),
-			WebhookID:  hook.ID.String(),
+	for _, name := range []string{"X-Signature", "x-signature", "Content-Type"} {
+		label := strings.ToLower(strings.ReplaceAll(name, "-", ""))
+		_, _, err := service.Create(t.Context(), CreateParams{
+			Name:     "reserved-" + label,
+			Endpoint: r.server.URL,
+			Method:   http.MethodPost,
+			Headers:  map[string]string{name: "forged"},
 		})
-		assert.Error(t, deliverErr, "attempt %d must surface the failure", attempt+1)
+		assert.ErrorIs(t, err, ErrReservedHeader, "a %s header must be refused", name)
+	}
+}
+
+// TestEmissionMatchesSubscriptions pins the subscription test: an empty list
+// receives every event, an exact entry receives its own, the wildcard
+// receives everything, and a disabled endpoint receives nothing — and the
+// emission rides the transaction the record rode, so a rollback would take
+// its deliveries with it.
+func TestEmissionMatchesSubscriptions(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+
+	_, _, err := service.Create(t.Context(), CreateParams{Name: "every-event", Endpoint: r.server.URL, Method: http.MethodPost})
+	require.NoError(t, err)
+	_, _, err = service.Create(t.Context(), CreateParams{Name: "sign-ins-only", Endpoint: r.server.URL, Method: http.MethodPost, EventTypes: []string{"session.signed_in"}})
+	require.NoError(t, err)
+	_, _, err = service.Create(t.Context(), CreateParams{Name: "wildcard", Endpoint: r.server.URL, Method: http.MethodPost, EventTypes: []string{"*"}})
+	require.NoError(t, err)
+	disabled := endpoint(t, service, r, "disabled", "*")
+	off := false
+	_, err = service.Update(t.Context(), disabled.ID, UpdateParams{Enabled: &off})
+	require.NoError(t, err)
+
+	// The emission runs inside the caller's transaction, the way the audit
+	// recorder hands the record's surface over.
+	err = pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: audit.EventSignIn})
+		return nil
+	})
+	require.NoError(t, err)
+
+	_, total, err := service.repo.ListDeliveries(t.Context(), pool, nil, mustWireEvent(t, audit.EventSignIn), 0, 100)
+	require.NoError(t, err)
+	assert.Equal(t, 3, total, "the empty list, the exact entry, and the wildcard receive the event; the disabled endpoint does not")
+	disabledDeliveries, _, err := service.repo.ListDeliveries(t.Context(), pool, &disabled.ID, mustWireEvent(t, audit.EventSignIn), 0, 100)
+	require.NoError(t, err)
+	assert.Empty(t, disabledDeliveries, "the disabled endpoint receives nothing")
+
+	// A second emission of another event costs each subscriber one more
+	// delivery: every happening is delivered, not folded.
+	err = pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: audit.EventAccountCreated})
+		return nil
+	})
+	require.NoError(t, err)
+	_, total, err = service.repo.ListDeliveries(t.Context(), pool, nil, mustWireEvent(t, audit.EventAccountCreated), 0, 100)
+	require.NoError(t, err)
+	assert.Equal(t, 2, total, "the other event finds the empty list and the wildcard; the exact subscriber does not")
+}
+
+// TestRunDeliverySignsTheBodyAndRecordsTheAttempt pins the delivery
+// contract: the receiver sees the signature headers, the digest verifies
+// against the secret and the exact body bytes, and the attempt row records
+// the outcome.
+func TestRunDeliverySignsTheBodyAndRecordsTheAttempt(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+
+	row := endpoint(t, service, r, "receiver", "session.signed_in")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	require.Equal(t, 1, r.requests)
+
+	// The signature verifies the way a receiver computes it: the digest of
+	// the timestamp and the exact body bytes, under the secret shown once.
+	secret := storedSecret(t, service, row.ID)
+	value := strings.TrimPrefix(r.header.Get(SignatureHeader), "t=")
+	timestamp, sig, ok := strings.Cut(value, ",v1=")
+	require.True(t, ok, "the signature header carries t=<unix>,v1=<hex>")
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp + "."))
+	mac.Write(r.body)
+	assert.Equal(t, hex.EncodeToString(mac.Sum(nil)), sig)
+	assert.Equal(t, mustWireEvent(t, audit.EventSignIn), r.header.Get(EventHeader))
+	assert.Equal(t, FormatEndpointID(row.ID), r.header.Get(IDHeader), "the endpoint's wire form rides the header")
+	assert.Equal(t, "hogwarts", r.header.Get("X-Tenant"), "the custom headers ride along")
+	assert.Equal(t, ContentType, r.header.Get(TypeHeader))
+
+	// The delivery is done, and the attempt row tells the story.
+	delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
+	require.NoError(t, err)
+	assert.Equal(t, StatusSucceeded, delivery.Status)
+	require.NotNil(t, delivery.DeliveredAt)
+	assert.Equal(t, 1, delivery.AttemptCount)
+
+	attempts, err := service.repo.LatestAttempts(t.Context(), pool, []uuid.UUID{delivery.ID})
+	require.NoError(t, err)
+	attempt, ok := attempts[delivery.ID]
+	require.True(t, ok)
+	assert.Equal(t, http.StatusOK, *attempt.ResponseStatus)
+	assert.NotNil(t, attempt.DurationMS)
+}
+
+// TestRunDeliveryRetriesThenFails pins the retry terms: a failed attempt is
+// the error the queue retries on, the attempt count climbs with each one,
+// and the fifth failure is where the delivery's story ends.
+func TestRunDeliveryRetriesThenFails(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusInternalServerError)
+	service := testService(t, pool, r.server)
+
+	row := endpoint(t, service, r, "downstream", "session.signed_in")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+	for attempt := 1; attempt <= maxAttempts-1; attempt++ {
+		err := service.RunDelivery(t.Context(), deliveryID)
+		require.Error(t, err, "a non-2xx answer is the retry signal")
+		delivery, getErr := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
+		require.NoError(t, getErr)
+		assert.Equal(t, StatusPending, delivery.Status, "a delivery inside its attempt budget is still pending")
+		assert.Equal(t, attempt, delivery.AttemptCount)
 	}
 
-	assert.Equal(t, WebhookMaxAttempts, sender.count(), "each attempt reaches the receiver")
-
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.Equal(t, WebhookMaxAttempts, recorded.Attempts)
-	assert.False(t, recorded.Succeeded)
-	require.NotNil(t, recorded.Error)
-	assert.Contains(t, *recorded.Error, "500")
-	assert.Contains(t, recorded.Response["body"], "boom")
+	// The last attempt marks the delivery failed and ends the story: the
+	// task answers quietly, because the delivery row now carries the truth
+	// and the queue has no more retries to spend.
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
+	require.NoError(t, err)
+	assert.Equal(t, StatusFailed, delivery.Status)
+	assert.Equal(t, maxAttempts, delivery.AttemptCount)
 }
 
-func TestDeliveryToDisabledEndpointNeverCallsOut(t *testing.T) {
-	sender := okSender()
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
+// TestRotateSecretAffectsNewDeliveriesOnly pins the rotation: the old secret
+// stops working, the new one signs, and the stored ciphertext is never
+// answered again — only the rotation response carried the new plaintext.
+func TestRotateSecretAffectsNewDeliveriesOnly(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
 
-	hook := stack.create(t, "disabled-endpoint", "https://example.test/hook", AllEvents)
-	disabled := false
-	_, err := stack.Service.Update(ctx, hook.ID, UpdateParams{Enabled: &disabled})
+	row, first, err := service.Create(t.Context(), CreateParams{Name: "rotating", Endpoint: r.server.URL, Method: http.MethodPost})
 	require.NoError(t, err)
-
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
+	rotated, second, err := service.RotateSecret(t.Context(), row.ID)
 	require.NoError(t, err)
+	assert.NotEqual(t, first, second, "every rotation mints a new secret")
+	assert.Equal(t, rotated.ID, row.ID)
 
-	err = stack.Service.Deliver(ctx, WebhookDeliveryTask{
-		DeliveryID: deliveryID.String(),
-		WebhookID:  hook.ID.String(),
-	})
-	assert.ErrorIs(t, err, ErrDisabled)
-	assert.Zero(t, sender.count(), "a disabled endpoint must not be called")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	require.Equal(t, 1, r.requests)
+
+	// The receiver verifies the new signature against the new secret: the
+	// stored ciphertext opens to the plaintext the response showed.
+	secret := storedSecret(t, service, row.ID)
+	assert.Equal(t, second, secret, "the rotation's shown secret is the one the row seals")
+	timestamp, sig, ok := strings.Cut(strings.TrimPrefix(r.header.Get(SignatureHeader), "t="), ",v1=")
+	require.True(t, ok)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp + "."))
+	mac.Write(r.body)
+	assert.Equal(t, hex.EncodeToString(mac.Sum(nil)), sig)
 }
 
-func TestRotateSecretInvalidatesTheOldSignature(t *testing.T) {
-	sender := okSender()
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
+// TestDeleteKeepsTheDeliveries pins the delete: the endpoint goes, the
+// deliveries survive with the identifier nulled, and a delivery whose
+// endpoint is gone is marked failed rather than retried.
+func TestDeleteKeepsTheDeliveries(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
 
-	hook := stack.create(t, "rotating", "https://example.test/hook", AllEvents)
-	rotated, err := stack.Service.RotateSecret(ctx, hook.ID)
+	row := endpoint(t, service, r, "departing", "session.signed_in")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+	require.NoError(t, service.Delete(t.Context(), row.ID))
+	_, err := service.Get(t.Context(), row.ID)
+	assert.ErrorIs(t, err, ErrEndpointNotFound)
+
+	delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
 	require.NoError(t, err)
-	assert.NotEqual(t, *hook.Secret, rotated)
+	assert.Nil(t, delivery.WebhookID, "the delivery outlives its destination")
 
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
+	// The runner answers quietly: there is no endpoint to retry against.
+	assert.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	failed, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
 	require.NoError(t, err)
-	require.NoError(t, stack.Service.Deliver(ctx, WebhookDeliveryTask{
-		DeliveryID: deliveryID.String(),
-		WebhookID:  hook.ID.String(),
-	}))
-
-	delivery := sender.last()
-	require.NoError(t, VerifySignature(delivery.Headers[SignatureHeader], delivery.Body, rotated, time.Now().UTC()))
-	assert.Error(t, VerifySignature(delivery.Headers[SignatureHeader], delivery.Body, *hook.Secret, time.Now().UTC()),
-		"the rotated-out secret must no longer verify")
+	assert.Equal(t, StatusFailed, failed.Status)
 }
 
-func TestDeliverToQueuesWithAPendingDeliveryRow(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
+// TestTheTestDeliveryRidesItsOwnEvent pins the Test procedure: it queues one
+// `webhook.test` delivery to the endpoint it is pointed at, subscription or
+// not.
+func TestTheTestDeliveryRidesItsOwnEvent(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
 
-	hook := stack.create(t, "testable", "https://example.test/hook")
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, defaultTestEvent, map[string]any{"event": defaultTestEvent})
+	row := endpoint(t, service, r, "proving", "session.signed_in")
+
+	require.NoError(t, service.Test(t.Context(), row.ID))
+	deliveries, total, err := service.repo.ListDeliveries(t.Context(), pool, &row.ID, EventTest, 0, 100)
 	require.NoError(t, err)
-	assert.Equal(t, "webhook_delivery", deliveryID.Prefix())
+	require.Equal(t, 1, total)
+	assert.Equal(t, EventTest, deliveries[0].Event)
 
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.Equal(t, deliveryID.String(), recorded.ID.String())
-	assert.Zero(t, recorded.Attempts, "the row is pending until a worker runs")
+	// The endpoint is subscribed to sign_in alone, so the test event proves
+	// the plumbing rather than the subscription.
+	_, allTotal, err := service.repo.ListDeliveries(t.Context(), pool, &row.ID, "", 0, 100)
+	require.NoError(t, err)
+	assert.Equal(t, 1, allTotal)
 }
 
-func TestDuplicateNameConflicts(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
+// TestTheWireFormsRoundTripThroughTheTypeIDPrefixes pins the boundary: the
+// endpoint, delivery, and attempt identifiers render with their own prefixes
+// on the wire and parse back to the UUID the column stores, and a wire form
+// without the prefix names nothing.
+func TestTheWireFormsRoundTripThroughTheTypeIDPrefixes(t *testing.T) {
+	raw := uuid.NewV7()
 
-	params := CreateParams{Name: "unique-name", Endpoint: "https://example.test/hook"}
-	_, err := stack.Service.Create(ctx, params)
+	assert.Regexp(t, `^whk_[0-9a-z]{26}$`, FormatEndpointID(raw))
+	assert.Regexp(t, `^whd_[0-9a-z]{26}$`, FormatDeliveryID(raw))
+	assert.Regexp(t, `^wha_[0-9a-z]{26}$`, FormatAttemptID(raw))
+
+	parsed, err := ParseEndpointID(FormatEndpointID(raw))
 	require.NoError(t, err)
+	assert.Equal(t, raw, parsed)
 
-	_, err = stack.Service.Create(ctx, params)
-	assert.ErrorIs(t, err, ErrDuplicateName)
+	_, err = ParseEndpointID(raw.String())
+	assert.Error(t, err, "a bare UUID is not the wire form")
 }
 
-func TestPruneLogsRemovesEntriesPastRetention(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
+// emitOne runs one emission inside a transaction and answers the delivery
+// the endpoint received. It is the shape every audit record takes on the way
+// to a delivery.
+func emitOne(t *testing.T, service *Service, webhookID uuid.UUID, event string) string {
+	t.Helper()
 
-	hook := stack.create(t, "pruned", "https://example.test/hook")
-	_, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
-	require.NoError(t, err)
-
-	tag, err := stack.DB.Exec(ctx,
-		"UPDATE webhook_deliveries SET created_at = CURRENT_TIMESTAMP - INTERVAL '60 days' WHERE webhook_id = $1",
-		hook.ID.UUID())
-	require.NoError(t, err)
-	require.Equal(t, int64(1), tag.RowsAffected())
-
-	removed, err := stack.Store.PruneDeliveries(ctx, time.Now().UTC().Add(-jobs.WebhookLogRetention))
-	require.NoError(t, err)
-	assert.Equal(t, int64(1), removed)
-}
-
-func TestListFiltersByEnabledAndEvent(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	stack.create(t, "enabled-user", "https://one.test/hook", "user.created")
-	stack.create(t, "enabled-api", "https://two.test/hook", "api_key.created")
-
-	enabled := true
-	userOnly, total, err := stack.Store.List(ctx, ListParams{Enabled: &enabled, Event: "user.created"})
-	require.NoError(t, err)
-	assert.Equal(t, 1, total)
-	require.Len(t, userOnly, 1)
-	assert.Equal(t, "enabled-user", userOnly[0].Name)
-}
-
-// ptr returns a pointer to its argument (test helper).
-func ptr[T any](value T) *T { return &value }
-
-// TestHTTPDeliveryAgainstLiveReceiver exercises the fetcher-backed
-// sender against a real HTTP server: method, headers, signature, and
-// the response status must all survive the round trip.
-func TestHTTPDeliveryAgainstLiveReceiver(t *testing.T) {
-	var (
-		mu      sync.Mutex
-		gotReq  *http.Request
-		gotBody []byte
-	)
-	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		mu.Lock()
-		gotReq, gotBody = r, body
-		mu.Unlock()
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(`{"received":true}`))
-	}))
-	t.Cleanup(receiver.Close)
-
-	ctx := t.Context()
-	pg := testutils.StartPostgres(ctx, t)
-	if _, err := database.MigrateUp(ctx, pg.DSN); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-	db, err := datastore.New(ctx, datastore.Options{DSN: pg.DSN})
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	t.Cleanup(func() {
-		bg := context.Background()
-		_, _ = db.Exec(bg, "DELETE FROM webhook_delivery_attempts")
-		_, _ = db.Exec(bg, "DELETE FROM webhook_deliveries")
-		_, _ = db.Exec(bg, "DELETE FROM webhook_endpoints")
-	})
-
-	outbound := fetcher.New(fetcher.Options{Logger: logger.NewMock(), Timeout: 5 * time.Second})
-	t.Cleanup(func() { _ = outbound.Close() })
-
-	sealer, err := crypto.NewCipher(make([]byte, 32))
-	require.NoError(t, err)
-
-	store := NewPostgresStore(db)
-	service := NewService(store, db, nil, sealer, logger.NewMock(),
-		WithSender(NewFetcherSender(outbound)),
-	)
-
-	hook, err := service.Create(ctx, CreateParams{Name: "real-receiver", Endpoint: receiver.URL})
-	require.NoError(t, err)
-
-	body, err := CanonicalPayload(map[string]any{"event": "user.created"})
-	require.NoError(t, err)
-
-	delivery := &Delivery{WebhookID: &hook.ID, Event: ptr("user.created")}
-	require.NoError(t, store.InsertDelivery(ctx, db, delivery, body))
-	require.NotZero(t, delivery.ID)
-	require.NoError(t, service.Deliver(ctx, WebhookDeliveryTask{
-		DeliveryID: delivery.ID.String(),
-		WebhookID:  hook.ID.String(),
-	}))
-
-	mu.Lock()
-	req, body := gotReq, gotBody
-	mu.Unlock()
-	require.NotNil(t, req, "the receiver must see the delivery")
-	assert.Equal(t, http.MethodPost, req.Method)
-	assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
-	assert.NotEmpty(t, req.Header.Get(SignatureHeader))
-	require.NoError(t, VerifySignature(req.Header.Get(SignatureHeader), body, *hook.Secret, time.Now().UTC()))
-
-	recorded := func() Delivery {
-		logs, _, listErr := store.ListDeliveries(ctx, ListParams{}, &hook.ID)
-		require.NoError(t, listErr)
-		require.Len(t, logs, 1)
-		return logs[0]
-	}()
-	assert.True(t, recorded.Succeeded)
-	require.NotNil(t, recorded.HTTPStatus)
-	assert.Equal(t, http.StatusAccepted, *recorded.HTTPStatus)
-	assert.Contains(t, recorded.Response["body"], "received")
-
-	// The delivery record must let a receiver re-verify offline: the
-	// committed body bytes and the signature the receiver saw. The
-	// signature travels with the sender capture; the stored bytes are
-	// re-verified against a fresh signature computed from the same
-	// secret, pinning byte-for-byte stability.
-	stored, err := store.DeliveryForSend(ctx, recorded.ID)
-	require.NoError(t, err)
-	assert.Equal(t, string(body), string(stored.Body), "the stored bytes are the delivered bytes")
-	fresh, err := Sign(stored.Event, hook.Endpoint, hook.Method, hook.ID, nil, stored.Body, *hook.Secret, time.Now().UTC())
-	require.NoError(t, err)
-	require.NoError(t, VerifySignature(fresh.Headers[SignatureHeader], stored.Body, *hook.Secret, time.Now().UTC()))
-}
-
-func TestServiceNameAndDoubleRegistrationPanics(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	assert.Equal(t, ModuleName, stack.Service.Name())
-
-	// Double wiring is a build-time bug; the queue rejects the duplicate.
-	assert.Panics(t, func() { stack.Service.RegisterQueue(stack.Queue) })
-}
-
-func TestRejectOversizedPayloadAtEmit(t *testing.T) {
-	stack := newTestStack(t, okSender())
-	ctx := t.Context()
-
-	stack.create(t, "size-guard", "https://example.test/hook", AllEvents)
-
-	err := stack.Service.Emit(ctx, "user.created", map[string]any{"blob": strings.Repeat("x", maxPayloadBytes+1)})
-	assert.ErrorIs(t, err, ErrTooLarge)
-
-	_, total, err := stack.Store.ListDeliveries(ctx, ListParams{}, nil)
-	require.NoError(t, err)
-	assert.Zero(t, total, "an oversized event must not leave an outbox row")
-}
-
-// TestRetrySignsTheSameImmutableBytes proves the retry contract: the
-// committed body bytes never change between attempts, so a receiver
-// that verified attempt one can verify attempt two against the same
-// signature.
-func TestRetrySignsTheSameImmutableBytes(t *testing.T) {
-	sender := &captureSender{script: []sendResult{
-		{status: http.StatusInternalServerError, body: `{"error":"boom"}`},
-		{status: http.StatusInternalServerError, body: `{"error":"boom"}`},
-		{status: http.StatusOK, body: `{"ok":true}`},
-	}}
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
-
-	hook := stack.create(t, "stable-bytes", "https://example.test/hook", AllEvents)
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{
-		"event":   "user.created",
-		"user_id": "user_01m2",
+	var deliveryID string
+	err := service.pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
+		service.AuditRecorded(ctx, tx, fwaudit.Entry{Event: event})
+		rows, _, listErr := service.repo.ListDeliveries(ctx, tx, &webhookID, mustWireEvent(t, event), 0, 1)
+		if listErr != nil {
+			return listErr
+		}
+		if len(rows) == 0 {
+			return errors.New("webhook: the emission produced no delivery")
+		}
+		deliveryID = rows[0].ID.String()
+		return nil
 	})
 	require.NoError(t, err)
+	return deliveryID
+}
 
-	bodies := make(map[string]struct{})
-	for range 3 {
-		// The first two attempts fail by script; the third succeeds.
-		_ = stack.Service.Deliver(ctx, WebhookDeliveryTask{
-			DeliveryID: deliveryID.String(),
-			WebhookID:  hook.ID.String(),
+// mustWireEvent maps an audit event onto the wire name the catalog delivers
+// it under. The catalog is expected to carry every audit event; a test that
+// reaches an unmapped one is testing an emission that cannot happen.
+func mustWireEvent(t *testing.T, source string) string {
+	t.Helper()
+	event, ok := EventForSource(source)
+	require.True(t, ok, "the catalog maps every audit event")
+	return event.Name
+}
+
+// storedSecret opens the endpoint's sealed signing secret, the way the
+// delivery runner does before it signs.
+func storedSecret(t *testing.T, service *Service, id uuid.UUID) string {
+	t.Helper()
+
+	row, err := service.Get(t.Context(), id)
+	require.NoError(t, err)
+	require.NotNil(t, row.SecretEnc)
+	secret, err := testSecretKey(t).Decrypt(*row.SecretEnc)
+	require.NoError(t, err)
+	return secret
+}
+
+// mustParse turns a delivery identifier into the key the rows carry.
+func mustParse(t *testing.T, id string) uuid.UUID {
+	t.Helper()
+
+	parsed, err := uuid.Parse(id)
+	require.NoError(t, err)
+	return parsed
+}
+
+// TestRunDeliveryRetriesAnInvisibleDelivery pins the wakeup race: a claim
+// that runs ahead of the commit that wrote the delivery row is the queue's
+// retry signal, not a quiet end — the row appears with the commit, and the
+// next attempt delivers it.
+func TestRunDeliveryRetriesAnInvisibleDelivery(t *testing.T) {
+	pool := migratedPool(t)
+	service := testService(t, pool, nil)
+
+	err := service.RunDelivery(t.Context(), uuid.NewV7().String())
+	require.Error(t, err, "a delivery the reader cannot see is the retry signal")
+}
+
+// TestRunDeliveryRefusesAReplayAfterTerminalState pins the status guard: a
+// replayed task — a lost worker's reclaim, a dead-task replay — must not
+// re-send a delivery a receiver has already answered, and must not rewrite
+// the terminal state another attempt stamped.
+func TestRunDeliveryRefusesAReplayAfterTerminalState(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+
+	row := endpoint(t, service, r, "settled", "session.signed_in")
+	deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	arrivals := r.requests
+
+	// The delivery carries a terminal status now; a replayed task is the
+	// same quiet end, and the receiver sees nothing more.
+	require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+	assert.Equal(t, arrivals, r.requests, "a settled delivery is not sent again")
+}
+
+// TestRunDeliveryRefusesAPermanentAnswerWithoutARetry pins the retry
+// classification: a redirect and a 4xx are facts a receiver would repeat on
+// every try, so the delivery fails on the first answer and the queue's
+// budget is not spent.
+func TestRunDeliveryRefusesAPermanentAnswerWithoutARetry(t *testing.T) {
+	for name, status := range map[string]int{
+		"redirect":     http.StatusMovedPermanently,
+		"client error": http.StatusNotFound,
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := migratedPool(t)
+			r := newReceiver(t, status)
+			service := testService(t, pool, r.server)
+
+			row := endpoint(t, service, r, "refusing", "session.signed_in")
+			deliveryID := emitOne(t, service, row.ID, audit.EventSignIn)
+
+			require.NoError(t, service.RunDelivery(t.Context(), deliveryID))
+			assert.Equal(t, 1, r.requests, "a permanent answer is not retried")
+
+			delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, deliveryID))
+			require.NoError(t, err)
+			assert.Equal(t, StatusFailed, delivery.Status)
 		})
-		bodies[string(sender.last().Body)] = struct{}{}
 	}
-	require.Len(t, bodies, 1, "every retry must carry the identical body bytes")
-
-	stored, err := stack.Store.DeliveryForSend(ctx, deliveryID)
-	require.NoError(t, err)
-	assert.Equal(t, nextKey(bodies), string(stored.Body), "the signed bytes are the committed bytes")
-
-	// The final success wins the delivery state and the attempt
-	// history stays complete.
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.True(t, recorded.Succeeded)
-	assert.Equal(t, 3, recorded.Attempts)
-	require.NotNil(t, recorded.DeliveredAt)
 }
 
-// nextKey returns the single map key; the map exists to assert
-// uniqueness, not to iterate.
-func nextKey(set map[string]struct{}) string {
-	for key := range set {
-		return key
-	}
-	return ""
-}
+// TestRunDeliveryRefusesAPrivateDestination pins the SSRF stance: with the
+// private network switched off, a delivery whose host resolves into the
+// kept-out ranges is a failed delivery, not a spent retry budget — and with
+// the policy on, the same endpoint delivers.
+func TestRunDeliveryRefusesAPrivateDestination(t *testing.T) {
+	pool := migratedPool(t)
+	r := newReceiver(t, http.StatusOK)
+	service := testService(t, pool, r.server)
+	blocked := Service{pool: pool, repo: service.repo, audit: service.audit, queue: service.queue,
+		fetch: service.fetch, cipher: service.cipher, log: service.log, now: service.now}
 
-// TestDuplicateAttemptIsIdempotent drives the same delivery twice
-// after success: the state stays succeeded, the attempt count grows,
-// and no duplicate delivery row appears.
-func TestDuplicateAttemptIsIdempotent(t *testing.T) {
-	sender := okSender()
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
+	row := endpoint(t, service, r, "loopback", "session.signed_in")
+	refusedID := emitOne(t, service, row.ID, audit.EventSignIn)
 
-	hook := stack.create(t, "idempotent", "https://example.test/hook", AllEvents)
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
+	require.NoError(t, blocked.RunDelivery(t.Context(), refusedID))
+	assert.Zero(t, r.requests, "the private destination is never reached")
+
+	delivery, err := service.repo.GetDelivery(t.Context(), pool, mustParse(t, refusedID))
 	require.NoError(t, err)
+	assert.Equal(t, StatusFailed, delivery.Status, "a policy refusal is a fact, not a retry")
 
-	task := WebhookDeliveryTask{DeliveryID: deliveryID.String(), WebhookID: hook.ID.String()}
-	require.NoError(t, stack.Service.Deliver(ctx, task))
-	require.NoError(t, stack.Service.Deliver(ctx, task))
-
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.True(t, recorded.Succeeded)
-	assert.Equal(t, 2, recorded.Attempts)
-	require.NotNil(t, recorded.DeliveredAt)
-
-	// delivered_at keeps the FIRST success; the second attempt does
-	// not move it.
-	first := *recorded.DeliveredAt
-	require.NoError(t, stack.Service.Deliver(ctx, task))
-	again := stack.onlyDelivery(t, hook.ID)
-	require.NotNil(t, again.DeliveredAt)
-	assert.Equal(t, first.Unix(), again.DeliveredAt.Unix())
-}
-
-// TestTransportErrorIsRetriedAndRecorded covers the sender-failure
-// path: the error is recorded per attempt, the delivery stays failed,
-// and the receiver is retried until the budget is exhausted.
-func TestTransportErrorIsRetriedAndRecorded(t *testing.T) {
-	sender := &captureSender{script: []sendResult{{err: context.DeadlineExceeded}}}
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
-
-	hook := stack.create(t, "timeout", "https://example.test/hook", AllEvents)
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
-	require.NoError(t, err)
-
-	for range WebhookMaxAttempts {
-		assert.Error(t, stack.Service.Deliver(ctx, WebhookDeliveryTask{
-			DeliveryID: deliveryID.String(),
-			WebhookID:  hook.ID.String(),
-		}))
-	}
-
-	assert.Equal(t, WebhookMaxAttempts, sender.count(), "every retry reaches the receiver")
-
-	recorded := stack.onlyDelivery(t, hook.ID)
-	assert.False(t, recorded.Succeeded)
-	assert.Equal(t, WebhookMaxAttempts, recorded.Attempts)
-	require.NotNil(t, recorded.Error)
-	assert.Contains(t, *recorded.Error, "deadline")
-	assert.Nil(t, recorded.HTTPStatus, "a transport failure carries no response status")
-}
-
-// TestAttemptRowsRecordEveryOutcome checks the per-attempt history:
-// one row per attempt with the response status, the error, and a
-// duration, in attempt order.
-func TestAttemptRowsRecordEveryOutcome(t *testing.T) {
-	sender := &captureSender{script: []sendResult{
-		{status: http.StatusInternalServerError, body: `{"error":"boom"}`},
-		{status: http.StatusOK, body: `{"ok":true}`},
-	}, latency: 2 * time.Millisecond}
-	stack := newTestStack(t, sender)
-	ctx := t.Context()
-
-	hook := stack.create(t, "attempt-history", "https://example.test/hook", AllEvents)
-	deliveryID, err := stack.Service.DeliverTo(ctx, hook.ID, "user.created", map[string]any{"event": "user.created"})
-	require.NoError(t, err)
-
-	task := WebhookDeliveryTask{DeliveryID: deliveryID.String(), WebhookID: hook.ID.String()}
-	assert.Error(t, stack.Service.Deliver(ctx, task))
-	require.NoError(t, stack.Service.Deliver(ctx, task))
-
-	attempts, err := stack.Store.ListAttempts(ctx, deliveryID)
-	require.NoError(t, err)
-	require.Len(t, attempts, 2)
-	assert.Equal(t, 1, attempts[0].Number)
-	assert.False(t, attempts[0].Succeeded)
-	require.NotNil(t, attempts[0].HTTPStatus)
-	assert.Equal(t, http.StatusInternalServerError, *attempts[0].HTTPStatus)
-	assert.Contains(t, attempts[0].Response["body"], "boom")
-	assert.Equal(t, 2, attempts[1].Number)
-	assert.True(t, attempts[1].Succeeded)
-	require.NotNil(t, attempts[1].DurationMs)
-	assert.Positive(t, *attempts[1].DurationMs, "the attempt records its wall time")
+	// The policy the deployment turned on delivers the same destination.
+	// A fresh emission rides a fresh delivery: a refusal is terminal.
+	allowedID := emitOne(t, service, row.ID, audit.EventSignIn)
+	require.NoError(t, service.RunDelivery(t.Context(), allowedID))
+	assert.Equal(t, 1, r.requests, "the private network is the operator's decision")
 }

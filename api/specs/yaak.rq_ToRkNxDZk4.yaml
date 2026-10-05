@@ -1,0 +1,61 @@
+type: http_request
+model: http_request
+id: rq_ToRkNxDZk4
+createdAt: 2026-09-25T10:33:41.981014
+updatedAt: 2026-09-26T18:47:27.381708
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "id": "REPLACE_SIGNUP_TOKEN_ID"
+    }
+bodyType: application/json
+description: |-
+  Delete a signup token by ID
+
+  Mirror of Pocket ID `DELETE /api/signup-tokens/{id}`.
+
+  Parameters:
+  - id (path, required): Token ID
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Delete signup token'
+sortPriority: 2000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/DeleteSignupToken
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

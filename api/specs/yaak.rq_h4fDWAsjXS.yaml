@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_h4fDWAsjXS
+createdAt: 2026-09-25T10:33:41.815424
+updatedAt: 2026-09-26T18:47:27.388573
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "username": "admin",
+      "email": "${[ identity ]}"
+    }
+bodyType: application/json
+description: |-
+  Sign up and generate setup access token for initial admin user
+
+  Mirror of Pocket ID `POST /api/signup/setup`.
+
+  Parameters:
+  - body (body, required): User information
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Sign up initial admin user (unplanned)'
+sortPriority: 25000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.SignupService/SetupInitialAdmin
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

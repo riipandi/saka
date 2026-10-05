@@ -1,0 +1,55 @@
+type: http_request
+model: http_request
+id: rq_YqCUdPXiqY
+createdAt: 2026-09-26T15:42:28.373873
+updatedAt: 2026-09-26T18:47:27.386293
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Retrieve information about the currently authenticated user.
+
+  Ported from Pocket ID `GET /api/users/me` as the `saka.identity.v1.UserService/GetCurrentUser` procedure. The target is the token's subject, never something the request names; a delegated session is refused.
+
+  Parameters: none
+
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Get current user'
+sortPriority: 10000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/GetCurrentUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

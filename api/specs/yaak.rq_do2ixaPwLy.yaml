@@ -1,0 +1,45 @@
+type: http_request
+model: http_request
+id: rq_do2ixaPwLy
+createdAt: 2026-09-26T21:47:19.152358
+updatedAt: 2026-09-26T21:49:11.686833
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user_id": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='always', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
+      "reason": "Lost authenticator device, verified over support"
+    }
+bodyType: application/json
+description: '[Saka] Removes every authenticator and the recovery set of a named account — the operator''s way in when the holder has lost every factor and cannot prove anything. The administrative session is the authority; no proof code exists to give. reason is optional and travels to the audit record and the notification. An account that holds no confirmed authenticator answers failed_precondition; an unknown or malformed identifier answers not_found. A notice email is queued to the account''s address.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: hxkUAQuYXf
+method: POST
+name: '[Saka] Disable user MFA (admin)'
+sortPriority: 5160.493827160494
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/AdminDisableMfa
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

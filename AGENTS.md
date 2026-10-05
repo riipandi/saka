@@ -1,142 +1,80 @@
-# AGENTS.md
+# Agents Instructions
 
-Go + React monolith (tango): one binary serving an OIDC provider API (`:3080`), SPA assets, and a CLI.
+One binary: HTTP/ConnectRPC API, embedded SPA, CLI. This file holds the general
+instructions; the detail lives in `.llms/`. Read in this order:
 
-## Project Overview
+1. This file — behavioral rules, always in force.
+2. `.llms/index.md` — the documentation map.
+3. `.llms/rules.md` — the detailed rules: tasks, per-package contracts, how-to-change recipes, traps. Read the section a change touches before touching it.
+4. `.llms/architecture.md` — per-package reasoning and library decision records. Read that package's section before changing it.
 
-- Port of upstream Pocket ID (`~/Developer/github.com/pocket-id/pocket-id`, tag `v2.14.0` — read it locally, never fetch from the web) onto a Go/Postgres stack, deliberately diverging where the porting plan says so.
-- Read `llms/porting-plan/README.md` before porting or changing API features: active scope, excluded-feature cleanup, atomic tasks, endpoint contract checks, and validation gates are defined there. Use `llms/endpoint-reference.md`, `llms/database-reference.sql`, and `llms/tango-deviations.md` as contract references; `llms/archived/` is historical context only. Transport decisions live in `llms/connectrpc-plan/endpoint-reference.md`; open audit findings live in `llms/remediation-connectrpc/`.
-- The upstream port is complete (parity 112/113, one recorded non-goal); new work should check the deviations doc first so upstream shapes do not leak into handlers.
+## Shape
 
-## Tech Stack & Tooling
+- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The frontend is a pnpm + Vite+ monorepo under `packages/`: `webapp` (the React 19 + TanStack SPA source, plus `public/`), `email` (React Email templates — `vp build packages/email` compiles them into the Go embed), `plugins` (the Vite plugins: email, golang), `e2e-tests` (Playwright). The production pipeline stays in the root `vite.config.ts`, which compiles the SPA and the templates and embeds both into the binary (`web/output/`, `web/email/`); the Go shell (`web/shell.go`) owns the HTML document, so there is no `index.html`. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3080`.
+- Implemented surfaces are listed in `.llms/index.md` and `.llms/architecture.md`; the rest of `internal/**` and `modules/**` is a scaffold. Do not document, test, or treat a stub as working.
+- Pocket ID is passkey-only. Surfaces it never had are `[Saka]` in Yaak. Auth flows beyond ported endpoints follow Better Auth.
+- Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
+- Porting a plan into code means implementing it. A doc may describe a larger surface than the code has.
 
-- Go 1.27, Node >= 24.21, pnpm >= 12.4, Docker.
-- Task runner: `task` (`Taskfile.yml`). Dev stack: `docker compose up -d` (Postgres, Mailpit, upstream parity instance).
-- Frontend: React 19 + TanStack Router/Query/Store + Vite. Email templates in `email/` compile via `plugins/plugin-email.ts` into `web/email` (embedded in the binary).
+## Stack (summary)
 
-## Build / Test / Lint
+Go 1.27.1, Node ≥ 24.21, pnpm, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do` DI, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, local and S3 storage. DI rules (`do.Package`, no singletons, no package `init`) and the registry seams are in `.llms/rules.md` and the skill `golang-samber-do`.
 
-- `task test` — full gate: Go release-tag suite + debug-tag suite + frontend. Run one package with `task test:go -- ./modules/identity/...`.
-- `task test:go:debug` covers `cmd/...` + `database/...`; the release-tag suite is `go test -tags release ./...`. The full gate is all three suites.
-- `task lint` — golangci-lint + oxlint. `task check` — go vet + format check. `task format` — gofmt + oxfmt. `task typecheck` — `tsc -b --noEmit`.
-- Integration tests use testutils.StartPostgres/StartMailpit/StartMinIO (testcontainers; Postgres 18, Mailpit). They fail fast on a broken daemon, and skip via `testutils.SkipWithoutDocker` when no Docker daemon is available — the macOS CI job has none (GitHub-hosted macOS runners lack nested virtualization; container tests only run on Linux).
+## Vite+ toolchain
 
-## Architecture
+The frontend toolchain is Vite+ (`vp`): one CLI over Vite/Rolldown, Vitest, Oxlint, Oxfmt, and its task runner. Docs: `node_modules/vite-plus/docs` or <https://viteplus.dev/guide/>.
 
-- `cmd/launcher` remains the CLI and server entrypoint. `internal/registry` is the explicit composition root. Keep `internal/` flat and avoid adding `internal/app`, `internal/platform`, or a generic plugin registry. Application boundaries are `modules/identity`, `modules/federation`, `modules/admin`, and `modules/webhook`.
-- `modules/<area>/<feature>/{schema,service,handler}.go`, plus `store.go` when the feature owns
-  persistence — the store file is named exactly `store.go`, Postgres-backed via `internal/datastore`.
-  No memory-store implementations. A feature that reads and writes only through another feature's
-  stores has no `store.go`.
-- `modules/identity` — accounts core + auth features (session, password, webauthn, signup, apikey, apiaccess, ...). `modules/federation` — provider surface (oidc, jwks, discovery, scimsync). Authn/authz features never leave `modules/identity`.
-- Admin-editable settings live in `app_config` via `modules/admin/appconfig`; defaults fold catalog < DB. Only non-secret behavior settings belong in the catalog. Cross-module consumers read through the appconfig surface (`MergedValues`), not raw env. Environment-backed settings (SMTP relay, credentials, lifetimes) have exactly one source: the environment, and are never admin-editable.
-- Schema is owned by `database/migrations/` (goose). Never embed or auto-create schema. Migration DDL is verbatim: editing an applied migration does not re-run it; reset via `tango db migrate:down --force --count N` then `migrate:up`.
-- Typed IDs per module via `go.jetify.com/typeid`; the prefix lives in the module's `schema.go`. Only URL-facing/cross-module IDs carry TypeID; token/code rows use SHA-256 keys plus DB `uuidv7()`.
-- Background work runs on the built-in queue `internal/queue` (tango-owned; based on backlite): Postgres-backed, in-process dispatcher, schema in migrations. Consumers register queue processors and enqueue typed tasks; the engine reads/writes only through `internal/datastore` (`Executor`/`WithTx`). Recurring maintenance lives in `internal/jobs` (`Job` registry, fixed-delay self-rescheduling).
-- Recoverable encrypted values use `pkg/crypto.Cipher` and are written with the exact `enc:` prefix (`enc:<ciphertext>`). Passwords, reset/session tokens, API keys, and recovery codes remain hashes when verification is sufficient. Do not add another encryption format.
-- This is a fresh target implementation: do not add legacy code, backward-compatibility branches, fallback readers, compatibility views, dual writes, transitional columns, or adapters for removed behavior. Delete obsolete paths instead.
-- `llms/database-reference.sql` — upstream schema dump for parity checks.
+- `vp <name>` runs a built-in; `vp run <name>` runs a `package.json` script or a `vite.config.ts` task — they may differ. Check both before assuming what a name runs.
+- `vp check` = format + lint + type check (`--fix` to write); `vp fmt` / `vp lint` are the pieces. The lint/fmt settings live in the root `vite.config.ts` (migrated from the former `.oxlintrc.json` / `.oxfmtrc.json`).
+- `vp toolchain [tool]` shows versions; `vp why <package>` the dependency graph. Run `vp install` after pulling remote changes.
+- **Commit hooks.** The dispatcher is `core.hooksPath → .vite-hooks/_` (generated; `prepare: vp config` reinstalls it). The project-owned `.vite-hooks/pre-commit` runs `vp staged` — the `staged` block in the root `vite.config.ts` maps `*.{ts,tsx,js,jsx,css,json}` to `vp check --fix` and `*.go` to `gofmt -w`, re-staging fixed files — then guards the Yaak export with `scripts/check-yaak-secrets.sh`. `VP_GIT_HOOKS=0` skips hooks per process.
 
-### Transport split (ConnectRPC vs REST)
+## Ambiguous decisions
 
-- **First-party application API is ConnectRPC below `/rpc`.** The contract is `api/connect/*.proto`
-  (flat layout, module-owning packages `tango.<module>.v1`); handlers are generated from it.
-- **Protocol and infrastructure surfaces stay REST** below `/api`, `/authorize`, or a documented
-  root path: OAuth/OIDC, WebAuthn ceremonies, device-login request/exchange, email links, the auth
-  worker's token refresh, health, and discovery.
-- Generated Go and TypeScript land in `codegen/proto/go/` and `codegen/proto/ts/`. Both are
-  **gitignored build outputs** — never commit them, never edit them. `task rpc:generate` produces
-  both; `test`, `dev`, `build`, `typecheck`, and `release` already depend on it, so a clean checkout
-  generates before it builds. `task rpc:stale` fails when the contracts change without regenerating.
-- Handlers live in `modules/<area>/<feature>/handler_rpc.go`, beside the REST `handler.go` when the
-  feature still has one. Business logic stays in `service.go`; the RPC file owns transport mapping
-  only (principal resolution, error codes, proto conversion).
-- Adding an endpoint: write the proto, run `task rpc:generate`, implement the handler, register the
-  mount in `internal/registry/registry.go` `MountRPC`, add the row to `llms/endpoint-reference.md`,
-  create and send the Yaak request through Yaak MCP, then update the matching `api/client` schema
-  only if a retained REST route also changed.
+Stop and confirm before writing code, migrations, protos, or config when scope, system design, or an architecture choice is unclear. Do not pick a design silently and ship it.
 
-### ConnectRPC authorization
+Ask when any of these is true:
 
-- `Authorization: Bearer <access-token>` authenticates protected RPCs. `X-API-KEY` reaches **only**
-  the documented admin application API. Password change, profile update, MFA, device approval, email
-  verification, and one-time-access administration are session-only, so a leaked key cannot rotate
-  its owner's password or edit its profile. The boundary is pinned by
-  `internal/registry.TestRPCMachineCredentialBoundary`; extend it when a mount moves.
-- Cookies are token storage and never authorize an RPC.
-- Pick exactly one mount-level guard, then a per-procedure interceptor only for a service that mixes
-  visibility (the set is documented at the top of `internal/transport/middleware/rpc_guard.go`):
-  `RPCPrincipalGuard` for mixed admin/self/public, `RPCPrincipalAuth` for fully protected non-admin,
-  `RPCAdminGuard` for fully admin, `RPCSessionAuth` to also reject machine credentials,
-  `RPCMachineDenied` for per-procedure session enforcement. `RPCAPIKeyAuth` resolves the machine
-  credential before whichever guard runs.
-- A new RPC request header must be added to `internal/transport/middleware/cors.go`; the nginx layer
-  in `compose.yaml` carries the same list for deployed stacks.
+- The request fits more than one package, area, table, or transport.
+- A new surface, job, queue, config key, grant, or migration is implied but not named.
+- `.llms/architecture.md` and this file leave more than one valid shape.
+- The change would be hard to undo (schema, public contract, seed, authz rule, secret, storage key).
+- You would have to invent a product rule (who can call it, what is stored, what is async).
 
-## Conventions
+Do not ask about rules the docs already settle: stack, DI, SQL style, guard refusal codes, log frontend, goose layout, JSON v2, file size habits.
 
-- Go 1.27 idioms: stdlib `uuid`, `encoding/json/v2` (`omitzero`), `for range n`, `t.Context()` in tests, `errors.Join`, `min`/`max`/`slices`/`maps`.
-- Request validation via `pkg/validate` (ozzo v4, code-first `Validate()` methods); handlers respond 422 through `pkg/responder` — no ad-hoc field guards.
-- SQL via `github.com/huandu/go-sqlbuilder` (PostgreSQL dialect). Gotchas: raw conditions (`IS NOT NULL`) pass as plain strings; pgx surfaces statement errors through `rows.Err()` after iteration, not the `Query` return.
-- Responses use the envelope `{status, message?, data, error?, metadata, links}` in snake_case, except declared bare-document endpoints (jwks, images, `.well-known/*`). ConnectRPC responses use the same snake_case field names: each RPC service registers the codec in `internal/rpcerr` that serializes protobuf under its declared proto field names, overriding protobuf's lowerCamelCase default. SCIM and WebAuthn keep camelCase because their specifications require it.
-- Tests use `pkg/testutils.StartPostgres` (throwaway containers; isolate data with unique names, never absolute-count assertions).
-- Comments: write only concise context that the code cannot show. Explain a non-obvious invariant, security rule, protocol requirement, compatibility constraint, or side effect; do not narrate control flow or restate names and expressions.
-- Exported declarations need a short Go doc comment when their contract is not obvious; begin it with the declaration name. Add comments to unexported functions only when their behavior or constraint needs explanation.
-- Do not add history, porting progress, phase/task/plan markers, TODO-style notes, personal context, or upstream-reference commentary. Preserve a reference only when it explains a live protocol or compatibility requirement, and describe the behavior rather than its origin.
-- Keep test comments limited to setup, invariants, security properties, or non-obvious fixtures. Remove comments that merely label the next assertion or restate the test name.
-- Do not use section-separator comments. When existing comments violate these rules, delete or rewrite them while preserving behavior.
+How to ask:
 
-## Common Tasks
+1. One line: what is unclear and what breaks if the wrong option ships.
+2. A numbered list of concrete options (usually 2–4). Each option is a design, not a vibe.
+3. Mark exactly one option `recommended` and give one sentence of why (constraint in this repo, blast radius, or fit with an existing package).
+4. Always add a final free-input option so the human can name a different path in their own words.
+5. Wait. Do not implement, generate, or migrate until they pick a number or write their own.
 
-- Add an endpoint: for a first-party surface, write the proto in `api/connect/*.proto`, run
-  `task rpc:generate`, then the handler and the mount (see "Transport split" above). For upstream
-  parity work, follow the matching task list in `llms/porting-plan/`. Transport decisions live in
-  `llms/connectrpc-plan/endpoint-reference.md`; open findings live in
-  `llms/remediation-connectrpc/`. Create the request in Yaak (via MCP) and send it against the
-  running server before ticking a checkbox. Exported request specs land in `api/specs/*.yaml`.
-- API client SDK (`api/client/`) is the **REST-only** SDK for retained HTTP and protocol endpoints.
-  It does not wrap ConnectRPC services, and adding or changing an RPC never requires an SDK change.
-  A change to a retained REST route does: add or extend the namespace method, mirror the Go DTO in
-  the zod schema (including show-once secrets and bare documents), update `client.ts`/`index.ts` when
-  a namespace appears, and cover it with vitest. Run `task typecheck` and the vitest api-client
-  suite. Relying-party OAuth surfaces (`token`, `introspect`, `par`, `device/authorize`, `userinfo`,
-  `.well-known/*`) stay out of typed namespaces; `raw()` is the escape hatch — see
-  `llms/api-client-plan/README.md` for the route-diff workflow.
-- Add a config key: catalog entry in `modules/admin/appconfig/config.go`; `.env.example` documents env names. Secrets and relay credentials never enter the catalog — they stay env-only in `internal/config`.
-- Frontend asset images live in `public/images/` → copied to `web/output/images` by the Vite build; never embed them in Go.
-- LDAP is an excluded upstream feature: no LDAP configuration, services, clients, or schema
-  columns. Do not reintroduce any of them.
-- Migrations: `tango db migrate:create`, `migrate:up`, `migrate:status` (see `tango db --help`); bump the version/count assertions in the migrator tests (`database/migrator_test.go`, `cmd/launcher/db_migrate*_test.go`) with every new migration.
+```text
+Unclear: <decision> — wrong pick means <cost>.
 
-## Gotchas / Anti-patterns
+1. <option> — <one-line consequence>
+2. <option> — <one-line consequence>  [recommended: <one reason>]
+3. <option> — <one-line consequence>
+4. Other — reply with the design you want
+```
 
-- Check `gofmt -l` before committing; lefthook `format-go` and `format-js` block dirty trees. Committing without a JS file staged can still fail `format-js` — retry or use `--no-verify` after confirming `format-go` is clean.
-- `env.example` and `internal/config` are kept in sync by a test — new config keys must be documented in `.env.example`.
-- The SDK's zod schemas and test fixtures are hand-mirrored from Go DTOs — nothing fails automatically when a handler response shape changes. Whenever a DTO, envelope usage, or status code changes, update the matching `api/client/` schema and test in the same change, or the SDK silently drifts from the wire.
-- Tests and Yaak requests must fail fast with explicit timeouts. Prefer focused commands with `-failfast` where supported; stop and report a hung test, unavailable container, or stalled request instead of waiting for a long default timeout.
-- When local Pocket ID behavior, a database field, or an API contract is ambiguous, do not guess. Record the evidence and ask the project owner for confirmation before changing dependent code, endpoint matrices, or Yaak requests.
-- Route params with IDs only accept TypeID form (`user_...`, `oidc_client_...`); raw UUIDs 404.
-- `compose.yaml` `pocketid` service runs upstream Pocket ID for parity testing; its DB holds real schema state — do not wipe it casually.
-- Commits are local only; never push without being asked.
-- Never commit on your own — even when the work is done and the gate is green. Recommend a commit message and let the user run the commit (the only exception is an explicit "commit" instruction in that turn).
+If they already chose in the same thread, do not re-ask. If new facts change the choice, confirm the delta only.
 
-## Committing
+## Workflow
 
-- Only commit files YOU changed in THIS session.
-- Stage explicit paths (`git add <path1> <path2>`); never `git add -A` / `git add .`.
-- Before committing, run `git status` and verify you are only staging your files.
-- Message format: `{feat,fix,docs}[(...)]: <commit message> (optionally multiple lines)`. Message is informative and concise.
+- **Issues.** A finding that outlives the turn — a defect discovered mid-work, a gap a plan's closure exposed, a parked decision with a named trigger — goes to `.llms/issues/issue-YYYYMMDD_hhmm.md` when found, not to chat memory. The file's frontmatter carries the rollup `status` and `captured`/`updated` timestamps; each item inside carries its own `status` line, the plan documents it came from or touches, and the trigger that reopens it. Statuses: `open`, `considering`, `resolved`, `wontfix`. When an item resolves, mark it in the file it lives in — the file is the tracker, not a diary.
+- **Docs sync.** A change that lands a behavior must land its documentation in the same turn: contract or invariant → `.llms/rules.md`; reasoning, decision, or library record → `.llms/architecture.md`; a shipped endpoint, job, email, audit event, guard rule, or settings key → the endpoint reference, the Yaak collection, and `docs/` where they live. Decide once per turn, before the commit: if the diff changes what a doc claims, the doc rides the same commit. Outdated prose is a defect of the change, not a follow-up.
+- **Validation.** `go test ./...`, `task lint`, and a probe against a freshly built `build/release/saka serve --env-file=.env.local` before claiming a change works — a green unit suite does not exercise the composition root.
+- **Plans.** A plan (`.llms/plans/`) is a contract with a fixed shape and hard rules; it executes only on the owner's explicit instruction. The full spec is in `.llms/rules.md` ("Plan documents").
+- **Prose.** Tree documents are English. Technical documentation for agents lives in `.llms/`; product documentation for humans lives in `docs/` — keep `docs/` free of technical references (paths, internals, agent context); its orientation is the human reader. Chat may follow the user's language. Files do not. Use skill `clarity` before writing or rewriting any of them; `handoff` for handovers.
+- **Library docs.** Use the MCP Context7 and DeepWiki tools for external libraries; the module cache is the pinned truth — code wins over docs.
+- **Secrets.** A secret is listed in `internal/config` `secretKeys` and nowhere else. Never print one; never rewrite a dotenv file without consent.
 
-Never run (destroys other agents' work or bypasses checks):
+## Git
 
-- `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git add -A`, `git add .`, `git commit --no-verify`.
-
-If rebase conflicts occur:
-
-- Resolve conflicts only in files you modified.
-- If a conflict is in a file you did not modify, abort and ask the user.
-- Never force push.
-
-## Related Agent Instructions
-
-- None found. `AGENTS.md` is the single instruction source for all agents (Codex, Elph, Copilot, Cursor, Gemini CLI).
+- Stage explicit paths. Check `git status`. Never `git add -A` or `git add .`.
+- Message: `{feat,fix,docs,refactor,chore}[(scope)]: <concise message>`. Do not push.
+- Do not commit unless this turn asked for it. When the work is finished, recommend the one-line message and list the paths.
+- Never run `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git commit --no-verify`, or `git push --force`.

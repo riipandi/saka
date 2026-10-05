@@ -1,0 +1,305 @@
+// The audit-log contract: the procedures that read what happened.
+//
+// An audit record is written by the feature that caused it, in the same
+// transaction, through internal/audit — never by a procedure here. This
+// contract is read-only by construction: there is no procedure to write,
+// edit, or delete a record, because a log its subject can rewrite is not a
+// log. Retention is the one deletion path, and it is a scheduled job rather
+// than an endpoint.
+//
+// The four procedures divide by who is asking. `List` answers the caller's
+// own activity, which is why it is the one procedure here a non-administrator
+// reaches; `ListAll`, `ListForUser`, and `FilterOptions` are the
+// administrator's views of the same table. The rule lives in
+// internal/guard, not in a handler.
+//
+// The failure codes follow docs/api-response.md: a caller without a token is
+// `unauthenticated`, and a caller who may not run a procedure is refused with
+// `not_found` rather than `permission_denied`, so the answer discloses
+// nothing about whether the procedure or the account exists.
+syntax = "proto3";
+
+package saka.auditlog.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/auditlog/v1;auditlogv1";
+
+// AuditLogService reads the audit trail.
+service AuditLogService {
+  // List answers one page of the caller's own audit records, newest first.
+  //
+  // It is the self-service view: the records are the ones whose subject is
+  // the caller. A delegated session — an administrator acting as this
+  // account — is refused here by the guard, because the account's own
+  // activity is not a surface an impersonation may read as if it were the
+  // account.
+  rpc List(ListRequest) returns (ListResponse);
+
+  // ListAll answers one page of every audit record, newest first, with the
+  // filters the administrator's view offers. It is an administrative
+  // procedure.
+  rpc ListAll(ListAllRequest) returns (ListAllResponse);
+
+  // ListForUser answers one page of one account's audit records, newest
+  // first: the administrative view of a single account, where `List` is the
+  // caller's own view of theirs.
+  rpc ListForUser(ListForUserRequest) returns (ListForUserResponse);
+
+  // FilterOptions answers the values the filters can take — the events that
+  // occur in the table and the accounts that appear in it — so an
+  // administrator's filter control is built from what is there rather than
+  // from a list the client keeps in step with the server.
+  rpc FilterOptions(FilterOptionsRequest) returns (FilterOptionsResponse);
+}
+
+// AuditLog is one record.
+message AuditLog {
+  // id is the record's identifier.
+  string id = 1;
+
+  // created_at is when the action happened, in UTC. It is the record's own
+  // timestamp, written by the database, so it orders the page.
+  google.protobuf.Timestamp created_at = 2;
+
+  // event is what happened, in this application's own vocabulary:
+  // `sign_in`, `account_created`, `account_updated`, `account_deleted`,
+  // `email_verification_sent`, `email_verified`,
+  // `profile_picture_updated`, `profile_picture_reset`.
+  string event = 3;
+
+  // trigger_type is who caused it: `user` for a caller's action, `system`
+  // for the application's own.
+  string trigger_type = 4;
+
+  // action_status is the outcome: `success`, or `failed` for an action that
+  // was attempted and refused. A record is written once, after the outcome
+  // is known, so the enum's `pending` and `unknown` never appear.
+  string action_status = 5;
+
+  // user_id is the account the action is about — the account that was acted
+  // on, never the administrator who acted. It is empty for an action with no
+  // account, such as a sign-in that failed on an unknown identity.
+  string user_id = 6;
+
+  // username is the account's name, read beside its identifier so a reader
+  // does not have to resolve one to show the other. It is empty for a record
+  // whose account no longer exists.
+  string username = 7;
+
+  // actor_id and actor_username name the administrator behind a delegated
+  // action, when the record was written while one account acted as another.
+  // Both are empty for every record written by an ordinary caller, so a
+  // reader can tell a delegated action from a direct one.
+  //
+  // They are read out of the payload, where the writer put them: the record
+  // stores the actor beside the subject, so no column is needed for a fact
+  // only a delegated action carries.
+  string actor_id = 8;
+  string actor_username = 9;
+
+  // ip_address is where the request came from, as the transport resolved it.
+  // It is empty when no address could be determined.
+  string ip_address = 10;
+
+  // user_agent is the browser's own identification, written as it arrived
+  // rather than parsed: a stored parse cannot be redone when a parser
+  // improves.
+  string user_agent = 11;
+
+  // device_fingerprint is the browser fingerprint the frontend computed and
+  // sent. It is opaque here. It is empty for a caller that sends none, which
+  // is every non-browser client.
+  string device_fingerprint = 12;
+
+  // country and city are resolved from ip_address by a location resolver,
+  // when a deployment configures one. Both are empty otherwise.
+  string country = 13;
+  string city = 14;
+
+  // resource_type and resource_id name what was acted on, when that is not
+  // the account itself. The identifier's form is the resource's own: a
+  // session's record carries the session's UUID (the column's key), a
+  // user_group's carries the group's UUID. Neither is the account's wire
+  // TypeID — that is user_id's shape alone.
+  string resource_type = 15;
+  string resource_id = 16;
+
+  // payload is what the event needs to be read later, exactly as it was
+  // stored: the fields a change touched, the actor behind a delegated
+  // action. It is empty for an event that carries none.
+  map<string, string> payload = 17;
+}
+
+// ListRequest carries the page the caller asks for. Both fields unset answer
+// the first default-sized page.
+message ListRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+
+  // sort_by names the column the page orders by. Absent, the record time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "event",
+      "username",
+      "ip_address",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListResponse is the page of the caller's own records.
+message ListResponse {
+  // logs are the records, newest first.
+  repeated AuditLog logs = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ListAllRequest carries the page and the filters of the administrative view.
+message ListAllRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+
+  // event filters by what happened, matched exactly. Absent means every
+  // event. The values to offer are the ones FilterOptions answers.
+  optional string event = 3 [(buf.validate.field).string.max_len = 64];
+
+  // user_id filters by the account the action is about. Absent means every
+  // account.
+  optional string user_id = 4 [(buf.validate.field).string.min_len = 1];
+
+  // search filters by a term matched against the account's username and
+  // email, so an administrator can find an account's activity by naming it
+  // rather than by looking its identifier up first.
+  optional string search = 5 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the record time
+  // orders the page, newest first.
+  optional string sort_by = 6 [(buf.validate.field).string = {
+    in: [
+      "event",
+      "username",
+      "ip_address",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 7 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListAllResponse is the page of every record.
+message ListAllResponse {
+  // logs are the records, newest first.
+  repeated AuditLog logs = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ListForUserRequest names the account whose records are read.
+message ListForUserRequest {
+  // user_id is the account's identifier in its wire form, a TypeID
+  // (`user_…`) encoded from the row's UUID.
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // page is the one-based page number.
+  optional int32 page = 2 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 3 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+}
+
+// ListForUserResponse is the page of one account's records.
+message ListForUserResponse {
+  // logs are the records, newest first.
+  repeated AuditLog logs = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// FilterOptionsRequest takes no fields: the facets are derived from the table
+// itself, so there is nothing for a caller to name.
+message FilterOptionsRequest {}
+
+// FilterOptionsResponse is the values the filters can take.
+message FilterOptionsResponse {
+  // events are the distinct event names the table holds, sorted, so a filter
+  // control offers what occurs rather than a fixed list.
+  repeated string events = 1;
+
+  // users are the accounts that appear in the table, so a filter control
+  // offers the accounts that have activity rather than every account.
+  repeated UserOption users = 2;
+
+  // status is the outcome word the client checks — success; a failure never
+  // reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// UserOption is one account a filter can select.
+message UserOption {
+  // id is the account's identifier, which is what the filters take.
+  string id = 1;
+
+  // username is the account's name, which is what a person selects by.
+  string username = 2;
+}

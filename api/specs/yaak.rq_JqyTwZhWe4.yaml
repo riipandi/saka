@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_JqyTwZhWe4
+createdAt: 2026-09-26T18:07:11.767026
+updatedAt: 2026-09-26T18:15:06.059278
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_YFXTtzfvhT
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "user": "${[ response.body.path(request='rq_6XVjYSdXiu', behavior='smart', ttl='0', result='first', join=', ', path='$.users[1].id') ]}",
+      "reason": "investigating the reported issue"
+    }
+bodyType: application/json
+description: |-
+  Opens a NEW session on the target account's behalf: the token pair names the target as its subject and the administrator in its actor claims (`actor_id`, `actor_username`), and the session row records the delegation in `impersonated_by`.
+
+  The window is fixed at one hour — the refresh rotation keeps the delegation alive inside it, and the actor pair survives every renewal because it is re-signed from the session row. A target that is an administrator (or the caller itself) answers `permission_denied`; an unknown or malformed identifier answers `not_found`; a disabled or banned target answers the ended-session failure. The delegation is refused on self-service procedures by the guard, and both halves of its life are audited (`impersonation_started`, `impersonation_stopped`).
+
+  Saka-only surface, modeled on Better Auth's admin plugin but fitted to this architecture. Call Stop impersonating to end the delegation and return to the administrator's own account.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: NKkZaUaphT
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: QFBNheJfzY
+method: POST
+name: '[Saka] Impersonate user'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/ImpersonateUser
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

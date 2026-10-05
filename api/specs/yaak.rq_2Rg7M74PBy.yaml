@@ -1,0 +1,52 @@
+type: http_request
+model: http_request
+id: rq_2Rg7M74PBy
+createdAt: 2026-10-02T13:08:13.346265
+updatedAt: 2026-10-02T13:08:13.346265
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "pattern": "spammer@example.com"
+    }
+bodyType: application/json
+description: 'Stores one blocked identifier — an email address or an @domain entry, lowercased, matched case-insensitively at sign-up. A blocked exact address also blocks its subaddressed variants. Adding a duplicate is not an error: the answer is the stored row. Guard: Admin.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+- enabled: true
+  name: Authorization
+  value: Bearer {{[ accessToken ]}}
+  id: null
+method: POST
+name: '[Saka] Add blocklist entry'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

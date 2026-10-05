@@ -1,0 +1,50 @@
+type: http_request
+model: http_request
+id: rq_VWGuRKGeUM
+createdAt: 2026-09-30T01:59:38.739195
+updatedAt: 2026-09-30T02:12:17.732889
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_d23um6bp9P
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "event": "user.created",
+      "page": 1,
+      "limit": 20
+    }
+bodyType: application/json
+description: '[Saka] List one page of every delivery the deployment holds, narrowed by the event filter when given. Attempts name response metadata only. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: List All Webhook Deliveries
+sortPriority: 4136.8185744043085
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/ListAllDeliveries
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

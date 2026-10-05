@@ -2,269 +2,63 @@
 
 version: "3"
 
+silent: true
+
 vars:
   APP_NAME:
-    sh: jq -r .name package.json 2>/dev/null || echo tango
+    sh: jq -r .name package.json 2>/dev/null || echo saka
   APP_VERSION:
     sh: jq -r .version package.json 2>/dev/null || echo 0.0.0
   IMAGE:
-    sh: jq -r .config.image package.json 2>/dev/null || echo ghcr.io/riipandi/tango
+    sh: jq -r '.config.image // "ghcr.io/riipandi/saka"' package.json
+
+# Every group lives in scripts/task-. Each include is flattened, so a task keeps
+# the name it had when this file held it. That also keeps one flat namespace,
+# so a task in one file can depend on a task in another by its plain name.
+includes:
+  dev:
+    taskfile: ./scripts/task-development.yml
+    flatten: true
+  build:
+    taskfile: ./scripts/task-build.yml
+    flatten: true
+  command:
+    taskfile: ./scripts/task-command.yml
+    flatten: true
+  database:
+    taskfile: ./scripts/task-database.yml
+    flatten: true
+  cert:
+    taskfile: ./scripts/task-generate.yml
+    flatten: true
+  test:
+    taskfile: ./scripts/task-test.yml
+    flatten: true
+  cleanup:
+    taskfile: ./scripts/task-cleanup.yml
+    flatten: true
+  docker:
+    taskfile: ./scripts/task-container.yml
+    flatten: true
+  metrics:
+    taskfile: ./scripts/task-metrics.yml
+    flatten: true
 
 tasks:
   default:
     desc: List all available tasks
-    cmd: task --list --sort none
-    silent: true
-
-  # ----------------------------------------------------------------------------
-  # Development
-  # ----------------------------------------------------------------------------
-  dev:
-    desc: Run Vite dev server (frontend :3000 + Go API :3080)
-    deps: [rpc:generate]
-    cmd: pnpm exec vite dev {{.CLI_ARGS}}
-
-  run:
-    desc: Run the Go backend directly (debug build)
-    cmd: go run -tags debug ./cmd --env-file=.env.local {{.CLI_ARGS}}
-
-  email:dev:
-    desc: Run React Email dev UI (:3030)
-    cmd: pnpm exec email dev --dir ./email/templates --port 3030
-
-  email:build:
-    desc: Compile email templates only (no Go binary, no SPA bundle)
-    cmd: TANGO_SKIP_GO=1 pnpm exec vite build
-
-  # ----------------------------------------------------------------------------
-  # Build & release
-  # ----------------------------------------------------------------------------
-  build:
-    desc: Build frontend + Go binary (single file)
-    deps: [rpc:generate]
-    cmd: pnpm exec vite build {{.CLI_ARGS}}
-
-  build:release:
-    desc: Build release binaries via goreleaser
-    deps: [rpc:generate]
-    cmd: goreleaser build --clean --auto-snapshot
-
-  release:
-    desc: Publish a release via goreleaser
-    deps: [rpc:generate]
-    cmd: goreleaser release --clean --auto-snapshot
-
-  start:
-    desc: Run the release binary on :3000
-    cmds:
-      - pnpm exec kill-port 3000
-      - ./build/release/{{.APP_NAME}} serve --port 3000 {{.CLI_ARGS}}
-
-  # ----------------------------------------------------------------------------
-  # Database & keys
-  # ----------------------------------------------------------------------------
-  db:migrate:
-    desc: Run database migrations
-    cmd: go run -tags debug ./cmd --env-file=.env.local db migrate:up {{.CLI_ARGS}}
-
-  secrets:generate:
-    desc: Generate application secrets (dev only)
-    cmd: go run -tags debug ./cmd secrets {{.CLI_ARGS}}
-
-  # ----------------------------------------------------------------------------
-  # Test
-  # ----------------------------------------------------------------------------
-  test:
-    desc: Run all tests (Go + frontend)
-    deps: [rpc:generate]
-    cmds:
-      - task: test:go
-      - task: test:ui
-
-  test:go:
-    desc: Run Go unit tests (pass packages or flags after `--`)
-    cmd: gotestsum --format testname {{.CLI_ARGS | default "./..."}}
-
-  test:go:debug:
-    desc: Run Go unit tests for the debug build (migrate create/fix/validate included)
-    cmd: gotestsum --format testname -- -tags debug {{.CLI_ARGS | default "./cmd/... ./database/..."}}
-
-  test:ui:
-    desc: Run frontend unit tests
-    cmd: pnpm exec vitest run {{.CLI_ARGS}}
-
-  test:sdk:
-    desc: Run unit tests for API Client
-    cmd: pnpm exec vitest run --project api-client {{.CLI_ARGS}}
-
-  coverage:
-    desc: Run Go tests with coverage report
-    cmds:
-      - gotestsum --format testname -- -coverprofile=coverage.out ./...
-      - go tool cover -func=coverage.out | tail -1
-
-  # ----------------------------------------------------------------------------
-  # Format, check, lint
-  # ----------------------------------------------------------------------------
-  format:
-    desc: Format all files (Go + JS)
-    cmds:
-      - gofmt -w .
-      - pnpm exec oxfmt --write .
-
-  check:
-    desc: Run all checks (go vet + JS formatting)
-    cmds:
-      - go vet ./...
-      - pnpm exec oxfmt --check
-      - pnpm exec oxlint
-
-  lint:
-    desc: Run all linters (Go + JS)
-    cmds:
-      - pnpm exec oxlint --fix .
-      - golangci-lint run -c .golangci.yml ./...
-
-  typecheck:
-    desc: Run TypeScript type checking
-    deps: [rpc:generate]
-    cmd: pnpm exec tsc -b --noEmit
-
-  # ----------------------------------------------------------------------------
-  # ConnectRPC contracts
-  # ----------------------------------------------------------------------------
-  rpc:generate:
-    desc: Generate Go + TypeScript from api/connect/*.proto
-    cmds:
-      - go tool buf generate
-      - gofmt -w codegen/proto/go
-      - task: rpc:stamp
-
-  rpc:lint:
-    desc: Lint protobuf contracts
-    cmd: go tool buf lint
-
-  rpc:breaking:
-    desc: Check protobuf contracts for breaking changes
-    cmd: go tool buf breaking --against '.git#ref=HEAD~1,subdir=api/connect'
-
-  rpc:stamp:
-    desc: Refresh the contract stamp used by stale detection
-    cmd: sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > .rpc-gen.stamp'
-
-  rpc:stale:
-    desc: Fail when generated code is out of date with the contracts
-    cmds:
-      - sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > /tmp/rpc-stamp.now'
-      - sh -c 'test -f .rpc-gen.stamp || (echo "no contract stamp yet — run task rpc:generate" && exit 1)'
-      - sh -c 'diff .rpc-gen.stamp /tmp/rpc-stamp.now || (echo "contracts changed — run task rpc:generate" && exit 1)'
-
-  # ----------------------------------------------------------------------------
-  # Dependencies
-  # ----------------------------------------------------------------------------
-  deps:
-    desc: Install Go toolchain binaries (golangci-lint, goose, etc)
-    cmds:
-      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-      - go install github.com/pressly/goose/v3/cmd/goose@latest
-      - go install github.com/goreleaser/goreleaser/v2@latest
-      - go install github.com/anchore/grype/cmd/grype@latest
-      - go install github.com/swaggo/swag/cmd/swag@latest
-      - go get -tool github.com/bufbuild/buf/cmd/buf@latest
-      - go get -tool google.golang.org/protobuf/cmd/protoc-gen-go@latest
-      - go get -tool connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
-
-  # ----------------------------------------------------------------------------
-  # Cleanup
-  # ----------------------------------------------------------------------------
-  cleanup:
-    desc: Remove build artifacts and dependencies
-    cmds:
-      - task: cleanup:dist
-      - task: cleanup:deps
-
-  cleanup:dist:
-    desc: Remove build artifacts
-    cmd: pnpm dlx del-cli .{output,tanstack} build web/output codegen
-
-  cleanup:deps:
-    desc: Remove dependencies
-    cmd: pnpm dlx del-cli pnpm-lock.yaml node_modules vendor
-
-  update-deps:
-    desc: Update dependencies
-    deps: [rpc:generate]
-    cmds:
-      - pnpm exec npm-check-updates --configFileName .ncurc.json
-      - go mod download && go mod tidy
-
-  # ----------------------------------------------------------------------------
-  # Docker
-  # ----------------------------------------------------------------------------
-  docker:build:
-    desc: Build the Docker image
-    vars:
-      BUILD_HASH:
-        sh: git rev-parse --short HEAD 2>/dev/null || echo dev
-      BUILD_DATE:
-        sh: date -u +%Y-%m-%dT%H:%M:%SZ
-    cmds:
-      - |
-          docker build -f ./deploy/Dockerfile . \
-          --build-arg DISTROLESS_TAG=debug-nonroot \
-          --build-arg BUILD_VERSION={{.APP_VERSION}} \
-          --build-arg BUILD_HASH={{.BUILD_HASH}} \
-          --build-arg BUILD_DATE={{.BUILD_DATE}} \
-          -t {{.IMAGE}}:{{.APP_VERSION}}-dev \
-          -t {{.IMAGE}}:latest-dev {{.CLI_ARGS}}
-      - docker image list --filter reference={{.IMAGE}}:*
-
-  docker:run:
-    desc: Run the Docker image
-    cmd: |
-      docker run --network=host --rm -it \
-      --env-file=.env.local -v $(pwd)/storage:/srv/storage \
-      {{.CLI_ARGS}} {{.IMAGE}}:latest-dev
-
-  docker:shell:
-    desc: Open a shell in the Docker image
-    cmds:
-      - task: docker:run
-        vars:
-          CLI_ARGS: --entrypoint /busybox/sh
-
-  docker:push:
-    desc: Push the Docker image
-    cmd: docker push {{.IMAGE}}:latest-dev && docker push {{.IMAGE}}:{{.APP_VERSION}}-dev
-
-  docker:prune:
-    desc: Remove the Docker image
-    cmd: docker image rm --force $(docker image list --filter reference={{.IMAGE}}:* -q)
-
-  docker:images:
-    desc: List project Docker images
-    cmd: docker image list --filter reference={{.IMAGE}}:*
-
-  docker:check:
-    desc: Scan the Docker image for vulnerabilities
-    cmd: grype --scope all-layers {{.IMAGE}}:latest-dev
+    cmd: task --list
 
   # ----------------------------------------------------------------------------
   # Docker compose
   # ----------------------------------------------------------------------------
   compose:up:
     desc: Start docker compose services
-    cmd: docker compose -f compose.yaml up --detach --remove-orphans
+    cmd: docker compose -f container/compose.yaml up --detach --remove-orphans
 
   compose:down:
     desc: Stop docker compose services
-    cmd: docker compose -f compose.yaml down --remove-orphans
-
-  compose:cleanup:
-    desc: Stop services and remove volumes
-    cmds:
-      - docker-compose -f compose.yaml down --remove-orphans --volumes
-      - pnpm dlx del-cli .storage/{mailpit_data,pgsql_data,redis_data,silo_data}
+    cmd: docker compose -f container/compose.yaml down --remove-orphans
 
   compose:restart:
     desc: Restart docker compose services
@@ -272,8 +66,14 @@ tasks:
       - task: compose:down
       - task: compose:up
 
+  compose:cleanup:
+    desc: Stop services and remove volumes
+    cmds:
+      - docker-compose -f container/compose.yaml down --remove-orphans --volumes
+      - pnpm dlx del-cli .storage/*_data .storage/nginx_logs
+
   compose:reset:
     desc: Reset docker compose services
+    deps: [compose:cleanup]
     cmds:
-      - task: compose:cleanup
       - task: compose:up

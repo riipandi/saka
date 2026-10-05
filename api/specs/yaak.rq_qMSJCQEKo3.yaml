@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_qMSJCQEKo3
+createdAt: 2026-09-28T22:24:37.882613
+updatedAt: 2026-09-28T22:24:37.882613
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+  - enabled: true
+    name: scope
+    value: openid profile
+bodyType: application/x-www-form-urlencoded
+description: |-
+  RFC 8628: the device asks for authorization, gets a device code to poll and a user code the human carries to the browser. Client authentication rides the Basic header or the form.
+
+  Endpoint: `POST /oidc/device_authorization`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: null
+method: POST
+name: '[Saka] Device authorization request'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/device_authorization
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -1,0 +1,269 @@
+// The API key contract: a machine credential that acts as the account that
+// owns it.
+//
+// An API key is a personal access token a holder issues for their own
+// scripting and integrations. It carries the owner's identity and role
+// through the same guard table a session does — an administrator's key
+// administers — but the surface that manages the keys themselves refuses it,
+// the way the upstream it ports does: a credential that cannot be revoked by
+// itself must not be the one managing credentials.
+//
+// The key is shown once, in the creation and renewal responses, and stored
+// only as a hash, so a database leak cannot replay it. Revocation is soft:
+// the row survives with its revocation instant, so a reader can still tell
+// what a revoked key had access to.
+syntax = "proto3";
+
+package saka.apikey.v1;
+
+import "buf/validate/validate.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1;apikeyv1";
+
+// ApiKeyService issues and manages the machine credentials an account holds.
+//
+// The four management procedures are the owner's own surface, and they are
+// the one surface an API key is refused on — the `Session` guard rule, the
+// rule a browser session satisfies and a machine credential does not. The
+// fifth procedure is saka's own: an administrator's view over every key the
+// deployment holds, which the upstream it ports has no equivalent of.
+service ApiKeyService {
+  // CreateApiKey issues a key for the caller's own account. The raw key
+  // exists in this response alone.
+  rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse);
+
+  // ListApiKeys answers one page of the caller's own keys, newest first.
+  // A revoked key stays listed, named by its revocation instant.
+  rpc ListAPIKeys(ListAPIKeysRequest) returns (ListAPIKeysResponse);
+
+  // RenewApiKey replaces an expired key's secret and window. An unexpired
+  // key is refused — renewal is how a key lives past its expiry, not how it
+  // escapes one — and the answer carries the new raw key, shown once.
+  rpc RenewAPIKey(RenewAPIKeyRequest) returns (RenewAPIKeyResponse);
+
+  // RevokeApiKey marks one of the caller's own keys revoked. The revocation
+  // is a stamp, not a deletion, and revoking an already-revoked key is the
+  // same success — the state it names is the one the key is in.
+  rpc RevokeAPIKey(RevokeAPIKeyRequest) returns (RevokeAPIKeyResponse);
+
+  // ListAllApiKeys answers one page of every key the deployment holds,
+  // newest first. It is saka-only: upstream carries no administrative view
+  // over its keys.
+  rpc ListAllAPIKeys(ListAllAPIKeysRequest) returns (ListAllAPIKeysResponse);
+}
+
+// ApiKey is the key's view. It never carries the key material: the raw key
+// is the create and renew responses' `key` field, and only its hash is
+// stored.
+message ApiKey {
+  // id is the key row's identifier, a UUID string.
+  string id = 1;
+
+  // name is the label the owner gave the key. It is unique per owner.
+  string name = 2;
+
+  // description is the optional note the owner wrote.
+  optional string description = 3;
+
+  // prefix is the key's leading characters, carried so an operator can tell
+  // which row a leaked key belongs to without the key itself.
+  string prefix = 4;
+
+  // expires_at is when the key stops authenticating.
+  google.protobuf.Timestamp expires_at = 5;
+
+  // last_used_at is the last validation the key passed, absent when the key
+  // has never authenticated a request.
+  optional google.protobuf.Timestamp last_used_at = 6;
+
+  // created_at is the issue instant.
+  google.protobuf.Timestamp created_at = 7;
+
+  // updated_at is the last field-changing write, absent when the row was
+  // never updated.
+  optional google.protobuf.Timestamp updated_at = 8;
+
+  // revoked_at is when the key was revoked, absent while it is live.
+  optional google.protobuf.Timestamp revoked_at = 9;
+
+  // expiration_email_sent says whether the expiry reminder went out.
+  bool expiration_email_sent = 10;
+
+  // owner_id is the account the key acts as. It is saka's own field: the
+  // administrative view over every key is meaningless without naming whose
+  // key it is, and the owner's own list answers it with the caller.
+  string owner_id = 11;
+}
+
+// CreateAPIKeyRequest carries the new key's label, note, and window.
+message CreateAPIKeyRequest {
+  // name is the key's label: 3-64 characters of ASCII letters, digits,
+  // underscores, and spaces. It is unique among the owner's keys.
+  string name = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_ -]{3,64}$"];
+
+  // description is the optional note the key carries.
+  optional string description = 2 [(buf.validate.field).string.max_len = 255];
+
+  // expires_at is when the key stops authenticating. It must lie in the
+  // future: a key that is born expired authenticates nothing.
+  google.protobuf.Timestamp expires_at = 3 [(buf.validate.field).timestamp.gt_now = true];
+}
+
+// CreateAPIKeyResponse is the created key and the raw key itself.
+message CreateAPIKeyResponse {
+  // api_key is the key's view.
+  ApiKey api_key = 1;
+
+  // key is the raw credential, shown exactly once. It is never stored —
+  // only its hash is — so losing it means revoking the key and issuing
+  // another.
+  string key = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ListAPIKeysRequest carries the page the caller asks for. Both fields unset
+// answer the first default-sized page.
+message ListAPIKeysRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "created_at",
+      "expires_at",
+      "last_used_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListAPIKeysResponse is the page of the caller's own keys.
+message ListAPIKeysResponse {
+  // api_keys are the keys, newest first, revoked ones included.
+  repeated ApiKey api_keys = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// RenewAPIKeyRequest names the expired key and the window it earns.
+message RenewAPIKeyRequest {
+  // id is the key row's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+
+  // expires_at is the new expiry. It must lie in the future.
+  google.protobuf.Timestamp expires_at = 2 [(buf.validate.field).timestamp.gt_now = true];
+}
+
+// RenewAPIKeyResponse is the renewed key and its new raw key.
+message RenewAPIKeyResponse {
+  // api_key is the key's view after the renewal.
+  ApiKey api_key = 1;
+
+  // key is the new raw credential, shown exactly once. The old secret is
+  // dead the moment this row is written.
+  string key = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// RevokeAPIKeyRequest names the key to revoke.
+message RevokeAPIKeyRequest {
+  // id is the key row's identifier.
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// RevokeAPIKeyResponse is empty: a successful revocation says so with the
+// protocol, and a key that is not the caller's answers the not-found code.
+message RevokeAPIKeyResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListAllAPIKeysRequest carries the page of the administrative view. Both
+// fields unset answer the first default-sized page.
+message ListAllAPIKeysRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "created_at",
+      "expires_at",
+      "last_used_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListAllAPIKeysResponse is the page of every key the deployment holds.
+message ListAllAPIKeysResponse {
+  // api_keys are the keys, newest first, revoked ones included.
+  repeated ApiKey api_keys = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}

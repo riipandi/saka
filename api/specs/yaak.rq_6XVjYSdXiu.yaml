@@ -1,0 +1,85 @@
+type: http_request
+model: http_request
+id: rq_6XVjYSdXiu
+createdAt: 2026-09-25T10:33:40.668220
+updatedAt: 2026-10-03T22:57:40.701824
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "page": 1,
+      "limit": 25,
+      "search": "",
+      "sort_by": "created_at",
+      "sort_order": "asc"
+    }
+bodyType: application/json
+description: |-
+  List users with pagination, an optional search term, and sorting.
+
+  Ported from Pocket ID `GET /api/users` as the `saka.identity.v1.UserService/ListUsers` procedure.
+
+  Parameters:
+  - page (body, optional): One-based page number
+  - limit (body, optional): Page size
+  - search (body, optional): Search term
+  - sort_by (body, optional): One of username, email, first_name, last_name, display_name, created_at; absent orders newest first
+  - sort_order (body, optional): SORT_ORDER_ASC or SORT_ORDER_DESC; absent means ascending
+
+  The response's `picture` is the account's picture's public URL, resolved from the filestore object the account references - empty (omitted on the wire) when the account has none, the picture the bundled default answers for.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: KYF7juaMec
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 3CirqgauVh
+method: POST
+name: '[Pocket ID] List users'
+sortPriority: 7000.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserService/ListUsers
+urlParameters:
+- enabled: false
+  name: search
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[page]
+  value: ''
+  id: null
+- enabled: false
+  name: pagination[limit]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[column]
+  value: ''
+  id: null
+- enabled: false
+  name: sort[direction]
+  value: ''
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

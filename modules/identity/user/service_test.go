@@ -1,147 +1,1194 @@
 package user
 
 import (
+	"bytes"
 	"context"
-	"strconv"
-	"strings"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity"
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"connectrpc.com/connect"
+
+	"log/slog"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"github.com/riipandi/saka/framework/datastore"
+	fstorage "github.com/riipandi/saka/framework/storage"
+	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/internal/testutils"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+	conttest "github.com/riipandi/saka/pkg/testutils"
 
 	"uuid"
 )
 
-// uniqueStamp yields a per-call unique suffix: the test container
-// may be shared across runs and packages.
-func uniqueStamp() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 10)
+func migratedPool(t *testing.T) *datastore.Postgres {
+	t.Helper()
+
+	return testutils.MigratedPostgres(t, "user_test")
 }
 
-func TestServiceCreateAndGet(t *testing.T) {
-	store := newTestStore(t)
-	var recorded []identity.AuditEvent
-	recorder := testRecorder{events: &recorded}
-	svc := NewService(store, recorder)
+// readPicture opens the account's picture through the service's read, so a
+// test reads the body the transport would stream.
+func (s *Service) readPicture(ctx context.Context, id string) (io.ReadCloser, string, error) {
+	view, err := s.ProfilePicture(ctx, id)
+	if err != nil {
+		return nil, "", err
+	}
+	return view.Body, view.ContentType, nil
+}
 
-	stamp := uniqueStamp()
-	user, err := svc.Create(t.Context(), CreateParams{
-		Username:  "john_" + stamp,
-		Email:     "john-" + stamp + "@example.com",
-		FirstName: "John",
-		LastName:  "Doe",
+func testService(t *testing.T, pool *datastore.Postgres) *Service {
+	t.Helper()
+
+	// The ban writes move through the restrictions feature. The audit
+	// recorder is nil-safe.
+	return NewService(pool, nil, nil, nil).
+		WithRestrictions(restrictions.NewService(pool, nil, nil))
+}
+
+// testPictureService builds the service over the real storage engine — the
+// local driver in a throwaway directory — so a picture procedure runs the
+// stage, sync, and read the production path runs. The engine and its
+// directory travel with the test through the returned cleanup.
+func testPictureService(t *testing.T, pool *datastore.Postgres) (*Service, *fstorage.Manager) {
+	t.Helper()
+
+	if _, err := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
+	manager := fstorage.NewManager(fstorage.NewFS(t.TempDir()), pool,
+		t.TempDir(), slog.New(slog.DiscardHandler))
+	return NewService(pool, nil, nil, manager), manager
+}
+
+// passwordCount reads how many credentials an account carries. An account
+// created without a password carries none.
+// rowID decodes the wire identifier the views carry into the UUID the rows
+// and the storage keys are built from.
+func rowID(t *testing.T, wire string) string {
+	t.Helper()
+	id, err := ParseID(wire)
+	require.NoError(t, err)
+	return id.UUID()
+}
+
+func passwordCount(t *testing.T, pool *datastore.Postgres, userID string) int {
+	userID = rowID(t, userID)
+	t.Helper()
+
+	id, err := uuid.Parse(userID)
+	require.NoError(t, err)
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("count(*)")
+	sb.From(entity.TableUserPasswords)
+	sb.Where(sb.Equal("user_id", id))
+
+	query, args := sb.Build()
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&count))
+	return count
+}
+
+func TestCreateUserStoresTheAccountAndTheCredential(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username:      "hermione",
+		Email:         "hermione@example.com",
+		Password:      "expecto-patronum",
+		FirstName:     "Hermione",
+		LastName:      "Granger",
+		EmailVerified: true,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "user", user.ID.Prefix())
 
-	// The suffix decodes to a UUIDv7 (RFC 9562): version nibble is 7.
-	parsed, parseErr := uuid.Parse(user.ID.UUID())
-	require.NoError(t, parseErr)
-	assert.Equal(t, byte(7), parsed[6]>>4)
-	assert.True(t, strings.HasPrefix(user.Username, "john_"))
-	assert.Equal(t, "John Doe", user.DisplayName)
+	assert.NotEmpty(t, created.ID)
+	assert.Equal(t, "hermione", created.Username)
+	assert.Equal(t, "hermione@example.com", created.Email)
+	assert.Equal(t, "Hermione Granger", created.DisplayName)
+	assert.True(t, created.EmailVerified)
+	assert.False(t, created.CreatedAt.IsZero())
+	assert.Equal(t, 1, passwordCount(t, pool, created.ID))
 
-	require.Len(t, recorded, 1)
-	assert.Equal(t, "user.created", recorded[0].Action)
-
-	got, err := svc.GetByID(t.Context(), user.ID)
+	read, err := service.GetUser(t.Context(), created.ID)
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(got.Username, "john_"))
-	assert.Equal(t, user.Email, got.Email)
-
-	missing := identity.NewID[UserID]()
-	_, err = svc.GetByID(t.Context(), missing)
-	assert.ErrorIs(t, err, ErrNotFound)
+	assert.Equal(t, "Hermione Granger", read.DisplayName)
+	require.NotNil(t, read.FirstName)
+	assert.Equal(t, "Hermione", *read.FirstName)
 }
 
-func TestServiceCreateValidation(t *testing.T) {
-	svc := NewService(newTestStore(t), nil)
+func TestCreateUserWithoutAPasswordCarriesNoCredential(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
 
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	created, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Robert", LastName: "Langdon",
+		Username: "langdon",
+		Email:    "langdon@example.com",
+	})
+	require.NoError(t, err)
+
+	// The display name is composed from the mandatory names, and no
+	// credential row exists to sign in with.
+	assert.Equal(t, "Robert Langdon", created.DisplayName)
+	assert.False(t, created.EmailVerified)
+	assert.Equal(t, 0, passwordCount(t, pool, created.ID))
+}
+
+func TestCreateUserRefusesADuplicateAccount(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	_, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "hermione", Email: "hermione@example.com"})
+	require.NoError(t, err)
+
+	// The username matches case-insensitively, the way its unique index does.
+	_, err = service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "HERMIONE", Email: "other@example.com"})
+	assert.ErrorIs(t, err, ErrAccountExists)
+
+	_, err = service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "other", Email: "hermione@example.com"})
+	assert.ErrorIs(t, err, ErrAccountExists)
+}
+
+// mustID parses a wire identifier in a test helper. A view identifier is
+// always valid, so the failure is the test's own bug.
+func mustID(t *testing.T, wire string) UserID {
+	t.Helper()
+	parsed, err := ParseID(wire)
+	require.NoError(t, err)
+	return parsed
+}
+
+// TestGetCurrentUserAnswersTheSubject reads the account the caller is: the
+// subject travels as the wire identifier, and the answer is the same view
+// the identifier-addressed read produces.
+func TestGetCurrentUserAnswersTheSubject(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:  "sophie_neveu",
+		Email:     "sophie.neveu@holy.grail",
+		FirstName: "Sophie",
+		LastName:  "Neveu",
+	})
+	require.NoError(t, err)
+
+	view, err := service.GetCurrentUser(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "sophie_neveu", view.Username)
+	assert.Equal(t, created.ID, view.ID)
+}
+
+// TestGetCurrentUserRefusesAnUnknownSubject keeps the boundary honest: an
+// identifier that names no account is the not-found failure, whatever
+// surface read it.
+func TestGetCurrentUserRefusesAnUnknownSubject(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	service := testService(t, migratedPool(t))
+
+	_, err := service.GetCurrentUser(t.Context(), "user_00000000000000000000000000")
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+// TestUpdateCurrentUserTouchesOnlyTheProfile pins the self-service
+// boundary: the names and the locale travel, and everything the
+// administrative surface owns — the username, the email, the role, the
+// disabled flag — rides through untouched.
+func TestUpdateCurrentUserTouchesOnlyTheProfile(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:  "vittoria_vetra",
+		Email:     "vittoria.vetra@infinite.bound",
+		FirstName: "Vittoria",
+		LastName:  "Vetra",
+		Locale:    "id-ID",
+	})
+	require.NoError(t, err)
+
+	updated, err := service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Vittoria",
+		LastName:    "Vetra",
+		DisplayName: "V. Vetra",
+		Locale:      "en-US",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "V. Vetra", updated.DisplayName)
+	assert.Equal(t, "en-US", *updated.Locale)
+
+	// The identity fields are not the caller's to rewrite: read them back
+	// from the store the administrative procedures would.
+	row, err := service.repo.GetUser(ctx, pool, IDToUUID(mustID(t, created.ID)))
+	require.NoError(t, err)
+	assert.Equal(t, "vittoria_vetra", row.Username)
+	assert.Equal(t, "vittoria.vetra@infinite.bound", row.Email)
+}
+
+func TestUpdateCurrentUserSetsTheTimezoneItIsGiven(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:    "hermione_granger",
+		Email:       "hermione.granger@hogwarts.edu",
+		DisplayName: "Hermione",
+		Password:    "Expecto-Patronum-9",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTimezone, created.Timezone,
+		"an account that never chose a zone starts on the default, not on an empty string")
+
+	updated, err := service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+		Timezone:    "Asia/Jakarta",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Asia/Jakarta", updated.Timezone)
+
+	// Clearing the field is the default, not an unparseable zone: the
+	// frontend falls back to UTC the way it would for a fresh account.
+	cleared, err := service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTimezone, cleared.Timezone)
+
+	_, err = service.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		FirstName:   "Hermione",
+		LastName:    "Granger",
+		DisplayName: "Hermione",
+		Timezone:    "Mars/Olympus",
+	})
+	assert.ErrorIs(t, err, ErrTimezoneInvalid,
+		"a zone the tz database does not carry is refused, not stored")
+}
+
+func TestUpdateUserReplacesTheTimezoneAndRefusesAnUnknownZone(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	created, err := service.CreateUser(ctx, CreateParams{
+		Username:    "robert_langdon",
+		Email:       "robert.langdon@harvard.edu",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	require.NoError(t, err)
+
+	existing, err := service.GetUser(ctx, created.ID)
+	require.NoError(t, err)
+
+	updated, err := service.UpdateUser(ctx, created.ID, UpdateParams{
+		Username:    existing.Username,
+		Email:       existing.Email,
+		FirstName:   *existing.FirstName,
+		LastName:    *existing.LastName,
+		DisplayName: existing.DisplayName,
+		Timezone:    "Europe/Rome",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Europe/Rome", updated.Timezone)
+
+	_, err = service.UpdateUser(ctx, created.ID, UpdateParams{
+		Username:    existing.Username,
+		Email:       existing.Email,
+		FirstName:   *existing.FirstName,
+		LastName:    *existing.LastName,
+		DisplayName: existing.DisplayName,
+		Timezone:    "Not/AZone",
+	})
+	assert.ErrorIs(t, err, ErrTimezoneInvalid)
+}
+
+func TestGetUserRefusesAnUnknownIdentifier(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	_, err := service.GetUser(t.Context(), uuid.NewV7().String())
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	_, err = service.GetUser(t.Context(), "not-a-uuid")
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+func TestListUsersSearchesAndPaginates(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	// The four accounts carry distinct names, so the search's one match is
+	// observable: the Granger name is hers alone.
+	for _, account := range []struct{ username, first, last string }{
+		{"hermione", "Hermione", "Granger"},
+		{"langdon", "Robert", "Langdon"},
+		{"sophie", "Sophie", "Neveu"},
+		{"vittoria", "Vittoria", "Vetra"},
+	} {
+		_, err := service.CreateUser(t.Context(), CreateParams{
+			Username: account.username, Email: account.username + "@example.com",
+			FirstName: account.first, LastName: account.last,
+		})
+		require.NoError(t, err)
+	}
+
+	users, pagination, err := service.ListUsers(t.Context(), "", "", false, 1, 2)
+	require.NoError(t, err)
+	assert.Len(t, users, 2)
+	require.NotNil(t, pagination.TotalItems)
+	assert.Equal(t, 4, *pagination.TotalItems)
+
+	// The search matches the username and the name parts, case-insensitively,
+	// and answers only the accounts it names.
+	users, _, err = service.ListUsers(t.Context(), "GRA", "", false, 1, 10)
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, "hermione", users[0].Username)
+}
+
+func TestUpdateUserReplacesTheFields(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username:  "hermione",
+		Email:     "hermione@example.com",
+		FirstName: "Hermione",
+	})
+	require.NoError(t, err)
+
+	// The full replace is the whole shape: every field is specified, and the
+	// names are mandatory, so a name part left empty is a contract refusal
+	// the transport answers before the service runs.
+	updated, err := service.UpdateUser(t.Context(), created.ID, UpdateParams{
+		Username:    "hermione",
+		Email:       "grey.lady@example.com",
+		FirstName:   "Hermione",
+		LastName:    "King",
+		DisplayName: "The Grey Lady",
+		Locale:      "en-GB",
+		Disabled:    true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "The Grey Lady", updated.DisplayName)
+	assert.Equal(t, "grey.lady@example.com", updated.Email)
+	assert.True(t, updated.Disabled)
+	require.NotNil(t, updated.FirstName)
+	assert.Equal(t, "Hermione", *updated.FirstName)
+	require.NotNil(t, updated.LastName)
+	assert.Equal(t, "King", *updated.LastName)
+	require.NotNil(t, updated.Locale)
+	assert.Equal(t, "en-GB", *updated.Locale)
+
+	read, err := service.GetUser(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "King", *read.LastName)
+}
+
+func TestUpdateUserAppliesAndLiftsTheBan(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.now = func() time.Time { return time.Unix(2000000000, 0) }
+
+	created, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "hermione", Email: "hermione@example.com"})
+	require.NoError(t, err)
+
+	expires := service.now().Add(24 * time.Hour)
+	banned, err := service.UpdateUser(t.Context(), created.ID, UpdateParams{
+		Username:     "hermione",
+		Email:        "hermione@example.com",
+		FirstName:    "Hermione",
+		LastName:     "Granger",
+		DisplayName:  "hermione",
+		BanExpiresAt: &expires,
+		BanReason:    new("unruly behaviour"),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, banned.BannedAt)
+	assert.Equal(t, service.now(), *banned.BannedAt)
+	require.NotNil(t, banned.BanExpires)
+	require.NotNil(t, banned.BanReason)
+
+	// A re-ban keeps the start instant on record: the field answers "since
+	// when", so applying a new expiry does not move it.
+	later := expires.Add(24 * time.Hour)
+	rebanned, err := service.UpdateUser(t.Context(), created.ID, UpdateParams{
+		Username:     "hermione",
+		Email:        "hermione@example.com",
+		FirstName:    "Hermione",
+		LastName:     "Granger",
+		DisplayName:  "hermione",
+		BanExpiresAt: &later,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, service.now(), *rebanned.BannedAt)
+
+	lifted, err := service.UpdateUser(t.Context(), created.ID, UpdateParams{
+		Username:    "hermione",
+		Email:       "hermione@example.com",
+		DisplayName: "hermione",
+	})
+	require.NoError(t, err)
+	assert.Nil(t, lifted.BannedAt)
+	assert.Nil(t, lifted.BanExpires)
+	assert.Nil(t, lifted.BanReason)
+}
+
+func TestUpdateUserRefusesAnUnknownIdentifierAndADuplicate(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	_, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "hermione", Email: "hermione@example.com"})
+	require.NoError(t, err)
+
+	_, err = service.UpdateUser(t.Context(), uuid.NewV7().String(), UpdateParams{
+		Username: "hermione", Email: "ron@example.com", DisplayName: "x", FirstName: "Hermione", LastName: "Granger",
+	})
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	other, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "langdon", Email: "langdon@example.com"})
+	require.NoError(t, err)
+
+	_, err = service.UpdateUser(t.Context(), other.ID, UpdateParams{
+		Username: "hermione", Email: "langdon@example.com", DisplayName: "langdon", FirstName: "Hermione", LastName: "Granger",
+	})
+	assert.ErrorIs(t, err, ErrAccountExists)
+}
+
+func TestDeleteUserRefusesTheSignedInAccount(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	created, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "hermione", Email: "hermione@example.com"})
+	require.NoError(t, err)
+
+	// The signed-in account is refused, whatever case the claims carry it in.
+	err = service.DeleteUser(t.Context(), created.ID, "HERMIONE")
+	assert.ErrorIs(t, err, ErrSelfDeletion)
+
+	other, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Hermione", LastName: "Granger", Username: "langdon", Email: "langdon@example.com"})
+	require.NoError(t, err)
+	require.NoError(t, service.DeleteUser(t.Context(), other.ID, "hermione"))
+
+	_, err = service.GetUser(t.Context(), other.ID)
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	err = service.DeleteUser(t.Context(), other.ID, "hermione")
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 	cases := []struct {
-		name    string
-		params  CreateParams
-		wantErr error
+		err  error
+		code connect.Code
 	}{
-		{"short username", CreateParams{Username: "ab", Email: "a@b.co"}, ErrInvalidUsername},
-		{"bad username chars", CreateParams{Username: "has space", Email: "a@b.co"}, ErrInvalidUsername},
-		{"missing email", CreateParams{Username: "john"}, ErrInvalidEmail},
-		{"bad email", CreateParams{Username: "john", Email: "not-an-email"}, ErrInvalidEmail},
+		{ErrUserNotFound, connect.CodeNotFound},
+		{ErrAccountExists, connect.CodeAlreadyExists},
+		{ErrSelfDeletion, connect.CodeFailedPrecondition},
 	}
-
 	for _, tc := range cases {
-		_, err := svc.Create(t.Context(), tc.params)
-		assert.ErrorIs(t, err, tc.wantErr, tc.name)
+		assert.Equal(t, tc.code, connect.CodeOf(mapError(tc.err)), "%v", tc.err)
 	}
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(mapError(errors.New("boom"))))
 }
 
-func TestServiceCreateDuplicate(t *testing.T) {
-	svc := NewService(newTestStore(t), nil)
-	stamp := uniqueStamp()
+// TestThePictureFlowStagesSyncsAndReadsBack runs the update through the real
+// engine — stage, inline sync, row pointer — and reads the bytes back with
+// the content type the update recorded.
+func TestThePictureFlowStagesSyncsAndReadsBack(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
 
-	_, err := svc.Create(t.Context(), CreateParams{
-		Username: "john_" + stamp,
-		Email:    "john-" + stamp + "@example.com",
+	pool := migratedPool(t)
+	service, pictures := testPictureService(t, pool)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
 	})
 	require.NoError(t, err)
 
-	_, err = svc.Create(t.Context(), CreateParams{
-		Username: "john_" + stamp,
-		Email:    "other-" + stamp + "@example.com",
-	})
-	assert.ErrorIs(t, err, ErrDuplicate)
+	picture := bytes.Repeat([]byte("A"), 80) // PNG magic + filler
+	picture[0], picture[3] = 0x89, 'N'
+	copy(picture, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, picture))
+
+	body, mime, err := service.readPicture(t.Context(), created.ID)
+	require.NoError(t, err)
+	defer body.Close()
+	assert.Equal(t, "image/png", mime)
+	read, err := io.ReadAll(body)
+	require.NoError(t, err)
+	assert.Equal(t, picture, read)
+
+	// The engine holds the file whole under the key the row names — the
+	// same tree of keys both drivers keep.
+	stored, err := pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
+	require.NoError(t, err)
+	storedBody, err := io.ReadAll(stored)
+	require.NoError(t, err)
+	require.NoError(t, stored.Close())
+	assert.Equal(t, picture, storedBody)
+
+	// The row names the object the engine holds the file in: the reference
+	// is the filestore row's identity, and the join answers the location.
+	bucket, key := storedPictureReference(t, pool, created.ID)
+	assert.Equal(t, "devbucket", bucket)
+	assert.Equal(t, "pictures/"+rowID(t, created.ID)+".png", key)
 }
 
-func TestDisplayNameFallback(t *testing.T) {
-	svc := NewService(newTestStore(t), nil)
+// TestPictureUpdateMovesTheKeyWhenTheKindChanges pins the naming contract: the
+// key is `pictures/<id>.<ext>` with the extension the sniffed bytes earned, so
+// an upload of another kind moves the picture rather than leaving the old one
+// under a name that lies about its content.
+func TestPictureUpdateMovesTheKeyWhenTheKindChanges(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
 
-	// Unique emails per case: the container outlives a single test.
-	stamp := uniqueStamp()
-	cases := []struct {
-		name   string
-		params CreateParams
-		want   string
-	}{
-		{"explicit", CreateParams{Username: "ada_a_" + stamp, Email: "ada-a-" + stamp + "@example.com", DisplayName: "Ada L"}, "Ada L"},
-		{"first last", CreateParams{Username: "ada_b_" + stamp, Email: "ada-b-" + stamp + "@example.com", FirstName: "Ada", LastName: "L"}, "Ada L"},
-		{"email local", CreateParams{Username: "ada_c_" + stamp, Email: "ada3-" + stamp + "@example.com"}, "ada3-" + stamp},
+	pool := migratedPool(t)
+	service, pictures := testPictureService(t, pool)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
+
+	png := append([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, []byte("first")...)
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, png))
+	pngKey := "devbucket/pictures/" + rowID(t, created.ID) + ".png"
+	assert.Equal(t, pngKey, storedPictureKey(t, pool, created.ID))
+
+	// The second upload is another kind, so it lands under another key.
+	jpeg := append([]byte{0xff, 0xd8, 0xff}, []byte("second")...)
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, jpeg))
+	jpegKey := "devbucket/pictures/" + rowID(t, created.ID) + ".jpg"
+	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
+
+	// The replaced picture left the engine whole: no object answers its key,
+	// and no manifest row keeps the garbage collection from ever sweeping it.
+	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
+	assert.ErrorIs(t, err, fstorage.ErrNotFound)
+	// The manifest row left with the object: a row without a file is what
+	// the garbage collection keeps a key for, so one that lingered would
+	// make the old name unsweepable forever.
+	_, err = fstorage.NewManifests().Load(t.Context(), pool, "00000000-0000-0000-0000-000000000000", pngKey)
+	assert.ErrorIs(t, err, fstorage.ErrNoManifest)
+
+	// The read answers the picture the row now names.
+	body, mime, err := service.readPicture(t.Context(), created.ID)
+	require.NoError(t, err)
+	defer body.Close()
+	assert.Equal(t, "image/jpeg", mime)
+	read, err := io.ReadAll(body)
+	require.NoError(t, err)
+	assert.Equal(t, jpeg, read)
+
+	// The same kind again keeps its key: an update is not a move when the
+	// extension does not change.
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, jpeg))
+	assert.Equal(t, jpegKey, storedPictureKey(t, pool, created.ID))
+}
+
+// storedPictureReference reads the location the account's picture
+// reference resolves to: the object row's bucket and key, through the same
+// join the account reads answer from.
+func storedPictureReference(t *testing.T, pool *datastore.Postgres, userID string) (string, string) {
+	t.Helper()
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("b.name", "so.key")
+	sb.From(entity.TableUsers + " u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageObjects+" so", "so.id = u.picture_file_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageBuckets+" b", "b.id = so.bucket_id")
+	sb.Where(sb.Equal("u.id", rowID(t, userID)))
+	query, args := sb.Build()
+
+	var bucket, key *string
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&bucket, &key))
+	require.NotNil(t, bucket, "the row names the picture it stored")
+	require.NotNil(t, key, "the row names the picture it stored")
+	return *bucket, *key
+}
+
+// storedPictureKey reads the bucket-scoped reference the account's picture
+// reference resolves to: `<bucket>/<key>`.
+func storedPictureKey(t *testing.T, pool *datastore.Postgres, userID string) string {
+	t.Helper()
+	bucket, key := storedPictureReference(t, pool, userID)
+	return bucket + "/" + key
+}
+
+// TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration refuses a payload
+// no accepted image kind claims, whatever its name says.
+func TestPictureUpdateSniffsTheBytesRatherThanTheDeclaration(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testPictureService(t, pool)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
+
+	err = service.UpdateProfilePicture(t.Context(), created.ID, []byte("definitely not an image"))
+	assert.ErrorIs(t, err, ErrUnsupportedPicture)
+
+	// The WAV file shares the RIFF form with WebP; the format field tells
+	// them apart.
+	wav := append([]byte("RIFF"), make([]byte, 8)...)
+	copy(wav[8:], "WAVE")
+	err = service.UpdateProfilePicture(t.Context(), created.ID, wav)
+	assert.ErrorIs(t, err, ErrUnsupportedPicture)
+}
+
+// TestPictureResetFallsBackToTheDefault clears the row and removes the file,
+// so the read answers the bundled default the frontend ships.
+func TestPictureResetFallsBackToTheDefault(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, pictures := testPictureService(t, pool)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
+	picture := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 1, 2}
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, picture))
+
+	// The read before the reset answers the stored bytes.
+	body, _, readErr := service.readPicture(t.Context(), created.ID)
+	require.NoError(t, readErr)
+	body.Close()
+
+	require.NoError(t, service.ResetProfilePicture(t.Context(), created.ID))
+
+	var pictureFileID *string
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("picture_file_id")
+	sb.From(entity.TableUsers)
+	sb.Where(sb.Equal("id", rowID(t, created.ID)))
+	query, args := sb.Build()
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&pictureFileID))
+	assert.Nil(t, pictureFileID)
+
+	// The file left the engine: no read answers the key anymore.
+	_, err = pictures.Open(t.Context(), "devbucket", "pictures/"+rowID(t, created.ID)+".png")
+	assert.ErrorIs(t, err, fstorage.ErrNotFound)
+
+	view, err := service.ProfilePicture(t.Context(), created.ID)
+	require.NoError(t, err)
+	defer view.Body.Close()
+	assert.True(t, view.Default)
+	empty, err := io.ReadAll(view.Body)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+
+	// The file left the engine: the sync the update ran holds no copy the
+	// reset forgot.
+	assert.True(t, view.Default, "the read after the reset answers the default")
+}
+
+// TestPictureReadFallsBackWhenTheBytesAreGone covers the manifest that
+// outlives its object — a deployment that switched storage drivers, a bucket
+// emptied underneath the engine. The account has no readable picture, so the
+// read answers the bundled default; a 500 would tell the client its request
+// was wrong when the request was fine.
+func TestPictureReadFallsBackWhenTheBytesAreGone(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	// The backend's root is the test's own, so the object can be taken away
+	// from underneath the engine — the state another driver's tree leaves.
+	root := t.TempDir()
+	if _, seedErr := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		t.Fatal(seedErr)
 	}
+	manager := fstorage.NewManager(fstorage.NewFS(root), pool,
+		t.TempDir(), slog.New(slog.DiscardHandler))
+	service := NewService(pool, nil, nil, manager)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
 
-	for _, tc := range cases {
-		user, err := svc.Create(t.Context(), tc.params)
-		require.NoError(t, err, tc.name)
-		assert.Equal(t, tc.want, user.DisplayName, tc.name)
+	picture := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 4, 4, 4}
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, picture))
+
+	// The object leaves the backend while the manifest row stays: exactly
+	// the state another driver's tree produces. The file lives under the
+	// uploads container, `uploads/{bucket}/{key}`.
+	key := storedPictureKey(t, pool, created.ID)
+	require.NoError(t, os.Remove(filepath.Join(root, "uploads", filepath.FromSlash(key))))
+	var bucketID string
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT id FROM storage_buckets WHERE name = 'devbucket'`).Scan(&bucketID))
+	_, err = fstorage.NewManifests().Load(t.Context(), pool, bucketID, "pictures/"+rowID(t, created.ID)+".png")
+	require.NoError(t, err, "the manifest row outlives the object")
+
+	view, err := service.ProfilePicture(t.Context(), created.ID)
+	require.NoError(t, err)
+	defer view.Body.Close()
+	assert.True(t, view.Default, "an account whose bytes are gone reads as one without a picture")
+	empty, err := io.ReadAll(view.Body)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+}
+
+// TestPictureRefusesAnUnknownAccount keeps the not-found boundary on every
+// picture procedure.
+func TestPictureRefusesAnUnknownAccount(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, _ := testPictureService(t, pool)
+
+	id := "00000000-0000-0000-0000-000000000000"
+	err := service.UpdateProfilePicture(t.Context(), id, []byte("x"))
+	assert.ErrorIs(t, err, ErrUserNotFound)
+	err = service.ResetProfilePicture(t.Context(), id)
+	assert.ErrorIs(t, err, ErrUserNotFound)
+	_, err = service.ProfilePicture(t.Context(), id)
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+// TestThePictureFlowLandsOnS3 runs the same update through the S3-compatible
+// backend — the local driver's twin — and reads the bytes back through the
+// engine, so the picture procedures are indifferent to the store they are
+// given. The picture feature writes into the engine's default bucket, so
+// the physical bucket the container gets is that row's own name.
+func TestThePictureFlowLandsOnS3(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	backend := conttest.StartMinIO(t.Context(), t)
+	store, err := fstorage.NewS3(fstorage.S3Options{
+		AccessKey:      backend.AccessKey,
+		SecretKey:      backend.Secret,
+		EndpointURL:    backend.Endpoint,
+		ForcePathStyle: true,
+		Region:         "us-east-1",
+	})
+	require.NoError(t, err)
+	if _, seedErr := pool.Exec(t.Context(),
+		`INSERT INTO storage_buckets (name) VALUES ('devbucket') ON CONFLICT (name) DO NOTHING`); seedErr != nil {
+		t.Fatal(seedErr)
 	}
-}
+	manager := fstorage.NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
+	require.NoError(t, manager.EnsureBucket(t.Context(), "devbucket"))
+	service := NewService(pool, nil, nil, manager)
 
-func TestStoreListNewestFirst(t *testing.T) {
-	store := newTestStore(t)
-	stamp := uniqueStamp()
-
-	first, err := store.Create(t.Context(), CreateParams{
-		Username: "list1_" + stamp, Email: "list1-" + stamp + "@example.com",
-	})
-	require.NoError(t, err)
-	second, err := store.Create(t.Context(), CreateParams{
-		Username: "list2_" + stamp, Email: "list2-" + stamp + "@example.com",
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
 	})
 	require.NoError(t, err)
 
-	users, _, err := store.List(t.Context(), ListParams{Page: Page{Page: 1, Limit: 25}})
+	picture := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 9, 8, 7}
+	require.NoError(t, service.UpdateProfilePicture(t.Context(), created.ID, picture))
+
+	// The read streams the file the backend holds — the same flow the
+	// local driver answers, no S3-specific branch anywhere in the feature.
+	view, mime, err := service.readPicture(t.Context(), created.ID)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(users), 2)
-	// The two just-created users are the newest; newest first.
-	assert.Equal(t, second.ID, users[0].ID)
-	assert.Equal(t, first.ID, users[1].ID)
+	defer view.Close()
+	assert.Equal(t, "image/png", mime)
+	read, err := io.ReadAll(view)
+	require.NoError(t, err)
+	assert.Equal(t, picture, read)
+
+	// The bucket holds the final file at the key — the same tree the local
+	// driver keeps — and nothing else: no chunk-shaped object ever lands
+	// beside it. The object key carries no prefix: the bucket is the
+	// namespace the row names.
+	listed, err := storeList(t.Context(), backend, "devbucket", "")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pictures/" + rowID(t, created.ID) + ".png"}, listed)
+
+	// The object carries the feature's content type: a direct read of the
+	// bucket — a presigned URL, a console preview — answers what the
+	// bytes are without consulting the manifest.
+	headed, err := storeHead(t.Context(), backend, "devbucket", "pictures/"+rowID(t, created.ID)+".png")
+	require.NoError(t, err)
+	assert.Equal(t, "image/png", awssdk.ToString(headed.ContentType))
+
+	// The reset removes the object the backend holds, so the account falls
+	// back to the bundled default the same way it does on the local driver.
+	require.NoError(t, service.ResetProfilePicture(t.Context(), created.ID))
+	fallback, err := service.ProfilePicture(t.Context(), created.ID)
+	require.NoError(t, err)
+	defer fallback.Body.Close()
+	assert.True(t, fallback.Default)
+
+	// The reset emptied the bucket: the object left with the account's
+	// key, the same state a local reset lands in.
+	listed, err = storeList(t.Context(), backend, "devbucket", "")
+	require.NoError(t, err)
+	assert.Empty(t, listed)
 }
 
-// testRecorder captures audit events in place of the auditlog sink.
-type testRecorder struct {
-	events *[]identity.AuditEvent
+// storeList lists one physical bucket through the raw S3 client, the view
+// the engine's driver answers to.
+func storeList(ctx context.Context, backend *conttest.MinIO, bucket, prefix string) ([]string, error) {
+	client, err := backend.Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	listed, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: awssdk.String(bucket),
+		Prefix: awssdk.String(prefix),
+	})
+	if err != nil {
+		return nil, err
+	}
+	keys := []string{}
+	for _, item := range listed.Contents {
+		keys = append(keys, awssdk.ToString(item.Key))
+	}
+	return keys, nil
 }
 
-func (r testRecorder) Record(_ context.Context, e identity.AuditEvent, _ datastore.Executor) {
-	*r.events = append(*r.events, e)
+// storeHead reads one object's headers through the raw S3 client.
+func storeHead(ctx context.Context, backend *conttest.MinIO, bucket, key string) (*s3.HeadObjectOutput, error) {
+	client, err := backend.Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: awssdk.String(bucket),
+		Key:    awssdk.String(key),
+	})
+}
+
+// TestPictureProceduresRefuseARunWithoutTheEngine covers the deployment that
+// serves accounts without picture storage: the account procedures answer as
+// usual, the picture procedures refuse.
+func TestPictureProceduresRefuseARunWithoutTheEngine(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "hermione", Email: "hermione@example.com", Password: "expecto-patronum",
+		FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
+
+	err = service.UpdateProfilePicture(t.Context(), created.ID, []byte("x"))
+	assert.ErrorIs(t, err, ErrPicturesUnavailable)
+	err = service.ResetProfilePicture(t.Context(), created.ID)
+	assert.ErrorIs(t, err, ErrPicturesUnavailable)
+}
+
+// recordingEnder is the session ender a test observes: it counts the calls
+// and ends nothing, because the ban's transaction is the thing under test.
+type recordingEnder struct {
+	calls []uuid.UUID
+}
+
+func (r *recordingEnder) RevokeAllForUser(_ context.Context, _ datastore.Querier, userID uuid.UUID) (int, error) {
+	r.calls = append(r.calls, userID)
+	return 2, nil
+}
+
+// silentNotifier records the notices a ban and its lift queue.
+type silentNotifier struct {
+	banned, unbanned int
+}
+
+func (s *silentNotifier) UserBanned(_ context.Context, _ string, _ UserView, _ *time.Time) {
+	s.banned++
+}
+
+func (s *silentNotifier) UserUnbanned(_ context.Context, _ string, _ UserView) {
+	s.unbanned++
+}
+
+func TestBanUserAppliesTheTermAndEndsTheSessions(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.now = func() time.Time { return time.Unix(2000000000, 0) }
+
+	ender := &recordingEnder{}
+	notifier := &silentNotifier{}
+	service.sessions = ender
+	service.notify = notifier
+
+	created, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Sophie", LastName: "Neveu", Username: "sophie", Email: "sophie@example.com"})
+	require.NoError(t, err)
+
+	expires := service.now().Add(24 * time.Hour)
+	outcome, err := service.BanUser(t.Context(), created.ID, BanParams{
+		Reason:    "unruly behaviour",
+		ExpiresAt: &expires,
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, outcome.User.BannedAt)
+	assert.Equal(t, service.now(), *outcome.User.BannedAt)
+	require.NotNil(t, outcome.User.BanExpires)
+	assert.Equal(t, expires, *outcome.User.BanExpires)
+	require.NotNil(t, outcome.User.BanReason)
+	assert.Equal(t, "unruly behaviour", *outcome.User.BanReason)
+	assert.Equal(t, 2, outcome.EndedSessions)
+	assert.Equal(t, 1, len(ender.calls), "the ban ended the account's live sessions")
+
+	// A re-ban replaces the terms and keeps the start instant: the field
+	// answers "since when", so applying a new expiry does not move it.
+	later := service.now().Add(48 * time.Hour)
+	rebanned, err := service.BanUser(t.Context(), created.ID, BanParams{
+		Reason:    "still unruly",
+		ExpiresAt: &later,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, service.now(), *rebanned.User.BannedAt)
+	assert.Equal(t, "still unruly", *rebanned.User.BanReason)
+	assert.Equal(t, 2, notifier.banned, "the re-ban queued its notice too")
+	assert.Equal(t, 2, len(ender.calls), "the re-ban ended the live sessions again")
+}
+
+func TestBanUserRefusesAPastExpiryAndAnUnknownTarget(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	past := service.now().Add(-time.Hour)
+	_, err := service.BanUser(t.Context(), "user_01a0da1ccb4177900000000000", BanParams{
+		Reason:    "anything",
+		ExpiresAt: &past,
+	})
+	assert.ErrorIs(t, err, ErrBanInPast)
+
+	_, err = service.BanUser(t.Context(), "user_01a0da1ccb4177900000000000", BanParams{
+		Reason: "anything",
+	})
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+func TestUnbanUserLiftsTheBanAsAUnitAndAnswersTheQuiet(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	service.now = func() time.Time { return time.Unix(2000000000, 0) }
+
+	notifier := &silentNotifier{}
+	service.notify = notifier
+
+	created, err := service.CreateUser(t.Context(), CreateParams{FirstName: "Vittoria", LastName: "Vetra", Username: "vittoria", Email: "vittoria@example.com"})
+	require.NoError(t, err)
+
+	_, err = service.BanUser(t.Context(), created.ID, BanParams{Reason: "cooling off"})
+	require.NoError(t, err)
+
+	lifted, err := service.UnbanUser(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Nil(t, lifted.User.BannedAt)
+	assert.Nil(t, lifted.User.BanExpires)
+	assert.Nil(t, lifted.User.BanReason)
+	assert.Equal(t, 1, notifier.unbanned)
+
+	// An account that is not banned is the same success: the state the
+	// caller asked for is the state the row is in.
+	again, err := service.UnbanUser(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Nil(t, again.User.BannedAt)
+	assert.Equal(t, 2, notifier.unbanned)
+}
+
+// stubUserSettings answers the self-service gates' catalog keys.
+type stubUserSettings map[string]bool
+
+func (s stubUserSettings) GetBool(_ context.Context, key string) (bool, error) {
+	value, ok := s[key]
+	if !ok {
+		return false, errors.New("unreadable setting")
+	}
+	return value, nil
+}
+
+func TestUpdateCurrentUserChangesTheUsernameBehindTheToggle(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	ctx := t.Context()
+
+	created, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:  "robert_langdon",
+		Email:     "robert.langdon@digital.fortress",
+		FirstName: "Robert",
+		LastName:  "Langdon",
+	})
+	require.NoError(t, err)
+
+	// The toggle off: a present username is the not-found-shaped refusal,
+	// and the row keeps its handle.
+	gated := testService(t, pool).WithSettings(stubUserSettings{
+		SettingChangeUsernameEnabled: false,
+	})
+	_, err = gated.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert_langdon_ii",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	// The toggle on: the change lands, the pattern holds, and the record
+	// names the rename.
+	open := testService(t, pool).WithSettings(stubUserSettings{
+		SettingChangeUsernameEnabled: true,
+	})
+	_, err = open.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert langdon",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	assert.ErrorIs(t, err, ErrUsernameInvalid)
+
+	renamed, err := open.UpdateCurrentUser(ctx, created.ID, ProfileParams{
+		Username:    "robert_langdon_ii",
+		FirstName:   "Robert",
+		LastName:    "Langdon",
+		DisplayName: "Robert Langdon",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "robert_langdon_ii", renamed.Username)
+
+	// A taken handle is the column's unique index: the same refusal the
+	// duplicate sign-up earns.
+	other, err := open.CreateUser(ctx, CreateParams{
+		Username:  "sophie_neveu",
+		Email:     "sophie.neveu@digital.fortress",
+		FirstName: "Sophie",
+		LastName:  "Neveu",
+	})
+	require.NoError(t, err)
+	_, err = open.UpdateCurrentUser(ctx, other.ID, ProfileParams{
+		Username:    "ROBERT_LANGDON_II",
+		FirstName:   "Sophie",
+		LastName:    "Neveu",
+		DisplayName: "Sophie Neveu",
+	})
+	assert.ErrorIs(t, err, ErrAccountExists)
+}
+
+func TestDeleteMyAccountFollowsTheGateAndTheOverride(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	ctx := t.Context()
+
+	// The gate off and no override: the refusal is not-found-shaped, and
+	// the account keeps its row.
+	created, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:  "vittoria_vetra",
+		Email:     "vittoria.vetra@inferno.falls",
+		FirstName: "Vittoria",
+		LastName:  "Vetra",
+		Password:  "Expecto-Patronum-9",
+	})
+	require.NoError(t, err)
+
+	gated := testService(t, pool).WithSettings(stubUserSettings{
+		SettingSelfDeleteEnabled: false,
+	})
+	assert.ErrorIs(t, gated.DeleteMyAccount(ctx, created.ID), ErrUserNotFound)
+
+	// The gate on: the row is really gone — the soft-delete trigger holds
+	// its capture — and the dependent rows die by their own table rules.
+	open := testService(t, pool).WithSettings(stubUserSettings{
+		SettingSelfDeleteEnabled: true,
+	})
+	require.NoError(t, open.DeleteMyAccount(ctx, created.ID))
+
+	var accounts int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM public.users WHERE id = $1`, IDToUUID(mustID(t, created.ID))).Scan(&accounts))
+	assert.Equal(t, 0, accounts)
+
+	var captures int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM public.deleted_records WHERE source_table = 'users' AND object_id = $1::text`,
+		IDToUUID(mustID(t, created.ID))).Scan(&captures))
+	assert.Equal(t, 1, captures, "the archive names the account the delete removed")
+
+	var credentials int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM public.user_passwords WHERE user_id = $1`,
+		IDToUUID(mustID(t, created.ID))).Scan(&credentials))
+	assert.Equal(t, 0, credentials)
+
+	// The gate on but the account's override false: refused. The override
+	// true under the gate off: admitted — the column answers for itself.
+	overrideDenied, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:    "sophie_neveu",
+		Email:       "sophie.neveu@inferno.falls",
+		DisplayName: "Sophie Neveu",
+	})
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `UPDATE public.users SET self_delete_override = FALSE WHERE id = $1`, IDToUUID(mustID(t, overrideDenied.ID)))
+	require.NoError(t, err)
+	assert.ErrorIs(t, open.DeleteMyAccount(ctx, overrideDenied.ID), ErrUserNotFound)
+
+	overrideAllowed, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username:    "hermione_granger",
+		Email:       "hermione.granger@hogwarts.edu",
+		DisplayName: "Hermione Granger",
+	})
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `UPDATE public.users SET self_delete_override = TRUE WHERE id = $1`, IDToUUID(mustID(t, overrideAllowed.ID)))
+	require.NoError(t, err)
+	assert.NoError(t, gated.DeleteMyAccount(ctx, overrideAllowed.ID))
 }

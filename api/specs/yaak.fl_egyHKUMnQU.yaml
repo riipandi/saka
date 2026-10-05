@@ -1,0 +1,35 @@
+type: folder
+model: folder
+id: fl_egyHKUMnQU
+createdAt: 2026-09-26T19:15:03.999549
+updatedAt: 2026-09-26T19:52:04.577955
+workspaceId: wk_kBiMYTkhPP
+folderId: null
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+description: ''
+headers: []
+name: Multi-factor
+sortPriority: 15333.333333333334
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingRequestMessageSize:
+  enabled: false
+  value: 67108864
+settingHttpVersion:
+  enabled: false
+  value: auto

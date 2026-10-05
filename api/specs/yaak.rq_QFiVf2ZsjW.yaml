@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_QFiVf2ZsjW
+createdAt: 2026-09-28T22:24:37.970590
+updatedAt: 2026-09-28T22:24:37.970591
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/x-www-form-urlencoded
+  form:
+  - enabled: true
+    name: grant_type
+    value: urn:ietf:params:oauth:grant-type:device_code
+  - enabled: true
+    name: device_code
+    value: REPLACE_DEVICE_CODE
+  - enabled: true
+    name: client_id
+    value: REPLACE_CLIENT_ID
+bodyType: application/x-www-form-urlencoded
+description: |-
+  The device polls the token endpoint with its device code; `authorization_pending` until the human approves, the token pair once they do. The code is single-use.
+
+  Endpoint: `POST /oidc/token`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: null
+method: POST
+name: '[Saka] Poll device code for token'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/token
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

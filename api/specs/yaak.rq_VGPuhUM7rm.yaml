@@ -1,0 +1,60 @@
+type: http_request
+model: http_request
+id: rq_VGPuhUM7rm
+createdAt: 2026-09-26T15:48:10.454731
+updatedAt: 2026-09-26T15:52:56.045867
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_iMD6Wv2JMZ
+authentication:
+  prefix: Bearer
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: |-
+    {
+      "id": "${[ userId ]}"
+    }
+bodyType: application/json
+description: |-
+  Retrieve all groups a specific user belongs to.
+
+  Ported from Pocket ID `GET /api/users/{id}/groups`. Saka's UserGroupService answers group CRUD and member assignment per group (`SetUserGroupMembers`), but no per-user read yet. Placeholder until the procedure ships.
+
+  Parameters:
+  - id (path, required): User ID
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Get user groups'
+sortPriority: 5055.555555555556
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.UserGroupService/GetUserGroups
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

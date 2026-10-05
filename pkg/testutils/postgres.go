@@ -50,7 +50,7 @@ func StartPostgres(ctx context.Context, t testing.TB) *Postgres {
 // on Docker Desktop proxies (macOS/Windows).
 func startPostgres(ctx context.Context) (*Postgres, error) {
 	container, err := tcpg.Run(ctx, postgresImage,
-		tcpg.WithDatabase("tango_test"),
+		tcpg.WithDatabase("saka_test"),
 		tcpg.WithUsername("postgres"),
 		tcpg.WithPassword("postgres"),
 		tcpg.BasicWaitStrategies(),
@@ -89,7 +89,7 @@ func (p *Postgres) CopyFileFromContainer(ctx context.Context, containerPath, hos
 	if err != nil {
 		return fmt.Errorf("copy file from container: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	err = os.MkdirAll(filepath.Dir(hostPath), 0o755)
 	if err != nil {
@@ -100,7 +100,7 @@ func (p *Postgres) CopyFileFromContainer(ctx context.Context, containerPath, hos
 	if err != nil {
 		return fmt.Errorf("create host file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := io.Copy(f, reader); err != nil {
 		return fmt.Errorf("write host file: %w", err)

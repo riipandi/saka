@@ -2,19 +2,30 @@ type: http_request
 model: http_request
 id: rq_24pawEzUmb
 createdAt: 2026-09-14T09:48:01.887234
-updatedAt: 2026-09-18T10:07:44.319130
+updatedAt: 2026-09-28T10:16:43.785662
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_tw8Gigobcd
-authentication: {}
-authenticationType: null
+authentication:
+  disabled: false
+  token: ${[ accessToken ]}
+authenticationType: bearer
 body: {}
 bodyType: null
-description: Get the settings the unauthenticated SPA may see — public keys only, env defaults folded with admin overrides
-headers: []
+description: |-
+  Answers the deployment resolved configuration, the JSON file view of the world.
+
+  Saka endpoint GET /api/configuration (replaces Pocket ID GET /api/application-configuration and /all - one endpoint, scope follows the caller).
+
+  Anonymous or non-admin token: the public subset (app mode, base URL, sign-in and announcement toggles). Administrator token: every non-secret setting. Secrets are absent by construction.
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: XgYJZSktgb
 method: GET
-name: List public application configurations
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/api/application-configuration
+name: '[Saka] Get app configuration'
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/api/configuration
 urlParameters: []
 settingSendCookies:
   enabled: false

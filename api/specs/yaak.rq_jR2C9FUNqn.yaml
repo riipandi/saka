@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_jR2C9FUNqn
+createdAt: 2026-09-26T12:07:10.119139
+updatedAt: 2026-09-26T12:07:10.119146
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_YFXTtzfvhT
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  End every live session of the account, the one the access token names included. The access token itself keeps working until its own expiry — the statelessness the protocol settles — so a client that means to discard its credential should drop the token pair too. Saka-only.
+
+  Parameters: none (the account is the claims' sub).
+headers:
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: '[Saka] Sign out all sessions'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/SignOutAllSessions
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

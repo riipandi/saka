@@ -2,7 +2,7 @@ type: folder
 model: folder
 id: fl_R5pypBKj8u
 createdAt: 2026-09-13T16:07:30.592905
-updatedAt: 2026-09-19T15:35:41.786509
+updatedAt: 2026-09-25T19:25:50.840289
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication:
@@ -11,7 +11,7 @@ authenticationType: bearer
 description: 'Upstream tag: Device Login — pairing flow (create request, verification inspect/decision, long-poll exchange)'
 headers: []
 name: Device Login
-sortPriority: 17000.0
+sortPriority: 6000.0
 settingSendCookies:
   enabled: false
   value: true

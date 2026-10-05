@@ -1,0 +1,62 @@
+type: http_request
+model: http_request
+id: rq_NzPVg4uqqp
+createdAt: 2026-09-25T10:33:42.091565
+updatedAt: 2026-09-26T18:47:27.386732
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: |-
+    {
+      "id": "${[ userId ]}"
+    }
+bodyType: application/json
+description: |-
+  Send a one-time access code to one account's address. The code never passes through the caller: it travels by email alone. Refused while `auth.one_time_access_email_as_admin_enabled` is off.
+
+  Mirror of Pocket ID `POST /api/users/{id}/one-time-access-email`, ported as the RPC procedure `saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`.
+
+  Body:
+  - id: the account's identifier (uuid)
+  - ttl_seconds: optional, 60..86400; unset means 900
+
+  The `id`/`user_id` field is the account's wire TypeID (`user_...`), not the row's UUID - the UUID never leaves the server.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Pocket ID] Request one-time access email (admin)'
+sortPriority: 21000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

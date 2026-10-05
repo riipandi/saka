@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_bgLz5oNdGm
+createdAt: 2026-09-28T20:45:57.272939
+updatedAt: 2026-10-05T17:46:12.188598
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: null
+body:
+  bodyType: application/json
+  text: |-
+    {
+      "scopes": [
+        "openid",
+        "profile"
+      ]
+    }
+bodyType: application/json
+description: |-
+  Completes the authorization interaction: approves the requested scopes (the browser session cookie or bearer token proves the account), parks the consent in the ledger, and answers the redirect with the code.
+
+  Endpoint: `POST /oidc/interactions/{id}/complete`
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: '[Saka] Approve authorization interaction'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID/complete
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

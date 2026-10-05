@@ -1,0 +1,39 @@
+type: http_request
+model: http_request
+id: rq_n4PiHj4cqQ
+createdAt: 2026-09-28T20:45:48.483671
+updatedAt: 2026-09-28T20:47:56.475328
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_5R2gfN3X4T
+authentication: {}
+authenticationType: none
+body: {}
+bodyType: null
+description: |-
+  Reads the authorization interaction the provider parked for the browser: the client's display facts, the requested scopes, and the account's previous consent. The SPA interaction page renders from this before completing.
+
+  Endpoint: `GET /oidc/interactions/{id}`
+headers: []
+method: GET
+name: '[Saka] Read authorization interaction'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/oidc/interactions/REPLACE_SESSION_ID
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

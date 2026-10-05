@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+x-common: &common
+  networks: ["intranet"]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "localhost:host-gateway"
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  shm_size: 512m # set shared memory limit
+  mem_limit: 1g # set memory limit
+  cpus: 2.0 # set CPUs limit
+  healthcheck:
+    start_period: 10s
+    interval: 1m30s
+    timeout: 10s
+    retries: 3
+
+services:
+  openobserve:
+    <<: *common
+    # @ref: https://openobserve.ai/docs/administration/configuration/environment-variables
+    # image: public.ecr.aws/zinclabs/openobserve:${OPENOBSERVE_VERSION:-v1.0.4-debug}
+    image: public.ecr.aws/zinclabs/openobserve-enterprise:${OPENOBSERVE_VERSION:-v0.40.32}
+    hostname: openobserve
+    ports: ['5080:5080']
+    environment:
+      ZO_DATA_DIR: '/data'
+      ZO_HTTP_ADDR: '0.0.0.0'
+      ZO_HTTP_PORT: 5080
+      ZO_LOCAL_MODE: true
+      ZO_LOCAL_MODE_STORAGE: disk
+      # Authorization: "Basic YWRtaW5AZXhhbXBsZS5jb206ZHVtbXk="
+      ZO_ROOT_USER_EMAIL: '${OPENOBSERVE_ROOT_EMAIL:-admin@example.com}'
+      ZO_ROOT_USER_PASSWORD: '${OPENOBSERVE_ROOT_PASSWORD:-@DMin123}'
+      ZO_ROOT_USER_TOKEN: '${OPENOBSERVE_ROOT_USER_TOKEN:-dummy}'
+      ZO_S3_ACCESS_KEY: 's3admin'
+      ZO_S3_BUCKET_NAME: 'otelbucket'
+      ZO_S3_BUCKET_PREFIX: 'openobserve/'
+      ZO_S3_PROVIDER: 'minio'
+      ZO_S3_REGION_NAME: 'auto'
+      ZO_S3_SECRET_KEY: 's3passw0rd'
+      ZO_S3_SERVER_URL: 'http://silo:9100'
+      ZO_TELEMETRY: false
+    volumes: ['../.storage/openobserve_data:/data:rw']
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:5080/healthz || exit 1']
+
+  otelcol:
+    <<: *common
+    image: docker.io/otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.162.0-amd64}
+    platform: linux/amd64
+    hostname: otelcol
+    ports: ['4318:4318']
+    volumes: ['./otel-collector.yaml:/etc/otelcol/config.yaml:ro']
+    environment:
+      # The Basic credential the exporter's Authorization header interpolates:
+      # ZO_ROOT_USER_EMAIL : ZO_ROOT_USER_PASSWORD, base64-encoded once — the
+      # same pair the metrics:* tasks and the UI log in with. Regenerate when
+      # either changes: printf '%s' 'admin@example.com:@DMin123' | base64
+      OPENOBSERVE_AUTH: '${OPENOBSERVE_AUTH:-YWRtaW5AZXhhbXBsZS5jb206QERNaW4xMjM=}'
+    command: ['--config', '/etc/otelcol/config.yaml']
+    #healthcheck:
+    #  test: ['CMD-SHELL', 'curl -sf http://localhost:13133/ || exit 1']
+    depends_on:
+      openobserve: { condition: service_healthy }
+      pgsql: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+
+networks:
+  intranet:
+    driver: bridge
+    enable_ipv6: false

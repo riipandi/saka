@@ -2,19 +2,40 @@ type: http_request
 model: http_request
 id: rq_P7f5Mp4zXS
 createdAt: 2026-09-19T12:31:58.358897
-updatedAt: 2026-09-19T14:58:10.676243
+updatedAt: 2026-09-28T14:56:44.121099
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "id": "REPLACE_CLIENT_ID",
-      "name": "REPLACE_CLIENT_NAME"
+      "id": "hogwarts-portal",
+      "name": "Hogwarts Portal",
+      "description": "The house points dashboard",
+      "callback_urls": ["https://portal.hogwarts.example/callback"],
+      "logout_callback_urls": ["https://portal.hogwarts.example/signed-out"],
+      "launch_url": "https://portal.hogwarts.example",
+      "is_public": false,
+      "pkce_enabled": true,
+      "requires_reauthentication": false,
+      "requires_pushed_authorization_requests": false,
+      "skip_consent": false,
+      "backchannel_logout_uri": "https://portal.hogwarts.example/backchannel-logout",
+      "backchannel_logout_session_required": true,
+      "access_token_duration_minutes": 60,
+      "refresh_token_duration_minutes": 43200
     }
 bodyType: application/json
-description: ''
+description: |-
+  Replaces a client's fields — the full replace, so a field the request leaves out falls back to empty. The secrets, the logo, and the group restriction are not fields of this call: each has its own procedure, because a rotation and an access change are happenings of their own.
+
+  Saka procedure saka.federation.v1.OidcClientService/UpdateClient. Guard: admin.
+
+  Parameters:
+  - id (body, required): the client to rewrite
+  - name (body, required): the display name
+  - callback_urls (body, required): the redirect URIs, at least one
 headers:
 - enabled: true
   name: Content-Type
@@ -25,10 +46,14 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Update OIDC client
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/UpdateClient
-urlParameters: []
+name: '[Pocket ID] Update OIDC client'
+sortPriority: 4000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/UpdateClient
+urlParameters:
+- enabled: true
+  name: id
+  value: REPLACE_ID
+  id: null
 settingSendCookies:
   enabled: false
   value: true

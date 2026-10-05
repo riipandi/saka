@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_GkWYC6Dvhi
+createdAt: 2026-09-26T19:47:06.117944
+updatedAt: 2026-09-26T19:57:52.812540
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "totp_id": "${[ response.body.path(request='rq_rMFy9xx22T', behavior='smart', ttl='0', result='first', join=', ', path='$.enrollments[0].totp_id') ]}",
+      "code": "${[ otp.generate(secret='${[ response.body.path(request=\'rq_TqXu366GwX\', behavior=\'smart\', ttl=\'0\', result=\'first\', join=\', \', path=\'$.secret\') ]}', inputFormat='Base32', type='totp', algorithm='SHA1', digits='6', period='30', window='1') ]}"
+    }
+bodyType: application/json
+description: |-
+  Removes one authenticator.
+
+  An unconfirmed row needs no proof — deleting a mistyped start is how the ceremony is thrown away. A removal that leaves the account holding another confirmed factor is free. **The last confirmed factor's removal requires `code`** — a code from the factor itself or a recovery code — and the recovery set dies with the factor it answers for.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: vjMUIwIgaH
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: pzAbYB8C88
+method: POST
+name: '[Saka] Delete TOTP enrollment'
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/DeleteTotpEnrollment
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

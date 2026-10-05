@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_c6YK8wRvwD
+createdAt: 2026-10-01T18:57:43.371091
+updatedAt: 2026-10-01T19:08:00.590663
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_znKwvJhRQz
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "scd_01m3wn191de3aby4bytbmqehc1"
+    }
+bodyType: application/json
+description: |-
+  Scheduler surface — enqueues a job's task immediately without advancing its schedule. An unknown name answers not_found.
+
+  Admin only. saka built-in; no Pocket ID counterpart.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Run a scheduled job now (scheduler)'
+sortPriority: 5456.79012345679
+url: ${[ apiBaseURL ]}/rpc/saka.system.v1.SchedulerService/RunNow
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

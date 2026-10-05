@@ -1,0 +1,53 @@
+type: http_request
+model: http_request
+id: rq_4AA73xACsZ
+createdAt: 2026-09-26T19:47:06.257638
+updatedAt: 2026-09-26T22:11:59.143608
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_egyHKUMnQU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "code": "${[ otp.generate(secret='${[ response.body.path(request=\'rq_rMFy9xx22T\', behavior=\'always\', ttl=\'0\', result=\'first\', join=\', \', path=\'$.enrollments[0].secret\') ]}', inputFormat='Base32', type='totp', algorithm='SHA1', digits='6', period='30', window='1') ]}"
+    }
+bodyType: application/json
+description: |-
+  Removes every authenticator and the recovery set — the way out when the account no longer wants the second factor.
+
+  `code` is the second-factor proof, and it is the point of the procedure: **a stolen session alone cannot switch the protection off**, which is the property the whole second factor exists for.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: kkFGbr9x4G
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: 5xi8gKaZsa
+method: POST
+name: '[Saka] Disable current user MFA'
+sortPriority: 4880.658436213992
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.MultifactorService/DisableMfa
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

@@ -2,32 +2,41 @@ type: http_request
 model: http_request
 id: rq_z7AXTcG7wN
 createdAt: 2026-09-13T16:08:36.116262
-updatedAt: 2026-09-18T10:25:08.371571
+updatedAt: 2026-09-28T22:37:28.100243
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_R5pypBKj8u
 authentication: {}
 authenticationType: null
-body: {}
+body:
+  bodyType: application/json
+  text: '{}'
 bodyType: null
-description: Wait for a device login decision and create a browser session after it has been approved — the polling device authenticates with the X-Device-Token header (or tango_device_login cookie) from create
+description: |-
+  Long-polls the pairing decision (25s window, 202 while pending) and answers the account view the session mints. The pairing cookie proves the creating browser.
+
+  Endpoint: `POST /api/device-login/requests/{id}/exchange`
 headers:
 - enabled: true
   name: X-Device-Token
   value: REPLACE_DEVICE_TOKEN
-  id: null
+  id: ReppGXuMpe
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: C05UhbX8cI
 method: POST
-name: Exchange device login request
-sortPriority: 1000.0
+name: '[Saka] Exchange device login request'
+sortPriority: 333.3333333333333
 url: ${[ apiBaseURL ]}/api/device-login/requests/:id/exchange
 urlParameters:
 - enabled: true
   name: :id
-  value: dummy
-  id: l83g0a99dx
+  value: ${[ response.body.path(request='rq_ykxJHjw3fT', behavior='smart', ttl='0', result='first', join=', ', path='$.id') ]}
+  id: path-placeholder:0
 - enabled: true
   name: ''
   value: ''
-  id: qWppdWPDXK
+  id: NczKu2iYv6
 settingSendCookies:
   enabled: false
   value: true

@@ -1,0 +1,271 @@
+package mailer
+
+import (
+	"context"
+	"io"
+	"io/fs"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"testing"
+	"testing/fstest"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"encoding/json/v2"
+
+	"github.com/riipandi/saka/pkg/testutils"
+)
+
+// startMailer points the configuration at the shared Mailpit container and
+// builds the mailer against it. The container requires a Docker daemon, so a run
+// without one skips rather than fails.
+func startMailer(t *testing.T) (*Service, *testutils.Mailpit) {
+	t.Helper()
+
+	server := testutils.StartMailpit(t.Context(), t)
+	opts := mailpitOptions(t, server)
+
+	client, err := New(opts, nil)
+	require.NoError(t, err)
+	templates, err := NewTemplatesFS(fixtureFS(), Sender{AppName: "Hogwarts", LogoURL: "https://cdn.example.com/logo.svg"})
+	require.NoError(t, err)
+	return NewService(client, templates), server
+}
+
+// mailpitHostPort splits the container's SMTP address into the two fields the
+// configuration takes.
+func mailpitHostPort(t *testing.T, server *testutils.Mailpit) (string, int) {
+	t.Helper()
+
+	host, portText, err := net.SplitHostPort(server.SMTPAddr)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	return host, port
+}
+
+// mailpitOptions is the option set that reaches the container.
+func mailpitOptions(t *testing.T, server *testutils.Mailpit) Options {
+	t.Helper()
+
+	host, port := mailpitHostPort(t, server)
+	return Options{
+		SMTPHost:     host,
+		SMTPPort:     port,
+		SMTPUsername: server.Username,
+		SMTPPassword: server.Password,
+		FromEmail:    "no-reply@hogwarts.test",
+		FromName:     "Hogwarts Express",
+	}
+}
+
+// fixtureFS is the template set the integration test renders with: a minimal
+// name/body pair in an fs.FS the test owns, so the engine is exercised without
+// this binary's embedded catalog.
+func fixtureFS() fs.FS {
+	return fstest.MapFS{
+		"email/test-email_html.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}<!DOCTYPE html><p>{{.AppName}}: hello {{.Data.Email}}</p>{{end}}`)},
+		"email/test-email_text.tmpl": &fstest.MapFile{Data: []byte(
+			`{{define "root"}}{{.AppName}}: hello {{.Data.Email}}{{end}}`)},
+	}
+}
+
+func TestSendDeliversATemplatedMessage(t *testing.T) {
+	// The whole path: render a template, build the MIME message, authenticate,
+	// and hand it to a real SMTP server.
+	service, server := startMailer(t)
+
+	recipient := "neveu@hogwarts.test"
+	subject := uniqueSubject("mailer smoke")
+	require.NoError(t, service.Send(t.Context(), Request{
+		To:       []string{recipient},
+		Subject:  subject,
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": recipient}},
+	}))
+
+	message := awaitMessage(t, server, subject)
+	assert.Equal(t, subject, message.Subject)
+	assert.Contains(t, message.Visible(), recipient)
+
+	// The HTML rendering is what the recipient sees, so the data has to arrive
+	// rendered and the sender identity has to be there.
+	detail := fetchMessage(t, server, message.ID)
+	assert.Contains(t, detail.HTML, recipient)
+	assert.Contains(t, detail.HTML, "Hogwarts")
+	assert.NotContains(t, detail.HTML, "{{")
+}
+
+func TestSendReachesBlindRecipientsWithoutShowingThem(t *testing.T) {
+	service, server := startMailer(t)
+
+	subject := uniqueSubject("mailer bcc")
+	require.NoError(t, service.Send(t.Context(), Request{
+		To:       []string{"primary@hogwarts.test"},
+		Bcc:      []string{"blind@hogwarts.test"},
+		Subject:  subject,
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": "primary@hogwarts.test"}},
+	}))
+
+	message := awaitMessage(t, server, subject)
+	assert.ElementsMatch(t, []string{"primary@hogwarts.test", "blind@hogwarts.test"}, message.Delivered(),
+		"a blind recipient is still delivered to")
+
+	// Mailpit parses the message the way a receiving client does, so the
+	// headers it reports are the headers that were sent.
+	assert.Equal(t, []string{"primary@hogwarts.test"}, message.Visible(),
+		"a blind recipient must not appear in the headers")
+
+	detail := fetchMessage(t, server, message.ID)
+	assert.NotContains(t, detail.Text, "blind@hogwarts.test",
+		"a blind recipient must not appear in the message")
+}
+
+func TestSendReportsRejectedCredentials(t *testing.T) {
+	// The class a caller matches has to survive the whole session, not just the
+	// classification function.
+	_, server := startMailer(t)
+
+	opts := mailpitOptions(t, server)
+	opts.SMTPPassword = "wrong-password"
+	client, err := New(opts, nil)
+	require.NoError(t, err)
+	templates, err := NewTemplatesFS(fixtureFS(), Sender{AppName: "Hogwarts", LogoURL: "https://cdn.example.com/logo.svg"})
+	require.NoError(t, err)
+
+	err = NewService(client, templates).Send(t.Context(), Request{
+		To:       []string{"neveu@hogwarts.test"},
+		Subject:  "should not arrive",
+		Template: "test-email",
+		View:     View{Data: map[string]any{"Email": "neveu@hogwarts.test"}},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrAuth)
+}
+
+func TestSendAllowsPlaintextCredentialsToALoopbackServer(t *testing.T) {
+	// The exemption that keeps a local development server usable without a
+	// certificate. Mailpit without TLS is reached over loopback, so no opt-in
+	// is needed.
+	server := testutils.StartMailpit(t.Context(), t)
+
+	host, port := mailpitHostPort(t, server)
+	opts := Options{SMTPHost: host, SMTPPort: port, SMTPUsername: server.Username, SMTPPassword: server.Password}
+
+	client, err := New(opts, nil)
+	require.NoError(t, err)
+
+	subject := uniqueSubject("mailer loopback plaintext")
+	require.NoError(t, client.Send(t.Context(), Message{
+		To:      []string{"neveu@hogwarts.test"},
+		Subject: subject,
+		Text:    "Hello",
+	}))
+	assert.NotEmpty(t, awaitMessage(t, server, subject))
+}
+
+// uniqueSubject makes a subject this run can be found by. The container is
+// shared with every other test in the binary, so a search names the subject
+// rather than looking for an empty mailbox.
+func uniqueSubject(prefix string) string {
+	return prefix + " " + strconv.FormatInt(time.Now().UnixNano(), 10)
+}
+
+// mailpitMessage is one message as Mailpit's search API reports it. To holds the
+// visible recipients and Bcc the blind ones, which is what makes the delivery of
+// a blind recipient checkable.
+type mailpitMessage struct {
+	ID      string `json:"ID"`
+	Subject string `json:"Subject"`
+	To      []struct {
+		Address string `json:"Address"`
+	} `json:"To"`
+	Bcc []struct {
+		Address string `json:"Address"`
+	} `json:"Bcc"`
+}
+
+// Delivered lists every address the message was delivered to.
+func (m mailpitMessage) Delivered() []string {
+	out := make([]string, 0, len(m.To)+len(m.Bcc))
+	for _, addr := range append(m.To, m.Bcc...) {
+		out = append(out, addr.Address)
+	}
+	return out
+}
+
+// Visible lists the recipients a reader sees in the headers.
+func (m mailpitMessage) Visible() []string {
+	out := make([]string, 0, len(m.To))
+	for _, addr := range m.To {
+		out = append(out, addr.Address)
+	}
+	return out
+}
+
+// mailpitDetail is one message's full body, which is where a rendered template
+// and a header can be checked together.
+type mailpitDetail struct {
+	HTML string `json:"HTML"`
+	Text string `json:"Text"`
+}
+
+// awaitMessage polls Mailpit until the message a run just sent appears.
+func awaitMessage(t *testing.T, server *testutils.Mailpit, subject string) mailpitMessage {
+	t.Helper()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if messages := searchMessages(t, server, subject); len(messages) > 0 {
+			return messages[0]
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("no message with subject %q arrived within the deadline", subject)
+	return mailpitMessage{}
+}
+
+// searchMessages asks Mailpit for the messages matching a subject.
+func searchMessages(t *testing.T, server *testutils.Mailpit, subject string) []mailpitMessage {
+	t.Helper()
+
+	query := url.Values{"query": {"subject:" + strconv.Quote(subject)}}
+	response := getJSON[struct {
+		Messages []mailpitMessage `json:"messages"`
+	}](t, server.APIURL+"/api/v1/search?"+query.Encode())
+	return response.Messages
+}
+
+// fetchMessage reads one message's body.
+func fetchMessage(t *testing.T, server *testutils.Mailpit, id string) mailpitDetail {
+	t.Helper()
+	return getJSON[mailpitDetail](t, server.APIURL+"/api/v1/message/"+id)
+}
+
+// getJSON reads one JSON document from the container's API.
+func getJSON[T any](t *testing.T, target string) T {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	require.NoError(t, err)
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var out T
+	require.NoError(t, json.Unmarshal(body, &out), "body: %s", strings.TrimSpace(string(body)))
+	return out
+}

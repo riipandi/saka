@@ -2,100 +2,69 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"connectrpc.com/authn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/riipandi/tango/internal/kernel"
+	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
-// next is a trivial terminal handler for middleware tests.
-func next(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-// TestRPCSessionAuthHeaderShapes pins that a malformed bearer header
-// answers the Connect unauthenticated error instead of falling back to
-// anything else: cookies stay token storage, never RPC authorization.
-func TestRPCSessionAuthHeaderShapes(t *testing.T) {
-	handler := RPCSessionAuth(stubAuth{})(http.HandlerFunc(next))
-
-	cases := []struct {
-		name   string
-		header string
-	}{
-		{"bare scheme", "Bearer"},
-		{"empty token", "Bearer "},
-		{"wrong scheme", "Basic dXNlcjpwYXNz"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/rpc/tango.identity.v1.UserService/ListUsers", nil)
-			req.Header.Set("Authorization", tc.header)
-			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
-
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-			assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
-			assert.JSONEq(t, `{"code":"unauthenticated","message":"bearer token required"}`, w.Body.String())
-		})
-	}
-}
-
-// stubAuth resolves any non-empty token to a fixed principal.
-type stubAuth struct{ err error }
-
-func (s stubAuth) ResolveAccess(_ context.Context, token string) (kernel.Principal, error) {
-	if s.err != nil || token == "" {
-		return kernel.Principal{}, errors.New("session: invalid or expired")
-	}
-	return kernel.Principal{SessionID: "sess_1", UserID: "user_1", IsAdmin: true}, nil
-}
-
-// TestRPCSessionAuth pins the bearer-only RPC authentication contract:
-// valid tokens attach the resolved principal to the request context;
-// missing tokens and failed resolution answer distinct Connect
-// unauthenticated messages; cookies never authenticate.
-func TestRPCSessionAuth(t *testing.T) {
-	var seen Principal
-	probe := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p, ok := PrincipalFromContext(r.Context()); ok {
-			seen = p
+// authStub answers the caller the request's token names, and refuses
+// everything else — the shape every real authenticator shares.
+func authStub(refuse bool) Authenticator {
+	return func(ctx context.Context, req *http.Request) (any, error) {
+		if refuse {
+			return nil, authn.Errorf("authentication required")
 		}
-		w.WriteHeader(http.StatusOK)
-	})
-	handler := RPCSessionAuth(stubAuth{})(probe)
+		return &jwtutils.Caller{UserID: "01a0", AccessClaims: jwtutils.AccessClaims{Username: "hermione"}}, nil
+	}
+}
 
-	req := httptest.NewRequest(http.MethodPost, "/rpc/x/Call", nil)
-	req.Header.Set("Authorization", "Bearer session-token")
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
+// TestRESTBearerProtectsByDefault keeps the rule the RPC surface's bearer
+// middleware encodes: a route is protected unless it is named public, and the
+// refusal is the REST envelope a REST caller reads.
+func TestRESTBearerProtectsByDefault(t *testing.T) {
+	for name, tc := range map[string]struct {
+		method string
+		path   string
+		refuse bool
+		code   int
+	}{
+		"public route":                          {http.MethodGet, "/api/users/01a0/profile-picture.png", false, http.StatusNoContent},
+		"public route, other verb is protected": {http.MethodPut, "/api/users/01a0/profile-picture.png", true, http.StatusUnauthorized},
+		"unlisted path":                         {http.MethodGet, "/api/users/01a0/picture.png", true, http.StatusUnauthorized},
+		"wildcard spans no more than one segment": {
+			http.MethodGet, "/api/users/01a0/extra/profile-picture.png", true, http.StatusUnauthorized,
+		},
+	} {
+		guarded := RESTBearer(authStub(tc.refuse), []guard.RestEntry{
+			{Method: http.MethodGet, Pattern: "/api/users/{id}/profile-picture.png", Rule: guard.Public},
+		})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		rec := httptest.NewRecorder()
+		guarded.ServeHTTP(rec, req)
+		require.Equal(t, tc.code, rec.Code, name)
+		if tc.code == http.StatusUnauthorized {
+			assert.Contains(t, rec.Body.String(), "authentication required", name)
+		}
+	}
+}
 
-	require.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "user_1", seen.UserID)
-
-	// Cookie fallback rejected even when present.
-	req = httptest.NewRequest(http.MethodPost, "/rpc/x/Call", nil)
-	req.AddCookie(&http.Cookie{Name: "tango.session", Value: "session-token"})
-	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "bearer token required")
-
-	// Failed resolution (expired, revoked, unknown) answers the
-	// enumeration-safe message.
-	handler = RPCSessionAuth(stubAuth{err: errors.New("session: invalid or expired")})(probe)
-	req = httptest.NewRequest(http.MethodPost, "/rpc/x/Call", nil)
-	req.Header.Set("Authorization", "Bearer anything")
-	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "invalid or expired token")
+// TestRESTBearerWithoutAnAuthenticator covers the test state: a nil
+// authenticator leaves the handler open, which is how a response-only test
+// reads it.
+func TestRESTBearerWithoutAnAuthenticator(t *testing.T) {
+	handler := RESTBearer(nil, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/anything", nil))
+	assert.Equal(t, http.StatusTeapot, rec.Code)
 }

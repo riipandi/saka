@@ -1,93 +1,65 @@
-// Package session manages sign-in sessions: issue (cookie-backed
-// opaque tokens), validate (sliding expiry), list, and revoke. The
-// sign-in endpoint lives here; credential checking is delegated to
-// a Verifier (the password feature) via consumer-side wiring.
 package session
 
 import (
-	"context"
-	"errors"
+	"net/netip"
 	"time"
 
+	"uuid"
+
 	"go.jetify.com/typeid"
-
-	"github.com/riipandi/tango/modules/identity/user"
 )
 
-// Typed IDs for the session tables: UUIDv7 suffix, snake_case prefix
-// matching the singular table name.
-type (
-	sessionPrefix struct{}
+// SessionPrefix is the TypeID prefix of a session's identifier. A session id
+// leaves the server in a token claim and an API response, so the reader of a
+// log line or a support ticket can tell what it names without a lookup.
+type SessionPrefix struct{}
 
-	SessionID = typeid.TypeID[sessionPrefix]
+// Prefix reports the TypeID prefix.
+func (SessionPrefix) Prefix() string { return "sess" }
 
-	authTokenPrefix struct{}
+// SessionID is the typed identifier of one row of entity.TableSessions.
+type SessionID = typeid.TypeID[SessionPrefix]
 
-	AuthTokenID = typeid.TypeID[authTokenPrefix]
+// ResourceSession is the resource type an audit record names when the change
+// is about a session. The record's user_id names the account the session
+// belongs to, and the session is named in resource_type and resource_id.
+const ResourceSession = "session"
 
-	refreshTokenPrefix struct{}
-
-	RefreshTokenID = typeid.TypeID[refreshTokenPrefix]
-)
-
-func (sessionPrefix) Prefix() string      { return "session" }
-func (authTokenPrefix) Prefix() string    { return "auth_token" }
-func (refreshTokenPrefix) Prefix() string { return "refresh_token" }
-
-// Session is one active sign-in. The ID is public (listed, revoked
-// by users); the token never leaves the service — only its SHA-256
-// hash is stored, and only the cookie carries it.
-type Session struct {
-	ID        string
-	UserID    user.UserID
-	Provider  string
-	TokenHash string
-
-	UserAgent   *string
-	DeviceName  *string
-	IPAddress   *string
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	RefreshedAt *time.Time
-	RevokedAt   *time.Time
-
-	// Remember records the duration requested at sign-in: a session
-	// issued with remember=false keeps the short lifetime across
-	// sliding refreshes and rotations.
-	Remember bool
-}
-
-// Meta carries request context captured at sign-in.
-type Meta struct {
-	UserAgent  string
-	DeviceName string
-	IPAddress  string
-	// Remember selects the long session lifetime; the zero value asks
-	// for the short one.
-	Remember bool
-}
-
-// Errors surfaced by stores and the service.
-var (
-	// ErrNotFound is returned when no session matches, including
-	// expired and revoked ones (they must be indistinguishable).
-	ErrNotFound = errors.New("session: not found")
-)
-
-// Store persists sessions. Validity (revoked/expired) is enforced
-// by every read.
-type Store interface {
-	Create(ctx context.Context, s *Session) error
-	ValidByTokenHash(ctx context.Context, tokenHash string) (Session, user.User, error)
-	// ValidByID resolves one live session with its user by session
-	// ID — the access-token check anchors on it.
-	ValidByID(ctx context.Context, id string) (Session, user.User, error)
-	Touch(ctx context.Context, id string, expiresAt time.Time) error
-	// Rotate replaces the session's refresh token hash and restarts
-	// its sliding expiry; the previous token stops resolving.
-	Rotate(ctx context.Context, id string, tokenHash string, expiresAt time.Time) error
-	RevokeByTokenHash(ctx context.Context, tokenHash string) error
-	RevokeForUser(ctx context.Context, userID user.UserID, sessionID string) error
-	RevokeAllForUser(ctx context.Context, userID user.UserID, exceptID string) error
-	ListActiveForUser(ctx context.Context, userID user.UserID) ([]Session, error)
+// SessionSchema is one row of entity.TableSessions. It lists only the columns the
+// application writes, so a migration can add a column with a default without
+// touching this struct. The db tags are the column names the query builder
+// uses.
+type SessionSchema struct {
+	ID        SessionID `db:"id"`
+	UserID    uuid.UUID `db:"user_id"`
+	Provider  string    `db:"provider"`
+	TokenHash string    `db:"token_hash"`
+	UserAgent string    `db:"user_agent"`
+	// DeviceFingerprint is the browser fingerprint the frontend computed,
+	// stored beside the session it identifies. The column has no default, so
+	// a caller that has none writes an empty string rather than NULL: the
+	// distinction carries no meaning here.
+	DeviceFingerprint string      `db:"device_fingerprint"`
+	IPAddress         *netip.Addr `db:"ip_address"`
+	Remember          bool        `db:"remember"`
+	CreatedAt         time.Time   `db:"created_at"`
+	ExpiresAt         time.Time   `db:"expires_at"`
+	// RefreshedAt is the last renewal's instant, nil while the refresh token
+	// was never spent.
+	RefreshedAt *time.Time `db:"refreshed_at"`
+	// RevokedAt is when the session ended, nil while it is live. The stamp
+	// is the soft revocation the lifecycle writes; the row survives it.
+	RevokedAt *time.Time `db:"revoked_at"`
+	// RevokedBy names the account that ended the session — its own holder,
+	// or nobody yet.
+	RevokedBy *uuid.UUID `db:"revoked_by"`
+	// ImpersonatedBy names the administrator a delegated session acts for —
+	// nil on every session a sign-in opened. The column is the durable fact
+	// a stop request checks the actor claims against, so a delegation is
+	// provable from the row and not from the token alone.
+	ImpersonatedBy *uuid.UUID `db:"impersonated_by"`
+	// RotatedTokenHash is the refresh hash the last rotation replaced. A
+	// lookup that lands on it is a replayed token, and the session it names
+	// is revoked as compromised rather than merely refused.
+	RotatedTokenHash string `db:"rotated_token_hash"`
 }

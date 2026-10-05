@@ -1,0 +1,246 @@
+package password
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"uuid"
+
+	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/internal/database/entity"
+	"github.com/riipandi/saka/modules/identity/restrictions"
+)
+
+// Repository reads and writes the reset token and the account state it
+// opens. Every method takes the query surface, so the service passes either
+// the pool or the transaction it runs in.
+type Repository struct{}
+
+// NewRepository builds the repository over the shared pool.
+func NewRepository() *Repository {
+	return &Repository{}
+}
+
+// Account is the slice of the users row the flow needs: who to greet, where
+// to send, and whether the credential is refused right now.
+type Account struct {
+	ID          uuid.UUID
+	Username    string
+	Email       string
+	DisplayName string
+	Disabled    bool
+	// RestrictionKind is the account's active ban — the account_restrictions
+	// join answers it. Empty, no ban stands.
+	Banned      string
+	PasswordSet bool
+}
+
+// BannedNow reports whether the account's active restriction is a ban —
+// the same judgement the sign-in issuer keeps.
+func (a Account) BannedNow() bool { return a.Banned == restrictions.KindBan }
+
+// FindUserByEmail reads the account an address names. The email is TEXT
+// matched exactly, the way its unique index does — the same match the
+// sign-in identity accepts.
+func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
+		"u.disabled", "coalesce(ar.kind, '') AS banned",
+		"p.password_hash IS NOT NULL",
+	)
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+	sb.Where(sb.Equal("u.email", email))
+
+	query, args := sb.Build()
+	var row Account
+	err := db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName,
+		&row.Disabled, &row.Banned, &row.PasswordSet,
+	)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return Account{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("password: find user by email: %w", err)
+	}
+	return row, nil
+}
+
+// FindUserByID reads the account the admin trigger names. The id is the
+// UUID the wire-form TypeID decodes to.
+func (r *Repository) FindUserByID(ctx context.Context, db datastore.Querier, userID uuid.UUID) (Account, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select(
+		"u.id", "coalesce(u.username, '') AS username", "u.email", "u.display_name",
+		"u.disabled", "coalesce(ar.kind, '') AS banned",
+		"p.password_hash IS NOT NULL",
+	)
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
+		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
+	sb.Where(sb.Equal("u.id", userID))
+
+	query, args := sb.Build()
+	var row Account
+	err := db.QueryRow(ctx, query, args...).Scan(
+		&row.ID, &row.Username, &row.Email, &row.DisplayName,
+		&row.Disabled, &row.Banned, &row.PasswordSet,
+	)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return Account{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("password: find user by id: %w", err)
+	}
+	return row, nil
+}
+
+// UpsertToken writes the reset token and answers nothing: the account
+// carries at most one row per purpose, so a re-request replaces the hash,
+// moves the window, and stamps the send time over the row it conflicts
+// with.
+func (r *Repository) UpsertToken(ctx context.Context, db datastore.Querier, userID uuid.UUID, tokenHash string, expiresAt, sentAt time.Time) error {
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(entity.TableAuthTokens)
+	ib.Cols("user_id", "token_hash", "purpose", "expires_at", "last_sent_at")
+	ib.Values(userID, tokenHash, PurposePasswordReset, expiresAt, sentAt)
+	// The conflict target carries the partial index's predicate: the unique
+	// index excludes reauthentication, so a bare column list matches nothing.
+	ib.SQL("ON CONFLICT (user_id, purpose) WHERE purpose <> 'reauthentication' DO UPDATE SET " +
+		"token_hash = EXCLUDED.token_hash, " +
+		"expires_at = EXCLUDED.expires_at, " +
+		"last_sent_at = EXCLUDED.last_sent_at")
+
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("password: upsert reset token: %w", err)
+	}
+	return nil
+}
+
+// FindTokenByHash reads the reset row a raw value hashes to. The raw value
+// is never stored: only the caller's hash reaches this query.
+func (r *Repository) FindTokenByHash(ctx context.Context, db datastore.Querier, tokenHash string) (ResetTokenSchema, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "user_id", "expires_at", "last_sent_at")
+	sb.From(entity.TableAuthTokens)
+	sb.Where(
+		sb.Equal("token_hash", tokenHash),
+		sb.Equal("purpose", PurposePasswordReset),
+	)
+
+	query, args := sb.Build()
+	var row ResetTokenSchema
+	err := db.QueryRow(ctx, query, args...).Scan(&row.ID, &row.UserID, &row.ExpiresAt, &row.LastSent)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return ResetTokenSchema{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return ResetTokenSchema{}, fmt.Errorf("password: find reset token: %w", err)
+	}
+	return row, nil
+}
+
+// FindTokenByUser reads the reset row an account carries, whatever value it
+// hashes. The resend cooldown reads the send time it stamps.
+func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) (ResetTokenSchema, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id", "user_id", "expires_at", "last_sent_at")
+	sb.From(entity.TableAuthTokens)
+	sb.Where(
+		sb.Equal("user_id", userID),
+		sb.Equal("purpose", PurposePasswordReset),
+	)
+
+	query, args := sb.Build()
+	var row ResetTokenSchema
+	err := db.QueryRow(ctx, query, args...).Scan(&row.ID, &row.UserID, &row.ExpiresAt, &row.LastSent)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return ResetTokenSchema{}, datastore.ErrNoRows
+	}
+	if err != nil {
+		return ResetTokenSchema{}, fmt.Errorf("password: find reset token by user: %w", err)
+	}
+	return row, nil
+}
+
+// DeleteToken consumes the reset row. The delete's WHERE carries the token
+// hash, so two resets racing on one token cannot both spend it: the second
+// answers false, and the password write it was about to make never happens.
+func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id uuid.UUID, hash string) (bool, error) {
+	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbl.DeleteFrom(entity.TableAuthTokens)
+	dbl.Where(dbl.Equal("id", id), dbl.Equal("token_hash", hash), dbl.Equal("purpose", PurposePasswordReset))
+
+	query, args := dbl.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("password: delete reset token: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// FindPasswordHash reads the account's current credential hash, or an
+// empty string when the account holds no password row. The same-password
+// refusal compares the new credential against it.
+func (r *Repository) FindPasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) (string, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("p.password_hash")
+	sb.From(entity.TableUsers + " AS u")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" AS p", "p.user_id = u.id")
+	sb.Where(sb.Equal("u.id", userID))
+
+	query, args := sb.Build()
+	var hash []byte
+	if err := db.QueryRow(ctx, query, args...).Scan(&hash); err != nil {
+		if errors.Is(err, datastore.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("password: find password hash: %w", err)
+	}
+	if hash == nil {
+		return "", nil
+	}
+	return string(hash), nil
+}
+
+// DeletePasswordHash removes the account's credential row. The removal is
+// the honest write: a row with an empty hash would read as "no password" to
+// FindPasswordHash while still counting the account into joins that expect
+// the row to mean something.
+func (r *Repository) DeletePasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	dbn := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbn.DeleteFrom(entity.TableUserPasswords)
+	dbn.Where(dbn.Equal("user_id", userID))
+	query, args := dbn.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("password: delete password hash: %w", err)
+	}
+	return nil
+}
+
+// SetPasswordHash writes the new credential. The row is upserted because a
+// reset may be the account's first password (a passkey-created account that
+// added one).
+func (r *Repository) SetPasswordHash(ctx context.Context, db datastore.Querier, userID uuid.UUID, hash string) error {
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(entity.TableUserPasswords)
+	ib.Cols("user_id", "password_hash")
+	ib.Values(userID, hash)
+	ib.SQL("ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash")
+
+	query, args := ib.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("password: set password hash: %w", err)
+	}
+	return nil
+}

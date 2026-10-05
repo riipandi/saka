@@ -1,0 +1,53 @@
+type: http_request
+model: http_request
+id: rq_Tj7oWnSZEf
+createdAt: 2026-09-30T21:05:00
+updatedAt: 2026-09-30T21:05:00
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_TMZFHpR4cU
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "password": ""
+    }
+bodyType: application/json
+description: |-
+  Proves the caller again — by password or by a passkey assertion over a ceremony BeginLogin answered — and answers a single-use reauthentication token. The token is hashed at rest and dies at its five-minute window; the next guarded call spends it through the X-Saka-Reauthentication header, and its replay answers unauthenticated.
+
+  The passkey form rides the oneof: {"passkey": {"session_id": "wcs_", "credential": "<assertion JSON>"}}.
+
+  Guard: Session.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Reauthenticate (step-up proof)'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.WebAuthnService/Reauthenticate
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

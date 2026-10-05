@@ -2,23 +2,41 @@ type: http_request
 model: http_request
 id: rq_yEfmnyDkq9
 createdAt: 2026-09-19T12:32:34.132102
-updatedAt: 2026-09-19T12:32:34.132102
+updatedAt: 2026-09-26T14:38:41.494676
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_R8Ld3NMbtT
+folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
+  bodyType: application/json
   form:
   - enabled: true
     name: token
     value: REPLACE_ACCESS_TOKEN
+  text: '{}'
 bodyType: application/x-www-form-urlencoded
-description: ''
-headers: []
+description: |-
+  Client-scoped RFC 7662 introspection: a client reads only the tokens minted to it; a stranger answers access_denied. Client authentication rides the Basic header or the form.
+
+  Endpoint: `POST /oidc/introspect`
+
+  Mirror of Pocket ID `POST /api/oidc/introspect`.
+
+  Parameters:
+  - token (formData, required): The token to be introspected.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
 method: POST
-name: Introspect OIDC tokens (RFC 7662)
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/api/oidc/introspect
+name: '[Pocket ID] Introspect OIDC tokens'
+sortPriority: 16000.0
+url: ${[ apiBaseURL ]}/oidc/introspect
 urlParameters: []
 settingSendCookies:
   enabled: false

@@ -1,27 +1,44 @@
-// Package onetimeaccess issues single-use sign-in tokens delivered
-// by email: admins mint them per user; unauthenticated users may
-// request one for their own address when the app policy allows.
-// Storage: auth_tokens (purpose = one_time_access, hash at rest)
-// via the shared token store.
 package onetimeaccess
 
 import (
-	"errors"
 	"time"
+
+	"uuid"
 )
 
-// Token lifetime and resend throttle.
-const (
-	// TokenTTL bounds one-time access tokens.
-	TokenTTL = 15 * time.Minute
-	// ResendThrottle bounds re-request frequency.
-	ResendThrottle = time.Minute
-)
+// The table the one-time access codes live in. The migrations own the schema;
+// these constants are how Go code names it, so a rename touches one line. The
+// table is shared with the email-verification feature, which names it for its
+// own purpose — the purpose column is what keeps the two apart, and the
+// unique index on (user_id, purpose) keeps an account to one code at a time:
+// a new code replaces the old, so no cleanup job ever has rows to sweep.
 
-// Errors surfaced to handlers.
-var (
-	// ErrNotFound covers unknown tokens/users without leaking which.
-	ErrNotFound = errors.New("onetimeaccess: token is invalid or expired")
-	// ErrThrottled rejects re-requests inside the resend window.
-	ErrThrottled = errors.New("onetimeaccess: request throttled")
-)
+// PurposeOneTimeAccess is the purpose value the rows this feature writes
+// carry.
+const PurposeOneTimeAccess = "one_time_access"
+
+// OneTimeToken is one row of the token table under the one-time purpose. The
+// raw code is never stored — the caller's hash is — and the device token is
+// the second half the email path pairs with it: the requester holds the one,
+// the mailbox holds the other, and the exchange demands both.
+type OneTimeToken struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	ExpiresAt   time.Time
+	DeviceToken *string
+	LastSentAt  *time.Time
+}
+
+// Account is the account view the exchange and the email sends read. The
+// exchange names the session's bearer and the issuer's state checks; the
+// email send names the address and the greeting.
+type Account struct {
+	ID          uuid.UUID
+	Username    string
+	Email       string
+	DisplayName string
+	Disabled    bool
+	// RestrictionKind is the account's active restriction — ban or lockout
+	// — the account_restrictions join answers.
+	RestrictionKind string
+}

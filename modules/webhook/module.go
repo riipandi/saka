@@ -1,41 +1,71 @@
+// Package webhook is the webhook area: the outbound event surface saka
+// carries and Pocket ID does not.
+//
+// It is an area of its own rather than a feature of identity because a
+// delivery endpoint is not an account fact — it is a destination the
+// deployment streams its events to, and the events it streams are the audit
+// catalog's. The area is saka-only, and the surface that manages the
+// endpoints is administrative all the way through.
+//
+// The emission seam rides the audit recorder: the recorder carries a sink
+// every written record is offered to, and this area's service is that sink,
+// wired after construction so internal/audit never learns this package
+// exists. The delivery engine is a queue task; its processor lives in
+// internal/jobs beside the other processors and resolves this service at
+// task-run time.
 package webhook
 
 import (
-	"context"
+	"log/slog"
+
+	"github.com/samber/do/v2"
+
+	fwaudit "github.com/riipandi/saka/framework/audit"
+	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/fetcher"
+	"github.com/riipandi/saka/framework/kernel"
+	"github.com/riipandi/saka/framework/queue"
+	"github.com/riipandi/saka/internal/config"
+	"github.com/riipandi/saka/pkg/crypto"
 )
 
-// ModuleName identifies the webhook module in the registry.
-const ModuleName = "webhook"
+// Package registers the service this area owns, and arms the audit
+// recorder's emission sink with it.
+//
+// The sink is wired inside the provider rather than beside it: the recorder
+// is an infrastructure service this area must not depend on to construct —
+// but the emission needs it, and a provider that resolved it directly would
+// order the two around each other. Resolving it here constructs it on the
+// way to this service, which is what the wiring intends.
+var Package = do.Package(
+	do.Lazy(func(i do.Injector) (*Service, error) {
+		pool := do.MustInvoke[*datastore.Postgres](i)
+		recorder := do.MustInvoke[*fwaudit.Recorder](i)
+		client := do.MustInvoke[*queue.Client](i)
+		fetch := do.MustInvoke[*fetcher.Client](i)
+		log := do.MustInvoke[*slog.Logger](i)
+		c := do.MustInvoke[*config.Config](i)
 
-// Module is the webhook feature: endpoint CRUD, delivery logs, and
-// the outbox event sink. The whole surface serves ConnectRPC
-// exclusively (see handler_rpc.go) — the composition root wraps the
-// mount with the admin guard.
-type Module struct {
-	service *Service
+		// The signing secrets are application material, not auth material: a
+		// rotation of AUTH_SECRET_KEY does not touch them, the way it does
+		// not touch the SCIM tokens or the appconfig values.
+		var cipher *crypto.Cipher
+		if c.App.SecretKey != "" {
+			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
+			if err != nil {
+				return nil, err
+			}
+			cipher = built
+		}
+
+		service := NewService(pool, recorder, client, fetch, cipher, log, c.Webhook.AllowPrivateNetwork)
+		recorder.WithSink(service)
+		return service, nil
+	}),
+)
+
+// Mount resolves what this area needs and builds the module the router
+// mounts. It is the other half of the seam the composition root uses.
+func Mount(i do.Injector) (kernel.Module, error) {
+	return NewModule(do.MustInvoke[*Service](i)), nil
 }
-
-// New builds the module on top of the service.
-func New(service *Service, _opts ...Option) *Module {
-	if service == nil {
-		panic("webhook: nil service")
-	}
-	return &Module{service: service}
-}
-
-// Option configures the webhook module at construction.
-type Option func(*Module)
-
-// Store exposes the persistence layer for the recurring log-pruning
-// job; the module itself never needs a wider surface.
-func (m *Module) Store() Store { return m.service.store }
-
-// Emit fans an application event out to its subscribers. It is the
-// event sink the composition root hands to other modules, so a domain
-// package never imports this one directly.
-func (m *Module) Emit(ctx context.Context, event string, payload map[string]any) error {
-	return m.service.Emit(ctx, event, payload)
-}
-
-// Name identifies the module.
-func (*Module) Name() string { return ModuleName }

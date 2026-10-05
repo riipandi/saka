@@ -1,0 +1,49 @@
+type: http_request
+model: http_request
+id: rq_F5ahYRmyn5
+createdAt: 2026-09-26T11:36:51.036551
+updatedAt: 2026-09-26T11:43:21.555374
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_YFXTtzfvhT
+authentication:
+  token: ${[ accessToken ]}
+authenticationType: bearer
+body:
+  text: '{}'
+bodyType: application/json
+description: |-
+  Answer the session the access token names and the account it belongs to — the "who am I" a client asks when it resumes. A session that has ended answers `unauthenticated`. Saka-only: upstream Pocket ID signs in with passkeys and carries no session lifecycle.
+
+  Parameters: none.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 4gjc7TDg36
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: DvQrw2wgND
+method: POST
+name: '[Saka] Get session'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/GetSession
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

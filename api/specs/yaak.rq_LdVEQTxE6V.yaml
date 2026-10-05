@@ -2,19 +2,41 @@ type: http_request
 model: http_request
 id: rq_LdVEQTxE6V
 createdAt: 2026-09-19T12:31:46.271298
-updatedAt: 2026-09-19T18:12:13.565479
+updatedAt: 2026-09-28T14:56:36.762532
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_WNyJqCXLvz
+folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "name": "${[ faker.company.name() ]}",
-      "callback_urls": ["${[ faker.internet.url() ]}/callback"]
+      "id": "hogwarts-portal",
+      "name": "Hogwarts Portal",
+      "description": "The house points dashboard",
+      "callback_urls": ["https://portal.hogwarts.example/callback"],
+      "logout_callback_urls": ["https://portal.hogwarts.example/signed-out"],
+      "launch_url": "https://portal.hogwarts.example",
+      "is_public": false,
+      "pkce_enabled": true,
+      "skip_consent": false,
+      "backchannel_logout_uri": "https://portal.hogwarts.example/backchannel-logout",
+      "backchannel_logout_session_required": true,
+      "access_token_duration_minutes": 60,
+      "refresh_token_duration_minutes": 43200,
+      "allowed_user_groups": ["${[ response.body.path(request='rq_0z8QsXN3S4', behavior='smart', ttl='0', result='first', join=', ', path='$.groups[0].id') ]}"]
     }
 bodyType: application/json
-description: Name and callback URL are generated per run with Faker, so repeated sends do not collide on the client name.
+description: |-
+  Defines a client and mints its first secret. The identifier is generated when absent — letters, digits, underscores, and hyphens only. The raw secret is shown exactly once; only its SHA-256 hash is stored. A public client forces the PKCE requirement on, and allowed_user_groups (the groups' wire identifiers) turns the group restriction on.
+
+  Saka procedure saka.federation.v1.OidcClientService/CreateClient. Guard: admin.
+
+  Parameters:
+  - id (body, optional): the client_id the relying party will present
+  - name (body, required): the display name a sign-in page shows
+  - callback_urls (body, required): the redirect URIs, at least one
+  - is_public (body, optional): a client that cannot keep a secret
+  - allowed_user_groups (body, optional): groups the restriction admits
 headers:
 - enabled: true
   name: Content-Type
@@ -25,9 +47,9 @@ headers:
   value: '1'
   id: null
 method: POST
-name: Create OIDC client
-sortPriority: 0.0
-url: ${[ apiBaseURL ]}/rpc/tango.federation.v1.OidcClientService/CreateClient
+name: '[Pocket ID] Create OIDC client'
+sortPriority: 1000.0
+url: ${[ apiBaseURL ]}/rpc/saka.federation.v1.OidcClientService/CreateClient
 urlParameters: []
 settingSendCookies:
   enabled: false

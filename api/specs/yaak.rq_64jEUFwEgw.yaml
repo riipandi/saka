@@ -1,0 +1,48 @@
+type: http_request
+model: http_request
+id: rq_64jEUFwEgw
+createdAt: 2026-09-25T19:19:46.512735
+updatedAt: 2026-09-26T17:20:21.978475
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_DW9SfXAyKe
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ prompt.text(label='TypeID', store='none', namespace='${[ctx.workspace()]}', ttl='0', placeholder='prefix_***') ]}"
+    }
+bodyType: application/json
+description: Debug-build only. Decodes a TypeID string into the prefix and UUID it carries. Refused with a 404 envelope by a release build.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: '[Saka] Decode Type ID'
+sortPriority: 0.0
+url: ${[ apiBaseURL ]}/debug/decode-id
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

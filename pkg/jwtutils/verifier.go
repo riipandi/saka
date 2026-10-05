@@ -18,6 +18,10 @@ var (
 	ErrReservedClaim = errors.New("jwtutils: private claim collides with a registered claim")
 	// ErrWeakHMACKey reports an HMAC key shorter than the algorithm minimum.
 	ErrWeakHMACKey = errors.New("jwtutils: HMAC key too short")
+	// ErrMissingSubject reports a verified token that names no account. A
+	// caller without a subject cannot be compared against an identifier, so
+	// it is refused at the door rather than handed on as an empty identity.
+	ErrMissingSubject = errors.New("jwtutils: token subject is required")
 )
 
 // Verifier checks JWTs and decodes their typed private claims.

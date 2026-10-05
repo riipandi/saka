@@ -2,616 +2,262 @@ package oidc
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
-	"net/http"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
-	commonv1 "github.com/riipandi/tango/codegen/proto/go/tango/common/v1"
-	federationv1 "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1"
-	federationv1connect "github.com/riipandi/tango/codegen/proto/go/tango/federation/v1/federationv1connect"
-	"github.com/riipandi/tango/internal/rpcerr"
-	"github.com/riipandi/tango/internal/transport/middleware"
-	"github.com/riipandi/tango/pkg/responder"
-	"go.jetify.com/typeid"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
+	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
+	"github.com/riipandi/saka/framework/webutil"
 )
 
-// ScimBinding is the per-client SCIM provider projection the
-// GetScimProvider procedure serves; the scimsync feature owns the
-// data and adapts its store onto the lookup function.
-type ScimBinding struct {
-	ID           string
-	Endpoint     string
-	OIDCClientID string
-	LastSyncedAt *time.Time
-	CreatedAt    time.Time
-}
-
-// clientRPC adapts the client administration service to the generated
-// Connect contract. Every procedure is admin-only; the composition
-// root wraps the mount with the admin guard.
-type clientRPC struct {
+// rpcHandler is the transport mapping of the procedures. The service carries
+// the rules; this type carries the connect codes and the caller's identity.
+// The wire mapping — the views onto the generated messages, and the
+// service's failures onto the codes — lives in wire.go.
+type rpcHandler struct {
 	service *Service
 }
 
-// consentRPC adapts the consent surface: self-service listing and
-// revocation plus the admin-wide views — guarded per procedure.
-type consentRPC struct {
-	service *Service
+// newRPCHandler builds the handler over the service.
+func newRPCHandler(service *Service) federationv1connect.OidcClientServiceHandler {
+	return &rpcHandler{service: service}
 }
 
-// RPCService returns the client administration registration; the
-// composition root wraps it with the admin guard.
-func (f Feature) RPCService() (string, http.Handler) {
-	prefix, handler := federationv1connect.NewOidcClientServiceHandler(&clientRPC{service: f.service}, rpcerr.Options()...)
-	return prefix, handler
-}
-
-// ConsentRPCService returns the consent registration; the surface
-// mixes self-service procedures with the admin-wide views, so the
-// per-procedure guard rides the handler (the composition root mounts
-// it bare).
-func (f Feature) ConsentRPCService() (string, http.Handler) {
-	admin := map[string]bool{
-		federationv1connect.OidcConsentServiceListUserAuthorizedClientsProcedure: true,
-		federationv1connect.OidcConsentServiceListAllAuthorizedClientsProcedure:  true,
-	}
-	self := map[string]bool{
-		federationv1connect.OidcConsentServiceListMyAuthorizedClientsProcedure:  true,
-		federationv1connect.OidcConsentServiceRevokeMyAuthorizedClientProcedure: true,
-		federationv1connect.OidcConsentServiceListMyClientsProcedure:            true,
-	}
-	opts := rpcerr.Options()
-	if f.service.access != nil {
-		opts = append(opts, connect.WithInterceptors(middleware.RPCPrincipalGuard(f.service.access, admin, self)))
-	}
-	prefix, handler := federationv1connect.NewOidcConsentServiceHandler(&consentRPC{service: f.service}, opts...)
-	return prefix, handler
-}
-
-func (h *clientRPC) ListClients(ctx context.Context, _ *connect.Request[commonv1.PageRequest]) (*connect.Response[federationv1.ListOidcClientsResponse], error) {
-	clients, err := h.service.store.ListClients(ctx)
+// ListClients answers one page of the clients.
+func (h *rpcHandler) ListClients(ctx context.Context, req *connect.Request[federationv1.ListOidcClientsRequest]) (*connect.Response[federationv1.ListOidcClientsResponse], error) {
+	clients, pagination, err := h.service.List(ctx, req.Msg.GetSearch(), req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
-		return nil, rpcerr.Internal("failed to list clients")
+		return nil, mapError(err)
 	}
-	out := make([]*federationv1.OidcClient, 0, len(clients))
-	for _, c := range clients {
-		out = append(out, clientProto(c))
-	}
-	return connect.NewResponse(&federationv1.ListOidcClientsResponse{Clients: out}), nil
+	return connect.NewResponse(&federationv1.ListOidcClientsResponse{
+		Clients:  wireClients(clients),
+		Metadata: metadataOf(pagination),
+		Status:   webutil.StatusSuccess,
+		Message:  "the OIDC clients were listed",
+	}), nil
 }
 
-func (h *clientRPC) CreateClient(ctx context.Context, req *connect.Request[federationv1.CreateOidcClientRequest]) (*connect.Response[federationv1.CreateOidcClientResponse], error) {
-	created, rawSecret, err := h.service.createClient(ctx, clientRequestFromCreate(req.Msg))
+// CreateClient defines a client and mints its first secret.
+func (h *rpcHandler) CreateClient(ctx context.Context, req *connect.Request[federationv1.CreateOidcClientRequest]) (*connect.Response[federationv1.CreateOidcClientResponse], error) {
+	callerID, err := callerUUID(ctx)
 	if err != nil {
-		if errors.Is(err, errNotCIMD) || isMetadataError(err) {
-			return nil, rpcerr.InvalidArgument(err.Error())
-		}
-		return nil, rpcerr.Internal("failed to create client")
+		return nil, err
+	}
+	issued, err := h.service.Create(ctx, callerID, CreateParams{
+		ID:                                  req.Msg.GetId(),
+		Name:                                req.Msg.Name,
+		Description:                         req.Msg.GetDescription(),
+		CallbackURLs:                        req.Msg.CallbackUrls,
+		LogoutCallbackURLs:                  req.Msg.LogoutCallbackUrls,
+		LaunchURL:                           optionalString(req.Msg.LaunchUrl),
+		IsPublic:                            req.Msg.IsPublic,
+		PkceEnabled:                         req.Msg.PkceEnabled,
+		RequiresReauthentication:            req.Msg.RequiresReauthentication,
+		RequiresPushedAuthorizationRequests: req.Msg.RequiresPushedAuthorizationRequests,
+		SkipConsent:                         req.Msg.SkipConsent,
+		AccessTokenDurationMinutes:          req.Msg.GetAccessTokenDurationMinutes(),
+		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
+		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
+		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
+		AllowedGrantWires:                   req.Msg.AllowedGrantTypes,
+		AllowedGroupWires:                   req.Msg.AllowedUserGroups,
+	})
+	if err != nil {
+		return nil, mapError(err)
 	}
 	return connect.NewResponse(&federationv1.CreateOidcClientResponse{
-		Client:       clientProto(created),
-		ClientSecret: rawSecret,
+		Client:  wireClient(issued.Client),
+		Secret:  issued.Secret,
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client was created",
 	}), nil
 }
 
-func (h *clientRPC) GetClient(ctx context.Context, req *connect.Request[federationv1.GetOidcClientRequest]) (*connect.Response[federationv1.OidcClient], error) {
-	client, err := h.service.clientByID(ctx, req.Msg.GetClientId())
+// GetClient answers one client's full view.
+func (h *rpcHandler) GetClient(ctx context.Context, req *connect.Request[federationv1.GetOidcClientRequest]) (*connect.Response[federationv1.GetOidcClientResponse], error) {
+	client, err := h.service.Get(ctx, req.Msg.Id)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	return connect.NewResponse(clientProto(client)), nil
-}
-
-func (h *clientRPC) UpdateClient(ctx context.Context, req *connect.Request[federationv1.UpdateOidcClientRequest]) (*connect.Response[federationv1.OidcClient], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-
-	// Validation depends on the client type: a CIMD client's
-	// document-owned fields (name, redirect URIs) are optional.
-	existing, err := h.service.store.GetClient(ctx, id)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	request := clientRequestFromUpdate(req.Msg)
-	if verr := request.validateWith(existing.ClientType == "cimd"); verr != nil {
-		return nil, rpcerr.InvalidArgument("validation failed")
-	}
-
-	client, err := h.service.updateClient(ctx, id, request)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	return connect.NewResponse(clientProto(client)), nil
-}
-
-func (h *clientRPC) DeleteClient(ctx context.Context, req *connect.Request[federationv1.DeleteOidcClientRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-	if err := h.service.deleteClient(ctx, id); err != nil {
-		return nil, clientError(err)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *clientRPC) UpdateAllowedUserGroups(ctx context.Context, req *connect.Request[federationv1.UpdateAllowedUserGroupsRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-	if err := h.service.store.SetClientGroups(ctx, id, req.Msg.GetGroupIds()); err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *clientRPC) GetClientMeta(ctx context.Context, req *connect.Request[federationv1.GetOidcClientRequest]) (*connect.Response[federationv1.OidcClientMeta], error) {
-	client, err := h.service.clientByID(ctx, req.Msg.GetClientId())
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(clientMetaProto(client)), nil
-}
-
-func (h *clientRPC) PreviewClient(ctx context.Context, req *connect.Request[federationv1.PreviewClientRequest]) (*connect.Response[federationv1.OidcTokenPreview], error) {
-	client, err := h.service.clientByID(ctx, req.Msg.GetClientId())
-	if err != nil {
-		return nil, err
-	}
-	if _, lookupErr := h.service.store.UserByID(ctx, req.Msg.GetUserId()); lookupErr != nil {
-		return nil, rpcerr.NotFound("user not found")
-	}
-
-	claims, err := h.service.claimsFor(ctx, req.Msg.GetUserId(), "", "", time.Now().UTC())
-	if err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	now := time.Now().UTC()
-	userInfo, err := structpb.NewStruct(profileClaimsMap("", claims))
-	if err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	return connect.NewResponse(&federationv1.OidcTokenPreview{
-		IdToken:     claimsToJSON(h.service.idTokenClaims(client, claims, now, h.service.AccessTokenTTL())),
-		AccessToken: claimsToJSON(h.service.accessTokenClaims(client, claims, "", now, h.service.AccessTokenTTL())),
-		UserInfo:    userInfo,
+	return connect.NewResponse(&federationv1.GetOidcClientResponse{
+		Client:  wireClient(client),
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client was read",
 	}), nil
 }
 
-func (h *clientRPC) RefreshClient(ctx context.Context, req *connect.Request[federationv1.GetOidcClientRequest]) (*connect.Response[federationv1.OidcClient], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
+// UpdateClient replaces a client's fields.
+func (h *rpcHandler) UpdateClient(ctx context.Context, req *connect.Request[federationv1.UpdateOidcClientRequest]) (*connect.Response[federationv1.UpdateOidcClientResponse], error) {
+	client, err := h.service.Update(ctx, req.Msg.Id, UpdateParams{
+		Name:                                req.Msg.Name,
+		Description:                         req.Msg.GetDescription(),
+		CallbackURLs:                        req.Msg.CallbackUrls,
+		LogoutCallbackURLs:                  req.Msg.LogoutCallbackUrls,
+		LaunchURL:                           optionalString(req.Msg.LaunchUrl),
+		IsPublic:                            req.Msg.IsPublic,
+		PkceEnabled:                         req.Msg.PkceEnabled,
+		RequiresReauthentication:            req.Msg.RequiresReauthentication,
+		RequiresPushedAuthorizationRequests: req.Msg.RequiresPushedAuthorizationRequests,
+		SkipConsent:                         req.Msg.SkipConsent,
+		AccessTokenDurationMinutes:          req.Msg.GetAccessTokenDurationMinutes(),
+		RefreshTokenDurationMinutes:         req.Msg.GetRefreshTokenDurationMinutes(),
+		BackchannelLogoutURI:                req.Msg.GetBackchannelLogoutUri(),
+		BackchannelLogoutSessionRequired:    req.Msg.BackchannelLogoutSessionRequired,
+		AllowedGrantWires:                   req.Msg.AllowedGrantTypes,
+	})
 	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
+		return nil, mapError(err)
 	}
-	client, err := h.service.store.GetClient(ctx, id)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	refreshed, err := h.service.refreshClientMetadata(ctx, client)
-	if err != nil {
-		if errors.Is(err, errNotCIMD) || isMetadataError(err) {
-			return nil, rpcerr.InvalidArgument(err.Error())
-		}
-		return nil, rpcerr.Internal("failed to refresh client metadata")
-	}
-	return connect.NewResponse(clientProto(refreshed)), nil
-}
-
-func (h *clientRPC) UploadLogo(ctx context.Context, req *connect.Request[federationv1.UploadLogoRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-	client, err := h.service.store.GetClient(ctx, id)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	image := req.Msg.GetImage()
-	if len(image) == 0 {
-		return nil, rpcerr.InvalidArgument("image is required")
-	}
-	if len(image) > maxLogoUpload {
-		return nil, rpcerr.InvalidArgument("file too large")
-	}
-	ext := logoExtFromBytes(image)
-	if ext == "" {
-		return nil, rpcerr.InvalidArgument("unsupported_file_type")
-	}
-
-	logoPath := "client-logos/" + client.ID.String() + ext
-	if err := h.service.images.Save(ctx, logoPath, strings.NewReader(string(image))); err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	if err := h.service.store.SetClientLogoPath(ctx, client.ID, &logoPath); err != nil {
-		_ = h.service.images.Delete(ctx, logoPath)
-		return nil, clientError(err)
-	}
-	// The replaced blob may carry a different extension — remove it.
-	if client.LogoPath != nil && *client.LogoPath != logoPath {
-		_ = h.service.images.Delete(ctx, *client.LogoPath)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *clientRPC) DeleteLogo(ctx context.Context, req *connect.Request[federationv1.DeleteLogoRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-	client, err := h.service.store.GetClient(ctx, id)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	if client.LogoPath != nil {
-		if err := h.service.store.SetClientLogoPath(ctx, client.ID, nil); err != nil {
-			return nil, clientError(err)
-		}
-		// A missing blob stays a success.
-		_ = h.service.images.Delete(ctx, *client.LogoPath)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *clientRPC) ListSecrets(ctx context.Context, req *connect.Request[federationv1.ListSecretsRequest]) (*connect.Response[federationv1.ListSecretsResponse], error) {
-	client, err := h.service.clientByID(ctx, req.Msg.GetClientId())
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*federationv1.OidcSecretEntry, 0, len(client.Secrets))
-	for _, s := range client.Secrets {
-		out = append(out, secretProto(s))
-	}
-	return connect.NewResponse(&federationv1.ListSecretsResponse{Secrets: out}), nil
-}
-
-func (h *clientRPC) CreateSecret(ctx context.Context, req *connect.Request[federationv1.CreateSecretRequest]) (*connect.Response[federationv1.CreateSecretResponse], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
-	}
-	// The wire contract generates secrets server-side only (no BYO
-	// field on CreateSecretRequest).
-	request := createSecretRequest{}
-	if raw := req.Msg.GetExpiresAt(); raw != "" {
-		expiresAt, parseErr := time.Parse(time.RFC3339, raw)
-		if parseErr != nil {
-			return nil, rpcerr.InvalidArgument("invalid expires_at")
-		}
-		request.ExpiresAt = &expiresAt
-	}
-	created, err := h.service.addSecret(ctx, id, request)
-	if err != nil {
-		return nil, clientError(err)
-	}
-	entry := &federationv1.OidcSecretEntry{}
-	if v, ok := created["id"].(string); ok {
-		entry.Id = v
-	}
-	if v, ok := created["is_active"].(bool); ok {
-		entry.IsActive = v
-	}
-	if v, ok := created["created_at"].(time.Time); ok {
-		entry.CreatedAt = v.UTC().Format(time.RFC3339)
-	}
-	if v, ok := created["expires_at"].(*time.Time); ok && v != nil {
-		text := v.UTC().Format(time.RFC3339)
-		entry.ExpiresAt = &text
-	}
-	raw, _ := created["secret"].(string)
-	return connect.NewResponse(&federationv1.CreateSecretResponse{
-		Secret:       entry,
-		ClientSecret: raw,
+	return connect.NewResponse(&federationv1.UpdateOidcClientResponse{
+		Client:  wireClient(client),
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client was updated",
 	}), nil
 }
 
-func (h *clientRPC) DeleteSecret(ctx context.Context, req *connect.Request[federationv1.DeleteSecretRequest]) (*connect.Response[emptypb.Empty], error) {
-	id, err := parseClientID(req.Msg.GetClientId())
-	if err != nil {
-		return nil, rpcerr.InvalidArgument("invalid client id")
+// DeleteClient removes a client.
+func (h *rpcHandler) DeleteClient(ctx context.Context, req *connect.Request[federationv1.DeleteOidcClientRequest]) (*connect.Response[federationv1.DeleteOidcClientResponse], error) {
+	if err := h.service.Delete(ctx, req.Msg.Id); err != nil {
+		return nil, mapError(err)
 	}
-	if err := h.service.store.DeleteClientSecret(ctx, id, req.Msg.GetSecretId()); err != nil {
-		return nil, clientError(err)
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *clientRPC) GetScimProvider(ctx context.Context, req *connect.Request[federationv1.GetOidcClientRequest]) (*connect.Response[federationv1.ScimProvider], error) {
-	if h.service.scimBinding == nil {
-		return nil, rpcerr.Internal("scim lookup is not wired")
-	}
-	if _, err := h.service.clientByID(ctx, req.Msg.GetClientId()); err != nil {
-		return nil, err
-	}
-	binding, err := h.service.scimBinding(ctx, req.Msg.GetClientId())
-	if err != nil {
-		return nil, err
-	}
-	out := &federationv1.ScimProvider{
-		Id:           binding.ID,
-		Endpoint:     binding.Endpoint,
-		OidcClientId: binding.OIDCClientID,
-		CreatedAt:    binding.CreatedAt.UTC().Format(time.RFC3339),
-	}
-	if binding.LastSyncedAt != nil {
-		v := binding.LastSyncedAt.UTC().Format(time.RFC3339)
-		out.LastSyncedAt = &v
-	}
-	return connect.NewResponse(out), nil
-}
-
-func (h *consentRPC) ListMyAuthorizedClients(ctx context.Context, req *connect.Request[commonv1.PageRequest]) (*connect.Response[federationv1.ListAuthorizedClientsResponse], error) {
-	p, ok := middleware.PrincipalFromContext(ctx)
-	if !ok || p.UserID == "" {
-		return nil, rpcerr.Unauthenticated("bearer token required")
-	}
-	return h.listAuthorized(ctx, &p.UserID, req.Msg)
-}
-
-func (h *consentRPC) RevokeMyAuthorizedClient(ctx context.Context, req *connect.Request[federationv1.RevokeMyAuthorizedClientRequest]) (*connect.Response[emptypb.Empty], error) {
-	p, ok := middleware.PrincipalFromContext(ctx)
-	if !ok || p.UserID == "" {
-		return nil, rpcerr.Unauthenticated("bearer token required")
-	}
-	if err := h.service.store.DeleteAuthorization(ctx, p.UserID, req.Msg.GetClientId()); err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	if err := h.service.store.RevokeClientTokens(ctx, req.Msg.GetClientId(), p.UserID); err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (h *consentRPC) ListMyClients(ctx context.Context, req *connect.Request[commonv1.PageRequest]) (*connect.Response[federationv1.ListMyClientsResponse], error) {
-	p, ok := middleware.PrincipalFromContext(ctx)
-	if !ok || p.UserID == "" {
-		return nil, rpcerr.Unauthenticated("bearer token required")
-	}
-	page, limit := rpcerr.NormalizePage(int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
-	clients, err := h.service.store.AccessibleClients(ctx, p.UserID)
-	if err != nil {
-		return nil, rpcerr.Internal("internal error")
-	}
-	total := len(clients)
-	if start := responder.Offset(page, limit); start > 0 || !responder.All(page, limit) {
-		if start >= total {
-			clients = nil
-		} else {
-			clients = clients[start:min(start+limit, total)]
-		}
-	}
-	out := make([]*federationv1.OidcClient, 0, len(clients))
-	for _, c := range clients {
-		out = append(out, clientProto(c))
-	}
-	return connect.NewResponse(&federationv1.ListMyClientsResponse{
-		Clients:  out,
-		Metadata: rpcerr.ListMetadata(ctx, page, limit, total),
+	return connect.NewResponse(&federationv1.DeleteOidcClientResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client was deleted",
 	}), nil
 }
 
-func (h *consentRPC) ListUserAuthorizedClients(ctx context.Context, req *connect.Request[federationv1.ListUserAuthorizedClientsRequest]) (*connect.Response[federationv1.ListAuthorizedClientsResponse], error) {
-	// The user id is validated and resolved before the listing: an id
-	// that is not a TypeID, or that names no user, is a not-found. Letting
-	// either reach the query surfaces as a uuid cast failure and a 500.
-	if _, err := typeid.FromString(req.Msg.GetUserId()); err != nil {
-		return nil, rpcerr.NotFound("user not found")
-	}
-	if _, err := h.service.store.UserByID(ctx, req.Msg.GetUserId()); err != nil {
-		if errors.Is(err, ErrInvalidGrant) {
-			return nil, rpcerr.NotFound("user not found")
-		}
-		return nil, rpcerr.Internal("internal error")
-	}
-	userID := req.Msg.GetUserId()
-	return h.listAuthorized(ctx, &userID, req.Msg.GetPage())
-}
-
-func (h *consentRPC) ListAllAuthorizedClients(ctx context.Context, req *connect.Request[commonv1.PageRequest]) (*connect.Response[federationv1.ListAuthorizedClientsResponse], error) {
-	return h.listAuthorized(ctx, nil, req.Msg)
-}
-
-// listAuthorized serves both consent listings; the store returns the
-// full set and the handler pages in memory (matching the unpaged REST
-// contract while the wire carries metadata).
-func (h *consentRPC) listAuthorized(ctx context.Context, userID *string, page *commonv1.PageRequest) (*connect.Response[federationv1.ListAuthorizedClientsResponse], error) {
-	records, err := h.service.store.AuthorizedClients(ctx, userID)
+// UpdateAllowedUserGroups replaces the group restriction's set.
+func (h *rpcHandler) UpdateAllowedUserGroups(ctx context.Context, req *connect.Request[federationv1.UpdateOidcClientAllowedUserGroupsRequest]) (*connect.Response[federationv1.UpdateOidcClientAllowedUserGroupsResponse], error) {
+	client, err := h.service.SetAllowedGroups(ctx, req.Msg.Id, req.Msg.UserGroupIds)
 	if err != nil {
-		return nil, rpcerr.Internal("failed to list authorized clients")
+		return nil, mapError(err)
 	}
-	out := make([]*federationv1.AuthorizedClient, 0, len(records))
-	for _, r := range records {
-		out = append(out, &federationv1.AuthorizedClient{
-			UserId:     r.UserID,
-			ClientId:   r.ClientID,
-			Scopes:     r.Scopes,
-			LastUsedAt: r.LastUsedAt.UTC().Format(time.RFC3339),
-		})
-	}
-	pn, limit := rpcerr.NormalizePage(int(page.GetPage()), int(page.GetLimit()))
-	total := len(out)
-	if start := responder.Offset(pn, limit); start > 0 || !responder.All(pn, limit) {
-		if start >= total {
-			out = nil
-		} else {
-			out = out[start:min(start+limit, total)]
-		}
-	}
-	return connect.NewResponse(&federationv1.ListAuthorizedClientsResponse{
-		AuthorizedClients: out,
-		Metadata:          rpcerr.ListMetadata(ctx, pn, limit, total),
+	return connect.NewResponse(&federationv1.UpdateOidcClientAllowedUserGroupsResponse{
+		Client:  wireClient(client),
+		Status:  webutil.StatusSuccess,
+		Message: "the allowed user groups were updated",
 	}), nil
 }
 
-// clientByID resolves a client or maps the miss onto not_found.
-func (s *Service) clientByID(ctx context.Context, raw string) (Client, error) {
-	id, err := parseClientID(raw)
+// GetClientMeta answers the display facts a sign-in page renders.
+func (h *rpcHandler) GetClientMeta(ctx context.Context, req *connect.Request[federationv1.GetOidcClientMetaRequest]) (*connect.Response[federationv1.GetOidcClientMetaResponse], error) {
+	meta, err := h.service.Meta(ctx, req.Msg.Id)
 	if err != nil {
-		return Client{}, rpcerr.InvalidArgument("invalid client id")
+		return nil, mapError(err)
 	}
-	client, err := s.store.GetClient(ctx, id)
+	return connect.NewResponse(&federationv1.GetOidcClientMetaResponse{
+		Meta:    wireMeta(meta),
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client metadata was read",
+	}), nil
+}
+
+// PreviewClient answers the claim maps one account would produce.
+func (h *rpcHandler) PreviewClient(ctx context.Context, req *connect.Request[federationv1.PreviewOidcClientRequest]) (*connect.Response[federationv1.PreviewOidcClientResponse], error) {
+	idToken, accessToken, userInfo, err := h.service.Preview(ctx, req.Msg.Id, req.Msg.UserId)
 	if err != nil {
-		return Client{}, clientError(err)
+		return nil, mapError(err)
 	}
-	return client, nil
-}
-
-// clientError maps the client store sentinels onto Connect codes.
-func clientError(err error) error {
-	if errors.Is(err, ErrNotFound) {
-		return rpcerr.NotFound("client not found")
-	}
-	return rpcerr.Internal("internal error")
-}
-
-func parseClientID(raw string) (OIDCClientID, error) {
-	return OIDCParseClientID(raw)
-}
-
-// logoExtFromBytes sniffs the image type against the logo allowlist;
-// DetectContentType reports SVG as text/plain, so the XML prolog
-// decides.
-func logoExtFromBytes(image []byte) string {
-	mime := http.DetectContentType(image)
-	for ext, known := range logoMime {
-		if known == mime {
-			return ext
-		}
-	}
-	head := image[:min(len(image), 512)]
-	if mime == "text/plain; charset=utf-8" && strings.Contains(strings.TrimSpace(string(head)), "<svg") {
-		return ".svg"
-	}
-	return ""
-}
-
-// claimsToJSON renders a claim map as the compact JSON string the
-// token-preview fields carry.
-func claimsToJSON(claims map[string]any) string {
-	raw, err := json.Marshal(claims)
+	idTokenStruct, err := structpb.NewStruct(idToken)
 	if err != nil {
-		return "{}"
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the preview could not be rendered"))
 	}
-	return string(raw)
+	accessTokenStruct, err := structpb.NewStruct(accessToken)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the preview could not be rendered"))
+	}
+	userInfoStruct, err := structpb.NewStruct(userInfo)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the preview could not be rendered"))
+	}
+	return connect.NewResponse(&federationv1.PreviewOidcClientResponse{
+		Preview: &federationv1.OidcClientPreview{
+			IdToken:     idTokenStruct,
+			AccessToken: accessTokenStruct,
+			UserInfo:    userInfoStruct,
+		},
+		Status:  webutil.StatusSuccess,
+		Message: "the OIDC client preview was built",
+	}), nil
 }
 
-func clientProto(c Client) *federationv1.OidcClient {
-	out := &federationv1.OidcClient{
-		Id:                          c.ID.String(),
-		Name:                        c.Name,
-		HasSecret:                   hasUsableSecret(c),
-		CallbackUrls:                c.CallbackURLs,
-		LogoutCallbackUrls:          c.LogoutCallbackURLs,
-		IsPublic:                    protoBool(c.IsPublic),
-		PkceEnabled:                 protoBool(c.PKCEEnabled),
-		PkceSupported:               protoBool(c.PKCESupported),
-		SkipConsent:                 protoBool(c.SkipConsent),
-		IsGroupRestricted:           protoBool(c.IsGroupRestricted),
-		AccessTokenDurationMinutes:  protoI32(c.AccessTokenDurationMinutes),
-		RefreshTokenDurationMinutes: protoI32(c.RefreshTokenDurationMinutes),
-		AllowedUserGroupIds:         c.AllowedGroupIDs,
+// UploadLogo replaces a client's logo.
+func (h *rpcHandler) UploadLogo(ctx context.Context, req *connect.Request[federationv1.UploadOidcClientLogoRequest]) (*connect.Response[federationv1.UploadOidcClientLogoResponse], error) {
+	if err := h.service.UploadLogo(ctx, req.Msg.Id, req.Msg.Logo); err != nil {
+		return nil, mapError(err)
 	}
-	if c.Description != "" {
-		out.Description = &c.Description
-	}
-	if c.LaunchURL != "" {
-		out.LaunchUrl = &c.LaunchURL
-	}
-	if c.ClientType != "" {
-		out.ClientType = &c.ClientType
-	}
-	if c.MetadataURL != nil {
-		out.MetadataUrl = c.MetadataURL
-	}
-	return out
+	return connect.NewResponse(&federationv1.UploadOidcClientLogoResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the client logo was updated",
+	}), nil
 }
 
-func clientMetaProto(c Client) *federationv1.OidcClientMeta {
-	out := &federationv1.OidcClientMeta{
-		Id:      c.ID.String(),
-		Name:    c.Name,
-		HasLogo: c.LogoPath != nil,
+// DeleteLogo removes a client's logo.
+func (h *rpcHandler) DeleteLogo(ctx context.Context, req *connect.Request[federationv1.DeleteOidcClientLogoRequest]) (*connect.Response[federationv1.DeleteOidcClientLogoResponse], error) {
+	if err := h.service.DeleteLogo(ctx, req.Msg.Id); err != nil {
+		return nil, mapError(err)
 	}
-	if c.Description != "" {
-		out.Description = &c.Description
-	}
-	if c.LaunchURL != "" {
-		out.LaunchUrl = &c.LaunchURL
-	}
-	if c.RequiresReauthentication {
-		out.RequiresReauthentication = protoBool(true)
-	}
-	if c.ClientType != "" {
-		out.ClientType = &c.ClientType
-	}
-	return out
+	return connect.NewResponse(&federationv1.DeleteOidcClientLogoResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the client logo was deleted",
+	}), nil
 }
 
-func secretProto(s ClientSecret) *federationv1.OidcSecretEntry {
-	out := &federationv1.OidcSecretEntry{
-		Id:        s.ID,
-		CreatedAt: s.CreatedAt.UTC().Format(time.RFC3339),
-		IsActive:  s.IsActive,
+// ListSecrets answers a client's secrets as their views.
+func (h *rpcHandler) ListSecrets(ctx context.Context, req *connect.Request[federationv1.ListOidcClientSecretsRequest]) (*connect.Response[federationv1.ListOidcClientSecretsResponse], error) {
+	secrets, err := h.service.ListSecrets(ctx, req.Msg.Id)
+	if err != nil {
+		return nil, mapError(err)
 	}
-	if s.ExpiresAt != nil {
-		v := s.ExpiresAt.UTC().Format(time.RFC3339)
-		out.ExpiresAt = &v
-	}
-	return out
+	return connect.NewResponse(&federationv1.ListOidcClientSecretsResponse{
+		Credentials: wireCredentials(secrets),
+		Status:      webutil.StatusSuccess,
+		Message:     "the client secrets were listed",
+	}), nil
 }
 
-// clientRequestFromCreate maps the wire request onto the service
-// payload; the plain-string fields mirror the REST contract.
-func clientRequestFromCreate(msg *federationv1.CreateOidcClientRequest) clientRequest {
-	return clientRequest{
-		Name:                        msg.GetName(),
-		Description:                 msg.GetDescription(),
-		Secret:                      msg.Secret,
-		CallbackURLs:                msg.GetCallbackUrls(),
-		LogoutCallbackURLs:          msg.GetLogoutCallbackUrls(),
-		LaunchURL:                   msg.GetLaunchUrl(),
-		IsPublic:                    msg.GetIsPublic(),
-		PKCEEnabled:                 msg.GetPkceEnabled(),
-		PKCESupported:               msg.GetPkceSupported(),
-		SkipConsent:                 msg.GetSkipConsent(),
-		IsGroupRestricted:           msg.GetIsGroupRestricted(),
-		AccessTokenDurationMinutes:  int64(msg.GetAccessTokenDurationMinutes()),
-		RefreshTokenDurationMinutes: int64(msg.GetRefreshTokenDurationMinutes()),
-		AllowedGroupIDs:             msg.GetAllowedUserGroupIds(),
-		MetadataURL:                 msg.GetMetadataUrl(),
+// CreateSecret mints one more secret.
+func (h *rpcHandler) CreateSecret(ctx context.Context, req *connect.Request[federationv1.CreateOidcClientSecretRequest]) (*connect.Response[federationv1.CreateOidcClientSecretResponse], error) {
+	var expiresAt *time.Time
+	if req.Msg.ExpiresAt != nil {
+		at := req.Msg.ExpiresAt.AsTime()
+		expiresAt = &at
 	}
+	issued, err := h.service.CreateSecret(ctx, req.Msg.Id, req.Msg.GetSecret(), expiresAt)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&federationv1.CreateOidcClientSecretResponse{
+		Secret:  wireSecret(issued.Secret),
+		Value:   issued.Value,
+		Status:  webutil.StatusSuccess,
+		Message: "the client secret was created",
+	}), nil
 }
 
-// clientRequestFromUpdate maps the update wire request; only the
-// fields the proto carries ride along.
-func clientRequestFromUpdate(msg *federationv1.UpdateOidcClientRequest) clientRequest {
-	return clientRequest{
-		Name:                        msg.GetName(),
-		Description:                 msg.GetDescription(),
-		CallbackURLs:                msg.GetCallbackUrls(),
-		LogoutCallbackURLs:          msg.GetLogoutCallbackUrls(),
-		LaunchURL:                   msg.GetLaunchUrl(),
-		IsPublic:                    msg.GetIsPublic(),
-		PKCEEnabled:                 msg.GetPkceEnabled(),
-		PKCESupported:               msg.GetPkceSupported(),
-		SkipConsent:                 msg.GetSkipConsent(),
-		IsGroupRestricted:           msg.GetIsGroupRestricted(),
-		AccessTokenDurationMinutes:  int64(msg.GetAccessTokenDurationMinutes()),
-		RefreshTokenDurationMinutes: int64(msg.GetRefreshTokenDurationMinutes()),
-		AllowedGroupIDs:             msg.GetAllowedUserGroupIds(),
+// DeleteSecret withdraws one secret.
+func (h *rpcHandler) DeleteSecret(ctx context.Context, req *connect.Request[federationv1.DeleteOidcClientSecretRequest]) (*connect.Response[federationv1.DeleteOidcClientSecretResponse], error) {
+	if err := h.service.DeleteSecret(ctx, req.Msg.Id, req.Msg.SecretId); err != nil {
+		return nil, mapError(err)
 	}
+	return connect.NewResponse(&federationv1.DeleteOidcClientSecretResponse{
+		Status:  webutil.StatusSuccess,
+		Message: "the client secret was deleted",
+	}), nil
 }
 
-func protoBool(v bool) *bool { return &v }
-
-func protoI32(v int64) *int32 {
-	out := rpcerr.ToInt32(int(v))
-	return &out
+// RefreshClient forces a CIMD client's metadata document to be re-fetched.
+func (h *rpcHandler) RefreshClient(ctx context.Context, req *connect.Request[federationv1.RefreshOidcClientRequest]) (*connect.Response[federationv1.RefreshOidcClientResponse], error) {
+	client, err := h.service.RefreshCIMDClient(ctx, req.Msg.Id)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return connect.NewResponse(&federationv1.RefreshOidcClientResponse{
+		Client:  wireClient(client),
+		Status:  webutil.StatusSuccess,
+		Message: "the client metadata document was refreshed",
+	}), nil
 }

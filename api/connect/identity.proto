@@ -1,556 +1,1464 @@
-// First-party identity RPCs: authentication, account, signup, MFA,
-// one-time access, email verification, users, groups, device approval,
-// and custom claims. Timestamps and TypeIDs are strings at the wire
-// boundary; show-once secrets appear only in the response that issues
-// them and are never returned by any read RPC.
+// The identity contract: the procedures that create and manage accounts.
+//
+// Sign-up creates an account from a signup token an operator issued. The
+// account carries its primary credential from the first call — the password
+// the caller chose — so it can sign in immediately; email verification is a
+// later procedure and the account is created unverified.
+//
+// The failure codes follow docs/api-response.md: a refused signup token is
+// `permission_denied`, an account that already exists is `already_exists`,
+// and a malformed field is `invalid_argument` with the typed violations the
+// protovalidate constraints produce.
 syntax = "proto3";
 
-package tango.identity.v1;
+package saka.identity.v1;
 
+import "buf/validate/validate.proto";
 import "common.proto";
-import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/riipandi/tango/codegen/proto/go/tango/identity/v1;identityv1";
+option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1;identityv1";
 
-// User mirrors the account projection shared by the SPA and admin
-// console.
-message User {
-  string id = 1;
-  string username = 2;
-  string email = 3;
-  optional string first_name = 4;
-  optional string last_name = 5;
-  optional string avatar_url = 6;
-  optional string locale = 7;
-  string display_name = 8;
-  bool is_admin = 9;
-  bool disabled = 10;
-  optional string email_verified_at = 11;
-  string created_at = 12;
-  optional string updated_at = 13;
-  optional string last_login_at = 14;
-}
-
-// SessionView is the client-safe session projection; it never carries
-// the token hash.
-message SessionView {
-  string id = 1;
-  string provider = 2;
-  optional string user_agent = 3;
-  optional string device_name = 4;
-  optional string ip_address = 5;
-  string created_at = 6;
-  string expires_at = 7;
-  optional string refreshed_at = 8;
-}
-
-// UserGroup is an access group binding users to OIDC clients.
-message UserGroup {
-  string id = 1;
-  string name = 2;
-  string display_name = 3;
-  string created_at = 4;
-  optional string updated_at = 5;
-}
-
-// WebAuthnCredential is the admin/self-service credential projection.
-message WebAuthnCredential {
-  string id = 1;
-  optional string name = 2;
-  string credential_id = 3;
-  optional string attestation_type = 4;
-  repeated string transport = 5;
-  optional bool backup_eligible = 6;
-  optional bool backup_state = 7;
-  optional string created_at = 8;
-  optional string last_used_at = 9;
-}
-
-// CustomClaim is a claim entry bound to a user or a user group.
-message CustomClaim {
-  string id = 1;
-  string key = 2;
-  string value = 3;
-  optional string user_id = 4;
-  optional string user_group_id = 5;
-  string created_at = 6;
-}
-
-// SignedIn is the session-issuing response shared by sign-in, signup,
-// setup, and pending-MFA completion. Every credential travels in the
-// body: the client keeps the session token and presents it to refresh,
-// and uses the access token as the RPC bearer.
-message SignedIn {
-  User user = 1;
-  string session_id = 2;
-  string provider = 3;
-  optional string expires_at = 4;
-  bool pending = 5;
-  bool remember = 6;
-  // session_token is the rotating session credential. Absent while a
-  // second factor is still pending.
-  string session_token = 7;
-  // access_token is the short-lived internal bearer JWT. Absent while
-  // a second factor is still pending.
-  string access_token = 8;
-  // pending_token is the bridge credential for the pending second
-  // factor. Present only when pending is true.
-  optional string pending_token = 9;
-}
-
-// AuthService covers authentication lifecycle RPCs. Protected methods
-// require `Authorization: Bearer <internal-access-token>`; the
-// sign-in/forgot/reset flow is anonymous but rate-limited.
-service AuthService {
-  rpc SignIn(SignInRequest) returns (SignedIn);
-  rpc SignOut(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetSession(google.protobuf.Empty) returns (SignedIn);
-  rpc ForgotPassword(ForgotPasswordRequest) returns (google.protobuf.Empty);
-  rpc ResetPassword(ResetPasswordRequest) returns (google.protobuf.Empty);
-}
-
-message SignInRequest {
-  // identity is the username or email the account is looked up by.
-  string identity = 1;
-  // password is the plaintext credential, verified and never stored.
-  string password = 2;
-  // remember selects the session duration: true issues a long-lived
-  // session, false a short one.
-  bool remember = 3;
-}
-
-message ForgotPasswordRequest {
-  string identity = 1;
-}
-
-message ResetPasswordRequest {
-  string token = 1;
-  string new_password = 2;
-}
-
-// AccountService is the self-service surface for the signed-in user.
-// AccountService covers the tango-only self-service surfaces that
-// upstream has no equivalent for: upstream signs users in with
-// passkeys and exposes no password or session API. Profile read and
-// write stay on UserService, matching upstream's `GET/PUT
-// /api/users/me`.
-service AccountService {
-  rpc ChangePassword(ChangePasswordRequest) returns (google.protobuf.Empty);
-  rpc ListSessions(google.protobuf.Empty) returns (ListSessionsResponse);
-  rpc RevokeSession(RevokeSessionRequest) returns (google.protobuf.Empty);
-}
-
-message UpdateProfileRequest {
-  optional string first_name = 1;
-  optional string last_name = 2;
-  optional string display_name = 3;
-  optional string avatar_url = 4;
-  optional string locale = 5;
-}
-
-message ChangePasswordRequest {
-  string current_password = 1;
-  string new_password = 2;
-}
-
-message ListSessionsResponse {
-  repeated SessionView sessions = 1;
-}
-
-message RevokeSessionRequest {
-  string session_id = 1;
-}
-
-// SignupService covers account creation and initial admin setup plus
-// signup-token administration.
+// SignupService creates accounts and administers the tokens sign-up requires.
 service SignupService {
-  rpc Signup(SignupRequest) returns (SignedIn);
-  rpc GetSetupAvailability(google.protobuf.Empty) returns (GetSetupAvailabilityResponse);
-  rpc SetupInitialAdmin(SetupInitialAdminRequest) returns (SignedIn);
-  rpc ListSignupTokens(common.v1.PageRequest) returns (ListSignupTokensResponse);
-  rpc CreateSignupToken(CreateSignupTokenRequest) returns (SignupTokenSecret);
-  rpc DeleteSignupToken(DeleteSignupTokenRequest) returns (google.protobuf.Empty);
+  // Signup creates an account. In the invite mode a valid signup token is
+  // required; in the open mode the account is created without one, filtered
+  // by the allowlist when that is on. Whether the account must verify its
+  // email before signing in is a setting, so the answer's contract is
+  // mode-independent.
+  //
+  // The invite token is a raw value an operator issued once and is stored
+  // server-side only as a hash, so a database leak cannot replay it. A token
+  // that is unknown, expired, or spent answers the same failure, so the
+  // endpoint does not disclose which half was wrong. The username is
+  // case-insensitive and the email is matched exactly, the way their unique
+  // indexes are.
+  rpc Signup(SignupRequest) returns (SignupResponse);
+
+  // CreateSignupToken issues the signup token an account is created under.
+  // It is an administrative procedure: the caller must carry a Bearer token
+  // whose claims name an administrator, and a leaked machine credential is
+  // no substitute, so a leaked key cannot mint account invitations.
+  //
+  // The raw token is generated here and returned once; only its hash is
+  // stored, so no later procedure can read it back.
+  rpc CreateSignupToken(CreateSignupTokenRequest) returns (CreateSignupTokenResponse);
+
+  // ListSignupTokens answers the issued tokens with their usage counters.
+  // The raw values are absent on purpose: they were shown once, at creation,
+  // and only their hashes live in the database.
+  rpc ListSignupTokens(ListSignupTokensRequest) returns (ListSignupTokensResponse);
+
+  // DeleteSignupToken revokes an issued token. A spent or expired token needs
+  // no deletion — the consumption rules refuse it — so this exists for an
+  // invitation withdrawn before its window closes.
+  rpc DeleteSignupToken(DeleteSignupTokenRequest) returns (DeleteSignupTokenResponse);
 }
 
-message SignupRequest {
-  string username = 1;
-  string email = 2;
-  optional string first_name = 3;
-  optional string last_name = 4;
-  optional string token = 5;
-}
-
-message GetSetupAvailabilityResponse {
-  bool available = 1;
-}
-
-message SetupInitialAdminRequest {
-  string username = 1;
-  string email = 2;
-}
-
-message SignupToken {
-  string id = 1;
-  int32 usage_limit = 2;
-  int32 usage_count = 3;
-  string created_at = 4;
-  string expires_at = 5;
-  repeated string user_groups = 6;
-}
-
-// SignupTokenSecret carries the raw signup token exactly once, in the
-// creation response only.
-message SignupTokenSecret {
-  SignupToken token_info = 1;
-  string token = 2;
-}
-
-message ListSignupTokensResponse {
-  repeated SignupToken tokens = 1;
-  common.v1.ResponseMetadata metadata = 2;
-}
-
-message CreateSignupTokenRequest {
-  // Go duration string (e.g. "24h"); empty means no expiry policy.
-  optional string ttl = 1;
-  int32 usage_limit = 2;
-  repeated string user_group_ids = 3;
-}
-
-message DeleteSignupTokenRequest {
-  string token_id = 1;
-}
-
-// MfaService manages the TOTP lifecycle. Enroll/confirm/rotate answers
-// are show-once; verify completes a pending sign-in.
-service MfaService {
-  rpc EnrollTotp(google.protobuf.Empty) returns (EnrollTotpResponse);
-  rpc ConfirmTotp(ConfirmTotpRequest) returns (ConfirmTotpResponse);
-  rpc GetTotpStatus(google.protobuf.Empty) returns (GetTotpStatusResponse);
-  rpc VerifyPending(VerifyPendingRequest) returns (SignedIn);
-  rpc RotateRecoveryCodes(ConfirmTotpRequest) returns (ConfirmTotpResponse);
-  rpc DisableTotp(DisableTotpRequest) returns (google.protobuf.Empty);
-}
-
-// EnrollTotpResponse carries the raw secret and provisioning URI
-// exactly once.
-message EnrollTotpResponse {
-  string secret = 1;
-  string provisioning_uri = 2;
-}
-
-message ConfirmTotpRequest {
-  string code = 1;
-}
-
-// ConfirmTotpResponse carries the new recovery codes exactly once.
-message ConfirmTotpResponse {
-  repeated string recovery_codes = 1;
-}
-
-message GetTotpStatusResponse {
-  bool confirmed = 1;
-  int32 recovery_codes_remaining = 2;
-}
-
-message VerifyPendingRequest {
-  string code = 1;
-  // pending_token is the bridge credential issued by the pending
-  // sign-in response.
-  string pending_token = 2;
-}
-
-message DisableTotpRequest {
-  string password = 1;
-}
-
-// OneTimeAccessService covers email-token bootstrap. The token
-// exchange itself stays a REST email-link endpoint and is not an RPC.
-service OneTimeAccessService {
-  rpc RequestEmail(RequestEmailRequest) returns (google.protobuf.Empty);
-  rpc AdminSendEmail(AdminSendEmailRequest) returns (google.protobuf.Empty);
-  rpc AdminIssueToken(AdminIssueTokenRequest) returns (AdminIssueTokenResponse);
-}
-
-message RequestEmailRequest {
-  string identity = 1;
-}
-
-message AdminSendEmailRequest {
-  string user_id = 1;
-}
-
-message AdminIssueTokenRequest {
-  string user_id = 1;
-}
-
-// AdminIssueTokenResponse carries the raw one-time access token
-// exactly once.
-message AdminIssueTokenResponse {
-  string token = 1;
-}
-
-// EmailVerificationService sends the verification email from the SPA;
-// the verify step is the email-link REST endpoint and stays HTTP.
-service EmailVerificationService {
-  rpc SendEmail(google.protobuf.Empty) returns (google.protobuf.Empty);
-}
-
-// UserService is the admin console CRUD surface plus self-service
-// profile and credential management.
+// UserService administers the accounts. Every procedure is administrative:
+// the caller must carry a Bearer token whose claims name an administrator,
+// the same rule the signup-token procedures apply — a leaked machine
+// credential is no substitute, and a leaked key cannot rewrite accounts.
+//
+// An account's creation through sign-up is the SignupService's procedure;
+// CreateUser is the administrator's own door, for an account that exists
+// without an invitation. Updating is a full replace, the way the upstream
+// endpoint it ports is: every field is specified, an absent optional field
+// clears its column, and the ban fields operate as a unit.
 service UserService {
-  rpc ListUsers(common.v1.PageRequest) returns (ListUsersResponse);
-  rpc GetUser(GetUserRequest) returns (User);
-  rpc CreateUser(CreateUserRequest) returns (User);
-  rpc UpdateUser(UpdateUserRequest) returns (User);
-  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
-  rpc UpdateMe(UpdateProfileRequest) returns (User);
-  rpc UpdateMyProfilePicture(UpdateMyProfilePictureRequest) returns (User);
-  rpc DeleteMyProfilePicture(google.protobuf.Empty) returns (User);
-  rpc UpdateProfilePicture(UpdateProfilePictureRequest) returns (User);
-  rpc DeleteProfilePicture(DeleteProfilePictureRequest) returns (User);
-  rpc ListUserGroups(ListUserGroupsRequest) returns (ListUserGroupsResponse);
-  rpc ReplaceUserGroups(ReplaceUserGroupsRequest) returns (google.protobuf.Empty);
-  rpc ListWebAuthnCredentials(ListWebAuthnCredentialsRequest) returns (ListWebAuthnCredentialsResponse);
-  rpc UpdateWebAuthnCredential(UpdateWebAuthnCredentialRequest) returns (WebAuthnCredential);
-  rpc DeleteWebAuthnCredential(DeleteWebAuthnCredentialRequest) returns (google.protobuf.Empty);
+  // ListUsers answers one page of the accounts, newest first, optionally
+  // filtered by a search term matched against the username, the email, and
+  // the display name — the columns the trigram indexes exist for.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // GetUser answers one account by its identifier.
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // CreateUser creates an account directly, without a signup token. The
+  // password is optional: an account created without one carries no
+  // credential until a later procedure sets it.
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+
+  // UpdateUser replaces an account's fields. The ban fields are one unit:
+  // an expiry present applies the ban (the start instant is recorded
+  // automatically), an absent expiry lifts it.
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+
+  // DeleteUser removes an account. The database trigger archives the row, so
+  // the removal is soft by construction, not by a flag the service writes.
+  // An administrator cannot delete the account they are signed in with.
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+
+  // ResetProfilePicture removes an account's profile picture. The account
+  // falls back to the bundled default picture the read answers with. The
+  // caller may be the account's owner or an administrator.
+  rpc ResetProfilePicture(ResetProfilePictureRequest) returns (ResetProfilePictureResponse);
+
+  // GetCurrentUser answers the account the caller is. The target is the
+  // token's subject, never something the request names — this is the `/me`
+  // door upstream answers beside the identifier-addressed `GetUser`.
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+
+  // UpdateCurrentUser replaces the signed-in account's own profile fields:
+  // the names the account displays, its locale, and — where the change
+  // toggle admits it — the username. The credential, the address, and the
+  // role are not the caller's to rewrite here — the administrative surface
+  // owns them.
+  rpc UpdateCurrentUser(UpdateCurrentUserRequest) returns (UpdateCurrentUserResponse);
+
+  // DeleteMyAccount removes the signed-in account itself. The global
+  // self-delete setting arms the door and the account's override column
+  // answers for it; a caller the gate refuses answers the not-found code,
+  // the same shape an unknown account earns, so the surface says nothing
+  // about what the setting holds. The removal is the administrator delete's
+  // own: the row is archived by the database trigger, the live sessions
+  // die with their foreign keys, and the record names the account.
+  rpc DeleteMyAccount(DeleteMyAccountRequest) returns (DeleteMyAccountResponse);
+
+  // AddPassword sets the signed-in account's first password credential —
+  // the self-service an account created without one holds. The proof is
+  // the step-up token the guard consumes from the X-Saka-Reauthentication
+  // header; an account that already holds a password is refused, because
+  // changing one is a different procedure with its own proof. The password
+  // must meet the account's policy; the strength floor is the frontend's
+  // to show, the backend judges the length and the character rules.
+  rpc AddPassword(AddPasswordRequest) returns (AddPasswordResponse);
+
+  // RemovePassword deletes the signed-in account's password credential —
+  // the self-service counterpart of AddPassword, for an account moving to
+  // passkey-only sign-in. The proof is the step-up token the guard consumes
+  // from the X-Saka-Reauthentication header, the same shape the addition
+  // demands. The removal is refused while the account keeps no other live
+  // credential (passkey or binding): an account that cannot sign in again is
+  // a state the self-service never writes. Live sessions ride the queue's
+  // password-changed notices, and the account's address learns of the
+  // removal in a notification.
+  rpc RemovePassword(RemovePasswordRequest) returns (RemovePasswordResponse);
+
+  // BanUser applies a ban to the named account: the start instant is now,
+  // the reason is required, and the expiry is optional — absent, the ban
+  // never lifts by itself. Every live session the account holds is ended in
+  // the same transaction (the statelessness the protocol settles means an
+  // already-issued access token keeps working until its own expiry, but the
+  // refresh token dies here), and a notification is queued to the account's
+  // address. An unknown or malformed identifier answers the not-found code;
+  // an already-banned account is the same success, with the reason and
+  // expiry replaced — the write is the caller's intent, not a comparison.
+  rpc BanUser(BanUserRequest) returns (BanUserResponse);
+
+  // UnbanUser lifts the named account's ban as a unit — start instant,
+  // expiry, and reason together. An account that is not banned is the same
+  // success: the state the caller asked for is the state the row is in.
+  // A notification is queued to the account's address.
+  rpc UnbanUser(UnbanUserRequest) returns (UnbanUserResponse);
+
+  // UnlockUser lifts the named account's open lockout — the automated
+  // restriction the failed-attempt policy writes when a sign-in run trips
+  // `lockout.max_attempts`. The admin lift is the same unit the expiry is:
+  // the lockout row is lifted, and the account's failed-attempt streak
+  // starts fresh, because the lockout answered for the streak. An account
+  // with no open lockout is the same success — the state the caller asked
+  // for is the state the account is in. A ban is not a lockout and the
+  // procedure does not touch one; UnbanUser owns that.
+  rpc UnlockUser(UnlockUserRequest) returns (UnlockUserResponse);
 }
 
-message ListUsersResponse {
-  repeated User users = 1;
-  common.v1.ResponseMetadata metadata = 2;
-}
-
-message GetUserRequest {
-  string user_id = 1;
-}
-
-message CreateUserRequest {
-  string username = 1;
-  string email = 2;
-  optional string first_name = 3;
-  optional string last_name = 4;
-  optional string display_name = 5;
-  bool is_admin = 6;
-}
-
-message UpdateUserRequest {
-  string user_id = 1;
-  optional string email = 2;
-  optional string first_name = 3;
-  optional string last_name = 4;
-  optional string display_name = 5;
-  optional bool is_admin = 6;
-  optional bool disabled = 7;
-}
-
-message DeleteUserRequest {
-  string user_id = 1;
-}
-
-message UpdateMyProfilePictureRequest {
-  // Raw image bytes; the server validates the content type.
-  bytes image = 1;
-}
-
-message UpdateProfilePictureRequest {
-  string user_id = 1;
-  // Raw image bytes; the server validates the content type.
-  bytes image = 2;
-}
-
-message DeleteProfilePictureRequest {
-  string user_id = 1;
-}
-
-// ListUserGroupsRequest lists one user's group memberships. Bounded:
-// a user belongs to a bounded set of groups, so no page window.
-message ListUserGroupsRequest {
-  string user_id = 1;
-}
-
-message ListUserGroupsResponse {
-  repeated UserGroup groups = 1;
-}
-
-message ReplaceUserGroupsRequest {
-  string user_id = 1;
-  // Atomic replacement: the binding becomes exactly this set.
-  repeated string group_ids = 2;
-}
-
-// ListWebAuthnCredentialsRequest lists one user's passkeys. Bounded:
-// a user registers a handful of credentials, so no page window.
-message ListWebAuthnCredentialsRequest {
-  string user_id = 1;
-}
-
-message ListWebAuthnCredentialsResponse {
-  repeated WebAuthnCredential credentials = 1;
-}
-
-message UpdateWebAuthnCredentialRequest {
-  string user_id = 1;
-  string credential_id = 2;
-  string name = 3;
-}
-
-message DeleteWebAuthnCredentialRequest {
-  string user_id = 1;
-  string credential_id = 2;
-}
-
-// UserGroupService is the admin CRUD surface for access groups.
+// UserGroupService administers the groups accounts belong to. A group is an
+// organizing unit: it carries no permission of its own, but the members it
+// gathers are addressed together — a later feature may hang claims on a
+// group or gate a client on it, and every member inherits the outcome. The
+// surface is administrative end to end, and the membership update is a
+// replace, the way the upstream endpoint it ports is: the request names the
+// whole member set, not a delta.
 service UserGroupService {
-  rpc ListGroups(common.v1.PageRequest) returns (ListGroupsResponse);
-  rpc GetGroup(GetUserGroupRequest) returns (UserGroup);
-  rpc CreateGroup(CreateUserGroupRequest) returns (UserGroup);
-  rpc UpdateGroup(UpdateUserGroupRequest) returns (UserGroup);
-  rpc DeleteGroup(DeleteUserGroupRequest) returns (google.protobuf.Empty);
-  rpc ListGroupUsers(ListGroupUsersRequest) returns (ListGroupUsersResponse);
-  rpc ReplaceGroupUsers(ReplaceGroupUsersRequest) returns (google.protobuf.Empty);
-  rpc ReplaceAllowedOidcClients(ReplaceAllowedOidcClientsRequest) returns (google.protobuf.Empty);
+  // ListUserGroups answers one page of the groups, optionally filtered by a
+  // search term matched against the name and the display name, and sorted by
+  // one column. The default order is the display name, ascending.
+  rpc ListUserGroups(ListUserGroupsRequest) returns (ListUserGroupsResponse);
+
+  // GetUserGroup answers one group with its members.
+  rpc GetUserGroup(GetUserGroupRequest) returns (GetUserGroupResponse);
+
+  // CreateUserGroup creates a group. The name is unique — the unique index
+  // is the storage of that rule, and a duplicate answers `already_exists`.
+  rpc CreateUserGroup(CreateUserGroupRequest) returns (CreateUserGroupResponse);
+
+  // UpdateUserGroup replaces a group's two fields. Both are required, the
+  // way the upstream endpoint it ports is.
+  rpc UpdateUserGroup(UpdateUserGroupRequest) returns (UpdateUserGroupResponse);
+
+  // DeleteUserGroup removes a group. Membership rows die with it by the
+  // foreign keys' cascade, and the accounts themselves are untouched.
+  rpc DeleteUserGroup(DeleteUserGroupRequest) returns (DeleteUserGroupResponse);
+
+  // SetUserGroupMembers replaces the group's member set with the accounts
+  // the request names. An empty list empties the group — a group may be
+  // emptied, only not made wrong by a member that does not exist.
+  rpc SetUserGroupMembers(SetUserGroupMembersRequest) returns (SetUserGroupMembersResponse);
+
+  // GetUserGroups answers the groups one account belongs to, ordered by the
+  // group's display name. The target is the account the request names; the
+  // administrative procedures address accounts by identifier, which is the
+  // shape the upstream port carries.
+  rpc GetUserGroups(GetUserGroupsRequest) returns (GetUserGroupsResponse);
+
+  // UpdateUserGroups replaces the set of groups one account belongs to.
+  // The replacement, like its per-group sibling, is whole: the request
+  // names every group the account belongs to after the call, and an empty
+  // list removes the account from all of them. Every named group must
+  // exist — a membership is not created into nothing.
+  rpc UpdateUserGroups(UpdateUserGroupsRequest) returns (UpdateUserGroupsResponse);
+
+  // SetAllowedOidcClients replaces the set of OIDC clients the group's
+  // allowlist names — the group-side view of the client restriction, the
+  // mirror of the client surface's UpdateAllowedUserGroups. The replace is
+  // whole, an empty list empties the roll, and one identifier that names
+  // no client refuses the replacement.
+  rpc SetAllowedOidcClients(SetGroupAllowedOidcClientsRequest) returns (SetGroupAllowedOidcClientsResponse);
 }
 
-message ListGroupsResponse {
-  repeated UserGroup groups = 1;
-  common.v1.ResponseMetadata metadata = 2;
+// EmailVerificationService verifies an account's address. The verification
+// email is the only mail the flow sends, and the token it carries is the
+// flow's whole credential: it is generated here, shown once in the message,
+// and stored only as a hash, so a database leak cannot verify an account.
+//
+// SendEmail is the signed-in user's own door — it mails the address on
+// record, never one the request names. VerifyEmail is answered without a
+// caller: the token identifies the account, and the frontend the message
+// links to forwards the value, so the flow works in a browser that holds no
+// session.
+service EmailVerificationService {
+  // SendEmail mails the verification link to the signed-in user's address.
+  // An already-verified account is refused — the caller learns the state
+  // rather than receiving a pointless message — and an unconfigured mailer
+  // refuses the procedure rather than enqueuing a task that cannot succeed.
+  // The email itself is sent by the durable queue: the request writes the
+  // token row and enqueues, and the queue's retries own the SMTP attempt.
+  rpc SendEmail(SendVerificationEmailRequest) returns (SendVerificationEmailResponse);
+
+  // VerifyEmail marks the account the token names as verified. An unknown,
+  // expired, and spent token answer the same failure, so the endpoint does
+  // not disclose which half was wrong. Verification consumes the token: the
+  // row is deleted, so the link works once.
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse);
+
+  // RequestEmailChange writes the pending change for the signed-in account
+  // and mails its token to the address the change moves to. The address the
+  // request names must be free: another account's address is refused here,
+  // where the caller can pick a different one, rather than at the
+  // confirmation, where the link would already be in flight. The message to
+  // the old address is the account holder's defense against a change
+  // someone else asked for; the token message is the flow itself.
+  rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse);
+
+  // ConfirmEmailChange consumes the pending token and moves the account to
+  // the address the token binds. An unknown, expired, and spent token
+  // answer the same failure, and the row is deleted, so the link works
+  // once. The confirmation is answered without a caller: the token
+  // identifies the account, and the frontend the message links to forwards
+  // the value, so the flow works in a browser that holds no session.
+  rpc ConfirmEmailChange(ConfirmEmailChangeRequest) returns (ConfirmEmailChangeResponse);
 }
 
-message GetUserGroupRequest {
-  string group_id = 1;
+// SendVerificationEmailRequest is empty: the caller is the account the
+// Bearer claims name, and the address is the one on record.
+message SendVerificationEmailRequest {}
+
+// SendVerificationEmailResponse is empty: acceptance says the token was
+// issued and the task enqueued, not that a message was delivered.
+message SendVerificationEmailResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-message CreateUserGroupRequest {
-  string name = 1;
-  string display_name = 2;
+// VerifyEmailRequest carries the token the message linked to.
+message VerifyEmailRequest {
+  // token is the raw verification token, in clear text. It travels only
+  // over TLS and is never logged.
+  string token = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-message UpdateUserGroupRequest {
-  string group_id = 1;
-  optional string name = 2;
-  optional string display_name = 3;
+// VerifyEmailResponse is empty: the protocol carries the success.
+message VerifyEmailResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-message DeleteUserGroupRequest {
-  string group_id = 1;
+// RequestEmailChangeRequest names the address the account moves to.
+message RequestEmailChangeRequest {
+  // new_email is the pending address. It is refused here when another
+  // account is already on record with it, and the token the procedure
+  // mails binds it: the confirmation moves the account to this address,
+  // never to one a replayed link could pick.
+  string new_email = 1 [(buf.validate.field).string.email = true];
 }
 
-message ListGroupUsersRequest {
-  string group_id = 1;
-  common.v1.PageRequest page = 2;
+// RequestEmailChangeResponse is empty: acceptance says the token was issued
+// and the tasks enqueued, not that a message was delivered.
+message RequestEmailChangeResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-message ListGroupUsersResponse {
+// ConfirmEmailChangeRequest carries the token the message linked to.
+message ConfirmEmailChangeRequest {
+  // token is the raw change token, in clear text. It travels only over TLS
+  // and is never logged.
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// ConfirmEmailChangeResponse is empty: the protocol carries the success.
+message ConfirmEmailChangeResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// SignupRequest carries the account fields and, for the invite mode, the
+// signup token. Which fields the request must carry is the settings' call —
+// the access mode decides the token, the identity toggles decide the
+// username — so the transport enforces the shapes and the service owns the
+// conditionals.
+message SignupRequest {
+  // username is the account's handle: 3-32 characters of ASCII letters,
+  // digits, and underscores, matched case-insensitively. Optional by the
+  // identity toggles; presence and the pattern are the service's check.
+  string username = 1;
+
+  // email is the account's address, matched exactly.
+  string email = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"];
+
+  // password is the account's primary credential, in clear text. The field
+  // travels only over TLS and is never logged. The transport's floor keeps a
+  // degenerate answer cheap; the policy rule itself is the service's.
+  string password = 3 [(buf.validate.field).string.min_len = 8];
+
+  // token is the raw signup token the account is created under. Required
+  // only in the invite mode; the access mode is a setting the service reads,
+  // so the field carries no constraint here.
+  string token = 4;
+
+  // first_name is the given name the account displays.
+  string first_name = 5 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // last_name is the family name the account displays.
+  string last_name = 6 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+}
+
+// SignupResponse is the account the token created.
+message SignupResponse {
+  // user is the created account's view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// User is the account view the identity procedures answer with. It carries
+// the fields a client renders or an operator manages, not the row: no
+// password hash, no metadata blob, no profile-picture path. The nullable
+// columns are optional on the wire, so an account without a name part or a
+// ban reads as absent rather than as an empty string.
+message User {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1;
+
+  // username is the account's handle, case preserved as stored.
+  string username = 2;
+
+  // email is the account's address.
+  string email = 3;
+
+  // display_name is the name shown in the UI.
+  string display_name = 4;
+
+  // first_name is the optional given name.
+  optional string first_name = 5;
+
+  // last_name is the optional family name.
+  optional string last_name = 6;
+
+  // disabled says whether sign-ins are refused.
+  bool disabled = 9;
+
+  // email_verified says whether the address was verified. Verification
+  // itself is a later procedure; the flag reflects the column.
+  bool email_verified = 10;
+
+  // created_at is the creation instant, RFC 3339.
+  string created_at = 11;
+
+  // banned_at is when the ban started, RFC 3339, absent when unbanned.
+  optional string banned_at = 12;
+
+  // ban_expires is when the ban lifts, RFC 3339, absent when unbanned or
+  // permanent.
+  optional string ban_expires = 13;
+
+  // ban_reason is the note the banning administrator wrote.
+  optional string ban_reason = 14;
+
+  // metadata is the account's preference document — the locale and the
+  // timezone an account sets about itself, read as one typed block. The
+  // requests keep their flat fields; this is the stored shape's view.
+  UserMetadata metadata = 15;
+
+  // user_groups are the groups the account belongs to, ordered by the
+  // group's display name — the same view ListUserGroups answers with, so
+  // a client rendering an account never needs a second roundtrip to name
+  // its memberships. The group names are what a deployment's clients
+  // match a group-based claim against.
+  repeated UserGroup user_groups = 16;
+
+  // picture is the account's picture's public URL, resolved from the
+  // filestore object the account references. Empty when the account has
+  // no picture: the client then shows its bundled default, the same
+  // picture the profile-picture read answers by redirect.
+  string picture = 17;
+}
+
+// UserMetadata is the account's preference document, the typed view of the
+// JSONB `users.metadata` column. The document is closed: these keys are the
+// whole contract, and a key a client invents is not carried. Absent fields
+// answer the defaults — an absent timezone is UTC, an absent locale is
+// unset — and the server never localizes: every instant it answers is UTC,
+// the timezone is the presentation hint alone.
+message UserMetadata {
+  // locale is the optional preferred locale tag.
+  optional string locale = 1;
+
+  // timezone is the IANA zone the client formats UTC timestamps against;
+  // "UTC" is the default.
+  string timezone = 2;
+}
+
+// SignupToken is the issued token's view. It carries the counters an operator
+// manages, never the raw value: a token is shown once, in the creation
+// response, and only its hash is stored.
+//
+// SignupToken is one issued token as the list answers it.
+message SignupToken {
+  // id is the token row's identifier, a UUID string.
+  string id = 1;
+
+  // usage_limit is how many sign-ups the token admits.
+  int32 usage_limit = 2;
+
+  // usage_count is how many sign-ups have used it.
+  int32 usage_count = 3;
+
+  // created_at is the issue time, RFC 3339.
+  string created_at = 4;
+
+  // expires_at is the instant the token stops admitting sign-ups, RFC 3339.
+  string expires_at = 5;
+
+  // user_group_ids are the groups every account this token creates joins.
+  repeated string user_group_ids = 6;
+}
+
+// CreateSignupTokenRequest carries the token's window, budget, and groups.
+message CreateSignupTokenRequest {
+  // ttl_seconds is how long the token admits sign-ups, in seconds: between
+  // one hour and thirty days.
+  int32 ttl_seconds = 1 [(buf.validate.field).int32 = {
+    gte: 3600
+    lte: 2592000
+  }];
+
+  // usage_limit is how many sign-ups the token admits. Unset means the
+  // single invitation; when set it is between 1 and 1000.
+  optional int32 usage_limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 1000
+  }];
+
+  // user_group_ids are the groups every account signed up under this token
+  // joins. Each names a group that exists; a token naming none creates
+  // groupless accounts, the way upstream's empty list does.
+  repeated string user_group_ids = 3 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
+}
+
+// CreateSignupTokenResponse is the issued token. raw_token is the only place
+// the value exists: it is not stored and cannot be read back.
+message CreateSignupTokenResponse {
+  // token is the issued token's view.
+  SignupToken token = 1;
+
+  // raw_token is the value an invitation carries. Show it once.
+  string raw_token = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// ListSignupTokensRequest carries the page and the sort the caller asks for.
+// Both page fields unset answer the first default-sized page.
+message ListSignupTokensRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // sort_by names the column the page orders by. Absent, the issue time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "expires_at",
+      "usage_count",
+      "usage_limit"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListSignupTokensResponse is the issued tokens and their pagination block.
+message ListSignupTokensResponse {
+  // tokens are the issued tokens, newest first.
+  repeated SignupToken tokens = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// DeleteSignupToken names the token to revoke.
+message DeleteSignupTokenRequest {
+  // id is the token row's identifier, the UUID string the list answered.
+  string id = 1;
+}
+
+// DeleteSignupTokenResponse is empty: a successful deletion says so with the
+// protocol, and a missed one with the not-found code.
+message DeleteSignupTokenResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// ListUsersRequest carries the page, the filter, and the sort the caller
+// asks for.
+message ListUsersRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // search filters by a term matched against the username, the email, and
+  // the display name. Absent means every account.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "username",
+      "email",
+      "first_name",
+      "last_name",
+      "display_name",
+      "created_at",
+      "last_login_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListUsersResponse is the page of accounts and their pagination block.
+message ListUsersResponse {
+  // users are the accounts, newest first.
   repeated User users = 1;
-  common.v1.ResponseMetadata metadata = 2;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
 }
 
-message ReplaceGroupUsersRequest {
-  string group_id = 1;
-  // Atomic replacement: the membership becomes exactly this set.
-  repeated string user_ids = 2;
+// GetUserRequest names the account to read.
+message GetUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-message ReplaceAllowedOidcClientsRequest {
-  string group_id = 1;
-  // Atomic replacement: the allowlist becomes exactly this set.
-  repeated string client_ids = 2;
+// GetUserResponse is the account.
+message GetUserResponse {
+  // user is the account's view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-// DeviceApprovalService backs the internal approval UI for device
-// login (RFC 8628 device side stays REST).
-service DeviceApprovalService {
-  rpc GetPendingRequest(GetPendingRequestRequest) returns (VerificationInfo);
-  rpc DecideRequest(DecideRequestRequest) returns (google.protobuf.Empty);
+// CreateUserRequest carries the account fields and the optional credential.
+message CreateUserRequest {
+  // username is the account's handle: 3-32 characters of ASCII letters,
+  // digits, and underscores, matched case-insensitively.
+  string username = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_]{3,32}$"];
+
+  // email is the account's address, matched exactly.
+  string email = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"];
+
+  // password is the account's primary credential, in clear text. It travels
+  // only over TLS and is never logged. Absent means the account carries no
+  // credential until one is set. The transport's floor keeps a degenerate
+  // answer cheap; the strength rule itself is the service's.
+  optional string password = 3 [(buf.validate.field).string.min_len = 8];
+
+  // first_name is the given name.
+  string first_name = 4 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // last_name is the family name.
+  string last_name = 5 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // display_name is the name the UI shows. Absent, it is composed from the
+  // given and family names.
+  optional string display_name = 6 [(buf.validate.field).string.max_len = 200];
+
+  // locale is the optional preferred locale tag.
+  optional string locale = 7;
+
+  // disabled refuses sign-ins from the start. Default false.
+  optional bool disabled = 9;
+
+  // email_verified records the address as verified at creation. Default
+  // false; verification itself is a later procedure.
+  optional bool email_verified = 10;
+
+  // user_group_ids are the groups the created account joins, the way the
+  // upstream create carries them. Every name must be a group the
+  // deployment holds — the creation refuses an audience it cannot name,
+  // the way the group procedures refuse an unknown identifier.
+  repeated string user_group_ids = 11;
 }
 
-message GetPendingRequestRequest {
-  // The user code shown on the device awaiting approval.
-  string user_code = 1;
+// CreateUserResponse is the created account.
+message CreateUserResponse {
+  // user is the account's view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-message VerificationInfo {
-  string user_code = 1;
-  string device = 2;
-  string ip_address = 3;
-  string city = 4;
-  string country = 5;
-  string expires_at = 6;
+// UpdateUserRequest replaces an account's fields. Every field is specified:
+// an empty name part or locale clears its column, and a display name is
+// always required. The ban fields are one unit — ban_expires present
+// applies the ban, absent lifts it.
+message UpdateUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // username is the account's handle: 3-32 characters of ASCII letters,
+  // digits, and underscores, matched case-insensitively.
+  string username = 2 [(buf.validate.field).string.pattern = "^[a-zA-Z0-9_]{3,32}$"];
+
+  // email is the account's address, matched exactly.
+  string email = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"];
+
+  // first_name is the given name; never empty.
+  string first_name = 4 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // last_name is the family name; never empty.
+  string last_name = 5 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // display_name is the name the UI shows; never empty.
+  string display_name = 6 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 200
+  ];
+
+  // locale is the preferred locale tag; empty clears it.
+  string locale = 7;
+
+  // timezone is the IANA zone the account's client formats UTC timestamps
+  // against. Empty resets it to "UTC"; a non-empty value must name a zone
+  // the tz database knows — the server refuses an unknown name.
+  string timezone = 12 [(buf.validate.field).string.max_len = 64];
+
+  // disabled refuses or allows sign-ins.
+  bool disabled = 9;
+
+  // ban_expires is when the ban lifts. Present, it applies the ban — the
+  // start instant is recorded automatically, keeping an earlier start when
+  // the account was already banned. Absent, it lifts the ban.
+  optional google.protobuf.Timestamp ban_expires = 10;
+
+  // ban_reason is the note the banning administrator wrote. Meaningful only
+  // with ban_expires; clearing the ban clears it.
+  optional string ban_reason = 11;
 }
 
-message DecideRequestRequest {
-  string user_code = 1;
-  bool approve = 2;
+// UpdateUserResponse is the account as the update left it.
+message UpdateUserResponse {
+  // user is the account's view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-// CustomClaimService administers claim entries on users and groups.
-service CustomClaimService {
-  rpc Suggest(SuggestRequest) returns (SuggestResponse);
-  rpc ListUserClaims(ListUserClaimsRequest) returns (ListClaimsResponse);
-  rpc CreateUserClaim(CreateUserClaimRequest) returns (CustomClaim);
-  rpc UpdateUserClaim(UpdateClaimRequest) returns (CustomClaim);
-  rpc DeleteUserClaim(DeleteClaimRequest) returns (google.protobuf.Empty);
-  rpc ListGroupClaims(ListGroupClaimsRequest) returns (ListClaimsResponse);
-  rpc CreateGroupClaim(CreateGroupClaimRequest) returns (CustomClaim);
-  rpc UpdateGroupClaim(UpdateGroupClaimRequest) returns (CustomClaim);
-  rpc DeleteGroupClaim(DeleteGroupClaimRequest) returns (google.protobuf.Empty);
+// DeleteUserRequest names the account to remove.
+message DeleteUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-message SuggestRequest {
-  string query = 1;
+// DeleteUserResponse is empty: a successful deletion says so with the
+// protocol, and a missed one with the not-found code.
+message DeleteUserResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-message SuggestResponse {
-  repeated string keys = 1;
+message ResetProfilePictureRequest {
+  // The account whose picture is removed — the same `id` its sibling
+  // account procedures (GetUser, UpdateUser, DeleteUser) address it by.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-// ListUserClaimsRequest lists one user's custom claims. Bounded: the
-// claim set is small and fixed per user, so no page window.
-message ListUserClaimsRequest {
-  string user_id = 1;
+message ResetProfilePictureResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }
 
-// ListGroupClaimsRequest lists one group's custom claims. Bounded: the
-// claim set is small and fixed per group, so no page window.
-message ListGroupClaimsRequest {
-  string user_group_id = 1;
+// BanUserRequest names the account to ban and the terms of the ban.
+message BanUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // reason is why the account is banned. It is required — a ban without a
+  // stated reason is the one an audit trail cannot explain, and the same
+  // sentence travels to the account in the notification.
+  string reason = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 500
+  ];
+
+  // expires_at is when the ban lifts by itself, absent for a ban that never
+  // lifts. An instant in the past is refused by the service: it would write
+  // a ban that is already over, a state the caller cannot have meant.
+  optional google.protobuf.Timestamp expires_at = 3;
 }
 
-message ListClaimsResponse {
-  repeated CustomClaim claims = 1;
+// BanUserResponse answers the account as the ban left it.
+message BanUserResponse {
+  // user is the account's view after the write — the ban fields carry the
+  // instant, the expiry, and the reason the request applied.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-message CreateUserClaimRequest {
-  string user_id = 1;
-  string key = 2;
-  string value = 3;
+// UnbanUserRequest names the account whose ban is lifted.
+message UnbanUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-message CreateGroupClaimRequest {
-  string user_group_id = 1;
-  string key = 2;
-  string value = 3;
+// UnbanUserResponse answers the account as the lift left it.
+message UnbanUserResponse {
+  // user is the account's view after the write — the ban fields are gone.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-message UpdateClaimRequest {
-  string user_id = 1;
-  string claim_id = 2;
-  string value = 3;
+// UnlockUserRequest names the account whose lockout is lifted.
+message UnlockUserRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
-message UpdateGroupClaimRequest {
-  string user_group_id = 1;
-  string claim_id = 2;
-  string value = 3;
+// UnlockUserResponse answers the account as the unlock left it.
+message UnlockUserResponse {
+  // user is the account's view after the write — the failed-attempt
+  // counter is zero and no lockout row stands against the account.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-message DeleteClaimRequest {
-  string user_id = 1;
-  string claim_id = 2;
+// GetCurrentUserRequest is empty: the account is the caller the token names.
+message GetCurrentUserRequest {}
+
+// GetCurrentUserResponse is the signed-in account.
+message GetCurrentUserResponse {
+  // user is the caller's own account view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
 }
 
-message DeleteGroupClaimRequest {
-  string user_group_id = 1;
-  string claim_id = 2;
+// UpdateCurrentUserRequest carries the signed-in account's profile fields.
+// The writable set is the account's display surface — the names and the
+// locale — not its identity: the username, the email, and the role are the
+// administrative surface's to change.
+message UpdateCurrentUserRequest {
+  // first_name is the given name; never empty.
+  string first_name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // last_name is the family name; never empty.
+  string last_name = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+
+  // display_name is the name the UI shows; never empty.
+  string display_name = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 200
+  ];
+
+  // locale is the preferred locale tag; empty clears it.
+  string locale = 4;
+
+  // timezone is the IANA zone the account's client formats UTC timestamps
+  // against. Empty resets it to "UTC"; a non-empty value must name a zone
+  // the tz database knows — the server refuses an unknown name.
+  string timezone = 5 [(buf.validate.field).string.max_len = 64];
+
+  // username is the account's handle, changeable while the change toggle
+  // admits it: 3-32 characters of ASCII letters, digits, and underscores,
+  // matched case-insensitively. Absent, the field keeps the current
+  // username; presence and the pattern are the service's check.
+  string username = 6;
+}
+
+// DeleteMyAccountRequest carries nothing: the target is the token's subject,
+// never something the request names.
+message DeleteMyAccountRequest {}
+
+// DeleteMyAccountResponse answers the removal the caller asked for.
+message DeleteMyAccountResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
+}
+
+// AddPasswordRequest carries the new credential only: the proof rode the
+// header, and the account is the token's subject.
+message AddPasswordRequest {
+  // new_password is the clear-text credential, judged by the account's
+  // policy at the service — the proto's floor stays at one character so
+  // the settings own the real bound.
+  string new_password = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message AddPasswordResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
+}
+
+// RemovePasswordRequest carries nothing: the proof rode the
+// X-Saka-Reauthentication header, and the account is the token's subject.
+message RemovePasswordRequest {}
+
+// RemovePasswordResponse answers the removal the caller asked for.
+message RemovePasswordResponse {
+  // status and message are the shared envelope's fields.
+  string status = 1;
+  string message = 2;
+}
+
+// UpdateCurrentUserResponse is the account as the update left it.
+message UpdateCurrentUserResponse {
+  // user is the caller's own account view.
+  User user = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UserGroup is the group's minimal view: the shape the list answers. The
+// member count travels with the row — it is not a column, it is the count
+// the query computes, so a list never needs a second round trip per row.
+message UserGroup {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`).
+  string id = 1;
+
+  // name is the group's unique handle.
+  string name = 2;
+
+  // display_name is the name the UI shows.
+  string display_name = 3;
+
+  // user_count is how many accounts belong to the group.
+  int32 user_count = 4;
+
+  // created_at is the creation instant, RFC 3339.
+  string created_at = 5;
+
+  // updated_at is the last field-changing write, RFC 3339, absent when the
+  // row was never updated.
+  optional string updated_at = 6;
+}
+
+// UserGroupDetail is the group's full view: the minimal shape plus the
+// members, the accounts the group gathers.
+message UserGroupDetail {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`).
+  string id = 1;
+
+  // name is the group's unique handle.
+  string name = 2;
+
+  // display_name is the name the UI shows.
+  string display_name = 3;
+
+  // users are the members, ordered by username.
+  repeated User users = 4;
+
+  // user_count is how many accounts belong to the group — always the size
+  // of users, carried so a caller never derives it.
+  int32 user_count = 5;
+
+  // created_at is the creation instant, RFC 3339.
+  string created_at = 6;
+
+  // updated_at is the last field-changing write, RFC 3339, absent when the
+  // row was never updated.
+  optional string updated_at = 7;
+
+  // allowed_oidc_clients are the clients the group's allowlist names — the
+  // accounts in the group may only reach these clients when the client is
+  // restricted — ordered by the client's name. Upstream answers the same
+  // roll inside its group detail view.
+  repeated AllowedOidcClientRef allowed_oidc_clients = 8;
+}
+
+// ListUserGroupsRequest carries the page, the filter, and the sort the list
+// answers with.
+message ListUserGroupsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+
+  // search filters by a term matched against the name and the display name.
+  // Absent means every group.
+  optional string search = 3 [(buf.validate.field).string.max_len = 100];
+
+  // sort_by names the column the page orders by. Absent, the display name
+  // orders the page.
+  optional string sort_by = 4 [(buf.validate.field).string = {
+    in: [
+      "name",
+      "display_name",
+      "user_count",
+      "created_at"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 5 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListUserGroupsResponse is the page of groups and their pagination block.
+message ListUserGroupsResponse {
+  // groups are the groups in the page order.
+  repeated UserGroup groups = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// GetUserGroupRequest names the group to read.
+message GetUserGroupRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetUserGroupResponse is the group with its members.
+message GetUserGroupResponse {
+  // group is the group's detail view.
+  UserGroupDetail group = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// CreateUserGroupRequest carries the two fields a group is made of.
+message CreateUserGroupRequest {
+  // name is the group's unique handle: 2-255 characters.
+  string name = 1 [
+    (buf.validate.field).string.min_len = 2,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // display_name is the name the UI shows: 2-50 characters.
+  string display_name = 2 [
+    (buf.validate.field).string.min_len = 2,
+    (buf.validate.field).string.max_len = 50
+  ];
+}
+
+// CreateUserGroupResponse is the created group.
+message CreateUserGroupResponse {
+  // group is the group's detail view — its member set is empty.
+  UserGroupDetail group = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateUserGroupRequest replaces a group's two fields. Both are required.
+message UpdateUserGroupRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // name is the group's unique handle: 2-255 characters.
+  string name = 2 [
+    (buf.validate.field).string.min_len = 2,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // display_name is the name the UI shows: 2-50 characters.
+  string display_name = 3 [
+    (buf.validate.field).string.min_len = 2,
+    (buf.validate.field).string.max_len = 50
+  ];
+}
+
+// UpdateUserGroupResponse is the updated group.
+message UpdateUserGroupResponse {
+  // group is the group's detail view.
+  UserGroupDetail group = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// DeleteUserGroupRequest names the group to remove.
+message DeleteUserGroupRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteUserGroupResponse is empty: a successful deletion says so with the
+// protocol, and a missed one with the not-found code.
+message DeleteUserGroupResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
+}
+
+// SetUserGroupMembersRequest replaces the group's member set.
+message SetUserGroupMembersRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // user_ids are the accounts that belong to the group after the call.
+  // An empty list empties the group.
+  repeated string user_ids = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
+}
+
+// SetUserGroupMembersResponse is the group after the replacement.
+message SetUserGroupMembersResponse {
+  // group is the group's detail view.
+  UserGroupDetail group = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// SetGroupAllowedOidcClientsRequest replaces the group's OIDC client
+// allowlist — the group-side roll of which clients the group's members may
+// be signed into.
+message SetGroupAllowedOidcClientsRequest {
+  // id is the group's identifier in its wire form, a TypeID (`ugrp_…`).
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // oidc_client_ids are the clients the group's members may access after
+  // the call. An empty list empties the roll — with the clients' own
+  // restrictions on, an empty roll means the group admits nobody through
+  // it.
+  repeated string oidc_client_ids = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.items.string = {
+      min_len: 1
+      max_len: 64
+    }
+  ];
+}
+
+// AllowedOidcClientRef is one client the group's allowlist names, in the
+// minimal shape a group view renders it: the protocol identifier and the
+// display name.
+message AllowedOidcClientRef {
+  // id is the client's protocol identifier — the client_id the relying
+  // party presents, not a row UUID.
+  string id = 1;
+
+  // name is the client's display name.
+  string name = 2;
+}
+
+// SetGroupAllowedOidcClientsResponse is the group and the allowlist after
+// the replacement.
+message SetGroupAllowedOidcClientsResponse {
+  // group is the group's view.
+  UserGroup group = 1;
+
+  // allowed_clients are the clients the roll now names, ordered by name.
+  repeated AllowedOidcClientRef allowed_clients = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// GetUserGroupsRequest names the account whose groups are read.
+message GetUserGroupsRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetUserGroupsResponse is the groups the account belongs to.
+message GetUserGroupsResponse {
+  // groups are the account's groups, ordered by display name.
+  repeated UserGroup groups = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// UpdateUserGroupsRequest replaces the set of groups one account belongs to.
+message UpdateUserGroupsRequest {
+  // id is the account's identifier in its wire form, a TypeID (`user_…`)
+  // encoded from the row's UUID — the UUID never leaves the server.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+
+  // group_ids are the groups the account belongs to after the call. An
+  // empty list removes the account from every group. Every identifier must
+  // name an existing group: a duplicate is refused by the contract, an
+  // unknown one by the service.
+  repeated string group_ids = 2 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
+}
+
+// UpdateUserGroupsResponse is the groups the account belongs to after the
+// replacement.
+message UpdateUserGroupsResponse {
+  // groups are the account's groups, ordered by display name.
+  repeated UserGroup groups = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// BlocklistService administers the sign-up blocklist: the identifiers no
+// open-mode sign-up may claim while the feature's setting is on. Every
+// procedure is administrative — the caller must carry a Bearer token whose
+// claims name an administrator, the same rule the other admin surfaces
+// apply.
+//
+// An entry is one email address (`john.doe@example.com`) or one domain
+// (`@example.com`, every address at it), stored lowercased and matched
+// case-insensitively. A blocked exact address also blocks the subaddressed
+// variants of it (`john.doe+tag@example.com`); the wildcard patterns are
+// not part of this grammar.
+service BlocklistService {
+  // ListBlocklistEntries answers one page of the entries, newest first.
+  rpc ListBlocklistEntries(ListBlocklistEntriesRequest) returns (ListBlocklistEntriesResponse);
+
+  // AddBlocklistEntry stores one entry. Adding an entry the list already
+  // carries is not an error: the answer is the stored row, so the caller
+  // sees the identifier's real state. The pattern is validated against the
+  // grammar here as far as the contract can — the length — and fully in
+  // the service.
+  rpc AddBlocklistEntry(AddBlocklistEntryRequest) returns (AddBlocklistEntryResponse);
+
+  // RemoveBlocklistEntry deletes one entry by its identifier. An unknown
+  // identifier answers the not-found code.
+  rpc RemoveBlocklistEntry(RemoveBlocklistEntryRequest) returns (RemoveBlocklistEntryResponse);
+}
+
+// BlocklistEntry is one blocked identifier as the list answers it.
+message BlocklistEntry {
+  // id is the entry row's identifier, the UUID string.
+  string id = 1;
+
+  // pattern is the stored entry: the lowercased email address or the
+  // `@domain` entry.
+  string pattern = 2;
+
+  // created_by is the administrator who added the entry, in the account
+  // wire form, when the row still names a live account.
+  optional string created_by = 3;
+
+  // created_at is the instant the entry was added.
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// ListBlocklistEntriesRequest carries the page and the sort the caller asks
+// for. Both page fields unset answer the first default-sized page.
+message ListBlocklistEntriesRequest {
+  // page is the one-based page number.
+  optional int32 page = 1;
+
+  // limit is the page size.
+  optional int32 limit = 2;
+
+  // sort_by names the column the page orders by. Absent, the creation time
+  // orders the page, newest first.
+  optional string sort_by = 3 [(buf.validate.field).string = {
+    in: [
+      "created_at",
+      "pattern"
+    ]
+  }];
+
+  // sort_order flips the direction; absent means ascending.
+  optional string sort_order = 4 [(buf.validate.field).string = {
+    in: [
+      "asc",
+      "desc"
+    ]
+  }];
+}
+
+// ListBlocklistEntriesResponse is the page of entries and the pagination
+// block.
+message ListBlocklistEntriesResponse {
+  // entries are the blocklist entries, newest first unless sort_by says
+  // otherwise.
+  repeated BlocklistEntry entries = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 2;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 3;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 4;
+}
+
+// AddBlocklistEntryRequest names the identifier to block.
+message AddBlocklistEntryRequest {
+  // pattern is the email address or the `@domain` entry to block, at most
+  // one `@`, only as the address's separator or the entry's first byte.
+  // The length bound keeps the row from carrying prose; the grammar is the
+  // service's check.
+  string pattern = 1 [
+    (buf.validate.field).string.min_len = 3,
+    (buf.validate.field).string.max_len = 254
+  ];
+}
+
+// AddBlocklistEntryResponse is the entry as stored — on a duplicate, the
+// row that was already there.
+message AddBlocklistEntryResponse {
+  // entry is the stored row.
+  BlocklistEntry entry = 1;
+
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 2;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 3;
+}
+
+// RemoveBlocklistEntry names the entry to delete.
+message RemoveBlocklistEntryRequest {
+  // id is the entry row's identifier, the UUID string the list answered.
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// RemoveBlocklistEntryResponse is empty: a successful deletion says so with
+// the protocol, and a missed one with the not-found code.
+message RemoveBlocklistEntryResponse {
+  // status is the outcome word the client checks — success; a
+  // failure never reaches this body, it is a connect error.
+  string status = 1;
+
+  // message is the human-readable sentence describing what the call did.
+  string message = 2;
 }

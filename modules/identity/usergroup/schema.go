@@ -1,120 +1,85 @@
-// Package usergroup groups users so OIDC client access can be
-// granted in bulk. Membership references identity root users.
 package usergroup
 
 import (
-	"context"
-	"errors"
-	"strings"
+	"fmt"
 	"time"
 
-	"github.com/go-ozzo/ozzo-validation/v4"
+	"uuid"
+
 	"go.jetify.com/typeid"
 
-	"github.com/riipandi/tango/internal/datastore"
-	"github.com/riipandi/tango/modules/identity/user"
+	"github.com/riipandi/saka/pkg/strutils"
 )
 
-// Typed IDs for the user group tables: UUIDv7 suffix, snake_case
-// prefix matching the singular table name.
-type (
-	userGroupPrefix struct{}
+// ResourceGroup is the resource type an audit record names when the change is
+// about a group. The record's user_id stays empty — a group is not an account
+// — and the group is named in resource_type and resource_id, the way any other
+// acted-on resource is.
+const ResourceGroup = "user_group"
 
-	UserGroupID = typeid.TypeID[userGroupPrefix]
-)
+// GroupIDPrefix is the TypeID prefix of a group's identifier. The id leaves
+// the server in an API response, so the reader of a log line or a support
+// ticket can tell what it names without a lookup.
+type GroupIDPrefix struct{}
 
-func (userGroupPrefix) Prefix() string { return "user_group" }
+// Prefix reports the TypeID prefix.
+func (GroupIDPrefix) Prefix() string { return "ugrp" }
 
-// UserGroup is one grantable group of users.
-type UserGroup struct {
-	ID          UserGroupID `json:"id"`
-	Name        string      `json:"name"`
-	DisplayName string      `json:"display_name"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   *time.Time  `json:"updated_at,omitzero"`
+// GroupID is the typed identifier of one row of entity.TableUserGroups, in its wire
+// form. The column stays a UUID; the conversion is strutils', bound to this
+// prefix by the type.
+type GroupID = typeid.TypeID[GroupIDPrefix]
+
+// IDFromUUID wraps the row's UUID into the wire form.
+func IDFromUUID(raw uuid.UUID) (GroupID, error) {
+	return strutils.EncodeID[GroupID](raw)
 }
 
-// CreateParams carries the fields a caller supplies.
-type CreateParams struct {
-	Name        string
-	DisplayName string
+// FormatID renders the wire form of a row's UUID. Rows read from the
+// database always carry a valid UUID, so the render cannot fail; an invalid
+// one answers the empty string, which no consumer should mistake for an id.
+func FormatID(raw uuid.UUID) string {
+	return strutils.FormatID[GroupID](raw)
 }
 
-// Validate normalizes and enforces the database constraints up front.
-func (p *CreateParams) Validate() error {
-	p.Name = strings.TrimSpace(p.Name)
-	p.DisplayName = strings.TrimSpace(p.DisplayName)
-	return validation.ValidateStruct(p,
-		validation.Field(&p.Name, validation.Required, validation.Match(user.UsernamePattern)),
-		validation.Field(&p.DisplayName, validation.Required),
-	)
-}
-
-// UpdateParams patches fields; nil keeps the column.
-type UpdateParams struct {
-	Name        *string
-	DisplayName *string
-}
-
-// Store abstracts group persistence. SetMembers replaces the whole
-// membership of one group; ReplaceGroupsForUser is the inverse
-// (PUT /users/{id}/user-groups).
-type Store interface {
-	Create(ctx context.Context, params CreateParams) (UserGroup, error)
-	GetByID(ctx context.Context, id UserGroupID) (UserGroup, error)
-	Update(ctx context.Context, id UserGroupID, params UpdateParams) (UserGroup, error)
-	Delete(ctx context.Context, id UserGroupID) error
-
-	// WithTx runs fn inside a transaction for multi-statement
-	// domain writes that must commit atomically with their audit
-	// entries.
-	WithTx(ctx context.Context, fn func(datastore.Executor) error) error
-	List(ctx context.Context, params ListParams) ([]UserGroup, int, error)
-	SetMembers(ctx context.Context, id UserGroupID, memberIDs []user.UserID) error
-	MemberIDs(ctx context.Context, id UserGroupID) ([]user.UserID, error)
-	GroupIDsForUser(ctx context.Context, id user.UserID) ([]UserGroup, error)
-	ReplaceGroupsForUser(ctx context.Context, id user.UserID, groupIDs []UserGroupID) error
-	// ReplaceAllowedClients swaps the group-side OIDC client
-	// allowlist (PUT /user-groups/{id}/allowed-oidc-clients).
-	// Client IDs are opaque typeid strings here — identity never
-	// imports federation; the store's existence check + FK enforce
-	// validity.
-	ReplaceAllowedClients(ctx context.Context, id UserGroupID, clientIDs []string) error
-	AllowedClientIDs(ctx context.Context, id UserGroupID) ([]string, error)
-
-	// ReplaceAllowedClientsTx runs the allowlist swap inside the
-	// caller's transaction so the audit entry commits with it.
-	ReplaceAllowedClientsTx(ctx context.Context, exec datastore.Executor, id UserGroupID, clientIDs []string) error
-}
-
-// Page is the store-level paging window: plain ints with no HTTP
-// dependency. The handler converts the request query into it.
-type Page struct {
-	Page  int
-	Limit int
-}
-
-// All reports whether the listing skips paging (page or limit is the
-// all marker -1).
-func (p Page) All() bool { return p.Page == -1 || p.Limit == -1 }
-
-// Offset returns the SQL offset for the current page.
-func (p Page) Offset() int {
-	if p.All() || p.Page < 1 || p.Limit < 1 {
-		return 0
+// ParseID reads the wire form back. It is the boundary a request crosses: an
+// identifier that arrives without the prefix names no group, the not-found
+// the caller refuses.
+func ParseID(wire string) (GroupID, error) {
+	parsed, err := strutils.ParseID[GroupID](wire)
+	if err != nil {
+		return GroupID{}, fmt.Errorf("usergroup: %w", err)
 	}
-	return (p.Page - 1) * p.Limit
+	return parsed, nil
 }
 
-// ListParams narrows and pages the admin listing.
-type ListParams struct {
-	Query string
-	Page
+// IDToUUID unwraps the wire form into the UUID the column stores. The typed
+// id carries the bytes itself, so nothing re-parses text to get there.
+func IDToUUID(id GroupID) uuid.UUID {
+	return strutils.ToUUID(id)
 }
 
-// Errors surfaced by the store; the handler maps them to statuses.
-var (
-	ErrNotFound   = errors.New("user group not found")
-	ErrDuplicate  = errors.New("user group name already exists")
-	ErrInvalidIDs = errors.New("user group: unknown member ids")
-)
+// UUIDFromWire is the request boundary in one step: the wire form a request
+// carries in, the key the rows carry out.
+func UUIDFromWire(wire string) (uuid.UUID, error) {
+	return strutils.UUIDFromWire[GroupID](wire)
+}
+
+// GroupSchema is one row of entity.TableUserGroups. The updated column is nullable by
+// construction: the trigger fills it on the first update, so a row never
+// updated reads as nil, not as a zero instant.
+type GroupSchema struct {
+	ID          GroupID    `db:"id"`
+	Name        string     `db:"name"`
+	DisplayName string     `db:"display_name"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
+}
+
+// GroupRow is one row of a list answer: the group plus the member count the
+// query computes. The count is not a column — it is what the LEFT JOIN counts,
+// and a group with no members reads as zero because the join is left.
+type GroupRow struct {
+	GroupSchema
+	UserCount int
+}

@@ -1,0 +1,54 @@
+type: http_request
+model: http_request
+id: rq_yaRdgWJj6r
+createdAt: 2026-09-26T23:10:25.696277
+updatedAt: 2026-09-27T06:38:06.519065
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_xxFhnsiD2K
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "new_email": "${[ prompt.text(label='New Email', store='none', namespace='${[ctx.workspace()]}', ttl='0', defaultValue='admin@example.com', placeholder='somebody@example.com') ]}"
+    }
+bodyType: application/json
+description: |-
+  Write the pending email change for the signed-in account and mail its token to the address the change moves to. The address must be free; the token binds it, so the confirmation moves the account to the address the request named. The message to the old address is gated by mailer.notifications.email_change_notice_enabled; the token message is transactional and always sent.
+
+  Saka-only surface: the saka.identity.v1.EmailVerificationService/RequestEmailChange procedure. Guard: Authenticated (the claims name the account).
+
+  Parameters:
+  - new_email (body, required): The pending address
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: wZTIUIEQpy
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: SPeWpI89z4
+method: POST
+name: '[Saka] Request email change'
+sortPriority: 25250.0
+url: ${[ apiBaseURL ]}/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto

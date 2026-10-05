@@ -1,0 +1,51 @@
+type: http_request
+model: http_request
+id: rq_KHXbqB8Kzm
+createdAt: 2026-09-30T01:59:38.511883
+updatedAt: 2026-09-30T02:18:10.562358
+workspaceId: wk_kBiMYTkhPP
+folderId: fl_d23um6bp9P
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "id": "${[ response.body.path(request='rq_oTHPnZqWaG', behavior='smart', ttl='0', result='first', join=', ', path='$.webhooks[0].id') ]}",
+      "description": "New note",
+      "enabled": true,
+      "event_types": {"event_types": ["*"]}
+    }
+bodyType: application/json
+description: '[Saka] Rewrite an endpoint. Every field is optional; an absent field keeps its stored value, a present one replaces it. Admin only.'
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Connect-Protocol-Version
+  value: '1'
+  id: null
+method: POST
+name: Update Webhook
+sortPriority: 3000.0
+url: ${[ apiBaseURL ]}/rpc/saka.webhook.v1.WebhookService/Update
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
+settingHttpVersion:
+  enabled: false
+  value: auto
