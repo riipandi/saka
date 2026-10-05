@@ -6,7 +6,9 @@
 
 Status after the certification-readiness phases (`.llms/plans/plan-20261005_1845.md`);
 a tick means implemented and locally rehearsal-green against the OIDF suite —
-the hosted submission run is phase 6's runbook.
+the hosted submission run is phase 6's runbook. The OP side is the inbound
+surface (`modules/federation/oidc`); the RP side is the outbound one
+(`modules/identity/oauthsso`), listed under Relying Party below.
 
 - [x] Basic OP — implemented; local rehearsal 35/35
 - [x] Config OP — implemented; local rehearsal 1/1 (WARNING = pass)
@@ -24,14 +26,21 @@ the hosted submission run is phase 6's runbook.
 
 ### Relying Party
 
-Saka is a provider, not a relying party — the RP profiles are out of scope.
+Saka is also a relying party: sign-in with Google, GitHub, or a custom
+OIDC provider rides the outbound surface (`modules/identity/oauthsso`) —
+the authorization code flow with PKCE S256, state, an OIDC nonce the
+`id_token` must answer, discovery-based connections, a verified
+`id_token` (userinfo overrides on OAuth2-only providers), and refresh
+rotation. None of the RP profiles has been rehearsed against the suite —
+the suite runs them as the `oidcc-client-*` plans, a separate harness
+this plan did not build.
 
-- [ ] Back-Channel RP
-- [ ] Basic RP
-- [ ] Config RP
-- [ ] Dynamic RP
-- [ ] Form Post RP
-- [ ] RP-Initiated RP
+- [x] Basic RP — implemented (code flow + PKCE S256 sign-in); not rehearsed
+- [x] Config RP — implemented (discovery-based connections); not rehearsed
+- [ ] Dynamic RP — not implemented (a sign-in client never registers itself)
+- [ ] Form Post RP — not implemented (`response_mode=form_post` unused)
+- [ ] RP-Initiated RP — not implemented (sign-in never ends the upstream session)
+- [ ] Back-Channel RP — not implemented (no logout-token receiver)
 
 ## References
 
