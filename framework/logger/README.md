@@ -5,7 +5,7 @@ sinks the configuration names — the console, a rotating file, and an OpenTelem
 in any combination. Application code never touches LogLayer; it calls slog, and this package
 decides where the entry goes.
 
-> **Relation to the observer:** the OTLP sink is built from `internal/observer`'s exporter
+> **Relation to the observer:** the OTLP sink is built from `framework/observer`'s exporter
 > plumbing (`TLSConfig`, `SignalPath`) rather than carrying a copy — one collector receives
 > every signal, and the two packages describe the same service from the same configuration.
 >
@@ -63,7 +63,7 @@ to prevent.
 - `go.loglayer.dev/v3` + `go.loglayer.dev/integrations/sloghandler/v3` — the core and the
   slog bridge; per-transport packages for the console, the file, and OTLP
 - `github.com/natefinch/lumberjack` — the file rotation
-- `internal/observer` — only when the OTLP transport is named (shared exporter plumbing)
+- `framework/observer` — only when the OTLP transport is named (shared exporter plumbing)
 
 ## Wiring
 

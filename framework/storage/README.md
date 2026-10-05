@@ -5,9 +5,9 @@ S3-compatible object store, with the manifest in PostgreSQL. The request path is
 write; everything else runs on the durable queue. The resumable-upload protocol (tus 1.0.0,
 implemented in-house) is the engine's client surface. The engine takes typed options (driver,
 local path, S3 connection, telemetry namespace, link path prefix) and reads nothing itself; the
-schema mapping lives in `internal/config`'s adapter and the buckets are the app's rows.
+schema mapping lives in `framework/config`'s adapter and the buckets are the app's rows.
 
-> **Relation to the queue:** storage is the payload; the queue (`internal/queue`) is the
+> **Relation to the queue:** storage is the payload; the queue (`framework/queue`) is the
 > executor. The code that finished a write — a `Stage` caller or the tus completion — enqueues
 > a `StorageUploadTask` naming the `bucket/key` reference, and the queue owns execution,
 > retries, backoff, and the archive. A sync is idempotent, so a replayed task finishes the
@@ -144,7 +144,7 @@ flow with `tus-js-client`'s UMD bundle from the CDN.
 - PostgreSQL >= 18 (the manifest tables; shared `datastore` pool)
 - One backend: the local filesystem, or any S3-compatible service (aws-sdk-go-v2; path style
   for MinIO/Silo)
-- `internal/queue` — the upload, the expiry, and the garbage collection run as queue jobs
+- `framework/queue` — the upload, the expiry, and the garbage collection run as queue jobs
 - Docker for the tests (testcontainers: Postgres, MinIO)
 
 ## Wiring

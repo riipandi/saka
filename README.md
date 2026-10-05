@@ -68,7 +68,7 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
 - **Configuration** — `app.config.json` is the single source of truth. Precedence: built-in
   defaults → config file → CLI flags. The environment is not a layer: a variable reaches a key
   only where the file references it (`env:NAME` or `${NAME}`), and secrets are never written
-  literally. Details: [`internal/config/README.md`](./internal/config/README.md).
+  literally. Details: [`framework/config/README.md`](./framework/config/README.md).
 - **Database** — goose migrations embedded in the binary (`internal/database/migrations/`), tracked in
   `app_migration`, applied over a single locked connection. Migrate, seed, and inspect with the
   `db:*` / `migrate:*` commands. Details: [`internal/database/README.md`](./internal/database/README.md).
@@ -76,27 +76,27 @@ Run `task` to list every target. Most targets live in `scripts/task-*`, one file
   optional `--compression`); `task db:import` loads it back in one transaction, reordered by
   foreign keys. See `internal/database/README.md` for the flags.
 - **Logging** — `log/slog` is the only frontend; `log.transport` names the sinks (console,
-  rotating file, OTLP collector). Details: [`internal/logger/README.md`](./internal/logger/README.md).
+  rotating file, OTLP collector). Details: [`framework/logger/README.md`](./framework/logger/README.md).
 - **Tracing and metrics** — OpenTelemetry, opt-in per signal, one collector address
   (`otel.endpoint`), plus a Prometheus exposition. Details:
-  [`internal/observer/README.md`](./internal/observer/README.md).
+  [`framework/observer/README.md`](./framework/observer/README.md).
 - **Health** — `task health` and `GET /api/healthz` report the same aggregated status
   (postgres, storage; optional checks are reported but never fail the aggregate). Details:
   [`framework/health/README.md`](./framework/health/README.md).
 - **Cache & key-value store** — the cache is off by default; the optional Valkey backend
-  (`kvstore.enable`) is never required. Details: [`internal/cache/README.md`](./internal/cache/README.md).
+  (`kvstore.enable`) is never required. Details: [`framework/cache/README.md`](./framework/cache/README.md).
 - **Outbound HTTP** — one client for external services, with timeouts, retries, and a
-  circuit breaker. Details: [`internal/fetcher/README.md`](./internal/fetcher/README.md).
+  circuit breaker. Details: [`framework/fetcher/README.md`](./framework/fetcher/README.md).
 - **Email** — templated messages sent over SMTP, with the React Email templates compiled into the
   binary. Optional, so a local checkout needs no mail server. Details:
-  [`internal/mailer/README.md`](./internal/mailer/README.md).
+  [`framework/mailer/README.md`](./framework/mailer/README.md).
 - **File storage** — chunked, content-addressed uploads over the local data directory or S3,
   manifest in Postgres, uploads on the durable queue. Details:
   [`framework/storage/README.md`](./framework/storage/README.md).
 - **Queue & scheduler** — a durable Postgres task queue with retries and a dead-letter archive
-  ([`internal/queue/README.md`](./internal/queue/README.md)), driven by a cron scheduler whose
+  ([`framework/queue/README.md`](./framework/queue/README.md)), driven by a cron scheduler whose
   claimed tick and enqueued task share one transaction
-  ([`internal/scheduler/README.md`](./internal/scheduler/README.md)).
+  ([`framework/scheduler/README.md`](./framework/scheduler/README.md)).
 
 ## Local HTTPS
 
