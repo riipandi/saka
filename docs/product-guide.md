@@ -1,9 +1,10 @@
 # Saka Product Guide
 
-Saka is a **project boilerplate with authentication built in**. Start a
-new product from it and the hardest, most security-sensitive part —
-accounts, sign-in, sessions, permissions — already works, tried and
-tested. You build your product around it; the auth core is done.
+**Saka is a project boilerplate with authentication and authorization
+built in.** Start a new product from it and the hardest, most
+security-sensitive part — accounts, sign-in, sessions, permissions —
+already works, tried and tested. You build your product around it; the
+auth core is done.
 
 Because the auth core is a full OpenID provider, Saka fits three shapes,
 and the same codebase serves all of them:

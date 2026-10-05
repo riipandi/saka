@@ -13,10 +13,11 @@
 
 **Saka**: an enterprise-ready foundation for scalable applications,
 unified identity, and modular architecture. A project boilerplate with
-authentication built in. Clone it, and the hardest part of a new product
-(accounts, sign-in, sessions, permissions) already works, tried and
-tested. Build your product around the auth core, or deploy it standalone
-as a pure identity provider for your other applications.
+authentication and authorization built in. Clone it, and the hardest
+part of a new product (accounts, sign-in, sessions, permissions) already
+works, tried and tested. Build your product around the auth core, or
+deploy it standalone as a pure identity provider for your other
+applications.
 
 The auth works in both directions out of the box:
 

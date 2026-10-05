@@ -1,6 +1,7 @@
 # Saka Documentation
 
-Saka is a **project boilerplate with authentication built in**: clone it,
+Saka is a **project boilerplate with authentication and authorization
+built in**: clone it,
 and the hardest part of a new product — accounts, sign-in, sessions,
 permissions — already works. Your product's code grows around a battle-
 tested core instead of rebuilding user management from scratch.
