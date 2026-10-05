@@ -474,7 +474,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/rpc/saka.federation.v1.OidcClientService/ListClients` | List OIDC clients | done — admin; page/limit/search over the name; sorted by `id`, `name`, or `created_at` (absent: newest first); every client carries its secrets' views and its allowed groups | `modules/federation/oidc` (service tests), `internal/guard` (rules) |
 | POST | `/rpc/saka.federation.v1.OidcClientService/CreateClient` | Create OIDC client | done — admin; the identifier is operator-chosen (letters, digits, `_`, `-`) or generated; the first secret is shown exactly once, only its SHA-256 hash stored in the `credentials` JSONB; a public client forces `pkce_enabled` on | `modules/federation/oidc.TestCreateMintsASecretTheRowCannotReplay` |
 | POST | `/rpc/saka.federation.v1.OidcClientService/GetClient` | Get OIDC client | done — admin; the full view with secrets' views and groups | `modules/federation/oidc` (service tests) |
-| POST | `/rpc/saka.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done — admin; full replace under the row lock; secrets, logo, and restriction untouched | `modules/federation/oidc.TestUpdateReplacesTheFieldsAndKeepsTheSecrets` |
+| POST | `/rpc/saka.federation.v1.OidcClientService/UpdateClient` | Update OIDC client | done — admin; full replace under the row lock; secrets, logo, and restriction untouched; a boolean or list the payload omits is replaced with its zero — `skipConsent`, `backchannelLogoutSessionRequired`, `logoutCallbackUrls` included — so a caller that keeps a flag re-sends it | `modules/federation/oidc.TestUpdateReplacesTheFieldsAndKeepsTheSecrets` |
 | POST | `/rpc/saka.federation.v1.OidcClientService/DeleteClient` | Delete OIDC client | done — admin; the codes, sessions, grants, and restrictions die with the row by the cascades | `modules/federation/oidc.TestDeleteRemovesTheClientAndTheRecordNamesIt` |
 | POST | `/rpc/saka.federation.v1.OidcClientService/UpdateAllowedUserGroups` | Update allowed user groups | done — admin; the replace, not a delta; an unknown group refuses the replacement whole | `modules/federation/oidc.TestAllowedGroupsReplaceWholeAndRefuseAnUnknownGroup` |
 | POST | `/rpc/saka.federation.v1.OidcClientService/GetClientMeta` | Get client metadata | done — admin; the display facts a sign-in page renders | `modules/federation/oidc` (service tests) |
@@ -500,7 +500,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/oidc/par` | Push authorization request | done — REST, RFC 9126; one-time request_uri, 5-minute lifetime | `modules/federation/oidc` (protocol mount), protocol tests |
 | POST | `/oidc/device_authorization` | Device authorization grant | done — REST, public, RFC 8628; the codes resolve through hashed pointer rows | `modules/federation/oidc` (protocol mount), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/device` | Device verification | done — REST, public; the browser enters the user code and answers the consent question; the approval walks the SPA interaction | `modules/federation/oidc` (protocol mount) |
-| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when the `oidc.end_session_revokes_consent` setting is on), delivers a back-channel logout token when the client registered a URI and the `oidc.backchannel_logout_enabled` setting is on, redirects to a registered `post_logout_redirect_uri` or the SPA root | `modules/federation/oidc` (protocol mount, `protocol_logout.go`, `backchannel.go`), `internal/guard` (RestRules) |
+| GET, POST | `/oidc/end-session` | RP-initiated logout | done — REST, public; requires `id_token_hint`, refuses an `at+jwt` hint, revokes the account's grants and tokens for the client (the consent ledger too when the `oidc.end_session_revokes_consent` setting is on), delivers a back-channel logout token when the client registered a URI and the `oidc.backchannel_logout_enabled` setting is on, redirects to a registered `post_logout_redirect_uri` with the `state` echoed, or the SPA root; an unregistered URI answers `invalid_request` | `modules/federation/oidc` (protocol mount, `protocol_logout.go`, `backchannel.go`), `internal/guard` (RestRules) |
 | GET, POST | `/oidc/userinfo` | Get user information | done — REST, public, bearer token, RFC-style errors; the `profile` scope answers the Standard Claims the account holds — `given_name`, `family_name`, `name`, `preferred_username`, `picture` (the composed public URL), `updated_at` (epoch seconds, the creation stamp when no update has touched the account) | `modules/federation/oidc` (protocol mount) |
 
 The protocol design notes below record implementation behavior for device flow,
@@ -684,7 +684,13 @@ with `typ: logout+jwt`, `events` carrying the
 `http://schemas.openid.net/event/backchannel-logout` member, `aud` the
 client, `sub` the account, `iat`/`exp` a two-minute window, `jti` a
 random draw, and `sid` the session identifier the hint carried — none
-when the hint named none, and never a `nonce`. The delivery is the
+when the hint named none, and never a `nonce`. The `sid` a saka-minted
+hint carries is the grant's own identifier: the ID token mints `sid` =
+the grant id at issuance (`sid` is a protected claim key and rides
+`claims_supported`), so a client that registered
+`backchannel_logout_session_required` can match the delivery to the
+session it ended, and the end-session hint carries the correlation
+back to the provider. The delivery is the
 `backchannel_logout` queue's job (`internal/jobs`): a form POST
 (`logout_token=…`) expecting an empty 200, five attempts, one-minute
 backoff — a failure logs and retries, it never fails the logout that

@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"context"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -154,4 +155,90 @@ func TestTheLogoutPolicyRefusesAnUnknownSubject(t *testing.T) {
 
 	assert.Equal(t, goidc.StatusFailure, status)
 	require.Error(t, err)
+}
+
+// recordingSigner answers the session identifier the dispatch was handed —
+// the correlation the signed token would carry.
+type recordingSigner struct {
+	sessions []string
+}
+
+func (r *recordingSigner) SignLogoutToken(_ context.Context, _, _, sessionID string) (string, error) {
+	r.sessions = append(r.sessions, sessionID)
+	return "signed-token", nil
+}
+
+// TestTheLogoutPolicyCarriesTheHintsSessionToTheDelivery pins the Back-Channel
+// Logout correlation: the hint's sid — the grant id the ID token minted at
+// login — is the sid the delivered logout token carries, so a client that
+// registered `backchannel_logout_session_required` can match the delivery to
+// the session it ended.
+// TestTheIDTokenCarriesTheGrantAsItsSession pins the session correlation the
+// Back-Channel Logout profile reads: the ID token's sid is the grant's own
+// identifier, so a relying party can match the delivered logout token to the
+// session it names, and the end-session hint carries it back to the provider.
+func TestTheIDTokenCarriesTheGrantAsItsSession(t *testing.T) {
+	pool := migratedPool(t)
+	account := seedAccount(t, pool, "luna")
+	accountWire, err := user.IDFromUUIDString(account.String())
+	require.NoError(t, err)
+	service := testService(t, pool).WithUserDirectory(&stubDirectory{
+		accounts: map[string]user.UserView{
+			accountWire.String(): {ID: accountWire.String(), Username: "luna"},
+		},
+	}).WithClaimSource(&stubClaims{})
+
+	grant := &goidc.Grant{ID: "grant-elder-wand", Subject: account.String(), Scopes: "openid"}
+	claims := idTokenClaims(service)(t.Context(), grant)
+	assert.Equal(t, "grant-elder-wand", claims["sid"],
+		"the grant id is the session correlation")
+
+	// The userinfo map is not a session surface — no sid rides there.
+	info := userInfoClaims(service)(t.Context(), grant)
+	_, present := info["sid"]
+	assert.False(t, present, "userinfo carries claims, not the session correlation")
+}
+
+func TestTheLogoutPolicyCarriesTheHintsSessionToTheDelivery(t *testing.T) {
+	pool := migratedPool(t)
+	userID := seedAccount(t, pool, "sinistra")
+	dispatcher := &recordingDispatcher{}
+	signer := &recordingSigner{}
+	service := testService(t, pool).
+		WithBackchannelLogoutSource(staticBackchannel{enabled: true}).
+		WithBackchannelLogoutSigner(signer).
+		WithBackchannelLogoutDispatcher(dispatcher)
+	issued, err := service.Create(t.Context(), userID, CreateParams{
+		Name:                             "Astronomy Tower",
+		CallbackURLs:                     []string{"https://tower.example/callback"},
+		BackchannelLogoutURI:             "https://tower.example/backchannel",
+		BackchannelLogoutSessionRequired: true,
+	})
+	require.NoError(t, err)
+
+	// The hint carries the sid the ID token minted at login: the grant's
+	// own identifier.
+	session := hintSession(hintToken(t, ""), userID.String(), issued.Client.ID)
+	session.IDTokenHintClaims = &goidc.IDToken{
+		Subject:          userID.String(),
+		AdditionalClaims: map[string]any{"sid": "grant-elder-wand"},
+	}
+
+	policy := logoutPolicy(service)
+	status, logoutErr := policy.Logout(httptest.NewRecorder(),
+		httptest.NewRequest("POST", "/oidc/end-session", nil), session)
+
+	assert.Equal(t, goidc.StatusSuccess, status)
+	require.NoError(t, logoutErr)
+	assert.Equal(t, []string{"grant-elder-wand"}, signer.sessions,
+		"the hint's session identifier rides to the signing")
+	require.Len(t, dispatcher.dispatches, 1)
+	assert.Equal(t, issued.Client.ID, dispatcher.dispatches[0].ClientID)
+
+	// The session-required flag answers false-positively no more: the
+	// round-trip reads the flag back the create wrote.
+	view, err := service.Get(t.Context(), issued.Client.ID)
+	require.NoError(t, err)
+	assert.True(t, view.BackchannelLogoutSessionRequired)
+	assert.Equal(t, "https://tower.example/backchannel", view.BackchannelLogoutURI)
 }

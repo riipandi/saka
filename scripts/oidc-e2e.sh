@@ -95,6 +95,7 @@ CREATE=$(curl -s "$BASE/rpc/saka.federation.v1.OidcClientService/CreateClient" \
     \"id\": \"e2e-conf-$STAMP\",
     \"name\": \"E2E Confidential\",
     \"callbackUrls\": [\"http://localhost:9010/auth/callback\"],
+    \"logoutCallbackUrls\": [\"http://localhost:9010/logout\"],
     \"skipConsent\": true
   }")
 CLIENT_ID=$(echo "$CREATE" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("client",{}).get("id",""))')
@@ -247,7 +248,7 @@ contains "pkce: wrong verifier refused" "$WRONG" "invalid_grant"
 echo "== client credentials =="
 CC_GRANT=$(curl -s "$BASE/rpc/saka.federation.v1.OidcClientService/UpdateClient" \
     -H "Authorization: Bearer $ACCESS" -H 'Content-Type: application/json' \
-    -d "{\"id\": \"$CLIENT_ID\", \"name\": \"E2E Confidential\", \"callbackUrls\": [\"http://localhost:9010/auth/callback\"], \"allowedGrantTypes\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"]}")
+    -d "{\"id\": \"$CLIENT_ID\", \"name\": \"E2E Confidential\", \"callbackUrls\": [\"http://localhost:9010/auth/callback\"], \"logoutCallbackUrls\": [\"http://localhost:9010/logout\"], \"skipConsent\": true, \"allowedGrantTypes\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"]}")
 CC=$(curl -s "$BASE/oidc/token" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET")
@@ -326,8 +327,35 @@ contains "ledger: page carries the pagination block" "$LEDGER" '"total_items"'
 contains "ledger: page respects the limit" "$LEDGER" '"limit":10'
 
 echo "== end-session =="
-ES_HINT="$ID_TOKEN"
-ES=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/oidc/end-session?id_token_hint=$ID_TOKEN&client_id=$CLIENT_ID")
+# RP-Initiated Logout: the post-logout redirect must be one the client
+# registered, and the state the RP sent rides back on it. The logout walks
+# a fresh grant — the revoke section above already withdrew the first one,
+# and a hint whose grant is gone names no client to match a registered
+# redirect against.
+LOGOUT_CODE=$(curl -s -o /dev/null -w '%{redirect_url}' \
+    "$BASE/oidc/authorize?response_type=code&client_id=$CLIENT_ID&scope=openid&state=lo&code_challenge=$CHALLENGE&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Fauth%2Fcallback" \
+    -H "Authorization: Bearer $ACCESS" | sed -n 's/.*[?&]code=\([^&]*\).*/\1/p')
+[ -n "$LOGOUT_CODE" ] || {
+    echo "no logout code minted"
+    exit 1
+}
+LOGOUT_TOKENS=$(curl -s "$BASE/oidc/token" \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    -d "grant_type=authorization_code&code=$LOGOUT_CODE&redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Fauth%2Fcallback&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&code_verifier=$VERIFIER")
+LOGOUT_HINT=$(echo "$LOGOUT_TOKENS" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("id_token",""))')
+[ -n "$LOGOUT_HINT" ] || {
+    echo "no logout hint minted (tokens=$(echo "$LOGOUT_TOKENS" | head -c 200))"
+    exit 1
+}
+ES_STATE="es-$STAMP"
+ES_REDIRECT=$(curl -s -o /dev/null -w '%{redirect_url}' \
+    "$BASE/oidc/end-session?id_token_hint=$LOGOUT_HINT&client_id=$CLIENT_ID&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Flogout&state=$ES_STATE")
+contains "end-session: redirect to the registered URI" "$ES_REDIRECT" "localhost:9010/logout"
+contains "end-session: state echoed" "$ES_REDIRECT" "state=$ES_STATE"
+BAD_POSTLOGOUT=$(curl -s -w '\n%{http_code}' \
+    "$BASE/oidc/end-session?id_token_hint=$LOGOUT_HINT&client_id=$CLIENT_ID&post_logout_redirect_uri=http%3A%2F%2Fevil.example%2Flogout" | tail -1)
+check "end-session: unregistered post_logout_redirect_uri refused" "400" "$BAD_POSTLOGOUT"
+ES=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/oidc/end-session?id_token_hint=$LOGOUT_HINT&client_id=$CLIENT_ID")
 check "end-session answers" "302" "$ES"
 
 echo

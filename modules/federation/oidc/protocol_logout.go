@@ -64,10 +64,11 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 				userID = wire
 			}
 
-			// The hint's sid names the OP session the RP correlates — a
-			// token the provider minted itself carries none, saka never
-			// writing the member; a third-party hint's answer rides
-			// through so the client's session matching keeps working.
+			// The hint's sid names the OP session the RP correlates. The
+			// provider mints the member as the grant's own identifier —
+			// the correlation the back-channel delivery carries — and a
+			// third-party hint's answer rides through so the client's
+			// session matching keeps working.
 			sid := hintSessionID(claims)
 
 			if err := service.EndSession(req.Context(), userID.String(), session.ClientID, sid); err != nil {

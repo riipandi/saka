@@ -440,7 +440,7 @@ var profileClaims = []string{"given_name", "family_name", "name", "display_name"
 // at_hash is absent on purpose: the engine's code flow does not carry the
 // access token into the ID-token issuance, and the claim stays optional
 // under OIDC Core §3.1.3.6.
-var registeredClaims = []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "jti"}
+var registeredClaims = []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "jti", "sid"}
 
 // claimsSupported is the discovery document's claims_supported. The list is
 // informational — the claims request parameter is not enabled — but it
@@ -459,7 +459,7 @@ func claimsSupported() []string {
 // the second line of defense.
 var protectedClaimKeys = map[string]struct{}{
 	"sub": {}, "iss": {}, "aud": {}, "exp": {}, "iat": {}, "nbf": {}, "jti": {},
-	"auth_time": {}, "nonce": {}, "acr": {}, "amr": {}, "azp": {}, "client_id": {},
+	"sid": {}, "auth_time": {}, "nonce": {}, "acr": {}, "amr": {}, "azp": {}, "client_id": {},
 	"at_hash": {}, "c_hash": {}, "s_hash": {},
 	"given_name": {}, "family_name": {}, "name": {}, "display_name": {},
 	"preferred_username": {}, "picture": {}, "email": {}, "email_verified": {},
@@ -470,10 +470,17 @@ var protectedClaimKeys = map[string]struct{}{
 
 // idTokenClaims merges the account facts and the operator-defined claims
 // into an ID token at issuance. An account the directory no longer knows
-// names no claims — the grant fails closed downstream.
+// names no claims — the grant fails closed downstream. The sid member is
+// the grant's own identifier: the RP's session correlation for Back-Channel
+// Logout (a client registered `backchannel_logout_session_required` reads
+// it from the logout token), and the end-session hint's correlation key.
 func idTokenClaims(service *Service) goidc.IDTokenClaimsFunc {
 	return func(ctx context.Context, grant *goidc.Grant) map[string]any {
-		return subjectClaims(ctx, service, service.claims, grant)
+		claims := subjectClaims(ctx, service, service.claims, grant)
+		if grant.ID != "" {
+			claims["sid"] = grant.ID
+		}
+		return claims
 	}
 }
 
