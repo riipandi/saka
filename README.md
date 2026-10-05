@@ -111,13 +111,12 @@ task dev                  # the dev loop: Vite + HMR behind the Go proxy
 - Mail inbox: <http://localhost:8025> (Mailpit)
 - Health: <http://localhost:3080/healthz>
 
-**Available task commands:**
-
-- `task dev` - Run the dev loop (Vite + HMR behind the Go proxy)
-- `task serve` - Run the server (debug build)
-- `task build` - Build the application binaries
-- `task lint` / `task test` / `task check` - The everyday checks
-- `task --list` - The full list (it mirrors the CLI)
+**The task runner.** Run `task` — it lists everything available, from the
+dev loop and the checks to the compose stacks and the database tools.
+The tasks are defined in the [`Taskfile.yml`](./Taskfile.yml), which
+composes the per-area files under [`scripts/`](./scripts) (`task-build`,
+`task-database`, `task-container`, …) — the same commands the CLI
+mirrors.
 
 ## Documentation
 
