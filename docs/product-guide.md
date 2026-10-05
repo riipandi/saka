@@ -60,12 +60,15 @@ flowchart TD
 *every* sign-in path — password, one-time code, external provider —
 pauses at the same second-factor step: a TOTP authenticator code, with
 printable recovery codes as the way back. Sensitive actions can demand a
-fresh proof (step-up) even for an already signed-in session.
+fresh proof (step-up) even for an already signed-in session. The rules
+in detail: [Authentication](auth.md).
 
 **Sessions.** Users see every device signed in as them, revoke one, sign
 out the others, or sign out everywhere. "Remember me" picks a longer
 session window. Administrators can open a support session on a user's
 behalf (impersonation) — its own visible, revocable session.
+[Authentication](auth.md) carries the machinery: recovery, lockouts,
+bans, one-time guest access.
 
 **Recovery.** Forgot-password flows send single-use codes. An
 administrator can reset a user's password directly — the user is signed
@@ -102,7 +105,7 @@ first-class citizens:
 - **API keys** authenticate machine callers (a key is shown once at
   creation, then never again), each with its own expiry and access.
 - **Webhooks** deliver signed events to registered URLs when something
-  happens in Saka.
+  happens in Saka. See [Webhooks](webhooks.md).
 
 ---
 
@@ -110,8 +113,9 @@ first-class citizens:
 
 - **Storage** — file buckets, resumable uploads that survive bad
   networks, expiring signed download links, per-bucket access rules.
+  See [Storage](storage.md).
 - **Notifications** — announcements and targeted notices, to everyone, a
-  group, or one user, with read receipts.
+  group, or one user, with read receipts. See [Notifications](notifications.md).
 - **Audit log** — every security-relevant act (a sign-in, a password
   change, a role grant, a revoked session) recorded with who, what, and
   when, searchable by administrators.
@@ -123,10 +127,16 @@ first-class citizens:
 
 ## Where to go next
 
+- [Authentication in depth](auth.md) — every method's rules, MFA,
+  step-up, sessions and impersonation, recovery
 - [OAuth SSO](oauth-sso.md) — connecting external providers for sign-in
 - [OpenID provider](oidc.md) — how other apps sign users in with Saka,
   and [OIDC profiles](oidc-profiles.md) — which conformance profiles
   Saka supports and why
+- [Storage](storage.md) — buckets, resumable uploads, signed links
+- [Webhooks](webhooks.md) and [Notifications](notifications.md)
+- [Debug & operator utilities](debug-utilities.md) — the devtools, the
+  operator commands, the verification harnesses
 - [API endpoints](api-endpoint.md) and [API responses](api-response.md) —
   the machine-facing contract
 - [Deployment](deployment.md) — running Saka yourself

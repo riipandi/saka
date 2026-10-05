@@ -27,9 +27,13 @@ Authentication ships in both directions:
 | Topic | Page | What it covers |
 | --- | --- | --- |
 | The whole product | [Product guide](product-guide.md) | All sign-in methods, the second factor, sessions, users, the platform surfaces |
-| Signing in with Google, GitHub, or your own provider | [OAuth SSO](oauth-sso.md) | Connecting providers, how the sign-in resolves, linking and account safety |
+| The built-in authentication, closely | [Authentication](auth.md) | Each method's rules, MFA and recovery codes, step-up, sessions and impersonation, lockouts and bans || Signing in with Google, GitHub, or your own provider | [OAuth SSO](oauth-sso.md) | Connecting providers, how the sign-in resolves, linking and account safety |
 | Signing other apps in with Saka | [OpenID provider](oidc.md) | What connected applications can do, sign-out, getting connected |
 | Which standards Saka speaks | [OIDC profiles](oidc-profiles.md) | The conformance profiles in plain language — kept, optional, dropped, and why |
+| Files | [Storage](storage.md) | Buckets, resumable uploads, signed links, profile pictures |
+| Outbound events | [Webhooks](webhooks.md) | Subscribing destinations, signed deliveries, retries and guards |
+| In-product messages | [Notifications](notifications.md) | Audiences, read receipts, the live stream |
+| Building and operating | [Debug & operator utilities](debug-utilities.md) | The debug devtools, the operator commands, the verification harnesses |
 | The machine-facing contract | [API endpoints](api-endpoint.md), [API responses](api-response.md) | Every procedure and route, and the one contract both transports share |
 
 ## Reference
