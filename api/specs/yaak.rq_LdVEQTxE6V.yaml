@@ -19,6 +19,8 @@ body:
       "is_public": false,
       "pkce_enabled": true,
       "skip_consent": false,
+      "backchannel_logout_uri": "https://portal.hogwarts.example/backchannel-logout",
+      "backchannel_logout_session_required": true,
       "access_token_duration_minutes": 60,
       "refresh_token_duration_minutes": 43200,
       "allowed_user_groups": ["${[ response.body.path(request='rq_0z8QsXN3S4', behavior='smart', ttl='0', result='first', join=', ', path='$.groups[0].id') ]}"]

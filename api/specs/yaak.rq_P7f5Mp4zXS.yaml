@@ -21,6 +21,8 @@ body:
       "requires_reauthentication": false,
       "requires_pushed_authorization_requests": false,
       "skip_consent": false,
+      "backchannel_logout_uri": "https://portal.hogwarts.example/backchannel-logout",
+      "backchannel_logout_session_required": true,
       "access_token_duration_minutes": 60,
       "refresh_token_duration_minutes": 43200
     }

@@ -2,17 +2,21 @@ type: http_request
 model: http_request
 id: rq_xoWqRoPXNX
 createdAt: 2026-09-28T20:29:03.944202
-updatedAt: 2026-09-28T20:29:03.944203
+updatedAt: 2026-10-05T17:40:30.320956
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
 authenticationType: null
 body:
   bodyType: application/json
-  text: '{}'
+  text: |-
+    {
+      "page": 1,
+      "limit": 50
+    }
 bodyType: application/json
 description: |-
-  The deployment-wide ledger: every consent with its account named in the wire form. Administrative.
+  The deployment-wide ledger: every consent with its account named in the wire form. Paginated — page is one-based, limit caps at 100; both unset answer the first default-sized page, and the response carries the flat metadata block (page, limit, total_pages, item range).
 
   Procedure: `saka.federation.v1.OidcConsentService/ListAllAuthorizedClients`
 headers:
