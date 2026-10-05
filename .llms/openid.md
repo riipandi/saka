@@ -21,7 +21,8 @@ is retiring it.
   **keep** (discovery is how clients connect today; near-free beside Basic)
 - [ ] Dynamic OP — not implemented (no dynamic client registration surface) —
   **optional** (only for an open ecosystem where clients self-register;
-  admin registration serves saka's model)
+  admin registration serves saka's model — and even MCP, the spec's own
+  priority order prefers pre-registration, see below)
 - [ ] Form Post OP — not implemented (`response_mode=form_post` absent) —
   **optional** (some legacy SPAs and bridge products ask for it; nothing in
   the current client set does)
@@ -46,6 +47,37 @@ is retiring it.
 - [ ] Session OP — rejected: session-management iframes contradict the
   no-browser-session design (plan D1) — **drop** (deprecated in practice;
   the OIDF's own guidance points new work at back-channel)
+
+### Internal MCP servers (planned integration)
+
+The MCP authorization spec (2025-11-25) makes an MCP server an OAuth 2.1
+resource server and the MCP client an OAuth 2.1 client — the authorization
+server (saka) needs nothing outside the profiles above:
+
+- **Basic OP + Config OP are sufficient as-is.** MCP's flow is exactly the
+  code flow with PKCE S256 the two profiles certify; MCP clients refuse to
+  proceed unless the discovery document names
+  `code_challenge_methods_supported` — saka's does (`["S256"]`).
+- **Dynamic OP stays optional even here.** The current spec demotes DCR to
+  a MAY for backwards compatibility: MCP clients prefer pre-registered
+  credentials (saka's model), then Client ID Metadata Documents (a
+  draft-ietf mechanism for strangers), then DCR as the fallback. Enable
+  DCR only if the MCP fleet grows past admin-managed registration — and
+  then behind an initial access token.
+- **RFC 8707 resource indicators are the piece to enable.** MCP clients
+  MUST send `resource` and MCP servers MUST validate the token's audience
+  against their own canonical URI — without it, one MCP server accepts
+  tokens minted for another. The engine supports it out of the box
+  (`provider.WithResourceIndicators`, `WithResourceIndicatorsRequired` in
+  `pkg/provider/option.go:1588`); not yet enabled on saka's provider.
+- **Protected Resource Metadata (RFC 9728) lives on the MCP servers**, not
+  on saka: each MCP server advertises its authorization server (saka) and
+  required scopes via the `WWW-Authenticate` challenge or a well-known
+  URI. Not an OP-side profile.
+- **Logout profiles stay irrelevant** — MCP sessions live in the AI host
+  and end with token expiry or revocation; there is no browser session to
+  sign out. The refresh-token rotation saka already performs covers the
+  spec's public-client requirement.
 
 ### Relying Party
 
