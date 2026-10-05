@@ -140,17 +140,18 @@ adapted.
 
 ## Why Saka?
 
-The name is Indonesian. A **saka** is the main pillar of a house — the
-one that holds everything above it. That is what this project wants to
-be for your product: the load-bearing part you shouldn't have to rebuild
-— accounts, sign-in, sessions, permissions — so you can spend your
-effort on the rooms people actually live in.
+*Saka* is Indonesian for the main pillar of a house — the one beam
+everything above rests on. Every product has one: accounts, sign-in,
+sessions, permissions. It is the part nobody sees when it works, and
+nobody forgets when it fails. Saka ships that pillar built, tested, and
+ready — so your effort goes to the rooms, not the frame.
 
-And in Sundanese, **sakahayang** means "whatever you like" — you can
-build anything you want with this. The technical half keeps that
-promise: an open codebase with no proprietary locks, standard protocols
-(OpenID Connect, OAuth, SCIM, WebAuthn) any client library speaks, and
-features built as modules you keep, extend, or ignore.
+And *sakahayang* — Sundanese for "whatever you like" — is the freedom
+the foundation gives you. Nothing here is locked: the code is open, the
+protocols are the standards (OpenID Connect, OAuth, SCIM, WebAuthn) that
+every client library already speaks, and the features are modules —
+keep them, change them, or leave them. Build whatever you like; the
+pillar holds.
 
 ## License
 
