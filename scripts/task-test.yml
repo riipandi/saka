@@ -35,6 +35,14 @@ tasks:
         $(go list ./... | egrep -v '(/test|/codegen)$$')
       - go tool cover -func=.output/coverage.out | tail -1
 
+  bench:loadtest:
+    desc: Run the k6 load test against a running server (K6_PROFILE=smoke|load|stress, K6_TARGET; needs a seeded db — see scripts/loadtest/README.md)
+    preconditions:
+      - sh: command -v k6
+        msg: k6 is not installed — see https://grafana.com/docs/k6/latest/set-up/install-k6/
+    cmds:
+      - k6 run -e K6_PROFILE={{.K6_PROFILE | default "smoke"}} -e K6_TARGET={{.K6_TARGET | default "http://localhost:3080"}} {{.CLI_ARGS}} scripts/loadtest/loadtest.mjs
+
   coverage:report:
     desc: Open HTML coverage report in browser (detailed line coverage)
     deps: [coverage]
