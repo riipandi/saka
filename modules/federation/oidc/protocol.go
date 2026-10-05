@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -336,7 +337,7 @@ func (p *Protocol) Mount(r chi.Router) {
 	r.Handle(protocolPrefix+protocolDeviceAuthorizeEndpoint, flatten(handler))
 	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint, handler)
 	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint+"/*", handler)
-	r.Handle("/.well-known/openid-configuration", handler)
+	r.Handle("/.well-known/openid-configuration", withLogoutDiscoveryMetadata(handler))
 	// The RFC 8414 alias is the OAuth face of the same document: the
 	// provider registers the discovery handler on the openid-configuration
 	// path alone, so the alias re-points the request at it. The document
@@ -345,7 +346,7 @@ func (p *Protocol) Mount(r chi.Router) {
 	// introspection and revocation surfaces with their authentication
 	// methods — and one document cannot drift from itself.
 	r.Handle("/.well-known/oauth-authorization-server",
-		requestAt("/.well-known/openid-configuration", handler))
+		requestAt("/.well-known/openid-configuration", withLogoutDiscoveryMetadata(handler)))
 }
 
 // requestAt re-points a request's path before the handler sees it. The
@@ -357,6 +358,94 @@ func requestAt(path string, next http.Handler) http.Handler {
 		r.URL.RawPath = ""
 		next.ServeHTTP(w, r)
 	})
+}
+
+// withLogoutDiscoveryMetadata augments the discovery documents the
+// provider renders with the back-channel logout members. The engine's
+// document builder names neither member, yet the delivery is ported and
+// the logout profiles test the advertisement — an RP that reads the
+// metadata honestly would never learn the OP can post its logout token.
+// The document renders fully before the members merge in: anything the
+// handler refuses flushes exactly as the engine wrote it.
+func withLogoutDiscoveryMetadata(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder := &bufferedResponse{ResponseWriter: w}
+		next.ServeHTTP(recorder, recorder.request(r))
+
+		mergeable := recorder.code == http.StatusOK &&
+			strings.Contains(recorder.Header().Get("Content-Type"), "json")
+		var members map[string]any
+		if mergeable {
+			if err := json.Unmarshal(recorder.body, &members); err != nil || members == nil {
+				mergeable = false
+			}
+		}
+		if !mergeable {
+			recorder.flush()
+			return
+		}
+
+		members["backchannel_logout_supported"] = true
+		members["backchannel_logout_session_supported"] = true
+		merged, err := json.Marshal(members)
+		if err != nil {
+			recorder.flush()
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(merged)))
+		w.WriteHeader(recorder.code)
+		_, _ = w.Write(merged)
+	})
+}
+
+// bufferedResponse holds the handler's answer back until the decorator
+// decides whether the metadata joins it. The engine's discovery answers
+// once — head then body — so the buffer never grows past one document.
+type bufferedResponse struct {
+	http.ResponseWriter
+	code    int
+	body    []byte
+	flushed bool
+}
+
+// request keeps the recorder from satisfying interfaces the handler may
+// probe: only the writer's surface is borrowed.
+func (b *bufferedResponse) request(r *http.Request) *http.Request {
+	return r
+}
+
+func (b *bufferedResponse) WriteHeader(code int) {
+	if b.flushed {
+		return
+	}
+	if b.code == 0 {
+		b.code = code
+	}
+}
+
+func (b *bufferedResponse) Write(p []byte) (int, error) {
+	if b.flushed {
+		return b.ResponseWriter.Write(p)
+	}
+	if b.code == 0 {
+		b.code = http.StatusOK
+	}
+	b.body = append(b.body, p...)
+	return len(p), nil
+}
+
+// flush answers what the buffer holds when the decorator declines to
+// edit: the head the handler sent, then its body, untouched.
+func (b *bufferedResponse) flush() {
+	if b.flushed {
+		return
+	}
+	if b.code == 0 {
+		b.code = http.StatusOK
+	}
+	b.ResponseWriter.WriteHeader(b.code)
+	b.flushed = true
+	_, _ = b.ResponseWriter.Write(b.body)
 }
 
 // defaultDeviceCodeFunc draws the device code the same way the library

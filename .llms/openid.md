@@ -4,21 +4,27 @@
 
 ### OpenID Provider Servers
 
-- [ ] Basic OP
-- [ ] Config OP
-- [ ] Dynamic OP
-- [ ] Form Post OP
-- [ ] Hybrid OP
-- [ ] Implicit OP
+Status after the certification-readiness phases (`.llms/plans/plan-20261005_1845.md`);
+a tick means implemented and locally rehearsal-green against the OIDF suite —
+the hosted submission run is phase 6's runbook.
+
+- [x] Basic OP — implemented; local rehearsal 35/35
+- [x] Config OP — implemented; local rehearsal 1/1 (WARNING = pass)
+- [ ] Dynamic OP — not implemented (no dynamic client registration surface)
+- [ ] Form Post OP — not implemented (`response_mode=form_post` absent)
+- [ ] Hybrid OP — not implemented (no `code id_token` hybrid flows)
+- [ ] Implicit OP — not implemented (OAuth 2.1 dropped the implicit grant)
 
 ### OpenID Providers for Logout Profiles
 
-- [ ] Back-Channel OP
-- [ ] Front-Channel OP
-- [ ] RP-Initiated OP
-- [ ] Session OP
+- [x] RP-Initiated OP — implemented; local rehearsal 11/11
+- [x] Back-Channel OP — implemented; local rehearsal 2/2
+- [ ] Front-Channel OP — rejected: iframe delivery contradicts the no-embedded-frame design (plan D1)
+- [ ] Session OP — rejected: session-management iframes contradict the no-browser-session design (plan D1)
 
 ### Relying Party
+
+Saka is a provider, not a relying party — the RP profiles are out of scope.
 
 - [ ] Back-Channel RP
 - [ ] Basic RP

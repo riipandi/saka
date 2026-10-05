@@ -34,21 +34,44 @@ export const alias = process.env.CONFORMANCE_ALIAS ?? 'saka'
 export const clients = {
   basic: {
     client_id: 'suite-basic',
-    client_secret: 'saka-suite-basic',
+    client_secret: 'saka-suite-basic-client-secret-32',
     auth: 'client_secret_basic',
     alias: `${alias}-basic`
   },
   config: {
     client_id: 'suite-config',
-    client_secret: 'saka-suite-config',
+    client_secret: 'saka-suite-config-client-secret-32',
     auth: 'client_secret_post',
     alias: `${alias}-config`
   },
   logout: {
     client_id: 'suite-logout',
-    client_secret: 'saka-suite-logout',
+    client_secret: 'saka-suite-logout-client-secret-32',
     auth: 'client_secret_basic',
     alias: `${alias}-logout`
+  },
+  backchannel: {
+    client_id: 'suite-backchannel',
+    client_secret: 'saka-suite-backchannel-secret-32',
+    auth: 'client_secret_basic',
+    alias: `${alias}-backchannel`
+  }
+}
+
+// The client pair each logout plan drives. The profiles contradict: the
+// RP-initiated plan fails a module when the OP delivers a logout token
+// its receiver does not serve, the back-channel plan fails when the OP
+// withholds one — so the back-channel plan takes the pair whose
+// registrations name the suite's receiver, and the RP-initiated plan the
+// pair without it.
+const planClients = {
+  'oidcc-backchannel-rp-initiated-logout-certification-test-plan': {
+    client: 'backchannel',
+    client2: 'logout'
+  },
+  'oidcc-rp-initiated-logout-certification-test-plan': {
+    client: 'basic',
+    client2: 'config'
   }
 }
 
@@ -69,18 +92,28 @@ export function buildConfiguration(planName) {
       discoveryUrl: `${issuer}/.well-known/openid-configuration`,
       login_hint: account.username
     },
-    // The plans' static registration fields: a basic client, the
-    // second basic client, and the secret_post one. The provider
+    // The plans' static registration fields: the pair the plan drives
+    // (see planClients) and the secret_post one. The provider
     // authenticates every confidential client by basic and post
-    // alike, so the same three serve every plan.
-    client: {
-      client_id: clients.basic.client_id,
-      client_secret: clients.basic.client_secret
-    },
-    client2: {
-      client_id: clients.logout.client_id,
-      client_secret: clients.logout.client_secret
-    },
+    // alike, so the same clients serve under either authentication.
+    client: planClients[planName]
+      ? {
+          client_id: clients[planClients[planName].client].client_id,
+          client_secret: clients[planClients[planName].client].client_secret
+        }
+      : {
+          client_id: clients.basic.client_id,
+          client_secret: clients.basic.client_secret
+        },
+    client2: planClients[planName]
+      ? {
+          client_id: clients[planClients[planName].client2].client_id,
+          client_secret: clients[planClients[planName].client2].client_secret
+        }
+      : {
+          client_id: clients.logout.client_id,
+          client_secret: clients.logout.client_secret
+        },
     client_secret_post: {
       client_id: clients.config.client_id,
       client_secret: clients.config.client_secret

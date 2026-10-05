@@ -34,7 +34,7 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 		func(_ *http.Request, session *goidc.LogoutSession) bool {
 			return session.IDTokenHint != ""
 		},
-		func(_ http.ResponseWriter, req *http.Request, session *goidc.LogoutSession) (goidc.Status, error) {
+		func(w http.ResponseWriter, req *http.Request, session *goidc.LogoutSession) (goidc.Status, error) {
 			typ, err := joseTypeMember(session.IDTokenHint)
 			if err != nil {
 				return goidc.StatusFailure, goidc.WrapError(goidc.ErrorCodeInvalidRequest, "invalid request",
@@ -74,6 +74,10 @@ func logoutPolicy(service *Service) goidc.LogoutPolicy {
 			if err := service.EndSession(req.Context(), userID.String(), session.ClientID, sid); err != nil {
 				return goidc.StatusFailure, fmt.Errorf("could not end the session: %w", err)
 			}
+			// The browser-session marker dies with the session it names:
+			// a later prompt=none request must answer login_required, not
+			// resume an authentication the user just ended.
+			clearBrowserSessionCookie(w)
 			return goidc.StatusSuccess, nil
 		},
 	)
@@ -91,6 +95,21 @@ func hintSessionID(claims *goidc.IDToken) string {
 		return ""
 	}
 	return raw
+}
+
+// clearBrowserSessionCookie expires the OP's browser-session marker in
+// the response that answers the logout — the mirror of the writes the
+// completion paths make (protocol_policy.go).
+func clearBrowserSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     oidcSessionCookie,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // joseTypeMember reads the type member of the first JOSE header of a

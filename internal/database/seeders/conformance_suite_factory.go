@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+
+	"github.com/riipandi/saka/modules/appconfig"
 	"uuid"
 
 	"github.com/riipandi/saka/framework/datastore"
@@ -56,32 +58,47 @@ type suiteClient struct {
 	BackchannelURI string
 }
 
-// suiteClients are the three clients the four profiles ride: the basic
-// profile authenticates with client_secret_basic, the config profile with
+// suiteClients are the clients the profiles ride: the basic profile
+// authenticates with client_secret_basic, the config profile with
 // client_secret_post (the provider accepts both for every confidential
 // client — the plan's client_auth_type decides which the suite presents),
-// and the logout pair rides the third. The back-channel URI is registered
-// on the logout client alone.
+// and the logout plans ride the last two. The back-channel receiver is
+// registered on the back-channel client ALONE: the profiles contradict —
+// the RP-initiated plan fails a module the moment the OP delivers a
+// logout token its receiver does not serve, the back-channel plan fails
+// the moment the OP withholds one — so the runner's configuration maps
+// each plan to the right pair (conformance/config.mjs).
 var suiteClients = []suiteClient{
 	{
 		ID:     "suite-basic",
 		Name:   "Conformance Suite Basic OP",
-		Secret: "saka-suite-basic",
+		Secret: "saka-suite-basic-client-secret-32",
 	},
 	{
 		ID:     "suite-config",
 		Name:   "Conformance Suite Config OP",
-		Secret: "saka-suite-config",
+		Secret: "saka-suite-config-client-secret-32",
 	},
 	{
 		ID:     "suite-logout",
-		Name:   "Conformance Suite Logout OP",
-		Secret: "saka-suite-logout",
+		Name:   "Conformance Suite RP-Initiated Logout OP",
+		Secret: "saka-suite-logout-client-secret-32",
+	},
+	{
+		ID:     "suite-backchannel",
+		Name:   "Conformance Suite Back-Channel Logout OP",
+		Secret: "saka-suite-backchannel-secret-32",
 		// The suite's back-channel receiver: the profile asks the OP to
 		// POST its logout token there, and the session-required flag is
 		// what puts the sid member into the delivered token.
-		BackchannelURI: SuiteBaseURL + "/test/a/" + SuiteAlias + "/backchannel_logout",
+		BackchannelURI: suiteBackchannelURL(),
 	},
+}
+
+// suiteBackchannelURL answers the receiver the suite hosts for the shared
+// alias — see suiteCallbackURLs.
+func suiteBackchannelURL() string {
+	return SuiteBaseURL + "/test/a/" + SuiteAlias + "/backchannel_logout"
 }
 
 // suiteCallbackURLs answers the paths a client of the shared alias needs:
@@ -121,6 +138,21 @@ func applyConformanceSuite(ctx context.Context, q datastore.Querier, dryRun bool
 		}
 		created = append(created, createdKey...)
 		skipped = append(skipped, skippedKey...)
+	}
+
+	// The rehearsal's posture: the delivery the back-channel logout plan
+	// tests rides the deployment switch, and its catalog default is off.
+	// The fixture re-asserts the switch on every seed — an operator's
+	// later decision outranks a re-seed only on a row the fixture does
+	// not own.
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(entity.TableAppSettings)
+	ib.Cols("key", "value")
+	ib.Values(appconfig.SettingOIDCBackchannelLogoutEnabled, "true")
+	ib.SQL("ON CONFLICT (key) DO UPDATE SET value = excluded.value")
+	query, args := ib.Build()
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return created, skipped, fmt.Errorf("seeders: enable the back-channel logout switch: %w", err)
 	}
 	return created, skipped, nil
 }

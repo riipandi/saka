@@ -699,7 +699,21 @@ request whose `max_age` still covers the recorded instant: the auth_time
 the tokens carry must not move within the window, and `prompt=login`
 demands exactly the opposite — a fresh authentication, a fresh
 `auth_time`. The ID token's `auth_time` rides the grant's store, stamped
-at completion (`modules/federation/oidc/protocol_policy.go`).
+at completion (`modules/federation/oidc/protocol_policy.go`). A successful
+RP-initiated logout expires the marker in the answer (`Max-Age=-1`) — a
+later silent request reads `login_required`, never a session the user
+just ended.
+
+**The back-channel advertisement.** The engine's discovery builder names
+neither logout member, so the protocol decorates the document
+(`withLogoutDiscoveryMetadata`): `backchannel_logout_supported: true` and
+`backchannel_logout_session_supported: true` merge into every 200 JSON
+answer the two well-known paths render — a refusal flushes untouched.
+The decoration states what the module below delivers; the switch
+`oidc.backchannel_logout_enabled` stays the deployment's hand on it, and
+off, the advertisement would outshout the behavior (the rehearsal's
+fixture turns the switch on; a production deployment that keeps it off
+should not advertise).
 
 **Back-channel logout delivers after the commit.** A client whose
 `backchannel_logout_uri` is registered receives a logout token when an
