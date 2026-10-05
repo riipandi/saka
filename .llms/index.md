@@ -74,8 +74,18 @@ carries: no technical references here — internals, engine paths, and agent
 context belong in `.llms/`; keep the orientation on the human reader. Keep
 aligned when a shipped surface changes.
 
+## Issues (`.llms/issues/`)
+
+The open and considering items, newest capture first:
+`issue-YYYYMMDD_hhmm.md` with a frontmatter rollup (`status`, `captured`,
+`updated`) and per-item status lines carrying their reopen triggers. The
+rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
+lands there the moment it is found — not in chat memory. Newest:
+`issue-20261006_0050.md`.
+
 ## Finding history fast
 
 - **A design decision** → the plan's Decisions section (dated, with rejected alternatives); the storage model's decisions live in `plan-20261003_2359.md`.
+- **An open item** → `.llms/issues/` (above).
 - **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
 - **What a past session did** → the handover of that date; memory recall supplements it.
