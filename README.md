@@ -1,123 +1,133 @@
 [![Go](https://img.shields.io/badge/Go-1.27-blue.svg?logo=Go&logoColor=white)](https://go.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/Postgres-18-blue.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19-blue.svg?logo=react)](https://react.dev)
-[![Postgres](https://img.shields.io/badge/Postgres-18-blue.svg?logo=postgresql)](https://www.postgresql.org)
-
-Starter project template built with [Go][golang], [chi][go-chi] (HTTP router), [ConnectRPC][connectrpc] (RPC),
-[Postgres][postgres] (database), [React][react], and [TanStack][tanstack] (Router, Query, Store). It exists so you
-can start building without repeating the initial setup.
+[![Release](https://img.shields.io/github/v/release/riipandi/saka?logo=docker&logoColor=white)](https://github.com/riipandi/saka/releases)
+[![Contribution](https://img.shields.io/badge/Contributions-welcome-gray.svg?labelColor=green)](https://github.com/riipandi/saka/graphs/contributors)
+<!-- [![CI Test](https://github.com/riipandi/saka/actions/workflows/test.yml/badge.svg)](https://github.com/riipandi/saka/actions/workflows/test.yml) -->
+<!-- [![CI Release](https://github.com/riipandi/saka/actions/workflows/release.yml/badge.svg)](https://github.com/riipandi/saka/actions/workflows/release.yml) -->
 
 ---
 
-> [!NOTE]
-> This project is a template I use for my personal use, so you may encounter bugs.
-> Please review the release notes thoroughly before updating, as breaking changes can occur!
+**Saka is a project boilerplate with authentication built in.** Clone it,
+and the hardest part of a new product — accounts, sign-in, sessions,
+permissions — already works, tried and tested. Build your product around
+the auth core; or deploy it standalone as a pure identity provider for
+your other applications.
+
+The auth works in both directions out of the box:
+
+- **Saka as the IdP** — other applications sign their users in with Saka
+  accounts over OpenID Connect.
+- **Saka as the SSO client** — users sign in to Saka itself with Google,
+  GitHub, or any OpenID Connect provider you connect.
+
+The architecture is a **modular monolith**: features live in isolated
+modules with clear domain boundaries, while deployment stays a single
+binary. It follows the [twelve-factor app](https://12factor.net/)
+methodology — strict config separation, stateless processes, backing
+service abstraction — so a future service extraction is a refactor, not
+a rewrite.
+
+> [!WARNING]
+> This project is under active development, so you may encounter bugs.
+> Please review the release notes thoroughly before updating, as breaking
+> changes can occur — use at your own risk!
+
+## Features
+
+**The auth core** — the part most projects build last and regret:
+
+- **Built-in authentication**: password, passkeys (WebAuthn), one-time
+  email codes, device pairing login — every account may carry several
+- **MFA**: TOTP with printable recovery codes, honored on *every* sign-in
+  path; step-up proofs for sensitive actions
+- **OAuth SSO**: sign in with Google, GitHub, or custom OpenID Connect
+  connections (discovery-based), with account linking, JIT sign-up, and
+  email-code verification gates
+- **OpenID provider**: other apps sign in with Saka accounts — code flow
+  with PKCE S256, PAR, device flow, refresh rotation, introspection,
+  revocation, RP-initiated and back-channel logout; the four certification
+  profiles rehearse green against the OpenID Foundation suite
+- **Sessions**: multi-device with per-session revocation, admin
+  impersonation (delegated, audited), anti-enumeration recovery flows
+- **Authorization**: role and permission grants checked against a catalog;
+  users, groups, sign-up modes (open/invite/closed), blocklist
+- **API keys**: machine credentials with shown-once secrets, renewal, and
+  soft revocation
+
+**The platform around it:**
+
+- **Single-binary deployment**: backend, frontend, email templates, and
+  migrations in one Go binary
+- **API**: ConnectRPC (snake_case JSON) + REST, type-safe by code
+  generation; wire-level documentation in `docs/`
+- **Storage**: buckets, resumable (tus) uploads, local or S3-compatible
+  backends, signed links
+- **Webhooks**: signed (HMAC-SHA256) event deliveries with retries and an
+  SSRF guard
+- **Notifications**: in-product announcements with audiences, receipts,
+  and a live stream
+- **SCIM**: outbound provisioning per client (hourly + change-driven)
+- **Audit log**: every security-relevant act, retained by policy
+- **Observability**: structured logs, OpenTelemetry traces and metrics
+  (Prometheus endpoint), health/readiness
+- **Database**: PostgreSQL (pgx), goose migrations with UUIDv7 keys
+- **Testing**: Testcontainers integration tests, wire-level E2E ladders,
+  a k6 load test, and the conformance-suite driver
+- **Developer workflow**: `task` runner, Docker Compose dev stack
+  (Postgres, Mailpit, optional Valkey), Vite+ toolchain, debug-build
+  devtools
 
 ## Quick Start
+Read the [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on contributing to this project.
 
-You will need [`Go >= 1.27`][golang], [`Node.js >= 24.21`][nodejs], [`PNPM >= 12.6`][pnpm], and
-[`Docker >= 20.10`][docker] installed on your machine.
+### Up and Running
 
-```bash
-pnpm dlx tiged riipandi/saka myapp-name
-```
-
-1. Install the Go toolchain binaries: `task deps`
-2. Find and replace `saka`, `Saka`, and `MyApplication` across the source files.
-3. Install the frontend dependencies: `pnpm install`
-4. Write a starter config file: `task config:generate`
-5. Generate the secret keys into your env file: `task key:generate`
-6. Start the local Postgres: `docker compose -f container/compose.yaml up -d pgsql`
-7. Set `DATABASE_URL` in `.env.local` (see `.env.example`)
-8. Run the database migrations: `task db:migrate`
-9. Bootstrap the system seed, the signing key pair, and the first administrator: `task db:initialize` (see `scripts/task-database.yml`; wraps `saka initialize`)
-10. Start the development servers: `task dev`
-
-The browser opens **:3080** only — the Go server renders the document, its shell points
-at the same origin, and the debug build proxies the Vite compiler (modules, assets, the
-HMR socket) behind it. Go files are watched and rebuilt automatically.
-
-## Available Tasks
-
-Run `task` to list every target. Most targets live in `scripts/task-*`, one file per group; the root
-`Taskfile.yml` declares the shared variables, includes them (flattened — `task db:migrate`, never
-`task database:db:migrate`), and keeps the `compose:*` targets itself.
-
-| Command             | Description                                            |
-| ------------------- | ------------------------------------------------------ |
-| `task dev`          | One origin (:3080) — Go serves the document; Vite compiles + HMR behind it; the binary rebuilt from `build/debug` on every Go change |
-| `task run`          | Run the CLI directly (debug build)                     |
-| `task build`        | Build the frontend and both Go binaries                |
-| `task start`        | Run the production binary                              |
-| `task test`         | Run the frontend and backend tests                     |
-| `task typecheck`    | Run TypeScript type checking                           |
-| `task lint`         | Run all linters (Go and JS)                            |
-| `task check`        | Run `go vet` and the formatting check                  |
-| `task format`       | Format all files (Go and JS)                           |
-| `task key:generate` | Generate the application secret keys                   |
-| `task cert:generate`| Generate local HTTPS certificates into `storage/config` |
-| `task cert:trust`   | Trust the local CA in the system trust store           |
-| `task rpc:generate` | Generate Go and TypeScript from the proto contracts    |
-| `task rpc:stale`    | Fail when generated code is out of date                |
-| `task metrics:up`   | Start the observability stack (OpenTelemetry)          |
-| `task compose:up`   | Start the docker compose services                      |
-| `task compose:down` | Stop the docker compose services                       |
-
-## The Short Version
-
-- **Configuration** — `app.config.json` is the single source of truth. Precedence: built-in
-  defaults → config file → CLI flags. The environment is not a layer: a variable reaches a key
-  only where the file references it (`env:NAME` or `${NAME}`), and secrets are never written
-  literally. Details: [`framework/config/README.md`](./framework/config/README.md).
-- **Database** — goose migrations embedded in the binary (`internal/database/migrations/`), tracked in
-  `app_migration`, applied over a single locked connection. Migrate, seed, and inspect with the
-  `db:*` / `migrate:*` commands. Details: [`internal/database/README.md`](./internal/database/README.md).
-- **Dump and restore** — `task db:export` writes a readable SQL dump (`COPY` blocks, PK-ordered,
-  optional `--compression`); `task db:import` loads it back in one transaction, reordered by
-  foreign keys. See `internal/database/README.md` for the flags.
-- **Logging** — `log/slog` is the only frontend; `log.transport` names the sinks (console,
-  rotating file, OTLP collector). Details: [`framework/logger/README.md`](./framework/logger/README.md).
-- **Tracing and metrics** — OpenTelemetry, opt-in per signal, one collector address
-  (`otel.endpoint`), plus a Prometheus exposition. Details:
-  [`framework/observer/README.md`](./framework/observer/README.md).
-- **Health** — `task health` and `GET /api/healthz` report the same aggregated status
-  (postgres, storage; optional checks are reported but never fail the aggregate). Details:
-  [`framework/health/README.md`](./framework/health/README.md).
-- **Cache & key-value store** — the cache is off by default; the optional Valkey backend
-  (`kvstore.enable`) is never required. Details: [`framework/cache/README.md`](./framework/cache/README.md).
-- **Outbound HTTP** — one client for external services, with timeouts, retries, and a
-  circuit breaker. Details: [`framework/fetcher/README.md`](./framework/fetcher/README.md).
-- **Email** — templated messages sent over SMTP, with the React Email templates compiled into the
-  binary. Optional, so a local checkout needs no mail server. Details:
-  [`framework/mailer/README.md`](./framework/mailer/README.md).
-- **File storage** — chunked, content-addressed uploads over the local data directory or S3,
-  manifest in Postgres, uploads on the durable queue. Details:
-  [`framework/storage/README.md`](./framework/storage/README.md).
-- **Queue & scheduler** — a durable Postgres task queue with retries and a dead-letter archive
-  ([`framework/queue/README.md`](./framework/queue/README.md)), driven by a cron scheduler whose
-  claimed tick and enqueued task share one transaction
-  ([`framework/scheduler/README.md`](./framework/scheduler/README.md)).
-
-## Local HTTPS
-
-The nginx service in `container/compose-dev.yaml` reads certificates from `storage/config`. Generate them with
-[`mkcert`](https://github.com/FiloSottile/mkcert), falling back to a self-signed `openssl` certificate when
-`mkcert` is unavailable:
+Requirements: Go 1.27+, Node 24.21+, pnpm, and Docker.
 
 ```sh
-# Writes storage/config/localhost_key.pem and storage/config/localhost_crt.pem.
-task cert:generate
+# Clone the repository
+git clone https://github.com/riipandi/saka
+cd saka
 
-# Install the mkcert local CA in the system trust store.
-task cert:trust
+pnpm install              # frontend dependencies
+task deps                 # Go toolchain binaries (golangci-lint, goose, …)
+task config:generate      # write app.config.json, then fill in the secrets
+cp .env.example .env.local && edit .env.local
+task compose:up           # start local dev services (postgres, mailpit, …)
+task db:initialize        # migrations + system seed + first administrator
+task dev                  # the dev loop: Vite + HMR behind the Go proxy
 ```
 
-`task cert:generate` covers `localhost`, `127.0.0.1`, `::1`, `host.docker.internal`, and
-`*.localhost.test`. `storage/` is gitignored, so the certificates stay local.
+**The application will be accessible at:**
 
-## Deployment
+- Application: <http://localhost:3080> (API and frontend on one origin)
+- Mail inbox: <http://localhost:8025> (Mailpit)
+- Health: <http://localhost:3080/healthz>
 
-Build the image with `task docker:build`. Read the [Deployment Guidelines](./docs/deployment.md) for the full procedure.
+**Available task commands:**
+
+- `task dev` - Run the dev loop (Vite + HMR behind the Go proxy)
+- `task serve` - Run the server (debug build)
+- `task build` - Build the application binaries
+- `task lint` / `task test` / `task check` - The everyday checks
+- `task --list` - The full list (it mirrors the CLI)
+
+## Documentation
+
+| Page | What it covers |
+| --- | --- |
+| [Product guide](./docs/product-guide.md) | The whole product in one walk |
+| [Authentication](./docs/auth.md) | The sign-in methods, MFA, sessions — in depth |
+| [OAuth SSO](./docs/oauth-sso.md) | Connecting external providers |
+| [OpenID provider](./docs/oidc.md) | How other apps sign in with Saka |
+| [Configuration](./docs/configuration.md) | The config file, secrets, settings |
+| [Deployment](./docs/deployment.md) | Running Saka for real |
+
+More in [`docs`](./docs): storage, webhooks, notifications, API keys,
+SCIM, the conformance profiles, the debug utilities, and the API
+reference.
 
 ## License
 
@@ -130,14 +140,5 @@ See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) for more information.
 
 [![Creator Badge](https://badgen.net/badge/icon/by%20Aris%20Ripandi?label&color=black&labelColor=black)][riipandi-x]
 
-[connectrpc]: https://connectrpc.com/
-[docker]: https://docs.docker.com/engine/install/
-[go-chi]: https://github.com/go-chi/chi
-[golang]: https://go.dev/doc/install
 [license-apache]: https://choosealicense.com/licenses/apache-2.0/
-[nodejs]: https://nodejs.org/en/download
-[pnpm]: https://pnpm.io/installation
-[postgres]: https://www.postgresql.org/
-[react]: https://react.dev/
 [riipandi-x]: https://twitter.com/intent/follow?screen_name=riipandi
-[tanstack]: https://tanstack.com/
