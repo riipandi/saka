@@ -62,7 +62,7 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 - `audit-20260929_1613.md` — federation, device flow, SCIM.
 - `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
 - `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s.
-- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, certification readiness.
+- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness.
 
 ## Product docs (`docs/`)
 
