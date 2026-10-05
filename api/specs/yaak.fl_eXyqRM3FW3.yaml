@@ -1,17 +1,16 @@
 type: folder
 model: folder
-id: fl_5R2gfN3X4T
-createdAt: 2026-09-25T10:28:09.871988
-updatedAt: 2026-10-05T15:58:58.434263
+id: fl_eXyqRM3FW3
+createdAt: 2026-10-05T15:58:41.095344
+updatedAt: 2026-10-05T15:58:46.309183
 workspaceId: wk_kBiMYTkhPP
 folderId: null
-authentication:
-  token: ${[ accessToken ]}
-authenticationType: bearer
+authentication: {}
+authenticationType: null
 description: ''
 headers: []
-name: OIDC Authentication
-sortPriority: 5333.333333333333
+name: OIDC Management
+sortPriority: 5407.407407407407
 settingSendCookies:
   enabled: false
   value: true
