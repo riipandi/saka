@@ -71,6 +71,59 @@ func (clientManagerStub) DeleteClient(context.Context, string) error {
 	return goidc.ErrNotFound
 }
 
+// TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface answers for the two
+// metadata hygiene fixes the phase 1 audit asked for: the PKCE method list
+// names S256 alone (RFC 9700 §4.1.3 retires plain), and claims_supported
+// carries the registered claims beside the scope-gated ones — at_hash
+// absent on purpose, the code flow's ID token does not mint it.
+func TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface(t *testing.T) {
+	rp := &goidc.Client{
+		ID:            "rp",
+		RedirectURIs:  []string{"https://rp.example/cb"},
+		GrantTypes:    []goidc.GrantType{goidc.GrantAuthorizationCode},
+		ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
+		ScopeIDs:      "openid",
+	}
+	p, err := provider.New(provider.Config{
+		Issuer: "https://saka.example",
+		JWKS: func(context.Context) (goidc.JSONWebKeySet, error) {
+			return goidc.JSONWebKeySet{}, nil
+		},
+		IDTokenAlgs: []goidc.SignatureAlgorithm{goidc.SigAlgES256},
+	},
+		provider.WithPathPrefix(protocolPrefix),
+		provider.WithStaticClients(rp),
+		provider.WithScopes(protocolScopes()...),
+		provider.WithClaims(claimsSupported()...),
+		provider.WithAuthCodeGrant(provider.AuthCodeGrantConfig{
+			ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
+		},
+			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256},
+				provider.WithPKCERequired()),
+		),
+	)
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/.well-known/openid-configuration", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var document struct {
+		PKCEMethods []string `json:"code_challenge_methods_supported"`
+		Claims      []string `json:"claims_supported"`
+		Scopes      []string `json:"scopes_supported"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &document))
+	assert.Equal(t, []string{"S256"}, document.PKCEMethods,
+		"the provider offers the S256 challenge alone")
+	assert.NotContains(t, document.PKCEMethods, "plain")
+	assert.Contains(t, document.Scopes, "openid")
+
+	assert.Contains(t, document.Claims, "sub")
+	assert.Contains(t, document.Claims, "iss")
+	assert.Contains(t, document.Claims, "email")
+	assert.NotContains(t, document.Claims, "at_hash")
+}
+
 func TestTheRFC8414AliasServesTheDiscoveryDocument(t *testing.T) {
 	server := httptest.NewServer(metadataProvider(t))
 	t.Cleanup(server.Close)

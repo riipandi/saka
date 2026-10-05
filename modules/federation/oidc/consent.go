@@ -10,6 +10,7 @@ import (
 
 	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/internal/database/entity"
 	"github.com/riipandi/saka/modules/identity/user"
@@ -112,21 +113,36 @@ func (s *Service) UserAuthorizedClients(ctx context.Context, userID string) ([]A
 	return s.authorizedClientsFor(ctx, s.pool, userID)
 }
 
-// AllAuthorizedClients answers every ledger row with its account named.
-// A left join keeps the rows whose account is gone — the delete that
-// removed it left the consent behind on purpose.
-func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, error) {
+// AllAuthorizedClients answers one page of the ledger rows, each with its
+// account named, most recently used first. A left join keeps the rows whose
+// account is gone — the delete that removed it left the consent behind on
+// purpose. The count rides the page's own answer, so the wire carries the
+// pagination block.
+func (s *Service) AllAuthorizedClients(ctx context.Context, page, limit int) ([]LedgerEntry, webutil.Pagination, error) {
+	page, limit = webutil.NormalizePage(page, limit, webutil.DefaultPageSize, webutil.MaxPageSize)
+
+	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	cb.Select("COUNT(*)")
+	cb.From(entity.TableUserAuthorizedOIDCClients + " l")
+	cb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableOIDCClients+" c ON c.id = l.client_id")
+	countQuery, countArgs := cb.Build()
+	var total int
+	if err := s.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, webutil.Pagination{}, err
+	}
+
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(append(ledgerClientColumns, "l.scope", "l.last_used_at", "u.id")...)
 	sb.From(entity.TableUserAuthorizedOIDCClients + " l")
 	sb.JoinWithOption(sqlbuilder.InnerJoin, entity.TableOIDCClients+" c ON c.id = l.client_id")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUsers+" u ON u.id = l.user_id")
 	sb.OrderBy("l.last_used_at DESC")
+	sb.Limit(limit).Offset(webutil.Offset(page, limit))
 	query, args := sb.Build()
 
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, webutil.Pagination{}, err
 	}
 	defer rows.Close()
 
@@ -137,7 +153,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, erro
 			return rows.Scan(append(dest, &accountID)...)
 		})
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, webutil.Pagination{}, scanErr
 		}
 		entry := LedgerEntry{
 			Client:     row.view(s.now()),
@@ -151,7 +167,10 @@ func (s *Service) AllAuthorizedClients(ctx context.Context) ([]LedgerEntry, erro
 		}
 		entries = append(entries, entry)
 	}
-	return entries, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, webutil.Pagination{}, err
+	}
+	return entries, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
 
 // MyClients answers the clients the account may authorize. The rule is

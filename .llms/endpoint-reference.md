@@ -489,7 +489,7 @@ implementation status and evidence; planned rows remain explicitly marked.
 | POST | `/rpc/saka.federation.v1.OidcConsentService/RevokeMyAuthorizedClient` | Revoke authorization for an OIDC client | shipped — guard `Authenticated`; revocation cascades to the grants and the pointers riding them | `modules/federation/oidc.TestRevokingAConsentKillsTheGrantsAndTheirTokens` |
 | POST | `/rpc/saka.federation.v1.OidcConsentService/ListMyClients` | List accessible OIDC clients for current user | shipped — guard `Authenticated`; the fail-closed restriction catalogue: a client counts as restricted when its flag is set or its allowed-groups roll carries rows, restricted clients answer only for their allowed groups' members | `modules/federation/oidc.TestTheAccessibleClientListFollowsTheGroupRestriction`, `modules/federation/oidc.TestTheCatalogueHidesAFlaggedClientWithNoGroups` |
 | POST | `/rpc/saka.federation.v1.OidcConsentService/ListUserAuthorizedClients` | List authorized clients for a user | shipped — guard `Admin` | `internal/guard` (rules) |
-| POST | `/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped — guard `Admin` | `internal/guard` (rules) |
+| POST | `/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients` | List every authorized client | shipped — guard `Admin`; one page (`page`, `limit`), the shared `metadata` pagination block rides the answer | `internal/guard` (rules), `modules/federation/oidc.TestTheLedgerAnswersTheConsentsTheApprovalRecorded` |
 | GET | `/oidc/clients/{id}/logo` | Get client logo | done — REST, public; the raw image for the sign-in page, 404 for an unknown client or an absent logo, never a substitute | `modules/federation/oidc` (module mount), `internal/guard` (RestRules) |
 | GET | `/oidc/authorize/{id}` | Resume the authorization interaction | done — REST, public; the callback the SPA's interaction page returns to once the account is signed in; without a decision it answers the interaction document (`consent_required`) | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
 | POST | `/oidc/authorize/{id}` | Complete the authorization interaction | done — REST, public; the SPA posts the consent decision the flow grants scopes from | `modules/federation/oidc` (protocol mount, the `authorize/*` pattern) |
@@ -507,6 +507,19 @@ The protocol design notes below record implementation behavior for device flow,
 PAR, end-session `id_token_hint` verification, and discovery. Saka's own JWKS
 endpoint (`/.well-known/jwks.json`, `modules/identity/jwks`) is published by the
 identity module; the federation provider uses that key set.
+
+**Discovery metadata hygiene.** `claims_supported` carries the registered
+claims the tokens mint (`sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`,
+`nonce`, `jti`) beside the scope-gated profile claims; `at_hash` is absent on
+purpose — the engine's code-flow ID token does not mint it, and Core §3.1.3.6
+leaves it optional. `code_challenge_methods_supported` names `["S256"]` alone
+(`TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface`).
+
+**Consent-service wire shape.** The consent handler is built with the
+transport's shared handler options (`modules/federation/oidc/module.go`
+`MountRPC`), so its procedures answer in the same snake_case codec the rest
+of the RPC surface answers in — the earlier wiring built it bare and let
+connect's default camelCase codec leak through.
 
 ### Design contract — protocol core (slice 5), consent (6), device (7)
 
@@ -569,7 +582,9 @@ before any grant, consent, or device approval (`modules/federation/oidc`
 `completeAuthentication`), fail-closed on the flag-or-roll rule. `pkce_supported`
 is stamped when a client presents a
 code challenge the requirement did not demand. PKCE is enforced for public
-clients; `plain` and `S256` are accepted.
+clients; `S256` is the only accepted challenge method — `plain` is refused
+at the authorize endpoint (RFC 9700 §4.1.3), and the discovery document
+names `["S256"]` alone.
 
 **Third-party initiated login.** A relying party links the browser
 straight to `GET /oidc/authorize` with its own `client_id`, an optional

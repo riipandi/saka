@@ -186,9 +186,28 @@ func (s *Service) newSecret(expiresAt *time.Time) (Secret, string, error) {
 
 // suppliedSecret stores a value the operator already holds, so a credential
 // issued elsewhere can be carried over. The hash is of the value as it will
-// be presented — nothing is trimmed or reshaped.
+// be presented — nothing is trimmed or reshaped. The carried-over value is
+// hashed the way passwords are hashed — a salted, memory-hard PHC digest,
+// not the bare SHA-256 the machine-minted secrets use: an operator-chosen
+// value is a low-entropy guessable one, and RFC 9700 asks the store not to
+// make it cheap to attack.
 func (s *Service) suppliedSecret(raw string, expiresAt *time.Time) (Secret, string, error) {
-	return sealSecret(raw, expiresAt, s.now())
+	digest, err := crypto.NewPasswordHasher().Hash(raw)
+	if err != nil {
+		return Secret{}, "", fmt.Errorf("oidc: hash supplied secret: %w", err)
+	}
+	prefix := raw
+	if len(prefix) > 4 {
+		prefix = prefix[:4]
+	}
+	return Secret{
+		ID:        uuid.NewV7().String(),
+		Algorithm: "phc",
+		Hash:      digest,
+		Prefix:    prefix,
+		CreatedAt: s.now(),
+		ExpiresAt: expiresAt,
+	}, raw, nil
 }
 
 // sealSecret reduces a raw value to its stored presence: the hash, the

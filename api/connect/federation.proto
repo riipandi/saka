@@ -925,13 +925,26 @@ message ListUserAuthorizedClientsResponse {
   string message = 3;
 }
 
-// ListAllAuthorizedClientsRequest is empty: the answer is every ledger row.
-message ListAllAuthorizedClientsRequest {}
+// ListAllAuthorizedClientsRequest carries the page the caller asks for. Both
+// fields unset answer the first default-sized page.
+message ListAllAuthorizedClientsRequest {
+  // page is the one-based page number.
+  optional int32 page = 1 [(buf.validate.field).int32.gte = 1];
+
+  // limit is the page size.
+  optional int32 limit = 2 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+}
 
 // ListAllAuthorizedClientsResponse is the deployment-wide ledger.
 message ListAllAuthorizedClientsResponse {
   // entries are the ledger rows, most recently used first.
   repeated AuthorizedOidcClientEntry entries = 1;
+
+  // metadata is the pagination block the list responses carry.
+  saka.common.v1.ListMetadata metadata = 4;
 
   // status is the outcome word the client checks — success; a
   // failure never reaches this body, it is a connect error.

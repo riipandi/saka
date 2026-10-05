@@ -140,7 +140,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		provider.WithUserInfoEndpoint(protocolUserInfoEndpoint),
 		provider.WithJWKSEndpoint(protocolJWKSEndpoint),
 		provider.WithScopes(protocolScopes()...),
-		provider.WithClaims(profileClaims...),
+		provider.WithClaims(claimsSupported()...),
 		provider.WithAuthCodeGrant(provider.AuthCodeGrantConfig{
 			Manager:       authnStore{protocolStore: stores},
 			ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
@@ -149,7 +149,10 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			// The code's window is pinned: the grant document records the
 			// deadline and the token endpoint refuses an expired one.
 			provider.WithAuthCodeLifetime(protocolAuthCodeLifetimeSecs),
-			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256, goidc.CodeChallengeMethodPlain},
+			// RFC 9700 §4.1.3: the verifier must be the S256 challenge —
+			// plain is the method the specification tells servers to stop
+			// offering, so the provider does not.
+			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256},
 				provider.WithPKCERequired()),
 			// Third-party initiated login: the authorization response carries
 			// the iss parameter (RFC 9207), so a relying party that linked
@@ -431,6 +434,21 @@ func protocolScopes() []goidc.Scope {
 // profileClaims are the claims the profile scope publishes; openid is
 // required and the subject rides every token regardless.
 var profileClaims = []string{"given_name", "family_name", "name", "display_name", "preferred_username", "picture", "email", "email_verified", "groups"}
+
+// registeredClaims are the JWT registered claims the tokens mint — the
+// names a relying party can expect beside whatever the scopes gate.
+// at_hash is absent on purpose: the engine's code flow does not carry the
+// access token into the ID-token issuance, and the claim stays optional
+// under OIDC Core §3.1.3.6.
+var registeredClaims = []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "jti"}
+
+// claimsSupported is the discovery document's claims_supported. The list is
+// informational — the claims request parameter is not enabled — but it
+// tells the relying party what the surface answers: the registered claims
+// above, then the scope-gated profile claims.
+func claimsSupported() []string {
+	return append(append([]string{}, registeredClaims...), profileClaims...)
+}
 
 // protectedClaimKeys are the claims a custom claim must never replace:
 // the registered JWT claim names the library mints (it copies the claim

@@ -100,9 +100,9 @@ func (h *consentHandler) ListUserAuthorizedClients(ctx context.Context, req *con
 	}), nil
 }
 
-// ListAllAuthorizedClients answers every ledger row.
-func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, _ *connect.Request[federationv1.ListAllAuthorizedClientsRequest]) (*connect.Response[federationv1.ListAllAuthorizedClientsResponse], error) {
-	entries, err := h.service.AllAuthorizedClients(ctx)
+// ListAllAuthorizedClients answers one page of the deployment-wide ledger.
+func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, req *connect.Request[federationv1.ListAllAuthorizedClientsRequest]) (*connect.Response[federationv1.ListAllAuthorizedClientsResponse], error) {
+	entries, pagination, err := h.service.AllAuthorizedClients(ctx, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -111,8 +111,9 @@ func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, _ *connec
 		rows = append(rows, wireLedgerEntry(entry))
 	}
 	return connect.NewResponse(&federationv1.ListAllAuthorizedClientsResponse{
-		Entries: rows,
-		Status:  webutil.StatusSuccess,
-		Message: "the authorized clients were listed",
+		Entries:  rows,
+		Metadata: metadataOf(pagination),
+		Status:   webutil.StatusSuccess,
+		Message:  "the authorized clients were listed",
 	}), nil
 }

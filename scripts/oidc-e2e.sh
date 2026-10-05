@@ -6,7 +6,10 @@
 #   - the server answers on ${SAKA_BASE:-http://localhost:3080}
 #   - an account exists whose credentials are $SAKA_USER/$SAKA_PASS
 #     (default admin / Expecto-Patronum-9 — the dev bootstrap's shape)
-#   - the rate limits are loose enough for the run (dev config)
+#   - the rate limits are loose enough for the run: serve with a throwaway
+#     config file that raises `rate_limit.limit` and `rate_limit.auth_limit`
+#     (the committed defaults are 60/10 per minute — the run makes dozens of
+#     token calls, and the credential bucket trips at ten)
 #
 # The script creates one confidential client (e2e-oidc-<ts>) and one public
 # client, then walks: discovery, JWKS, authorization code + PKCE (post and
@@ -122,6 +125,8 @@ DOC=$(curl -s "$BASE/.well-known/openid-configuration")
 contains "discovery: issuer" "$DOC" "\"issuer\":\"$BASE\""
 contains "discovery: token endpoint" "$DOC" "/oidc/token"
 contains "discovery: code challenge methods" "$DOC" "S256"
+contains "discovery: no plain challenge method" "$DOC" '"code_challenge_methods_supported":["S256"]'
+contains "discovery: claims_supported names the subject" "$DOC" '"claims_supported":["sub"'
 JWKS_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$(echo "$DOC" | python3 -c 'import sys,json,urllib.parse;print(urllib.parse.urlparse(json.load(sys.stdin)["jwks_uri"]).path)')")
 check "discovery jwks_uri answers 200" "200" "$JWKS_CODE"
 
@@ -305,6 +310,20 @@ echo "note  unknown scope redirect: $UNKNOWN_SCOPE"
 BAD_REDIRECT=$(curl -s -w '\n%{http_code}' "$BASE/oidc/authorize?response_type=code&client_id=$CLIENT_ID&scope=openid&state=s5&code_challenge=$CHALLENGE&code_challenge_method=S256&redirect_uri=http%3A%2F%2Fevil.example%2Fcb" \
     -H "Authorization: Bearer $ACCESS" | tail -1)
 check "unregistered redirect_uri refused" "400" "$BAD_REDIRECT"
+
+# RFC 9700 §4.1.3: plain is the challenge method a server stops offering —
+# the authorize request naming it is refused outright.
+PLAIN_REDIRECT=$(curl -s -o /dev/null -w '%{redirect_url}' \
+    "$BASE/oidc/authorize?response_type=code&client_id=$PUB_ID&scope=openid&state=s6&code_challenge=$VERIFIER&code_challenge_method=plain&redirect_uri=http%3A%2F%2Flocalhost%3A9010%2Fauth%2Fcallback" \
+    -H "Authorization: Bearer $ACCESS")
+contains "pkce: plain method refused" "$PLAIN_REDIRECT" "error=invalid_request"
+
+# The deployment-wide ledger read is a page, not the whole table.
+LEDGER=$(curl -s "$BASE/rpc/saka.federation.v1.OidcConsentService/ListAllAuthorizedClients" \
+    -H "Authorization: Bearer $ACCESS" -H 'Content-Type: application/json' \
+    -d '{"page":1,"limit":10}')
+contains "ledger: page carries the pagination block" "$LEDGER" '"total_items"'
+contains "ledger: page respects the limit" "$LEDGER" '"limit":10'
 
 echo "== end-session =="
 ES_HINT="$ID_TOKEN"

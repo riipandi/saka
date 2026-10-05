@@ -43,11 +43,13 @@ func TestTheLedgerAnswersTheConsentsTheApprovalRecorded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, perUser, 1)
 
-	entries, err := service.AllAuthorizedClients(t.Context())
+	entries, pagination, err := service.AllAuthorizedClients(t.Context(), 1, 25)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 	assert.Equal(t, issued.Client.ID, entries[0].Client.ID)
 	assert.NotEmpty(t, entries[0].UserWire)
+	require.NotNil(t, pagination.TotalItems)
+	assert.Equal(t, 1, *pagination.TotalItems)
 }
 
 func TestRevokingAConsentKillsTheGrantsAndTheirTokens(t *testing.T) {

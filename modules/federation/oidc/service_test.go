@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
@@ -314,13 +315,34 @@ func TestSecretsAddWithdrawAndNeverReplayEachOther(t *testing.T) {
 	err = service.DeleteSecret(t.Context(), issued.Client.ID, second.Secret.ID)
 	assert.ErrorIs(t, err, ErrSecretNotFound)
 
-	// A supplied value is stored as the hash of itself as presented.
+	// A supplied value is stored as the hash of itself as presented — and
+	// as a salted PHC digest, not the bare SHA-256 the machine-minted
+	// secrets use: an operator-chosen value is the low-entropy one, so the
+	// stored hash must not make it cheap to attack (RFC 9700 §2.4 asks the
+	// store for the password-hashing treatment).
 	supplied, err := service.CreateSecret(t.Context(), issued.Client.ID, "ExpectoPatronum2026", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "ExpectoPatronum2026", supplied.Value)
 	stored, err := service.repo.GetClient(t.Context(), pool, issued.Client.ID)
 	require.NoError(t, err)
 	assert.NotContains(t, string(stored.Credentials), "ExpectoPatronum2026")
+	assert.Contains(t, string(stored.Credentials), "$scrypt$",
+		"the supplied secret is a salted PHC hash")
+
+	// The stored hash reads as PHC and the presented value verifies against
+	// it — the shape the token endpoint's secret check answers for.
+	var creds credentials
+	require.NoError(t, json.Unmarshal(stored.Credentials, &creds))
+	hash := ""
+	for _, s := range creds.Secrets {
+		if s.ID == supplied.Secret.ID {
+			hash = s.Hash
+		}
+	}
+	require.NotEmpty(t, hash)
+	assert.Equal(t, "phc", storedAlgorithm(hash))
+	assert.True(t, verifyClientSecret(hash, "ExpectoPatronum2026"),
+		"the supplied secret verifies against the stored PHC hash")
 }
 
 // TestExpiredSecretsReadInactive covers the window: a secret past its expiry
