@@ -126,14 +126,12 @@ mirrors.
 
 ## Documentation
 
-| Page | What it covers |
-| --- | --- |
-| [Product guide](./docs/product-guide.md) | The whole product in one walk |
-| [Authentication](./docs/auth.md) | The sign-in methods, MFA, sessions — in depth |
-| [OAuth SSO](./docs/oauth-sso.md) | Connecting external providers |
-| [OpenID provider](./docs/oidc.md) | How other apps sign in with Saka |
-| [Configuration](./docs/configuration.md) | The config file, secrets, settings |
-| [Deployment](./docs/deployment.md) | Running Saka for real |
+- [Product guide](./docs/product-guide.md) — the whole product in one walk
+- [Authentication](./docs/auth.md) — the sign-in methods, MFA, sessions — in depth
+- [OAuth SSO](./docs/oauth-sso.md) — connecting external providers
+- [OpenID provider](./docs/oidc.md) — how other apps sign in with Saka
+- [Configuration](./docs/configuration.md) — the config file, secrets, settings
+- [Deployment](./docs/deployment.md) — running Saka for real
 
 More in [`docs`](./docs): storage, webhooks, notifications, API keys,
 SCIM, the conformance profiles, the debug utilities, the API reference,
