@@ -1,15 +1,30 @@
 # Saka Product Guide
 
-Saka is a self-hosted identity and application platform: it keeps your
-users' accounts safe, signs them in (by itself, or through the providers
-they already trust), and gives developers the machinery around those
-accounts — files, notifications, audit trails, and an API — behind one
-roof.
+Saka is a **project boilerplate with authentication built in**. Start a
+new product from it and the hardest, most security-sensitive part —
+accounts, sign-in, sessions, permissions — already works, tried and
+tested. You build your product around it; the auth core is done.
 
-This guide walks through what the product does. Protocol details live in
-the [API endpoints](api-endpoint.md) reference; the identity-provider
-surface has its own pages under [oidc-provider](oidc-provider/index.md)
-and [oauth-sso](oauth-sso/index.md).
+Because the auth core is a full OpenID provider, Saka fits three shapes,
+and the same codebase serves all of them:
+
+| Shape | What you use it as | What runs |
+| --- | --- | --- |
+| **App boilerplate** | Your product's starting codebase | Everything — your features grow beside a finished auth core |
+| **Standalone IdP** | Just the identity provider | The sign-in and OpenID surfaces; the rest idles |
+| **Both at once** | Your product *and* the identity provider for your other apps | The common case, no extra setup |
+
+```mermaid
+flowchart LR
+    users["Your users"] --> app["Your product<br/>(built on Saka)"]
+    users --> saka["Saka<br/>sign-in + accounts"]
+    app -->|"sign in with Saka accounts<br/>(OpenID Connect)"| saka
+    saka -->|"sign in with<br/>(OAuth SSO)"| ext["Google · GitHub ·<br/>any OIDC provider"]
+```
+
+The result: your users sign in with Saka accounts, your users' other
+apps can too (via the OpenID provider), and your users can reach Saka
+through the providers they already have (via OAuth SSO).
 
 ---
 
@@ -18,106 +33,100 @@ and [oauth-sso](oauth-sso/index.md).
 Saka offers several ways in, and each account can carry several at once —
 so losing one never locks the person out.
 
-- **Password** — the classic: an email address or username plus a
-  password. Passwords can be required to meet length and character-class
-  rules.
-- **Passkeys** — the modern replacement: the account unlocks with the
-  device's own biometrics or security key. A user can add a passkey,
-  sign in with one, and even *remove their password entirely* once a
-  passkey or linked provider exists — the system refuses to leave an
-  account with no way back in.
-- **One-time email codes** — sign in with just an email address and a
-  short code. Every email-based flow (verification, sign-in, password
-  reset) delivers a **single-use code, never a link** — links don't leak
-  through preview bots and referrer headers; codes can't be replayed.
-- **External providers** — "Continue with Google/GitHub" or any
-  OpenID Connect provider. See [OAuth SSO](oauth-sso/index.md).
-- **One-time access links for guests** — grant a person access without
-  an account for a bounded time (a contractor, a demo): a scoped,
-  expiring credential instead of a shared login.
+| Method | How it works | Notes |
+| --- | --- | --- |
+| **Password** | Email or username plus a password | Configurable length and character-class rules |
+| **Passkey** | The device's biometrics or security key | A password can be *removed entirely* once a passkey or linked provider exists — the system refuses to leave an account with no way back in |
+| **One-time email code** | An email address plus a short code | Every email flow delivers a **single-use code, never a link** — codes can't leak through preview bots and can't be replayed |
+| **External provider** | "Continue with Google/GitHub/custom" | See [OAuth SSO](oauth-sso.md) |
+| **One-time access** | A scoped, expiring credential for guests | A contractor or demo gets in without an account |
+| **Device code** | The device shows a short code; the user approves it on their browser | For TVs, kiosks, CLIs — the device never sees a password |
 
-**The second factor.** Accounts can require a TOTP authenticator app
-(the rotating six-digit kind), with printable recovery codes as the way
-back in. When an account has multi-factor on, *every* sign-in path —
-password, one-time code, external provider — pauses at the same
-second-factor step. Sensitive actions can demand a fresh proof (step-up)
-even for an already signed-in session.
+```mermaid
+flowchart TD
+    start["Sign-in attempt"] --> known{"Provider account<br/>seen before?"}
+    known -->|yes| in["Signed in"]
+    known -->|no| email{"Provider email<br/>verified?"}
+    email -->|no| code["Prove the address<br/>with an email code"] --> linked
+    email -->|yes| linked{"Same address on an<br/>existing account?"}
+    linked -->|yes, linking on| in
+    linked -->|no, open sign-up| jit["Account created<br/>(names asked if missing)"] --> in
+    linked -->|no, closed| refused["Sign-in refused"]
+    in --> mfa{"Multi-factor on?"}
+    mfa -->|yes| second["Second factor<br/>(or recovery code)"] --> in
+```
 
-**Device sign-in.** A device with no keyboard of its own (a TV, a kiosk)
-displays a short code; the user enters it on their normal browser and
-approves — the device signs in without ever seeing the password.
+**The second factor is honored everywhere.** With multi-factor enabled,
+*every* sign-in path — password, one-time code, external provider —
+pauses at the same second-factor step: a TOTP authenticator code, with
+printable recovery codes as the way back. Sensitive actions can demand a
+fresh proof (step-up) even for an already signed-in session.
 
-**Sessions.** Users can see every device signed in as them, revoke one,
-sign out everything else, or sign out everywhere. "Remember me" picks a
-longer session window. Administrators can open a support session on a
-user's behalf (impersonation), which is its own visible, revocable
-session.
+**Sessions.** Users see every device signed in as them, revoke one, sign
+out the others, or sign out everywhere. "Remember me" picks a longer
+session window. Administrators can open a support session on a user's
+behalf (impersonation) — its own visible, revocable session.
 
-**Recovery.** Forgot-password flows send single-use codes. Administrators
-can reset a user's password directly, which signs that user out
-everywhere and leaves an audit record.
+**Recovery.** Forgot-password flows send single-use codes. An
+administrator can reset a user's password directly — the user is signed
+out everywhere and the act is audited.
 
 ---
 
 ## Who's who: accounts, groups, roles
 
-- **Users** hold a verified email, an optional username, names, a photo,
-  and per-user settings such as whether they may delete their own
-  account.
-- **Groups** collect users (an "editors" group, say). Groups can be
-  granted access to things as a whole.
-- **Roles and permissions** are the access system's vocabulary: named
-  capabilities (like "create notifications") are granted to roles or
-  directly to a user, and everything the API can do checks this catalog
-  before it answers.
-- **Blocklist** can refuse sign-ups (and optionally sign-ins) for
-  particular emails or domains — disposable-address control for open
-  sign-up deployments.
+| Concept | What it does |
+| --- | --- |
+| **Users** | A verified email, an optional username, names, a photo, per-user choices (like whether they may delete their own account) |
+| **Groups** | Collect users ("editors", "moderators"); whole groups can be granted access |
+| **Roles & permissions** | Named capabilities ("create notifications") granted to roles or directly to a user — the API checks this catalog before it answers anything |
+| **Blocklist** | Refuses sign-ups (and optionally sign-ins) for particular addresses or domains — disposable-address control for open sign-up |
 
 ---
 
 ## Letting other applications in
 
-- **OpenID provider** — other applications sign their users in with
-  Saka accounts: the standard code flow with modern protections, user
-  consent, refresh tokens, machine-to-machine credentials, and a device
-  flow for TVs and CLIs. See [oidc-provider](oidc-provider/index.md).
-- **Connected clients** — administrators manage the registered
-  applications (their callbacks and secrets), users manage their own
-  consents, and extra token claims can be shaped per application.
-- **SCIM** — an organization's user directory can synchronize accounts
-  and group memberships into Saka automatically.
-- **API keys** — machine callers authenticate with keys an administrator
-  issues (one visible at creation, then never again), each carrying its
-  own expiry and access.
-- **Webhooks** — when something happens in Saka, other systems can hear
-  about it: signed event deliveries to registered URLs.
+The auth core is a full OpenID provider, so other applications are
+first-class citizens:
+
+- **Connected applications** sign their users in with Saka accounts —
+  the standard code flow with modern protections, user consent, refresh
+  tokens, machine-to-machine credentials, and a device flow. See
+  [OpenID provider](oidc.md).
+- **Administrators** manage the registered applications (callbacks,
+  secrets, logos, per-app extra claims).
+- **Users** manage their own consents — they see which applications can
+  sign them in and revoke any of them.
+- **SCIM** lets an organization's directory synchronize accounts and
+  group memberships automatically.
+- **API keys** authenticate machine callers (a key is shown once at
+  creation, then never again), each with its own expiry and access.
+- **Webhooks** deliver signed events to registered URLs when something
+  happens in Saka.
 
 ---
 
 ## The rest of the platform
 
-- **Storage** — file buckets with uploads that survive bad networks
-  (resumable uploads), signed download links that expire, and per-bucket
-  access rules.
-- **Notifications** — in-product announcements and targeted notices,
-  delivered to everyone, to a group, or to one user, with read receipts.
+- **Storage** — file buckets, resumable uploads that survive bad
+  networks, expiring signed download links, per-bucket access rules.
+- **Notifications** — announcements and targeted notices, to everyone, a
+  group, or one user, with read receipts.
 - **Audit log** — every security-relevant act (a sign-in, a password
-  change, a role grant, a revoked session) is recorded with who did it,
-  what, and when — searchable by administrators.
-- **Settings** — the deployment's switches (sign-up open or invite-only,
-  verification rules, session windows, retention) live in one
-  administrator-facing place, with safe defaults.
+  change, a role grant, a revoked session) recorded with who, what, and
+  when, searchable by administrators.
+- **Settings** — the deployment's switches (open or invite-only sign-up,
+  verification rules, session windows) in one administrator-facing place
+  with safe defaults.
 
 ---
 
 ## Where to go next
 
-- [OAuth SSO](oauth-sso/index.md) — connecting external providers for
-  sign-in
-- [OpenID Provider](oidc-provider/index.md) — how other apps sign users
-  in with Saka, and [Profiles](oidc-provider/profiles.md) — which
-  conformance profiles Saka supports and why
+- [OAuth SSO](oauth-sso.md) — connecting external providers for sign-in
+- [OpenID provider](oidc.md) — how other apps sign users in with Saka,
+  and [OIDC profiles](oidc-profiles.md) — which conformance profiles
+  Saka supports and why
 - [API endpoints](api-endpoint.md) and [API responses](api-response.md) —
   the machine-facing contract
 - [Deployment](deployment.md) — running Saka yourself

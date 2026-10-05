@@ -1,15 +1,24 @@
 # Saka Documentation
 
-Welcome. Saka is a self-hosted identity and application platform: it
-keeps your users' accounts safe, signs them in — by itself, or through
-the providers they already trust — and gives developers the machinery
-around those accounts: files, notifications, audit trails, and an API.
+Saka is a **project boilerplate with authentication built in**: clone it,
+and the hardest part of a new product — accounts, sign-in, sessions,
+permissions — already works. Your product's code grows around a battle-
+tested core instead of rebuilding user management from scratch.
+
+Authentication ships in both directions:
+
+- **Saka as the IdP** — other applications sign their users in with Saka
+  accounts over OpenID Connect. Deploy Saka standalone and it is just an
+  identity provider; keep building your product on it and the same
+  provider serves your app's own users.
+- **Saka as the SSO client** — users sign in to Saka itself with Google,
+  GitHub, or any OpenID Connect provider you connect.
 
 ## Start here
 
-- **[Product guide](product-guide.md)** — the whole product in one walk:
-  every way to sign in, accounts and groups, letting other applications
-  in, storage, notifications, audit, and the rest.
+- **[Product guide](product-guide.md)** — everything built in, one walk:
+  every way to sign in, accounts and groups, application-facing
+  surfaces, storage, notifications, audit, and the rest.
 - **[Deployment](deployment.md)** — running Saka yourself.
 - **[Contributing](contributing.md)** — joining the project.
 
@@ -17,9 +26,10 @@ around those accounts: files, notifications, audit trails, and an API.
 
 | Topic | Page | What it covers |
 | --- | --- | --- |
-| Signing in with Google, GitHub, or your own provider | [OAuth SSO](oauth-sso/index.md) | Connecting providers, how the sign-in resolves, linking and account safety |
-| Signing other apps in with Saka | [OpenID Provider](oidc-provider/index.md) | What connected applications can do, sign-out, getting connected |
-| Which standards Saka speaks | [Profiles](oidc-provider/profiles.md) | The conformance profiles, in plain language — what's kept, what's dropped, why |
+| The whole product | [Product guide](product-guide.md) | All sign-in methods, the second factor, sessions, users, the platform surfaces |
+| Signing in with Google, GitHub, or your own provider | [OAuth SSO](oauth-sso.md) | Connecting providers, how the sign-in resolves, linking and account safety |
+| Signing other apps in with Saka | [OpenID provider](oidc.md) | What connected applications can do, sign-out, getting connected |
+| Which standards Saka speaks | [OIDC profiles](oidc-profiles.md) | The conformance profiles in plain language — kept, optional, dropped, and why |
 | The machine-facing contract | [API endpoints](api-endpoint.md), [API responses](api-response.md) | Every procedure and route, and the one contract both transports share |
 
 ## Reference

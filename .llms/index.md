@@ -68,7 +68,8 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 ## Product docs (`docs/`)
 
 For humans, not agents: `api-endpoint.md`, `api-response.md`,
-`authentication/`, `deployment.md`, `oidc-provider/`. The rule `AGENTS.md`
+`product-guide.md`, `oauth-sso.md`, `oidc.md`, `oidc-profiles.md`,
+`deployment.md`. The rule `AGENTS.md`
 carries: no technical references here — internals, engine paths, and agent
 context belong in `.llms/`; keep the orientation on the human reader. Keep
 aligned when a shipped surface changes.

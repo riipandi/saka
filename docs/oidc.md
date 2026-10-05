@@ -1,13 +1,19 @@
 # OpenID Provider
 
-Saka is an OpenID Connect provider: it issues identity tokens that let other
-applications sign their users in with the accounts they already have here.
-It speaks the standard protocols (OIDC Core, OAuth 2.0/2.1) so any
-standards-compliant application can connect — a web app, a mobile app, a
-CLI tool, or another service acting on a user's behalf.
+Saka's auth core is a full OpenID provider. Out of the box, other
+applications — your own product's siblings, a customer's integration, a
+CLI tool — can sign their users in **with Saka accounts**: the standard,
+standards-tested protocol (OIDC Core, OAuth 2.0/2.1) that any
+standards-compliant application already speaks.
 
-New here? Start with [Profiles](profiles.md) — what Saka supports, what it
-deliberately doesn't, and why, in plain terms.
+And because it is a boilerplate, the provider is not a separate product
+you bolt on — it is the same accounts, the same sessions, and the same
+consent pages your own app already uses. Deploy Saka standalone and it
+is just an identity provider; build on it and the same provider serves
+your product.
+
+New here? Start with [Profiles](oidc-profiles.md) — what Saka supports,
+what it deliberately doesn't, and why, in plain terms.
 
 ## What an application can do
 

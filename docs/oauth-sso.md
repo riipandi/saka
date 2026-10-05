@@ -1,14 +1,22 @@
 # OAuth SSO: sign in with Google, GitHub, or your own provider
 
-Saka's sign-in page can accept external identity providers. A user clicks
-"Continue with Google" (or GitHub, or any OpenID Connect provider the
-operator has connected), proves who they are on the provider's site, and
-lands back in Saka — signed in, with no new password to remember.
+Saka ships with external sign-in built in: a user clicks "Continue with
+Google" (or GitHub, or any OpenID Connect provider the operator has
+connected), proves who they are on the provider's site, and lands back —
+signed in, with no new password to remember.
 
-For the person running Saka, this page explains what can be connected, how
-the sign-in behaves, and the rules the system enforces. For the person
-signing in, the short version is: use the button, follow the provider's
-prompts, and you're in.
+For the person running Saka, this page explains what can be connected,
+how the sign-in behaves, and the rules the system enforces. For the
+person signing in, the short version is: use the button, follow the
+provider's prompts, and you're in.
+
+```mermaid
+flowchart LR
+    u["User"] --> saka["Saka sign-in page"]
+    saka -->|"redirect"| p["Google · GitHub ·<br/>custom OIDC provider"]
+    p -->|"back with a code"| saka
+    saka -->|"signed-in session"| u
+```
 
 ## Connecting a provider (administrator)
 
@@ -76,19 +84,18 @@ multi-factor enabled, the OAuth sign-in pauses at the same second-factor
 step a password sign-in would — approving the sign-in is what opens the
 session, and the provider login alone never does.
 
-## After the first sign-in
+**After the first sign-in.** The user sees their linked providers and
+can remove one — provided they would not be locked out: the last
+remaining way in (another provider, a password, a passkey) cannot be
+unlinked. Removing a provider requires proving the current session
+(step-up) and, if the account has multi-factor, that factor too.
 
-- **The user sees their linked providers** and can remove one — provided
-  they would not be locked out: the last remaining way in (another
-  provider, a password, a passkey) cannot be unlinked. Removing a
-  provider requires proving the current session (step-up) and, if the
-  account has multi-factor, that factor too.
-- **Provider tokens are kept for the user's future use** (calling the
-  provider's API on their behalf). They are stored encrypted, they
-  rotate on every sign-in, and only the account holder can retrieve
-  them. Saka refreshes them when they near expiry and — when a refresh
-  fails because the provider revoked access — signs the binding out and
-  records it, rather than leaving a dead token behind.
+**Provider tokens are kept for the user's future use** (calling the
+provider's API on their behalf). They are stored encrypted, they rotate
+on every sign-in, and only the account holder can retrieve them. Saka
+refreshes them when they near expiry and — when a refresh fails because
+the provider revoked access — signs the binding out and records it,
+rather than leaving a dead token behind.
 
 ## What this feature is not
 
