@@ -43,8 +43,7 @@ names the server (default `http://localhost:3080`).
 
 | Tag | Endpoint | Why it is crucial |
 | --- | --- | --- |
-| `healthz` | `GET /healthz` | the liveness floor |
-| `api-healthz` | `GET /api/healthz` | the checker's aggregate read |
+| `healthz` | `GET /api/healthz` | the liveness floor and the checker's aggregate read (there is no root `/healthz` route — that path answers the SPA's shell) |
 | `jwks` | `GET /.well-known/jwks.json` | every client's first read before verifying a token |
 | `signin` | `POST /rpc … AuthService/SignIn` | the password hasher is expensive by design — the CPU ceiling a public credential surface carries |
 | `get-session` | `POST …/GetSession` | the authN read every API call makes |
