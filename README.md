@@ -88,6 +88,7 @@ driver, because the in-process one is coherent on a single node alone.
   guide](https://viteplus.dev/guide/monorepo))
 
 ## Quick Start
+
 Read the [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on contributing to this project.
 
 ### Up and Running
@@ -102,7 +103,9 @@ cd saka
 pnpm install              # frontend dependencies
 task deps                 # Go toolchain binaries (golangci-lint, goose, …)
 task config:generate      # write app.config.json, then fill in the secrets
+
 cp .env.example .env.local && edit .env.local
+
 task compose:up           # start local dev services (postgres, mailpit, …)
 task db:initialize        # migrations + system seed + first administrator
 task dev                  # the dev loop: Vite + HMR behind the Go proxy
@@ -140,7 +143,8 @@ adapted.
 ## License
 
 This project licensed under the [Apache License 2.0][license-apache].
-See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) for more information.
+See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) — which names the
+projects whose code and ideas Saka builds on — for more information.
 
 ---
 
