@@ -13,7 +13,7 @@ import (
 )
 
 // RequestIDHeader is the header a request id is read from and written to. It
-// is the header pkg/responder names in the envelope metadata.
+// is the header framework/webutil names in the envelope metadata.
 const RequestIDHeader = webutil.RequestIDHeader
 
 // RequestIDPrefix is the TypeID prefix of a generated request id. The `req_`

@@ -175,8 +175,8 @@ The memory driver is tested without a backend; the Valkey driver runs against a 
 read path:
 
 ```bash
-go test ./internal/cache/
-go test -bench . -benchmem ./internal/cache/
+go test ./framework/cache/
+go test -bench . -benchmem ./framework/cache/
 ```
 
 ## Design Decisions

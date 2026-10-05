@@ -98,7 +98,7 @@ Three rules keep the wait honest:
 The interval is a constant, not an exponential backoff: the count already bounds the wait, and
 a startup wants a predictable duration — an operator reading "5 attempts, 2 seconds apart"
 knows the worst case. A backoff belongs to a client retrying requests against a live server,
-which is `internal/fetcher`'s job, not this one's.
+which is `framework/fetcher`'s job, not this one's.
 
 ## Requirements
 
@@ -170,7 +170,7 @@ transaction is enqueued with the change that caused it or not at all.
 // Standalone (the migrate commands), or from the running pool:
 db, err := pool.MigrationDB(ctx)
 defer func() { _ = db.Close() }()
-// hand it to database.NewMigrator
+// hand it to the migration.Runner (framework/migration)
 ```
 
 ## API Reference

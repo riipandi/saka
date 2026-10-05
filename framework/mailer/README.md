@@ -3,7 +3,7 @@
 The mailer engine's outbound email path. One `*Service` pairs an SMTP client with a caller-supplied
 `fs.FS` of compiled email templates, built from typed options and the process logger. The schema
 mapping, the embedded template set, and the template catalog live in the app binding
-(`internal/mailer`).
+(`framework/mailer`).
 
 > **Relation to the registry:** `internal/registry` registers the service, `serve` resolves it
 > before the listener opens, and a feature receives it. It does not construct one. The mailer is

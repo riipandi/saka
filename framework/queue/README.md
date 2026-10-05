@@ -99,9 +99,9 @@ it in `internal/registry`: the client is built from the shared `datastore.Postgr
 the `queue` config section, and `internal/jobs.Register` lists the application's job queues
 and seeds the recurring ones.
 
-Schema is owned by the migrations (`internal/database/migrations/00008_create_scheduler_tables.sql`,
-shared with the scheduler's state table) — run `task db:migrate`; the client never creates
-tables itself.
+Schema is owned by this package's own migration set (`migrations/00001_create_queue_tables.sql`,
+declared by `Schema()` and composed by the binary) — run `task db:migrate`; the client never
+creates tables itself.
 
 The engine logs through `log/slog` — the same `*slog.Logger` the process built in
 `framework/logger`, handed over by `serve` — so queue lines reach every configured sink
@@ -390,7 +390,8 @@ tasks. See "Process Tasks from Another Task".
 
 ## Database Schema
 
-Three tables, created by migration `internal/database/migrations/00008_create_scheduler_tables.sql`:
+Two tables, created by this package's own set (`migrations/00001_create_queue_tables.sql`;
+the scheduler's state table travels in the scheduler package's set):
 
 ### `queue_tasks`
 
@@ -407,11 +408,6 @@ Three tables, created by migration `internal/database/migrations/00008_create_sc
 | `created_at`       | `TIMESTAMPTZ` | Original creation time                     |
 
 **Index:** `idx_queue_tasks_fetch` on `(priority DESC, wait_until ASC NULLS FIRST, id ASC)`
-
-### `scheduler_jobs`
-
-The scheduler's durable state (one row per registered job) is documented in
-`scheduler/README.md`; the queue set carries only the queue's own tables now — the scheduler set carries the state table.
 
 ### `queue_tasks_completed`
 

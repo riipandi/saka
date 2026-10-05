@@ -73,7 +73,7 @@ double-scheduled.
 
 - Go >= 1.27 (the `robfig/cron/v3` dependency carries no transitive dependencies)
 - PostgreSQL >= 18 (shared with the queue — no separate backend)
-- `internal/queue` — the claimed tick enqueues onto the queue client
+- `framework/queue` — the claimed tick enqueues onto the queue client
 
 ## Wiring
 
@@ -83,9 +83,8 @@ pool and the queue client, and its job list comes from `jobs.Scheduled()` in
 `internal/jobs/register.go` — the same one place the application's job lists are spelled
 out.
 
-Schema is owned by the migration (`internal/database/migrations/00008_create_scheduler_tables.sql`,
-shared with the queue's tables) — run `task db:migrate`; the scheduler never creates tables
-itself.
+Schema is owned by this package's own migration set (`migrations/00001_create_scheduler_tables.sql`,
+declared by `Schema()`) — run `task db:migrate`; the scheduler never creates tables itself.
 
 The engine logs through `log/slog` — the process logger `serve` hands over — so scheduler
 lines reach every configured sink and carry the trace context of the run.
@@ -203,7 +202,7 @@ closes when they do. Returns `true` when every fire finished in time.
 
 ## Database Schema
 
-One table, created by migration `internal/database/migrations/00008_create_scheduler_tables.sql`
+One table, created by this package's own set (`migrations/00001_create_scheduler_tables.sql`)
 (shared with the queue's two tables):
 
 ### `scheduler_jobs`

@@ -4,7 +4,7 @@ Observer wires the process's traces and metrics: the two OpenTelemetry signals, 
 the resolved configuration as the only source of truth. It also owns the exporter plumbing
 every OTLP exporter of the process shares — including the logger's log sink.
 
-> **Relation to the logger:** logging is not here — `internal/logger` owns it — but the
+> **Relation to the logger:** logging is not here — `framework/logger` owns it — but the
 > signals share one collector address and one resource, so both packages describe the same
 > service from the same configuration. The logger's OTLP sink consumes this package's
 > exporter plumbing rather than carrying a copy.
@@ -183,12 +183,12 @@ the protocol's own route.
 
 ## Testing
 
-`internal/observer/observer_test.go` covers the same ground the smoke command proves against
+`observer_test.go` covers the same ground the smoke command proves against
 Docker — construction refusals, sampler selection, resource attributes, the signal routes —
 without a collector:
 
 ```bash
-go test ./internal/observer/
+go test ./framework/observer/
 ```
 
 

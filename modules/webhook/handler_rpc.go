@@ -72,7 +72,7 @@ func newRPCHandler(service *Service) webhookv1connect.WebhookServiceHandler {
 
 // List answers one page of the endpoints.
 func (h *rpcHandler) List(ctx context.Context, req *connect.Request[webhookv1.ListWebhooksRequest]) (*connect.Response[webhookv1.ListWebhooksResponse], error) {
-	enabled := (*bool)(req.Msg.Enabled)
+	enabled := req.Msg.Enabled
 	rows, pagination, err := h.service.List(ctx, enabled, req.Msg.GetEvent(), int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)

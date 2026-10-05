@@ -46,9 +46,9 @@ type TusHandler struct {
 
 	// locks serializes the appends per upload: the offset claim a PATCH
 	// makes is only the whole concurrency story if two chunks for one file
-	// cannot interleave between the check and the write. The map grows by
-	// upload and never shrinks — a session's entry is a few dozen bytes,
-	// and a deployment's live sessions are not a legion.
+	// cannot interleave between the check and the write. Entries leave when
+	// their last holder releases: a finished upload's lock is gone, so the
+	// map tracks the uploads in flight, not every upload ever served.
 	locks sync.Map
 }
 
@@ -293,12 +293,41 @@ func (h *TusHandler) isComplete(ctx context.Context, bucket, key string, offset 
 }
 
 // lockUpload pins one upload's appends behind a mutex for the request's
-// span.
+// span, and removes the entry when the last holder leaves.
+//
+// The removal is the part that needs care. A plain delete after unlock would
+// race a concurrent appender: it could take the entry, then watch a third
+// request — arriving after the delete — build a second mutex for the same
+// ref, and the two chunks the lock exists to serialize would interleave. The
+// entry therefore carries a reference count: an appender increments it while
+// holding the mutex, and the last holder deletes the entry while still
+// holding it, so any request that got the old mutex either finishes under it
+// (the count was taken) or finds it swapped out and takes the new one.
+type uploadLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
 func (h *TusHandler) lockUpload(ref string) func() {
-	entry, _ := h.locks.LoadOrStore(ref, &sync.Mutex{})
-	mu, _ := entry.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+	for {
+		entry, _ := h.locks.LoadOrStore(ref, &uploadLock{})
+		lock, _ := entry.(*uploadLock)
+		lock.mu.Lock()
+		// The entry may have been replaced between the load and the lock:
+		// the previous holder deleted it while holding the mutex. A stale
+		// grab is released and retried against the entry the map holds now.
+		if current, ok := h.locks.Load(ref); ok && current == entry {
+			lock.refs++
+			return func() {
+				lock.refs--
+				if lock.refs == 0 {
+					h.locks.CompareAndDelete(ref, entry)
+				}
+				lock.mu.Unlock()
+			}
+		}
+		lock.mu.Unlock()
+	}
 }
 
 // refuse answers a failure the client cannot fix by resending: the log

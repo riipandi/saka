@@ -210,5 +210,5 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 	if err != nil {
 		return 0, fmt.Errorf("onetimeaccess: delete token: %w", err)
 	}
-	return int64(tag.RowsAffected()), nil
+	return tag.RowsAffected(), nil
 }

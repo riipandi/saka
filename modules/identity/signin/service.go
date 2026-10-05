@@ -821,7 +821,7 @@ type TokenPair = crypto.RefreshTokenPair
 // depend on which procedure issued it.
 func NewRefreshToken() (TokenPair, error) {
 	pair, err := crypto.NewRefreshTokenPair()
-	return TokenPair(pair), err
+	return pair, err
 }
 
 // verifyDummy runs the password verifier against a hash of nothing, so a

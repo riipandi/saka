@@ -190,7 +190,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			if grant.Subject == grant.ClientID && grant.Subject != "" {
 				lifetime = clientCredentialsLifetimeSecs
 			}
-			return goidc.NewJWTTokenOptions(goidc.SignatureAlgorithm(algs[0]), lifetime)
+			return goidc.NewJWTTokenOptions(algs[0], lifetime)
 		}),
 		// The device grant rides the same session store: the device code
 		// and the user code resolve through hashed pointer rows, the
