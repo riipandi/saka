@@ -29,8 +29,10 @@ The architecture is a **modular monolith**: features live in isolated
 modules with clear domain boundaries, while deployment stays a single
 binary. It follows the [twelve-factor app](https://12factor.net/)
 methodology — strict config separation, stateless processes, backing
-service abstraction — so a future service extraction is a refactor, not
-a rewrite.
+service abstraction — with two honest footnotes: the configuration
+lives in one JSON file (the environment feeds it values but is not a
+config layer), and scaling past one instance asks for the Valkey cache
+driver, because the in-process one is coherent on a single node alone.
 
 > [!WARNING]
 > This project is under active development, so you may encounter bugs.
