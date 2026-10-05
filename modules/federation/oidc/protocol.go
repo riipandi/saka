@@ -141,6 +141,14 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		provider.WithJWKSEndpoint(protocolJWKSEndpoint),
 		provider.WithScopes(protocolScopes()...),
 		provider.WithClaims(claimsSupported()...),
+		// The request parameters the authorize endpoint accepts beyond the
+		// mandatory ones: every display hint the specification names, and
+		// the authentication context references the certification profiles
+		// send — the suite's rehearsal vocabulary rides the LoA numbers,
+		// and both lists advertise themselves in the discovery document.
+		provider.WithDisplayValues(goidc.DisplayValuePage, goidc.DisplayValuePopup,
+			goidc.DisplayValueTouch, goidc.DisplayValueWAP),
+		provider.WithACRs(protocolACRs()...),
 		provider.WithAuthCodeGrant(provider.AuthCodeGrantConfig{
 			Manager:       authnStore{protocolStore: stores},
 			ResponseTypes: []goidc.ResponseType{goidc.ResponseTypeCode},
@@ -157,6 +165,11 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			// while a confidential client may omit PKCE — the Basic OP
 			// profile the certification runs names requests without one.
 			provider.WithPKCE([]goidc.CodeChallengeMethod{goidc.CodeChallengeMethodSHA256}),
+			// The request object by value (JAR, RFC 9101): the unsigned
+			// form the Basic OP profile sends — the object's state, nonce,
+			// and the rest replace the query's — plus ES256 for a client
+			// that registers a key set to sign one with.
+			provider.WithJAR([]goidc.SignatureAlgorithm{goidc.SigAlgNone, goidc.SigAlgES256}),
 			// Third-party initiated login: the authorization response carries
 			// the iss parameter (RFC 9207), so a relying party that linked
 			// the browser here can tell the answer apart from any other
@@ -453,6 +466,16 @@ func claimsSupported() []string {
 	return append(append([]string{}, registeredClaims...), profileClaims...)
 }
 
+// protocolACRs are the authentication context references the authorize
+// endpoint accepts. The rehearsal profiles send the LoA numbers — the
+// values the conformance suite's Basic OP modules name — and the
+// authentication the provider performs answers none of them specially
+// today: the requested acr_values validate against this list, the token
+// carries no acr claim until the sign-in policy learns to grade itself.
+func protocolACRs() []goidc.ACR {
+	return []goidc.ACR{"1", "2"}
+}
+
 // protectedClaimKeys are the claims a custom claim must never replace:
 // the registered JWT claim names the library mints (it copies the claim
 // map over its own, so a collision would overwrite the token's subject,
@@ -482,6 +505,22 @@ func idTokenClaims(service *Service) goidc.IDTokenClaimsFunc {
 		claims := subjectClaims(ctx, service, service.claims, grant)
 		if grant.ID != "" {
 			claims["sid"] = grant.ID
+		}
+		// The authentication instant the completion stamped — the claim
+		// `max_age` is judged against, required whenever the request
+		// carried the parameter. The stored grant round-trips through
+		// JSON, so the number reads back as a float64.
+		if raw, ok := grant.Store[authTimeStoreKey]; ok {
+			switch at := raw.(type) {
+			case int:
+				if at > 0 {
+					claims["auth_time"] = at
+				}
+			case float64:
+				if at > 0 {
+					claims["auth_time"] = int(at)
+				}
+			}
 		}
 		return claims
 	}

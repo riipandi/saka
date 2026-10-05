@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"uuid"
 
@@ -38,6 +39,25 @@ type consentDecision struct {
 	Scopes []string `json:"scopes,omitempty"`
 }
 
+// oidcSessionCookie is the OP's browser-session marker. The provider holds
+// no interactive session the SPA relies on — the sign-in credential rides
+// the request — but the `prompt=none` semantics OIDC Core §3.1.2.1 asks
+// for need the one answer only a browser-side state can give: whether this
+// user agent already authenticated here. A completed authorization leaves
+// the marker; a prompt=none request reads it or refuses with
+// login_required.
+const oidcSessionCookie = "saka_oidc_session"
+
+// oidcSessionCookieLifetimeSecs is the marker's window — the same order the
+// engine's authentication sessions live for, long enough that a relying
+// party's silent renewals across a workday meet an existing session.
+const oidcSessionCookieLifetimeSecs = 28800
+
+// authTimeStoreKey is the key the completed authentication stamps its
+// instant under — the value the ID token's auth_time claim carries, the
+// claim `max_age` is judged against.
+const authTimeStoreKey = "auth_time"
+
 // signInPolicy runs while the browser stands on the authorization
 // endpoint itself. Without a credential it redirects to the SPA's
 // interaction page — the provider keeps the session pending and writes
@@ -49,6 +69,22 @@ func signInPolicy(service *Service) goidc.AuthnPolicy {
 			return r.URL.Path == protocolPrefix+protocolAuthorizeEndpoint
 		},
 		func(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession, client *goidc.Client) (goidc.Status, error) {
+			// A prompt=none request may never interact: the answer is the
+			// session the browser already holds, or the login_required
+			// error the specification names — never the interaction page.
+			if session.Prompt == goidc.PromptTypeNone {
+				return promptNoneAuthentication(service, w, r, session, client)
+			}
+			// An existing browser session answers without a fresh
+			// authentication while the request's max_age still covers the
+			// prior authentication instant — the auth_time the tokens
+			// carry must not move, and prompt=login asks for exactly the
+			// opposite.
+			if session.Prompt != goidc.PromptTypeLogin {
+				if resumeBrowserSession(service, w, r, session) {
+					return goidc.StatusSuccess, nil
+				}
+			}
 			caller, ok := jwtutils.CallerFrom(r.Context())
 			if !ok {
 				interactionRedirect(w, r, protocolPrefix+protocolAuthorizeEndpoint, session.ID)
@@ -56,6 +92,130 @@ func signInPolicy(service *Service) goidc.AuthnPolicy {
 			}
 			return completeAuthentication(r.Context(), service, w, r, session, client, caller)
 		})
+}
+
+// resumeBrowserSession answers from the browser-session marker when one
+// exists and the request's max_age still covers the authentication instant
+// it recorded: the subject carries over, the scopes ride as requested —
+// prompt=none semantics without the prompt — and the original auth_time
+// stays the one the tokens carry. It answers false when the marker is
+// absent, stale, or the request demands a fresh authentication.
+func resumeBrowserSession(service *Service, w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession) bool {
+	cookie, err := r.Cookie(oidcSessionCookie)
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	prior, err := authnStore{protocolStore: protocolStore{pool: service.pool}}.Session(r.Context(), cookie.Value)
+	if err != nil || prior.Subject == "" {
+		return false
+	}
+	raw, ok := prior.Store[authTimeStoreKey]
+	if !ok {
+		return false
+	}
+	authTime := 0
+	switch at := raw.(type) {
+	case int:
+		authTime = at
+	case float64:
+		authTime = int(at)
+	}
+	if authTime <= 0 {
+		return false
+	}
+	if session.MaxAuthnAgeSecs != nil && int(time.Now().Unix()) > authTime+*session.MaxAuthnAgeSecs {
+		return false
+	}
+
+	carryOverSession(w, session, prior)
+	return true
+}
+
+// promptNoneAuthentication answers a silent authorization request from the
+// browser session alone: the cookie names the authentication session a
+// previous completion left behind, its subject and its authentication
+// instant carry over — the id_token's auth_time must stay the original
+// login's, which is the very claim the request's max_age checks — and the
+// request's scopes ride as granted. Anything less is the login_required
+// refusal, and the bearer credential deliberately plays no part here:
+// prompt=none asks about the browser's state, not the API client's.
+func promptNoneAuthentication(service *Service, w http.ResponseWriter, r *http.Request,
+	session *goidc.AuthnSession, _ *goidc.Client) (goidc.Status, error) {
+
+	cookie, err := r.Cookie(oidcSessionCookie)
+	if err != nil || cookie.Value == "" {
+		return goidc.StatusFailure, goidc.NewError(goidc.ErrorCodeLoginRequired,
+			"no provider session: the browser has not authenticated here")
+	}
+
+	prior, err := authnStore{protocolStore: protocolStore{pool: service.pool}}.Session(r.Context(), cookie.Value)
+	if err != nil || prior.Subject == "" {
+		return goidc.StatusFailure, goidc.NewError(goidc.ErrorCodeLoginRequired,
+			"the provider session the browser named is gone")
+	}
+
+	carryOverSession(w, session, prior)
+	return goidc.StatusSuccess, nil
+}
+
+// carryOverSession finishes the request's session off the prior one: the
+// subject and the authentication instant move over untouched — the
+// id_token's auth_time must stay the original login's — the scopes ride as
+// requested, and the browser-session marker re-points at the session this
+// answer completes, so the next silent request names a live row.
+func carryOverSession(w http.ResponseWriter, session *goidc.AuthnSession, prior *goidc.AuthnSession) {
+	session.Subject = prior.Subject
+	session.Username = prior.Username
+	session.GrantedScopes = strings.Join(requestedScopes(session), " ")
+	if session.Store == nil {
+		session.Store = map[string]any{}
+	}
+	var authTime int
+	switch at := prior.Store[authTimeStoreKey].(type) {
+	case int:
+		authTime = at
+	case float64:
+		authTime = int(at)
+	}
+	session.Store[authTimeStoreKey] = authTime
+	// The completed session outlives the pending one's window: the
+	// browser-session marker names it, so the row must live as long as
+	// the cookie does or every later silent request reads a dead row.
+	session.ExpiresAt = int(time.Now().Unix()) + oidcSessionCookieLifetimeSecs
+	http.SetCookie(w, &http.Cookie{
+		Name:     oidcSessionCookie,
+		Value:    session.ID,
+		Path:     "/",
+		MaxAge:   oidcSessionCookieLifetimeSecs,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// stampAuthentication marks the completion the success answers with: the
+// authentication instant the ID token's auth_time carries — the value
+// `max_age` is judged against — and the browser-session marker a later
+// prompt=none request reads.
+func stampAuthentication(w http.ResponseWriter, session *goidc.AuthnSession) {
+	if session.Store == nil {
+		session.Store = map[string]any{}
+	}
+	now := int(time.Now().Unix())
+	session.Store[authTimeStoreKey] = now
+	// The completed session outlives the pending one's window: the
+	// browser-session marker names it, so the row must live as long as
+	// the cookie does or every later silent request reads a dead row.
+	session.ExpiresAt = now + oidcSessionCookieLifetimeSecs
+	http.SetCookie(w, &http.Cookie{
+		Name:     oidcSessionCookie,
+		Value:    session.ID,
+		Path:     "/",
+		MaxAge:   oidcSessionCookieLifetimeSecs,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // interactionPolicy runs on the callback path the SPA posts to.
@@ -129,6 +289,7 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		if isDevice {
 			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
 		}
+		stampAuthentication(w, session)
 		return goidc.StatusSuccess, nil
 	}
 
@@ -142,6 +303,7 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		if isDevice {
 			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
 		}
+		stampAuthentication(w, session)
 		return goidc.StatusSuccess, nil
 	}
 
@@ -155,6 +317,7 @@ func completeAuthentication(ctx context.Context, service *Service, w http.Respon
 		if isDevice {
 			service.recordDeviceAuthorization(ctx, account.subject, client.ID)
 		}
+		stampAuthentication(w, session)
 		return goidc.StatusSuccess, nil
 	}
 	writeInteraction(w, http.StatusOK, map[string]any{

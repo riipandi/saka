@@ -43,21 +43,72 @@ func applyJWKS(cipher *crypto.Cipher, algorithm string) func(context.Context, da
 			return nil, nil, err
 		}
 		if count > 0 {
-			return created, []string{"existing signing key"}, nil
-		}
-		if dryRun {
-			return []string{"jwk (first key pair)"}, nil, nil
+			skipped = append(skipped, "existing signing key")
+		} else {
+			if dryRun {
+				created = append(created, "jwk (first key pair)")
+			} else {
+				pair, err := jwks.GeneratePairWith(algorithm, cipher)
+				if err != nil {
+					return nil, nil, err
+				}
+				if err := insertJWKSRow(ctx, q, pair); err != nil {
+					return nil, nil, err
+				}
+				created = append(created, pair.KeyID)
+			}
 		}
 
-		pair, err := jwks.GeneratePairWith(algorithm, cipher)
-		if err != nil {
-			return nil, nil, err
+		// The Config OP profile the certification runs asks the discovery
+		// document to name RS256 beside the primary algorithm — the RSA
+		// pair rides beside the first key when the deployment's own
+		// algorithm is not RSA's. A deployment that provisions RS256 as
+		// its primary skips the second row.
+		if algorithm != jwksAlgorithmRS256 {
+			rsRows, err := countJWKSRowsWithAlgorithm(ctx, q, jwksAlgorithmRS256)
+			if err != nil {
+				return nil, nil, err
+			}
+			if rsRows == 0 {
+				if dryRun {
+					created = append(created, "jwk (RS256 pair)")
+				} else {
+					pair, err := jwks.GeneratePairWith(jwksAlgorithmRS256, cipher)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := insertJWKSRow(ctx, q, pair); err != nil {
+						return nil, nil, err
+					}
+					created = append(created, pair.KeyID)
+				}
+			} else {
+				skipped = append(skipped, "existing RS256 key")
+			}
 		}
-		if err := insertJWKSRow(ctx, q, pair); err != nil {
-			return nil, nil, err
-		}
-		return []string{pair.KeyID}, nil, nil
+		return created, skipped, nil
 	}
+}
+
+// jwksAlgorithmRS256 is the RSA signing algorithm the Config OP profile
+// requires the discovery document to name.
+const jwksAlgorithmRS256 = "RS256"
+
+// countJWKSRowsWithAlgorithm answers how many signing keys of one
+// algorithm the table holds — active or retired, the same rule the count
+// guard above applies.
+func countJWKSRowsWithAlgorithm(ctx context.Context, q datastore.Querier, algorithm string) (int64, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("count(*)")
+	sb.From(jwks.TableJWKS)
+	sb.Where(sb.Equal("algorithm", algorithm))
+
+	query, args := sb.Build()
+	var total int64
+	if err := q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count jwks rows: %w", err)
+	}
+	return total, nil
 }
 
 // countJWKSRows answers how many signing keys the table holds. Any row —

@@ -510,10 +510,18 @@ identity module; the federation provider uses that key set.
 
 **Discovery metadata hygiene.** `claims_supported` carries the registered
 claims the tokens mint (`sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`,
-`nonce`, `jti`) beside the scope-gated profile claims; `at_hash` is absent on
-purpose — the engine's code-flow ID token does not mint it, and Core §3.1.3.6
-leaves it optional. `code_challenge_methods_supported` names `["S256"]` alone
-(`TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface`).
+`nonce`, `jti`, `sid`) beside the scope-gated profile claims; `at_hash` is
+absent on purpose — the engine's code-flow ID token does not mint it, and
+Core §3.1.3.6 leaves it optional. `code_challenge_methods_supported` names
+`["S256"]` alone (`TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface`).
+`display_values_supported` names all four specification values;
+`acr_values_supported` names the LoA numbers the certification profiles
+send (`"1"`, `"2"`); `id_token_signing_alg_values_supported` names
+`["ES256","RS256"]` — the seed provisions the RSA pair beside the primary
+key (`internal/database/seeders/jwks_factory.go`), and the JWKS set
+publishes both; `request_parameter_supported` is `true` — the engine's JAR
+carries request objects by value, the unsigned form the Basic OP profile
+sends plus ES256 for a client that registers a key set.
 
 **Consent-service wire shape.** The consent handler is built with the
 transport's shared handler options (`modules/federation/oidc/module.go`
@@ -677,6 +685,21 @@ switch is a settings read per logout, so an operator's change lands
 without a restart) — records
 `oidc_session_ended`, and redirects to the registered URI with `state`
 when one was given, to the SPA root otherwise.
+
+**The OP's browser-session marker.** The provider holds no interactive
+session the SPA relies on, but the `prompt=none` semantics Core §3.1.2.1
+asks for need the one answer only browser-side state gives: whether this
+user agent already authenticated here. A completed authorization leaves a
+`HttpOnly` cookie (`saka_oidc_session`, Secure, SameSite=Lax, 8-hour
+window) naming the authentication session, and the session row's expiry
+extends to match. `prompt=none` reads the marker — present, the request
+completes silently with the prior subject and the PRIOR auth_time; absent,
+the answer is `login_required`. The same resume serves an interactive
+request whose `max_age` still covers the recorded instant: the auth_time
+the tokens carry must not move within the window, and `prompt=login`
+demands exactly the opposite — a fresh authentication, a fresh
+`auth_time`. The ID token's `auth_time` rides the grant's store, stamped
+at completion (`modules/federation/oidc/protocol_policy.go`).
 
 **Back-channel logout delivers after the commit.** A client whose
 `backchannel_logout_uri` is registered receives a logout token when an

@@ -12,13 +12,14 @@ const agent = new https.Agent({ rejectUnauthorized: false })
 
 // request performs one JSON call against the suite. The body and the
 // answer are JSON documents; a non-2xx answer carries the suite's error
-// body, which the caller reads off the thrown error.
-export function request(base, method, path, { query, body } = {}) {
+// body, which the caller reads off the thrown error. A raw body (a string
+// the caller built) goes out as-is — the image upload's data URI.
+export function request(base, method, path, { query, body, raw } = {}) {
   const url = new URL(base + path)
   for (const [key, value] of Object.entries(query ?? {})) {
     url.searchParams.set(key, value)
   }
-  const payload = body === undefined ? undefined : JSON.stringify(body)
+  const payload = body === undefined ? undefined : raw ? body : JSON.stringify(body)
 
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -27,7 +28,7 @@ export function request(base, method, path, { query, body } = {}) {
         method,
         agent,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': raw ? 'text/plain' : 'application/json',
           Accept: 'application/json',
           ...(payload === undefined ? {} : { 'Content-Length': Buffer.byteLength(payload) })
         }
@@ -95,10 +96,31 @@ export function testInfo(base, testId) {
   return request(base, 'GET', `/api/info/${testId}`)
 }
 
+// waitState long-polls the suite's own wait endpoint: it answers as soon
+// as the test's status enters one of the named states or the per-call
+// budget elapses ({"timeout": true}). This replaces status polling — a
+// module that sits between steps holds the call instead of the runner
+// guessing at an idle threshold and starting the next module too early.
+export function waitState(base, testId, states, timeoutMs) {
+  return request(base, 'GET', `/api/runner/${testId}/wait-state`, {
+    query: { states, timeoutMs }
+  })
+}
+
 // testLog is the module's log entries — the runner reads it to name a
-// failure in the report.
+// failure in the report and to find the image placeholders some modules
+// ask the operator to upload before they continue.
 export function testLog(base, testId) {
   return request(base, 'GET', `/api/log/${testId}`)
+}
+
+// uploadImage answers a module's upload placeholder: the screenshot rides
+// as the data URI the suite stores beside the log entry.
+export function uploadImage(base, testId, placeholder, dataUri) {
+  return request(base, 'POST', `/api/log/${testId}/images/${placeholder}`, {
+    body: dataUri,
+    raw: true
+  })
 }
 
 // health answers when the suite is up; the runner waits for it before the

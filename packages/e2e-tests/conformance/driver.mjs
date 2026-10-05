@@ -80,6 +80,22 @@ export async function openDriver({ bearer, issuerOrigin }) {
     // drive walks one browser URL the suite asked for. When the URL
     // leaves the issuer — the suite's callback — the leg is done.
     drive: (url) => driveBrowserURL(page, url, { issuerOrigin, bearer }),
+    // driveWithFinalUrl answers the page's final URL — the callback the
+    // leg landed on.
+    driveWithFinalUrl: async (url) => {
+      await driveBrowserURL(page, url, { issuerOrigin, bearer })
+      return page.url()
+    },
+    // clearCookies drops the OP's browser-session marker — the suite asks
+    // for it when a test must meet a user agent that has never
+    // authenticated here.
+    clearCookies: () => context.clearCookies(),
+    // screenshot captures the page as it stands — the evidence some
+    // modules ask the operator to upload before they continue.
+    screenshot: () =>
+      page
+        .screenshot({ type: 'jpeg', quality: 50 })
+        .then((buffer) => `data:image/jpeg;base64,${buffer.toString('base64')}`),
     close: () => browser.close()
   }
 }
