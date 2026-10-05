@@ -60,6 +60,7 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 
 - `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects).
 - `audit-20260929_1613.md` — federation, device flow, SCIM.
+- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
 
 ## Product docs (`docs/`)
 
