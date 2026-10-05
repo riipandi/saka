@@ -146,8 +146,9 @@ sessions, permissions. It is the part nobody sees when it works, and
 nobody forgets when it fails. Saka ships that pillar built, tested, and
 ready, so your effort goes to the rooms, not the frame.
 
-And *sakahayang*, Sundanese for "whatever you like", is the freedom the
-foundation gives you. Nothing here is locked: the code is open, the
+And the language keeps offering it: *sakahayang*, Sundanese for
+"whatever you like"; *sakarepmu*, Javanese for "up to you". The freedom
+the foundation gives you. Nothing here is locked: the code is open, the
 protocols are the standards (OpenID Connect, OAuth, SCIM, WebAuthn) that
 every client library already speaks, and the features are modules.
 Keep them, change them, or leave them. Build whatever you like; the
