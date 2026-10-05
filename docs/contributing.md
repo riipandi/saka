@@ -22,6 +22,30 @@ If you need more information on the steps to create a pull request, you can find
 
 ## Quick Start
 
-**TODO** Put the guidelines here.
+Requirements: Go 1.27+, Node 24.21+, pnpm, and Docker (for the dev
+containers).
+
+```sh
+pnpm install              # frontend dependencies
+task deps                 # Go toolchain binaries (golangci-lint, goose, …)
+task config:generate      # write app.config.json, then fill in the secrets
+cp .env.example .env.local && edit .env.local
+task compose:up           # postgres, mailpit, and the dev stack
+task db:initialize        # migrations + system seed + first administrator
+task dev                  # the dev loop: Vite + HMR behind the Go proxy on :3080
+```
+
+Sign in as the administrator `initialize` created, then make yourself at
+home:
+
+```sh
+task lint                 # all linters (Go + JS)
+task test                 # the test suites
+task check                # vet + migrations + formatting
+```
+
+Read [the deployment guide](deployment.md) before serving a real
+deployment, and [the product guide](product-guide.md) for what is already
+built in.
 
 [pull-requests-docs]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork
