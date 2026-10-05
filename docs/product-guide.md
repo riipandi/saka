@@ -151,5 +151,6 @@ first-class citizens:
   operator commands, the verification harnesses
 - [API endpoints](api-endpoint.md) and [API responses](api-response.md) —
   the machine-facing contract
+- [Acknowledgements](acknowledgements.md) — the projects Saka adapted
 - [Deployment](deployment.md) — running Saka yourself
 - [Contributing](contributing.md) — joining the project

@@ -14,9 +14,9 @@
 **Saka** — an enterprise-ready solid foundation for scalable applications,
 unified identity, and modular architecture. A project boilerplate with
 authentication built in: clone it, and the hardest part of a new product
-— accounts, sign-in, sessions, permissions — already works, tried and
-tested. Build your product around the auth core; or deploy it standalone
-as a pure identity provider for your other applications.
+— accounts, sign-in, sessions, permissions. Build your product around the
+auth core; or deploy it standalone as a pure identity provider for your
+other applications.
 
 The auth works in both directions out of the box:
 
@@ -81,8 +81,11 @@ driver, because the in-process one is coherent on a single node alone.
 - **Testing**: Testcontainers integration tests, wire-level E2E ladders,
   a k6 load test, and the conformance-suite driver
 - **Developer workflow**: `task` runner, Docker Compose dev stack
-  (Postgres, Mailpit, optional Valkey), Vite+ toolchain, debug-build
-  devtools
+  (Postgres, Mailpit, optional Valkey), debug-build devtools — and a
+  [Vite+](https://viteplus.dev) monorepo integrated with the Go server:
+  Vite compiles and HMR-serves the frontend while the Go binary rebuilds
+  on change, one origin in development ([the monorepo
+  guide](https://viteplus.dev/guide/monorepo))
 
 ## Quick Start
 Read the [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on contributing to this project.
@@ -130,8 +133,9 @@ mirrors.
 | [Deployment](./docs/deployment.md) | Running Saka for real |
 
 More in [`docs`](./docs): storage, webhooks, notifications, API keys,
-SCIM, the conformance profiles, the debug utilities, and the API
-reference.
+SCIM, the conformance profiles, the debug utilities, the API reference,
+and [acknowledgements](./docs/acknowledgements.md) — the projects Saka
+adapted.
 
 ## License
 
