@@ -117,14 +117,13 @@ jobs:
           install-mode: binary
           version: v2.13
 
-      # Mirrors `task check lint` (Taskfile.yml).
+      # Mirrors `task check` + `task lint` (scripts/task-cleanup.yml).
       - name: Check code quality
         run: |
           go vet ./...
-          pnpm exec oxfmt --check
-          pnpm exec oxlint
+          pnpm exec vp fmt --check
+          pnpm exec vp lint .
           golangci-lint run -c .golangci.yml ./...
-          pnpm exec oxlint --fix .
         env:
           NODE_ENV: production
 
