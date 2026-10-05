@@ -4,7 +4,7 @@ When contributing to this repository, please first discuss the change you wish t
 or any other method with the owners of this repository before making any changes. This way we can guide
 you through the process and give feedback.
 
-## 🍽️ Pull Request Process
+## Pull Request Process
 
 You can contribute changes to this repo by opening a pull request:
 
@@ -20,7 +20,7 @@ You can contribute changes to this repo by opening a pull request:
 
 If you need more information on the steps to create a pull request, you can find a detailed walkthrough in the [Github documentation][pull-requests-docs].
 
-## 🏁 Quick Start
+## Quick Start
 
 **TODO** Put the guidelines here.
 

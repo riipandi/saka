@@ -34,6 +34,11 @@ Authentication ships in both directions:
 | Outbound events | [Webhooks](webhooks.md) | Subscribing destinations, signed deliveries, retries and guards |
 | In-product messages | [Notifications](notifications.md) | Audiences, read receipts, the live stream |
 | Building and operating | [Debug & operator utilities](debug-utilities.md) | The debug devtools, the operator commands, the verification harnesses |
+| Managing people | [Users, groups, roles](users.md) | The administrative surface: accounts, bans and locks, groups, grants, sign-up modes, blocklist |
+| Machine credentials | [API keys](api-keys.md) | Creating, renewing, revoking; what a key may do and which credential fits which caller |
+| Provisioning to directories | [SCIM](scim.md) | Per-client provisioning targets, when passes run, extra token claims |
+| The deployment's knobs | [Configuration](configuration.md) | The config file's precedence, secrets, the settings catalog |
+| The signals | [Observability](observability.md) | Health vs readiness, logs, traces and metrics, the operations console |
 | The machine-facing contract | [API endpoints](api-endpoint.md), [API responses](api-response.md) | Every procedure and route, and the one contract both transports share |
 
 ## Reference

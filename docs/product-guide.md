@@ -78,6 +78,10 @@ out everywhere and the act is audited.
 
 ## Who's who: accounts, groups, roles
 
+The administrative surface in full — accounts, bans and locks, groups,
+role grants, sign-up modes, and the blocklist — has its own page:
+[Users, groups, roles](users.md). The concepts:
+
 | Concept | What it does |
 | --- | --- |
 | **Users** | A verified email, an optional username, names, a photo, per-user choices (like whether they may delete their own account) |
@@ -129,12 +133,20 @@ first-class citizens:
 
 - [Authentication in depth](auth.md) — every method's rules, MFA,
   step-up, sessions and impersonation, recovery
+- [Users, groups, roles](users.md) — the administrative surface:
+  accounts, groups, grants, sign-up modes, blocklist
 - [OAuth SSO](oauth-sso.md) — connecting external providers for sign-in
 - [OpenID provider](oidc.md) — how other apps sign users in with Saka,
   and [OIDC profiles](oidc-profiles.md) — which conformance profiles
   Saka supports and why
 - [Storage](storage.md) — buckets, resumable uploads, signed links
+- [API keys](api-keys.md) and [SCIM](scim.md) — machine credentials and
+  directory provisioning
 - [Webhooks](webhooks.md) and [Notifications](notifications.md)
+- [Configuration](configuration.md) — the config file, secrets, the
+  settings catalog
+- [Observability](observability.md) — health, logs, traces, metrics,
+  the operations console
 - [Debug & operator utilities](debug-utilities.md) — the devtools, the
   operator commands, the verification harnesses
 - [API endpoints](api-endpoint.md) and [API responses](api-response.md) —

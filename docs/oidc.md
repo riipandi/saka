@@ -68,6 +68,16 @@ machine-readable metadata at `/.well-known/openid-configuration` describes
 everything a client library needs — endpoints, algorithms, scopes, and
 claims. Most platforms' standard OIDC libraries work with no custom code.
 
+## Extra claims for a client
+
+Beyond the standard profile claims, an administrator can attach **custom
+claims** to a user or a group — a value of the deployment's choosing
+(an employee ID, a department, a tier) that the client's tokens and
+userinfo answers carry. Claim keys are suggested from a catalog the
+deployment knows, listed per subject, and replaced or removed as rows —
+and a preview procedure shows exactly which claims a given user would
+receive before anything is committed.
+
 ## Conformance
 
 Saka is rehearsed against the OpenID Foundation's conformance suite, run
