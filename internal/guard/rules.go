@@ -575,6 +575,12 @@ var RestRules = []RestEntry{
 	{Method: http.MethodPost, Pattern: "/oidc/introspect", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/revoke", Rule: Public},
 	{Method: http.MethodPost, Pattern: "/oidc/par", Rule: Public},
+	// The JWKS face the discovery document's jwks_uri names, and the
+	// registration endpoint the DCR-backed metadata advertises — the
+	// registration request itself is refused by the store, the management
+	// surface being the only writer.
+	{Method: http.MethodGet, Pattern: "/oidc/.well-known/jwks.json", Rule: Public},
+	{Method: http.MethodPost, Pattern: "/oidc/register", Rule: Public},
 	// The device flow: the device itself authenticates at the
 	// authorization endpoint like a token request; the verification
 	// endpoint is the browser's, carrying its own credential or none —

@@ -51,6 +51,7 @@ const (
 	// itself reaches the authorization endpoint.
 	protocolDeviceAuthorizeEndpoint    = "/device_authorization"
 	protocolDeviceVerificationEndpoint = "/device"
+	protocolRegisterEndpoint           = "/register"
 
 	// interactionPath is the SPA route the sign-in-less browser lands on.
 	interactionPath = "/interaction"
@@ -299,6 +300,18 @@ func (p *Protocol) Mount(r chi.Router) {
 	r.Handle(protocolPrefix+protocolRevokeEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolPAREndpoint, flatten(handler))
 	r.Handle(protocolPrefix+protocolEndSessionEndpoint, handler)
+	// The JWKS document rides the discovery document's jwks_uri, which the
+	// library renders under the protocol prefix — the root path the jwks
+	// feature serves is the legacy face, the prefix one is the advertised
+	// one. Both must answer, or a relying party that fetched the metadata
+	// finds a 404 where its keys should be.
+	r.Handle(protocolPrefix+protocolJWKSEndpoint, handler)
+	// The registration endpoint rides the discovery document because the
+	// DCR manager is what resolves clients by. Registration itself is the
+	// management surface's job — the store refuses every write — so the
+	// mounted endpoint answers the library's registration error, the
+	// metadata staying honest about where a registration request lands.
+	r.Handle(protocolPrefix+protocolRegisterEndpoint, flatten(handler))
 	// The device verification endpoint serves the browser's entry and
 	// its callback continuation, so the subtree mounts with the handler.
 	r.Handle(protocolPrefix+protocolDeviceAuthorizeEndpoint, flatten(handler))

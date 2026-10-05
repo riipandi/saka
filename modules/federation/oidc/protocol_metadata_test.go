@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -29,6 +30,8 @@ func metadataProvider(t *testing.T) http.Handler {
 		IDTokenAlgs: []goidc.SignatureAlgorithm{goidc.SigAlgES256},
 	},
 		provider.WithPathPrefix(protocolPrefix),
+		provider.WithJWKSEndpoint(protocolJWKSEndpoint),
+		provider.WithDCR(clientManagerStub{}),
 		provider.WithTokenIntrospection(func(_ context.Context, client *goidc.Client, info goidc.TokenInfo) bool {
 			return info.ClientID == client.ID
 		}),
@@ -42,10 +45,30 @@ func metadataProvider(t *testing.T) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The alias wiring Mount performs.
 		if r.URL.Path == "/.well-known/oauth-authorization-server" {
-			handler = requestAt("/.well-known/openid-configuration", handler)
+			r.URL.Path = "/.well-known/openid-configuration"
 		}
+		// The jwks and registration paths pass through unchanged: the
+		// provider's own mux matches them under the prefix, which is the
+		// shape Mount registers.
 		handler.ServeHTTP(w, r)
 	})
+}
+
+// clientManagerStub is the DCR manager the metadata test's provider needs:
+// its lookup answers not-found, its writes refuse — the shape saka's
+// clientStore keeps, the registration endpoint mounted yet closed.
+type clientManagerStub struct{}
+
+func (clientManagerStub) Client(context.Context, string) (*goidc.Client, error) {
+	return nil, goidc.ErrNotFound
+}
+
+func (clientManagerStub) SaveClient(context.Context, *goidc.Client) error {
+	return goidc.ErrNotFound
+}
+
+func (clientManagerStub) DeleteClient(context.Context, string) error {
+	return goidc.ErrNotFound
 }
 
 func TestTheRFC8414AliasServesTheDiscoveryDocument(t *testing.T) {
@@ -70,11 +93,13 @@ func TestTheRFC8414AliasServesTheDiscoveryDocument(t *testing.T) {
 		"one document cannot drift from itself")
 
 	var document struct {
-		Issuer             string   `json:"issuer"`
-		RevocationEndpoint string   `json:"revocation_endpoint"`
-		RevocationAuthn    []string `json:"revocation_endpoint_auth_methods_supported"`
-		IntrospectEndpoint string   `json:"introspection_endpoint"`
-		Scopes             []string `json:"scopes_supported"`
+		Issuer               string   `json:"issuer"`
+		JWKSURI              string   `json:"jwks_uri"`
+		RegistrationEndpoint string   `json:"registration_endpoint"`
+		RevocationEndpoint   string   `json:"revocation_endpoint"`
+		RevocationAuthn      []string `json:"revocation_endpoint_auth_methods_supported"`
+		IntrospectEndpoint   string   `json:"introspection_endpoint"`
+		Scopes               []string `json:"scopes_supported"`
 	}
 	require.NoError(t, json.Unmarshal(aliasBody, &document))
 	assert.Equal(t, "https://saka.example", document.Issuer)
@@ -84,4 +109,32 @@ func TestTheRFC8414AliasServesTheDiscoveryDocument(t *testing.T) {
 	assert.Equal(t, "https://saka.example"+protocolPrefix+protocolIntrospectEndpoint,
 		document.IntrospectEndpoint)
 	assert.NotEmpty(t, document.Scopes)
+
+	// The jwks_uri and the registration endpoint the document advertises
+	// must both answer: a relying party that fetches the metadata holds
+	// the document's word, and a 404 where keys should be is a broken
+	// discovery contract. The advertised URLs name the issuer's host; the
+	// probe re-points them at the test server.
+	for _, advertised := range []string{document.JWKSURI, document.RegistrationEndpoint} {
+		answer, fetchErr := server.Client().Get(strings.Replace(advertised, document.Issuer, server.URL, 1))
+		require.NoError(t, fetchErr)
+		defer answer.Body.Close()
+		assert.NotEqual(t, http.StatusNotFound, answer.StatusCode,
+			"the advertised endpoint %s must not answer 404", advertised)
+	}
+
+	// The registration endpoint is mounted but closed: the write refuses,
+	// and the refusal is the RFC 7591 error shape, not a bare 404 or a 500.
+	registration, err := server.Client().Post(strings.Replace(document.RegistrationEndpoint, document.Issuer, server.URL, 1),
+		"application/json", strings.NewReader(`{"redirect_uris":["https://rp.example/cb"]}`))
+	require.NoError(t, err)
+	defer registration.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, registration.StatusCode)
+	registrationBody, err := io.ReadAll(registration.Body)
+	require.NoError(t, err)
+	var refusal struct {
+		Error string `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(registrationBody, &refusal))
+	assert.Equal(t, "invalid_client_metadata", refusal.Error)
 }

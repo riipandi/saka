@@ -613,7 +613,9 @@ one-time grant's consumption is atomic under concurrency (settled 2026-09-29):
 the token endpoint's save demands the stored grant still hold the document the
 request read, so of the requests racing on one authorization code or device
 code exactly one receives tokens — the losers answer `invalid_grant` (the
-code already redeemed or gone) and never reach issuance. No token-type
+code already redeemed or gone; the lost compare-and-swap rides the same
+refusal since the 2026-10-05 audit, the library otherwise answering an
+unknown store error with a 500) and never reach issuance. No token-type
 discriminator claim is minted: the hint's identity rides the JOSE type
 member instead — access tokens carry RFC 9068's `at+jwt` and ID tokens
 carry none, and the end-session policy refuses a hint whose member reads

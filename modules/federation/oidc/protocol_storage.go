@@ -206,7 +206,13 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 				return err
 			}
 			if !saved {
-				return ErrGrantConcurrentlyModified
+				// The row moved under this request: a concurrent request
+				// spent the one-time grant first. The library answers any
+				// error it does not recognize with a 500, so the refusal
+				// travels as the goidc error the token endpoint turns into
+				// the invalid_grant refusal RFC 9700 names for a replayed
+				// or already-spent grant.
+				return goidc.WrapError(goidc.ErrorCodeInvalidGrant, "invalid grant", ErrGrantConcurrentlyModified)
 			}
 			snapshots.remember(grant.ID, data)
 		} else if err := s.save(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, &stored); err != nil {
