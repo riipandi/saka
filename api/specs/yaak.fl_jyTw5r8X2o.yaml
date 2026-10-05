@@ -1,8 +1,8 @@
 type: folder
 model: folder
 id: fl_jyTw5r8X2o
-createdAt: '2026-10-05T17:43:58.075754'
-updatedAt: '2026-10-05T17:43:58.075754'
+createdAt: 2026-10-05T17:43:58.075754
+updatedAt: 2026-10-05T17:45:35.354390
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 description: 'The client-management surface: register and maintain the applications that sign in with Saka, and the administrative consent ledger.'
 headers: []
 name: OIDC Management
-sortPriority: 0.0
+sortPriority: 5407.407407407407
 settingSendCookies:
   enabled: false
   value: true

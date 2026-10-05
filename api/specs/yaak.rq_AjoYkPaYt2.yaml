@@ -2,14 +2,17 @@ type: http_request
 model: http_request
 id: rq_AjoYkPaYt2
 createdAt: 2026-09-28T20:29:03.987502
-updatedAt: 2026-09-28T20:29:03.987502
+updatedAt: 2026-10-05T17:45:50.898497
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_jyTw5r8X2o
 authentication: {}
 authenticationType: null
 body:
   bodyType: application/json
-  text: '{"user_id": "REPLACE_USER_WIRE"}'
+  text: |-
+    {
+      "user_id": "REPLACE_USER_WIRE"
+    }
 bodyType: application/json
 description: |-
   One account's consent ledger. Administrative.

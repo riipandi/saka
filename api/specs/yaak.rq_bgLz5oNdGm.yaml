@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_bgLz5oNdGm
 createdAt: 2026-09-28T20:45:57.272939
-updatedAt: 2026-09-28T20:45:57.272940
+updatedAt: 2026-10-05T17:46:12.188598
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_5R2gfN3X4T
 authentication: {}
@@ -11,7 +11,10 @@ body:
   bodyType: application/json
   text: |-
     {
-      "scopes": ["openid", "profile"]
+      "scopes": [
+        "openid",
+        "profile"
+      ]
     }
 bodyType: application/json
 description: |-
