@@ -53,7 +53,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
 few matter — each summarizes its session and what stayed open; anything still
 true is folded into the core documents above. Newest:
-`handover-20261005_1700.md`.
+`handover-20261006_0138.md`.
 
 ## Audits (`.llms/audit/`)
 
