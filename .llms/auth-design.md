@@ -135,6 +135,23 @@ corpus (NIST 800-63B posture) — the zxcvbn requirement above was dropped
 
 > Must enable the blocklist or the allowlist to use this setting.
 
+## Federated identity (OIDC provider)
+
+The provider serves relying parties; its surface lives in the endpoint
+reference and the certification plan. The logout items the certification
+work touched:
+
+- [x] **RP-initiated logout**: A relying party ends a user's session at the
+  end-session endpoint with an ID-token hint; the answer expires the OP's
+  browser-session marker, so a later silent sign-in reads `login_required`.
+- [x] **Back-channel logout**: When a signed-in session ends, the provider
+  POSTs a signed logout token to every registered client's
+  `backchannel_logout_uri` (deployment switch, default off).
+- [ ] **Front-channel logout**: Rejected — iframe delivery contradicts the
+  no-embedded-frame design.
+- [ ] **Session management**: Rejected — session iframes contradict the
+  no-browser-session design.
+
 ## Customization (deferred)
 
 ### Email templates
