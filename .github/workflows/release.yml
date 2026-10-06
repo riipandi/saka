@@ -47,9 +47,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [[ "${{ steps.setup-sdk.outputs.nodeModules }}" != "true" ]]; then
-            pnpm install --ignore-scripts --frozen-lockfile
-          fi
+          pnpm install --ignore-scripts --frozen-lockfile
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Generate ConnectRPC code

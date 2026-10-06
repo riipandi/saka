@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - ".vite-hooks/**"
       - ".github/workflows/release.yml"
+      - ".goreleaser.yaml"
       - ".llms/**"
       - ".vscode/**"
       - ".zed/**"
@@ -84,9 +85,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [[ "${{ steps.setup-sdk.outputs.nodeModules }}" != "true" ]]; then
-            pnpm install --ignore-scripts --frozen-lockfile
-          fi
+          # Always install: the node_modules cache holds only the root
+          # node_modules, while a pnpm workspace links each importer's
+          # dependencies into packages/*/node_modules — with the store cache
+          # warm this is a link step, not a download.
+          pnpm install --ignore-scripts --frozen-lockfile
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       # Vite Task cache (@ref: https://viteplus.dev/guide/github-actions-cache).
