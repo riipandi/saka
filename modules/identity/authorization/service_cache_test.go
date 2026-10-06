@@ -26,8 +26,26 @@ func TestAListingIsServedFromTheCache(t *testing.T) {
 
 	second, cachedPagination, err := service.ListRoles(t.Context(), false, "", "", "", true, 1, 100)
 	require.NoError(t, err)
-	assert.Equal(t, first, second, "the cached page answers the same rows")
+	// The cache carries values as JSON, so the timestamps come back in a
+	// location that need not be the one the scan answered with — the same
+	// instant, a different zone name. The comparison weighs instants.
+	assert.Equal(t, normalizeUTC(first), normalizeUTC(second), "the cached page answers the same rows")
 	assert.Equal(t, pagination, cachedPagination)
+}
+
+// normalizeUTC rewrites the timestamps the JSON round-trip may hand back in a
+// different location, so a comparison weighs instants, not zone names.
+func normalizeUTC(rows []RoleRow) []RoleRow {
+	out := make([]RoleRow, len(rows))
+	for i, row := range rows {
+		row.CreatedAt = row.CreatedAt.UTC()
+		if row.UpdatedAt != nil {
+			updated := row.UpdatedAt.UTC()
+			row.UpdatedAt = &updated
+		}
+		out[i] = row
+	}
+	return out
 }
 
 // TestAChangeDropsEveryCachedListing pins the invalidation a write owes the

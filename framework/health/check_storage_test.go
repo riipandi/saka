@@ -158,13 +158,18 @@ func relativeToWorkingDir(t *testing.T, path string) string {
 	return relative
 }
 
-// The check must work against the directory a data-directory convention
-// names — "storage", the default `internal/config` resolves for
-// `storage.local_path` — so a broken default is caught here rather than at
-// deploy time. The literal keeps the framework free of the app's config
-// import; the value's home and its sync with the CLI are the app's tests.
+// TestStorageCheckOnRepositoryDataDir exercises the check against the
+// directory a data-directory convention names — "storage", the default
+// `internal/config` resolves for `storage.local_path` — so a broken default
+// is caught here rather than at deploy time. The literal keeps the framework
+// free of the app's config import; the value's home and its sync with the CLI
+// are the app's tests. The directory is gitignored, so a fresh checkout does
+// not carry it: the test materializes it the way the CLI does on first run.
 func TestStorageCheckOnRepositoryDataDir(t *testing.T) {
-	detail := storageResult(t, repoPath(t, "storage"))
+	dir := repoPath(t, "storage")
+	require.NoError(t, os.MkdirAll(dir, 0o750))
+
+	detail := storageResult(t, dir)
 
 	assert.Equal(t, health.StatusUp, detail.Status, detail.Error)
 }

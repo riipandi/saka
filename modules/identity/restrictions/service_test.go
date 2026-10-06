@@ -125,7 +125,7 @@ func TestTheBanWritesAndLiftsAsARow(t *testing.T) {
 	pool := migratedPool(t)
 	id := createAccount(t, pool)
 	repo := NewRepository()
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Microsecond)
 
 	expires := now.Add(24 * time.Hour)
 	require.NoError(t, repo.ApplyBan(t.Context(), pool, id, "unruly behaviour", &expires, now))
