@@ -10,7 +10,8 @@ name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    # tags: ["v*.*.*"]
+    tags: ["v20*-*"]
 
 permissions:
   contents: write
