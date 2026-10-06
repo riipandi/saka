@@ -79,10 +79,7 @@ jobs:
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       # Vite Task cache (@ref: https://viteplus.dev/guide/github-actions-cache).
-      # Restored after install because package installation can recreate
-      # node_modules. The rolling primary key keeps entries immutable; the
-      # restore prefix picks the newest cache for this OS/arch. Task inputs
-      # (sources, lockfiles) stay out of the key — Vite Task fingerprints them.
+      # Restored after install because package installation can recreate node_modules.
       - name: Restore Vite Task cache
         id: vite-task-cache
         uses: actions/cache/restore@v6
@@ -117,7 +114,6 @@ jobs:
           install-mode: binary
           version: v2.13
 
-      # Mirrors `task check` + `task lint` (scripts/task-cleanup.yml).
       - name: Check code quality
         run: |
           go vet ./...
@@ -127,33 +123,26 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Cached through `vp run` (vite.config.ts run.tasks).
       - name: Type check (TypeScript)
         run: vp run typecheck
         env:
           NODE_ENV: production
 
-      # Mirrors `task test:ui` (Taskfile.yml).
       - name: Run unit tests (frontend)
         run: pnpm exec vitest run
         env:
           NODE_ENV: production
 
-      # Mirrors `task test:go` (Taskfile.yml). Integration tests run the 
-      # pg client tools inside the Postgres container, so no host 
-      # PostgreSQL installation is needed.
       - name: Run unit tests (backend)
         run: gotestsum --format testname ./...
         env:
           NODE_ENV: production
 
       - name: Run unit tests (backend, debug tags)
-        run: gotestsum --format testname -- -tags debug ./cmd/... ./database/...
+        run: gotestsum --format testname -- -tags debug ./cmd/...
         env:
           NODE_ENV: production
 
-      # Mirrors `task build` (Taskfile.yml): the frontend bundle and the
-      # derived assets.json land first, then both binaries embed them.
       - name: Build application binaries
         run: |
           pnpm exec vp build

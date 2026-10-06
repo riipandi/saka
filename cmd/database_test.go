@@ -183,7 +183,7 @@ func TestDBImportRoundTrips(t *testing.T) {
 
 	assert.Contains(t, out, "loaded:    ")
 	assert.Contains(t, out, path)
-	assert.Equal(t, 6, countUsers(t, targetEnv))
+	assert.Equal(t, 7, countUsers(t, targetEnv))
 }
 
 // Without a file there is nothing to import, so the argument is required.
@@ -334,7 +334,7 @@ func TestDBImportTruncateForceSkipsPrompt(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotContains(t, out, "import cancelled")
-	assert.Equal(t, 6, countUsers(t, targetEnv))
+	assert.Equal(t, 7, countUsers(t, targetEnv))
 }
 
 // Every compression format exports to the right name and imports back, which is
@@ -367,7 +367,7 @@ func TestDBExportImportCompressionRoundTrip(t *testing.T) {
 			targetEnv := migratedDatabase(t)
 			out, err := runDBImportCmd(t, "", "--env-file="+targetEnv, "--truncate", "--force", written)
 			require.NoError(t, err)
-			assert.Equal(t, 6, countUsers(t, targetEnv), "the rows must survive the container")
+			assert.Equal(t, 7, countUsers(t, targetEnv), "the rows must survive the container")
 
 			if format != "none" {
 				assert.Contains(t, out, "format:")

@@ -228,8 +228,8 @@ state leaks. The dump/restore round trip is exercised end to end in `backup_test
 every new dump object kind adds its case there.
 
 ```bash
-go test ./database/
-go test -tags debug ./cmd/... ./database/...
+go test ./internal/database/
+go test -tags debug ./cmd/...
 ```
 
 ## Design Decisions

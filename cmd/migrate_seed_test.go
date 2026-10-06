@@ -57,8 +57,8 @@ func TestMigrateSeedCreatesTheDefaultUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" created")
-	assert.Contains(t, out, "status: 79 created, 0 skipped")
-	assert.Equal(t, 6, countUsers(t, envFile))
+	assert.Contains(t, out, "status: 123 created, 1 skipped")
+	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
 // Running the command twice must not create a second account.
@@ -72,8 +72,8 @@ func TestMigrateSeedIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" skipped")
-	assert.Contains(t, out, "0 created, 75 skipped")
-	assert.Equal(t, 6, countUsers(t, envFile))
+	assert.Contains(t, out, "0 created, 120 skipped")
+	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
 // --dry-run must report the work in future tense and write nothing.
@@ -84,7 +84,7 @@ func TestMigrateSeedDryRunWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" would create")
-	assert.Contains(t, out, "65 to create, 4 to skip")
+	assert.Contains(t, out, "105 to create, 5 to skip")
 	assert.Zero(t, countUsers(t, envFile))
 }
 
@@ -102,18 +102,20 @@ func TestMigrateSeedRequiresSchema(t *testing.T) {
 }
 
 // A database that stopped short of the last migration must also be refused. A
-// table check would pass here — public.users exists after version 2 — and the
-// seed would then run against a schema the migrations have not finished.
+// table check would pass here — public.users exists after version 4 — and the
+// seed would then run against a schema the migrations have not finished. The
+// refusal is asserted before any account exists, so the users table itself is
+// the probe.
 func TestMigrateSeedRequiresEveryMigration(t *testing.T) {
 	container := testutils.StartPostgres(t.Context(), t)
 	envFile := writeEnvFile(t, container.NewDatabase(t))
 
-	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force", "--to=2")
+	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force", "--to=4")
 	require.NoError(t, err)
 
 	out, err := runMigrateSeedCmd(t, "", "--env-file="+envFile, "--force")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("%d migrations pending", migrationTotal()-2))
+	assert.Contains(t, err.Error(), fmt.Sprintf("%d migrations pending", migrationTotal()-4))
 	assert.Empty(t, out)
 	assert.Zero(t, countUsers(t, envFile))
 }
@@ -144,8 +146,8 @@ func TestMigrateSeedAcceptedPromptSeeds(t *testing.T) {
 	out, err := runMigrateSeedCmd(t, "y\n", "--env-file="+envFile)
 	require.NoError(t, err)
 
-	assert.Contains(t, out, "status: 79 created, 0 skipped")
-	assert.Equal(t, 6, countUsers(t, envFile))
+	assert.Contains(t, out, "status: 123 created, 1 skipped")
+	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
 // A seeder that fails must roll the whole run back, so a partial seed is never

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/riipandi/saka/framework/migration"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/printext"
 )
@@ -147,13 +148,13 @@ func TestReportTargetRedactsUnparsableDSN(t *testing.T) {
 func TestReporterIndentsProgressOnly(t *testing.T) {
 	var out bytes.Buffer
 	p := plain(&out)
-	report := newReporter(p, migrationStateWidth(string(database.ProgressApplied)))
+	report := newReporter(p, migrationStateWidth(string(migration.ProgressApplied)))
 
-	report.progress(database.ProgressEvent{
+	report.progress(migration.ProgressEvent{
 		Version:   2,
 		Name:      "00002_create_identity_tables.sql",
 		Direction: "up",
-		State:     database.ProgressApplied,
+		State:     migration.ProgressApplied,
 		Duration:  37 * time.Millisecond,
 	})
 	require.NoError(t, report.failed())
@@ -176,13 +177,13 @@ func TestReporterIndentsProgressOnly(t *testing.T) {
 // and duration, so the two directions read as one report.
 func TestReporterReportsRollbackRows(t *testing.T) {
 	var out bytes.Buffer
-	report := newReporter(plain(&out), migrationStateWidth(string(database.ProgressRolledBack)))
+	report := newReporter(plain(&out), migrationStateWidth(string(migration.ProgressRolledBack)))
 
-	report.progress(database.ProgressEvent{
+	report.progress(migration.ProgressEvent{
 		Version:   9,
 		Name:      "00009_add_session_remember.sql",
 		Direction: "down",
-		State:     database.ProgressRolledBack,
+		State:     migration.ProgressRolledBack,
 		Duration:  3 * time.Millisecond,
 	})
 	require.NoError(t, report.failed())
@@ -196,13 +197,13 @@ func TestReporterReportsRollbackRows(t *testing.T) {
 // its duration because it did run.
 func TestReporterReportsEmptyMigration(t *testing.T) {
 	var out bytes.Buffer
-	report := newReporter(plain(&out), migrationStateWidth(string(database.ProgressApplied)))
+	report := newReporter(plain(&out), migrationStateWidth(string(migration.ProgressApplied)))
 
-	report.progress(database.ProgressEvent{
+	report.progress(migration.ProgressEvent{
 		Version:   10,
 		Name:      "00010_noop.sql",
 		Direction: "up",
-		State:     database.ProgressEmpty,
+		State:     migration.ProgressEmpty,
 		Duration:  0,
 	})
 	require.NoError(t, report.failed())
@@ -215,7 +216,7 @@ func TestReporterReportsEmptyMigration(t *testing.T) {
 // "pending" and the time column is empty rather than a fabricated timestamp.
 func TestPrintPendingUsesTheSharedRowShape(t *testing.T) {
 	var out bytes.Buffer
-	require.NoError(t, printPending(plain(&out), []database.MigrationStatus{
+	require.NoError(t, printPending(plain(&out), []migration.MigrationStatus{
 		{Version: 1, Name: "00001_initialize_schema.sql"},
 		{Version: 2, Name: "00002_create_identity_tables.sql"},
 	}))
@@ -229,7 +230,7 @@ func TestPrintPendingUsesTheSharedRowShape(t *testing.T) {
 // A rollback plan says "rollback", not "rolled back": nothing has run yet.
 func TestPrintRollbackUsesTheSharedRowShape(t *testing.T) {
 	var out bytes.Buffer
-	require.NoError(t, printRollback(plain(&out), []database.MigrationStatus{
+	require.NoError(t, printRollback(plain(&out), []migration.MigrationStatus{
 		{Version: 9, Name: "00009_add_session_remember.sql"},
 	}))
 
@@ -326,13 +327,13 @@ func TestMigrationLabel(t *testing.T) {
 // a log.
 func TestReporterIgnoresStartedEvents(t *testing.T) {
 	var out bytes.Buffer
-	report := newReporter(plain(&out), migrationStateWidth(string(database.ProgressApplied)))
+	report := newReporter(plain(&out), migrationStateWidth(string(migration.ProgressApplied)))
 
-	report.progress(database.ProgressEvent{
+	report.progress(migration.ProgressEvent{
 		Version:   1,
 		Name:      "00001_initialize_schema.sql",
 		Direction: "up",
-		State:     database.ProgressStarted,
+		State:     migration.ProgressStarted,
 	})
 
 	require.NoError(t, report.failed())
@@ -342,13 +343,13 @@ func TestReporterIgnoresStartedEvents(t *testing.T) {
 // A write failure cannot be returned from the progress callback, so it must be
 // held and surfaced when the command can report it.
 func TestReporterHoldsWriteFailure(t *testing.T) {
-	report := newReporter(printext.NewPalette(failingWriter{}), migrationStateWidth(string(database.ProgressApplied)))
+	report := newReporter(printext.NewPalette(failingWriter{}), migrationStateWidth(string(migration.ProgressApplied)))
 
-	report.progress(database.ProgressEvent{
+	report.progress(migration.ProgressEvent{
 		Version:   1,
 		Name:      "00001_initialize_schema.sql",
 		Direction: "up",
-		State:     database.ProgressApplied,
+		State:     migration.ProgressApplied,
 		Duration:  time.Millisecond,
 	})
 

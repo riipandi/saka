@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/migration"
 	"github.com/riipandi/saka/internal/database"
 	"github.com/riipandi/saka/pkg/envfile"
 	"github.com/riipandi/saka/pkg/testutils"
@@ -38,10 +39,10 @@ func TestMigrateValidateReportsNoIssues(t *testing.T) {
 
 // A broken file must fail the command, so `task check` fails with it.
 func TestMigrateValidateReportsIssuesAndFails(t *testing.T) {
-	migrationCheck = func() database.ValidationReport {
-		return database.ValidationReport{
+	migrationCheck = func() migration.ValidationReport {
+		return migration.ValidationReport{
 			Checked: 1,
-			Issues: []database.ValidationIssue{
+			Issues: []migration.ValidationIssue{
 				{File: "00001_x.sql", Line: 3, Message: "boom"},
 			},
 		}
@@ -64,7 +65,7 @@ func TestMigrateResetRollsBackEverything(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
-	assert.Contains(t, out, "11 migrations rolled back")
+	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", composedTotal()))
 	assert.Zero(t, currentVersion(t, dsn))
 }
 
@@ -79,8 +80,8 @@ func TestMigrateResetWithUpReappliesEverything(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up")
 	require.NoError(t, err)
-	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", migrationTotal()))
-	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", migrationTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", composedTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", composedTotal()))
 	assert.Equal(t, latestMigration().Version, currentVersion(t, dsn))
 
 	// The two halves must each use their own state column and their own clock.
@@ -107,7 +108,7 @@ func TestMigrateResetDryRunChangesNothing(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--dry-run")
 	require.NoError(t, err)
-	assert.Contains(t, out, "create_multifactor_tables")
+	assert.Contains(t, out, "create_filestore_tables")
 	assert.Contains(t, out, "3 migrations to roll back")
 	assert.Equal(t, int64(3), currentVersion(t, dsn))
 
@@ -137,8 +138,8 @@ func TestMigrateResetWithUpOnFreshDatabaseApplies(t *testing.T) {
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up")
 	require.NoError(t, err)
 	assert.NotContains(t, out, "no applied migrations")
-	assert.Contains(t, out, "11 migrations applied")
-	assert.Equal(t, int64(11), currentVersion(t, dsn))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", migrationTotal()))
+	assert.Equal(t, int64(latestMigration().Version), currentVersion(t, dsn))
 
 	// This path applies without rolling back first, so the rows must use the
 	// apply column width, not the rollback width the reporter was built with.
@@ -172,7 +173,7 @@ func TestMigrateResetDryRunOnFreshDatabase(t *testing.T) {
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--dry-run", "--up")
 	require.NoError(t, err)
 	assert.NotContains(t, out, "to roll back")
-	assert.Contains(t, out, "11 migrations pending")
+	assert.Contains(t, out, fmt.Sprintf("%d migrations pending", migrationTotal()))
 	assert.Zero(t, currentVersion(t, dsn))
 
 	// Without --up there is nothing to report at all.
@@ -195,8 +196,8 @@ func TestMigrateResetDeclinedLeavesDatabase(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "n\n", "--env-file="+envFile)
 	require.NoError(t, err)
-	assert.Contains(t, out, fmt.Sprintf("roll back all %d migrations?", migrationTotal()))
-	assert.Contains(t, out, fmt.Sprintf("%d migrations left applied", migrationTotal()))
+	assert.Contains(t, out, fmt.Sprintf("roll back all %d migrations?", composedTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations left applied", composedTotal()))
 	assert.Equal(t, latestMigration().Version, currentVersion(t, dsn))
 }
 
@@ -232,8 +233,8 @@ func TestMigrateResetWithUpAndSeedReappliesAndSeeds(t *testing.T) {
 
 	out, err := runMigrateResetCmd(t, "", "--env-file="+envFile, "--force", "--up", "--seed")
 	require.NoError(t, err)
-	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", migrationTotal()))
-	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", migrationTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations rolled back", composedTotal()))
+	assert.Contains(t, out, fmt.Sprintf("%d migrations applied", composedTotal()))
 	assert.Contains(t, out, "created", "the seed half must report the records it wrote")
 	assert.Greater(t, seededAccounts(t, dsn), int64(0),
 		"the seed half must leave the default account behind")
@@ -357,7 +358,7 @@ func TestMigrateCreateFailsOnNameConflict(t *testing.T) {
 	require.NoError(t, err)
 
 	out, err := runMigrateCreateCmd(t, dir, "Add Widgets")
-	require.ErrorIs(t, err, database.ErrMigrationNameTaken)
+	require.ErrorIs(t, err, migration.ErrMigrationNameTaken)
 	assert.Empty(t, out, "a failed create prints nothing to stdout")
 
 	entries, readErr := os.ReadDir(dir)
@@ -369,7 +370,7 @@ func TestMigrateCreateRejectsUnusableName(t *testing.T) {
 	dir := t.TempDir()
 
 	out, err := runMigrateCreateCmd(t, dir, "...")
-	require.ErrorIs(t, err, database.ErrInvalidMigrationName)
+	require.ErrorIs(t, err, migration.ErrInvalidMigrationName)
 	assert.Empty(t, out)
 
 	entries, readErr := os.ReadDir(dir)
@@ -381,7 +382,7 @@ func TestMigrateCreateFailsWhenDirectoryMissing(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope")
 
 	out, err := runMigrateCreateCmd(t, missing, "add widgets")
-	require.ErrorIs(t, err, database.ErrMigrationsDirMissing)
+	require.ErrorIs(t, err, migration.ErrMigrationsDirMissing)
 	assert.Empty(t, out)
 	assert.NoDirExists(t, missing)
 }
