@@ -14,6 +14,7 @@ env:
   - CGO_ENABLED=0
   - NODE_ENV=production
   - VITEST=true
+  - SKIP_GO_BUILD=1
 
 before:
   hooks:
@@ -22,7 +23,7 @@ before:
     - pnpm install --ignore-scripts --frozen-lockfile
     - go tool buf generate
     - gofmt -w codegen/proto/go
-    - SKIP_GO_BUILD=1 pnpm exec vite build
+    - pnpm exec vp build
     # - swag init --output ./api -d cmd,internal,modules,pkg -g saka/main.go --quiet
     # - swag fmt --dir ./api
 
