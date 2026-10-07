@@ -31,6 +31,52 @@ func TestTheNonDocumentRequestsRideTheCompiler(t *testing.T) {
 		"a module request is the compiler's to answer, not a document")
 }
 
+func TestTheCompilersOwnWritesRideTheProxy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method, "the dev tooling's write reaches the compiler")
+		_, _ = w.Write([]byte("pipe-ack"))
+	}))
+	defer upstream.Close()
+
+	r := chi.NewRouter()
+	bundler.MountDev(r, upstream.URL, DefaultPage, surfacePrefixes...)
+
+	// The TanStack devtools console pipe: a POST the compiler's own
+	// middleware owns, on a path no registered route claims.
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/__tsd/console-pipe", nil))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "pipe-ack", w.Body.String(),
+		"the compiler's own write is proxied, not refused by the method rule")
+}
+
+func TestAWriteThatAsksForADocumentIsRefused(t *testing.T) {
+	r := chi.NewRouter()
+	bundler.MountDev(r, "http://127.0.0.1:1", DefaultPage, surfacePrefixes...)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/some-page", nil)
+	req.Header.Set("Accept", "text/html")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Code,
+		"a write that names a document never renders the shell")
+	assert.Equal(t, "GET, HEAD", w.Header().Get("Allow"))
+}
+
+func TestAWritetoAReservedPrefixAnswersTheEnvelope(t *testing.T) {
+	r := chi.NewRouter()
+	bundler.MountDev(r, "http://127.0.0.1:1", DefaultPage, surfacePrefixes...)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/missing", nil))
+
+	assert.Equal(t, http.StatusNotFound, w.Code,
+		"an unclaimed API path answers the envelope's 404, not a static-surface method rule")
+	assert.Contains(t, w.Body.String(), "not found")
+}
+
 func TestSetupStaticJSONFallbacks(t *testing.T) {
 	r := chi.NewRouter()
 	SetupStatic(r)
