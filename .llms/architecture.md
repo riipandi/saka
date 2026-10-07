@@ -60,7 +60,7 @@ The deployment bootstrap, carried by the release build. `initialize` applies the
 
 Debug-only commands (`migrate:create|reset|seed|validate`). The actions live here rather than in `cmd/migration.go` because a release build would otherwise compile them into `unused`. `migrate:reset` rolls back everything and, with `--up`, re-applies in one run; on a database with nothing applied, `--up` alone applies the migrations, so `reset --up` also builds a schema from scratch. `migrate:create` takes a `--dir` flag defaulting to `internal/database/migrations` and needs no database. `migrate:seed` first proves the schema is current by asking the migrator for pending migrations, so it refuses with the count and `run migrate:up first` rather than failing halfway on a missing column. A dry run needs no confirmation; a real run asks (unless `--force` or a non-terminal stdin) and runs in one transaction.
 
-The smoke probes (`mailer:smoke`, `logger:smoke`, `otel:smoke`) follow the same split at the registration: their command files carry no build tag, but `cli_release.go` lists no smoke command. A release binary must not hand out an unauthenticated outbound-mail primitive, inject probe lines into the production log store, or fabricate spans and a permanent `saka_otel_smoke_total` series into the production time series; the probes exist to prove wiring before a deployment depends on it, so they belong to the side that also carries `migrate:seed`.
+The smoke probes (`mailer:smoke`, `logger:smoke`, `otel:smoke`) were removed — the running server itself is the probe: a debug `serve` with the transport enabled proves the same wiring against the same backends, without three debug-only commands that `task lint` could not see (13 `unused` findings) and that carried a permanent `saka_otel_smoke_total` series into the time store. The registration split (debug-only commands listed only in `cli_debug.go`) stays for `migrate:create|reset|seed|validate` and the other debug-side actions.
 
 ### migration.go
 
@@ -81,14 +81,6 @@ The `health` command. It needs no running server: opens the pool, runs the check
 ### logger.go
 
 How the process logger reaches a command. `initConfig` installs a `loggerState` on the context and the root `After` closes it, so a run flushes what it queued. The logger itself is built **lazily** (`loggerFrom`), not in `Before`: `config:generate` and `key:generate` run before a usable configuration exists, so building eagerly would break the two commands that bootstrap a fresh checkout. The state holds the configuration and a `sync.Once`, so the first command that logs builds one logger and every later call gets the same one. `loggerFrom` reports the failure rather than swallowing it — a command that asked for a logger and did not get one must say so, because the alternative is a run that looks healthy and writes nowhere. `observerState`/`observerFrom`/`closeObserver` live in the same file and work the same way for traces and metrics, because the two have the same lifecycle and the same reason to be lazy; they are separate state so a command that logs does not build a tracer. The root `After` closes the **observer first**, then the logger: a signal drained by the observer may be reported through the logger, and a logger closed first would drop that line. `closeObserver` **reports** a failed drain and returns nil — telemetry is a side channel, so a collector that is down at shutdown means some spans were lost, which is worth saying and is not a reason for a command to exit non-zero. The two shutdown timeouts are separate constants because the metric reader needs longer than a log batch to drain.
-
-### loggersmoke.go
-
-`logger:smoke`. It emits one line per level through every configured transport and prints where each one writes plus the LogsQL query that reads the line back, so the logging path can be proved end to end against a real backend before anything depends on it. It builds the logger itself rather than calling `loggerFrom`, because the command that exists to diagnose logging should not fail before it can say which transport broke. The probe field is named `probe`, not `level`: `level` is the structured transport's own key, and a field of that name would put the same key in the JSON object twice. It ships in the debug build only — the release-side split is at `### migrate_debug.go`.
-
-### otelsmoke.go
-
-`otel:smoke`. It records one span and one measurement through the providers the configuration enables, and prints what each signal is doing, so tracing and metrics can be proved end to end the way `logger:smoke` proves logging. It goes through `observerFrom`, the same accessor a real command uses, so the run proves the wiring rather than a pipeline assembled for the test. The counts in the closing status line are captured **before** the drain: `Shutdown` releases the providers, so checking afterwards would read every signal as off and report a run that proved nothing as if it had proved something. It ships in the debug build only, as `logger:smoke` does.
 
 ## pkg
 
@@ -149,7 +141,7 @@ Auth gotchas pinned by the live bring-up: the Basic credential is `email:passwor
 
 ### scripts/task-metrics.yml
 
-`metrics:up|down|health|endpoints|query|traces|streams|smoke|smoke:otel`, the shortcuts for the stack. The host ports: **OpenObserve 5080** (the UI, the query API, and the OTLP ingestion the collector exports to), **collector 4318** (the one address the application dials). `metrics:up` names `openobserve otel-collector` on the compose command; `metrics:health` probes both from the host; `metrics:query` runs a SQL query against `POST /api/default/_search` (Basic auth, one-hour window, the SQL escaped by `jq -Rs` through an env var because task substitution quotes `CLI_ARGS`); `metrics:traces`/`metrics:streams` list the streams and their doc counts; the smoke pair runs `logger:smoke` and `otel:smoke` against `.env.local`. The compose targets stay in the root `Taskfile.yml` next to the compose file they drive.
+`metrics:up|down|health|endpoints|query|traces|streams`, the shortcuts for the stack. The host ports: **OpenObserve 5080** (the UI, the query API, and the OTLP ingestion the collector exports to), **collector 4318** (the one address the application dials). `metrics:up` names `openobserve otel-collector` on the compose command; `metrics:health` probes both from the host; `metrics:query` runs a SQL query against `POST /api/default/_search` (Basic auth, one-hour window, the SQL escaped by `jq -Rs` through an env var because task substitution quotes `CLI_ARGS`); `metrics:traces`/`metrics:streams` list the streams and their doc counts. The compose targets stay in the root `Taskfile.yml` next to the compose file they drive.
 
 ### pkg/testutils/victorialogs.go
 
@@ -1130,7 +1122,7 @@ The library exports no sentinel for "this server has no STARTTLS", so the plaint
 
 **The parsed templates are the cache, and no second one is worth having.** Parsing every template is ~177 µs and happens once per process; rendering one rendering is ~4.5 µs (58 allocs, 1.5 KB) and both is ~10.4 µs (73 allocs, 20 KB), against 60–100 ms for the submission itself — under 0.01%. `internal/mailer/bench_test.go` pins those numbers over the embedded set. Memoizing by template data would retain reset tokens past their use, and putting templates in `framework/cache` would add a network round trip for content that is already in the binary.
 
-`cmd/mailersmoke.go` is `mailer:smoke`: it renders one template and submits it through a real server, printing the server, sender, auth, TLS mode, template, and recipient — the same shape as `logger:smoke` and `otel:smoke`, so the three prove their paths the same way. It builds the mailer itself rather than reaching for the registry, because a command that exists to diagnose mail should not fail before it can say which part broke. It ships in the debug build only, as its siblings do.
+`framework/mailer`'s send path is proven by its integration test and by the running server: a debug `serve` with `MAILER_*` pointed at Mailpit renders and submits through the same `*mailer.Service` the app uses.
 
 ### framework/kernel
 
@@ -1226,4 +1218,14 @@ Outcomes of library comparisons, kept so the comparison does not get re-run. Rec
 - `api/connect/*.proto` — ConnectRPC contracts (`saka.common.v1`, `saka.system.v1`), generated into `codegen/proto/{go,ts}` by `task rpc:generate`.
 - `packages/email/templates` — React Email sources compiled into `web/email`.
 - `framework/mailer` — the SMTP submission engine (`go-smtp` + `go-sasl`) over typed options and a caller-supplied `fs.FS`; one `*mailer.Service` pairs it with the rendering. `internal/mailer` binds the embedded templates, the sender identity, and the template catalog.
+- `web` — SPA embed and static serving (debug/release variants).
+n line and stays free, and so are the trace and metric exporters (`otlptracehttp`, `otlpmetrichttp`, `exporters/prometheus`), which depend on the core module rather than on `otel/log`. Before bumping any of the three pinned modules, check that the transport still compiles; the failure is at the type level and shows up only when `otellog` is built. **`go get` on an unrelated OTel package will silently raise `otel/log` past the pin** — it happened while adding the metric exporter — so after any `go get`, re-check the three versions and `go mod edit -require` them back.
+
+## Also implemented today (one line each)
+
+- `api/connect/*.proto` — ConnectRPC contracts (`saka.common.v1`, `saka.system.v1`), generated into `codegen/proto/{go,ts}` by `task rpc:generate`.
+- `packages/email/templates` — React Email sources compiled into `web/email`.
+- `framework/mailer` — the SMTP submission engine (`go-smtp` + `go-sasl`) over typed options and a caller-supplied `fs.FS`; one `*mailer.Service` pairs it with the rendering. `internal/mailer` binds the embedded templates, the sender identity, and the template catalog.
+- `web` — SPA embed and static serving (debug/release variants).
+rs it with the rendering. `internal/mailer` binds the embedded templates, the sender identity, and the template catalog.
 - `web` — SPA embed and static serving (debug/release variants).

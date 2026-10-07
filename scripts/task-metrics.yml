@@ -103,14 +103,6 @@ tasks:
       curl -sS '{{.O2_API}}/streams' -H "Authorization: {{.O2_AUTH}}" \
         | jq -r '.list[]? | "\(.stream_type // "logs")\t\(.name)\t\(.stats.doc_num)"'
 
-  metrics:smoke:
-    desc: Ship one line through every configured transport and read it back
-    cmd: go run -tags debug ./cmd logger:smoke --env-file=.env.local {{.CLI_ARGS}}
-
-  metrics:smoke:otel:
-    desc: Record one span and one measurement through the configured signals
-    cmd: go run -tags debug ./cmd otel:smoke --env-file=.env.local {{.CLI_ARGS}}
-
   metrics:down:
     desc: Stop the observability stack
     cmd: docker compose -f container/compose.yaml stop openobserve otelcol

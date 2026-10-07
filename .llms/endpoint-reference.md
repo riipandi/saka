@@ -301,8 +301,8 @@ redact.go prints — `[redacted]`, the datastore URLs reduced to
 `host:port/database`, an unset secret omitted — the same rendering
 `config:print`'s fail-safe uses, never the value itself. The test-email
 procedure is on `saka.system.v1.AppConfigService` in
-`api/connect/system.proto`. The other SMTP checks stay with the mailer smoke
-probe (`task mailer:smoke`).
+`api/connect/system.proto`; the other SMTP checks ride the running server
+with Mailpit as the target.
 
 ## Settings
 
