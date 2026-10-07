@@ -141,7 +141,7 @@ export const ColumnTotalsFooter: Story = {
     const totalPrice = demoData.reduce((total, row) => total + row.price, 0)
 
     const footer = (
-      <DataGridTableFootRow>
+      <DataGridTableFootRow table={table}>
         {/* Label spans checkbox + title + genre + status */}
         <DataGridTableFootRowCell colSpan={visibleCount - 2}>
           <span {...stylex.props(footerStyles.muted)}>Total balance</span>
@@ -168,8 +168,8 @@ export const ColumnTotalsFooter: Story = {
           </div>
           <CardContent style={footerStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable footerContent={footer} />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} footerContent={footer} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>
@@ -197,7 +197,7 @@ export const SummaryStatsFooter: Story = {
     const footer = (
       <>
         {/* Row 1: record count, min balance, max balance */}
-        <DataGridTableFootRow>
+        <DataGridTableFootRow table={table}>
           <DataGridTableFootRowCell colSpan={visibleCount - 2} />
           <DataGridTableFootRowCell>
             <div {...stylex.props(footerStyles.stack)}>
@@ -213,7 +213,7 @@ export const SummaryStatsFooter: Story = {
           </DataGridTableFootRowCell>
         </DataGridTableFootRow>
         {/* Row 2: avg balance, active count */}
-        <DataGridTableFootRow>
+        <DataGridTableFootRow table={table}>
           <DataGridTableFootRowCell colSpan={visibleCount - 2}>
             <div {...stylex.props(s.cellFlex)}>
               <span {...stylex.props(footerStyles.muted)}>Avg balance</span>
@@ -243,8 +243,8 @@ export const SummaryStatsFooter: Story = {
           </div>
           <CardContent style={footerStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable footerContent={footer} />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} footerContent={footer} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>
@@ -268,7 +268,7 @@ export const PerColumnAggregateFooter: Story = {
     }
 
     const footer = (
-      <DataGridTableFootRow>
+      <DataGridTableFootRow table={table}>
         <DataGridTableFootRowCell colSpan={2}>
           <div {...stylex.props(footerStyles.stack)}>
             <span {...stylex.props(footerStyles.muted)}>Summary</span>
@@ -304,8 +304,8 @@ export const PerColumnAggregateFooter: Story = {
           </div>
           <CardContent style={footerStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable footerContent={footer} />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} footerContent={footer} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>

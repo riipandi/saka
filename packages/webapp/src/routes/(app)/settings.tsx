@@ -7,19 +7,13 @@ import { Field, FieldLabel } from '#/components/base/field'
 import { Input } from '#/components/base/input'
 import { Alert, AlertDescription } from '#/components/extra/alert'
 import { Badge } from '#/components/extra/badge'
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '#/components/extra/card'
+import { CardDescription, CardHeader, CardTitle } from '#/components/extra/card'
+import { Card, CardAction, CardContent } from '#/components/extra/card'
 import { Text } from '#/components/extra/text'
-import { ThemeSwitcher } from '#/components/theme'
 import { useAuthentication, useAuthUser } from '#/libraries/guard/auth-provider'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/settings.stylex'
+import { ThemeSwitcher } from '#/theme'
 
 export const Route = createFileRoute('/(app)/settings')({
   component: RouteComponent,

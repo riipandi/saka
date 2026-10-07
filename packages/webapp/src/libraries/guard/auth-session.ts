@@ -1,6 +1,6 @@
 import { api } from '#/libraries/api-client'
+import { API_BASE_URL } from '#/libraries/api-client'
 import type { User } from '#/schemas/user.schema'
-import { API_BASE_URL } from './auth-engine'
 import { authStore, clearAuth, setAuthLoading, setAuthUser } from './auth-store'
 import { authWorker } from './auth-worker-client'
 
@@ -39,7 +39,7 @@ async function hasSessionCookie(): Promise<boolean> {
       probeWarned = true
       console.warn(
         '[auth] GET /auth/session unreachable — treat as logged out. ' +
-          'Cookie auth requires a same-site API: set PUBLIC_API_URL to your backend ' +
+          'Cookie auth requires a same-site API: set PUBLIC_BASE_URL to your backend ' +
           '(same parent domain) or proxy /api server-side. See README "Deploying the SPA".'
       )
     }

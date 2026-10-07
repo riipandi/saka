@@ -272,6 +272,12 @@ importers:
       '@blobatar/react':
         specifier: ^2.7.0
         version: 2.7.0(blobatar@2.7.0(react@19.3.0))(react@19.3.0)
+      '@connectrpc/connect':
+        specifier: ^2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect-web':
+        specifier: ^2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
       '@date-fns/tz':
         specifier: ^1.5.0
         version: 1.5.0
@@ -628,6 +634,17 @@ packages:
 
   '@bufbuild/protoplugin@2.16.0':
     resolution: {integrity: sha512-3FdYJys34VhFnBQsjiV9wurBkX/DBACQAkAk+nCKdO1p8ROVNi7gmaRAcba+4qq8hQq8rYVukuutwvGCvd4kJA==}
+
+  '@connectrpc/connect-web@2.2.0':
+    resolution: {integrity: sha512-uuBUcBTYfb/r1o98LzCCZk1H90yx0vmZ5m21dpw/q4EUwsKwkCDGI8H0aEdjcZld+Q2jJ5A5ADvPqfb6lzQ/sg==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.7.0
+      '@connectrpc/connect': 2.2.0
+
+  '@connectrpc/connect@2.2.0':
+    resolution: {integrity: sha512-M63OQ1ZFcPUm85CuewJ9G9CMV8LjzGR9935xOnXNQGSazAbwMb3x2W7vXBYM1zqrP7XFD8uxp/dUAhirclgwnQ==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.7.0
 
   '@corvu/utils@0.4.2':
     resolution: {integrity: sha512-Ox2kYyxy7NoXdKWdHeDEjZxClwzO4SKM8plAaVwmAJPxHMqA0rLOoAsa+hBDwRLpctf+ZRnAd/ykguuJidnaTA==}
@@ -5315,6 +5332,15 @@ snapshots:
       typescript: 5.4.5
     transitivePeerDependencies:
       - supports-color
+
+  '@connectrpc/connect-web@2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))':
+    dependencies:
+      '@bufbuild/protobuf': 2.16.0
+      '@connectrpc/connect': 2.2.0(@bufbuild/protobuf@2.16.0)
+
+  '@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0)':
+    dependencies:
+      '@bufbuild/protobuf': 2.16.0
 
   '@corvu/utils@0.4.2(solid-js@1.9.16)':
     dependencies:

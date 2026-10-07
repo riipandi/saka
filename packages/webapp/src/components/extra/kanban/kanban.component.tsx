@@ -65,13 +65,15 @@ import { kanbanStyles } from './kanban.stylex'
 
 interface KanbanContextProps<T> {
   columns: Record<string, T[]>
-  setColumns: (columns: Record<string, T[]>) => void
-  getItemId: (item: T) => string
+  // Method syntax keeps the callbacks bivariant, so a provider typed with a
+  // concrete item type assigns straight into the erased `unknown` context.
+  setColumns(columns: Record<string, T[]>): void
+  getItemId(item: T): string
   columnIds: string[]
   activeId: UniqueIdentifier | null
-  setActiveId: (id: UniqueIdentifier | null) => void
-  findContainer: (id: UniqueIdentifier) => string | undefined
-  isColumn: (id: UniqueIdentifier) => boolean
+  setActiveId(id: UniqueIdentifier | null): void
+  findContainer(id: UniqueIdentifier): string | undefined
+  isColumn(id: UniqueIdentifier): boolean
   modifiers?: Modifiers
 }
 
@@ -531,9 +533,10 @@ function Kanban<T>({
 
   return (
     // The context erases the generic item type for non-generic consumers; the
-    // value is only ever written and read inside this <Kanban> subtree.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- generic-to-unknown context erase
-    <KanbanContext.Provider value={contextValue as KanbanContextProps<unknown>}>
+    // value is only ever written and read inside this <Kanban> subtree, and
+    // the method-syntax callbacks make the concrete value assignable to the
+    // erased `unknown` context without an assertion.
+    <KanbanContext.Provider value={contextValue}>
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetectionStrategy}
@@ -622,8 +625,9 @@ function KanbanColumn({ value, style, render, disabled, ...props }: KanbanColumn
     animateLayoutChanges
   })
 
-  const { activeId, isColumn } = useContext(KanbanContext)
-  const isColumnDragging = activeId ? isColumn(activeId) : false
+  const context = useContext(KanbanContext)
+  const { activeId } = context
+  const isColumnDragging = activeId ? context.isColumn(activeId) : false
 
   const runtimeStyle: CSSProperties = {
     transition,
@@ -781,7 +785,8 @@ export interface KanbanColumnContentProps extends DivRenderProps {
 }
 
 function KanbanColumnContent({ value, style, render, ...props }: KanbanColumnContentProps) {
-  const { columns, getItemId } = useContext(KanbanContext)
+  const context = useContext(KanbanContext)
+  const { columns } = context
   const isEmpty = (columns[value]?.length ?? 0) === 0
 
   const itemIds = useMemo(() => {
@@ -792,8 +797,8 @@ function KanbanColumnContent({ value, style, render, ...props }: KanbanColumnCon
           `Available columns: ${Object.keys(columns).join(', ') || '(none)'}.`
       )
     }
-    return items.map(getItemId)
-  }, [columns, getItemId, value])
+    return items.map((item) => context.getItemId(item))
+  }, [context, columns, value])
 
   return (
     <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
@@ -831,11 +836,12 @@ export interface KanbanOverlayProps {
 }
 
 function KanbanOverlay({ children, style, ...props }: KanbanOverlayProps) {
-  const { activeId, isColumn, modifiers } = useContext(KanbanContext)
+  const context = useContext(KanbanContext)
+  const { activeId, modifiers } = context
   const { activeNodeRect } = useDndContext()
   const mounted = useSyncExternalStore(subscribeToNothing, getIsMounted, getIsMountedOnServer)
 
-  const variant = activeId ? (isColumn(activeId) ? 'column' : 'item') : 'item'
+  const variant = activeId ? (context.isColumn(activeId) ? 'column' : 'item') : 'item'
   const content =
     activeId && children
       ? typeof children === 'function'

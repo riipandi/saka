@@ -151,11 +151,11 @@ export const Pagination: Story = {
       <DataGrid table={table} recordCount={demoData?.length || 0}>
         <div {...stylex.props(s.stack)}>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTable />
+            <DataGridScrollArea table={table}>
+              <DataGridTable table={table} />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -214,12 +214,12 @@ export const CellBorder: Story = {
         <div {...stylex.props(s.stack)}>
           <Card style={s.cardFlush}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </Card>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -271,11 +271,11 @@ export const DenseLayout: Story = {
       <DataGrid table={table} recordCount={demoData?.length || 0} tableLayout={{ dense: true }}>
         <div {...stylex.props(s.stack)}>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTable />
+            <DataGridScrollArea table={table}>
+              <DataGridTable table={table} />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -332,12 +332,12 @@ export const WithoutTableBorders: Story = {
         <div {...stylex.props(s.stack)}>
           <Card style={s.cardFlush}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </Card>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -393,11 +393,11 @@ export const StripedRows: Story = {
       >
         <div {...stylex.props(s.stack)}>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTable />
+            <DataGridScrollArea table={table}>
+              <DataGridTable table={table} />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -449,11 +449,11 @@ export const AutoWidthTableLayout: Story = {
       <DataGrid table={table} recordCount={demoData?.length || 0} tableLayout={{ width: 'auto' }}>
         <div {...stylex.props(s.stack)}>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTable />
+            <DataGridScrollArea table={table}>
+              <DataGridTable table={table} />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )

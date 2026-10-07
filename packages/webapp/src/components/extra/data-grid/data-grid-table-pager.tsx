@@ -8,7 +8,7 @@ import { Button } from '#/components/base/button'
 import { SelectContent, SelectTrigger, SelectValue } from '#/components/base/select'
 import { Select, SelectItem } from '#/components/base/select'
 import { Skeleton } from '#/components/extra/skeleton'
-import { useDataGrid } from './data-grid'
+import { useDataGrid, type DataGridTableInstance } from './data-grid'
 import { dataGridPaginationStyles } from './data-grid-table.stylex'
 import { dataGridScrollAreaStyles } from './data-grid.stylex'
 
@@ -97,9 +97,12 @@ interface DataGridPaginationProps {
   ellipsisText?: string
 }
 
-function DataGridPagination(props: DataGridPaginationProps): JSX.Element {
+function DataGridPagination<TData extends object>(
+  props: DataGridPaginationProps & { table: DataGridTableInstance<TData> }
+): JSX.Element {
   const s = dataGridPaginationStyles
-  const { i18n, table, recordCount, isLoading } = useDataGrid()
+  const { i18n, recordCount, isLoading } = useDataGrid()
+  const { table } = props
 
   const defaultProps: Partial<DataGridPaginationProps> = {
     sizes: [5, 10, 25, 50, 100],
@@ -270,14 +273,15 @@ function DataGridPagination(props: DataGridPaginationProps): JSX.Element {
 
 export { DataGridPagination, type DataGridPaginationProps }
 
-function DataGridScrollArea({
+function DataGridScrollArea<TData extends object>({
   children,
   style,
   orientation = 'both',
+  table,
   ...props
-}: DataGridScrollAreaProps) {
+}: DataGridScrollAreaProps & { table: DataGridTableInstance<TData> }) {
   const s = dataGridScrollAreaStyles
-  const { props: dataGridProps, table } = useDataGrid()
+  const { props: dataGridProps } = useDataGrid()
   const containerRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)

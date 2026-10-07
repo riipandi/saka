@@ -3,7 +3,7 @@ import stylex from '@stylexjs/unplugin/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
-import { EventEmitter } from 'node:events'
+import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import golang from 'plugins/plugin-golang'
 import { comlink } from 'vite-plugin-comlink'
@@ -54,10 +54,7 @@ function vitestStylexCleanup(): Plugin {
     configureServer(devServer) {
       server = devServer
       if (!devServer.httpServer) {
-        // A bare EventEmitter stands in for the httpServer: stylex only needs
-        // something to register its interval cleanup on. Deliberate type lie.
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-        devServer.httpServer = new EventEmitter() as ViteDevServer['httpServer']
+        devServer.httpServer = createServer()
       }
     },
     buildEnd: closeHttpServer,

@@ -62,7 +62,7 @@ import {
   useSyncExternalStore
 } from 'react'
 import { createPortal } from 'react-dom'
-import { sortableStyles as s } from './sortable.stylex'
+import { overlayWidthStyle, sortableStyles as s } from './sortable.stylex'
 
 interface StyleProp {
   style?: stylex.StyleXStyles
@@ -281,10 +281,9 @@ function Sortable<T>({
           // collapse or grow differently than its grid slot.
           style: [
             s.overlayContent,
-            activeWidth != null ? { width: activeWidth } : { width: 'fit-content' },
+            activeWidth != null ? overlayWidthStyle.width(activeWidth) : s.overlayContentAuto,
             child.props.style
-            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- raw runtime width is not expressible as StyleXStyles
-          ] as stylex.StyleXStyles
+          ]
         })
       }
     })

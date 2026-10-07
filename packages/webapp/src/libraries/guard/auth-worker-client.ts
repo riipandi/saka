@@ -1,8 +1,26 @@
 import * as Comlink from 'comlink'
-import { API_BASE_URL, createAuthEngine, type AuthEngineApi } from './auth-engine'
+import { API_BASE_URL } from '#/libraries/api-client'
+import type { LoginCredentials } from '#/schemas/auth.schema'
+import type { User } from '#/schemas/user.schema'
+import type { AuthEngineApi, AuthLoginOptions } from './auth-engine'
+import { createAuthEngine } from './auth-engine'
 
-/** Comlink-backed handle to the auth engine. */
-export type AuthWorkerClient = Comlink.Remote<AuthEngineApi>
+/**
+ * Promise-facing handle to the auth engine. Both the Comlink proxy and the
+ * main-thread engine expose this surface: the proxy's extra Comlink marker
+ * members are structurally irrelevant to callers, so the client type names
+ * only the methods they can call.
+ */
+export interface AuthWorkerClient {
+  /** Validate credentials and establish the cookie session. Resolves with the user profile. */
+  login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<User>
+  /** Silent refresh — single-flight. Resolves `true` when a session is established. */
+  refresh(): Promise<boolean>
+  /** Refresh only when the session expires within `withinMs`. Resolves `true` when still valid. */
+  maybeRefresh(withinMs: number): Promise<boolean>
+  /** Terminate the session server-side (the backend clears the HttpOnly cookies). */
+  logout(): Promise<void>
+}
 
 let client: AuthWorkerClient | null = null
 
@@ -45,13 +63,9 @@ export function authWorker(): AuthWorkerClient {
 }
 
 /**
- * The engine methods are already async, so the plain object is structurally
- * compatible with its Comlink remote proxy type.
+ * The engine methods are already async, so the main-thread engine satisfies
+ * the same promise-facing surface the Comlink proxy exposes.
  */
 function createMainThreadEngine(): AuthWorkerClient {
-  // Deliberate structural substitution: the main-thread engine exposes the
-  // same async method surface as a Comlink proxy; the cast only bridges the
-  // proxy's internal symbol-keyed marker, which a plain object cannot carry.
-  // oxlint-disable-next-line no-unsafe-type-assertion -- intentional Comlink-proxy stand-in, see doc comment above.
-  return createAuthEngine(API_BASE_URL) as AuthWorkerClient
+  return createAuthEngine(API_BASE_URL)
 }

@@ -32,7 +32,8 @@ import {
   DataGridTableDndRowHandle,
   DataGridTableDndRows,
   dataGridFeatures,
-  type DataGridFeatures
+  type DataGridFeatures,
+  type DataGridTableInstance
 } from '../'
 import { demoData, type IBook } from './_mocks'
 import { stackStyles as s } from './_mocks.stylex'
@@ -103,13 +104,15 @@ const statusStyles = stylex.create({
 /* Row selection */
 /* ------------------------------------------------------------------ */
 
-function selectionColumns(): ColumnDef<DataGridFeatures, IBook>[] {
+function selectionColumns(
+  getTable: () => DataGridTableInstance<IBook>
+): ColumnDef<DataGridFeatures, IBook>[] {
   return [
     {
       id: 'select',
       meta: { headerTitle: 'Select all' },
       size: 40,
-      header: () => <DataGridTableRowSelectAll />,
+      header: () => <DataGridTableRowSelectAll table={getTable()} />,
       cell: ({ row }) => <DataGridTableRowSelect row={row} />
     },
     {
@@ -146,9 +149,17 @@ export const RowSelection: Story = {
       pageSize: 5
     })
     const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: true }])
-    const columns = useMemo(() => selectionColumns(), [])
     const selectedCount = Object.keys(rowSelection).length
 
+    const tableHolder: { current?: DataGridTableInstance<IBook> } = {}
+    const columns = useMemo(
+      () =>
+        selectionColumns(() => {
+          if (!tableHolder.current) throw new Error('table not ready')
+          return tableHolder.current
+        }),
+      [tableHolder]
+    )
     const table = useTable({
       features: dataGridFeatures,
       columns,
@@ -161,6 +172,7 @@ export const RowSelection: Story = {
       onPaginationChange: setPagination,
       onSortingChange: setSorting
     })
+    tableHolder.current = table
 
     return (
       <DataGrid table={table} recordCount={demoData.length}>
@@ -169,11 +181,11 @@ export const RowSelection: Story = {
             {selectedCount} of {demoData.length} selected
           </span>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTable />
+            <DataGridScrollArea table={table}>
+              <DataGridTable table={table} />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -283,8 +295,8 @@ export const ExpandableRows: Story = {
         tableStyles={{ edgeCell: s.edgeCell }}
       >
         <DataGridContainer>
-          <DataGridScrollArea>
-            <DataGridTable />
+          <DataGridScrollArea table={table}>
+            <DataGridTable table={table} />
           </DataGridScrollArea>
         </DataGridContainer>
       </DataGrid>
@@ -371,8 +383,8 @@ function SubTable({ items }: { items: IOrder['lines'] }) {
     <div style={{ paddingBlock: 8, paddingInline: 32 }}>
       <DataGrid table={table} recordCount={items.length}>
         <DataGridContainer>
-          <DataGridScrollArea>
-            <DataGridTable />
+          <DataGridScrollArea table={table}>
+            <DataGridTable table={table} />
           </DataGridScrollArea>
         </DataGridContainer>
       </DataGrid>
@@ -428,8 +440,8 @@ export const SubTableStory: Story = {
     return (
       <DataGrid table={table} recordCount={orderData.length}>
         <DataGridContainer>
-          <DataGridScrollArea>
-            <DataGridTable />
+          <DataGridScrollArea table={table}>
+            <DataGridTable table={table} />
           </DataGridScrollArea>
         </DataGridContainer>
       </DataGrid>
@@ -497,11 +509,15 @@ export const DraggableRows: Story = {
       <DataGrid table={table} recordCount={demoData.length}>
         <div {...stylex.props(s.stack)}>
           <DataGridContainer>
-            <DataGridScrollArea>
-              <DataGridTableDndRows handleDragEnd={demoRowDragEnd} dataIds={dataIds} />
+            <DataGridScrollArea table={table}>
+              <DataGridTableDndRows
+                table={table}
+                handleDragEnd={demoRowDragEnd}
+                dataIds={dataIds}
+              />
             </DataGridScrollArea>
           </DataGridContainer>
-          <DataGridPagination />
+          <DataGridPagination table={table} />
         </div>
       </DataGrid>
     )
@@ -599,13 +615,13 @@ export const RowPinningSupport: Story = {
           </CardHeader>
           <CardContent style={statusStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>
           <CardFooter style={statusStyles.cardFooter}>
-            <DataGridPagination />
+            <DataGridPagination table={table} />
           </CardFooter>
         </Card>
       </DataGrid>
@@ -696,12 +712,19 @@ export const TreeRows: Story = {
       eng: true,
       'eng-platform': true
     })
+    const tableHolder: { current?: DataGridTableInstance<ITreeNode> } = {}
     const columns = useMemo<ColumnDef<DataGridFeatures, ITreeNode>[]>(
       () => [
         {
           accessorKey: 'title',
           id: 'title',
-          header: ({ column }) => <DataGridColumnHeaderInline title='Title' column={column} />,
+          header: ({ column }) => (
+            <DataGridColumnHeaderInline
+              table={tableHolder.current!}
+              title='Title'
+              column={column}
+            />
+          ),
           cell: ({ row }) => {
             const item = row.original
             return (
@@ -768,6 +791,7 @@ export const TreeRows: Story = {
       onExpandedChange: setExpanded,
       paginateExpandedRows: false
     })
+    tableHolder.current = table
 
     return (
       <DataGrid
@@ -782,12 +806,12 @@ export const TreeRows: Story = {
         <div {...stylex.props(s.stack)}>
           <Card style={statusStyles.cardOverflow}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </Card>
-          <DataGridPagination sizes={[4, 8, 16]} />
+          <DataGridPagination table={table} sizes={[4, 8, 16]} />
         </div>
       </DataGrid>
     )
@@ -796,11 +820,13 @@ export const TreeRows: Story = {
 
 /** Tree story header uses the real column header component. */
 function DataGridColumnHeaderInline({
+  table,
   title,
   column
 }: {
+  table: DataGridTableInstance<ITreeNode>
   title: string
   column: Column<DataGridFeatures, ITreeNode>
 }) {
-  return <DataGridColumnHeader title={title} column={column} />
+  return <DataGridColumnHeader table={table} title={title} column={column} />
 }

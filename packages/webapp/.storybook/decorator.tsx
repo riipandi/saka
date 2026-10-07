@@ -1,7 +1,7 @@
 import type { StoryContext } from '@storybook/tanstack-react'
 import * as React from 'react'
 import { UIProvider } from '#/components/base/provider'
-import { ThemeProvider, type ThemeStorage } from '#/components/theme'
+import { ThemeProvider, type ThemeStorage } from '#/theme'
 
 export const STORYBOOK_THEME_GLOBAL = 'theme' as const
 

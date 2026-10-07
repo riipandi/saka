@@ -216,13 +216,13 @@ export const CrudFeatures: Story = {
           </CardHeader>
           <CardContent style={editingStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>
           <CardFooter style={editingStyles.frameFooter}>
-            <DataGridPagination />
+            <DataGridPagination table={table} />
           </CardFooter>
         </Card>
       </DataGrid>
@@ -302,13 +302,13 @@ export const CrudInFrameContainer: Story = {
           </CardHeader>
           <CardContent style={editingStyles.cardBody}>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
           </CardContent>
           <CardFooter style={editingStyles.frameFooter}>
-            <DataGridPagination />
+            <DataGridPagination table={table} />
           </CardFooter>
         </Card>
       </DataGrid>
@@ -461,18 +461,18 @@ export const SpreadsheetEditing: Story = {
           columnsPinnable: true
         }}
       >
-        <DataGridCellSelection />
+        <DataGridCellSelection table={table} />
         <Card style={editingStyles.frame}>
           <div {...stylex.props(s.stack)}>
             <span {...stylex.props(s.muted, editingStyles.hint)}>
               Drag, Shift+arrows or Ctrl/Cmd+A to select · type to edit · paste from a spreadsheet
             </span>
             <DataGridContainer>
-              <DataGridScrollArea>
-                <DataGridTable />
+              <DataGridScrollArea table={table}>
+                <DataGridTable table={table} />
               </DataGridScrollArea>
             </DataGridContainer>
-            <DataGridPagination style={editingStyles.bar} />
+            <DataGridPagination table={table} style={editingStyles.bar} />
           </div>
         </Card>
       </DataGrid>
