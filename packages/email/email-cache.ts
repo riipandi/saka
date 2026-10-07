@@ -50,11 +50,23 @@ export function cachePath(absOutput: string): string {
   return path.join(absOutput, CACHE_FILE)
 }
 
+/** A parsed lock that answers the cache's shape; anything else is a miss. */
+function isBuildCache(value: unknown): value is BuildCache {
+  if (typeof value !== 'object' || value === null) return false
+  if (!('version' in value) || !('toolchain' in value) || !('templates' in value)) return false
+  return (
+    value.version === CACHE_VERSION &&
+    typeof value.toolchain === 'string' &&
+    typeof value.templates === 'object' &&
+    value.templates !== null
+  )
+}
+
 export function loadCache(absOutput: string): BuildCache {
   try {
     const raw = fs.readFileSync(cachePath(absOutput), 'utf8')
-    const parsed = JSON.parse(raw) as BuildCache
-    if (parsed.version === CACHE_VERSION && typeof parsed.toolchain === 'string') {
+    const parsed: unknown = JSON.parse(raw)
+    if (isBuildCache(parsed)) {
       return parsed
     }
   } catch {

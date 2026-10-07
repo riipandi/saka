@@ -2,7 +2,7 @@ import * as fs from 'node:fs'
 import { createRequire } from 'node:module'
 import * as path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { ReactElement, ReactNode } from 'react'
+import { isValidElement, type ReactNode } from 'react'
 import { render } from 'react-email'
 import { loadCache, planRebuild, pruneOutputs, saveCache, sha256 } from './email-cache.ts'
 import type { TemplateCacheEntry } from './email-cache.ts'
@@ -78,10 +78,8 @@ function toolchainDigest(): string {
   const require = createRequire(import.meta.url)
   const parts = ['react-email', 'react', 'tsx'].map((name) => {
     try {
-      const pkg = JSON.parse(require.resolve(`${name}/package.json`)) as {
-        version?: string
-      }
-      return `${name}@${pkg.version ?? 'unknown'}`
+      const pkg: { version?: unknown } = JSON.parse(require.resolve(`${name}/package.json`))
+      return `${name}@${typeof pkg.version === 'string' ? pkg.version : 'unknown'}`
     } catch {
       return `${name}@unresolved`
     }
@@ -96,13 +94,20 @@ function getFirstExport(module: Record<string, unknown>): unknown {
   return module[firstKey]
 }
 
+function isEmailTemplate(value: unknown): value is EmailTemplate {
+  return typeof value === 'function'
+}
+
 // Template files are .tsx (JSX), so they must go through a TypeScript
 // transform before we can import them in-process. tsx is already a
 // devDependency; its ESM API registers the loader for the current thread.
 async function importTemplate(file: string, cacheBust: number): Promise<Record<string, unknown>> {
   const { tsImport } = await import('tsx/esm/api')
-  const mod = await tsImport(`${pathToFileURL(file).href}?t=${cacheBust}`, import.meta.url)
-  return mod as Record<string, unknown>
+  const mod: Record<string, unknown> = await tsImport(
+    `${pathToFileURL(file).href}?t=${cacheBust}`,
+    import.meta.url
+  )
+  return mod
 }
 
 async function buildTemplateFile(
@@ -111,7 +116,10 @@ async function buildTemplateFile(
   templateName: string,
   isPlainText: boolean
 ): Promise<void> {
-  const element = Component(templateProps) as ReactElement
+  const element = Component(templateProps)
+  if (!isValidElement(element)) {
+    throw new Error('template did not render to a React element')
+  }
 
   // `plainText` is a discriminated union, so it must be a literal, not a boolean.
   const rendered = isPlainText
@@ -139,11 +147,11 @@ async function buildOne(
 
   try {
     const importedModule = await importTemplate(path.join(templatesDir, file), Date.now())
-    const Component = (importedModule.default ?? getFirstExport(importedModule)) as EmailTemplate
-
-    if (!Component) {
+    const candidate: unknown = importedModule.default ?? getFirstExport(importedModule)
+    if (!isEmailTemplate(candidate)) {
       throw new Error('no component export found')
     }
+    const Component = candidate
 
     if (!Component.TemplateProps) {
       throw new Error('no TemplateProps export found')

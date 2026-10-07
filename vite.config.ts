@@ -1,22 +1,3 @@
-import { defineConfig } from 'vite-plus'
-
-const ignoredPatterns = [
-  '.output',
-  '.storage',
-  '.tanstack',
-  '**/*.md',
-  '**/*.mdx',
-  '**/*.yml',
-  '**/*.yaml',
-  '**/*.toml',
-  '**/*.tmpl',
-  '**/e2e-result/**',
-  '**/public/**',
-  '/codegen/**',
-  '/storage/**',
-  '/temp/**'
-]
-
 /**
  * Monorepo setup, and nothing else: the repo-wide toolchain blocks every
  * workspace shares (staged commit checks, formatter, linter, cached run
@@ -39,6 +20,26 @@ const ignoredPatterns = [
  * added when its first test lands, not pre-wired against directories
  * that do not exist.
  */
+
+import { defineConfig } from 'vite-plus'
+
+const ignoredPatterns = [
+  '.output',
+  '.storage',
+  '.tanstack',
+  '**/*.md',
+  '**/*.mdx',
+  '**/*.yml',
+  '**/*.yaml',
+  '**/*.toml',
+  '**/*.tmpl',
+  '**/e2e-result/**',
+  '**/public/**',
+  '/codegen/**',
+  '/storage/**',
+  '/temp/**'
+]
+
 export default defineConfig({
   test: {
     reporters:

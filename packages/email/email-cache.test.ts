@@ -4,29 +4,29 @@ import * as path from 'node:path'
 import { describe, expect, test } from 'vite-plus/test'
 import { loadCache, planRebuild, pruneOutputs, saveCache, sha256 } from './email-cache.ts'
 
+function sandbox() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'email-cache-'))
+  const templates = path.join(dir, 'templates')
+  const output = path.join(dir, 'output')
+  fs.mkdirSync(templates)
+  fs.mkdirSync(output)
+  return { dir, templates, output }
+}
+
+function writeSources(dir: string, body = '') {
+  fs.writeFileSync(path.join(dir, 'a.tsx'), `export default () => null${body}`)
+  fs.writeFileSync(path.join(dir, 'b.tsx'), 'export default () => null')
+}
+
+function writeOutputs(dir: string, names: string[]) {
+  for (const name of names)
+    fs.writeFileSync(path.join(dir, name), `{{define "root"}}${name}{{end}}`)
+}
+
 describe('email build cache', () => {
   const files = {
     sources: ['a.tsx', 'b.tsx'] as string[],
     outputs: ['a_html.tmpl', 'a_text.tmpl', 'b_html.tmpl', 'b_text.tmpl'] as string[]
-  }
-
-  function sandbox() {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'email-cache-'))
-    const templates = path.join(dir, 'templates')
-    const output = path.join(dir, 'output')
-    fs.mkdirSync(templates)
-    fs.mkdirSync(output)
-    return { dir, templates, output }
-  }
-
-  function writeSources(dir: string, body = '') {
-    fs.writeFileSync(path.join(dir, 'a.tsx'), `export default () => null${body}`)
-    fs.writeFileSync(path.join(dir, 'b.tsx'), 'export default () => null')
-  }
-
-  function writeOutputs(dir: string, names: string[]) {
-    for (const name of names)
-      fs.writeFileSync(path.join(dir, name), `{{define "root"}}${name}{{end}}`)
   }
 
   function filledCache(templates: string, output: string, toolchain = 't1') {

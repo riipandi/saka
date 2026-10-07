@@ -74,17 +74,18 @@ export const options = {
   userAgent: 'k6-loadtest (saka bench)'
 }
 
+const stages = (target) => [
+  { duration: '1m', target },
+  { duration: '3m', target },
+  { duration: '30s', target: 0 }
+]
+
 function loadScenarios(profile) {
   // The load profile spreads the virtual users across the surface by
   // importance; the stress profile arrives by rate instead, so the run
   // finds the ceiling rather than holding a shape.
   if (profile === 'load') {
     const spec = { executor: 'ramping-vus', startVUs: 0, gracefulRampDown: '20s' }
-    const stages = (target) => [
-      { duration: '1m', target },
-      { duration: '3m', target },
-      { duration: '30s', target: 0 }
-    ]
     const weights = {
       healthz: 8,
       jwks: 8,

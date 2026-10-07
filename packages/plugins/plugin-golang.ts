@@ -130,10 +130,19 @@ function formatFileSize(bytes: number): string {
 // Printed relative to the Go module root (the plugin's `root` option), so a
 // line names the path a developer would type from the repo; a path outside
 // it stays absolute.
+// Printed relative to the Go module root (the plugin's `root` option), so a
+// line names the path a developer would type from the repo; a path outside
+// it stays absolute.
 function displayPath(base: string, target: string): string {
   const rel = path.relative(base, target)
   if (rel === '') return '.'
   return rel.startsWith('..') ? target : rel
+}
+
+function logOutput(output: string) {
+  for (const line of output.split('\n')) {
+    if (line.trim()) console.error(`${PREFIX} ${C.red}${line}${C.reset}`)
+  }
 }
 
 // One arg builder for both paths (dev rebuilds and production targets): flags
@@ -289,12 +298,6 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
     // Default gutter fits the longest common label; callers may pass an exact width.
     const w = width ?? (label.endsWith(':') ? 10 : 9)
     log(`${C.dim}${label.padEnd(w)}${C.reset}${value}`)
-  }
-
-  function logOutput(output: string) {
-    for (const line of output.split('\n')) {
-      if (line.trim()) console.error(`${PREFIX} ${C.red}${line}${C.reset}`)
-    }
   }
 
   function killGo() {
