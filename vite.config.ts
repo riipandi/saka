@@ -34,8 +34,39 @@ const ignoredPatterns = [
  * the workspace root intentionally refuse to pick: enter through
  * `task dev` / `task build`, or target a package with
  * `vp -C packages/webapp <command>`.
+ *
+ * The test block gathers the workspace's unit tests; `vp test` from the
+ * root runs them all. One project per live test surface — a project is
+ * added when its first test lands, not pre-wired against directories
+ * that do not exist.
  */
 export default defineConfig({
+  test: {
+    reporters:
+      process.env.GITHUB_ACTIONS === 'true'
+        ? [['github-actions']]
+        : [['default'], ['json', { outputFile: './.output/tests-results/vitest-results.json' }]],
+    projects: [
+      {
+        extends: true,
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: 'plugins',
+          environment: 'node',
+          include: ['./packages/plugins/**/*.test.ts']
+        }
+      },
+      {
+        extends: true,
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: 'email',
+          environment: 'node',
+          include: ['./packages/email/**/*.test.ts']
+        }
+      }
+    ]
+  },
   staged: {
     '*.{ts,tsx,js,jsx,css,json}': 'vp check --fix',
     '*.go': 'gofmt -w'

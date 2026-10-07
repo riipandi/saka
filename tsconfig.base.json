@@ -27,7 +27,7 @@
         "strict": true,
         "strictPropertyInitialization": true,
         "target": "esnext",
-        "types": ["vite/client", "vitest/config"],
+        "types": ["vite/client", "node"],
         "useDefineForClassFields": true,
         "verbatimModuleSyntax": true
     }

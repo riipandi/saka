@@ -22,7 +22,7 @@ tasks:
 
   test:ui:
     desc: Run frontend unit tests
-    cmd: pnpm exec vitest run {{.CLI_ARGS}}
+    cmd: pnpm exec vp test {{.CLI_ARGS}}
 
   coverage:
     desc: Run Go tests with coverage
