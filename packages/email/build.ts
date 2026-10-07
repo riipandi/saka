@@ -78,7 +78,7 @@ function toolchainDigest(): string {
   const require = createRequire(import.meta.url)
   const parts = ['react-email', 'react', 'tsx'].map((name) => {
     try {
-      const pkg = JSON.parse(require.resolve(`${name}/package.json`) as unknown as string) as {
+      const pkg = JSON.parse(require.resolve(`${name}/package.json`)) as {
         version?: string
       }
       return `${name}@${pkg.version ?? 'unknown'}`
