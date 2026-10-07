@@ -15,10 +15,12 @@
  * `task dev` / `task build`, or target a package with
  * `vp -C packages/webapp <command>`.
  *
- * The test block gathers the workspace's unit tests; `vp test` from the
- * root runs them all. One project per live test surface — a project is
- * added when its first test lands, not pre-wired against directories
- * that do not exist.
+ * The test block gathers the workspace's tests; `vp test` from the root
+ * runs them all. The webapp owns its own test projects (unit, browser,
+ * storybook) inside `packages/webapp/vite.config.ts` and is referenced as a
+ * project; the node-only packages stay inline here. A project is added when
+ * its first test lands, not pre-wired against directories that do not
+ * exist.
  */
 
 import { resolve } from 'node:path'
@@ -50,24 +52,9 @@ export default defineConfig({
         ? [['github-actions']]
         : [['default'], ['json', { outputFile: testOutputFile }]],
     projects: [
-      {
-        extends: true,
-        resolve: { tsconfigPaths: true },
-        test: {
-          name: 'plugins',
-          environment: 'node',
-          include: ['./packages/plugins/**/*.test.ts']
-        }
-      },
-      {
-        extends: true,
-        resolve: { tsconfigPaths: true },
-        test: {
-          name: 'email',
-          environment: 'node',
-          include: ['./packages/email/**/*.test.ts']
-        }
-      }
+      './packages/webapp/vite.config.ts',
+      './packages/plugins/vite.config.ts',
+      './packages/email/vite.config.ts'
     ]
   },
   staged: {

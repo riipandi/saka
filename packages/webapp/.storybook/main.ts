@@ -39,8 +39,8 @@ export default {
       server: undefined,
       plugins: [
         stylex({
-          aliases: { '#/*': resolve('./app/*') },
-          useCSSLayers: true
+          aliases: { '#/*': resolve(import.meta.dirname, '../src/*') },
+          useCSSLayers: { before: ['reset'], prefix: 'stylex' }
         })
       ]
     })
