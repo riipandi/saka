@@ -32,7 +32,7 @@ const goVersionLdflags = [
  * run starts in this directory — and plugin-golang's `root` option anchors
  * its watcher, build, and binary spawn at the repo root.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     // Comlink owns worker construction; only plugins that transform
     // ComlinkWorker call sites may precede it.
@@ -81,4 +81,4 @@ export default defineConfig({
   // IPv4 loopback on purpose: the Go debug proxy targets 127.0.0.1, and a
   // bare `localhost` bind lands on ::1, which the proxy cannot reach.
   server: { port: 5173, host: '127.0.0.1', strictPort: true }
-})
+}))

@@ -116,10 +116,17 @@ jobs:
         if: steps.gotestsum.outputs.cache-hit != 'true'
         run: go install gotest.tools/gotestsum@v1.13.0
 
-      - name: Generate email template
-        run: pnpm exec vp build
+      # The Go compile steps below embed web/email (templates) and web/output
+      # (the SPA bundle plus the derived assets.json) — both artifacts must
+      # exist first. The webapp pass also compiles the debug and release
+      # binaries with the plugin's own ldflags; there is no separate build
+      # step at the end.
+      - name: Build frontend artifacts
+        run: |
+          pnpm exec vp run email#build
+          pnpm exec vp run webapp#build
         env:
-          SKIP_GO_BUILD: 1
+          NODE_ENV: production
 
       - name: Setup golangci-lint toolchain
         uses: golangci/golangci-lint-action@v9
@@ -143,7 +150,7 @@ jobs:
           NODE_ENV: production
 
       - name: Run unit tests (frontend)
-        run: pnpm exec vitest run
+        run: pnpm exec vp test
         env:
           NODE_ENV: production
 
@@ -154,14 +161,6 @@ jobs:
 
       - name: Run unit tests (backend, debug tags)
         run: gotestsum --format testname -- -tags debug ./cmd/...
-        env:
-          NODE_ENV: production
-
-      - name: Build application binaries
-        run: |
-          pnpm exec vp build
-          go build -tags "debug,noasm,nounsafe" -trimpath -o build/debug/saka ./cmd
-          go build -tags "release,noasm,nounsafe" -trimpath -o build/release/saka ./cmd
         env:
           NODE_ENV: production
 

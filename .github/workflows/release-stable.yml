@@ -55,10 +55,15 @@ jobs:
           go tool buf generate
           gofmt -w codegen/proto/go
 
-      - name: Generate email template
-        run: pnpm exec vp build
+      # GoReleaser compiles binaries that embed web/email (templates) and
+      # web/output (the SPA bundle plus the derived assets.json) — both
+      # artifacts must exist before it runs.
+      - name: Build frontend artifacts
+        run: |
+          pnpm exec vp run email#build
+          pnpm exec vp run webapp#build
         env:
-          SKIP_GO_BUILD: 1
+          NODE_ENV: production
 
       # Code signing:
       # @ref: https://github.com/goreleaser/goreleaser-action?tab=readme-ov-file#signing
