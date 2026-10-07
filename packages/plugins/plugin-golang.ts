@@ -127,10 +127,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
 
-// Printed relative to the working directory, so a line names the path a
-// developer would type; a path outside it stays absolute.
-function displayPath(target: string): string {
-  const rel = path.relative(process.cwd(), target)
+// Printed relative to the Go module root (the plugin's `root` option), so a
+// line names the path a developer would type from the repo; a path outside
+// it stays absolute.
+function displayPath(base: string, target: string): string {
+  const rel = path.relative(base, target)
   if (rel === '') return '.'
   return rel.startsWith('..') ? target : rel
 }
@@ -157,7 +158,10 @@ function resolveTarget(
   return { name, outputDir: target.outputDir, binPath, args, buildTags, buildFlags, ldflags }
 }
 
-function formatBuildInfo(target: ResolvedTarget): Array<{ label: string; value: string }> {
+function formatBuildInfo(
+  target: ResolvedTarget,
+  base: string
+): Array<{ label: string; value: string }> {
   const tags = target.buildTags.length > 0 ? target.buildTags.join(', ') : 'none'
 
   const lines: Array<{ label: string; value: string }> = [
@@ -173,7 +177,7 @@ function formatBuildInfo(target: ResolvedTarget): Array<{ label: string; value: 
     lines.push({ label: `ldflags[${index}]`, value: flag })
   }
 
-  lines.push({ label: 'output', value: displayPath(target.binPath) })
+  lines.push({ label: 'output', value: displayPath(base, target.binPath) })
 
   return lines
 }
@@ -445,7 +449,9 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
 
         const embedPath = path.resolve(projectRoot, embedDir)
         if (!fs.existsSync(embedPath)) {
-          log(`embed directory "${displayPath(embedPath)}" not found, skipping go builds`)
+          log(
+            `embed directory "${displayPath(projectRoot, embedPath)}" not found, skipping go builds`
+          )
           process.exitCode = 1
           return
         }
@@ -459,7 +465,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
         const manifestSource = path.resolve(embedPath, '.vite/manifest.json')
         if (!fs.existsSync(manifestSource)) {
           log(
-            `${C.red}build manifest not found at ${displayPath(manifestSource)} — run the SPA build before the Go build${C.reset}`
+            `${C.red}build manifest not found at ${displayPath(projectRoot, manifestSource)} — run the SPA build before the Go build${C.reset}`
           )
           process.exitCode = 1
           return
@@ -471,7 +477,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
 
           log(`building binary (${target.name})...`)
 
-          const infoLines = formatBuildInfo(target)
+          const infoLines = formatBuildInfo(target, projectRoot)
           const gutter = Math.max(...infoLines.map((line) => line.label.length)) + 1
           for (const line of infoLines) {
             logInfo(line.label, line.value, gutter)
@@ -494,7 +500,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
           }
 
           log(
-            `${C.green}binary built → ${displayPath(target.binPath)}${size} in ${formatDuration(duration)}${C.reset}\n`
+            `${C.green}binary built → ${displayPath(projectRoot, target.binPath)}${size} in ${formatDuration(duration)}${C.reset}\n`
           )
         }
       }

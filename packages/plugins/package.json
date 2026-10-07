@@ -3,6 +3,9 @@
     "version": "0.0.0",
     "private": true,
     "type": "module",
+    "exports": {
+        "./plugin-golang": "./plugin-golang.ts"
+    },
     "devDependencies": {
         "typescript": "catalog:",
         "vite": "catalog:",

@@ -1,8 +1,8 @@
 import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
+import golang from 'plugins/plugin-golang'
 import { comlink } from 'vite-plugin-comlink'
 import { defineConfig } from 'vite-plus'
-import golang from '../plugins/plugin-golang.ts'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
 const goModule = 'github.com/riipandi/saka'
@@ -14,44 +14,31 @@ const goVersionLdflags = [
 ]
 
 /**
- * The web application's own pipeline — the SPA sources and the Go binary
- * that serves them are one app: `vite build` compiles the bundle into the
- * Go embed directory (`web/output`), then the go plugin closes the pass by
- * compiling both binaries. `vp dev` runs the same pipeline as the compiler
- * behind the Go port — the browser talks to :3080 only, and the Go debug
- * build proxies the module graph and the HMR socket to this server.
+ * The app's one vite pipeline — the SPA and the Go binary that serves it
+ * are one application. `vp build` compiles the bundle into the Go embed
+ * (`web/output`), then the go plugin derives `assets.json` from the Vite
+ * manifest (the go:embed pattern skips dot directories) and compiles both
+ * binaries. `vp dev` runs the same pipeline behind the Go port: the
+ * browser talks to :3080 only; the debug build proxies the module graph
+ * and the HMR socket here. The Go binary owns the HTML document
+ * (web/shell.go), so there is no index.html; manifest keys are
+ * webapp-root-relative (`src/main.tsx` — web/shell.go names the same key).
  *
- * The email templates are a separate package with its own build script; the
- * Taskfile sequences the passes (email first, so the binary embeds freshly
- * compiled templates). Template editing in dev happens in the React Email
- * UI (`task email:dev`), which has its own watcher.
+ * The email templates are a separate package with its own build script;
+ * the Taskfile sequences the passes (email first). Template editing in
+ * dev happens in the React Email UI (`task email:dev`).
  *
- * Plugin order is the contract: comlink owns worker construction and must
- * register first (only plugins that transform ComlinkWorker call sites may
- * precede it); the go plugin's closeBundle derives `assets.json` from the
- * Vite manifest before the binaries compile (the go:embed pattern skips
- * dot directories, so `.vite/` never ships).
- *
- * Every path this config names is absolute (`import.meta.dirname`-based):
- * a package script / `vp -C` run starts in this directory, and the go
- * plugin's watcher, build, and binary spawn all anchor at the repo root
- * via its `root` option.
- *
- * Backend integration (the Vite guide's): the Go binary owns the HTML
- * document — web/shell.go renders it — so there is no index.html. In
- * production the shell resolves every tag from the build manifest, one
- * entry per page; the keys are webapp-root-relative (`src/main.tsx` —
- * web/shell.go names the same key). The Vite-internal manifest lives
- * under `.vite/`, a dot directory go:embed silently skips — deliberate;
- * the Go fragment reads the derived copy (`assets.json`) the
- * embed-manifest plugin writes after every build.
+ * Paths are `import.meta.dirname`-absolute — a package script or `vp -C`
+ * run starts in this directory — and plugin-golang's `root` option anchors
+ * its watcher, build, and binary spawn at the repo root.
  */
 export default defineConfig({
   plugins: [
+    // Comlink owns worker construction; only plugins that transform
+    // ComlinkWorker call sites may precede it.
     comlink(),
-    // React Compiler (native oxc path, requires `oxc-transform-react`).
-    // Defaults: compilationMode 'infer', panicThreshold 'none' (components
-    // that violate the Rules of React are skipped, never broken), target 19.
+    // React Compiler via the native oxc path: components that violate the
+    // Rules of React are skipped, never broken.
     react({ compiler: true }),
     golang({
       packageName: 'saka',
@@ -91,10 +78,7 @@ export default defineConfig({
     }
   },
   worker: { plugins: () => [comlink()] },
-  // The compiler's port: bound to IPv4 loopback on purpose — the Go debug
-  // proxy (web/static_debug.go, viteDevServer) targets 127.0.0.1, and a
+  // IPv4 loopback on purpose: the Go debug proxy targets 127.0.0.1, and a
   // bare `localhost` bind lands on ::1, which the proxy cannot reach.
-  // No proxy block here — the proxy is the Go debug build's side
-  // (web/static_debug.go forwards :3080 paths to this server).
   server: { port: 5173, host: '127.0.0.1', strictPort: true }
 })

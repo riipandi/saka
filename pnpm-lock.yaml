@@ -303,6 +303,9 @@ importers:
       oxc-transform-react:
         specifier: 'catalog:'
         version: 0.145.0
+      plugins:
+        specifier: workspace:*
+        version: link:../plugins
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
