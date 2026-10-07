@@ -28,7 +28,7 @@ type EmailTemplate = ((props: unknown) => ReactNode) & { TemplateProps?: unknown
 // it is run from.
 const templatesDir = path.resolve(import.meta.dirname, 'templates')
 const outputDir = path.resolve(import.meta.dirname, '../../web/email')
-const repoRoot = path.resolve(import.meta.dirname, '../..')
+const projectRoot = path.resolve(import.meta.dirname, '../..')
 
 // Log style kept in sync with plugins/plugin-golang.ts
 const C = {
@@ -49,7 +49,7 @@ function formatDuration(ms: number): string {
 // Printed relative to the repo root, so a line names the path a developer
 // would type; a path outside it stays absolute.
 function displayPath(target: string): string {
-  const rel = path.relative(repoRoot, target)
+  const rel = path.relative(projectRoot, target)
   if (rel === '') return '.'
   return rel.startsWith('..') ? target : rel
 }

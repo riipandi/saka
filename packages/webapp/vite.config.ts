@@ -1,3 +1,4 @@
+import stylex from '@stylexjs/unplugin/vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import golang from 'plugins/plugin-golang'
@@ -6,7 +7,7 @@ import { defineConfig } from 'vite-plus'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
 const goModule = 'github.com/riipandi/saka'
-const repoRoot = resolve(import.meta.dirname, '../..')
+const projectRoot = resolve(import.meta.dirname, '../..')
 const goVersionLdflags = [
   `-X ${goModule}/internal/config.AppVersion=${process.env.BUILD_VERSION || '0.0.0'}`,
   `-X ${goModule}/internal/config.BuildHash=${process.env.BUILD_HASH || 'dev'}`,
@@ -34,28 +35,29 @@ const goVersionLdflags = [
  */
 export default defineConfig(({ mode }) => ({
   plugins: [
-    // Comlink owns worker construction; only plugins that transform
-    // ComlinkWorker call sites may precede it.
     comlink(),
-    // React Compiler via the native oxc path: components that violate the
-    // Rules of React are skipped, never broken.
+    stylex({
+      aliases: { '#/*': resolve('./src/*') },
+      enableDevClassNames: mode === 'development',
+      useCSSLayers: { before: ['reset'], prefix: 'stylex' }
+    }),
     react({ compiler: true }),
     golang({
       packageName: 'saka',
-      root: repoRoot,
-      packagePath: resolve(repoRoot, 'cmd'),
+      root: projectRoot,
+      packagePath: resolve(projectRoot, 'cmd'),
       binArgs: ['--env-file=.env.local', 'serve'],
       build: {
-        embedDir: resolve(repoRoot, 'web/output'),
+        embedDir: resolve(projectRoot, 'web/output'),
         devTarget: 'debug',
         targets: {
           debug: {
-            outputDir: resolve(repoRoot, 'build/debug'),
+            outputDir: resolve(projectRoot, 'build/debug'),
             buildTags: ['debug', 'noasm', 'nounsafe'],
             ldflags: goVersionLdflags
           },
           release: {
-            outputDir: resolve(repoRoot, 'build/release'),
+            outputDir: resolve(projectRoot, 'build/release'),
             buildTags: ['release', 'noasm', 'nounsafe'],
             buildFlags: ['-trimpath', '-buildmode=pie', '-buildvcs=false'],
             ldflags: [...goVersionLdflags, '-w -s -extldflags -static']
@@ -64,6 +66,7 @@ export default defineConfig(({ mode }) => ({
       }
     })
   ],
+  envPrefix: ['VITE_', 'PUBLIC_'],
   resolve: { tsconfigPaths: true },
   root: resolve(import.meta.dirname),
   publicDir: resolve(import.meta.dirname, 'public'),
