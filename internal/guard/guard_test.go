@@ -95,7 +95,7 @@ func TestSelfAnswersOnlyTheNamedAccount(t *testing.T) {
 }
 
 // TestSelfRefusesAnAdministratorActingOnAnotherAccount keeps the rule
-// upstream reaches by construction: `/users/me` beside `/users/{id}`. The
+// the self-service route expresses by construction: `/me` beside `/{id}`. The
 // role is not a way past the self-service request.
 func TestSelfRefusesAnAdministratorActingOnAnotherAccount(t *testing.T) {
 	rule := guard.Self("id")

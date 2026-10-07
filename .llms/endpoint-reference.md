@@ -1,4 +1,4 @@
-# Endpoint Reference (Pocket ID upstream)
+# Endpoint Reference (upstream)
 
 Source: <https://pocket-id.org/swagger.yaml> — grouped by spec tag. Use as the Yaak
 request checklist: one request per row, named `<METHOD> <path>` for REST and
@@ -50,7 +50,7 @@ are pinned by `internal/transport/router/rpc_test.go`.
 
 ## Authentication (saka-only)
 
-Password authentication is a saka-only surface: upstream Pocket ID signs users in with passkeys
+Password authentication is a saka-only surface: upstream signs users in with passkeys
 only. The contract lives in `api/connect/authn.proto` under `saka.authn.v1` — `AuthService` issues
 the credentials, `SessionService` carries the lifecycle of the session a sign-in opened. The
 session is the server's one trace of an authenticated caller: who opened it, from where, under
@@ -80,7 +80,7 @@ the same. Audit events cover sign-in, sign-out, and named revocations; a renewal
 
 ## Password Recovery (saka-only)
 
-Upstream Pocket ID has no passwords, so the whole flow is saka's. The contract lives in
+Upstream has no passwords, so the whole flow is saka's. The contract lives in
 `api/connect/authn.proto` under `PasswordRecoveryService`; the implementation is
 `modules/identity/password` (`recovery_*`).
 
@@ -96,7 +96,7 @@ them in the same transaction. Impersonating administrators are refused.
 
 ## One-Time Access
 
-The codes that sign an account in without its password, ported from upstream Pocket ID's
+The codes that sign an account in without its password, ported from upstream's
 one-time access feature. An administrator issues a code for one account or sends it by email;
 an account holder asks for the email from the sign-in page. The exchange is the procedure the
 frontend reaches with the code the email linked to, and it answers the token pair a password
@@ -120,7 +120,7 @@ a path), and the frontend forwards the code to the exchange. Audit events: `one_
 
 ## MFA TOTP (saka-only)
 
-Upstream Pocket ID has no TOTP; this surface is saka-only and follows the database contract in
+Upstream has no TOTP; this surface is saka-only and follows the database contract in
 `.llms/porting-plan/database.md` — the tables now carry the names `mfa_totp`, `mfa_recovery_codes`,
 and `mfa_pending` (migration `00004_create_multifactor_tables.sql`).
 
@@ -148,7 +148,7 @@ proof — the audit record names it.
 
 ## OAuth SSO (saka-only)
 
-Upstream Pocket ID has no SSO; this surface is saka-only. Sign in with Google, GitHub, or a
+Upstream has no SSO; this surface is saka-only. Sign in with Google, GitHub, or a
 custom OIDC connection. The outbound flow rides two REST routes that answer 302 redirects only —
 the browser is mid-redirect, so errors reach the SPA as `?error=` codes, success as `?flow_token=`.
 The flow token is minted at the callback, not the begin; it is the credential the completion
@@ -182,7 +182,7 @@ is downloaded and stored, a failed download never failing the sign-in.
 
 ## Webhooks (saka-only)
 
-The outbound event surface saka carries and Pocket ID does not: an administrator registers a
+The outbound event surface saka carries and upstream does not: an administrator registers a
 destination and subscribes it to the event catalog. Every audit record is a candidate delivery,
 mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an endpoint that
 lists no events, or lists the `*` wildcard, receives every one of them. All procedures carry the
@@ -306,7 +306,7 @@ with Mailpit as the target.
 
 ## Settings
 
-Saka-only surface — Pocket ID has no generic settings CRUD. The catalog in
+Saka-only surface — upstream has no generic settings CRUD. The catalog in
 code declares every item (key, default, sealed, public, description);
 `public.app_settings` in `00006_create_settings_table.sql` stores the overrides
 alone. No delete surface exists by design: an item is removed by resetting
@@ -357,7 +357,7 @@ string or a JSON document — the tokens carry it as the document it names —
 and the identifiers travel as TypeIDs (`cclm_…`). The user and group
 surfaces answer the same table, and each refuses a row that belongs to the
 other subject kind, so a claim cannot silently move between subjects.
-**Reserved keys** (settled 2026-09-29, mirroring Pocket ID v2.14.0's
+**Reserved keys** (settled 2026-09-29, mirroring upstream v2.14.0's
 `isReservedClaim` plus saka's own discriminator): the registered JWT claim
 names (`sub`, `iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `auth_time`,
 `nonce`, `acr`, `amr`, `azp`, `client_id`), the standard profile claims
@@ -759,7 +759,7 @@ grace in bounded batches, and the lookup itself refuses a row the
 
 ## SCIM
 
-Outbound provisioning, ported from Pocket ID's `internal/scimsync`: saka is the SCIM client, not
+Outbound provisioning, ported from upstream's `internal/scimsync`: saka is the SCIM client, not
 the server. One provider row per OIDC client names a remote base URL and the bearer token the
 sync presents (sealed `enc:` at rest, shown once in the Create answer). One pass pushes the
 client's visible accounts and groups out until the remote matches the local snapshot — the
@@ -880,9 +880,9 @@ administrative roll doors ride the permission catalog.
 | POST | `/rpc/saka.authn.v1.WebAuthnService/DeleteCredential` | Delete passkey | done — guard `Session` + step-up (`X-Saka-Reauthentication`); deleting the last credential is allowed while the password row exists | `modules/identity/webauthn` (service tests) |
 | POST | `/rpc/saka.authn.v1.WebAuthnService/Reauthenticate` | Reauthenticate (step-up proof) | done — guard `Session`; proves the caller by password, passkey assertion, or the email code `SendReauthenticationCode` sent, and answers a single-use token (the `session.reverification_window`, hashed at rest); the guarded call spends it through the `X-Saka-Reauthentication` header; the audit record names the factor used | `modules/identity/webauthn.TestAStepUpProofSpendsOnce`, `TestTheEmailCodeProofMintsTheToken`, `internal/transport` (interceptor consumption) |
 | POST | `/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode` | Send the email-code reverification factor | done — guard `Session`; delivers a single-use twelve-character code to the caller's own address (hashed at rest, one live row, resend replaces after the one-minute cooldown); unavailable when the deployment has no mailer or queue | `modules/identity/webauthn.TestAResendReplacesTheLiveCode`, `TestAnUnwiredDeliveryAnswersUnavailable` |
-| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials` | List user passkeys (admin) | done — guard `Admin`; the roll over a named account — Pocket ID's mirror `GET /api/users/{id}/webauthn-credentials` | `modules/identity/webauthn.TestAdminSeesAnotherAccountsRoll` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials` | List user passkeys (admin) | done — guard `Admin`; the roll over a named account — upstream mirror `GET /api/users/{id}/webauthn-credentials` | `modules/identity/webauthn.TestAdminSeesAnotherAccountsRoll` |
 | POST | `/rpc/saka.authn.v1.WebAuthnService/AdminUpdateCredential` | Rename user passkey (admin) | done — guard `Admin`; the holder's rules over any account; audit `webauthn_credential_admin_renamed` | `modules/identity/webauthn.TestAdminRenamesAnotherAccountsPasskey` |
-| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential` | Delete user passkey (admin) | done — guard `Admin`; the stranding refusal holds here too — Pocket ID's mirror `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; audit `webauthn_credential_admin_removed` | `modules/identity/webauthn.TestAdminDeleteRefusesTheLastWayIn` |
+| POST | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential` | Delete user passkey (admin) | done — guard `Admin`; the stranding refusal holds here too — upstream mirror `DELETE /api/users/{id}/webauthn-credentials/{credentialId}`; audit `webauthn_credential_admin_removed` | `modules/identity/webauthn.TestAdminDeleteRefusesTheLastWayIn` |
 
 Expired ceremony rows and the spent proof tokens are swept hourly by the `webauthn_cleanup` job
 (`internal/jobs`). The AAGUID catalog ships embedded (`aaguid.json`, names only) and names an

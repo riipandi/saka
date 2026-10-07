@@ -14,9 +14,9 @@ import (
 const ScimSyncName = "scim_sync"
 
 // DefaultScimSyncInterval is how often every provider is pushed to, as a
-// recurring job re-enqueues itself. Pocket ID's upstream contract runs the
-// same cadence hourly; an external application that is minutes behind the
-// directory is the trade the interval states.
+// recurring job re-enqueues itself. The cadence is hourly; an external
+// application that is minutes behind the directory is the trade the
+// interval states.
 const DefaultScimSyncInterval = time.Hour
 
 // ScimSyncTask runs one provisioning pass per provider. The interval it
@@ -100,8 +100,8 @@ func scimSyncSeed(interval time.Duration) ScimSyncTask {
 // writes produce one pass.
 const ScimSyncDebouncedName = "scim_sync_debounced"
 
-// DefaultScimSyncDebounce is how long a change-triggered pass waits, the
-// debounce window Pocket ID's upstream contract also keeps.
+// DefaultScimSyncDebounce is how long a change-triggered pass waits before
+// it pushes: five minutes, so several related writes land in one pass.
 const DefaultScimSyncDebounce = 5 * time.Minute
 
 // ScimSyncDebouncedTask is one change-triggered pass. It carries no

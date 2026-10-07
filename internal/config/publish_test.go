@@ -20,7 +20,7 @@ func plantedConfig() Config {
 	cfg := Default()
 	cfg.App.SecretKey = planted
 	cfg.Auth.SecretKey = planted
-	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/pocketid"
+	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/saka"
 	cfg.KVStore.URL = "redis://:hunter2@cache.example.com:6379/2"
 	cfg.Mailer.SMTPPassword = planted
 	cfg.Storage.S3.AccessKey = planted
@@ -63,7 +63,7 @@ func TestTheFullScopeRedactsEverySecret(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(document, &body))
 	database := body["database"].(map[string]any)
-	assert.Equal(t, "db.example.com:5432/pocketid", database["url"])
+	assert.Equal(t, "db.example.com:5432/saka", database["url"])
 	kvstore := body["kvstore"].(map[string]any)
 	assert.Equal(t, "cache.example.com:6379/2", kvstore["url"])
 

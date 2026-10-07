@@ -1,5 +1,4 @@
-// The webhook contract: the outbound event surface saka carries and Pocket
-// ID does not.
+// The webhook contract: the outbound event surface saka carries.
 //
 // A webhook endpoint is a destination an administrator registers: a URL, a
 // method, optional custom headers, and the event names it subscribes to.

@@ -39,8 +39,8 @@ service AuthService {
 // caller who lost the password back in, carried by an email through the
 // frontend.
 //
-// Pocket ID has no password recovery at all — passkey-only accounts never
-// lose a password — so this service is saka-only. The flow is the
+// The service is saka-only: accounts sign in with passkeys and carry no
+// password to recover. The flow is the
 // email-verification shape: the raw token exists once in the email and once
 // in the request, the database stores only its hash, and an unknown, expired,
 // spent, and refused token answer the same failure. The token travels through
@@ -935,8 +935,7 @@ message AdminDisableMfaResponse {
 // DeviceApprovalService is the approving side of the device login flow:
 // a browser that cannot sign itself in creates a pairing request over
 // REST, and the account holder — signed in on a device that can — reads
-// what the request names and answers it here. The service is saka-only;
-// upstream Pocket ID has no passkey-less sign-in to approve.
+// what the request names and answers it here. The service is saka-only.
 service DeviceApprovalService {
   // Inspect answers the request the presented user code names: the code
   // as the device should render it, the requesting browser's address and
@@ -1013,8 +1012,7 @@ message DecideDeviceLoginResponse {
 
 // OAuthSSOService is the sign-in-with-a-provider surface: the builtin
 // Google and GitHub connections and the operator-configured custom OIDC
-// ones. The service is saka-only — upstream Pocket ID never signed an
-// account in through an external identity provider.
+// ones. The service is saka-only.
 //
 // The flow is a browser round trip: BeginSignIn answers the provider's
 // authorize URL the browser navigates to, the provider returns the browser

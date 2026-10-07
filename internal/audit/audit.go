@@ -12,9 +12,8 @@
 package audit
 
 // The event names a record carries. They are this application's own spelling,
-// snake_case like every other field it writes, rather than upstream's
-// SCREAMING_SNAKE: a client reads `sign_in` beside `status_code`, and the two
-// vocabularies would be one more thing to translate.
+// snake_case like every other field it writes: a client reads `sign_in`
+// beside `status_code` without a second naming convention to translate.
 //
 // An event names what happened, not which procedure answered. `user_created`
 // is written by both the administrator's CreateUser and the sign-up flow,

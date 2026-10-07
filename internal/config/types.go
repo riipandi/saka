@@ -106,9 +106,8 @@ type Auth struct {
 	// answers without the header.
 	HIBPAPIKey string `koanf:"hibp_api_key" json:"hibp_api_key"`
 	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
-	// default, the way the upstream feature ships: a mailer that reaches
-	// account holders on a schedule is a decision, not a default. It lives
-	// beside the token lifetimes because the reminder is the tokens'
+	// default: a mailer that reaches account holders on a schedule is a
+	// decision, not a default. It lives beside the token lifetimes because the reminder is the tokens'
 	// housekeeping, not the machine credentials' own surface.
 	ExpiryEmailEnabled bool `koanf:"expiry_email_enabled" json:"expiry_email_enabled"`
 	// SessionDriver is the backend the sign-in session store reads: SessionDB
@@ -118,7 +117,8 @@ type Auth struct {
 	SessionDriver string `koanf:"session_driver" json:"session_driver"`
 	// OneTimeAccessEmailAsAdminEnabled opens the administrative email path:
 	// an operator may have a one-time access code sent to an account's
-	// address. Off by default, the way the upstream feature ships.
+	// address. Off by default: an operator's mailer becomes a credential
+	// sender.
 	OneTimeAccessEmailAsAdminEnabled bool `koanf:"one_time_access_email_as_admin_enabled" json:"one_time_access_email_as_admin_enabled"`
 	// OneTimeAccessEmailAsUnauthenticatedEnabled opens the public email path:
 	// a caller with no session may ask for a code by naming an address. Off

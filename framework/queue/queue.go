@@ -2,7 +2,7 @@
 // shared Postgres pool, executed by an in-process worker pool. It is a port
 // of mikestefanello/backlite (MIT) adapted to this architecture — the schema
 // comes from the migrations, the queries from go-sqlbuilder, and the logs
-// from log/slog — and the engine is owned here, so upstream is not tracked.
+// from log/slog — and the engine is owned here.
 //
 // A task is a payload type declaring the queue it belongs to; a queue is that
 // declaration plus the callback that executes it. Tasks are inserted into

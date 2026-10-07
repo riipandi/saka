@@ -140,9 +140,9 @@ func Authenticated(caller *jwtutils.Caller, _ Target) error {
 // by the claim: a session credential names the row it acts on, so a caller
 // without the `sid` claim is not a session, whatever signed it. A key that
 // could list, create, and revoke sessions or keys would not survive its
-// owner's intent: the upstream it ports disables API-key authentication on
-// its own management routes, and this rule is that refusal expressed against
-// the one caller type instead of a second middleware.
+// owner's intent: API-key authentication is disabled on management routes,
+// and this rule is that refusal expressed against the one caller type
+// instead of a second middleware.
 func Session(caller *jwtutils.Caller, _ Target) error {
 	if caller == nil {
 		return ErrUnauthenticated
@@ -286,8 +286,8 @@ func StopImpersonating(caller *jwtutils.Caller, _ Target) error {
 // An administrator does not pass by virtue of the role: a self-service
 // request acts on the caller's own account, and an administrator who must act
 // on another account has the administrative procedure for it. That is the
-// rule upstream Pocket ID follows by construction — `/users/me` beside
-// `/users/{id}` — expressed here as one rule instead of two routes.
+// rule the self-service route expresses by construction — `/me` beside
+// `/{id}` — held here as one rule instead of two routes.
 //
 // A caller that is impersonating is refused outright. The delegation exists
 // so an administrator can act as another account through the administrative

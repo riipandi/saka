@@ -6,10 +6,9 @@ import (
 	"sync"
 )
 
-// The authenticator catalog: the AAGUID manifest passkeydeveloper publishes,
-// fetched by scripts/get-aaguid.sh and embedded the way Pocket ID embeds
-// its own. The upstream payload carries its icons inline as base64 — the
-// fetch script strips them, so the binary carries the names only.
+// The authenticator catalog: the community AAGUID catalog embedded in the
+// binary. The catalog's payload carries its icons inline as base64 — they
+// are stripped before the embedding, so the binary carries the names only.
 //
 //go:embed aaguid.json
 var aaguidCatalog []byte
@@ -38,7 +37,7 @@ func loadAAGUIDCatalog() {
 }
 
 // authenticatorName answers the display name an AAGUID names: the catalog's
-// record with the " Passkey" suffix, the way upstream renders it; an
+// record with the " Passkey" suffix appended; an
 // unknown or absent AAGUID falls back to the plain word. The formatted UUID
 // is the catalog's key shape — the column's own.
 func authenticatorName(aaguid []byte) string {

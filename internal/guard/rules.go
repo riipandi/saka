@@ -215,9 +215,8 @@ var ProcedureRules = map[string]Entry{
 
 	// The caller's own door: the procedure reads the account from the claims
 	// and takes no target from the request, so being authenticated is the
-	// whole requirement. Upstream answers this with a separate `/users/me`
-	// route; here the account is the claims' subject, which is the same rule
-	// without a second route.
+	// whole requirement. Here the account is the claims' subject, which is
+	// the same rule without a second route.
 	//
 	// An impersonated caller is refused here by the rule itself, which is
 	// what makes `Authenticated` fit the audit trail's self listing too: an
@@ -251,8 +250,7 @@ var ProcedureRules = map[string]Entry{
 	identityv1connect.UserServiceRemovePasswordProcedure: {Rule: Session, StepUp: true},
 
 	// Administrative, declared explicitly rather than left to the default so
-	// the table reads as the complete policy of the surface. Upstream guards
-	// every one of these with its admin-required middleware.
+	// the table reads as the complete policy of the surface.
 	identityv1connect.SignupServiceCreateSignupTokenProcedure: {Rule: Admin},
 	identityv1connect.SignupServiceListSignupTokensProcedure:  {Rule: Admin},
 	identityv1connect.SignupServiceDeleteSignupTokenProcedure: {Rule: Admin},
@@ -301,9 +299,9 @@ var ProcedureRules = map[string]Entry{
 	authzv1connect.AuthorizationServiceSetUserPermissionsProcedure:  {Rule: Admin},
 
 	// The API keys' own surface is session-only: a key cannot manage keys,
-	// the refusal the upstream spells with a middleware switch and this
-	// surface spells with a rule against the caller's credential kind. The
-	// administrative view over every key is a plain admin procedure.
+	// a refusal spelled here with a rule against the caller's credential
+	// kind rather than a middleware switch. The administrative view over
+	// every key is a plain admin procedure.
 	apikeyv1connect.ApiKeyServiceCreateAPIKeyProcedure:   {Rule: Session},
 	apikeyv1connect.ApiKeyServiceListAPIKeysProcedure:    {Rule: Session},
 	apikeyv1connect.ApiKeyServiceRenewAPIKeyProcedure:    {Rule: Session},
@@ -511,15 +509,14 @@ var RestRules = []RestEntry{
 	//
 	// They are the account's own by construction: no identifier travels, so
 	// the target is the caller the bearer middleware verified, and being
-	// authenticated is the whole requirement. The rules are the `/{id}`
-	// write's answer to the routes upstream offers beside it.
+	// authenticated is the whole requirement.
 	{Method: http.MethodPut, Pattern: "/api/users/me/profile-picture", Rule: Authenticated},
 	{Method: http.MethodDelete, Pattern: "/api/users/me/profile-picture", Rule: Authenticated},
 
 	// The write is the account's own: the caller must be the account named in
 	// the path. An administrator does not pass by virtue of the role — the
-	// administrative procedures are the RPC surface's — which is the rule
-	// upstream applies by offering `/users/me/profile-picture` separately.
+	// administrative procedures are the RPC surface's — the same
+	// self-ownership the `/me` routes beside it hold.
 	{
 		Method:  http.MethodPut,
 		Pattern: "/api/users/{id}/profile-picture",

@@ -29,8 +29,8 @@ const APIKeyExpiryEmailName = "api_key_expiry_email"
 // needs, and loose enough that a missed run costs a day, not the reminder.
 const DefaultAPIKeyExpiryInterval = 24 * time.Hour
 
-// APIKeyExpiryWindow is how far ahead the scan looks: the upstream it ports
-// reminds the holder seven days before their key expires.
+// APIKeyExpiryWindow is how far ahead the scan looks: the reminder reaches
+// the holder seven days before their key expires.
 const APIKeyExpiryWindow = 7 * 24 * time.Hour
 
 // APIKeyExpiryScanTask is one pass over the reminder window. It carries

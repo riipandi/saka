@@ -237,7 +237,7 @@ func Default() Config {
 			// enrollment's one answer is the only channel it travels
 			// through, and development debugging turns this on by hand.
 			ExposeTotpSecret: false,
-			// Ninety days is Pocket ID's own default, and the window a
+			// Ninety days is the default, and the window a
 			// security review usually asks for: long enough to answer "what
 			// happened last quarter", short enough that the table stays a
 			// table rather than an archive.
@@ -251,9 +251,9 @@ func Default() Config {
 			Issuer:        "",
 			AccessTTL:     15 * time.Minute,
 			SessionDriver: SessionDB,
-			// The API key's expiry reminder is off by default, the way the
-			// upstream feature ships: a mailer that reaches account holders
-			// on a schedule is a decision, not a default.
+			// The API key's expiry reminder is off by default: a mailer
+			// that reaches account holders on a schedule is a decision,
+			// not a default.
 			ExpiryEmailEnabled: false,
 			// Both email paths are opt-in: the administrative one because an
 			// operator's mailer becomes a credential sender, the public one

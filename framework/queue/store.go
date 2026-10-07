@@ -11,7 +11,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 )
 
-// The queue's own tables, created by database/migrations/00008. The engine
+// The queue's own tables. The engine
 // reads and writes them, and nothing else in the process names them.
 // Store is the database the queue runs on: the shared Postgres pool. The
 // transaction callback receives the shared Querier surface, so the engine

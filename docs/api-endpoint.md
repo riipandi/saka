@@ -9,7 +9,7 @@ routes live under `/api` (or their root path) and are throttled with the same po
 
 ## Authentication (saka-only)
 
-Password authentication is a saka-only surface; upstream Pocket ID signs users in with passkeys
+Password authentication is a saka-only surface; upstream signs users in with passkeys
 only. `SignIn` takes
 `{"identity": "<username or email>", "password": "<plaintext>", "remember": <bool>}` and answers
 the token pair plus the session view; `remember` selects the long or short session lifetime. A
@@ -78,7 +78,7 @@ single-use token that lives `session.reverification_window` (default 30 minutes)
 
 ## MFA TOTP
 
-Saka-only; upstream Pocket ID has no TOTP. A confirmed enrollment turns a successful password
+Saka-only; upstream has no TOTP. A confirmed enrollment turns a successful password
 sign-in into a pending bridge (5-minute TTL, 3-wrong-codes budget) that only `CompleteSignIn`
 completes — with a TOTP code or a recovery code.
 
@@ -96,7 +96,7 @@ completes — with a TOTP code or a recovery code.
 
 ## OAuth SSO
 
-Saka-only; upstream Pocket ID has no SSO. Sign in with Google, GitHub, or a custom OIDC
+Saka-only; upstream has no SSO. Sign in with Google, GitHub, or a custom OIDC
 connection. The browser flow rides two REST routes that answer 302 redirects only; the
 completion procedures run over ConnectRPC with the flow token as the credential (guarded
 `Public`). A resolved account keeping a confirmed second factor answers with the MFA bridge,

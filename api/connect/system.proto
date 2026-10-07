@@ -42,11 +42,10 @@ message CheckResponse {
 }
 
 // AppConfigService is the administrative surface over the deployment's
-// application configuration. Pocket ID keeps the surface behind
-// `/api/application-configuration`; Saka serves the configuration reads
-// over REST at `GET /api/configuration` — public subset without a
-// credential, the full document to an administrator — and keeps the
-// interactive procedures here.
+// application configuration. The configuration reads serve over REST at
+// `GET /api/configuration` — a public subset without a credential, the
+// full document to an administrator — and the interactive procedures
+// live here.
 service AppConfigService {
   // TestEmail sends one templated test message through the configured
   // mailer. The send is synchronous: the response says the message left

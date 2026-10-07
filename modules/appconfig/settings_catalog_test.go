@@ -55,8 +55,8 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 			assert.GreaterOrEqual(t, value, bounds[0], "%s: the default must clear the floor", def.Key)
 			assert.LessOrEqual(t, value, bounds[1], "%s: the default must respect the ceiling", def.Key)
 		case def.Key == SettingSessionReverificationWindow:
-			// The spec names no ceiling; the reader (Phase 5) owns the
-			// bounds. Here the default only has to parse as positive
+			// The spec names no ceiling; the bounds live with the
+			// reader. Here the default only has to parse as positive
 			// seconds.
 			value, err := strconv.ParseInt(def.Default, 10, 64)
 			require.NoError(t, err, "%s: the default must be integer seconds", def.Key)

@@ -184,10 +184,9 @@ type Issued struct {
 	Secret string
 }
 
-// UpdateParams is a rewrite's fields. The full replace is the shape the
-// upstream update keeps: a field the request leaves out falls back to
-// empty, and the secrets, the logo, and the restriction are not fields of
-// this call.
+// UpdateParams is a rewrite's fields. The replace is full: a field the
+// request leaves out falls back to empty, and the secrets, the logo, and
+// the restriction are not fields of this call.
 type UpdateParams struct {
 	Name                                string
 	Description                         string

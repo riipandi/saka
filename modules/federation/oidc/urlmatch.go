@@ -12,8 +12,7 @@ import (
 	"github.com/dunglas/go-urlpattern"
 )
 
-// The callback-URL matcher, ported from upstream Pocket ID's
-// `utils/callback_url_util.go` (backend/internal/utils): the redirect URI
+// The callback-URL matcher: the redirect URI
 // rules a client's callbacks are judged by, and the pattern grammar the
 // CIMD allowlist is written in. A pattern supports single `*` wildcards in
 // the base and path, `**` globstars in the path, and wildcard query

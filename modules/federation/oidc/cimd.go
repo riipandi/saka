@@ -20,7 +20,7 @@ import (
 // URL of a metadata document it hosts, materialized here from what the
 // document declares. The draft the feature implements is
 // draft-ietf-oauth-client-id-metadata-document; the validation rules are
-// upstream Pocket ID's, read off its cimd.go.
+// the ones the draft specifies.
 
 // The constraints a metadata document is held to. Only the public-client
 // authentication is accepted — the document's key material is never

@@ -69,7 +69,7 @@ type CredentialSchema struct {
 	PublicKey    []byte    `db:"public_key"`
 	// SignCount is the signature counter the authenticator reported at its
 	// last assertion. A regression between two assertions is the clone
-	// signal, so the count is persisted even though upstream does not.
+	// signal, so the count is persisted rather than discarded.
 	SignCount int64 `db:"sign_count"`
 	// AttestationType is the parsed format name ("none", "packed", ...). It
 	// is recorded, not policy-enforced.

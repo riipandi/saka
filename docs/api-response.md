@@ -245,7 +245,7 @@ which an operator reads.
 `Self` compares the account the request names against the caller's token
 subject, and an administrator does not pass by virtue of the role: the
 administrative procedures are where an administrator acts on someone else,
-which is how upstream Pocket ID expresses the same rule (`/users/me` beside
+which is how upstream expresses the same rule (`/users/me` beside
 `/users/{id}`). A **delegated (impersonated) caller** is refused on every
 `Self` request even when the subject matches — a delegation reaches the
 administrative surface, never the requests that belong to the account.

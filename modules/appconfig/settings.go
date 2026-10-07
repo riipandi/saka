@@ -87,8 +87,8 @@ const (
 
 	// SettingWebauthnAllowSyncedPasskeys decides whether a credential that
 	// can live in a synced passkey provider — iCloud Keychain, a password
-	// manager — may enroll. Off, only device-bound credentials enroll; on,
-	// the deployment accepts the upstream default.
+	// manager — may enroll. Off by default: only device-bound credentials
+	// enroll; on, credentials held by a synced passkey provider enroll too.
 	SettingWebauthnAllowSyncedPasskeys = "webauthn.allow_synced_passkeys"
 
 	// SettingWebauthnUserVerification is the user-verification level every

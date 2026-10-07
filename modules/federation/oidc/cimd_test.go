@@ -134,8 +134,8 @@ func TestRefreshRewritesTheClientFromTheDocument(t *testing.T) {
 
 // TestTheDocumentRulesRefuseWhatTheSurfaceWouldNotSign covers the
 // validation: the authentication method, the initiating grant, the
-// response types, and the redirect URIs are each held where upstream holds
-// them.
+// response types, and the redirect URIs are each held to the rules the
+// draft specifies.
 func TestTheDocumentRulesRefuseWhatTheSurfaceWouldNotSign(t *testing.T) {
 	pool := migratedPool(t)
 	service := testService(t, pool)
