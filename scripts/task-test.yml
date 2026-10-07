@@ -46,4 +46,4 @@ tasks:
       - sh: command -v k6
         msg: k6 is not installed — see https://grafana.com/docs/k6/latest/set-up/install-k6/
     cmds:
-      - k6 run -e K6_PROFILE={{.K6_PROFILE | default "smoke"}} -e K6_TARGET={{.K6_TARGET | default "http://localhost:3080"}} {{.CLI_ARGS}} scripts/loadtest/loadtest.mjs
+      - k6 run -e K6_PROFILE={{.K6_PROFILE | default "smoke"}} -e K6_TARGET={{.K6_TARGET | default "http://localhost:3000"}} {{.CLI_ARGS}} scripts/loadtest/loadtest.mjs

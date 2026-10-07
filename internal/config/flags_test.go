@@ -38,7 +38,7 @@ func runCommand(t *testing.T, args []string) config.Options {
 			Name: "serve",
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "host", Value: "0.0.0.0"},
-				&cli.UintFlag{Name: "port", Value: 3080},
+				&cli.UintFlag{Name: "port", Value: 3000},
 				&cli.StringFlag{Name: "base-url"},
 			},
 			Action: capture,
@@ -110,7 +110,7 @@ func TestResolveAppliesFlagOverEverything(t *testing.T) {
 		},
 		Commands: []*cli.Command{{
 			Name:  "serve",
-			Flags: []cli.Flag{&cli.UintFlag{Name: "port", Value: 3080}},
+			Flags: []cli.Flag{&cli.UintFlag{Name: "port", Value: 3000}},
 			Action: func(_ context.Context, cmd *cli.Command) error {
 				var err error
 				cfg, err = config.Resolve(cmd)

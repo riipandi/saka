@@ -3,7 +3,7 @@
 version: "3"
 
 tasks:
-  # One origin (:3080): the webapp's Vite compiles + HMR behind the Go proxy,
+  # One origin (:3000): the webapp's Vite compiles + HMR behind the Go proxy,
   # the binary rebuilt from build/debug on every Go change.
   dev:
     desc: Dev loop behind the Go proxy

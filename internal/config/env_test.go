@@ -122,7 +122,7 @@ func TestEnvFileFeedsInterpolation(t *testing.T) {
 	path := writeConfig(t, `{
 		"database": {"url": "env:MY_DSN"},
 		"auth": {"secret_key": "env:MY_SECRET"},
-		"app": {"base_url": "http://${MY_HOST}:3080"}
+		"app": {"base_url": "http://${MY_HOST}:3000"}
 	}`)
 
 	cfg, err := config.Load(config.Options{
@@ -134,7 +134,7 @@ func TestEnvFileFeedsInterpolation(t *testing.T) {
 
 	assert.Equal(t, dsn, cfg.Database.URL)
 	assert.Equal(t, secret, cfg.Auth.SecretKey)
-	assert.Equal(t, "http://example.test:3080", cfg.App.BaseURL)
+	assert.Equal(t, "http://example.test:3000", cfg.App.BaseURL)
 }
 
 func TestEnvFileBeatsSystemEnvironmentForAName(t *testing.T) {

@@ -21,7 +21,7 @@ func migratedPool(t *testing.T) *datastore.Postgres {
 
 func testService(t *testing.T, pool *datastore.Postgres) *Service {
 	t.Helper()
-	return NewService(pool, userService(t, pool), fwaudit.NewRecorder(nil), "http://localhost:3080")
+	return NewService(pool, userService(t, pool), fwaudit.NewRecorder(nil), "http://localhost:3000")
 }
 
 func userService(t *testing.T, pool *datastore.Postgres) *user.Service {
@@ -70,7 +70,7 @@ func TestCreateOpensOnePairingRequestTheExchangeAccepts(t *testing.T) {
 	require.Len(t, created.UserCode, 9) // XXXX-XXXX
 	require.Contains(t, created.UserCode, "-")
 	require.Equal(t, pollInterval, created.Interval)
-	require.Equal(t, "http://localhost:3080/device", created.VerificationURI)
+	require.Equal(t, "http://localhost:3000/device", created.VerificationURI)
 
 	// The exchange answers pending until the decision lands.
 	outcome, err := service.Exchange(t.Context(), created.ID, "token-plain")

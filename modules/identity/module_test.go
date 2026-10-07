@@ -241,6 +241,6 @@ func testConfig(t *testing.T) config.Config {
 	// The passkey engine derives its RP identity from the public origin at
 	// construction, and a default config carries no base URL; the test names
 	// the dev one.
-	cfg.App.BaseURL = "http://localhost:3080"
+	cfg.App.BaseURL = "http://localhost:3000"
 	return cfg
 }

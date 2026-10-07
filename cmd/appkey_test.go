@@ -48,7 +48,7 @@ func TestKeyGeneratePrintsAllKeys(t *testing.T) {
 // when .env.local exists in the working directory.
 func TestKeyGenerateWithoutEnvFileTouchesNothing(t *testing.T) {
 	dir := t.TempDir()
-	original := "HOST=localhost\nAPP_SECRET_KEY=stale\n"
+	original := "SERVER_HOST=localhost\nAPP_SECRET_KEY=stale\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.local"), []byte(original), 0o600))
 
 	t.Chdir(dir)
@@ -70,7 +70,7 @@ func TestKeyGenerateWithoutEnvFileTouchesNothing(t *testing.T) {
 func TestKeyGenerateIgnoresRootEnvFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".env.local")
-	original := "HOST=localhost\n"
+	original := "SERVER_HOST=localhost\n"
 	require.NoError(t, os.WriteFile(path, []byte(original), 0o600))
 
 	var out bytes.Buffer
@@ -131,7 +131,7 @@ func TestKeyGenerateCreatesMissingEnvFile(t *testing.T) {
 
 func TestKeyGenerateAsksBeforeReplacing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env.local")
-	original := "# app\nHOST=localhost\nAPP_SECRET_KEY=stale\n"
+	original := "# app\nSERVER_HOST=localhost\nAPP_SECRET_KEY=stale\n"
 	require.NoError(t, os.WriteFile(path, []byte(original), 0o644))
 
 	out, err := runKeyGenerateCmd(t, "y\n", "--env-file="+path)
@@ -156,7 +156,7 @@ func TestKeyGenerateLeavesFileUntouchedWithoutConfirmation(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), ".env.local")
-			original := "HOST=localhost\nAPP_SECRET_KEY=stale\n"
+			original := "SERVER_HOST=localhost\nAPP_SECRET_KEY=stale\n"
 			require.NoError(t, os.WriteFile(path, []byte(original), 0o600))
 
 			out, err := runKeyGenerateCmd(t, stdin, "--env-file="+path)
@@ -175,7 +175,7 @@ func TestKeyGenerateLeavesFileUntouchedWithoutConfirmation(t *testing.T) {
 
 func TestKeyGenerateOverwriteSkipsConfirmation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env.local")
-	require.NoError(t, os.WriteFile(path, []byte("HOST=localhost\nAPP_SECRET_KEY=stale\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("SERVER_HOST=localhost\nAPP_SECRET_KEY=stale\n"), 0o600))
 
 	out, err := runKeyGenerateCmd(t, "", "--env-file="+path, "--overwrite")
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestKeyGenerateOverwriteSkipsConfirmation(t *testing.T) {
 	secret, ok := file.Get("APP_SECRET_KEY")
 	require.True(t, ok)
 	assert.NotEqual(t, "stale", secret)
-	assert.Equal(t, []string{"HOST", "APP_SECRET_KEY", "AUTH_SECRET_KEY"},
+	assert.Equal(t, []string{"SERVER_HOST", "APP_SECRET_KEY", "AUTH_SECRET_KEY"},
 		file.Keys())
 }
 
@@ -216,7 +216,7 @@ func TestKeyGenerateFailsOnUnwritablePath(t *testing.T) {
 // hostOf reads HOST from a parsed dotenv file.
 func hostOf(t *testing.T, file *envfile.File) string {
 	t.Helper()
-	host, ok := file.Get("HOST")
+	host, ok := file.Get("SERVER_HOST")
 	require.True(t, ok)
 	return host
 }

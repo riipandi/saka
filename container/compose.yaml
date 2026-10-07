@@ -20,7 +20,7 @@ include:
 
 #####################################################################
 # oidc-test-client drives Saka's own OIDC/OAuth surface in E2E:
-# Saka answers on the host (dev :3080 or the disposable E2E port; the
+# Saka answers on the host (dev :3000 or the disposable E2E port; the
 # localhost extra_hosts mapping resolves it from inside the container).
 # Before the run, mint a client through Saka's admin RPC with callback
 # http://localhost:9010/auth/callback (verify the callback path against
@@ -43,7 +43,7 @@ include:
 #         GO_VERSION: ${GO_VERSION:-1.27.1}
 #     # platform: linux/amd64
 #     hostname: saka
-#     expose: ["3080"]
+#     expose: ["3000"]
 #     volumes: ["./storage:/srv/storage:rw"]
 #     env_file: "./.env.local"
 #     environment:
@@ -71,7 +71,7 @@ include:
 #       OIDC_CLIENT_ID: ${SAKA_TEST_CLIENT_ID:-change-me}
 #       OIDC_CLIENT_SECRET: ${SAKA_TEST_CLIENT_SECRET:-change-me}
 #       OIDC_ROOT_URL: http://localhost:9010
-#       OIDC_PROVIDER: ${SAKA_ISSUER:-http://localhost:3080}
+#       OIDC_PROVIDER: ${SAKA_ISSUER:-http://localhost:3000}
 #       OIDC_SCOPES: "openid,profile,email"
 #       OIDC_DO_REFRESH: true
 #       OIDC_DO_INTROSPECTION: true

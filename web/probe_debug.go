@@ -72,7 +72,7 @@ const webauthnProbeIndexPage = `<!doctype html>
 <h2>Saka passkey probe</h2>
 <p>Development instrument — the simulation of the SPA surfaces the frontend work will replace.
 The token each page asks for is the access token a sign-in answers with:
-<code>scripts/curl-rpc.sh http://localhost:3080/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
+<code>scripts/curl-rpc.sh http://localhost:3000/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
 <ul>
   <li><a href="/debug/passkey/enroll">/debug/passkey/enroll</a> — enroll a passkey on the authenticated session</li>
   <li><a href="/debug/passkey/signin">/debug/passkey/signin</a> — sign in passwordless</li>

@@ -32,7 +32,7 @@ task config:generate      # write app.config.json, then fill in the secrets
 cp .env.example .env.local && edit .env.local
 task compose:up           # postgres, mailpit, and the dev stack
 task db:initialize        # migrations + system seed + first administrator
-task dev                  # the dev loop: Vite + HMR behind the Go proxy on :3080
+task dev                  # the dev loop: Vite + HMR behind the Go proxy on :3000
 ```
 
 Sign in as the administrator `initialize` created, then make yourself at

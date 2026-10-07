@@ -3,7 +3,7 @@
 # discovery document names, driven against a running server with curl.
 #
 # Setup the script assumes:
-#   - the server answers on ${SAKA_BASE:-http://localhost:3080}
+#   - the server answers on ${SAKA_BASE:-http://localhost:3000}
 #   - an account exists whose credentials are $SAKA_USER/$SAKA_PASS
 #     (default admin / Expecto-Patronum-9 — the dev bootstrap's shape)
 #   - the rate limits are loose enough for the run: serve with a throwaway
@@ -18,7 +18,7 @@
 # device grant, PAR, and the refusal shapes a conformance suite probes.
 set -euo pipefail
 
-BASE="${SAKA_BASE:-http://localhost:3080}"
+BASE="${SAKA_BASE:-http://localhost:3000}"
 USER="${SAKA_USER:-admin}"
 PASS="${SAKA_PASS:-Expecto-Patronum-9}"
 STAMP=$(date +%s)

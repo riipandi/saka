@@ -72,7 +72,7 @@ const storybookProject = await storybookTest({
  * The app's one vite pipeline: `vp build` compiles the SPA into the Go
  * embed (`web/output`), then the go plugin derives `assets.json` from the
  * manifest and compiles both binaries. `vp dev` runs the same pipeline
- * behind the Go proxy on :3080 — the browser holds one origin, the Go
+ * behind the Go proxy on :3000 — the browser holds one origin, the Go
  * binary owns the HTML document (web/shell.go), and manifest keys are
  * webapp-root-relative. Email templates are a separate package the
  * Taskfile builds first. Paths are `import.meta.dirname`-absolute so a

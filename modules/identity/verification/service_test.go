@@ -95,9 +95,9 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) *Servi
 		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3080", false, true, nil, nil, nil, nil, nil, nil, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil, nil, nil, nil, nil)
 
-	return NewService(pool, mail, client, nil, "http://localhost:3080", nil)
+	return NewService(pool, mail, client, nil, "http://localhost:3000", nil)
 }
 
 func TestSendEmailRefusesTheStatesItCannotServe(t *testing.T) {
@@ -234,13 +234,13 @@ func TestTheFlowEndToEnd(t *testing.T) {
 		ReleaseAfter: time.Hour,
 	})
 	require.NoError(t, err)
-	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3080", false, true, nil, nil, nil, nil, nil, nil, nil)
+	jobs.Register(client, time.Hour, nil, mail, pool, "http://localhost:3000", false, true, nil, nil, nil, nil, nil, nil, nil)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	client.Start(ctx)
 	t.Cleanup(func() { client.Shutdown(context.Background()) })
 
-	service := NewService(pool, mail, client, nil, "http://localhost:3080", nil)
+	service := NewService(pool, mail, client, nil, "http://localhost:3000", nil)
 	hermione := uuid.MustParse(seedUser(t, pool, "hermione", "hermione@example.com", false))
 	require.NoError(t, service.SendEmail(t.Context(), hermione))
 

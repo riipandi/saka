@@ -137,7 +137,7 @@ var envKeys = map[string]string{
 // gets the stack's own Basic credential for the compose OpenObserve, which is
 // what makes a fresh stack ship on the first run).
 var envExampleValues = map[string]string{
-	"app.base_url":                     "http://localhost:3080",
+	"app.base_url":                     "http://localhost:3000",
 	"app.secret_key":                   "__REPLACE_WITH_SECURE_ENCRYPTION_KEY__",
 	"auth.hibp_api_key":                "",
 	"auth.secret_key":                  "__REPLACE_WITH_SECRET_KEY_AUTHENTICATION__",

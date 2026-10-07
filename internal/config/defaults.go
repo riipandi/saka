@@ -82,7 +82,7 @@ const DefaultCacheMaxMemory = 32 << 20
 // server the SPA is served from in development. Production names its own
 // origin through the configuration, so a browser has to prove where the call
 // comes from rather than being trusted by default.
-var DefaultCORSOrigins = []string{"http://localhost:3080"}
+var DefaultCORSOrigins = []string{"http://localhost:3000"}
 
 // DefaultCORSMethods is the method list the dual surface needs: the GET and
 // POST the Connect protocol answers with, plus the PUT, PATCH, and DELETE the
@@ -217,7 +217,7 @@ const DefaultMailerTimeout = 15 * time.Second
 // with the bucket name and key following it in the path. A deployment may
 // point app.assets_url at an S3 bucket or a CDN origin — the value is one
 // URL, and nothing else changes with it.
-const DefaultAssetsURL = "http://localhost:3080/storage"
+const DefaultAssetsURL = "http://localhost:3000/storage"
 
 // Default returns the built-in configuration. These values are the lowest
 // precedence layer: every other source may replace them, but a key no source
@@ -388,7 +388,7 @@ func Default() Config {
 		},
 		Server: Server{
 			Host:            "0.0.0.0",
-			Port:            3080,
+			Port:            3000,
 			ReadTimeout:     15 * time.Second,
 			WriteTimeout:    30 * time.Second,
 			IdleTimeout:     60 * time.Second,

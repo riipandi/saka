@@ -3,7 +3,7 @@
 # code and one refresh token. The provider's compare-and-swap must answer
 # exactly one winner per round.
 set -euo pipefail
-BASE="${SAKA_BASE:-http://localhost:3080}"
+BASE="${SAKA_BASE:-http://localhost:3000}"
 ADMIN=$(cat /tmp/saka_token.txt)
 STAMP=$(date +%s)
 

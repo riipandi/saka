@@ -13,7 +13,7 @@ import { resolve } from 'node:path'
 // The server the tests drive: the debug build is the one that carries the
 // /debug/passkey pages, and the base-url flag binding is where the RP
 // identity derives from.
-const serverBaseURL = 'http://localhost:3080'
+const serverBaseURL = 'http://localhost:3000'
 // Paths are relative to this package: the config lives in
 // packages/e2e-tests and the runner's cwd is the package, while the Go
 // module and the build output stay at the repository root.

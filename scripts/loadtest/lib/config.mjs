@@ -1,7 +1,7 @@
 // The load test's configuration: every knob reads the environment once, so a
 // run's shape is named on the command line and never edited in code.
 
-export const BASE_URL = __ENV.K6_TARGET || 'http://localhost:3080'
+export const BASE_URL = __ENV.K6_TARGET || 'http://localhost:3000'
 
 // The account the load test signs in as. The seeded administrator covers the
 // admin-gated reads (audit log, queue admin); override for a narrower one.

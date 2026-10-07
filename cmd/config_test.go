@@ -127,7 +127,7 @@ func TestConfigGenerateWritesEveryKey(t *testing.T) {
 			"DATABASE_URL=postgresql://user:pass@localhost:5432/saka?sslmode=disable",
 			"AUTH_SECRET_KEY=" + testSecret,
 			"APP_SECRET_KEY=" + testSecret,
-			"PUBLIC_BASE_URL=http://localhost:3080",
+			"PUBLIC_BASE_URL=http://localhost:3000",
 		},
 	})
 	require.NoError(t, err)
@@ -208,7 +208,7 @@ func TestConfigValidateAcceptsAGoodFile(t *testing.T) {
 	}`)
 	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 	t.Setenv("AUTH_SECRET_KEY", testSecret)
-	t.Setenv("PUBLIC_BASE_URL", "http://localhost:3080")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:3000")
 
 	out, err := runConfigValidateCmd(t)
 	require.NoError(t, err)
@@ -256,7 +256,7 @@ func TestConfigValidateUsesTheConfigFileFlag(t *testing.T) {
 	}`)
 	t.Setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/saka?sslmode=disable")
 	t.Setenv("AUTH_SECRET_KEY", testSecret)
-	t.Setenv("PUBLIC_BASE_URL", "http://localhost:3080")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:3000")
 
 	out, err := runConfigValidateCmd(t, "--config-file="+path)
 	require.NoError(t, err)

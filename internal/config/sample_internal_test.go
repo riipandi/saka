@@ -241,7 +241,7 @@ func TestSampleRoundTripsThroughLoad(t *testing.T) {
 			"DATABASE_URL=" + probeDSN,
 			"AUTH_SECRET_KEY=" + probeSecret,
 			"APP_SECRET_KEY=" + probeSecret,
-			"PUBLIC_BASE_URL=http://localhost:3080",
+			"PUBLIC_BASE_URL=http://localhost:3000",
 			"MAILER_SMTP_USERNAME=bot",
 			"MAILER_SMTP_PASSWORD=" + probeSecret,
 		},
@@ -274,7 +274,7 @@ func TestSampleMailerDirectivesResolveFromTheEnvironment(t *testing.T) {
 			"DATABASE_URL=" + probeDSN,
 			"AUTH_SECRET_KEY=" + probeSecret,
 			"APP_SECRET_KEY=" + probeSecret,
-			"PUBLIC_BASE_URL=http://localhost:3080",
+			"PUBLIC_BASE_URL=http://localhost:3000",
 			"MAILER_SMTP_HOST=smtp.example.com",
 			"MAILER_SMTP_PORT=465",
 			"MAILER_SMTP_USERNAME=bot",
@@ -508,7 +508,7 @@ func TestEnvExampleCoversEveryDirectiveVariable(t *testing.T) {
 		values[name] = value
 	}
 	require.Len(t, lines, len(values))
-	assert.Equal(t, "http://localhost:3080", values["PUBLIC_BASE_URL"])
+	assert.Equal(t, "http://localhost:3000", values["PUBLIC_BASE_URL"])
 
 	expected := make(map[string]string, len(secretKeys)+len(envKeys))
 	for _, key := range secretKeys {

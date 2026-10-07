@@ -4,7 +4,7 @@
 // for itself.
 //
 //   k6 run scripts/loadtest/loadtest.mjs
-//   K6_PROFILE=load K6_TARGET=http://localhost:3080 k6 run scripts/loadtest/loadtest.mjs
+//   K6_PROFILE=load K6_TARGET=http://localhost:3000 k6 run scripts/loadtest/loadtest.mjs
 //
 // Prerequisites: a running server (task dev or a built release binary), a
 // seeded database (task db:migrate && task db:seed) whose account matches

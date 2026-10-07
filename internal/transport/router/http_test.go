@@ -119,7 +119,7 @@ func TestServerTakesTheTimeoutsFromTheConfig(t *testing.T) {
 	cfg := config.Default()
 	server := transport.NewServer(cfg, http.NotFoundHandler())
 
-	assert.Equal(t, "0.0.0.0:3080", server.Addr)
+	assert.Equal(t, "0.0.0.0:3000", server.Addr)
 	assert.Equal(t, cfg.Server.ReadTimeout, server.ReadTimeout)
 	assert.Equal(t, cfg.Server.WriteTimeout, server.WriteTimeout)
 	assert.Equal(t, cfg.Server.IdleTimeout, server.IdleTimeout)

@@ -53,13 +53,13 @@ func TestConfigFileIgnoresUnknownKeys(t *testing.T) {
 }
 
 func TestInterpolationFromEnvironment(t *testing.T) {
-	path := configFile(t, `"app": {"base_url": "http://${TEST_HOST}:3080"}, "log": {"level": "info"}`)
+	path := configFile(t, `"app": {"base_url": "http://${TEST_HOST}:3000"}, "log": {"level": "info"}`)
 	environ := append(baseEnv(), "TEST_HOST=example.test")
 
 	cfg, err := config.Load(config.Options{ConfigFile: path, Environ: environ})
 	require.NoError(t, err)
 
-	assert.Equal(t, "http://example.test:3080", cfg.App.BaseURL)
+	assert.Equal(t, "http://example.test:3000", cfg.App.BaseURL)
 	assert.Equal(t, "info", cfg.Log.Level, "a value with no directive is untouched")
 }
 

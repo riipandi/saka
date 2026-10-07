@@ -23,7 +23,7 @@ import (
 
 // testOrigin is the origin the ceremonies run against: the RP ID is its
 // host, the way the production derivation reads app.base_url.
-const testOrigin = "http://localhost:3080"
+const testOrigin = "http://localhost:3000"
 
 // fakeIssuer records the sessions the sign-ins opened and knows the
 // accounts the tests seeded.

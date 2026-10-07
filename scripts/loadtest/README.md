@@ -23,9 +23,9 @@ shape of the run is one of three profiles.
 ## Running
 
 ```sh
-task bench:loadtest                                   # smoke, localhost:3080
+task bench:loadtest                                   # smoke, localhost:3000
 task bench:loadtest --- K6_PROFILE=load               # the working shape
-K6_PROFILE=stress K6_TARGET=http://host:3080 k6 run scripts/loadtest/loadtest.mjs
+K6_PROFILE=stress K6_TARGET=http://host:3000 k6 run scripts/loadtest/loadtest.mjs
 ```
 
 ## Profiles
@@ -37,7 +37,7 @@ K6_PROFILE=stress K6_TARGET=http://host:3080 k6 run scripts/loadtest/loadtest.mj
 | `stress` | arrival-rate ramps to 300 req/s aggregate, ~11 min | the ceiling: the shape finds where the surface bends, not a target to live at |
 
 `K6_VUS` / `K6_DURATION` override the load profile's targets; `K6_TARGET`
-names the server (default `http://localhost:3080`).
+names the server (default `http://localhost:3000`).
 
 ## Scenarios
 

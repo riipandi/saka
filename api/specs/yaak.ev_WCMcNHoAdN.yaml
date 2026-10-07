@@ -12,7 +12,7 @@ parentId: null
 variables:
 - enabled: true
   name: apiBaseURL
-  value: http://localhost:3080
+  value: http://localhost:3000
   id: thTEajV9Ny
 - enabled: true
   name: identity

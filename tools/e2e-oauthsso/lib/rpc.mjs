@@ -1,6 +1,6 @@
 // The server the ladder walks against, and one ConnectRPC call over the
 // shared JSON codec — the wire contract the ladder judges, headers included.
-export const BASE = 'http://localhost:3080'
+export const BASE = 'http://localhost:3000'
 
 export async function rpc(method, body, token, reauth) {
   const headers = {

@@ -84,7 +84,7 @@ func newSessionRouter(t *testing.T, auth router.Authenticator, pool *datastore.P
 	// The step-up proofs are spent by the webauthn feature's consumer, built
 	// over the same pool; the settings reader is nil because the consumption
 	// reads no setting.
-	cfg.App.BaseURL = "http://localhost:3080"
+	cfg.App.BaseURL = "http://localhost:3000"
 	reauth, err := webauthn.NewService(cfg, pool, webauthn.NewRepository(), issuer, nil,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	require.NoError(t, err)
