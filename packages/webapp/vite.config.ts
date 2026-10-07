@@ -206,6 +206,7 @@ export default defineConfig(({ mode }) => ({
       }
     ]
   },
+  resolve: { tsconfigPaths: true },
   build: {
     manifest: true,
     emptyOutDir: true,

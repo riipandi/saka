@@ -9,7 +9,7 @@ tasks:
     desc: Dev loop behind the Go proxy
     deps: [rpc:generate, email:build]
     cmds:
-      - SKIP_GO_BUILD=1 pnpm exec vp build
+      - pnpm exec vp run webapp#prebuild
       - pnpm exec vp run webapp#dev {{.CLI_ARGS}}
 
   # The one door to the application's CLI: `task run -- <command> [args]`

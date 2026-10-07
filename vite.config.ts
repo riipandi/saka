@@ -147,7 +147,6 @@ export default defineConfig({
     ],
     ignorePatterns: ignoredPatterns
   },
-  resolve: { tsconfigPaths: true },
   run: {
     cache: { tasks: true },
     tasks: {
