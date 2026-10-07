@@ -71,11 +71,9 @@ services:
     post_start:
       # docker-compose exec silo /usr/bin/mc alias ls
       - command: sh -c "/usr/bin/mc mb local/devbucket --ignore-existing"
-      - command: sh -c "/usr/bin/mc mb local/otelbucket --ignore-existing"
       - command: sh -c "/usr/bin/mc mb local/testbucket --ignore-existing"
       - command: sh -c "/usr/bin/mc mb local/dbarchive --ignore-existing"
       - command: sh -c "/usr/bin/mc anonymous set download local/devbucket"
-      - command: sh -c "/usr/bin/mc anonymous set download local/otelbucket"
       - command: sh -c "/usr/bin/mc anonymous set download local/testbucket"
     shm_size: 256m # set shared memory limit
     mem_limit: 512m # set memory limit
@@ -105,7 +103,7 @@ services:
   nginx:
     <<: *common
     # image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-slim}
-    image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-otel}
+    image: docker.io/nginx:${NGINX_VERSION:-1.31-alpine-slim}
     hostname: nginx
     ports: ["9180:9180", "3443:3443", "3220:3220"]
     volumes:

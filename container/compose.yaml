@@ -16,7 +16,6 @@ x-common: &common
 include:
   - ./compose-dev.yaml
   - ./compose-mock.yaml
-  - ./compose-sre.yaml
 
 #####################################################################
 # oidc-test-client drives Saka's own OIDC/OAuth surface in E2E:

@@ -40,9 +40,6 @@ includes:
   docker:
     taskfile: ./scripts/task-container.yml
     flatten: true
-  metrics:
-    taskfile: ./scripts/task-metrics.yml
-    flatten: true
 
 tasks:
   default:
