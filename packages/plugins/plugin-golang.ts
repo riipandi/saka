@@ -207,7 +207,7 @@ function runGoBuild(cmd: string, args: string[], cwd: string): Promise<GoBuildRe
 }
 
 export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
-  if (process.env.VITEST || process.env.STORYBOOK || process.env.SKIP_GO_BUILD) {
+  if (process.env.VITEST || process.env.SKIP_GO_BUILD) {
     return { name: 'vite-plugin-go' }
   }
 

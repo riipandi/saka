@@ -1,13 +1,12 @@
-import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite-plus'
 import pkg from './package.json' with { type: 'json' }
 import email from './packages/plugins/plugin-email.ts'
 import golang from './packages/plugins/plugin-golang.ts'
-import embedManifest from './packages/plugins/plugin-manifest.ts'
+// The SPA build contract lives in the webapp package and is composed here,
+// never duplicated — see packages/webapp/vite.config.ts.
+import { webappViteConfig } from './packages/webapp/vite.config.ts'
 
-// const isTestOrCI = process.env.CI || process.env.VITEST
-const isStorybook = process.env.STORYBOOK === 'true'
 const APP_VERSION = process.env.BUILD_VERSION || pkg.version
 const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString()
 const BUILD_HASH = process.env.BUILD_HASH || 'dev'
@@ -41,42 +40,43 @@ const ignoredPatterns = [
 ]
 
 /**
- * Plugin Comlink owns worker construction and must register first: only
- * plugins that transform ComlinkWorker call sites may precede it.
+ * One binary pipeline, composed: the webapp package owns the SPA build
+ * contract (manifest keys, `web/output`, the loopback dev port); this root
+ * config owns the repo-wide toolchain blocks (staged, fmt, lint, run tasks)
+ * and closes the pass — the email plugin compiles the React Email templates
+ * into the Go embed, then the go plugin compiles both binaries around the
+ * composed SPA plugin list.
  *
- * Plugin Email must be registered before the go plugin: its closeBundle
- * compiles the email templates that web/embed.go pulls into the go binary.
- *
- * With plugin Go, the SPA bundle and the email templates are compiled
- * once and embedded into both binaries.
+ * Plugin order here is the contract: the webapp list starts with comlink
+ * (it owns worker construction and must register first), email's
+ * closeBundle must precede golang's so the binary always embeds freshly
+ * compiled templates (web/embed.go: email/*.tmpl).
  *
  * Backend integration (the Vite guide's): the Go binary owns the HTML
- * document — web/shell.go renders it — so there is no index.html here.
- * The dev server is the compiler behind the Go port, not an origin of its
- * own: the browser talks to :3080 only, the shell's fragment carries
- * same-origin paths, and the debug build proxies the module graph and the
- * HMR socket to this server. In production the shell resolves every tag
- * from the build manifest, one entry per page.
- *
- * Monorepo: the SPA sources live in packages/webapp (the package builds
- * the same bundle standalone — this config's vite root points at that
- * package, so both builds agree on the manifest keys), the email templates
- * in packages/email (`vp build packages/email` compiles them alone), the
- * Vite plugins in packages/plugins, and Playwright in packages/e2e-tests.
- * This root config is still the canonical binary pipeline: the email
- * plugin compiles the templates into the Go embed directories, and the go
- * plugin closes the pass by compiling both binaries. The manifest keys
- * are webapp-root-relative — web/shell.go names the same key.
+ * document — web/shell.go renders it — so there is no index.html. The dev
+ * server is the compiler behind the Go port, not an origin of its own: the
+ * browser talks to :3080 only, the shell's fragment carries same-origin
+ * paths, and the debug build proxies the module graph and the HMR socket
+ * to this server. In production the shell resolves every tag from the
+ * build manifest, one entry per page.
  *
  * The manifest lives under `.vite/`, a dot directory go:embed silently
  * skips — deliberate: the Vite-internal manifest never ships in the
  * binary. The Go fragment reads the derived copy (`assets.json`) the
- * shared `VitePluginEmbedManifest` plugin writes after every build, so every
- * pipeline that compiles the frontend (task build, goreleaser, Docker,
- * CI) feeds the embed from one source.
+ * shared `VitePluginEmbedManifest` plugin writes after every build, so
+ * every pipeline that compiles the frontend (task build, goreleaser,
+ * Docker, CI) feeds the embed from one source.
  */
-
 export default defineConfig({
+  ...webappViteConfig,
+  // Restated literally so vp's static package detection sees the root
+  // package as an app — a spread hides the key from it (bare `vp build` at
+  // the workspace root would refuse to pick a target). The value must stay
+  // identical to the composed base.
+  root: resolve('packages/webapp'),
+  // The root config IS the binary pipeline (root: packages/webapp via the
+  // composed base), so `vp build` / `vp dev` from the workspace root act on
+  // it directly; `vp -C packages/webapp build` runs the standalone SPA pass.
   staged: {
     '*.{ts,tsx,js,jsx,css,json}': 'vp check --fix',
     '*.go': 'gofmt -w'
@@ -120,12 +120,19 @@ export default defineConfig({
   run: {
     cache: true,
     tasks: {
-      typecheck: 'pnpm exec tsc -b --noEmit'
+      // Each package checks against its own tsconfig — the root config
+      // covers only the root-level TS (see tsconfig.json), so aliases
+      // (`#/`, `~/codegen`) resolve where they belong and one package's
+      // drift can never satisfy another's contract.
+      typecheck:
+        'pnpm exec tsc -p packages/webapp --noEmit && pnpm exec tsc -p packages/plugins --noEmit && ' +
+        'pnpm exec tsc -p packages/email --noEmit && pnpm exec tsc -p packages/e2e-tests --noEmit && ' +
+        'pnpm exec tsc -p . --noEmit'
     }
   },
   plugins: [
-    embedManifest(),
-    react({ compiler: true }),
+    // ...webappViteConfig.plugins → comlink, embed-manifest, react.
+    ...webappViteConfig.plugins,
     email({
       templateDir: resolve('packages/email/templates'),
       outputDir: resolve('web/email')
@@ -152,21 +159,5 @@ export default defineConfig({
         }
       }
     })
-  ],
-  resolve: { tsconfigPaths: true },
-  root: resolve('packages/webapp'),
-  publicDir: resolve('packages/webapp/public'),
-  build: {
-    manifest: true,
-    emptyOutDir: true,
-    chunkSizeWarningLimit: 1024 * 4,
-    outDir: resolve('web/output'),
-    reportCompressedSize: false,
-    rolldownOptions: {
-      input: { app: resolve('packages/webapp/src/main.tsx') }
-    }
-  },
-  // The compiler's port: bound to the loopback, proxied by the Go
-  // debug build, and never opened by a developer or a deployment.
-  server: isStorybook ? undefined : { port: 5173, host: '127.0.0.1', strictPort: true }
+  ]
 })

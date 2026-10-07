@@ -1,5 +1,11 @@
 {
     "$schema": "https://json.schemastore.org/tsconfig",
-    "extends": "../../tsconfig.json",
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "paths": {
+            "~/codegen/*": ["../../codegen/proto/ts/*"],
+            "#/*": ["./src/*"]
+        }
+    },
     "include": ["src", "vite.config.ts"]
 }

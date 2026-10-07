@@ -139,7 +139,7 @@ async function buildTemplateFile(
 }
 
 export default function VitePluginEmail(userOptions: PluginEmailOptions = {}): Plugin {
-  if (process.env.VITEST || process.env.STORYBOOK) {
+  if (process.env.VITEST) {
     return { name: 'vite-plugin-email' }
   }
 

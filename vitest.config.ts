@@ -1,69 +1,25 @@
-import { resolve } from 'node:path'
-import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
-const excludedPath = ['node_modules', 'packages/*/node_modules', 'tests-e2e', 'e2e-tests']
-
+/**
+ * One project per live test surface. Surfaces without tests carry no
+ * project block — a project is added when its first test lands, not
+ * pre-wired against directories that do not exist (the former `api-client`
+ * and `app` projects pointed at code that was never written).
+ */
 export default defineConfig({
   test: {
     reporters:
       process.env.GITHUB_ACTIONS === 'true'
         ? [['github-actions']]
-        : [
-            ['default'],
-            ['json', { outputFile: resolve('.output/tests-results/vitest-results.json') }],
-            ['html', { outputDir: resolve('.output/tests-results') }]
-          ],
-    browser: { traceView: true },
-    coverage: {
-      provider: 'v8',
-      reporter: ['html-spa', 'text-summary'],
-      reportsDirectory: resolve('.output/tests-results/coverage'),
-      include: ['./api/client/**/*.{js,ts}'],
-      cleanOnRerun: true,
-      clean: true,
-      thresholds: {
-        global: {
-          statements: 80,
-          branches: 70,
-          functions: 75,
-          lines: 80
-        }
-      }
-    },
+        : [['default'], ['json', { outputFile: './.output/tests-results/vitest-results.json' }]],
     projects: [
-      {
-        extends: true,
-        resolve: { tsconfigPaths: true },
-        test: {
-          name: 'api-client',
-          environment: 'node',
-          env: loadEnv('test', process.cwd(), ''),
-          include: ['./api/client/**/*.test.ts'],
-          exclude: excludedPath,
-          globals: true
-        }
-      },
-      {
-        extends: true,
-        resolve: { tsconfigPaths: true },
-        test: {
-          name: 'app',
-          environment: 'happy-dom',
-          include: ['./packages/webapp/**/*.test.ts'],
-          exclude: excludedPath,
-          globals: true
-        }
-      },
       {
         extends: true,
         resolve: { tsconfigPaths: true },
         test: {
           name: 'plugins',
           environment: 'node',
-          include: ['./packages/plugins/**/*.test.ts'],
-          exclude: excludedPath,
-          globals: true
+          include: ['./packages/plugins/**/*.test.ts']
         }
       }
     ]
