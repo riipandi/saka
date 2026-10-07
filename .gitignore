@@ -2,6 +2,7 @@
 /.pnp
 /.husky
 /.atlas
+/.task
 .pnp.js
 .DS_Store
 .DS_Store?
