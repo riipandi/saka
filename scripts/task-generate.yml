@@ -4,7 +4,7 @@ version: "3"
 
 tasks:
   cert:generate:
-    desc: Generate local HTTPS certificates into storage/config
+    desc: Generate local HTTPS certificates
     vars:
       CERT_DIR: storage/config
     cmds:
@@ -24,7 +24,7 @@ tasks:
       - openssl x509 -in {{.CERT_DIR}}/localhost_crt.pem -noout -subject -ext subjectAltName
 
   cert:trust:
-    desc: Trust the local CA so browsers accept the generated certificates
+    desc: Trust the local CA
     cmds:
       - |
         if ! command -v mkcert >/dev/null 2>&1; then
@@ -33,13 +33,14 @@ tasks:
         fi
         mkcert -install
 
+  # The PKCS12 truststore the conformance suite's JVM imports.
   cert:conformance:
-    desc: Build the PKCS12 truststore the conformance suite's JVM imports
+    desc: Build the conformance suite truststore
     cmds:
       - ./scripts/cert-conformance.sh
 
   rpc:generate:
-    desc: Generate Go + TypeScript from api/connect/*.proto (skipped when the contracts are unchanged)
+    desc: Generate Go + TypeScript from the proto contracts
     sources:
       - api/connect/**/*.proto
       - buf.yaml
@@ -59,17 +60,17 @@ tasks:
 
   rpc:breaking:
     internal: true
-    desc: Check protobuf contracts for breaking changes
+    desc: Check contracts for breaking changes
     cmd: go tool buf breaking --against '.git#ref=HEAD~1,subdir=api/connect'
 
   rpc:stamp:
     internal: true
-    desc: Refresh the contract stamp used by stale detection
+    desc: Refresh the contract stamp
     cmd: sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > .output/rpc-gen.stamp'
 
   rpc:stale:
     internal: true
-    desc: Fail when generated code is out of date with the contracts
+    desc: Fail when codegen is stale
     cmds:
       - sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > /tmp/rpc-stamp.now'
       - sh -c 'test -f .output/rpc-gen.stamp || (echo "no contract stamp yet — run task rpc:generate" && exit 1)'

@@ -22,12 +22,6 @@ includes:
   build:
     taskfile: ./scripts/task-build.yml
     flatten: true
-  command:
-    taskfile: ./scripts/task-command.yml
-    flatten: true
-  database:
-    taskfile: ./scripts/task-database.yml
-    flatten: true
   cert:
     taskfile: ./scripts/task-generate.yml
     flatten: true

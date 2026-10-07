@@ -64,7 +64,7 @@ The smoke probes (`mailer:smoke`, `logger:smoke`, `otel:smoke`) were removed —
 
 ### migration.go
 
-DSN resolution and the migration commands. The DSN comes from `envfile.DatabaseURL`, resolved from the root `--env-file` first and the process environment second; nothing else opens a connection. `migrate:up` and `migrate:down` ask for confirmation only when stdin is a real terminal (checked with `golang.org/x/term`, because `/dev/null` is also a character device) and proceed immediately when piped, so `task db:migrate` and CI never block. `up` takes `--to`, `down` takes `--count`; both take `--dry-run` and `--force`. `migrate:status` lists every embedded migration with the time it last ran and closes with the most recent run. `migrate:version` prints the bare version number for scripts and is the only command with no target header.
+DSN resolution and the migration commands. The DSN comes from `envfile.DatabaseURL`, resolved from the root `--env-file` first and the process environment second; nothing else opens a connection. `migrate:up` and `migrate:down` ask for confirmation only when stdin is a real terminal (checked with `golang.org/x/term`, because `/dev/null` is also a character device) and proceed immediately when piped, so `task run -- migrate:up` and CI never block. `up` takes `--to`, `down` takes `--count`; both take `--dry-run` and `--force`. `migrate:status` lists every embedded migration with the time it last ran and closes with the most recent run. `migrate:version` prints the bare version number for scripts and is the only command with no target header.
 
 ### database.go, database_cmd.go (`db:export` / `db:import`)
 

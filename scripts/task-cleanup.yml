@@ -24,7 +24,7 @@ tasks:
       - pnpm exec vp fmt --write .
 
   check:
-    desc: Run all checks (go vet + migration files + JS formatting)
+    desc: Run go vet, migration check, and JS checks
     cmds:
       - go vet ./...
       - go run -tags debug ./cmd migrate:validate

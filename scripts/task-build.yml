@@ -4,7 +4,7 @@ version: "3"
 
 tasks:
   build:
-    desc: Build frontend + Go binaries (debug and release in one pass)
+    desc: Build the frontend and both Go binaries
     deps: [rpc:generate]
     cmds:
       - pnpm exec vp run email#build
