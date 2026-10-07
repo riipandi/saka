@@ -71,9 +71,11 @@ services:
     post_start:
       # docker-compose exec silo /usr/bin/mc alias ls
       - command: sh -c "/usr/bin/mc mb local/devbucket --ignore-existing"
+      - command: sh -c "/usr/bin/mc mb local/otelbucket --ignore-existing"
       - command: sh -c "/usr/bin/mc mb local/testbucket --ignore-existing"
       - command: sh -c "/usr/bin/mc mb local/dbarchive --ignore-existing"
       - command: sh -c "/usr/bin/mc anonymous set download local/devbucket"
+      - command: sh -c "/usr/bin/mc anonymous set download local/otelbucket"
       - command: sh -c "/usr/bin/mc anonymous set download local/testbucket"
     shm_size: 256m # set shared memory limit
     mem_limit: 512m # set memory limit
