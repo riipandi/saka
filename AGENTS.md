@@ -78,3 +78,7 @@ If they already chose in the same thread, do not re-ask. If new facts change the
 - Message: `{feat,fix,docs,refactor,chore}[(scope)]: <concise message>`. Do not push.
 - Do not commit unless this turn asked for it. When the work is finished, recommend the one-line message and list the paths.
 - Never run `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git commit --no-verify`, or `git push --force`.
+
+## Related Docs
+
+- `.llms/stylex-authoring.md` — read before writing styles. `.llms/stylex-installation.md` — StyleX setup.

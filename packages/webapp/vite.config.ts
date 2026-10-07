@@ -1,18 +1,18 @@
-import stylex from '@stylexjs/unplugin/vite'
-import react from '@vitejs/plugin-react'
-import { resolve } from 'node:path'
-import golang from 'plugins/plugin-golang'
-import { comlink } from 'vite-plugin-comlink'
-import { defineConfig } from 'vite-plus'
+import stylex from "@stylexjs/unplugin/vite";
+import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
+import golang from "plugins/plugin-golang";
+import { comlink } from "vite-plugin-comlink";
+import { defineConfig } from "vite-plus";
 
 // Version stamps shared by every Go target; release adds its static-link flags.
-const goModule = 'github.com/riipandi/saka'
-const projectRoot = resolve(import.meta.dirname, '../..')
+const goModule = "github.com/riipandi/saka";
+const projectRoot = resolve(import.meta.dirname, "../..");
 const goVersionLdflags = [
-  `-X ${goModule}/internal/config.AppVersion=${process.env.BUILD_VERSION || '0.0.0'}`,
-  `-X ${goModule}/internal/config.BuildHash=${process.env.BUILD_HASH || 'dev'}`,
-  `-X ${goModule}/internal/config.BuildDate=${process.env.BUILD_DATE || new Date().toISOString()}`
-]
+  `-X ${goModule}/internal/config.AppVersion=${process.env.BUILD_VERSION || "0.0.0"}`,
+  `-X ${goModule}/internal/config.BuildHash=${process.env.BUILD_HASH || "dev"}`,
+  `-X ${goModule}/internal/config.BuildDate=${process.env.BUILD_DATE || new Date().toISOString()}`,
+];
 
 /**
  * The app's one vite pipeline — the SPA and the Go binary that serves it
@@ -37,51 +37,51 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     comlink(),
     stylex({
-      aliases: { '#/*': resolve('./src/*') },
-      enableDevClassNames: mode === 'development',
-      useCSSLayers: { before: ['reset'], prefix: 'stylex' }
+      aliases: { "#/*": resolve("./src/*") },
+      enableDevClassNames: mode === "development",
+      useCSSLayers: { before: ["reset"], prefix: "stylex" },
     }),
     react({ compiler: true }),
     golang({
-      packageName: 'saka',
+      packageName: "saka",
       root: projectRoot,
-      packagePath: resolve(projectRoot, 'cmd'),
-      binArgs: ['--env-file=.env.local', 'serve'],
+      packagePath: resolve(projectRoot, "cmd"),
+      binArgs: ["--env-file=.env.local", "serve"],
       build: {
-        embedDir: resolve(projectRoot, 'web/output'),
-        devTarget: 'debug',
+        embedDir: resolve(projectRoot, "web/output"),
+        devTarget: "debug",
         targets: {
           debug: {
-            outputDir: resolve(projectRoot, 'build/debug'),
-            buildTags: ['debug', 'noasm', 'nounsafe'],
-            ldflags: goVersionLdflags
+            outputDir: resolve(projectRoot, "build/debug"),
+            buildTags: ["debug", "noasm", "nounsafe"],
+            ldflags: goVersionLdflags,
           },
           release: {
-            outputDir: resolve(projectRoot, 'build/release'),
-            buildTags: ['release', 'noasm', 'nounsafe'],
-            buildFlags: ['-trimpath', '-buildmode=pie', '-buildvcs=false'],
-            ldflags: [...goVersionLdflags, '-w -s -extldflags -static']
-          }
-        }
-      }
-    })
+            outputDir: resolve(projectRoot, "build/release"),
+            buildTags: ["release", "noasm", "nounsafe"],
+            buildFlags: ["-trimpath", "-buildmode=pie", "-buildvcs=false"],
+            ldflags: [...goVersionLdflags, "-w -s -extldflags -static"],
+          },
+        },
+      },
+    }),
   ],
-  envPrefix: ['VITE_', 'PUBLIC_'],
+  envPrefix: ["VITE_", "PUBLIC_"],
   resolve: { tsconfigPaths: true },
   root: resolve(import.meta.dirname),
-  publicDir: resolve(import.meta.dirname, 'public'),
+  publicDir: resolve(import.meta.dirname, "public"),
   build: {
     manifest: true,
     emptyOutDir: true,
     chunkSizeWarningLimit: 1024 * 4,
-    outDir: resolve(import.meta.dirname, '../../web/output'),
+    outDir: resolve(import.meta.dirname, "../../web/output"),
     reportCompressedSize: false,
     rolldownOptions: {
-      input: { app: resolve(import.meta.dirname, 'src/main.tsx') }
-    }
+      input: { app: resolve(import.meta.dirname, "src/main.tsx") },
+    },
   },
   worker: { plugins: () => [comlink()] },
   // IPv4 loopback on purpose: the Go debug proxy targets 127.0.0.1, and a
   // bare `localhost` bind lands on ::1, which the proxy cannot reach.
-  server: { port: 5173, host: '127.0.0.1', strictPort: true }
-}))
+  server: { port: 5173, host: "127.0.0.1", strictPort: true },
+}));

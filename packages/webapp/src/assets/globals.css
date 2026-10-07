@@ -1,0 +1,160 @@
+@import "./reset.css";
+@import "./fontface.css";
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family:
+      "Mona Sans Variable", system-ui, -apple-system, Roboto, Aptos, Helvetica, sans-serif;
+  }
+}
+
+@layer utilities {
+  .debug {
+    border-width: 1px;
+    border-style: dashed;
+    border-color: #f87171;
+  }
+}
+
+/*
+ * ScrollArea fade — registered custom properties so the fade mask can be
+ * animated by scroll-driven animations (Chrome/Edge/Safari 26+; other
+ * browsers skip the fade entirely). Kept as raw CSS because StyleX cannot
+ * declare @property. Consumed by `scrollAreaFadeStyles` in
+ * app/components/base/scroll-area/scroll-area.stylex.ts.
+ */
+@property --scroll-area-fade-block-start {
+  syntax: "<length>";
+  initial-value: 0px;
+  inherits: false;
+}
+
+@property --scroll-area-fade-block-end {
+  syntax: "<length>";
+  initial-value: 0px;
+  inherits: false;
+}
+
+@property --scroll-area-fade-inline-start {
+  syntax: "<length>";
+  initial-value: 0px;
+  inherits: false;
+}
+
+@property --scroll-area-fade-inline-end {
+  syntax: "<length>";
+  initial-value: 0px;
+  inherits: false;
+}
+
+@keyframes scroll-area-fade-block-start {
+  from {
+    --scroll-area-fade-block-start: 0px;
+  }
+  to {
+    --scroll-area-fade-block-start: 32px;
+  }
+}
+
+@keyframes scroll-area-fade-block-end {
+  from {
+    --scroll-area-fade-block-end: 32px;
+  }
+  to {
+    --scroll-area-fade-block-end: 0px;
+  }
+}
+
+@keyframes scroll-area-fade-inline-start {
+  from {
+    --scroll-area-fade-inline-start: 0px;
+  }
+  to {
+    --scroll-area-fade-inline-start: 32px;
+  }
+}
+
+@keyframes scroll-area-fade-inline-end {
+  from {
+    --scroll-area-fade-inline-end: 32px;
+  }
+  to {
+    --scroll-area-fade-inline-end: 0px;
+  }
+}
+
+/* TanStack chart tooltip — rows without a colored indicator render an
+   invisible swatch span; hide it and collapse the row to label + value.
+   Rows with a swatch keep the native three-column grid. `!important` is
+   required: the native rows set their grid inline. */
+.ts-chart-tooltip .ts-chart-tooltip__row > span:first-child:not(.ts-chart-tooltip__swatch):empty {
+  display: none;
+}
+
+.ts-chart-tooltip .ts-chart-tooltip__row:not(:has(> .ts-chart-tooltip__swatch)) {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+
+.ts-chart-tooltip .ts-chart-tooltip__row:has(> .ts-chart-tooltip__swatch) {
+  grid-template-columns: 0.55rem minmax(0, 1fr) auto !important;
+}
+
+/* Data grid cell selection — imperative viewport state. The fill drag and
+   the built-in cell editor toggle `data-cell-filling` / `data-cell-editing`
+   on the grid viewport outside React (pointermove-rate writes), so StyleX
+   cannot key the affected cells' styles off React props. While either is
+   live, the source cells' own ::before chrome rests: the fill-drag preview
+   outline or the editor outline is the ONE border, otherwise its lines
+   double against the region border at every shared edge. */
+[data-cell-filling] [data-cell-selected]::before,
+[data-cell-filling] [data-cell-focused]::before,
+[data-cell-editing] [data-cell-focused]::before {
+  display: none;
+}
+
+/* Data grid built-in cell editor — the textarea control grows downward over
+   the rows below as the text wraps (the Sheets model). `field-sizing` is not
+   yet a StyleX-validated property, so it ships as raw CSS keyed on the
+   editor's multiline attribute. */
+[data-slot="data-grid-cell-editor"][data-multiline="true"] {
+  field-sizing: content;
+  overflow: hidden;
+}
+
+/* Data grid last-row separator — when a pagination bar directly follows the
+   grid container, the final body row keeps its bottom border (the source's
+   `[data-grid]+[data-grid-pagination]` sibling selector with an ancestor
+   `:has()`, which StyleX cannot compile). */
+[data-slot="data-grid"]:has(+ [data-slot="data-grid-pagination"]) tbody tr:last-child > td {
+  border-bottom-width: 1px;
+}
+
+/* Data grid header icons — Keyline svgs ship at their 24px attribute size,
+   and the project Button carries no descendant-svg sizing rule (shadcn's
+   `[&_svg]:size-4` / label's `[&_svg]:size-3.5`), so header chrome sizes
+   descendant svgs here. Element selectors lose to StyleX classes, so icons
+   with explicit sizes (sort 13px, pin 14px, menu 14px) keep theirs. */
+[data-slot="data-grid"] thead button svg {
+  width: 16px;
+  height: 16px;
+}
+
+[data-slot="data-grid"] thead span svg {
+  width: 14px;
+  height: 14px;
+}
