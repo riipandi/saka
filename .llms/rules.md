@@ -11,7 +11,7 @@ detail behind them. Read the section a change touches before touching it.
 - `task rpc:generate` rewrites Go and TypeScript from `api/connect/*.proto`. `task rpc:stale` fails when the contract moved and the generated code did not.
 - `task cert:generate` / `cert:trust` write `storage/config/localhost_{key,crt}.pem` (mkcert, else openssl). nginx in `container/compose-dev.yaml` reads them.
 - Integration tests call `testutils.SkipWithoutDocker(t)` first, then `StartPostgres` / `StartMailpit` / `StartMinIO` / `StartValkey`. A missing daemon skips. Do not widen a timeout to hide a hung container.
-- Local Postgres: `docker compose -f container/compose.yaml up -d pgsql`. `task metrics:up` starts the observability half. Full stack and observability share that compose file.
+- Local Postgres: `docker compose -f container/compose.yaml up -d pgsql`. The observability half (openobserve, otelcol) rides the same compose file.
 
 ## Contracts
 
