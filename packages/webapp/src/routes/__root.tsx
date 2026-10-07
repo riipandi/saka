@@ -1,0 +1,43 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { AnyRouteMatch } from '@tanstack/react-router'
+import { Outlet, createRootRouteWithContext, useMatches } from '@tanstack/react-router'
+import { UIProvider } from '#/components/base/provider'
+import { ThemeProvider } from '#/components/theme'
+import { AuthProvider } from '#/libraries/guard/auth-provider'
+import { GlobalNotFound, GlobalError } from './-boundaries'
+import DevTools from './-devtools'
+
+export interface GlobalContext {
+  queryClient: QueryClient
+}
+
+export type BreadcrumbValue = string | string[] | ((match: AnyRouteMatch) => string | string[])
+
+export const Route = createRootRouteWithContext<GlobalContext>()({
+  notFoundComponent: GlobalNotFound,
+  errorComponent: GlobalError,
+  component: RootComponent,
+  loader({ context }) {
+    return { ...context }
+  }
+})
+
+function RootComponent() {
+  const matches = useMatches()
+  const { queryClient } = Route.useRouteContext()
+  const pageTitle = matches.findLast((match) => match.staticData?.pageTitle)?.staticData?.pageTitle
+
+  return (
+    <UIProvider direction='ltr'>
+      <title>{pageTitle ? `${pageTitle} - React Application` : 'React Application'}</title>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ThemeProvider disableTransitionOnChange>
+            <Outlet />
+          </ThemeProvider>
+        </AuthProvider>
+        <DevTools queryClient={queryClient} />
+      </QueryClientProvider>
+    </UIProvider>
+  )
+}

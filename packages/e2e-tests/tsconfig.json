@@ -4,5 +4,5 @@
     "compilerOptions": {
         "tsBuildInfoFile": "../../.output/e2e.tsbuildinfo"
     },
-    "include": ["**/*.ts"]
+    "include": ["**/*.ts", "**/*.tsx"]
 }

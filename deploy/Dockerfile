@@ -17,7 +17,7 @@ ENV VP_NODE_MANAGER=yes VP_PM_MANAGER=yes
 
 # Keep in sync with `devEngines.packageManager` in package.json.
 ARG NODE_VERSION=24.21
-ARG PNPM_VERSION=12.8.1
+ARG PNPM_VERSION=12.9.1
 ARG VP_VERSION=1.0.0
 
 # Install system dependencies (optional tools for building and debugging)

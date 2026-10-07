@@ -21,7 +21,10 @@
  * that do not exist.
  */
 
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite-plus'
+
+const testOutputFile = resolve('.output/tests-results/vitest-results.json')
 
 const ignoredPatterns = [
   '.output',
@@ -45,7 +48,7 @@ export default defineConfig({
     reporters:
       process.env.GITHUB_ACTIONS === 'true'
         ? [['github-actions']]
-        : [['default'], ['json', { outputFile: './.output/tests-results/vitest-results.json' }]],
+        : [['default'], ['json', { outputFile: testOutputFile }]],
     projects: [
       {
         extends: true,
@@ -157,6 +160,7 @@ export default defineConfig({
     ],
     ignorePatterns: ignoredPatterns
   },
+  resolve: { tsconfigPaths: true },
   run: {
     cache: { tasks: true },
     tasks: {

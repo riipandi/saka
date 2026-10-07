@@ -1,5 +1,5 @@
-@import "./reset.css";
-@import "./fontface.css";
+@import './reset.css';
+@import './fontface.css';
 
 @layer base {
   *,
@@ -19,7 +19,13 @@
     margin: 0;
     padding: 0;
     font-family:
-      "Mona Sans Variable", system-ui, -apple-system, Roboto, Aptos, Helvetica, sans-serif;
+      'Mona Sans Variable',
+      system-ui,
+      -apple-system,
+      Roboto,
+      Aptos,
+      Helvetica,
+      sans-serif;
   }
 }
 
@@ -39,25 +45,25 @@
  * app/components/base/scroll-area/scroll-area.stylex.ts.
  */
 @property --scroll-area-fade-block-start {
-  syntax: "<length>";
+  syntax: '<length>';
   initial-value: 0px;
   inherits: false;
 }
 
 @property --scroll-area-fade-block-end {
-  syntax: "<length>";
+  syntax: '<length>';
   initial-value: 0px;
   inherits: false;
 }
 
 @property --scroll-area-fade-inline-start {
-  syntax: "<length>";
+  syntax: '<length>';
   initial-value: 0px;
   inherits: false;
 }
 
 @property --scroll-area-fade-inline-end {
-  syntax: "<length>";
+  syntax: '<length>';
   initial-value: 0px;
   inherits: false;
 }
@@ -131,7 +137,7 @@
    the rows below as the text wraps (the Sheets model). `field-sizing` is not
    yet a StyleX-validated property, so it ships as raw CSS keyed on the
    editor's multiline attribute. */
-[data-slot="data-grid-cell-editor"][data-multiline="true"] {
+[data-slot='data-grid-cell-editor'][data-multiline='true'] {
   field-sizing: content;
   overflow: hidden;
 }
@@ -140,7 +146,7 @@
    grid container, the final body row keeps its bottom border (the source's
    `[data-grid]+[data-grid-pagination]` sibling selector with an ancestor
    `:has()`, which StyleX cannot compile). */
-[data-slot="data-grid"]:has(+ [data-slot="data-grid-pagination"]) tbody tr:last-child > td {
+[data-slot='data-grid']:has(+ [data-slot='data-grid-pagination']) tbody tr:last-child > td {
   border-bottom-width: 1px;
 }
 
@@ -149,12 +155,12 @@
    `[&_svg]:size-4` / label's `[&_svg]:size-3.5`), so header chrome sizes
    descendant svgs here. Element selectors lose to StyleX classes, so icons
    with explicit sizes (sort 13px, pin 14px, menu 14px) keep theirs. */
-[data-slot="data-grid"] thead button svg {
+[data-slot='data-grid'] thead button svg {
   width: 16px;
   height: 16px;
 }
 
-[data-slot="data-grid"] thead span svg {
+[data-slot='data-grid'] thead span svg {
   width: 14px;
   height: 14px;
 }

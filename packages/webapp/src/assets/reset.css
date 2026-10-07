@@ -36,7 +36,7 @@
   }
   :where(code, kbd, samp, pre) {
     font-family:
-      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
       monospace;
     font-size: 1em;
   }
@@ -73,13 +73,13 @@
     margin: 0;
     padding: 0;
   }
-  :where(button, [type="button"], [type="reset"], [type="submit"]) {
+  :where(button, [type='button'], [type='reset'], [type='submit']) {
     -webkit-appearance: button;
     appearance: button;
     background-color: transparent;
     background-image: none;
   }
-  :where(button, [role="button"]) {
+  :where(button, [role='button']) {
     cursor: pointer;
   }
   :where(:disabled) {
@@ -93,8 +93,8 @@
     color: var(--color-text-secondary, #9ca3af);
   }
   :where(
-    [type="search"]::-webkit-search-decoration,
-    [type="search"]::-webkit-search-cancel-button
+    [type='search']::-webkit-search-decoration,
+    [type='search']::-webkit-search-cancel-button
   ) {
     -webkit-appearance: none;
   }
@@ -133,10 +133,10 @@
       outline: none;
     }
   }
-  :where(html[data-theme="light"]) {
+  :where(html[data-theme='light']) {
     color-scheme: light;
   }
-  :where(html[data-theme="dark"]) {
+  :where(html[data-theme='dark']) {
     color-scheme: dark;
   }
   :where(html:not([data-theme])) {

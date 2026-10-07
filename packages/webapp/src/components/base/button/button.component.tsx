@@ -1,0 +1,31 @@
+/**
+ * A button component that can be rendered as another HTML tag while remaining keyboard accessible.
+ *
+ * @see: https://base-ui.com/react/components/button
+ *
+ * BaseUI Anatomy:
+ * <Button />
+ */
+
+import { Button as BaseButton } from '@base-ui/react/button'
+import * as stylex from '@stylexjs/stylex'
+import * as React from 'react'
+import { buttonSizes, buttonStyles, buttonVariants } from './button.stylex'
+
+export interface ButtonProps extends Omit<
+  React.ComponentPropsWithoutRef<typeof BaseButton>,
+  'className' | 'style'
+> {
+  variant?: keyof typeof buttonVariants
+  size?: keyof typeof buttonSizes
+  style?: stylex.StyleXStyles
+}
+
+export function Button({ variant = 'primary', size = 'md', style, ...props }: ButtonProps) {
+  return (
+    <BaseButton
+      {...props}
+      {...stylex.props(buttonStyles.root, buttonVariants[variant], buttonSizes[size], style)}
+    />
+  )
+}
