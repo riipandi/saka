@@ -20,9 +20,8 @@ const goVersionLdflags = [
   `-X ${goModule}/internal/config.BuildDate=${process.env.BUILD_DATE || new Date().toISOString()}`
 ]
 
-// vite preview does not redirect directory paths, so `/storybook` would 404
-// even though `/storybook/` serves the built Storybook. Netlify handles this
-// itself (Pretty URLs), so only the preview server needs it.
+// vite preview does not redirect `/storybook` to `/storybook/` (Netlify's
+// Pretty URLs do), so only the preview server needs this.
 function storybookPreviewRedirect(): Plugin {
   return {
     name: 'storybook-preview-redirect',
@@ -41,8 +40,8 @@ function storybookPreviewRedirect(): Plugin {
 }
 
 // StyleX starts a dev HMR interval in configureServer and only clears it on
-// httpServer 'close'. Vitest's Vite server often has no httpServer, so the
-// interval keeps the process alive after tests finish.
+// httpServer 'close'. Vitest's server has no httpServer, so the interval
+// keeps the process alive — this fake provides the close signal.
 function vitestStylexCleanup(): Plugin {
   let server: ViteDevServer | undefined
   const closeHttpServer = () => {
@@ -66,50 +65,37 @@ function vitestStylexCleanup(): Plugin {
   }
 }
 
-// The Storybook vitest project's plugin indexes the stories from the
-// .storybook/main.ts glob; awaited once at module load because the config
-// factory re-runs on every mode change.
+// The Storybook vitest project's plugin; awaited once — the config factory
+// re-runs on every mode change.
 const storybookProject = await storybookTest({
   configDir: resolve(import.meta.dirname, '.storybook')
 })
 
 /**
- * The app's one vite pipeline — the SPA and the Go binary that serves it
- * are one application. `vp build` compiles the bundle into the Go embed
- * (`web/output`), then the go plugin derives `assets.json` from the Vite
- * manifest (the go:embed pattern skips dot directories) and compiles both
- * binaries. `vp dev` runs the same pipeline behind the Go port: the
- * browser talks to :3080 only; the debug build proxies the module graph
- * and the HMR socket here. The Go binary owns the HTML document
- * (web/shell.go), so there is no index.html; manifest keys are
- * webapp-root-relative (`src/main.tsx` — web/shell.go names the same key).
- *
- * The email templates are a separate package with its own build script;
- * the Taskfile sequences the passes (email first). Template editing in
- * dev happens in the React Email UI (`task email:dev`).
- *
- * Paths are `import.meta.dirname`-absolute — a package script or `vp -C`
- * run starts in this directory — and plugin-golang's `root` option anchors
- * its watcher, build, and binary spawn at the repo root.
+ * The app's one vite pipeline: `vp build` compiles the SPA into the Go
+ * embed (`web/output`), then the go plugin derives `assets.json` from the
+ * manifest and compiles both binaries. `vp dev` runs the same pipeline
+ * behind the Go proxy on :3080 — the browser holds one origin, the Go
+ * binary owns the HTML document (web/shell.go), and manifest keys are
+ * webapp-root-relative. Email templates are a separate package the
+ * Taskfile builds first. Paths are `import.meta.dirname`-absolute so a
+ * package script or `vp -C` run works from anywhere.
  */
 export default defineConfig(({ mode }) => ({
   plugins: [
-    // Must precede stylex: stylex's configureServer registers its HMR
-    // interval's cleanup on `server.httpServer` — absent in vitest's
-    // middleware-mode server — so the fake httpServer must exist by then.
+    // Must precede stylex: the HMR-interval cleanup registers on
+    // server.httpServer, absent in vitest's middleware-mode server.
     vitestStylexCleanup(),
     comlink(),
     stylex({
       aliases: { '#/*': resolve(import.meta.dirname, 'src/*') },
       enableDevClassNames: mode === 'development',
       useCSSLayers: { before: ['reset'], prefix: 'stylex' },
+      // Vitest compiles in StyleX's test mode: debug class names, no CSS.
       test: Boolean(process.env.VITEST)
     }),
-    // Dev-only plugins: the router generator and the devtools overlay have
-    // no business inside vitest's Vite server (the generated routes file is
-    // already on disk), and the golang plugin no-ops under VITEST itself.
-    // react must stay AFTER tanstackRouter (vite-plus enforces the order),
-    // so it sits inside both branches.
+    // Dev-only plugins stay out of vitest's server; golang no-ops under
+    // VITEST itself. react must follow tanstackRouter — vite-plus enforces it.
     ...(process.env.VITEST
       ? [react({ compiler: true })]
       : [
@@ -150,12 +136,9 @@ export default defineConfig(({ mode }) => ({
   envPrefix: ['VITE_', 'PUBLIC_'],
   root: resolve(import.meta.dirname),
   publicDir: resolve(import.meta.dirname, 'public'),
-  // The test setup mirrors the vite-react-template the components were
-  // ported from: a happy-dom unit project, a real-browser component project
-  // (vitest-browser-react over Playwright Chromium), and the Storybook
-  // project that renders the stories. End-to-end tests live separately in
-  // packages/e2e-tests — Playwright against a running server — so nothing
-  // here duplicates them. The go plugin no-ops under VITEST.
+  // Vitest projects ported from the vite-react-template: happy-dom unit
+  // tests, real-browser component tests, and the Storybook project. E2E
+  // lives in packages/e2e-tests — nothing here duplicates it.
   test: {
     projects: [
       {

@@ -1,26 +1,10 @@
 /**
- * Monorepo setup, and nothing else: the repo-wide toolchain blocks every
- * workspace shares (staged commit checks, formatter, linter, cached run
- * tasks). No app pipeline lives here — each frontend package owns its own
- * `vite.config.ts` (`packages/webapp`: the SPA and the Go binary targets;
- * `packages/email`: builds its templates with its own script, no vite
- * config), so a new frontend package is one directory with its own
- * config, not another root clause.
- *
- * The Taskfile owns the sequencing that crosses packages (`task build`
- * compiles the email templates before the webapp pass so the Go binary
- * embeds fresh templates) and the up-to-date checks vp does not cover
- * (`rpc:generate` carries sources/generates). `vp dev` / `vp build` from
- * the workspace root intentionally refuse to pick: enter through
- * `task dev` / `task build`, or target a package with
- * `vp -C packages/webapp <command>`.
- *
- * The test block gathers the workspace's tests; `vp test` from the root
- * runs them all. The webapp owns its own test projects (unit, browser,
- * storybook) inside `packages/webapp/vite.config.ts` and is referenced as a
- * project; the node-only packages stay inline here. A project is added when
- * its first test lands, not pre-wired against directories that do not
- * exist.
+ * Monorepo setup, and nothing else: staged checks, formatter, linter, and
+ * cached run tasks the workspace shares. Every frontend package owns its
+ * own `vite.config.ts` — the test block only references them. The Taskfile
+ * sequences what crosses packages, and `vp dev` / `vp build` at the root
+ * refuse to pick a package: enter through `task dev` / `task build`, or
+ * target one with `vp -C packages/webapp <command>`.
  */
 
 import { resolve } from 'node:path'
