@@ -145,7 +145,7 @@ function bookColumns(withIcons: boolean): ColumnDef<DataGridFeatures, IBook>[] {
         ) : (
           <DataGridColumnHeader title='Price' column={column} />
         ),
-      cell: (info) => <>${(info.getValue() as number).toFixed(2)}</>,
+      cell: (info) => <>${Number(info.getValue()).toFixed(2)}</>,
       size: 120,
       enableSorting: true,
       enableHiding: false
@@ -238,14 +238,14 @@ export const DraggableColumns: Story = {
     const table = useDemoTable(
       columns,
       5,
-      columns.map((column) => column.id as string)
+      columns.map((column) => column.id ?? '')
     )
     const handleDragEnd = (event: DragEndEvent) => {
       const { active, over } = event
       if (active && over && active.id !== over.id) {
         table.setColumnOrder((columnOrder) => {
-          const oldIndex = columnOrder.indexOf(active.id as string)
-          const newIndex = columnOrder.indexOf(over.id as string)
+          const oldIndex = columnOrder.indexOf(String(active.id))
+          const newIndex = columnOrder.indexOf(String(over.id))
           return arrayMove(columnOrder, oldIndex, newIndex)
         })
       }

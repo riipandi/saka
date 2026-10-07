@@ -100,13 +100,13 @@ export const Disabled: Story = {
     if (!available || !restricted) throw new Error('Accordion triggers not found')
 
     // Disabled item: marked with data-disabled and never expands.
-    expect(restricted).toHaveAttribute('data-disabled')
+    await expect(restricted).toHaveAttribute('data-disabled')
     await userEvent.click(restricted)
-    expect(restricted).toHaveAttribute('aria-expanded', 'false')
+    await expect(restricted).toHaveAttribute('aria-expanded', 'false')
 
     // The enabled sibling still works.
     await userEvent.click(available)
-    expect(available).toHaveAttribute('aria-expanded', 'true')
+    await expect(available).toHaveAttribute('aria-expanded', 'true')
   }
 }
 
@@ -123,17 +123,17 @@ export const OpenClose: Story = {
   ),
   play: async ({ canvas }) => {
     const trigger = canvas.getByRole('button', { name: 'Alohomora' })
-    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
     // The closed panel is not mounted.
-    expect(canvas.queryByText('Unlocked.')).toBeNull()
+    await expect(canvas.queryByText('Unlocked.')).toBeNull()
 
     await userEvent.click(trigger)
     await waitFor(() => expect(canvas.getByText('Unlocked.')).toBeVisible())
-    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
     await userEvent.click(trigger)
     await waitFor(() => expect(canvas.queryByText('Unlocked.')).toBeNull())
-    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
   }
 }
 
@@ -151,13 +151,13 @@ export const OnValueChange: StoryObj<{ handleValueChange: ReturnType<typeof fn> 
   play: async ({ canvas, args }) => {
     const trigger = canvas.getByRole('button', { name: 'Sonorus' })
     await userEvent.click(trigger)
-    expect(args.handleValueChange).toHaveBeenCalledTimes(1)
+    await expect(args.handleValueChange).toHaveBeenCalledTimes(1)
     // The value is the (array of) open item values.
     const value = args.handleValueChange.mock.calls[0]?.[0]
-    expect(Array.isArray(value) ? value : [value]).toContain('item-1')
+    await expect(Array.isArray(value) ? value : [value]).toContain('item-1')
 
     await userEvent.click(trigger)
-    expect(args.handleValueChange).toHaveBeenCalledTimes(2)
+    await expect(args.handleValueChange).toHaveBeenCalledTimes(2)
   }
 }
 
@@ -186,7 +186,7 @@ export const MultiplePlay: Story = {
 
     await userEvent.click(first)
     await userEvent.click(second)
-    expect(first).toHaveAttribute('aria-expanded', 'true')
-    expect(second).toHaveAttribute('aria-expanded', 'true')
+    await expect(first).toHaveAttribute('aria-expanded', 'true')
+    await expect(second).toHaveAttribute('aria-expanded', 'true')
   }
 }

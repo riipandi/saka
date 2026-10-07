@@ -126,10 +126,10 @@ export const Practice: Story = {
     const chart = canvas.getByRole('img', {
       name: 'Practice hours versus spell power with trend line'
     })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // All 48 students as dots, plus the trend line.
-    expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(students.length)
-    expect(canvas.getByText('Day class')).toBeVisible()
-    expect(canvas.getByText('Night study')).toBeVisible()
+    await expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(students.length)
+    await expect(canvas.getByText('Day class')).toBeVisible()
+    await expect(canvas.getByText('Night study')).toBeVisible()
   }
 }

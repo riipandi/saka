@@ -59,7 +59,7 @@ export default meta
 
 const statusStyles = stylex.create({
   muted: {
-    color: s.muted.color as unknown as string
+    color: s.muted.color
   },
   expanderButton: {
     marginInlineStart: `calc(-1 * ${unit.x2})`
@@ -115,7 +115,7 @@ function selectionColumns(): ColumnDef<DataGridFeatures, IBook>[] {
     {
       accessorKey: 'title',
       header: 'Title',
-      cell: (info) => <span {...stylex.props(s.strong)}>{info.getValue() as string}</span>,
+      cell: (info) => <span {...stylex.props(s.strong)}>{String(info.getValue())}</span>,
       size: 160
     },
     {
@@ -131,7 +131,7 @@ function selectionColumns(): ColumnDef<DataGridFeatures, IBook>[] {
     {
       accessorKey: 'price',
       header: 'Price ($)',
-      cell: (info) => <>${(info.getValue() as number).toFixed(2)}</>,
+      cell: (info) => <>${Number(info.getValue()).toFixed(2)}</>,
       size: 120
     }
   ]
@@ -188,6 +188,13 @@ interface IDetail extends IBook {
   details: string
 }
 
+// The features bundle erases TData, so expanded rows arrive as unknown.
+const isDetailRow = (row: unknown): row is IDetail =>
+  typeof row === 'object' && row !== null && 'details' in row
+
+const isOrderRow = (row: unknown): row is IOrder =>
+  typeof row === 'object' && row !== null && 'lines' in row
+
 const detailData: IDetail[] = demoData.slice(0, 5).map((row, index) => ({
   ...row,
   details:
@@ -221,14 +228,12 @@ function ExpandableColumns(): ColumnDef<DataGridFeatures, IDetail>[] {
       meta: {
         // Receives `row.original` (source contract), not the TanStack row.
         // The features bundle erases TData, so narrow here.
-        expandedContent: (rawRow) => {
-          const row = rawRow as IDetail
-          return (
+        expandedContent: (rawRow) =>
+          isDetailRow(rawRow) ? (
             <div {...stylex.props(statusStyles.muted, statusStyles.expandedContent)}>
-              {row.details}
+              {rawRow.details}
             </div>
-          )
-        }
+          ) : null
       }
     },
     {
@@ -334,9 +339,7 @@ const orderData: IOrder[] = [
 ]
 
 /** Price cell shared by the order-line tables (currency, two decimals). */
-const priceCell = (info: { getValue: () => unknown }) => (
-  <>${(info.getValue() as number).toFixed(2)}</>
-)
+const priceCell = (info: { getValue: () => unknown }) => <>${Number(info.getValue()).toFixed(2)}</>
 
 /** The demo owns no data writes — the drag itself is the visible reorder;
  * persisting the new order is the consumer's concern. */
@@ -401,11 +404,12 @@ export const SubTableStory: Story = {
         {
           accessorKey: 'total',
           header: 'Total ($)',
-          cell: (info) => <>${(info.getValue() as number).toFixed(2)}</>,
+          cell: (info) => <>${Number(info.getValue()).toFixed(2)}</>,
           size: 120,
           meta: {
             // The features bundle erases TData, so narrow here.
-            expandedContent: (rawRow) => <SubTable items={(rawRow as IOrder).lines} />
+            expandedContent: (rawRow) =>
+              isOrderRow(rawRow) ? <SubTable items={rawRow.lines} /> : null
           }
         }
       ],
@@ -470,7 +474,7 @@ export const DraggableRows: Story = {
         {
           accessorKey: 'price',
           header: 'Price ($)',
-          cell: (info) => <>${(info.getValue() as number).toFixed(2)}</>,
+          cell: (info) => <>${Number(info.getValue()).toFixed(2)}</>,
           size: 120
         }
       ],

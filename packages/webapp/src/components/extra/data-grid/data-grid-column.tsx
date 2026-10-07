@@ -63,7 +63,11 @@ function DataGridColumnFilter<TData extends object, TValue>({
   const { i18n } = useDataGrid()
   const facets = column?.getFacetedUniqueValues()
   const filterValue = column?.getFilterValue()
-  const selectedValues = new Set(Array.isArray(filterValue) ? (filterValue as string[]) : [])
+  const selectedValues = new Set(
+    Array.isArray(filterValue)
+      ? filterValue.filter((value): value is string => typeof value === 'string')
+      : []
+  )
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredOptions = useMemo(() => {
@@ -405,7 +409,7 @@ function DataGridColumnHeaderInner<TData extends object, TValue>({
                   key={col.id}
                   checked={col.getIsVisible()}
                   onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                  onCheckedChange={(value) => col.toggleVisibility(value)}
                   style={sHeader.capitalize}
                 >
                   {getColumnHeaderLabel(col)}
@@ -498,6 +502,9 @@ function DataGridColumnHeaderInner<TData extends object, TValue>({
   )
 }
 
+// The memo wrapper erases the generic signature (TS instantiates TData/TValue
+// to their constraint); re-claiming it is deliberate.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const DataGridColumnHeaderMemo = memo(DataGridColumnHeaderInner) as <TData extends object, TValue>(
   props: DataGridColumnHeaderProps<TData, TValue> & {
     /** Internal: the state slices the header re-renders on. Not part of the public API. */
@@ -563,7 +570,7 @@ function DataGridColumnVisibility<TData extends object>({
                   style={sVisibility.item}
                   checked={column.getIsVisible()}
                   onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  onCheckedChange={(value) => column.toggleVisibility(value)}
                 >
                   {getColumnHeaderLabel(column)}
                 </DropdownMenuCheckboxItem>

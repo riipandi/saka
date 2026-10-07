@@ -39,7 +39,7 @@ export interface IconProps extends Omit<
   'className' | 'style' | 'color'
 > {
   /** Icon svg component (e.g. a Keyline icon) or a raw svg element. */
-  svg: React.ReactElement | React.ComponentType | null
+  svg: React.ReactElement<React.SVGProps<SVGSVGElement>> | React.ComponentType | null
   /** Icon size in pixels (number) or any CSS size (string). Defaults to `1em`. */
   size?: number | string
   /** Foreground color token. Inherits the parent text color when omitted. */
@@ -62,6 +62,11 @@ const svgStyle = {
   width: 'auto'
 } as const
 
+/** Narrow an unknown node to an svg element so `cloneElement` stays typed. */
+function isSvgElement(svg: unknown): svg is React.ReactElement<React.SVGProps<SVGSVGElement>> {
+  return React.isValidElement(svg)
+}
+
 export function Icon({
   svg,
   size = '1em',
@@ -71,9 +76,11 @@ export function Icon({
   render,
   ...props
 }: IconProps) {
-  const icon = (
-    React.isValidElement(svg) || svg === null ? svg : React.createElement(svg)
-  ) as React.ReactElement<React.SVGProps<SVGSVGElement>> | null
+  const icon: React.ReactElement<React.SVGProps<SVGSVGElement>> | null = isSvgElement(svg)
+    ? svg
+    : svg === null
+      ? null
+      : React.createElement(svg)
   const children = icon
     ? React.cloneElement(icon, {
         focusable: false,

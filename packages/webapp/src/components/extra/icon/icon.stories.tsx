@@ -179,7 +179,7 @@ export const Attributes: Story = {
   ),
   play: async ({ canvas }) => {
     const root = canvas.getByTestId('icon')
-    expect(root).toHaveAttribute('id', 'test-id')
+    await expect(root).toHaveAttribute('id', 'test-id')
   }
 }
 
@@ -197,7 +197,7 @@ export const Render: Story = {
   ),
   play: async ({ canvas }) => {
     const link = canvas.getByRole('link', { name: 'Reshaped' })
-    expect(link.querySelector('svg')).toBeInTheDocument()
+    await expect(link.querySelector('svg')).toBeInTheDocument()
   }
 }
 
@@ -211,7 +211,7 @@ export const ScreenReader: Story = {
   ),
   play: async ({ canvas }) => {
     const root = canvas.getByTestId('icon')
-    expect(root).toBeInTheDocument()
-    expect(root).toHaveAttribute('aria-hidden', 'true')
+    await expect(root).toBeInTheDocument()
+    await expect(root).toHaveAttribute('aria-hidden', 'true')
   }
 }

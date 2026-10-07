@@ -94,16 +94,16 @@ export const Completed: Story = {
     // 200ms transition, so wait for the end state.
     const loading = canvas.getByText('Transcribing with the Quick-Quotes Quill')
     const completed = canvas.getByText('Quill notes saved')
-    expect(loading).toBeVisible()
-    expect(completed).not.toBeVisible()
+    await expect(loading).toBeVisible()
+    await expect(completed).not.toBeVisible()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Complete' }))
     await waitFor(() => expect(loading).not.toBeVisible())
-    expect(completed).toBeVisible()
+    await expect(completed).toBeVisible()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Restart' }))
     await waitFor(() => expect(completed).not.toBeVisible())
-    expect(loading).toBeVisible()
+    await expect(loading).toBeVisible()
   }
 }
 

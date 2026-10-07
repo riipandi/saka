@@ -94,7 +94,7 @@ const AvatarLinkCell = ({ row }: { row: IBook & { initials: string } }) => (
 )
 
 const balanceCell = (info: { getValue: () => unknown }) => (
-  <>${(info.getValue() as number).toFixed(2)}</>
+  <>${Number(info.getValue()).toFixed(2)}</>
 )
 
 /** Pagination. */
@@ -106,7 +106,7 @@ export const Pagination: Story = {
         {
           accessorKey: 'title',
           header: 'Title',
-          cell: (info) => <>{info.getValue() as string}</>,
+          cell: (info) => <>{String(info.getValue())}</>,
           size: 150
         },
         {
@@ -114,8 +114,8 @@ export const Pagination: Story = {
           header: 'Author',
           cell: (info) => (
             <div {...stylex.props(s.truncate)}>
-              <a href={`mailto:${info.getValue()}`} {...stylex.props(s.link, s.truncate)}>
-                {info.getValue() as string}
+              <a href={`mailto:${String(info.getValue())}`} {...stylex.props(s.link, s.truncate)}>
+                {String(info.getValue())}
               </a>
             </div>
           ),
@@ -191,7 +191,7 @@ export const CellBorder: Story = {
           accessorKey: 'price',
           header: 'Price',
           cell: (info) => (
-            <span {...stylex.props(s.salary)}>${(info.getValue() as number).toFixed(2)}</span>
+            <span {...stylex.props(s.salary)}>${Number(info.getValue()).toFixed(2)}</span>
           ),
           size: 100
         }
@@ -245,8 +245,8 @@ export const DenseLayout: Story = {
           accessorKey: 'author',
           header: 'Author',
           cell: (info) => (
-            <a href={`mailto:${info.getValue()}`} {...stylex.props(s.link)}>
-              {info.getValue() as string}
+            <a href={`mailto:${String(info.getValue())}`} {...stylex.props(s.link)}>
+              {String(info.getValue())}
             </a>
           ),
           size: 175
@@ -363,8 +363,8 @@ export const StripedRows: Story = {
           accessorKey: 'author',
           header: 'Author',
           cell: (info) => (
-            <a href={`mailto:${info.getValue()}`} {...stylex.props(s.link)}>
-              {info.getValue() as string}
+            <a href={`mailto:${String(info.getValue())}`} {...stylex.props(s.link)}>
+              {String(info.getValue())}
             </a>
           ),
           size: 180
@@ -423,8 +423,8 @@ export const AutoWidthTableLayout: Story = {
           accessorKey: 'author',
           header: 'Author',
           cell: (info) => (
-            <a href={`mailto:${info.getValue()}`} {...stylex.props(s.link)}>
-              {info.getValue() as string}
+            <a href={`mailto:${String(info.getValue())}`} {...stylex.props(s.link)}>
+              {String(info.getValue())}
             </a>
           ),
           size: 200

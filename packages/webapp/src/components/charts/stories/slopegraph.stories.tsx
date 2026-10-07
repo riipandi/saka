@@ -38,7 +38,7 @@ const houses: readonly HouseRow[] = [
 ]
 
 const slopeScales = {
-  x: { scale: () => scalePoint<string>().padding(0.5) },
+  x: { scale: () => scalePoint().padding(0.5) },
   y: { scale: scaleLinear, nice: true, grid: false }
 } as const
 
@@ -126,10 +126,10 @@ export const HouseCup: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'House cup points at Christmas versus year end' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // Value labels at both ends plus all four houses in the legend.
-    expect(canvas.getByText('472')).toBeVisible()
-    expect(canvas.getByText('276')).toBeVisible()
-    expect(canvas.getByText('Hufflepuff')).toBeVisible()
+    await expect(canvas.getByText('472')).toBeVisible()
+    await expect(canvas.getByText('276')).toBeVisible()
+    await expect(canvas.getByText('Hufflepuff')).toBeVisible()
   }
 }

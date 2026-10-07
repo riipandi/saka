@@ -73,10 +73,10 @@ export const Square: Story = {
     </div>
   ),
   // The container keeps a square box regardless of content height.
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const frame = canvas.getByTestId('ratio-frame')
     const { width, height } = frame.getBoundingClientRect()
-    expect(Math.abs(width - height)).toBeLessThan(1)
+    await expect(Math.abs(width - height)).toBeLessThan(1)
   }
 }
 

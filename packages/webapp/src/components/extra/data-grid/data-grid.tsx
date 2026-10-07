@@ -209,11 +209,11 @@ export type DataGridTableInstance<TData extends object> = ReactTable<DataGridFea
 export function getColumnHeaderLabel<TData extends RowData, TValue>(
   column: Column<DataGridFeatures, TData, TValue>
 ): string {
-  const meta = column.columnDef.meta as { headerTitle?: string } | undefined
+  const meta = column.columnDef.meta
   if (typeof meta?.headerTitle === 'string') return meta.headerTitle
   const defHeader = column.columnDef.header
   if (typeof defHeader === 'string') return defHeader
-  return String(column.id)
+  return column.id
 }
 
 /**
@@ -223,7 +223,7 @@ export function getColumnHeaderLabel<TData extends RowData, TValue>(
  * trap the row-selection checkbox documents.
  */
 export function getDataGridCellSelectionCellAttrs<TData extends object>(
-  cell: Cell<DataGridFeatures, TData, unknown>
+  cell: Cell<DataGridFeatures, TData>
 ): {
   'aria-selected': boolean
   'data-col-id': string
@@ -749,6 +749,9 @@ function useDataGrid<
   // only readable through an explicit generic) without falling back to `any`.
   TData extends object = Record<string, unknown>
 >(): DataGridContextProps<TData> {
+  // The context stores `DataGridContextProps<never>` (erasure at the provider);
+  // no runtime guard can recover TData, so re-claiming it is deliberate.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const context = useContext(DataGridContext) as DataGridContextProps<TData> | undefined
   if (!context) {
     throw new Error('useDataGrid must be used within a DataGridProvider')
@@ -918,6 +921,9 @@ function DataGridProvider<TData extends object>({
     // `DataGridContextProps<TData>` value from a differently-typed provider
     // instance. The erasure happens here and is undone by the TData generic on
     // each consumer component.
+    // Deliberate erasure across invariant TData instances (see comment above);
+    // the provider holds a `never`-erased value.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     <DataGridContext.Provider value={value as unknown as DataGridContextProps<never>}>
       {children}
     </DataGridContext.Provider>
@@ -979,7 +985,13 @@ function DataGrid<TFeatures extends TableFeatures, TData extends object>({
   // over any feature bundle; internals need a concrete one to resolve the
   // feature-gated APIs they call, and v9's invariant TFeatures rules out
   // expressing that with a generic constraint.
+  // Deliberate widening: consumers own the feature bundle, internals need the
+  // concrete one; no runtime guard can express the invariant generics.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const internalTable = table as unknown as DataGridTableInstance<TData>
+  // Deliberate: mergedProps is built dynamically from DataGridProps<TFeatures>;
+  // internalProps needs the concrete layout contract.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const internalProps = mergedProps as unknown as DataGridLayoutProps<TData>
 
   return (

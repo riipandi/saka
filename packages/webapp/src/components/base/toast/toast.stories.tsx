@@ -89,7 +89,7 @@ export const Playground: Story = {
     await waitFor(() =>
       expect(within(document.body).getByText('Scheduled: Hogsmeade trip')).toBeInTheDocument()
     )
-    expect(within(document.body).getByText(/departure from platform 9¾/i)).toBeInTheDocument()
+    await expect(within(document.body).getByText(/departure from platform 9¾/i)).toBeInTheDocument()
   }
 }
 
@@ -99,13 +99,13 @@ export const ToastPromise: Story = {
     <ToastProvider>
       <Button
         variant='outline'
-        onClick={() =>
-          toast.promise(save(), {
+        onClick={() => {
+          void toast.promise(save(), {
             loading: 'Sealing the cryptex…',
             success: 'Cryptex sealed',
             error: 'The cryptex jammed'
           })
-        }
+        }}
       >
         Seal the cryptex
       </Button>

@@ -97,12 +97,12 @@ export const Playground: Story = {
       </div>
     </div>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const separators = canvas.getAllByRole('separator')
     // One horizontal divider plus two vertical ones in the row.
-    expect(separators.length).toBe(3)
-    expect(separators[0]).toHaveAttribute('aria-orientation', 'horizontal')
-    expect(separators[1]).toHaveAttribute('aria-orientation', 'vertical')
+    await expect(separators.length).toBe(3)
+    await expect(separators[0]).toHaveAttribute('aria-orientation', 'horizontal')
+    await expect(separators[1]).toHaveAttribute('aria-orientation', 'vertical')
   }
 }
 

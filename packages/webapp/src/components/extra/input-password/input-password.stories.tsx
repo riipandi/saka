@@ -122,7 +122,7 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Sealed by the Ministry')
-    expect(el).toBeDisabled()
+    await expect(el).toBeDisabled()
   }
 }
 
@@ -135,13 +135,13 @@ export const Interaction: Story = {
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Type and toggle...')
     await userEvent.type(el, 'alohomora')
-    expect(el).toHaveAttribute('type', 'password')
-    expect(el).toHaveValue('alohomora')
+    await expect(el).toHaveAttribute('type', 'password')
+    await expect(el).toHaveValue('alohomora')
     const toggle = canvas.getByRole('button', { name: 'Show password' })
     await userEvent.click(toggle)
-    expect(el).toHaveAttribute('type', 'text')
-    expect(canvas.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
+    await expect(el).toHaveAttribute('type', 'text')
+    await expect(canvas.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
     await userEvent.click(toggle)
-    expect(el).toHaveAttribute('type', 'password')
+    await expect(el).toHaveAttribute('type', 'password')
   }
 }

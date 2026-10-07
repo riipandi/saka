@@ -68,7 +68,7 @@ export const Playground: Story = {
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Draft your letter to the Daily Prophet…')
     await userEvent.type(el, 'Dear Editor,')
-    expect(el).toHaveValue('Dear Editor,')
+    await expect(el).toHaveValue('Dear Editor,')
   }
 }
 
@@ -96,9 +96,9 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Locked by Ministry decree')
-    expect(el).toBeDisabled()
+    await expect(el).toBeDisabled()
     await userEvent.type(el, 'alohomora')
-    expect(el).toHaveValue('')
+    await expect(el).toHaveValue('')
   }
 }
 
@@ -155,10 +155,10 @@ export const AutoResize: Story = {
 
     // Typing grows the textarea and updates the counter.
     await userEvent.type(el, 'Marauder')
-    expect(canvas.getByText('8/280')).toBeInTheDocument()
+    await expect(canvas.getByText('8/280')).toBeInTheDocument()
 
     // The counter flips to the warning tone near the limit.
     await userEvent.type(el, 'a'.repeat(20))
-    expect(canvas.getByText('28/280')).toBeInTheDocument()
+    await expect(canvas.getByText('28/280')).toBeInTheDocument()
   }
 }

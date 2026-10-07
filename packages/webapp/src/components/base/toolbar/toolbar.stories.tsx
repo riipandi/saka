@@ -51,13 +51,13 @@ export const Playground: Story = {
   ),
   play: async ({ canvas }) => {
     const charm = canvas.getByRole('button', { name: 'Toggle charm' })
-    expect(charm).toHaveAttribute('aria-pressed', 'false')
+    await expect(charm).toHaveAttribute('aria-pressed', 'false')
 
     // Toggles inside the toolbar keep their own state.
     await userEvent.click(charm)
-    expect(charm).toHaveAttribute('aria-pressed', 'true')
+    await expect(charm).toHaveAttribute('aria-pressed', 'true')
 
-    expect(canvas.getByRole('separator')).toBeInTheDocument()
+    await expect(canvas.getByRole('separator')).toBeInTheDocument()
   }
 }
 

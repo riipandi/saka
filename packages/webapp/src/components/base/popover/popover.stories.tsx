@@ -80,7 +80,7 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Summon popover' }))
     const popover = await body.findByRole('dialog')
-    expect(within(popover).getByPlaceholderText('First dial')).toHaveValue('100%')
+    await expect(within(popover).getByPlaceholderText('First dial')).toHaveValue('100%')
 
     // Clicking outside dismisses the popover.
     await userEvent.click(document.body)

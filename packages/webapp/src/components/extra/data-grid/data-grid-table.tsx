@@ -45,7 +45,7 @@ function cellSelectionChromeProps(
   const chrome = dataGridCellSelectionStyles
   const selected = !!selection['data-cell-selected']
   const focused = !!selection['data-cell-focused']
-  const pinned = !!selection['data-pinned' as keyof typeof selection]
+  const pinned = 'data-pinned' in selection && !!selection['data-pinned']
   // Boundary clamps: first/last column, first/last row, and cells adjacent
   // to a pinned column or the resize filler strip (all React-known).
   const clampEnd = geometry.isLastColumn || geometry.nextPinned || geometry.nextIsFillCell
@@ -82,6 +82,8 @@ function getDataGridTreeIndentStyle<TData extends object>(
 ): CSSProperties {
   return {
     '--data-grid-tree-padding': `${row.depth * indent}px`
+    // Deliberate: CSS custom properties are not in React's CSSProperties map.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   } as CSSProperties
 }
 
@@ -102,7 +104,7 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
  * width measurement - and the virtualizer - bind the wrong box.
  */
 function getDataGridScrollAreaViewport(node: HTMLElement): HTMLElement | null {
-  const scrollViewport = node.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null
+  const scrollViewport = node.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')
 
   if (!scrollViewport) return null
 
@@ -156,7 +158,7 @@ function getDataGridResizeEventClientX(
 
 function startDataGridColumnResizeOnEnd<TData extends object>(
   event: DataGridResizeStartEvent,
-  header: Header<DataGridFeatures, TData, unknown>,
+  header: Header<DataGridFeatures, TData>,
   table: DataGridTableInstance<TData>,
   /**
    * Live mode: per-move width updates go straight to the table element's
@@ -168,9 +170,9 @@ function startDataGridColumnResizeOnEnd<TData extends object>(
 ): (() => void) | undefined {
   const column = table.getColumn(header.column.id)
 
-  if (!column || !column.getCanResize()) return
+  if (!column || !column.getCanResize()) return undefined
   const isTouchSession = isDataGridTouchEvent(event)
-  if (isTouchSession && event.touches.length > 1) return
+  if (isTouchSession && event.touches.length > 1) return undefined
 
   event.persist?.()
 
@@ -199,7 +201,7 @@ function startDataGridColumnResizeOnEnd<TData extends object>(
       : dragStartClientX
 
   if (typeof dragStartClientX !== 'number' || typeof startOffset !== 'number') {
-    return
+    return undefined
   }
 
   ownerDocument.body.style.cursor = 'col-resize'
@@ -388,16 +390,16 @@ function getDataGridTableRowSections<TData extends object>(
 ) {
   if (!rowsPinnable) {
     return {
-      topRows: [] as Row<DataGridFeatures, TData>[],
-      centerRows: table.getRowModel().rows as Row<DataGridFeatures, TData>[],
-      bottomRows: [] as Row<DataGridFeatures, TData>[]
+      topRows: [],
+      centerRows: table.getRowModel().rows,
+      bottomRows: []
     }
   }
 
   return {
-    topRows: table.getTopRows() as Row<DataGridFeatures, TData>[],
-    centerRows: table.getCenterRows() as Row<DataGridFeatures, TData>[],
-    bottomRows: table.getBottomRows() as Row<DataGridFeatures, TData>[]
+    topRows: table.getTopRows(),
+    centerRows: table.getCenterRows(),
+    bottomRows: table.getBottomRows()
   }
 }
 
@@ -443,7 +445,7 @@ function getDataGridTableOrderedVisibleColumns<TData extends object>(
     ...table.getStartVisibleLeafColumns(),
     ...table.getCenterVisibleLeafColumns(),
     ...table.getEndVisibleLeafColumns()
-  ] as Column<DataGridFeatures, TData, unknown>[]
+  ] as Column<DataGridFeatures, TData>[]
 }
 
 function getDataGridTableOrderedVisibleCells<TData extends object>(
@@ -453,7 +455,7 @@ function getDataGridTableOrderedVisibleCells<TData extends object>(
     ...row.getStartVisibleCells(),
     ...row.getCenterVisibleCells(),
     ...row.getEndVisibleCells()
-  ] as Cell<DataGridFeatures, TData, unknown>[]
+  ] as Cell<DataGridFeatures, TData>[]
 }
 
 function getDataGridTableMergedHeaderGroups<TData extends object>(
@@ -481,7 +483,7 @@ function getDataGridTableMergedHeaderGroups<TData extends object>(
         ...(leftGroup?.headers ?? []),
         ...(centerGroup?.headers ?? []),
         ...(rightGroup?.headers ?? [])
-      ] as Header<DataGridFeatures, TData, unknown>[]
+      ] as Header<DataGridFeatures, TData>[]
     }
   })
 }
@@ -493,7 +495,7 @@ function hasDataGridTableRightPinnedColumns<TData extends object>(
 }
 
 function getPinningStyles<TData extends object>(
-  column: Column<DataGridFeatures, TData, unknown>
+  column: Column<DataGridFeatures, TData>
 ): CSSProperties {
   const isPinned = column.getIsPinned()
 
@@ -604,6 +606,9 @@ function DataGridTableAddRow() {
           variant='ghost'
           size='sm'
           data-dense={props.tableLayout?.dense ? '' : undefined}
+          // StyleX result type vs the StyleXStyles param: a deliberate
+          // cast, the runtime value is exactly what the button renders.
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
           style={s.addRowButton as StyleXStyles}
           onClick={(event) => {
             // Creating often unmounts this affordance (a draft row takes
@@ -883,7 +888,7 @@ function DataGridTableHeadRowCell<TData extends object>({
   dndStyle
 }: {
   children: ReactNode
-  header: Header<DataGridFeatures, TData, unknown>
+  header: Header<DataGridFeatures, TData>
   dndRef?: Ref<HTMLTableCellElement>
   dndStyle?: StyleXStyles
 }) {
@@ -1004,7 +1009,7 @@ function getDataGridColumnResizeMode(
 function DataGridTableHeadRowCellResize<TData extends object>({
   header
 }: {
-  header: Header<DataGridFeatures, TData, unknown>
+  header: Header<DataGridFeatures, TData>
 }) {
   const { props, table } = useDataGrid<TData>()
   const { column } = header
@@ -1317,7 +1322,7 @@ function DataGridTableBodyRowSkeleton({
 
   return (
     <tr
-      style={{ '--dg-row-border-b': wantsBorder ? '1px' : '0px' } as CSSProperties}
+      style={{ '--dg-row-border-b': wantsBorder ? '1px' : '0px' }}
       data-dense={props.tableLayout?.dense ? '' : undefined}
       {...stylex.props(
         s.row,
@@ -1338,7 +1343,7 @@ function DataGridTableBodyRowSkeletonCell<TData extends object>({
   column
 }: {
   children: ReactNode
-  column: Column<DataGridFeatures, TData, unknown>
+  column: Column<DataGridFeatures, TData>
 }) {
   const { props, table } = useDataGrid()
 
@@ -1425,11 +1430,9 @@ function DataGridTableBodyRow<TData extends object>({
         assignRef(rowRef, node)
         assignRef(dndRef, node)
       }}
-      style={
-        {
-          '--dg-row-border-b': wantsBorder ? '1px' : '0px'
-        } as CSSProperties
-      }
+      style={{
+        '--dg-row-border-b': wantsBorder ? '1px' : '0px'
+      }}
       data-state={table.options.enableRowSelection && row.getIsSelected() ? 'selected' : undefined}
       data-index={dataIndex}
       data-row-id={row.id}
@@ -1530,7 +1533,7 @@ function DataGridTableBodyRowCell<TData extends object>({
   rowStatus
 }: {
   children: ReactNode
-  cell: Cell<DataGridFeatures, TData, unknown>
+  cell: Cell<DataGridFeatures, TData>
   dndRef?: Ref<HTMLTableCellElement>
   dndStyle?: StyleXStyles
   /** Center-column index under column virtualization; data-column-index. */
@@ -1830,7 +1833,7 @@ function DataGridTableRenderedRow<TData extends object>({
         stripe={stripe ?? (typeof rowIndex === 'number' ? rowIndex % 2 === 0 : undefined)}
         wantsBorder={wantsBorder}
       >
-        {startVisibleCells.map((cell: Cell<DataGridFeatures, TData, unknown>, index) => (
+        {startVisibleCells.map((cell, index) => (
           <DataGridTableBodyRowCell
             cell={cell}
             key={cell.id}
@@ -1852,7 +1855,7 @@ function DataGridTableRenderedRow<TData extends object>({
             colSpan={leadingSpacerSpan}
           />
         )}
-        {windowedCenterCells.map((cell: Cell<DataGridFeatures, TData, unknown>, cellIndex) => (
+        {windowedCenterCells.map((cell, cellIndex) => (
           <DataGridTableBodyRowCell
             cell={cell}
             key={cell.id}
@@ -1876,7 +1879,7 @@ function DataGridTableRenderedRow<TData extends object>({
           />
         )}
         {resizableWithRightPinned ? <DataGridTableFillBodyCell /> : null}
-        {endVisibleCells.map((cell: Cell<DataGridFeatures, TData, unknown>) => (
+        {endVisibleCells.map((cell) => (
           <DataGridTableBodyRowCell
             cell={cell}
             key={cell.id}
@@ -2005,7 +2008,7 @@ function DataGridTableRowSelect<TData extends object>({
           <Checkbox
             checked={row.getIsSelected()}
             indeterminate={row.getIsSomeSelected() && !row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onCheckedChange={(value) => row.toggleSelected(value)}
             onClick={(event) => {
               // Selection must not bubble into the row's onRowClick handler.
               event.stopPropagation()
@@ -2035,7 +2038,7 @@ function DataGridTableRowSelectAll() {
             checked={isAllSelected}
             indeterminate={isSomeSelected && !isAllSelected}
             disabled={isLoading || recordCount === 0}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(value)}
             aria-label={i18n.labels.selectAll}
           />
         )
@@ -2210,6 +2213,9 @@ function DataGridTableBodyRows<TData extends object>({
 const MemoizedDataGridTableBodyRows = memo(
   DataGridTableBodyRows,
   (_prev, next) => !!next.table.state.columnResizing.isResizingColumn
+  // Deliberate: the memo wrapper erases the generic signature (TS
+  // instantiates TData to `object`); re-claiming it.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 ) as typeof DataGridTableBodyRows
 
 function DataGridTableHeader() {

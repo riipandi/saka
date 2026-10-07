@@ -91,11 +91,11 @@ export const BarsWithTrendLine: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Langdon checkouts with Potter trend' })
-    expect(chart).toBeVisible()
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length)
+    await expect(chart).toBeVisible()
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length)
     // The trend line paints at least one path plus its point markers.
-    expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(1)
-    expect(canvas.getByText('Robert Langdon')).toBeVisible()
-    expect(canvas.getByText('Harry Potter')).toBeVisible()
+    await expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(1)
+    await expect(canvas.getByText('Robert Langdon')).toBeVisible()
+    await expect(canvas.getByText('Harry Potter')).toBeVisible()
   }
 }

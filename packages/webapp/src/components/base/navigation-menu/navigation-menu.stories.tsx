@@ -123,8 +123,8 @@ export const Playground: Story = {
     await waitFor(() => expect(body.queryByRole('link', { name: /platform nine/i })).toBeNull())
 
     // Base UI restores pointer-events on the bar after the panel closes.
-    await waitFor(() => {
-      expect(getComputedStyle(secondTrigger).pointerEvents).not.toBe('none')
+    await waitFor(async () => {
+      await expect(getComputedStyle(secondTrigger).pointerEvents).not.toBe('none')
     })
 
     // Hovering the second trigger opens its own panel.
@@ -132,7 +132,7 @@ export const Playground: Story = {
     await waitFor(() => expect(body.getByRole('link', { name: /cryptex/i })).toBeInTheDocument(), {
       timeout: 3000
     })
-    expect(body.queryByRole('link', { name: /platform nine/i })).toBeNull()
+    await expect(body.queryByRole('link', { name: /platform nine/i })).toBeNull()
   }
 }
 

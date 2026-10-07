@@ -32,7 +32,7 @@ export function InputGroupAddon({
       // Read by the group root's :has() to switch to a column layout for block-aligned addons.
       data-align={align}
       onClick={(event) => {
-        if ((event.target as HTMLElement).closest('button')) return
+        if (event.target instanceof HTMLElement && event.target.closest('button')) return
         event.currentTarget.parentElement?.querySelector<HTMLElement>('input, textarea')?.focus()
       }}
       {...props}

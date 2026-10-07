@@ -311,7 +311,7 @@ interface VirtualBodyProps<TData extends object> {
 function DataGridTableVirtualPinnedPlaceholderCell<TData extends object>({
   column
 }: {
-  column: Column<DataGridFeatures, TData, unknown>
+  column: Column<DataGridFeatures, TData>
 }) {
   const { props } = useDataGrid()
   const isPinned = column.getIsPinned()
@@ -438,6 +438,9 @@ function DataGridTableVirtualStatusRow<TData extends object>({
  * focus, row checks) repaints through each cell's own Subscribe, and any real
  * data change rebuilds the row wrappers, so identity comparison is safe.
  */
+// The memo wrapper erases the generic signature (TS instantiates TData to
+// `object`); re-claiming it is deliberate.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const MemoizedRenderedRow = memo(
   DataGridTableRenderedRow,
   (prev, next) =>
@@ -447,6 +450,9 @@ const MemoizedRenderedRow = memo(
     prev.pinnedBoundary === next.pinnedBoundary &&
     prev.centerWindow?.start === next.centerWindow?.start &&
     prev.centerWindow?.end === next.centerWindow?.end
+  // Deliberate: the memo wrapper erases the generic signature (TS
+  // instantiates TData to `object`); re-claiming it.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 ) as typeof DataGridTableRenderedRow
 
 function DataGridTableVirtualBody<TData extends object>({
@@ -606,6 +612,9 @@ function DataGridTableVirtualBody<TData extends object>({
 const MemoizedVirtualBody = memo(
   DataGridTableVirtualBody,
   (_prev, next) => !!next.table.state.columnResizing.isResizingColumn
+  // Deliberate: the memo wrapper erases the generic signature (TS
+  // instantiates TData to `object`); re-claiming it.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 ) as typeof DataGridTableVirtualBody
 
 function DataGridTableVirtual<TData extends object>({

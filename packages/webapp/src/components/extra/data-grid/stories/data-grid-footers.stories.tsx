@@ -38,11 +38,11 @@ export default meta
 
 const footerStyles = stylex.create({
   muted: {
-    color: s.muted.color as unknown as string,
+    color: s.muted.color,
     fontSize: '0.75rem'
   },
   strong: {
-    color: s.strong.color as unknown as string,
+    color: s.strong.color,
     fontWeight: 500
   },
   stack: {
@@ -124,9 +124,7 @@ function baseColumns(): ColumnDef<DataGridFeatures, IBook>[] {
       accessorKey: 'price',
       header: 'Price ($)',
       cell: (info) => (
-        <span {...stylex.props(footerStyles.numeric)}>
-          ${(info.getValue() as number).toFixed(2)}
-        </span>
+        <span {...stylex.props(footerStyles.numeric)}>${Number(info.getValue()).toFixed(2)}</span>
       ),
       size: 130
     }

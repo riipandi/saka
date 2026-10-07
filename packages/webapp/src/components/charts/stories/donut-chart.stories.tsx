@@ -87,8 +87,8 @@ export const HousePoints: Story = {
   ),
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Hogwarts house points' })
-    expect(chart).toBeVisible()
-    expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(houses.length)
+    await expect(chart).toBeVisible()
+    await expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(houses.length)
   }
 }
 
@@ -123,7 +123,9 @@ export const WithCenterTotal: Story = {
     )
   },
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: 'Hogwarts house points with total' })).toBeVisible()
-    expect(canvas.getByText('1721')).toBeVisible()
+    await expect(
+      canvas.getByRole('img', { name: 'Hogwarts house points with total' })
+    ).toBeVisible()
+    await expect(canvas.getByText('1721')).toBeVisible()
   }
 }

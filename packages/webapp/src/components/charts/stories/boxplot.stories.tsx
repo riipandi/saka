@@ -47,7 +47,7 @@ const examScores: readonly ExamScore[] = (() => {
 })()
 
 const boxScales = {
-  x: { scale: () => scaleBand<string>().padding(0.35) },
+  x: { scale: () => scaleBand().padding(0.35) },
   y: { scale: scaleLinear, nice: true, grid: true }
 } as const
 
@@ -89,10 +89,10 @@ export const Charms: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Charms exam score distribution per house' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // Every house renders a box; the planted Slytherin outlier must appear
     // as its own mark so the whisker logic is provably Tukey.
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(4)
-    expect(canvas.getByText('Slytherin')).toBeVisible()
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(4)
+    await expect(canvas.getByText('Slytherin')).toBeVisible()
   }
 }

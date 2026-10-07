@@ -80,9 +80,9 @@ export const Overlaid: Story = {
     )
   },
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: 'Monthly checkouts by series' })).toBeVisible()
-    expect(canvas.getByText('Robert Langdon')).toBeVisible()
-    expect(canvas.getByText('Harry Potter')).toBeVisible()
+    await expect(canvas.getByRole('img', { name: 'Monthly checkouts by series' })).toBeVisible()
+    await expect(canvas.getByText('Robert Langdon')).toBeVisible()
+    await expect(canvas.getByText('Harry Potter')).toBeVisible()
   }
 }
 
@@ -142,8 +142,8 @@ export const Stacked: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Monthly checkouts stacked by series' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // One layered shape per series — area scenes paint as paths.
-    expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(2)
+    await expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(2)
   }
 }

@@ -90,10 +90,10 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Sealed by the Ministry')
-    expect(el).toBeDisabled()
+    await expect(el).toBeDisabled()
     await userEvent.click(el)
     await userEvent.type(el, 'alohomora')
-    expect(el).toHaveValue('')
+    await expect(el).toHaveValue('')
   }
 }
 
@@ -131,7 +131,7 @@ export const WithButton: Story = {
   play: async ({ canvas }) => {
     const el = canvas.getByPlaceholderText('Search the restricted section…')
     await userEvent.type(el, 'plexiglass')
-    expect(el).toHaveValue('plexiglass')
-    expect(canvas.getByRole('button', { name: 'Accio' })).toBeEnabled()
+    await expect(el).toHaveValue('plexiglass')
+    await expect(canvas.getByRole('button', { name: 'Accio' })).toBeEnabled()
   }
 }

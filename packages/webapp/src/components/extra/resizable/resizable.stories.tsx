@@ -88,15 +88,15 @@ export const Horizontal: Story = {
   play: async ({ canvas }) => {
     const handle = canvas.getByRole('separator', { name: 'Resize sidebar' })
     const panel = document.body.querySelector<HTMLElement>('[data-testid="sidebar"]')
-    expect(panel).not.toBeNull()
+    await expect(panel).not.toBeNull()
     // Keyboard focus shows the glow hugging the bar and resizes the panel.
     // (Hover styles rely on CSS :hover, which synthetic test events cannot
     // trigger — verified separately against a real browser session.)
     const before = panel?.getBoundingClientRect().width ?? 0
     handle.focus()
     await userEvent.keyboard('{ArrowRight}')
-    expect(getComputedStyle(handle).boxShadow).not.toBe('none')
-    expect(panel?.getBoundingClientRect().width ?? 0).toBeGreaterThan(before)
+    await expect(getComputedStyle(handle).boxShadow).not.toBe('none')
+    await expect(panel?.getBoundingClientRect().width ?? 0).toBeGreaterThan(before)
   }
 }
 
@@ -313,12 +313,12 @@ export const Controlled: Story = {
   },
   play: async ({ canvas }) => {
     const panel = document.body.querySelector<HTMLElement>('[data-testid="left"]')
-    expect(panel).not.toBeNull()
+    await expect(panel).not.toBeNull()
 
     // Applying a preset updates the layout programmatically.
     const before = panel?.getBoundingClientRect().width ?? 0
     await userEvent.click(canvas.getByRole('button', { name: '50 / 50' }))
     await waitFor(() => expect(canvas.getAllByText('50%')).toHaveLength(2))
-    expect(panel?.getBoundingClientRect().width ?? 0).toBeGreaterThan(before)
+    await expect(panel?.getBoundingClientRect().width ?? 0).toBeGreaterThan(before)
   }
 }

@@ -88,7 +88,7 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Open the cryptex' }))
     await body.findByRole('dialog')
-    expect(body.getByRole('heading', { name: 'Erase the map?' })).toBeInTheDocument()
+    await expect(body.getByRole('heading', { name: 'Erase the map?' })).toBeInTheDocument()
 
     // Escape dismisses the dialog.
     await userEvent.keyboard('{Escape}')

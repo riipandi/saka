@@ -60,7 +60,7 @@ const priceConfig = {
 } as const
 
 const priceScales = {
-  x: { scale: () => scalePoint<string>().padding(0.4) },
+  x: { scale: () => scalePoint().padding(0.4) },
   y: { scale: scaleLinear, nice: true, grid: true }
 } as const
 
@@ -119,10 +119,10 @@ export const Moonstone: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Moonstone powder price with Bollinger band' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // One band area plus two line paths at minimum.
-    expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(3)
-    expect(canvas.getByText('SMA-10')).toBeVisible()
-    expect(canvas.getByText('±2σ band')).toBeVisible()
+    await expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(3)
+    await expect(canvas.getByText('SMA-10')).toBeVisible()
+    await expect(canvas.getByText('±2σ band')).toBeVisible()
   }
 }

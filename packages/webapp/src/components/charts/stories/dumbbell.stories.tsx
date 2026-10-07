@@ -45,7 +45,7 @@ const dumbbellConfig = {
 
 const dumbbellScales = {
   x: { scale: scaleLinear, nice: true, grid: true },
-  y: { scale: () => scaleBand<string>().padding(0.4) }
+  y: { scale: () => scaleBand().padding(0.4) }
 } as const
 
 export const OwlVsNewt: Story = {
@@ -112,11 +112,13 @@ export const OwlVsNewt: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'OWL versus NEWT average grade per subject' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // Two dots per subject plus crosshair markers; connectors per subject.
-    expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(subjects.length * 2)
-    expect(canvas.getByText('OWL average')).toBeVisible()
-    expect(canvas.getByText('NEWT average')).toBeVisible()
-    expect(canvas.getByText('Defence Against the Dark Arts')).toBeVisible()
+    await expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(
+      subjects.length * 2
+    )
+    await expect(canvas.getByText('OWL average')).toBeVisible()
+    await expect(canvas.getByText('NEWT average')).toBeVisible()
+    await expect(canvas.getByText('Defence Against the Dark Arts')).toBeVisible()
   }
 }

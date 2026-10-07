@@ -63,12 +63,12 @@ export const Playground: Story = {
     </Card>
   ),
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('heading', { name: 'Submit to the Prophet' })).toBeInTheDocument()
+    await expect(canvas.getByRole('heading', { name: 'Submit to the Prophet' })).toBeInTheDocument()
 
     // The form inside the card accepts typing.
     const input = canvas.getByPlaceholderText('Headline')
     await userEvent.type(input, 'Snape Walks the Aisles')
-    expect(input).toHaveValue('Snape Walks the Aisles')
+    await expect(input).toHaveValue('Snape Walks the Aisles')
   }
 }
 

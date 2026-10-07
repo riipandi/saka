@@ -101,7 +101,7 @@ export const Playground: Story = {
     // menuitem elements inside the menubar role.
     await userEvent.click(canvas.getByRole('menuitem', { name: 'Grimoire' }))
     await body.findByRole('menu')
-    expect(body.getByRole('menuitem', { name: /new scroll/i })).toBeInTheDocument()
+    await expect(body.getByRole('menuitem', { name: /new scroll/i })).toBeInTheDocument()
 
     // Submenus open from their trigger.
     await userEvent.click(body.getByRole('menuitem', { name: /dispatch/i }))
@@ -119,11 +119,11 @@ export const Playground: Story = {
     await userEvent.click(canvas.getByRole('menuitem', { name: 'Divination' }))
     await body.findByRole('menu')
     await userEvent.click(body.getByRole('menuitemradio', { name: 'Slytherin' }))
-    expect(body.getByRole('menuitemradio', { name: 'Slytherin' })).toHaveAttribute(
+    await expect(body.getByRole('menuitemradio', { name: 'Slytherin' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
-    expect(body.getByRole('menuitemradio', { name: 'Gryffindor' })).toHaveAttribute(
+    await expect(body.getByRole('menuitemradio', { name: 'Gryffindor' })).toHaveAttribute(
       'aria-checked',
       'false'
     )

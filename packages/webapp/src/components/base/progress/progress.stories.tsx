@@ -78,10 +78,10 @@ export const Label: Story = {
       <ProgressValue />
     </Progress>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const el = canvas.getByRole('progressbar', { name: 'Gringotts vault capacity used' })
-    expect(el).toHaveAttribute('aria-valuenow', '72')
-    expect(el).toHaveAttribute('aria-valuemax', '100')
+    await expect(el).toHaveAttribute('aria-valuenow', '72')
+    await expect(el).toHaveAttribute('aria-valuemax', '100')
   }
 }
 
@@ -108,11 +108,11 @@ export const Controlled: Story = {
   },
   play: async ({ canvas }) => {
     const bar = canvas.getByRole('progressbar')
-    expect(bar).toHaveAttribute('aria-valuenow', '20')
+    await expect(bar).toHaveAttribute('aria-valuenow', '20')
 
     // Each click advances the controlled value by 20, clamped at 100.
     await userEvent.click(canvas.getByRole('button', { name: 'Decrypt next ring' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Decrypt next ring' }))
-    expect(bar).toHaveAttribute('aria-valuenow', '60')
+    await expect(bar).toHaveAttribute('aria-valuenow', '60')
   }
 }

@@ -42,7 +42,7 @@ const spells: readonly SpellRow[] = [
 
 const masteryScales = {
   x: { scale: scaleLinear, nice: true, grid: true },
-  y: { scale: () => scaleBand<string>().padding(0.35) }
+  y: { scale: () => scaleBand().padding(0.35) }
 } as const
 
 export const Ranked: Story = {
@@ -98,9 +98,9 @@ export const Ranked: Story = {
     const chart = canvas.getByRole('img', {
       name: 'Spell mastery ranked from strongest to weakest'
     })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // One tip dot per spell (crosshair markers may add their own circles).
-    expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(spells.length)
-    expect(canvas.getByText('Expelliarmus')).toBeVisible()
+    await expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(spells.length)
+    await expect(canvas.getByText('Expelliarmus')).toBeVisible()
   }
 }

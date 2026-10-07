@@ -101,10 +101,10 @@ export const Default: Story = {
   render: () => <ProgressCircle fraction={0.68} label='Shelves restocked' />,
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Shelves restocked' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // Track plus value arc.
-    expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(2)
-    expect(canvas.getByText('68%')).toBeVisible()
+    await expect(chart.querySelectorAll('path').length).toBeGreaterThanOrEqual(2)
+    await expect(canvas.getByText('68%')).toBeVisible()
   }
 }
 
@@ -125,7 +125,7 @@ export const Gallery: Story = {
       'New acquisitions catalogued',
       'Reading challenge progress'
     ]) {
-      expect(canvas.getByRole('img', { name: label })).toBeVisible()
+      await expect(canvas.getByRole('img', { name: label })).toBeVisible()
     }
   }
 }

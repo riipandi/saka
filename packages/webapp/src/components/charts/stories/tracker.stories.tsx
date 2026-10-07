@@ -132,9 +132,11 @@ export const ShelfAvailability: Story = {
   name: 'Shelf availability',
   render: () => <Tracker />,
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: /Shelf status for The Da Vinci Code/ })).toBeVisible()
-    expect(document.querySelectorAll('[data-status]').length).toBe(shelfStatuses.length)
-    expect(document.querySelectorAll('[data-status="overdue"]').length).toBeGreaterThan(0)
+    await expect(
+      canvas.getByRole('img', { name: /Shelf status for The Da Vinci Code/ })
+    ).toBeVisible()
+    await expect(document.querySelectorAll('[data-status]').length).toBe(shelfStatuses.length)
+    await expect(document.querySelectorAll('[data-status="overdue"]').length).toBeGreaterThan(0)
 
     // Hovering a segment opens the Base UI tooltip for that day.
     const firstSegment = document.querySelector('[data-status="low"]')

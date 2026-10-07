@@ -165,16 +165,17 @@ export const OnChange: StoryObj<{
   ),
   play: async ({ canvas, args }) => {
     const file = new File(['hello'], 'hello.png', { type: 'image/png' })
-    const input = canvas.getByTestId('root').querySelector('input') as HTMLInputElement
+    const input = canvas.getByTestId('root').querySelector('input')
+    if (!(input instanceof HTMLInputElement)) throw new Error('FileUpload input not rendered')
 
     await userEvent.upload(input, file)
 
-    expect(input).toHaveAttribute('name', 'test-name')
-    expect(input.files?.[0]).toBe(file)
-    expect(input.files).toHaveLength(1)
+    await expect(input).toHaveAttribute('name', 'test-name')
+    await expect(input.files?.[0]).toBe(file)
+    await expect(input.files).toHaveLength(1)
 
-    expect(args.handleChange).toHaveBeenCalledTimes(1)
-    expect(args.handleChange).toHaveBeenCalledWith({
+    await expect(args.handleChange).toHaveBeenCalledTimes(1)
+    await expect(args.handleChange).toHaveBeenCalledWith({
       name: 'test-name',
       value: [file],
       event: expect.objectContaining({ target: input })
@@ -196,6 +197,6 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const input = canvas.getByTestId('root').querySelector('input')
-    expect(input).toBeDisabled()
+    await expect(input).toBeDisabled()
   }
 }

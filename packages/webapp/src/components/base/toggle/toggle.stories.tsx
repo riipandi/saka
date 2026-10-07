@@ -53,13 +53,13 @@ export const Playground: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('button', { name: 'Toggle charm' })
-    expect(el).toHaveAttribute('aria-pressed', 'false')
+    await expect(el).toHaveAttribute('aria-pressed', 'false')
 
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-pressed', 'true')
+    await expect(el).toHaveAttribute('aria-pressed', 'true')
 
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-pressed', 'false')
+    await expect(el).toHaveAttribute('aria-pressed', 'false')
   }
 }
 

@@ -61,13 +61,13 @@ export const Playground: Story = {
   play: async ({ canvas }) => {
     // The accessible name combines aria-label and the label text.
     const el = canvas.getByRole('checkbox', { name: /Accept the Hogwarts letter/ })
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
 
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-checked', 'false')
+    await expect(el).toHaveAttribute('aria-checked', 'false')
 
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
   }
 }
 
@@ -78,8 +78,8 @@ export const Indeterminate: Story = {
       <Checkbox {...args} aria-label='Select all Marauders' /> Select all Marauders
     </Label>
   ),
-  play: ({ canvas }) => {
-    expect(canvas.getByRole('checkbox', { name: /Select all Marauders/ })).toHaveAttribute(
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('checkbox', { name: /Select all Marauders/ })).toHaveAttribute(
       'aria-checked',
       'mixed'
     )
@@ -109,10 +109,10 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('checkbox', { name: /Hogsmeade permission slip/ })
-    expect(el).toHaveAttribute('data-disabled')
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('data-disabled')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
   }
 }
 
@@ -196,12 +196,15 @@ export const GroupPlay: StoryObj<{ handleValueChange: ReturnType<typeof fn> }> =
   play: async ({ canvas, args }) => {
     const memos = canvas.getByRole('checkbox', { name: 'Ministry memos' })
     await userEvent.click(memos)
-    expect(memos).toHaveAttribute('aria-checked', 'true')
+    await expect(memos).toHaveAttribute('aria-checked', 'true')
     // onValueChange carries (value, eventDetails) — check the value arg.
-    expect(args.handleValueChange.mock.calls[0]?.[0]).toEqual(['newsletter', 'product-updates'])
+    await expect(args.handleValueChange.mock.calls[0]?.[0]).toEqual([
+      'newsletter',
+      'product-updates'
+    ])
 
     await userEvent.click(canvas.getByRole('checkbox', { name: 'Daily Prophet' }))
-    expect(args.handleValueChange.mock.calls[1]?.[0]).toEqual(['product-updates'])
+    await expect(args.handleValueChange.mock.calls[1]?.[0]).toEqual(['product-updates'])
   }
 }
 
@@ -236,20 +239,20 @@ export const GroupParentPlay: Story = {
     const parent = canvas.getByRole('checkbox', { name: 'All owl post' })
 
     // One of three selected: the parent checkbox is indeterminate.
-    expect(parent).toHaveAttribute('aria-checked', 'mixed')
+    await expect(parent).toHaveAttribute('aria-checked', 'mixed')
 
     // Selecting the parent checks every child.
     await userEvent.click(parent)
-    expect(parent).toHaveAttribute('aria-checked', 'true')
+    await expect(parent).toHaveAttribute('aria-checked', 'true')
     for (const name of ['Howlers', 'Prophet mentions', 'Quidditch updates']) {
-      expect(canvas.getByRole('checkbox', { name })).toHaveAttribute('aria-checked', 'true')
+      await expect(canvas.getByRole('checkbox', { name })).toHaveAttribute('aria-checked', 'true')
     }
 
     // Selecting it again clears every child.
     await userEvent.click(parent)
-    expect(parent).toHaveAttribute('aria-checked', 'false')
+    await expect(parent).toHaveAttribute('aria-checked', 'false')
     for (const name of ['Howlers', 'Prophet mentions', 'Quidditch updates']) {
-      expect(canvas.getByRole('checkbox', { name })).toHaveAttribute('aria-checked', 'false')
+      await expect(canvas.getByRole('checkbox', { name })).toHaveAttribute('aria-checked', 'false')
     }
   }
 }

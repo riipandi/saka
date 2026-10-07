@@ -72,12 +72,12 @@ export const Playground: Story = {
       </PaginationContent>
     </Pagination>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     // Links render as buttons; the active page carries aria-current.
-    expect(canvas.getByRole('button', { name: '2' })).toHaveAttribute('aria-current', 'page')
-    expect(canvas.getByRole('button', { name: '1' }).getAttribute('aria-current')).toBeNull()
-    expect(canvas.getByRole('button', { name: 'Go to previous page' })).toBeInTheDocument()
-    expect(canvas.getByRole('button', { name: 'Go to next page' })).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: '2' })).toHaveAttribute('aria-current', 'page')
+    await expect(canvas.getByRole('button', { name: '1' }).getAttribute('aria-current')).toBeNull()
+    await expect(canvas.getByRole('button', { name: 'Go to previous page' })).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Go to next page' })).toBeInTheDocument()
   }
 }
 

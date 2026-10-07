@@ -72,26 +72,26 @@ export const Playground: Story = {
     const thumbs = canvas.getAllByRole('slider')
     const thumb = thumbs.find((el) => el.getAttribute('aria-valuenow') === '50') ?? thumbs[0]
     if (!thumb) throw new Error('Slider thumb not found')
-    expect(thumb).toHaveAttribute('aria-valuenow', '50')
+    await expect(thumb).toHaveAttribute('aria-valuenow', '50')
 
     // Arrow keys step the value.
     thumb.focus()
     await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowLeft}')
-    expect(thumb).toHaveAttribute('aria-valuenow', '51')
+    await expect(thumb).toHaveAttribute('aria-valuenow', '51')
 
     // Home/End jump to the extremes.
     await userEvent.keyboard('{Home}')
-    expect(thumb).toHaveAttribute('aria-valuenow', '0')
+    await expect(thumb).toHaveAttribute('aria-valuenow', '0')
   }
 }
 
 export const Range: Story = {
   args: { defaultValue: [25, 75] },
   render: (args) => <Slider {...args} style={styles.root} />,
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const [min, max] = canvas.getAllByRole('slider')
-    expect(min).toHaveAttribute('aria-valuenow', '25')
-    expect(max).toHaveAttribute('aria-valuenow', '75')
+    await expect(min).toHaveAttribute('aria-valuenow', '25')
+    await expect(max).toHaveAttribute('aria-valuenow', '75')
   }
 }
 

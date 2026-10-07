@@ -31,6 +31,13 @@ export default meta
 
 const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', '']
 
+// React's CSSProperties type omits custom properties, so set it at runtime.
+const withSwatchVar = (color: string): React.CSSProperties => {
+  const style: React.CSSProperties = {}
+  Reflect.set(style, '--swatch-bg', color)
+  return style
+}
+
 function cellLabel(day: ReadingDay): string {
   const noun = day.chapters === 1 ? 'chapter' : 'chapters'
   const value = day.chapters === 0 ? 'No reading' : `${day.chapters} ${noun}`
@@ -94,9 +101,7 @@ function Heatmap({ days, label, summary }: HeatmapProps) {
                 aria-hidden='true'
                 {...stylex.props(
                   styles.cell,
-                  day.level === 0
-                    ? styles.cellEmpty
-                    : styles.cellFilled(readingPalette[day.level as 1 | 2 | 3 | 4])
+                  day.level === 0 ? styles.cellEmpty : styles.cellFilled(readingPalette[day.level])
                 )}
               />
               <TooltipContent>{cellLabel(day)}</TooltipContent>
@@ -110,20 +115,14 @@ function Heatmap({ days, label, summary }: HeatmapProps) {
         <div {...stylex.props(styles.legendScale)}>
           <span>Less</span>
           <div {...stylex.props(styles.swatches)}>
-            {[0, 1, 2, 3, 4].map((level) => (
+            {([0, 1, 2, 3, 4] as const).map((level) => (
               <span
                 key={level}
                 {...stylex.props(
                   styles.swatch,
                   level === 0 ? styles.swatchEmpty : styles.swatchFilled
                 )}
-                style={
-                  level === 0
-                    ? undefined
-                    : ({
-                        '--swatch-bg': readingPalette[level as 1 | 2 | 3 | 4]
-                      } as React.CSSProperties)
-                }
+                style={level === 0 ? undefined : withSwatchVar(readingPalette[level])}
               />
             ))}
           </div>
@@ -142,9 +141,9 @@ async function expectHeatmapStory(
   labelPattern: RegExp,
   summaryText: string
 ) {
-  expect(canvas.getByRole('img', { name: labelPattern })).toBeVisible()
-  expect(document.querySelectorAll('[data-level]').length).toBe(days.length)
-  expect(canvas.getByText(summaryText)).toBeVisible()
+  await expect(canvas.getByRole('img', { name: labelPattern })).toBeVisible()
+  await expect(document.querySelectorAll('[data-level]').length).toBe(days.length)
+  await expect(canvas.getByText(summaryText)).toBeVisible()
 
   // Hovering a heavy-reading day opens the Base UI tooltip for that date.
   const denseDay = days.find((day) => day.level === 4)

@@ -87,7 +87,7 @@ export const Fallback: Story = {
   // A broken image swaps in the fallback initials.
   play: async ({ canvas }) => {
     await waitFor(() => expect(canvas.getByText('GH')).toBeInTheDocument())
-    expect(canvas.queryByText('HP')).toBeNull()
+    await expect(canvas.queryByText('HP')).toBeNull()
   }
 }
 
@@ -143,8 +143,8 @@ export const GroupCount: Story = {
       <AvatarGroupCount>+3</AvatarGroupCount>
     </AvatarGroup>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     // The trailing count and each avatar render in the stack.
-    expect(canvas.getByText('+3')).toBeInTheDocument()
+    await expect(canvas.getByText('+3')).toBeInTheDocument()
   }
 }

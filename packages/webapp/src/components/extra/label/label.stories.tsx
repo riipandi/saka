@@ -40,9 +40,9 @@ export const Playground: Story = {
   // Clicking the label toggles the associated control.
   play: async ({ canvas }) => {
     const checkbox = canvas.getByRole('checkbox', { name: /Accept the Hogwarts letter/ })
-    expect(checkbox).toHaveAttribute('aria-checked', 'false')
+    await expect(checkbox).toHaveAttribute('aria-checked', 'false')
 
     await userEvent.click(canvas.getByText(/hogwarts letter and its terms/i))
-    expect(checkbox).toHaveAttribute('aria-checked', 'true')
+    await expect(checkbox).toHaveAttribute('aria-checked', 'true')
   }
 }

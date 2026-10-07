@@ -168,16 +168,16 @@ export const Playground: Story = {
   ),
   play: async ({ canvas }) => {
     const trigger = canvas.getByRole('button', { name: 'Alohomora' })
-    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
     const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '')
-    expect(panel).not.toBeNull()
+    await expect(panel).not.toBeNull()
 
     await userEvent.click(trigger)
-    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
 
     await userEvent.click(trigger)
-    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   }
 }
 
@@ -199,11 +199,11 @@ export const FileTree: Story = {
   ),
   play: async ({ canvas }) => {
     const closed = canvas.getByRole('button', { name: /diagon-alley/i })
-    expect(closed).toHaveAttribute('aria-expanded', 'false')
+    await expect(closed).toHaveAttribute('aria-expanded', 'false')
 
     // Opening a folder reveals nested files, and nested folders compose.
     await userEvent.click(closed)
-    expect(closed).toHaveAttribute('aria-expanded', 'true')
-    expect(canvas.getByText('golden-snitch.ico')).toBeInTheDocument()
+    await expect(closed).toHaveAttribute('aria-expanded', 'true')
+    await expect(canvas.getByText('golden-snitch.ico')).toBeInTheDocument()
   }
 }

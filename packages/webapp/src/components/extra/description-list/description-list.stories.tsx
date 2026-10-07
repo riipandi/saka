@@ -65,9 +65,9 @@ export const Default: Story = {
     </DescriptionList>
   ),
   play: async ({ canvas }) => {
-    expect(canvas.getAllByRole('term')).toHaveLength(5)
-    expect(canvas.getAllByRole('definition')).toHaveLength(5)
-    expect(canvas.getByText('ORD-0071')).toBeInTheDocument()
+    await expect(canvas.getAllByRole('term')).toHaveLength(5)
+    await expect(canvas.getAllByRole('definition')).toHaveLength(5)
+    await expect(canvas.getByText('ORD-0071')).toBeInTheDocument()
   }
 }
 

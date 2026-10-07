@@ -25,7 +25,7 @@ export default meta
 // Sparklines drop every guide: no grid, no axis, no tooltip — the number in
 // the card carries the value, the spark carries the shape.
 const sparkScales = {
-  x: { scale: () => scaleBand<string>().padding(0.1) },
+  x: { scale: () => scaleBand().padding(0.1) },
   y: { scale: scaleLinear, nice: true }
 } as const
 
@@ -132,8 +132,8 @@ export const KpiRow: Story = {
   },
   play: async ({ canvas }) => {
     for (const card of cards) {
-      expect(canvas.getByRole('img', { name: `${card.label} sparkline` })).toBeVisible()
+      await expect(canvas.getByRole('img', { name: `${card.label} sparkline` })).toBeVisible()
     }
-    expect(canvas.getByText('1,364')).toBeVisible()
+    await expect(canvas.getByText('1,364')).toBeVisible()
   }
 }

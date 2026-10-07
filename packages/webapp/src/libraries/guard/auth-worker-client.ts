@@ -49,5 +49,9 @@ export function authWorker(): AuthWorkerClient {
  * compatible with its Comlink remote proxy type.
  */
 function createMainThreadEngine(): AuthWorkerClient {
-  return createAuthEngine(API_BASE_URL) as unknown as AuthWorkerClient
+  // Deliberate structural substitution: the main-thread engine exposes the
+  // same async method surface as a Comlink proxy; the cast only bridges the
+  // proxy's internal symbol-keyed marker, which a plain object cannot carry.
+  // oxlint-disable-next-line no-unsafe-type-assertion -- intentional Comlink-proxy stand-in, see doc comment above.
+  return createAuthEngine(API_BASE_URL) as AuthWorkerClient
 }

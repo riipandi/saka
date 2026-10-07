@@ -50,11 +50,11 @@ export const Playground: Story = {
       <MeterValue>{(_, value) => `${value} ml of 64 ml`}</MeterValue>
     </Meter>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const el = canvas.getByRole('meter', { name: 'Polyjuice Potion brewed' })
-    expect(el).toHaveAttribute('aria-valuenow', '24')
-    expect(el).toHaveAttribute('aria-valuemax', '64')
-    expect(canvas.getByText('24 ml of 64 ml')).toBeInTheDocument()
+    await expect(el).toHaveAttribute('aria-valuenow', '24')
+    await expect(el).toHaveAttribute('aria-valuemax', '64')
+    await expect(canvas.getByText('24 ml of 64 ml')).toBeInTheDocument()
   }
 }
 
@@ -67,11 +67,11 @@ export const CustomRange: Story = {
       <MeterValue>{(_, value) => `${value} psi`}</MeterValue>
     </Meter>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const el = canvas.getByRole('meter', { name: 'Cryptex pressure' })
-    expect(el).toHaveAttribute('aria-valuemin', '30')
-    expect(el).toHaveAttribute('aria-valuemax', '90')
-    expect(el).toHaveAttribute('aria-valuenow', '72')
-    expect(canvas.getByText('72 psi')).toBeInTheDocument()
+    await expect(el).toHaveAttribute('aria-valuemin', '30')
+    await expect(el).toHaveAttribute('aria-valuemax', '90')
+    await expect(el).toHaveAttribute('aria-valuenow', '72')
+    await expect(canvas.getByText('72 psi')).toBeInTheDocument()
   }
 }

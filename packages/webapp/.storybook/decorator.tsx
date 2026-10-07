@@ -148,8 +148,15 @@ function CanvasControls({
   )
 }
 
+const STORYBOOK_THEMES = ['light', 'dark', 'system'] as const
+
+function isStorybookTheme(value: unknown): value is StorybookTheme {
+  return typeof value === 'string' && (STORYBOOK_THEMES as readonly string[]).includes(value)
+}
+
 export function GlobalDecorator({ context, children }: GlobalDecoratorProps) {
-  const globalTheme = (context.globals[STORYBOOK_THEME_GLOBAL] ?? 'system') as StorybookTheme
+  const raw: unknown = context.globals[STORYBOOK_THEME_GLOBAL] ?? 'system'
+  const globalTheme = isStorybookTheme(raw) ? raw : 'system'
   const forcedTheme = globalTheme === 'system' ? undefined : globalTheme
 
   const [direction, setDirection] = React.useState<Direction>('ltr')

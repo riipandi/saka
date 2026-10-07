@@ -75,7 +75,7 @@ export const Playground: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Seal the cryptex' }))
 
     const dialog = within(document.body).getByRole('alertdialog')
-    expect(
+    await expect(
       within(document.body).getByRole('heading', { name: /absolutely sure/i })
     ).toBeInTheDocument()
 
@@ -165,7 +165,11 @@ export const Destructive: Story = {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant='destructive' disabled={deleting} onClick={handleDelete}>
+            <AlertDialogAction
+              variant='destructive'
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
               {deleting && <Spinner />}
               {deleting ? 'Closing…' : 'Close the vault'}
             </AlertDialogAction>
@@ -183,8 +187,8 @@ export const Destructive: Story = {
     await userEvent.click(action)
 
     // Pending state disables both actions while the promise runs.
-    expect(within(document.body).getByRole('button', { name: /closing/i })).toBeDisabled()
-    expect(within(document.body).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    await expect(within(document.body).getByRole('button', { name: /closing/i })).toBeDisabled()
+    await expect(within(document.body).getByRole('button', { name: 'Cancel' })).toBeDisabled()
 
     // Resolving the action closes the dialog.
     await waitFor(() => expect(within(document.body).queryByRole('alertdialog')).toBeNull(), {

@@ -51,6 +51,10 @@ const commands = [
 
 type CommandEntry = (typeof commands)[number]
 
+// Base UI erases the item type, so narrow with a guard before reading it.
+const itemLabel = (item: unknown): string =>
+  typeof item === 'object' && item !== null && 'label' in item ? String(item.label) : ''
+
 const commandGroups = [
   {
     value: 'spells',
@@ -124,11 +128,7 @@ export default meta
 
 export const Playground: Story = {
   render: () => (
-    <Command
-      items={commands}
-      itemToStringValue={(item) => (item as CommandEntry).label}
-      style={styles.root}
-    >
+    <Command items={commands} itemToStringValue={itemLabel} style={styles.root}>
       <CommandInput placeholder='Cast a spell or search…' />
       <CommandEmpty>No spells found.</CommandEmpty>
       <CommandList>
@@ -184,11 +184,7 @@ export const Groups: Story = {
 
 export const Scrollable: Story = {
   render: () => (
-    <Command
-      items={spells}
-      itemToStringValue={(item) => (item as { label: string }).label}
-      style={styles.root}
-    >
+    <Command items={spells} itemToStringValue={itemLabel} style={styles.root}>
       <CommandInput placeholder='Search spells…' />
       <CommandEmpty>No spells found.</CommandEmpty>
       <CommandList>
@@ -219,7 +215,7 @@ export const DialogHotkey: Story = {
           </KbdGroup>
         </Button>
         <CommandDialog open={open} onOpenChange={setOpen}>
-          <Command items={commands} itemToStringValue={(item) => (item as CommandEntry).label}>
+          <Command items={commands} itemToStringValue={itemLabel}>
             <CommandInput placeholder='Cast a spell or search…' />
             <CommandEmpty>No spells found.</CommandEmpty>
             <CommandList>

@@ -61,7 +61,9 @@ export function FileUpload({
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     // Ignore elements inside the field
-    if (event.currentTarget.contains(event.relatedTarget as Node)) return
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+      return
+    }
     setHighlighted(false)
     otherProps.onDragLeave?.(event)
   }

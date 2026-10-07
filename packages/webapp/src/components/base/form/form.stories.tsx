@@ -111,7 +111,7 @@ export const SubmitFlow: StoryObj<{ handleSubmit: ReturnType<typeof fn> }> = {
     await userEvent.click(canvas.getByRole('button', { name: 'Send via owl' }))
 
     await waitFor(() => expect(canvas.getByText(/at least 2 characters/i)).toBeInTheDocument())
-    expect(args.handleSubmit).not.toHaveBeenCalled()
+    await expect(args.handleSubmit).not.toHaveBeenCalled()
 
     // Fixing the value lets the form submit with consolidated values.
     await userEvent.type(canvas.getByPlaceholderText('sneveu'), 'neveu')

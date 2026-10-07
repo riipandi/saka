@@ -68,15 +68,15 @@ export const Playground: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('switch', { name: /Invisibility Cloak/ })
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
 
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-checked', 'false')
+    await expect(el).toHaveAttribute('aria-checked', 'false')
 
     // Keyboard toggles as well.
     el.focus()
     await userEvent.keyboard(' ')
-    expect(el).toHaveAttribute('aria-checked', 'true')
+    await expect(el).toHaveAttribute('aria-checked', 'true')
   }
 }
 
@@ -115,9 +115,9 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('switch', { name: /Disabled switch/ })
-    expect(el).toHaveAttribute('data-disabled')
+    await expect(el).toHaveAttribute('data-disabled')
     await userEvent.click(el)
-    expect(el).toHaveAttribute('aria-checked', 'false')
+    await expect(el).toHaveAttribute('aria-checked', 'false')
   }
 }
 

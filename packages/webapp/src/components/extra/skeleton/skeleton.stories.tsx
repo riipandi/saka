@@ -111,9 +111,9 @@ export const Playground: Story = {
   ),
   // Skeletons are empty presentational placeholders — four shapes for the
   // avatar and two text lines (plus their wrapper).
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const scene = canvas.getByTestId('skeleton-scene')
-    expect(scene.querySelectorAll('div').length).toBe(4)
+    await expect(scene.querySelectorAll('div').length).toBe(4)
   }
 }
 

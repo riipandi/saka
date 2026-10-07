@@ -8,6 +8,16 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+function stringBody(body: BodyInit | null | undefined): string {
+  if (typeof body !== 'string') throw new Error('expected a JSON string request body')
+  return body
+}
+
+function stringUrl(request: RequestInfo | URL | undefined): string {
+  if (typeof request !== 'string') throw new Error('expected a string request URL')
+  return request
+}
+
 const profile = {
   id: 1,
   email: 'emilys@x.dummyjson.com',
@@ -39,7 +49,7 @@ describe('auth engine (browser)', () => {
 
     expect(results).toEqual([true, true, true])
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/auth/refresh')
+    expect(stringUrl(fetchMock.mock.calls[0]?.[0])).toContain('/auth/refresh')
   })
 
   it('short-circuits during the cooldown after a failed refresh', async () => {
@@ -93,10 +103,10 @@ describe('auth engine (browser)', () => {
     const engine = createAuthEngine('http://test.local')
 
     await engine.login({ username: 'emilys', password: 'emilyspass' }, { rememberMe: true })
-    const rememberedBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    const rememberedBody = JSON.parse(stringBody(fetchMock.mock.calls[0]?.[1]?.body))
 
     await engine.login({ username: 'emilys', password: 'emilyspass' })
-    const plainBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    const plainBody = JSON.parse(stringBody(fetchMock.mock.calls[1]?.[1]?.body))
 
     expect(rememberedBody).toMatchObject({ rememberMe: true, expiresInMins: 60 * 24 * 30 })
     expect(plainBody).toMatchObject({ rememberMe: false, expiresInMins: 60 })

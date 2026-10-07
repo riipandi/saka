@@ -78,9 +78,9 @@ export const Vertical: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Chapters per Robert Langdon novel' })
-    expect(chart).toBeVisible()
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(langdonNovels.length)
-    expect(canvas.queryByText('Harry Potter')).toBeNull()
+    await expect(chart).toBeVisible()
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(langdonNovels.length)
+    await expect(canvas.queryByText('Harry Potter')).toBeNull()
   }
 }
 
@@ -102,7 +102,7 @@ export const Horizontal: Story = {
       ],
       scales: {
         x: { scale: scaleLinear, nice: true, grid: true, axis: { label: 'Pages' } },
-        y: { scale: () => scaleBand<string>().padding(0.2) }
+        y: { scale: () => scaleBand().padding(0.2) }
       },
       motion: barMotion,
       theme: chartTheme,
@@ -118,8 +118,8 @@ export const Horizontal: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Harry Potter books by page count' })
-    expect(chart).toBeVisible()
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(hpBooks.length)
+    await expect(chart).toBeVisible()
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(hpBooks.length)
   }
 }
 
@@ -176,9 +176,9 @@ export const Stacked: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Monthly checkouts stacked by series' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // Two stacked segments per month.
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length * 2)
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length * 2)
   }
 }
 
@@ -229,7 +229,7 @@ export const Grouped: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Monthly checkouts grouped by series' })
-    expect(chart).toBeVisible()
-    expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length * 2)
+    await expect(chart).toBeVisible()
+    await expect(chart.querySelectorAll('rect').length).toBeGreaterThanOrEqual(checkouts.length * 2)
   }
 }

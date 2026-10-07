@@ -411,6 +411,30 @@ function extendDataGridSelection<TData extends object>(
 }
 
 /**
+ * Serialization for clipboard/fill values without a formatter: primitives use
+ * their native string form, objects use JSON instead of the meaningless
+ * default `[object Object]` stringification.
+ */
+function getDataGridClipboardValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') return JSON.stringify(value)
+  // Remaining: number | bigint | boolean | symbol | function — all have
+  // meaningful native toString forms.
+  switch (typeof value) {
+    case 'number':
+    case 'bigint':
+    case 'symbol':
+    case 'function':
+      return value.toString()
+    case 'boolean':
+      return value ? 'true' : 'false'
+    default:
+      return ''
+  }
+}
+
+/**
  * The active region as formatted strings, row-major. Columns opted out of
  * selection are compacted away, matching the feature's own ranges-data
  * behavior, and rows the view cannot show are skipped when a viewport is
@@ -438,7 +462,7 @@ function getDataGridActiveRegionGrid<TData extends object>(
       if (!column || column.columnDef.enableCellSelection === false) continue
       const value = cells[column.id]?.getValue()
       const format = column.columnDef.meta?.cellEdit?.format
-      line.push(format ? format(value, row.original) : String(value ?? ''))
+      line.push(format ? format(value, row.original) : getDataGridClipboardValue(value))
     }
     grid.push(line)
   }
@@ -913,7 +937,7 @@ function startDataGridFillSession<TData extends object>(options: {
             const sourceFormat = sourceColumn.columnDef.meta?.cellEdit?.format
             const raw = sourceFormat
               ? sourceFormat(sourceValue, row.original)
-              : String(sourceValue ?? '')
+              : getDataGridClipboardValue(sourceValue)
             const parsed = targetEdit.parse(raw, row.original)
             if (parsed === undefined) {
               rejected.push({
@@ -1020,7 +1044,11 @@ function focusDataGridCellEditor(element: HTMLInputElement | HTMLTextAreaElement
  * body viewport, which also receives focus (container-focus model), so a
  * virtualized row unmounting can never strand `document.activeElement`.
  */
-function DataGridCellSelection<TData extends object>({
+// The controller's props carry no row type, so the context resolves to the
+// untyped row shape; helpers below are instantiated with it directly.
+type CellSelectionRowData = Record<string, unknown>
+
+function DataGridCellSelection({
   apiRef,
   clipboard = true,
   keyboard = true
@@ -1038,7 +1066,7 @@ function DataGridCellSelection<TData extends object>({
   // The context value serves `table` and `props` through getters over the
   // provider's own refs, so a context object captured at mount keeps handing
   // out the CURRENT instances; no ref mirror is needed here.
-  const context = useDataGrid<TData>()
+  const context = useDataGrid()
 
   const anchorRef = useRef<HTMLSpanElement | null>(null)
   // The body viewport, once the wiring effect resolves it; the built-in
@@ -1062,12 +1090,12 @@ function DataGridCellSelection<TData extends object>({
   })
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) return undefined
     const anchor = anchorRef.current
-    if (!anchor) return
+    if (!anchor) return undefined
 
     const root = anchor.closest('[data-slot="data-grid"]') ?? anchor.parentElement
-    if (!root) return
+    if (!root) return undefined
 
     // Split header/body grids render two viewports; the body one owns focus.
     const viewports = Array.from(
@@ -1076,7 +1104,7 @@ function DataGridCellSelection<TData extends object>({
     const viewport =
       viewports.find((node) => node.querySelector('[data-slot="data-grid-table-body"]')) ??
       viewports[0]
-    if (!viewport) return
+    if (!viewport) return undefined
 
     const { apiRef: apiRefTarget } = wiringRef.current
     const getTable = () => wiringRef.current.context.table
@@ -1157,7 +1185,10 @@ function DataGridCellSelection<TData extends object>({
       const table = getTable()
       const cell = table.getFocusedCell()
       if (!cell) return false
-      const cellEdit = getDataGridWritableCellEdit<TData>(cell.column, cell.row.original)
+      const cellEdit = getDataGridWritableCellEdit<CellSelectionRowData>(
+        cell.column,
+        cell.row.original
+      )
       if (cellEdit?.control) {
         const baseline = cellEdit.format
           ? cellEdit.format(cell.getValue(), cell.row.original)
@@ -1444,7 +1475,7 @@ function DataGridCellSelection<TData extends object>({
       // grid's cell navigation. Every other key stays native there.
       const appendedRow =
         event.target instanceof Element
-          ? (event.target.closest('tbody > tr:not([data-row-id])') as HTMLElement | null)
+          ? event.target.closest<HTMLElement>('tbody > tr:not([data-row-id])')
           : null
       if (appendedRow && viewport.contains(appendedRow)) {
         const appended = getAppendedRows()
@@ -1475,7 +1506,8 @@ function DataGridCellSelection<TData extends object>({
         // never lets it reach here unprevented, and portal-rendered
         // popups keep their Escape entirely outside the viewport.
         if (event.key === 'Escape') {
-          const cell = (event.target as Element).closest?.('td[data-col-id]')
+          const cell =
+            event.target instanceof Element ? event.target.closest('td[data-col-id]') : null
           if (cell && viewport.contains(cell)) {
             event.preventDefault()
             event.stopPropagation()
@@ -1524,7 +1556,12 @@ function DataGridCellSelection<TData extends object>({
             if (!isCut) return
             const onCellsChange = getOnCellsChange()
             if (!onCellsChange) return
-            const details = buildDataGridClearDetails<TData>(getTable(), 'cut', true, viewport)
+            const details = buildDataGridClearDetails<CellSelectionRowData>(
+              getTable(),
+              'cut',
+              true,
+              viewport
+            )
             if (details) onCellsChange(details)
           })
           return
@@ -1661,7 +1698,12 @@ function DataGridCellSelection<TData extends object>({
         case 'Backspace': {
           const onCellsChange = getOnCellsChange()
           if (!onCellsChange) return
-          const details = buildDataGridClearDetails<TData>(table, 'clear', false, viewport)
+          const details = buildDataGridClearDetails<CellSelectionRowData>(
+            table,
+            'clear',
+            false,
+            viewport
+          )
           if (details) onCellsChange(details)
           event.preventDefault()
           return
@@ -1786,7 +1828,12 @@ function DataGridCellSelection<TData extends object>({
       if (!copySelection(event, true)) return
       const onCellsChange = getOnCellsChange()
       if (!onCellsChange) return
-      const details = buildDataGridClearDetails<TData>(getTable(), 'cut', true, viewport)
+      const details = buildDataGridClearDetails<CellSelectionRowData>(
+        getTable(),
+        'cut',
+        true,
+        viewport
+      )
       if (details) onCellsChange(details)
     }
 
@@ -1798,7 +1845,7 @@ function DataGridCellSelection<TData extends object>({
       if (!text) return
       event.preventDefault()
       const table = getTable()
-      const result = buildDataGridPasteDetails<TData>(
+      const result = buildDataGridPasteDetails<CellSelectionRowData>(
         table,
         parseDataGridClipboardText(text),
         viewport
@@ -1868,7 +1915,7 @@ function DataGridCellSelection<TData extends object>({
       // imperatively: same feature handler, same drag session.
       event.stopPropagation()
       event.preventDefault()
-      const cell = (event.target as Element | null)?.closest?.('td[data-col-id]')
+      const cell = event.target instanceof Element ? event.target.closest('td[data-col-id]') : null
       const rowId = cell?.closest('tr[data-row-id]')?.getAttribute('data-row-id')
       const columnId = cell?.getAttribute('data-col-id')
       if (!rowId || !columnId) return
@@ -1921,7 +1968,7 @@ function DataGridCellSelection<TData extends object>({
       if (event.button !== 0) return
       // The cell a click focuses reaches assistive tech once React commits.
       requestAnimationFrame(syncActiveDescendant)
-      const target = event.target as Element | null
+      const target = event.target instanceof Element ? event.target : null
       // A modifier press is a selection gesture all the way through, the
       // Sheets contract: extending must not hand the keyboard to whatever
       // control sits under the pointer, or the follow-up Shift+arrows land
@@ -1952,7 +1999,7 @@ function DataGridCellSelection<TData extends object>({
       // plain range drag from the handle.
       event.preventDefault()
       event.stopPropagation()
-      startDataGridFillSession<TData>({
+      startDataGridFillSession<CellSelectionRowData>({
         table: getTable(),
         viewport,
         onCellsChange: getOnCellsChange()
@@ -1967,7 +2014,7 @@ function DataGridCellSelection<TData extends object>({
       if (wiringRef.current.context.props.tableLayout?.cellEditMode !== 'click') return
       if (event.shiftKey || event.ctrlKey || event.metaKey) return
       if (isDataGridInteractiveKeyTarget(event.target)) return
-      const cell = (event.target as HTMLElement | null)?.closest?.('td')
+      const cell = event.target instanceof Element ? event.target.closest('td') : null
       if (!cell?.hasAttribute('data-cell-focused')) return
       requestCellEdit()
     }
@@ -1978,8 +2025,7 @@ function DataGridCellSelection<TData extends object>({
     // non-selectable cell would edit whichever cell held focus before.
     const handleDoubleClick = (event: MouseEvent) => {
       if (isDataGridInteractiveKeyTarget(event.target)) return
-      const target = event.target as HTMLElement | null
-      const cell = target?.closest?.('td')
+      const cell = event.target instanceof Element ? event.target.closest('td') : null
       if (!cell?.hasAttribute('data-cell-focused')) return
       requestCellEdit()
     }
@@ -2073,7 +2119,7 @@ function DataGridCellSelection<TData extends object>({
   // straddling half, which would poke out beneath it; the viewport flags
   // the session so the handle hides, as it does during a drag.
   useEffect(() => {
-    if (!viewportEl || !editorSession) return
+    if (!viewportEl || !editorSession) return undefined
     viewportEl.setAttribute('data-cell-editing', '')
     return () => viewportEl.removeAttribute('data-cell-editing')
   }, [viewportEl, editorSession])
@@ -2132,7 +2178,8 @@ function DataGridCellSelection<TData extends object>({
     const tableNow = context.table
     const row = tableNow.getRowsInDisplayOrder().find((candidate) => candidate.id === session.rowId)
     const column = tableNow.getColumn(session.columnId)
-    const cellEdit = column && row ? getDataGridWritableCellEdit<TData>(column, row.original) : null
+    const cellEdit =
+      column && row ? getDataGridWritableCellEdit<CellSelectionRowData>(column, row.original) : null
     if (!row || !column || !cellEdit) return
     const previousValue = row.getAllCellsByColumnId()[column.id]?.getValue()
     let value: unknown = raw
@@ -2266,7 +2313,7 @@ function DataGridCellEditorOverlay({
   // nothing is written that the user cannot see.
   useEffect(() => {
     const body = viewport.querySelector('tbody')
-    if (!body) return
+    if (!body) return undefined
     const observer = new MutationObserver(() => {
       if (!finishedRef.current) onCancel()
     })

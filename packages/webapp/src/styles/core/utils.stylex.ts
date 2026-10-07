@@ -36,5 +36,9 @@ export const ring = ({
 }: RingOptions = {}) => recipes.boxShadow(`0 0 0 ${width} ${color}${drop ? `, ${drop}` : ''}`)
 
 export const customClassName = (className: string | undefined) => {
+  // Deliberate low-level hack: fabricate a compiled StyleX class object from a
+  // raw class name — the branded StyleXClassName type cannot express a plain
+  // runtime string, so the assertion is the only way to hand this to stylex.
+  // oxlint-disable-next-line no-unsafe-type-assertion -- intentional fake compiled-style object, see comment above.
   return className ? ({ [className]: className, $$css: true } as StyleXStyles) : null
 }

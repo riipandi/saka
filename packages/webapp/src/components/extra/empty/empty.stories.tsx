@@ -125,6 +125,6 @@ export const WithInputGroup: Story = {
   play: async ({ canvas }) => {
     const input = canvas.getByPlaceholderText('Search spells…')
     await userEvent.type(input, 'riddikulus')
-    expect(input).toHaveValue('riddikulus')
+    await expect(input).toHaveValue('riddikulus')
   }
 }

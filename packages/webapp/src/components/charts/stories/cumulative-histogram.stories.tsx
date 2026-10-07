@@ -92,11 +92,11 @@ export const OwlPotions: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Cumulative histogram of OWL Potions scores' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // One bar per bin; the running total only ever grows, so bar heights
     // should form a non-decreasing staircase left to right.
     const bars = [...chart.querySelectorAll('rect')]
-    expect(bars.length).toBeGreaterThanOrEqual(12)
-    expect(canvas.getByText('Cumulative students')).toBeVisible()
+    await expect(bars.length).toBeGreaterThanOrEqual(12)
+    await expect(canvas.getByText('Cumulative students')).toBeVisible()
   }
 }

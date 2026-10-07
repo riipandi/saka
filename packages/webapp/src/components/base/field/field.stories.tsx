@@ -78,11 +78,11 @@ export const AutoWiring: Story = {
   ),
   // Field wires label, description, and validation to the control without
   // explicit ids.
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const input = canvas.getByRole('textbox', { name: 'Owl post address' })
     const describedBy = input.getAttribute('aria-describedby')
-    expect(describedBy).toBeTruthy()
-    expect(document.getElementById(describedBy ?? '')).toHaveTextContent(
+    await expect(describedBy).toBeTruthy()
+    await expect(document.getElementById(describedBy ?? '')).toHaveTextContent(
       'Owls reply within two days.'
     )
   }
@@ -97,8 +97,8 @@ export const InvalidPlay: Story = {
       <FieldError>You must accept the school rules before the Sorting begins.</FieldError>
     </Field>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const input = canvas.getByRole('textbox', { name: 'Owl post address' })
-    expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
   }
 }

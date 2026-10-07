@@ -42,7 +42,7 @@ import {
   useRef,
   useState
 } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '#/components/base/button'
 import { useDataGrid } from './data-grid'
@@ -114,14 +114,16 @@ type DataGridTableDndRowDecoration<TData extends object> = (context: {
 function DataGridTableDndHeader<TData extends object>({
   header
 }: {
-  header: Header<DataGridFeatures, TData, unknown>
+  header: Header<DataGridFeatures, TData>
 }) {
   const { i18n, props } = useDataGrid()
   const { column } = header
 
   // Check if column ordering is enabled for this column
   const canOrder =
-    (column.columnDef as { enableColumnOrdering?: boolean }).enableColumnOrdering !== false
+    'enableColumnOrdering' in column.columnDef
+      ? column.columnDef.enableColumnOrdering !== false
+      : true
 
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: header.column.id
@@ -162,7 +164,7 @@ function DataGridTableDndHeader<TData extends object>({
 function DataGridTableDndCell<TData extends object>({
   cell
 }: {
-  cell: Cell<DataGridFeatures, TData, unknown>
+  cell: Cell<DataGridFeatures, TData>
 }) {
   const { isDragging, setNodeRef, transform, transition } = useSortable({
     id: cell.column.id
@@ -220,7 +222,7 @@ function DataGridTableDndBodyRows<TData extends object>({
                 items={table.state.columnOrder}
                 strategy={horizontalListSortingStrategy}
               >
-                {row.getVisibleCells().map((cell: Cell<DataGridFeatures, TData, unknown>) => (
+                {row.getVisibleCells().map((cell) => (
                   <DataGridTableDndCell cell={cell} key={cell.id} />
                 ))}
               </SortableContext>
@@ -242,16 +244,19 @@ function DataGridTableDndBodyRows<TData extends object>({
 const MemoizedDataGridTableDndBodyRows = memo(
   DataGridTableDndBodyRows,
   (_prev, next) => !!next.table.state.columnResizing.isResizingColumn
+  // Deliberate: the memo wrapper erases the generic signature (TS
+  // instantiates TData to `object`); re-claiming it.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 ) as typeof DataGridTableDndBodyRows
 
-function DataGridTableDnd<TData extends object>({
+function DataGridTableDnd({
   handleDragEnd,
   footerContent
 }: {
   handleDragEnd: (event: DragEndEvent) => void
   footerContent?: ReactNode
 }) {
-  const { table, props } = useDataGrid<TData>()
+  const { table, props } = useDataGrid()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDraggingColumn, setIsDraggingColumn] = useState(false)
 
@@ -266,7 +271,7 @@ function DataGridTableDnd<TData extends object>({
   )
 
   useEffect(() => {
-    if (!isDraggingColumn) return
+    if (!isDraggingColumn) return undefined
 
     const { body, documentElement } = document
     const previousBodyCursor = body.style.cursor
@@ -323,7 +328,7 @@ function DataGridTableDnd<TData extends object>({
       >
         <DataGridTableBase>
           <DataGridTableHead>
-            {table.getHeaderGroups().map((headerGroup: HeaderGroup<DataGridFeatures, TData>) => {
+            {table.getHeaderGroups().map((headerGroup) => {
               return (
                 <DataGridTableHeadRow key={headerGroup.id} rowId={headerGroup.id}>
                   <SortableContext
@@ -485,7 +490,7 @@ function DataGridTableDndRow<TData extends object>({
         dndRef={setNodeRef}
         dndStyle={dndRowDragStyle(isDragging, CSS.Transform.toString(transform))}
       >
-        {row.getVisibleCells().map((cell: Cell<DataGridFeatures, TData, unknown>, index, cells) => {
+        {row.getVisibleCells().map((cell, index, cells) => {
           return (
             <DataGridTableBodyRowCell cell={cell} key={cell.id}>
               {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -608,6 +613,9 @@ function DataGridTableDndRowsBody<TData extends object>({
 const MemoizedDataGridTableDndRowsBody = memo(
   DataGridTableDndRowsBody,
   (_prev, next) => !!next.table.state.columnResizing.isResizingColumn
+  // Deliberate: the memo wrapper erases the generic signature (TS
+  // instantiates TData to `object`); re-claiming it.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 ) as typeof DataGridTableDndRowsBody
 
 function DataGridTableDndRows<TData extends object>({
@@ -737,7 +745,7 @@ function DataGridTableDndRows<TData extends object>({
   )
 
   useEffect(() => {
-    if (!isDraggingRow) return
+    if (!isDraggingRow) return undefined
 
     const { body, documentElement } = document
     const previousBodyCursor = body.style.cursor
@@ -872,12 +880,10 @@ function DataGridTableDndRows<TData extends object>({
               {carried && carriedRow ? (
                 <table
                   aria-hidden='true'
-                  style={
-                    {
-                      width: carried.width,
-                      tableLayout: 'fixed'
-                    } as CSSProperties
-                  }
+                  style={{
+                    width: carried.width,
+                    tableLayout: 'fixed'
+                  }}
                   {...stylex.props(rowStyles.overlayTable)}
                 >
                   <tbody>
@@ -891,23 +897,21 @@ function DataGridTableDndRows<TData extends object>({
                       style={{ height: carried.height || undefined }}
                       {...stylex.props(rowStyles.overlayCell)}
                     >
-                      {carriedRow
-                        .getVisibleCells()
-                        .map((cell: Cell<DataGridFeatures, TData, unknown>, index: number) => (
-                          <td
-                            key={cell.id}
-                            // Falls back to the column's own size so an unforeseen
-                            // header/cell count mismatch degrades to a real width
-                            // rather than to `auto`.
-                            style={{
-                              width: carried.columns[index] ?? cell.column.getSize()
-                            }}
-                          >
-                            <div {...stylex.props(rowStyles.overlayCellInner)}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </div>
-                          </td>
-                        ))}
+                      {carriedRow.getVisibleCells().map((cell, index: number) => (
+                        <td
+                          key={cell.id}
+                          // Falls back to the column's own size so an unforeseen
+                          // header/cell count mismatch degrades to a real width
+                          // rather than to `auto`.
+                          style={{
+                            width: carried.columns[index] ?? cell.column.getSize()
+                          }}
+                        >
+                          <div {...stylex.props(rowStyles.overlayCellInner)}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                        </td>
+                      ))}
                     </tr>
                   </tbody>
                 </table>

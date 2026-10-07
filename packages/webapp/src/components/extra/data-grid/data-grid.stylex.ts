@@ -329,7 +329,9 @@ export const dataGridCellEditorStyles = stylex.create({
     fontWeight: m.fontWeight,
     letterSpacing: m.letterSpacing,
     lineHeight: m.lineHeight,
-    // Computed-style values; the cast only satisfies the CSS union type.
+    // Computed-style value passed through as-is (deliberate: the metric is a
+    // live getComputedStyle read; the union cast only satisfies stylex).
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     textAlign: m.textAlign as 'left',
     paddingTop: m.paddingTop,
     paddingBottom: m.paddingBottom,

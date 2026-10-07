@@ -90,8 +90,8 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Alohomora' }))
     const sheet = await body.findByRole('dialog')
-    expect(body.getByRole('heading', { name: 'Edit vault record' })).toBeInTheDocument()
-    expect(within(sheet).getByDisplayValue('Luna Lovegood')).toBeInTheDocument()
+    await expect(body.getByRole('heading', { name: 'Edit vault record' })).toBeInTheDocument()
+    await expect(within(sheet).getByDisplayValue('Luna Lovegood')).toBeInTheDocument()
 
     // Footer close action dismisses the sheet.
     await userEvent.click(within(sheet).getByRole('button', { name: 'Save vault record' }))

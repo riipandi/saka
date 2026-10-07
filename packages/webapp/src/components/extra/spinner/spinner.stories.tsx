@@ -64,10 +64,10 @@ export const Playground: Story = {
     </Button>
   ),
   // The spinner svg announces itself, so the button name combines both labels.
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const button = canvas.getByRole('button', { name: /Divining/ })
-    expect(button).toBeDisabled()
-    expect(button.querySelector('svg')).not.toBeNull()
+    await expect(button).toBeDisabled()
+    await expect(button.querySelector('svg')).not.toBeNull()
   }
 }
 

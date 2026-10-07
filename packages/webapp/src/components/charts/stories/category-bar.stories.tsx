@@ -211,15 +211,17 @@ export const HouseDistribution: Story = {
   name: 'House points share',
   render: () => <CategoryBar />,
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: /House points distribution/ })).toBeVisible()
+    await expect(canvas.getByRole('img', { name: /House points distribution/ })).toBeVisible()
 
     // Boundary labels and the total are rendered above the bar.
-    expect(canvas.getByText('0')).toBeVisible()
-    expect(canvas.getByText('472')).toBeVisible()
-    expect(canvas.getByText(String(total))).toBeVisible()
+    await expect(canvas.getByText('0')).toBeVisible()
+    await expect(canvas.getByText('472')).toBeVisible()
+    await expect(canvas.getByText(String(total))).toBeVisible()
 
     for (const house of houses) {
-      expect(document.querySelector(`[data-house="${house.house.toLowerCase()}"`)).not.toBeNull()
+      await expect(
+        document.querySelector(`[data-house="${house.house.toLowerCase()}"`)
+      ).not.toBeNull()
     }
 
     // Hovering the marker opens the Base UI tooltip for its value.

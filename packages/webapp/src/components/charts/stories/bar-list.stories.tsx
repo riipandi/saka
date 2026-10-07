@@ -102,10 +102,10 @@ export const Default: Story = {
   render: () => <BarList rows={hpBooks.toSorted((a, b) => b.pages - a.pages)} />,
   play: async ({ canvas }) => {
     const list = canvas.getByRole('list', { name: 'Most borrowed Harry Potter books' })
-    expect(list).toBeVisible()
-    expect(canvas.getAllByRole('listitem').length).toBe(hpBooks.length)
-    expect(canvas.getByText('Order of the Phoenix')).toBeVisible()
-    expect(canvas.getByText('766')).toBeVisible()
+    await expect(list).toBeVisible()
+    await expect(canvas.getAllByRole('listitem').length).toBe(hpBooks.length)
+    await expect(canvas.getByText('Order of the Phoenix')).toBeVisible()
+    await expect(canvas.getByText('766')).toBeVisible()
   }
 }
 
@@ -115,6 +115,6 @@ export const MutedBars: Story = {
     <BarList rows={hpBooks.toSorted((a, b) => b.pages - a.pages)} highlightFirst={false} />
   ),
   play: async ({ canvas }) => {
-    expect(canvas.getAllByRole('listitem').length).toBe(hpBooks.length)
+    await expect(canvas.getAllByRole('listitem').length).toBe(hpBooks.length)
   }
 }

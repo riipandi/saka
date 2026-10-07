@@ -198,8 +198,8 @@ export const Render: Story = {
   play: async ({ canvas }) => {
     const els = canvas.getAllByRole('heading')
 
-    expect(els[0]?.tagName).toEqual('H1')
-    expect(els[1]?.tagName).toBe('H3')
-    expect(els[2]?.tagName).toBe('H4')
+    await expect(els[0]?.tagName).toEqual('H1')
+    await expect(els[1]?.tagName).toBe('H3')
+    await expect(els[2]?.tagName).toBe('H4')
   }
 }

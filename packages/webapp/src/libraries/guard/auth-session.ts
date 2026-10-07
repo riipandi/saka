@@ -22,14 +22,18 @@ export async function me(): Promise<User> {
  * once and treat the visitor as logged out.
  */
 let probeWarned = false
+function isSessionPayload(value: unknown): value is { authenticated?: boolean } {
+  if (typeof value !== 'object' || value === null) return false
+  return !('authenticated' in value) || typeof value.authenticated === 'boolean'
+}
 async function hasSessionCookie(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/session`)
     if (!response.ok) {
       throw new Error(`unexpected status ${response.status}`)
     }
-    const data = (await response.json()) as { authenticated?: boolean }
-    return data.authenticated === true
+    const data: unknown = await response.json()
+    return isSessionPayload(data) && data.authenticated === true
   } catch {
     if (!probeWarned) {
       probeWarned = true

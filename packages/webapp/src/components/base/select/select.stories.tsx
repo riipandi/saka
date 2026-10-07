@@ -126,19 +126,19 @@ export const Playground: Story = {
     // Opening lists every wand core.
     await userEvent.click(trigger)
     const listbox = await body.findByRole('listbox')
-    expect(body.getAllByRole('option').length).toBe(3)
+    await expect(body.getAllByRole('option').length).toBe(3)
 
     // Selecting updates the trigger and closes the popup.
     await userEvent.click(within(listbox).getByRole('option', { name: 'Dragon heartstring' }))
     await waitFor(() => expect(body.queryByRole('listbox')).toBeNull())
-    expect(canvas.getByText('Dragon heartstring')).toBeInTheDocument()
+    await expect(canvas.getByText('Dragon heartstring')).toBeInTheDocument()
 
     // Escape dismisses without changing the value.
     await userEvent.click(trigger)
     await body.findByRole('listbox')
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(body.queryByRole('listbox')).toBeNull())
-    expect(canvas.getByText('Dragon heartstring')).toBeInTheDocument()
+    await expect(canvas.getByText('Dragon heartstring')).toBeInTheDocument()
   }
 }
 

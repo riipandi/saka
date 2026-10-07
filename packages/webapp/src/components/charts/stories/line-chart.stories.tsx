@@ -80,9 +80,9 @@ export const Multiple: Story = {
     )
   },
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: 'Monthly checkouts trend' })).toBeVisible()
-    expect(canvas.getByText('Robert Langdon')).toBeVisible()
-    expect(canvas.getByText('Harry Potter')).toBeVisible()
+    await expect(canvas.getByRole('img', { name: 'Monthly checkouts trend' })).toBeVisible()
+    await expect(canvas.getByText('Robert Langdon')).toBeVisible()
+    await expect(canvas.getByText('Harry Potter')).toBeVisible()
   }
 }
 
@@ -129,9 +129,11 @@ export const WithDots: Story = {
   },
   play: async ({ canvas }) => {
     const chart = canvas.getByRole('img', { name: 'Monthly checkouts trend with markers' })
-    expect(chart).toBeVisible()
+    await expect(chart).toBeVisible()
     // One dot per datum per series.
-    expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(checkouts.length * 2)
+    await expect(chart.querySelectorAll('circle').length).toBeGreaterThanOrEqual(
+      checkouts.length * 2
+    )
   }
 }
 
@@ -164,6 +166,6 @@ export const Rtl: Story = {
     )
   },
   play: async ({ canvas }) => {
-    expect(canvas.getByRole('img', { name: 'Monthly checkouts trend (RTL)' })).toBeVisible()
+    await expect(canvas.getByRole('img', { name: 'Monthly checkouts trend (RTL)' })).toBeVisible()
   }
 }

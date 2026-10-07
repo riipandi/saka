@@ -87,7 +87,7 @@ export const Playground: Story = {
     // Embedded controls stay interactive inside items.
     const protection = canvas.getByRole('switch')
     await userEvent.click(protection)
-    expect(protection).toHaveAttribute('aria-checked', 'false')
+    await expect(protection).toHaveAttribute('aria-checked', 'false')
 
     await userEvent.click(canvas.getByRole('button', { name: 'Order' }))
   }
@@ -192,8 +192,8 @@ export const Link: Story = {
       </ItemContent>
     </Item>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const link = canvas.getByRole('link', { name: /marauder's map/i })
-    expect(link).toHaveAttribute('href', '#dashboard')
+    await expect(link).toHaveAttribute('href', '#dashboard')
   }
 }

@@ -126,8 +126,8 @@ export const Playground: Story = {
     </ScrollArea>
   ),
   // All 50 editions are rendered — the viewport clips, not the DOM.
-  play: ({ canvas }) => {
-    expect(canvas.getAllByText(/^Daily Prophet edition \d+$/).length).toBe(50)
+  play: async ({ canvas }) => {
+    await expect(canvas.getAllByText(/^Daily Prophet edition \d+$/).length).toBe(50)
   }
 }
 

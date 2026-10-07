@@ -121,7 +121,11 @@ const CalendarDropdown = ({
       onValueChange={(newValue) => {
         if (newValue == null) return
         const syntheticEvent = {
-          target: { value: String(newValue) }
+          target: { value: newValue }
+          // Deliberate low-level shim: react-day-picker's Dropdown contract
+          // expects a native select change event, but Base UI's Select only
+          // hands us the value.
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- no honest type exists for this shim
         } as unknown as React.ChangeEvent<HTMLSelectElement>
         onChange?.(syntheticEvent)
       }}

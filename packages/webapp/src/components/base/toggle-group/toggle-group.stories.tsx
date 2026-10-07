@@ -68,16 +68,16 @@ export const Playground: Story = {
     const hex = canvas.getByRole('button', { name: 'Toggle hex' })
 
     // defaultValue starts pressed.
-    expect(charm).toHaveAttribute('data-pressed')
+    await expect(charm).toHaveAttribute('data-pressed')
 
     // Without `multiple`, selection is exclusive: pressing hex releases charm.
     await userEvent.click(hex)
-    expect(hex).toHaveAttribute('data-pressed')
-    expect(charm).not.toHaveAttribute('data-pressed')
+    await expect(hex).toHaveAttribute('data-pressed')
+    await expect(charm).not.toHaveAttribute('data-pressed')
 
     await userEvent.click(charm)
-    expect(charm).toHaveAttribute('data-pressed')
-    expect(hex).not.toHaveAttribute('data-pressed')
+    await expect(charm).toHaveAttribute('data-pressed')
+    await expect(hex).not.toHaveAttribute('data-pressed')
   }
 }
 

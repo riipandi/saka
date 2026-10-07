@@ -119,8 +119,8 @@ export const Playground: Story = {
     const options = await body.findAllByRole('option')
     const target = options[0]
     if (!target) throw new Error('No filtered options found')
-    expect(options.length).toBe(1)
-    expect(target).toHaveTextContent('Hogwarts')
+    await expect(options.length).toBe(1)
+    await expect(target).toHaveTextContent('Hogwarts')
 
     // Selecting fills the input and closes the popup.
     await userEvent.click(target)
@@ -197,7 +197,7 @@ export const Clear: Story = {
   ),
   play: async ({ canvas }) => {
     const input = canvas.getByPlaceholderText('Search school…')
-    expect(input).toHaveValue('Hogwarts')
+    await expect(input).toHaveValue('Hogwarts')
 
     await userEvent.click(canvas.getByRole('button', { name: 'Clear value' }))
     await waitFor(() => expect(input).toHaveValue(''))
@@ -272,9 +272,9 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const input = canvas.getByPlaceholderText('Search school…')
-    expect(input).toBeDisabled()
+    await expect(input).toBeDisabled()
     await userEvent.click(input)
-    expect(within(document.body).queryByRole('option')).toBeNull()
+    await expect(within(document.body).queryByRole('option')).toBeNull()
   }
 }
 

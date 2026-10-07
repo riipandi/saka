@@ -400,7 +400,7 @@ function DataGridScrollArea({
     const container = containerRef.current
     const viewport = viewportRef.current
 
-    if (!container || !viewport) return
+    if (!container || !viewport) return undefined
 
     if (!usesCustomVerticalScrollbar) {
       // Scheduled on the next frame: the reset is a settled-state cleanup,
@@ -428,16 +428,14 @@ function DataGridScrollArea({
 
     const resolveObservedElements = () => {
       observedElementsRef.current = {
-        header: container.querySelector(
-          '[data-slot="data-grid-table"] thead'
-        ) as HTMLElement | null,
-        horizontalScrollbar: container.querySelector(
+        header: container.querySelector<HTMLElement>('[data-slot="data-grid-table"] thead'),
+        horizontalScrollbar: container.querySelector<HTMLElement>(
           '[data-slot="data-grid-scrollbar"][data-orientation="horizontal"]'
-        ) as HTMLElement | null,
-        table: container.querySelector('[data-slot="data-grid-table"]') as HTMLElement | null,
-        tableViewport: container.querySelector(
+        ),
+        table: container.querySelector<HTMLElement>('[data-slot="data-grid-table"]'),
+        tableViewport: container.querySelector<HTMLElement>(
           '[data-slot="data-grid-table-viewport"]'
-        ) as HTMLElement | null
+        )
       }
 
       observeElement(observedElementsRef.current.header)

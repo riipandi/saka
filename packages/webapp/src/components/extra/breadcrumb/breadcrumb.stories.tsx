@@ -79,11 +79,11 @@ export const Playground: Story = {
     </Breadcrumb>
   ),
   // The current page carries aria-current; ancestors are plain links.
-  play: ({ canvas }) => {
-    expect(canvas.getByRole('link', { name: 'Louvre' })).toBeInTheDocument()
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('link', { name: 'Louvre' })).toBeInTheDocument()
     const current = canvas.getByRole('link', { name: 'Vatican Archives' })
-    expect(current).toHaveAttribute('aria-current', 'page')
-    expect(current).toHaveAttribute('aria-disabled', 'true')
+    await expect(current).toHaveAttribute('aria-current', 'page')
+    await expect(current).toHaveAttribute('aria-disabled', 'true')
   }
 }
 
@@ -146,7 +146,7 @@ export const Dropdown: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Collapsed breadcrumb levels' }))
     await body.findByRole('menu')
-    expect(body.getByRole('menuitem', { name: "Marauder's Map" })).toBeInTheDocument()
+    await expect(body.getByRole('menuitem', { name: "Marauder's Map" })).toBeInTheDocument()
 
     await userEvent.click(body.getByRole('menuitem', { name: 'Gringotts' }))
     await waitFor(() => expect(body.queryByRole('menu')).toBeNull())

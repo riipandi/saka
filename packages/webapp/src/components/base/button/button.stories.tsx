@@ -155,9 +155,9 @@ export const Disabled: Story = {
       Petrified
     </Button>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const el = canvas.getAllByRole('button')[0]
-    expect(el).toBeDisabled()
+    await expect(el).toBeDisabled()
   }
 }
 
@@ -196,8 +196,8 @@ export const OnClick: StoryObj<{ handleClick: ReturnType<typeof fn> }> = {
     const el = buttons[0]
     if (el) {
       await userEvent.click(el)
-      expect(el).toHaveAttribute('type', 'button')
-      expect(handleClick).toHaveBeenCalledTimes(1)
+      await expect(el).toHaveAttribute('type', 'button')
+      await expect(handleClick).toHaveBeenCalledTimes(1)
     }
   }
 }

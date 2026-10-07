@@ -88,12 +88,12 @@ const KanbanContext = createContext<KanbanContextProps<unknown>>({
 })
 
 const ColumnContext = createContext<{
-  attributes: DraggableAttributes
+  attributes: DraggableAttributes | undefined
   listeners: DraggableSyntheticListeners | undefined
   isDragging?: boolean
   disabled?: boolean
 }>({
-  attributes: {} as DraggableAttributes,
+  attributes: undefined,
   listeners: undefined,
   isDragging: false,
   disabled: false
@@ -255,13 +255,14 @@ function Kanban<T>({
   }, [columns, getItemValue])
 
   const isColumn = useCallback(
-    (id: UniqueIdentifier) => columnIds.includes(id as string),
+    (id: UniqueIdentifier): id is string => typeof id === 'string' && columnIds.includes(id),
     [columnIds]
   )
 
   const findContainer = useCallback(
     (id: UniqueIdentifier) => {
-      if (isColumn(id)) return id as string
+      if (isColumn(id)) return id
+      if (typeof id !== 'string') return undefined
       return columnIds.find((key) => columns[key]?.some((item) => getItemValue(item) === id))
     },
     [columns, columnIds, getItemValue, isColumn]
@@ -274,13 +275,14 @@ function Kanban<T>({
       if (!origin) return
       const id = event.active.id
       if (kind === 'column') {
+        if (typeof id !== 'string') return
         const keys = Object.keys(finalValue)
-        const overIndex = keys.indexOf(id as string)
+        const overIndex = keys.indexOf(id)
         if (overIndex === -1 || overIndex === origin.index) return
         onValueCommit(finalValue, {
           kind: 'column',
           event,
-          activeContainer: id as string,
+          activeContainer: id,
           activeIndex: origin.index,
           overContainer: String(event.over?.id ?? id),
           overIndex,
@@ -322,11 +324,11 @@ function Kanban<T>({
         const snapshot = valueRef.current
         const id = event.active.id
         const keys = Object.keys(snapshot)
-        if (keys.includes(id as string)) {
+        if (typeof id === 'string' && keys.includes(id)) {
           dragOriginRef.current = {
             value: snapshot,
-            container: id as string,
-            index: keys.indexOf(id as string)
+            container: id,
+            index: keys.indexOf(id)
           }
         } else {
           const getId = getItemValueRef.current
@@ -369,8 +371,9 @@ function Kanban<T>({
         const newActiveItems = [...activeItems]
         const newOverItems = [...overItems]
         const movedItems = newActiveItems.splice(activeIndex, 1)
-        if (movedItems.length > 0) {
-          newOverItems.splice(overIndex, 0, movedItems[0] as T)
+        const moved = movedItems[0]
+        if (moved !== undefined) {
+          newOverItems.splice(overIndex, 0, moved)
         }
         setColumns({ ...columns, [activeContainer]: newActiveItems, [overContainer]: newOverItems })
       } else {
@@ -430,8 +433,8 @@ function Kanban<T>({
       if (isColumn(active.id)) {
         // The drop target may be an item inside another column — resolve it
         // back to its container column so reordering works over items too.
-        const overColumnId = isColumn(over.id) ? (over.id as string) : findContainer(over.id)
-        const activeIndex = columnIds.indexOf(active.id as string)
+        const overColumnId = isColumn(over.id) ? over.id : findContainer(over.id)
+        const activeIndex = columnIds.indexOf(active.id)
         const overIndex = overColumnId ? columnIds.indexOf(overColumnId) : -1
         if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
           const newOrder = arrayMove(Object.keys(columns), activeIndex, overIndex)
@@ -479,8 +482,9 @@ function Kanban<T>({
           const newActiveItems = [...activeItems]
           const newOverItems = [...overItems]
           const movedItems = newActiveItems.splice(activeIndex, 1)
-          if (movedItems.length > 0) {
-            newOverItems.splice(overIndex, 0, movedItems[0] as T)
+          const moved = movedItems[0]
+          if (moved !== undefined) {
+            newOverItems.splice(overIndex, 0, moved)
           }
           const newColumns = {
             ...columns,
@@ -526,6 +530,9 @@ function Kanban<T>({
   )
 
   return (
+    // The context erases the generic item type for non-generic consumers; the
+    // value is only ever written and read inside this <Kanban> subtree.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- generic-to-unknown context erase
     <KanbanContext.Provider value={contextValue as KanbanContextProps<unknown>}>
       <DndContext
         sensors={sensors}
@@ -628,7 +635,7 @@ function KanbanColumn({ value, style, render, disabled, ...props }: KanbanColumn
       value={
         isOverlay
           ? {
-              attributes: {} as DraggableAttributes,
+              attributes: undefined,
               listeners: undefined,
               isDragging: true,
               disabled: false
@@ -849,7 +856,7 @@ function KanbanOverlay({ children, style, ...props }: KanbanOverlayProps) {
   return createPortal(
     <DragOverlay dropAnimation={dropAnimationConfig} modifiers={modifiers} {...props}>
       <IsOverlayContext.Provider value={true}>
-        <div {...ghostProps} style={{ ...ghostProps.style, ...ghostSize } as CSSProperties}>
+        <div {...ghostProps} style={{ ...ghostProps.style, ...ghostSize }}>
           {content}
         </div>
       </IsOverlayContext.Provider>

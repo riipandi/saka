@@ -48,19 +48,19 @@ export const Playground: Story = {
   ),
   play: async ({ canvas }) => {
     const input = canvas.getByRole('textbox', { name: 'Galleons' })
-    expect(input).toHaveValue('5')
+    await expect(input).toHaveValue('5')
 
     // Stepper buttons adjust the value by one.
     await userEvent.click(canvas.getByRole('button', { name: 'Increase' }))
-    expect(input).toHaveValue('6')
+    await expect(input).toHaveValue('6')
     await userEvent.click(canvas.getByRole('button', { name: 'Decrease' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Decrease' }))
-    expect(input).toHaveValue('4')
+    await expect(input).toHaveValue('4')
 
     // Typing a value works too.
     await userEvent.clear(input)
     await userEvent.type(input, '17')
-    expect(input).toHaveValue('17')
+    await expect(input).toHaveValue('17')
   }
 }
 
@@ -80,13 +80,13 @@ export const MinMaxStep: Story = {
 
     // Step increments land on multiples of 5.
     await userEvent.click(canvas.getByRole('button', { name: 'Increase' }))
-    expect(input).toHaveValue('25')
+    await expect(input).toHaveValue('25')
 
     // Typing a valid in-range value keeps it on blur (no snapping).
     await userEvent.clear(input)
     await userEvent.type(input, '7')
     await userEvent.tab()
-    expect(input).toHaveValue('7')
+    await expect(input).toHaveValue('7')
   }
 }
 

@@ -9,6 +9,10 @@ interface StyleProp {
   style?: stylex.StyleXStyles
 }
 
+function hasStyleProp(props: unknown): props is StyleProp {
+  return typeof props === 'object' && props !== null && 'style' in props
+}
+
 export interface ButtonGroupProps
   extends Omit<React.ComponentPropsWithoutRef<'div'>, 'className' | 'style'>, StyleProp {
   orientation?: 'horizontal' | 'vertical'
@@ -38,14 +42,12 @@ export function ButtonGroup({
               : index === items.length - 1
                 ? 'last'
                 : 'middle'
-        const childStyle = (child.props as StyleProp).style
-        return React.cloneElement(child as React.ReactElement<StyleProp>, {
+        const childStyle = hasStyleProp(child.props) ? child.props.style : undefined
+        const childProps: Partial<StyleProp> & { key: React.Key } = {
           key: child.key ?? index,
-          style: [
-            position && joined[`${orientation}-${position}` as keyof typeof joined],
-            childStyle
-          ]
-        })
+          style: [position && joined[`${orientation}-${position}`], childStyle]
+        }
+        return React.cloneElement(child, childProps)
       })}
     </div>
   )

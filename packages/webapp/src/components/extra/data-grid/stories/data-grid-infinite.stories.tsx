@@ -173,7 +173,7 @@ function useColumns() {
         header: ({ column }) => <DataGridColumnHeader title='Price ($)' column={column} />,
         cell: (info) => (
           <span {...stylex.props(infiniteStyles.numeric)}>
-            ${(info.getValue() as number).toFixed(2)}
+            ${Number(info.getValue()).toFixed(2)}
           </span>
         ),
         size: 130,
@@ -359,7 +359,7 @@ function matrixColumns(): ColumnDef<DataGridFeatures, IRow>[] {
         ),
         cell: (info: { getValue: () => unknown }) => (
           <span {...stylex.props(infiniteStyles.numeric)}>
-            {(info.getValue() as number).toFixed(0)}
+            {Number(info.getValue()).toFixed(0)}
           </span>
         ),
         size: 110,

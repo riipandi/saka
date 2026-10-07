@@ -5,8 +5,7 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import golang from 'plugins/plugin-golang'
 import { comlink } from 'vite-plugin-comlink'
-import type { Connect, Plugin } from 'vite-plus'
-import { defineConfig } from 'vite-plus'
+import { defineConfig, type Plugin } from 'vite-plus'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
 const goModule = 'github.com/riipandi/saka'
@@ -20,21 +19,19 @@ const goVersionLdflags = [
 // vite preview does not redirect directory paths, so `/storybook` would 404
 // even though `/storybook/` serves the built Storybook. Netlify handles this
 // itself (Pretty URLs), so only the preview server needs it.
-const storybookSubpathHandler: Connect.NextHandleFunction = (req, res, next) => {
-  const url = new URL(req.url ?? '/', 'http://localhost')
-  if (url.pathname === '/storybook') {
-    res.statusCode = 301
-    res.setHeader('Location', `/storybook/${url.search}`)
-    return res.end()
-  }
-  next()
-}
-
 function storybookPreviewRedirect(): Plugin {
   return {
     name: 'storybook-preview-redirect',
     configurePreviewServer: (server) => {
-      server.middlewares.use(storybookSubpathHandler)
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        if (url.pathname === '/storybook') {
+          res.statusCode = 301
+          res.setHeader('Location', `/storybook/${url.search}`)
+          return res.end()
+        }
+        return next()
+      })
     }
   }
 }

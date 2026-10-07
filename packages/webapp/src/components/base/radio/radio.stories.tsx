@@ -109,12 +109,12 @@ export const Playground: Story = {
     const slytherin = canvas.getByRole('radio', { name: 'Slytherin' })
     const ravenclaw = canvas.getByRole('radio', { name: 'Ravenclaw' })
 
-    expect(slytherin).toHaveAttribute('aria-checked', 'true')
+    await expect(slytherin).toHaveAttribute('aria-checked', 'true')
 
     // Selection is exclusive.
     await userEvent.click(ravenclaw)
-    expect(ravenclaw).toHaveAttribute('aria-checked', 'true')
-    expect(slytherin).toHaveAttribute('aria-checked', 'false')
+    await expect(ravenclaw).toHaveAttribute('aria-checked', 'true')
+    await expect(slytherin).toHaveAttribute('aria-checked', 'false')
   }
 }
 
@@ -170,13 +170,13 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const items = canvas.getAllByRole('radio')
-    for (const item of items) expect(item).toHaveAttribute('data-disabled')
+    for (const item of items) await expect(item).toHaveAttribute('data-disabled')
 
     const second = items[1]
     if (!second) throw new Error('Second radio not found')
     await userEvent.click(second)
-    expect(second).toHaveAttribute('aria-checked', 'false')
-    expect(items[0]).toHaveAttribute('aria-checked', 'true')
+    await expect(second).toHaveAttribute('aria-checked', 'false')
+    await expect(items[0]).toHaveAttribute('aria-checked', 'true')
   }
 }
 
@@ -195,6 +195,6 @@ export const OnValueChange: StoryObj<{ handleChange: ReturnType<typeof fn> }> = 
   play: async ({ canvas, args }) => {
     await userEvent.click(canvas.getByRole('radio', { name: 'Gryffindor' }))
     // onValueChange carries (value, eventDetails) — check the value arg.
-    expect(args.handleChange.mock.calls[0]?.[0]).toBe('Gryffindor')
+    await expect(args.handleChange.mock.calls[0]?.[0]).toBe('Gryffindor')
   }
 }

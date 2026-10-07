@@ -67,7 +67,7 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Open the menu' }))
     await body.findByRole('menu')
-    expect(body.getByRole('menuitem', { name: 'Vault holder' })).toBeInTheDocument()
+    await expect(body.getByRole('menuitem', { name: 'Vault holder' })).toBeInTheDocument()
 
     // Escape dismisses the menu.
     await userEvent.keyboard('{Escape}')
@@ -121,17 +121,17 @@ export const Checkboxes: Story = {
 
     // Checkbox items toggle open state.
     const traces = body.getByRole('menuitemcheckbox', { name: 'Show traces' })
-    expect(traces).toHaveAttribute('aria-checked', 'false')
+    await expect(traces).toHaveAttribute('aria-checked', 'false')
     await userEvent.click(traces)
-    expect(traces).toHaveAttribute('aria-checked', 'true')
+    await expect(traces).toHaveAttribute('aria-checked', 'true')
 
     // Radio items switch exclusively.
     await userEvent.click(body.getByRole('menuitemradio', { name: 'Ceiling' }))
-    expect(body.getByRole('menuitemradio', { name: 'Ceiling' })).toHaveAttribute(
+    await expect(body.getByRole('menuitemradio', { name: 'Ceiling' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
-    expect(body.getByRole('menuitemradio', { name: 'Floor' })).toHaveAttribute(
+    await expect(body.getByRole('menuitemradio', { name: 'Floor' })).toHaveAttribute(
       'aria-checked',
       'false'
     )

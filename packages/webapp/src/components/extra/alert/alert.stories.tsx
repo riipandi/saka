@@ -72,10 +72,10 @@ export const Action: Story = {
       </AlertAction>
     </Alert>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     // Title, description, and action all render inside the alert.
-    expect(canvas.getByRole('heading', { name: 'Spell recorded' })).toBeInTheDocument()
-    expect(canvas.getByText(/patronus is on file/i)).toBeInTheDocument()
-    expect(canvas.getByRole('button', { name: 'Reversal' })).toBeEnabled()
+    await expect(canvas.getByRole('heading', { name: 'Spell recorded' })).toBeInTheDocument()
+    await expect(canvas.getByText(/patronus is on file/i)).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Reversal' })).toBeEnabled()
   }
 }

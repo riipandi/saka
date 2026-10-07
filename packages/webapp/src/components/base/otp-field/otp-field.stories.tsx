@@ -127,9 +127,9 @@ export const Disabled: Story = {
     const slots = canvas.getAllByRole('textbox')
     const first = slots[0]
     if (!first) throw new Error('No OTP slots rendered')
-    for (const slot of slots) expect(slot).toBeDisabled()
+    for (const slot of slots) await expect(slot).toBeDisabled()
     await userEvent.type(first, '9')
-    expect(first).toHaveValue('1')
+    await expect(first).toHaveValue('1')
   }
 }
 
@@ -163,6 +163,6 @@ export const Controlled: Story = {
 
     // Typing fills one character per slot and advances focus.
     await userEvent.type(first, '924')
-    expect(canvas.getByText('Vault code: 924')).toBeInTheDocument()
+    await expect(canvas.getByText('Vault code: 924')).toBeInTheDocument()
   }
 }

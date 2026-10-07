@@ -62,7 +62,7 @@ function useUncontrolledState(
 ): [boolean, (next: boolean) => void] {
   const [uncontrolled, setUncontrolled] = React.useState(defaultState)
   const isControlled = controlled !== undefined
-  const value = isControlled ? (controlled as boolean) : uncontrolled
+  const value = controlled ?? uncontrolled
   const setValue = (next: boolean) => {
     if (!isControlled) setUncontrolled(next)
   }

@@ -136,7 +136,7 @@ export const Textarea: Story = {
   play: async ({ canvas }) => {
     const textarea = canvas.getByPlaceholderText('Write to Sirius…')
     await userEvent.type(textarea, 'Padfoot, the map is a fake.')
-    expect(textarea).toHaveValue('Padfoot, the map is a fake.')
+    await expect(textarea).toHaveValue('Padfoot, the map is a fake.')
   }
 }
 

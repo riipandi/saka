@@ -95,7 +95,7 @@ export const WithDefaultValue: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('textbox')
-    expect(el).toHaveValue('+1 213 555 1234')
+    await expect(el).toHaveValue('+1 213 555 1234')
   }
 }
 
@@ -117,9 +117,9 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('textbox')
-    expect(el).toBeDisabled()
+    await expect(el).toBeDisabled()
     await userEvent.type(el, '123')
-    expect(el).toHaveValue('')
+    await expect(el).toHaveValue('')
   }
 }
 
@@ -133,7 +133,7 @@ export const WithoutCountry: Story = {
   ),
   play: async ({ canvas }) => {
     // No flag button rendered; the digits span the whole group.
-    expect(canvas.queryByRole('combobox')).toBeNull()
+    await expect(canvas.queryByRole('combobox')).toBeNull()
   }
 }
 
@@ -153,8 +153,8 @@ export const ReadOnly: Story = {
   ),
   play: async ({ canvas }) => {
     const el = canvas.getByRole('textbox')
-    expect(el).toHaveAttribute('readonly')
-    expect(el).toHaveValue('+1 213 555 1234')
+    await expect(el).toHaveAttribute('readonly')
+    await expect(el).toHaveValue('+1 213 555 1234')
   }
 }
 
@@ -167,6 +167,6 @@ export const Interaction: Story = {
   play: async ({ canvas }) => {
     const el = canvas.getByRole('textbox')
     await userEvent.type(el, '2135551234')
-    expect(el).toHaveValue('(213) 555-1234')
+    await expect(el).toHaveValue('(213) 555-1234')
   }
 }

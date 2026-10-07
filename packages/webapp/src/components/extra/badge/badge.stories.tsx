@@ -90,8 +90,8 @@ export const Link: Story = {
       New at Weasleys'
     </Badge>
   ),
-  play: ({ canvas }) => {
+  play: async ({ canvas }) => {
     const link = canvas.getByRole('link', { name: "New at Weasleys'" })
-    expect(link).toHaveAttribute('href', '#new-release')
+    await expect(link).toHaveAttribute('href', '#new-release')
   }
 }

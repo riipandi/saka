@@ -55,14 +55,14 @@ export const Playground: Story = {
     const account = canvas.getByRole('tab', { name: 'Gringotts Vault' })
     const password = canvas.getByRole('tab', { name: 'Vault Password' })
 
-    expect(account).toHaveAttribute('aria-selected', 'true')
-    expect(canvas.getByText('Manage your vault at Gringotts.')).toBeInTheDocument()
+    await expect(account).toHaveAttribute('aria-selected', 'true')
+    await expect(canvas.getByText('Manage your vault at Gringotts.')).toBeInTheDocument()
 
     // Clicking a trigger swaps the visible panel.
     await userEvent.click(password)
-    expect(password).toHaveAttribute('aria-selected', 'true')
-    expect(account).toHaveAttribute('aria-selected', 'false')
-    expect(canvas.getByText('Change the password to your vault.')).toBeInTheDocument()
+    await expect(password).toHaveAttribute('aria-selected', 'true')
+    await expect(account).toHaveAttribute('aria-selected', 'false')
+    await expect(canvas.getByText('Change the password to your vault.')).toBeInTheDocument()
   }
 }
 
@@ -99,11 +99,14 @@ export const Disabled: Story = {
   ),
   play: async ({ canvas }) => {
     const locked = canvas.getByRole('tab', { name: 'Azkaban' })
-    expect(locked).toHaveAttribute('data-disabled')
+    await expect(locked).toHaveAttribute('data-disabled')
 
     await userEvent.click(locked)
-    expect(locked).toHaveAttribute('aria-selected', 'false')
-    expect(canvas.getByRole('tab', { name: 'Hogsmeade' })).toHaveAttribute('aria-selected', 'true')
+    await expect(locked).toHaveAttribute('aria-selected', 'false')
+    await expect(canvas.getByRole('tab', { name: 'Hogsmeade' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
   }
 }
 

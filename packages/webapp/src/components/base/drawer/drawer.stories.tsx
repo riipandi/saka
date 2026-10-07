@@ -83,7 +83,7 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Open the vault' }))
     const dialog = await body.findByRole('dialog')
-    expect(body.getByRole('heading', { name: 'Brew Polyjuice' })).toBeInTheDocument()
+    await expect(body.getByRole('heading', { name: 'Brew Polyjuice' })).toBeInTheDocument()
 
     // Footer close buttons dismiss the drawer.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
