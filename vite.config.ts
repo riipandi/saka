@@ -69,8 +69,10 @@ export default defineConfig({
     ignorePatterns: ignoredPatterns
   },
   lint: {
+    jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
     options: { typeAware: true, typeCheck: true },
     rules: {
+      'vite-plus/prefer-vite-plus-imports': 'error',
       'typescript/no-floating-promises': 'error',
       'typescript/no-misused-promises': 'error'
     },

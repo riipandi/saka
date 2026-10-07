@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite-plus'
 
 /**
  * One project per live test surface. Surfaces without tests carry no

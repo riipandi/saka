@@ -12,9 +12,10 @@
     },
     "type": "module",
     "scripts": {
-        "prepare": "vp config",
+        "dev": "vp run website#dev",
         "preinstall": "npx only-allow pnpm",
-        "postinstall": "go mod download"
+        "postinstall": "go mod download",
+        "prepare": "vp config"
     },
     "devDependencies": {
         "@bufbuild/protobuf": "^2.16.0",

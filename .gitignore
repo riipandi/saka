@@ -25,6 +25,7 @@ npm-debug.log*
 !.vscode/launch.json
 !.vscode/mcp.json
 !.vscode/tasks.json
+.claude/worktrees/
 
 *.bak
 
