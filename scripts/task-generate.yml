@@ -39,25 +39,36 @@ tasks:
       - ./scripts/cert-conformance.sh
 
   rpc:generate:
-    desc: Generate Go + TypeScript from api/connect/*.proto
+    desc: Generate Go + TypeScript from api/connect/*.proto (skipped when the contracts are unchanged)
+    sources:
+      - api/connect/**/*.proto
+      - buf.yaml
+      - buf.gen.yaml
+    generates:
+      - codegen/proto/go/**/*.go
+      - codegen/proto/ts/**/*.ts
     cmds:
       - go tool buf generate
       - gofmt -w codegen/proto/go
       - task: rpc:stamp
 
   rpc:lint:
+    internal: true
     desc: Lint protobuf contracts
     cmd: go tool buf lint
 
   rpc:breaking:
+    internal: true
     desc: Check protobuf contracts for breaking changes
     cmd: go tool buf breaking --against '.git#ref=HEAD~1,subdir=api/connect'
 
   rpc:stamp:
+    internal: true
     desc: Refresh the contract stamp used by stale detection
     cmd: sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > .output/rpc-gen.stamp'
 
   rpc:stale:
+    internal: true
     desc: Fail when generated code is out of date with the contracts
     cmds:
       - sh -c 'find api/connect buf.yaml buf.gen.yaml -type f | LC_ALL=C sort | xargs shasum -a 256 > /tmp/rpc-stamp.now'

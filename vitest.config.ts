@@ -21,6 +21,15 @@ export default defineConfig({
           environment: 'node',
           include: ['./packages/plugins/**/*.test.ts']
         }
+      },
+      {
+        extends: true,
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: 'email',
+          environment: 'node',
+          include: ['./packages/email/**/*.test.ts']
+        }
       }
     ]
   }

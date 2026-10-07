@@ -4,9 +4,11 @@ version: "3"
 
 tasks:
   dev:
-    desc: Dev loop on one origin (:3080) — Vite compiles + HMR behind the Go proxy, the binary rebuilt from build/debug on every Go change
-    deps: [rpc:generate]
-    cmd: pnpm exec vp dev {{.CLI_ARGS}}
+    desc: Dev loop on one origin (:3080) — the webapp's Vite compiles + HMR behind the Go proxy, the binary rebuilt from build/debug on every Go change
+    deps: [rpc:generate, email:build]
+    cmds:
+      - SKIP_GO_BUILD=1 pnpm exec vp build
+      - pnpm exec vp run webapp#dev {{.CLI_ARGS}}
 
   run:
     desc: Run the CLI directly (debug build)
@@ -32,7 +34,7 @@ tasks:
 
   email:build:
     desc: Compile email templates into the Go embed (one Vite pass, no binary)
-    cmd: pnpm exec vp build packages/email
+    cmd: pnpm exec vp run email#build
 
   deps:
     desc: Install Go toolchain binaries (golangci-lint, goose, etc)

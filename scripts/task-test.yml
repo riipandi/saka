@@ -22,10 +22,6 @@ tasks:
     desc: Run frontend unit tests
     cmd: pnpm exec vitest run {{.CLI_ARGS}}
 
-  test:sdk:
-    desc: Run unit tests for API Client
-    cmd: pnpm exec vitest run --project api-client {{.CLI_ARGS}}
-
   coverage:
     desc: Run Go tests with coverage report
     cmds:

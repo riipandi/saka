@@ -31,6 +31,13 @@ export interface GoBuildOptions {
 
 export interface PluginGolangOptions {
   packageName: string
+  /**
+   * The Go module root: where the watcher is armed, the build runs, and the
+   * binary spawns. Defaults to the directory vite was started from, which is
+   * wrong when the config lives in a workspace package — pass the repo root
+   * explicitly (an -C / package-script run changes the cwd).
+   */
+  root?: string
   /** Go toolchain binary (default: "go"). */
   cmd?: string
   packagePath?: string
@@ -228,6 +235,9 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
   // shadow an explicit top-level packagePath.
   const packagePath =
     userOptions.build?.packagePath ?? userOptions.packagePath ?? defaults.packagePath
+  // The module root defaults to the cwd; a package-resident config passes it
+  // explicitly because -C / package scripts run from the package directory.
+  const projectRoot = path.resolve(userOptions.root ?? process.cwd())
   const outputBin = userOptions.build?.outputBin ?? userOptions.packageName
   const embedDir = userOptions.build?.embedDir ?? defaults.build.embedDir
   const devTargetName = userOptions.build?.devTarget ?? defaults.build.devTarget
@@ -258,9 +268,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
     ...opts.excludeRegex.map((r) => new RegExp(r))
   ]
 
-  // The Go module and the config file live in the directory vite was started
-  // from, which is not vite's root when the SPA sits in a subdirectory.
-  const projectRoot = process.cwd()
+  // The Go module and the config file live at the module root — see `root`.
   let command: 'serve' | 'build' = 'serve'
   let goProcess: ChildProcess | null = null
   let buildTimer: ReturnType<typeof setTimeout> | null = null
@@ -441,6 +449,22 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
           process.exitCode = 1
           return
         }
+
+        // The go:embed pattern (`output`) skips dot directories, so Vite's
+        // internal manifest under `.vite/` never ships in the binary — the
+        // fragment resolves against the derived copy written here, after the
+        // SPA pass wrote its manifest and before the binaries compile. A
+        // missing manifest means the SPA pass did not run in this pipeline:
+        // copying nothing would embed a stale assets.json, so fail instead.
+        const manifestSource = path.resolve(embedPath, '.vite/manifest.json')
+        if (!fs.existsSync(manifestSource)) {
+          log(
+            `${C.red}build manifest not found at ${displayPath(manifestSource)} — run the SPA build before the Go build${C.reset}`
+          )
+          process.exitCode = 1
+          return
+        }
+        fs.copyFileSync(manifestSource, path.resolve(embedPath, 'assets.json'))
 
         for (const target of Object.values(targets)) {
           fs.mkdirSync(path.resolve(projectRoot, target.outputDir), { recursive: true })
