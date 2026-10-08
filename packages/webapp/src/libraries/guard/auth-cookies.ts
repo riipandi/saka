@@ -1,24 +1,15 @@
 /**
- * Main-thread cookie persistence for the token pair the auth worker holds.
+ * Main-thread persistence for the token pair the auth worker holds. Workers
+ * have no cookie access, so the engine reports every custody change through
+ * its token listener and this module mirrors it into per-item cookies; at
+ * boot `restore()` reads them back.
  *
- * Workers have no `document.cookie` access, so the engine reports every
- * custody change (sign-in, rotation, failure, sign-out) through its token
- * listener and this module mirrors the pair into per-item cookies; at boot
- * the cookies are read back and handed to the worker via `restore()`. The
- * listener is the only write path — the cookies can never lag behind the
- * worker's live pair, which is what killed the previous wiring (a rotated
- * pair left the stored copy holding the spent refresh token, and the reload
- * replayed it).
+ * The listener is the only write path — the cookies cannot lag the worker's
+ * live pair. JS-written cookies are always JS-readable, so the pair is
+ * short-lived and rotated on every renewal: the refresh token dies
+ * server-side the moment a rotation lands.
  *
- * One cookie per item — the token, its expiry, the refresh token, its
- * expiry, and the session id — so each piece is readable and clearable on
- * its own terms. JS-written cookies are readable by JS — HttpOnly is
- * impossible without the backend setting them — so the pair is short-lived
- * and rotated on every renewal: the refresh token dies server-side the
- * moment a rotation lands.
- *
- * Every read and write rides the cookies library's shared instance — this
- * module never touches `document.cookie` itself.
+ * Every read and write rides the cookies library's shared instance.
  */
 import { z } from 'zod'
 import { cookies } from '#/libraries/cookies'

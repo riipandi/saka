@@ -7,7 +7,7 @@ import { vi } from 'vite-plus/test'
  * about the engine's internals.
  */
 
-/** Fixtures from Dan Brown — see `.llms/rules.md` (test fixtures). */
+/** Fixtures from Dan Brown. */
 export const userJson = {
   id: 'user_v1_langdon',
   username: 'rlangdon',
