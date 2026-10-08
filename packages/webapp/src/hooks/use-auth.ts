@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react'
 import type { AuthLoginOptions, LoginCredentials } from '#/libraries/guard/auth-engine'
 import { authStore, type AuthState, type UserProfile } from '#/libraries/guard/auth-store'
 
-/** Subscribe to the session state (selector-based, minimal re-renders). */
+/** Subscribe to the whole session state. */
 export function useAuth(): AuthState {
   return useSelector(authStore, (state) => state)
 }
