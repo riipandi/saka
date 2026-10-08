@@ -20,7 +20,6 @@ import { GitHubIcon, GoogleIcon, ViteIcon } from 'uilibs/components/icons'
 import { z } from 'zod'
 import { useAuthentication } from '#/libraries/guard/auth-provider'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { loginSchema } from '#/schemas/auth.schema'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
 
 export const Route = createFileRoute('/(auth)/login')({
@@ -61,8 +60,7 @@ function RouteComponent() {
   }
 
   const form = useForm({
-    defaultValues: { username: '', password: '' },
-    validators: { onSubmit: loginSchema },
+    defaultValues: { identity: '', password: '' },
     onSubmit: async ({ value }) => {
       setFailed(null)
       try {
@@ -141,15 +139,18 @@ function RouteComponent() {
           >
             <div id='login-form-grid' {...stylex.props(styles.formGrid)}>
               <form.Field
-                name='username'
+                name='identity'
+                validators={{
+                  onChange: ({ value }) => (value ? undefined : { message: 'Identity is required' })
+                }}
                 children={(field) => {
                   const error = field.state.meta.errors?.[0]?.message
                   return (
-                    <Field id='field-username' invalid={!!error}>
-                      <FieldLabel htmlFor='username'>Username</FieldLabel>
+                    <Field id='field-identity' invalid={!!error}>
+                      <FieldLabel htmlFor='identity'>Username or email</FieldLabel>
                       <Input
-                        id='username'
-                        name='username'
+                        id='identity'
+                        name='identity'
                         placeholder='emilys'
                         autoComplete='username'
                         value={field.state.value}
@@ -167,6 +168,9 @@ function RouteComponent() {
 
               <form.Field
                 name='password'
+                validators={{
+                  onChange: ({ value }) => (value ? undefined : { message: 'Password is required' })
+                }}
                 children={(field) => {
                   const error = field.state.meta.errors?.[0]?.message
                   return (

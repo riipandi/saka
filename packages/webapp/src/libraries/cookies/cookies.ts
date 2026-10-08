@@ -118,8 +118,9 @@ export class Cookies {
 }
 
 /**
- * The shared instance non-React consumers use (the guard's persistence in
- * Phase 2 reads and writes through it). The provider accepts its own
+ * The shared instance non-React consumers use (the guard's persistence reads
+ * and writes through it). `/` is the site-wide scope every session item
+ * needs; per-call options merge over it. The provider accepts its own
  * instance for injection, so tests and isolated trees stay independent.
  */
-export const cookies = new Cookies()
+export const cookies = new Cookies({ path: '/' })

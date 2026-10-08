@@ -16,9 +16,12 @@
  * impossible without the backend setting them — so the pair is short-lived
  * and rotated on every renewal: the refresh token dies server-side the
  * moment a rotation lands.
+ *
+ * Every read and write rides the cookies library's shared instance — this
+ * module never touches `document.cookie` itself.
  */
-import { parse, serialize } from 'cookie-es'
 import { z } from 'zod'
+import { cookies } from '#/libraries/cookies'
 import type { TokenBundle } from './auth-engine'
 import type { UserProfile } from './auth-store'
 
@@ -30,35 +33,41 @@ const SESSION_ID_COOKIE = 'saka_session_id'
 const USER_COOKIE = 'saka_user'
 
 /**
- * Cookie options shared by every write and the clear — one definition, no drift.
- * SameSite=Lax keeps the pair on same-site navigations;
- * Secure whenever the page itself is served over TLS.
+ * Session posture shared by every write: SameSite=Lax keeps the pair on
+ * same-site navigations; Secure whenever the page itself is served over TLS.
+ * The shared instance carries `path: '/'`, so every item is site-wide.
  */
-function cookieOptions(maxAgeSeconds?: number) {
+function sessionOptions(expiresAtMs?: number) {
   const secure = typeof location !== 'undefined' && location.protocol === 'https:'
   return {
-    path: '/',
     sameSite: 'lax',
     ...(secure ? { secure: true } : {}),
-    ...(maxAgeSeconds === undefined ? {} : { maxAge: maxAgeSeconds })
+    ...(expiresAtMs === undefined ? {} : { maxAge: maxAgeSeconds(expiresAtMs) })
   } as const
 }
 
-/** Write one cookie with its own remaining lifetime, in whole seconds. */
-function writeCookie(name: string, value: string, expiresAtMs: number): void {
-  const maxAge = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000))
-  document.cookie = serialize(name, value, cookieOptions(maxAge))
+/** Remaining lifetime in whole seconds, floored at zero. */
+function maxAgeSeconds(expiresAtMs: number): number {
+  return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000))
 }
 
 /** Persist the pair — each cookie lives exactly as long as the item it holds. */
 export function writeTokenCookies(tokens: TokenBundle): void {
-  writeCookie(TOKEN_COOKIE, tokens.accessToken, tokens.accessExpiresAt)
-  writeCookie(TOKEN_EXP_COOKIE, String(tokens.accessExpiresAt), tokens.accessExpiresAt)
-  writeCookie(REFRESH_COOKIE, tokens.refreshToken, tokens.refreshExpiresAt)
-  writeCookie(REFRESH_EXP_COOKIE, String(tokens.refreshExpiresAt), tokens.refreshExpiresAt)
+  cookies.set(TOKEN_COOKIE, tokens.accessToken, sessionOptions(tokens.accessExpiresAt))
+  cookies.set(
+    TOKEN_EXP_COOKIE,
+    String(tokens.accessExpiresAt),
+    sessionOptions(tokens.accessExpiresAt)
+  )
+  cookies.set(REFRESH_COOKIE, tokens.refreshToken, sessionOptions(tokens.refreshExpiresAt))
+  cookies.set(
+    REFRESH_EXP_COOKIE,
+    String(tokens.refreshExpiresAt),
+    sessionOptions(tokens.refreshExpiresAt)
+  )
   // The session id is the refresh token's storage key server-side — it lives
   // with the refresh half.
-  writeCookie(SESSION_ID_COOKIE, tokens.sessionId, tokens.refreshExpiresAt)
+  cookies.set(SESSION_ID_COOKIE, tokens.sessionId, sessionOptions(tokens.refreshExpiresAt))
 }
 
 /** Clear every cookie — logout and failed refreshes leave no stale credentials. */
@@ -71,7 +80,7 @@ export function clearTokenCookies(): void {
     SESSION_ID_COOKIE,
     USER_COOKIE
   ]) {
-    document.cookie = serialize(name, '', cookieOptions(0))
+    cookies.remove(name)
   }
 }
 
@@ -84,7 +93,7 @@ export const tokenBundleSchema = z.object({
   sessionId: z.string().min(1)
 })
 
-/** The raw cookie jar shape — all five items, non-empty, still as strings. */
+/** The raw jar shape — all five items, non-empty, still as strings. */
 const jarSchema = z.object({
   [TOKEN_COOKIE]: z.string().min(1),
   [TOKEN_EXP_COOKIE]: z.coerce.number().finite(),
@@ -95,7 +104,7 @@ const jarSchema = z.object({
 
 /** Read the persisted pair, or null when any item is absent or malformed. */
 export function readTokenCookies(): TokenBundle | null {
-  const parsed = jarSchema.safeParse(parse(document.cookie))
+  const parsed = jarSchema.safeParse(cookies.getAll({ doNotParse: true }))
   if (!parsed.success) return null
   const jar = parsed.data
   return {
@@ -122,11 +131,7 @@ const userSchema = z.object({
  * is a session cookie, and the bootstrap falls back to the blocking path.
  */
 export function writeUserCookie(user: UserProfile, expiresAtMs?: number): void {
-  const options =
-    expiresAtMs === undefined
-      ? cookieOptions()
-      : cookieOptions(Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)))
-  document.cookie = serialize(USER_COOKIE, JSON.stringify(user), options)
+  cookies.set(USER_COOKIE, user, sessionOptions(expiresAtMs))
 }
 
 /**
@@ -135,8 +140,8 @@ export function writeUserCookie(user: UserProfile, expiresAtMs?: number): void {
  * and a hand-tampered value must never throw at boot.
  */
 export function readUserCookie(): UserProfile | null {
-  const raw = parse(document.cookie)[USER_COOKIE]
-  if (!raw) return null
+  const raw = cookies.get(USER_COOKIE, { doNotParse: true })
+  if (typeof raw !== 'string' || !raw) return null
   let value: unknown
   try {
     value = JSON.parse(raw)

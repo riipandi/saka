@@ -2,11 +2,15 @@ import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError, createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { RPC_BASE_URL } from '#/libraries/api-client'
-import type { LoginCredentials } from '#/schemas/auth.schema'
 import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/codegen/authn_pb'
 import { SessionService, SignInRequestSchema, SignOutRequestSchema } from '~/codegen/authn_pb'
-import type { AuthenticatedUser, SignInResponse } from '~/codegen/authn_pb'
-import type { GetSessionResponse, RefreshResponse } from '~/codegen/authn_pb'
+import type {
+  AuthenticatedUser,
+  GetSessionResponse,
+  RefreshResponse,
+  SignInRequest,
+  SignInResponse
+} from '~/codegen/authn_pb'
 import type { UserProfile } from './auth-store'
 
 /** Refresh this long before the access token expires. */
@@ -35,6 +39,13 @@ export interface AuthSession {
   user: UserProfile
   tokens: TokenBundle
 }
+
+/**
+ * What the sign-in form collects — the wire's own `SignInRequest` shape
+ * (the form field is the identity, and `remember` travels separately as a
+ * login option, so the pair is exactly the required fields).
+ */
+export type LoginCredentials = Pick<SignInRequest, 'identity' | 'password'>
 
 /**
  * Reported on every token custody change — a fresh pair from sign-in or
@@ -93,13 +104,15 @@ export interface AuthEngineApi {
   logout(): Promise<void>
 }
 
+/**
+ * The profile the store and the cookie jar carry — the wire account's own
+ * four fields and nothing else. The copy is the point: a proto message
+ * object travels with its `$typeName` internals, and neither the store nor
+ * the JSON cookie may hold them.
+ */
 function toProfile(user: AuthenticatedUser): UserProfile {
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    displayName: user.displayName
-  }
+  const { id, username, email, displayName } = user
+  return { id, username, email, displayName }
 }
 
 /** The GetSession answer's account, mapped — the field is presence-based. */
@@ -205,8 +218,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       clearTimer()
       const response = await auth.signIn(
         create(SignInRequestSchema, {
-          identity: credentials.username,
-          password: credentials.password,
+          ...credentials,
           remember: rememberMe || undefined
         })
       )

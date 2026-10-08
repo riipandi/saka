@@ -31,7 +31,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
 
-    const session = await engine.login({ username: 'rlangdon', password: 'sophie' })
+    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     expect(session.user).toEqual(userJson)
     expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
@@ -46,7 +46,7 @@ describe('auth engine', () => {
     )
     const engine = createAuthEngine('http://test.local')
 
-    await expect(engine.login({ username: 'rlangdon', password: 'sophie' })).rejects.toThrow(
+    await expect(engine.login({ identity: 'rlangdon', password: 'sophie' })).rejects.toThrow(
       /multi-factor/i
     )
     await expect(engine.accessToken()).resolves.toBeNull()
@@ -56,10 +56,10 @@ describe('auth engine', () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
 
-    await engine.login({ username: 'rlangdon', password: 'sophie' }, { rememberMe: true })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' }, { rememberMe: true })
     const rememberedBody = JSON.parse(stringBody(fetchMock.mock.calls[0]?.[1]?.body))
 
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
     const plainBody = JSON.parse(stringBody(fetchMock.mock.calls[1]?.[1]?.body))
 
     expect(rememberedBody).toEqual({ identity: 'rlangdon', password: 'sophie', remember: true })
@@ -70,7 +70,7 @@ describe('auth engine', () => {
   it('rotates the pair through SessionService/Refresh and sends no Bearer', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     fetchMock.mockResolvedValue(jsonResponse({ ...signInJson, accessToken: 'access-b' }))
     await expect(engine.refresh()).resolves.toBe(true)
@@ -85,7 +85,7 @@ describe('auth engine', () => {
   it('dedupes concurrent refreshes into a single network request', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
     fetchMock.mockClear()
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
 
@@ -98,7 +98,7 @@ describe('auth engine', () => {
   it('short-circuits during the cooldown after a failed refresh and drops the pair', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     fetchMock.mockResolvedValue(
       jsonResponse({ code: 'unauthenticated', message: 'invalid token' }, 401)
@@ -114,7 +114,7 @@ describe('auth engine', () => {
   it('skips the network in maybeRefresh while the access token is still fresh', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
     const callsAfterLogin = fetchMock.mock.calls.length
 
     await expect(engine.maybeRefresh(5 * 60_000)).resolves.toBe(true)
@@ -124,7 +124,7 @@ describe('auth engine', () => {
   it('discards an in-flight refresh that settles after logout', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
@@ -141,7 +141,7 @@ describe('auth engine', () => {
   it('spends the access token on sign-out and answers null afterwards', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     await engine.logout()
 
@@ -156,7 +156,7 @@ describe('auth engine', () => {
   it('restores a still-valid pair and refuses a dead one', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ username: 'rlangdon', password: 'sophie' })
+    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     const freshEngine = createAuthEngine('http://test.local')
     await freshEngine.restore(session.tokens)
@@ -172,7 +172,7 @@ describe('auth engine', () => {
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
 
-    const session = await engine.login({ username: 'rlangdon', password: 'sophie' })
+    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
     expect(changes).toEqual([session.tokens])
 
     fetchMock.mockResolvedValue(jsonResponse({ ...signInJson, accessToken: 'access-b' }))
@@ -192,7 +192,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(signInJson))
     fetchMock.mockResolvedValue(jsonResponse(getSessionJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     await expect(engine.session()).resolves.toEqual(userJson)
     const call = fetchMock.mock.calls.at(-1)
@@ -208,7 +208,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...signInJson, accessToken: 'access-b' }))
     fetchMock.mockResolvedValue(jsonResponse(getSessionJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     await expect(engine.session()).resolves.toEqual(userJson)
     const retry = fetchMock.mock.calls.at(-1)
@@ -229,7 +229,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(signInJson))
     fetchMock.mockResolvedValue(jsonResponse({ code: 'unavailable', message: 'down' }, 503))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     await expect(engine.session()).rejects.toThrow(/down|unavailable|HTTP 503/i)
     expect(stringUrl(fetchMock.mock.calls[1]?.[0])).toContain('GetSession')
@@ -239,7 +239,7 @@ describe('auth engine', () => {
   it('keeps the pair on a network-failed refresh — inconclusive is not a refusal', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     fetchMock.mockResolvedValue(jsonResponse({ code: 'unavailable', message: 'down' }, 503))
     await expect(engine.refresh()).resolves.toBe(false)
@@ -251,7 +251,7 @@ describe('auth engine', () => {
   it('drops the pair on a refused refresh — a refusal is a dead pair', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    await engine.login({ username: 'rlangdon', password: 'sophie' })
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     fetchMock.mockResolvedValue(
       jsonResponse({ code: 'unauthenticated', message: 'invalid token' }, 401)
@@ -263,7 +263,7 @@ describe('auth engine', () => {
   it('reports an accepted restore through the listener', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ username: 'rlangdon', password: 'sophie' })
+    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
 
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
@@ -280,7 +280,7 @@ describe('auth engine', () => {
     const worker = authWorker()
 
     // Sign-in writes the fresh pair and caches the profile.
-    await expect(worker.login({ username: 'rlangdon', password: 'sophie' })).resolves.toEqual(
+    await expect(worker.login({ identity: 'rlangdon', password: 'sophie' })).resolves.toEqual(
       userJson
     )
     expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
@@ -310,7 +310,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValue(jsonResponse(getSessionJson))
     const worker = authWorker()
 
-    await worker.login({ username: 'rlangdon', password: 'sophie' })
+    await worker.login({ identity: 'rlangdon', password: 'sophie' })
     // A reload: the worker's memory is gone, the cookie copy is what remains.
     await worker.restore()
     await expect(worker.session()).resolves.toEqual(userJson)

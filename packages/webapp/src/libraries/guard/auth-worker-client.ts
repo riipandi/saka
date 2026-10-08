@@ -1,12 +1,17 @@
 import * as Comlink from 'comlink'
-import type { LoginCredentials } from '#/schemas/auth.schema'
 import {
   clearTokenCookies,
   readTokenCookies,
   writeTokenCookies,
   writeUserCookie
 } from './auth-cookies'
-import type { AuthEngineApi, AuthLoginOptions, AuthSession, TokenListener } from './auth-engine'
+import type {
+  AuthEngineApi,
+  AuthLoginOptions,
+  AuthSession,
+  LoginCredentials,
+  TokenListener
+} from './auth-engine'
 import { createAuthEngine } from './auth-engine'
 import { clearAuth, type UserProfile } from './auth-store'
 import { publishTokens, subscribeTokens } from './auth-sync'

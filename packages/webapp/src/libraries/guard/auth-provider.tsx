@@ -1,9 +1,8 @@
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useSelector } from '@tanstack/react-store'
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
-import type { LoginCredentials } from '#/schemas/auth.schema'
 import { queryClient } from '../api-client'
-import type { AuthLoginOptions } from './auth-engine'
+import type { AuthLoginOptions, LoginCredentials } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
 import {
   authStore,

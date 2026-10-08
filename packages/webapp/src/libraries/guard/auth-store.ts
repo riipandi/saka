@@ -1,18 +1,14 @@
 import { createStore } from '@tanstack/react-store'
+import type { AuthenticatedUser } from '~/codegen/authn_pb'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 /**
- * The account view the backend answers (`saka.authn.v1.AuthenticatedUser`),
- * flattened for the UI. The wire form of `id` is the TypeID (`user_…`); the
- * row's UUID never leaves the server.
+ * The account view the UI renders — the projection of the wire's
+ * `saka.authn.v1.AuthenticatedUser` (its four renderable fields; the row's
+ * UUID never leaves the server as the id travels as the TypeID `user_…`).
  */
-export interface UserProfile {
-  id: string
-  username: string
-  email: string
-  displayName: string
-}
+export type UserProfile = Pick<AuthenticatedUser, 'id' | 'username' | 'email' | 'displayName'>
 
 export interface AuthState {
   user: UserProfile | null
