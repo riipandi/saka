@@ -19,7 +19,6 @@ import (
 // not need more; a lost browser's row is dead weight the sweep collects.
 const (
 	flowLifetime = 10 * time.Minute
-
 	// spaCallbackPath is the SPA route the callback redirects to, with
 	// the flow token or the error code riding the query. The path sits
 	// OUTSIDE the reserved surface prefixes (/oauth among them) — the
