@@ -20,20 +20,24 @@
 import { parse, serialize } from 'cookie-es'
 import { z } from 'zod'
 import type { TokenBundle } from './auth-engine'
+import type { UserProfile } from './auth-store'
 
 const TOKEN_COOKIE = 'saka_token'
 const TOKEN_EXP_COOKIE = 'saka_token_exp'
 const REFRESH_COOKIE = 'saka_refresh'
 const REFRESH_EXP_COOKIE = 'saka_refresh_exp'
 const SESSION_ID_COOKIE = 'saka_session_id'
+const USER_COOKIE = 'saka_user'
 
-/** Cookie options shared by every write and the clear — one definition, no drift. */
+/**
+ * Cookie options shared by every write and the clear — one definition, no drift.
+ * SameSite=Lax keeps the pair on same-site navigations;
+ * Secure whenever the page itself is served over TLS.
+ */
 function cookieOptions(maxAgeSeconds?: number) {
   const secure = typeof location !== 'undefined' && location.protocol === 'https:'
   return {
     path: '/',
-    // SameSite=Lax keeps the pair on same-site navigations; Secure whenever
-    // the page itself is served over TLS.
     sameSite: 'lax',
     ...(secure ? { secure: true } : {}),
     ...(maxAgeSeconds === undefined ? {} : { maxAge: maxAgeSeconds })
@@ -64,7 +68,8 @@ export function clearTokenCookies(): void {
     TOKEN_EXP_COOKIE,
     REFRESH_COOKIE,
     REFRESH_EXP_COOKIE,
-    SESSION_ID_COOKIE
+    SESSION_ID_COOKIE,
+    USER_COOKIE
   ]) {
     document.cookie = serialize(name, '', cookieOptions(0))
   }
@@ -91,4 +96,37 @@ export function readTokenCookies(): TokenBundle | null {
     refreshExpiresAt: jar[REFRESH_EXP_COOKIE],
     sessionId: jar[SESSION_ID_COOKIE]
   }
+}
+
+/** The cached profile shape — the store's own view, no wire fields. */
+const userSchema = z.object({
+  id: z.string().min(1),
+  username: z.string().min(1),
+  email: z.string().min(1),
+  displayName: z.string()
+})
+
+/**
+ * Cache the profile beside the pair — the reload reads it before any network.
+ * The cookie lives as long as the refresh half when its expiry is known
+ * (a persistent session survives a browser restart with it); without one it
+ * is a session cookie, and the bootstrap falls back to the blocking path.
+ */
+export function writeUserCookie(user: UserProfile, expiresAtMs?: number): void {
+  const options =
+    expiresAtMs === undefined
+      ? cookieOptions()
+      : cookieOptions(Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)))
+  document.cookie = serialize(USER_COOKIE, JSON.stringify(user), options)
+}
+
+/**
+ * Read the cached profile, or null when absent, malformed, or empty — a
+ * cleared cookie leaves the name behind with an empty value in some engines.
+ */
+export function readUserCookie(): UserProfile | null {
+  const raw = parse(document.cookie)[USER_COOKIE]
+  if (!raw) return null
+  const parsed = userSchema.safeParse(JSON.parse(raw))
+  return parsed.success ? parsed.data : null
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import { clearTokenCookies, readTokenCookies } from '#/libraries/guard/auth-cookies'
+import { clearTokenCookies, readTokenCookies, readUserCookie } from '#/libraries/guard/auth-cookies'
 import { createAuthEngine } from '#/libraries/guard/auth-engine'
 import type { TokenBundle } from '#/libraries/guard/auth-engine'
 import { authWorker } from '#/libraries/guard/auth-worker-client'
@@ -241,11 +241,12 @@ describe('auth engine (browser)', () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const worker = authWorker()
 
-    // Sign-in writes the fresh pair.
+    // Sign-in writes the fresh pair and caches the profile.
     await expect(worker.login({ username: 'rlangdon', password: 'sophie' })).resolves.toEqual(
       userJson
     )
     expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
+    expect(readUserCookie()).toEqual(userJson)
 
     // Rotation must rewrite the cookie — the stale copy is what killed reloads.
     fetchMock.mockResolvedValue(
@@ -254,13 +255,15 @@ describe('auth engine (browser)', () => {
     await expect(worker.refresh()).resolves.toBe(true)
     expect(readTokenCookies()?.accessToken).toBe('access-b')
     expect(readTokenCookies()?.refreshToken).toBe('refresh-b')
+    expect(readUserCookie()).toEqual(userJson)
 
-    // A refused refresh drops the pair and the cookie with it.
+    // A refused refresh drops the pair and every cookie with it.
     fetchMock.mockResolvedValue(
       jsonResponse({ code: 'unauthenticated', message: 'invalid token' }, 401)
     )
     await expect(worker.refresh()).resolves.toBe(false)
     expect(readTokenCookies()).toBeNull()
+    expect(readUserCookie()).toBeNull()
   })
 
   it('rebuilds the session from the cookie through restore and GetSession', async () => {
@@ -273,5 +276,6 @@ describe('auth engine (browser)', () => {
     // A reload: the worker's memory is gone, the cookie copy is what remains.
     await worker.restore()
     await expect(worker.session()).resolves.toEqual(userJson)
+    expect(readUserCookie()).toEqual(userJson)
   })
 })

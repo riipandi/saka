@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { useIsMobile } from 'uilibs/hooks/use-media-query'
 import { closeSidebar, useSidebarOpen, useSidebarCollapsed } from '#/libraries/app.store'
 import { toggleSidebar, toggleSidebarCollapsed } from '#/libraries/app.store'
+import { useAuthUser } from '#/libraries/guard/auth-provider'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated } from '#/libraries/guard/auth-store'
 import { styles } from '#/styles/element/root-layout.stylex'
@@ -35,6 +36,7 @@ export const Route = createFileRoute('/(app)')({
 
 function RouteComponent() {
   const router = useRouter()
+  const user = useAuthUser()
   const sidebarOpen = useSidebarOpen()
   const collapsed = useSidebarCollapsed()
   const isMobile = useIsMobile()
@@ -42,6 +44,18 @@ function RouteComponent() {
   // Close sidebar on route change (mobile). `onResolved` fires after every
   // navigation; closing an already-closed sidebar is a no-op state write.
   useEffect(() => router.subscribe('onResolved', closeSidebar), [router])
+
+  // The session can end while the user is on a protected page — the
+  // background verify found the pair dead, a refresh was refused, the
+  // backend revoked it. The guard only runs on navigation, so this effect
+  // is the eviction: the moment the profile is gone, so is the page.
+  useEffect(() => {
+    if (user) return
+    void router.navigate({
+      to: '/login',
+      search: { return_to: router.state.location.href, unauthenticated: true }
+    })
+  }, [user, router])
 
   return (
     <main {...stylex.props(styles.layout)}>

@@ -1,6 +1,11 @@
 import * as Comlink from 'comlink'
 import type { LoginCredentials } from '#/schemas/auth.schema'
-import { clearTokenCookies, readTokenCookies, writeTokenCookies } from './auth-cookies'
+import {
+  clearTokenCookies,
+  readTokenCookies,
+  writeTokenCookies,
+  writeUserCookie
+} from './auth-cookies'
 import type { AuthEngineApi, AuthLoginOptions, AuthSession, TokenListener } from './auth-engine'
 import { createAuthEngine } from './auth-engine'
 import type { UserProfile } from './auth-store'
@@ -59,6 +64,7 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
   return {
     async login(credentials: LoginCredentials, options?: AuthLoginOptions) {
       const result: AuthSession = await engine.login(credentials, options)
+      writeUserCookie(result.user, result.tokens.refreshExpiresAt)
       return result.user
     },
     refresh: () => engine.refresh(),
@@ -66,7 +72,17 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
     async restore() {
       await engine.restore(readTokenCookies())
     },
-    session: () => engine.session(),
+    async session() {
+      const profile = await engine.session()
+      if (profile) {
+        // Cache the confirmed profile for the next reload, with the refresh
+        // half's lifetime — the pair (possibly just rotated) is in the jar.
+        writeUserCookie(profile, readTokenCookies()?.refreshExpiresAt)
+      } else {
+        clearTokenCookies()
+      }
+      return profile
+    },
     accessToken: () => engine.accessToken(),
     async logout() {
       await engine.logout()
