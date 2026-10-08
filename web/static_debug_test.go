@@ -105,8 +105,10 @@ func TestSetupStaticRendersTheShell(t *testing.T) {
 	assert.Contains(t, body, `name="robots" content="noindex`, "the application page stays unlisted until a page says otherwise")
 	assert.Contains(t, body, `src="/@vite/client"`, "the debug shell's tags are same-origin")
 	assert.Contains(t, body, `src="/src/main.tsx"`, "the shell loads the page's entry, not a hard-coded main")
-	assert.Contains(t, body, `src="/virtual:stylex.js"`,
-		"the StyleX dev runtime rides the shell — transformIndexHtml cannot inject it into a Go-owned document")
+	assert.Contains(t, body, `href="/virtual:stylex.css"`,
+		"the compiler's collected sheet is a render-blocking link, so the first paint is styled")
+	assert.Contains(t, body, `src="/@id/virtual:stylex:runtime"`,
+		"the StyleX dev runtime rides the module pipeline — the raw middleware path carries no HMR context, so the sheet would never refresh past the first fetch")
 	assert.NotContains(t, body, "http://localhost:3", "the document names no other port")
 	assert.Contains(t, body, "s-loader", "the loading state rides the shell")
 }

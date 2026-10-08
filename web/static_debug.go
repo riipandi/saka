@@ -24,15 +24,21 @@ const viteDevServer = "http://127.0.0.1:5173"
 
 // devPage is the application document a debug build serves. It appends the
 // StyleX dev runtime to the Vite fragment: the compiler's transformIndexHtml
-// cannot inject it, because the document is the Go shell's — the runtime is
-// what loads /virtual:stylex.css and follows the stylex HMR events, and the
-// same-origin path rides the proxy below.
+// cannot inject it, because the document is the Go shell's. The pair mirrors
+// what transformIndexHtml injects for a Vite-served document: the stylesheet
+// link is render-blocking, so the first paint carries the CSS the compiler
+// has already collected, and the runtime — served through the module
+// pipeline at /@id/, not the raw middleware path — runs with a live HMR
+// context, re-fetches the full sheet as the compiler transforms the app's
+// modules, and disables the link once its inline copy covers the page.
 var devPage = bundler.Page{
 	Entry:       "src/main.tsx",
 	Title:       "Monolith Go React",
 	Description: "Monolith Go, React, and TanStack application template",
 	Noindex:     true,
-	ExtraHead:   template.HTML(`<script type="module" src="/virtual:stylex.js"></script>`),
+	ExtraHead: template.HTML(
+		`<link rel="stylesheet" href="/virtual:stylex.css">` +
+			`<script type="module" src="/@id/virtual:stylex:runtime"></script>`),
 }
 
 // SetupStatic mounts the SPA surface for a debug build.

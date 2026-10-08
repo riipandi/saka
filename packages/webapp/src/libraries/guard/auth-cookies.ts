@@ -12,7 +12,11 @@
  * Every read and write rides the cookies library's shared instance.
  */
 import { z } from 'zod'
-import { cookies } from '#/libraries/cookies'
+// The concrete module, not the `#/libraries/cookies` barrel: the barrel also
+// re-exports the React provider and hook, and this module's import chain
+// reaches the auth worker — a worker realm must not evaluate React surface
+// code (dev's react-refresh wrapper throws where no preamble exists).
+import { cookies } from '#/libraries/cookies/cookies'
 import type { TokenBundle } from './auth-engine'
 import type { UserProfile } from './auth-store'
 
