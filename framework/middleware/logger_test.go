@@ -89,3 +89,49 @@ func TestLoggerWithoutALoggerIsAPassThrough(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, rec.Code)
 }
+
+func TestLoggerQuietPathsWriteNoLine(t *testing.T) {
+	var buf bytes.Buffer
+	quiet := []string{"/favicon.", "/@fs/", "/@react-refresh", "/src/"}
+	handler := Logger(slog.New(slog.NewJSONHandler(&buf, nil)), quiet...)(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+	for _, path := range []string{
+		"/favicon.ico", // the prefix matches without a slash boundary
+		"/favicon.svg",
+		"/@fs/etc/passwd",
+		"/@react-refresh", // the bare prefix names itself
+		"/src/main.tsx",
+		"/src/routes/(auth)/login.tsx",
+	} {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+
+	assert.Empty(t, strings.TrimSpace(buf.String()), "a quiet path's success answers no line")
+
+	// A 4xx a quiet path earned is the browser's normal state — a stale HMR
+	// probe, a devtools manifest that is not there — and stays silent too.
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/src/ghost.ts", nil))
+	assert.Empty(t, strings.TrimSpace(buf.String()), "a quiet path's 4xx answers no line")
+
+	// A neighbouring path the prefixes do not name still logs.
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/things", nil))
+	assert.NotEmpty(t, strings.TrimSpace(buf.String()))
+	assert.Equal(t, "/api/things", requestLog(t, &buf)["path"])
+}
+
+func TestLoggerAQuietPathThatFailsStillLogs(t *testing.T) {
+	var buf bytes.Buffer
+	handler := Logger(slog.New(slog.NewJSONHandler(&buf, nil)), "/src/")(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/src/main.tsx", nil))
+
+	entry := requestLog(t, &buf)
+	assert.Equal(t, slog.LevelError.String(), entry["level"])
+	assert.Equal(t, "/src/main.tsx", entry["path"])
+}

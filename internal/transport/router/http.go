@@ -24,6 +24,27 @@ import (
 	appweb "github.com/riipandi/saka/web"
 )
 
+// quietRequestPrefixes are the request paths the request log is not worth a
+// line for, at info level: the browser's own automatic fetches and the dev
+// compiler's module traffic. The volume is the point — one dev session's
+// module graph can bury days of real traffic under a hundred thousand lines.
+// The list is a constant of the toolchain (the same knowledge the debug
+// shell's vite dev-server constant carries), not a configuration key: a
+// deployment has no reason to un-quiet a favicon.
+var quietRequestPrefixes = []string{
+	"/.well-known/appspecific/",
+	"/@fs/",
+	"/@id/",
+	"/@react-refresh",
+	"/@vite/",
+	"/__tsd/",
+	"/apple-touch-icon",
+	"/favicon.",
+	"/node_modules/",
+	"/src/",
+	"/virtual:",
+}
+
 // Options is what the routers need to serve. Every field is explicit, so a
 // caller cannot construct a router whose dependencies it cannot name.
 type Options struct {
@@ -132,7 +153,7 @@ func NewRouter(opts Options) chi.Router {
 	// gathered instead of one per transport. The address it resolves is the
 	// same one the rate limiter keys by, because both read chi's context.
 	r.Use(middleware.ClientInfo(opts.Config.Server.TrustedProxyHeaders))
-	r.Use(fwmiddleware.Logger(opts.Logger))
+	r.Use(fwmiddleware.Logger(opts.Logger, quietRequestPrefixes...))
 	r.Use(fwmiddleware.Recoverer(opts.Logger))
 	r.Use(fwmiddleware.CORS(fwmiddleware.CORSOptions{
 		AllowedOrigins:   opts.Config.Server.CORS.AllowedOrigins,

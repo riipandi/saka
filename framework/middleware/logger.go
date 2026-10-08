@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/riipandi/saka/framework/webutil"
@@ -11,6 +12,14 @@ import (
 
 // Logger writes one line per request: method, path, status, duration, size,
 // request id, and the client address.
+//
+// quietPrefixes name the request paths the line is not worth writing for —
+// the browser's own automatic fetches and the dev compiler's module traffic,
+// whose volume would bury the log. A quiet path is a prefix match on the URL
+// path, and below an error it writes nothing: a 404 the devtools probe or a
+// stale HMR request earned is the browser's normal state, not a fact the
+// log keeps. A 5xx is never quiet — the compiler's machinery failing is
+// exactly what the log is for.
 //
 // The level follows the status, so a probe of a failing service is found by
 // the same filter that finds the failure: 5xx logs at error, 4xx at warn,
@@ -20,7 +29,7 @@ import (
 //
 // The request id comes from the context the RequestID middleware put there.
 // Running Logger after RequestID is what makes the two agree.
-func Logger(log *slog.Logger) func(http.Handler) http.Handler {
+func Logger(log *slog.Logger, quietPrefixes ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if log == nil {
 			return next
@@ -44,6 +53,9 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 			case status >= http.StatusBadRequest:
 				level = slog.LevelWarn
 			}
+			if level != slog.LevelError && quiet(r.URL.Path, quietPrefixes) {
+				return
+			}
 
 			attrs := []slog.Attr{
 				slog.String("request_id", webutil.RequestIDFromContext(r.Context())),
@@ -59,6 +71,16 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 			log.LogAttrs(context.WithoutCancel(r.Context()), level, "request", attrs...)
 		})
 	}
+}
+
+// quiet decides whether a path sits under one of the quiet prefixes.
+func quiet(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if path == prefix || strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // responseRecorder captures the status and the size of the response the
