@@ -18,6 +18,7 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { GitHubIcon, GoogleIcon, ViteIcon } from 'uilibs/components/icons'
 import { z } from 'zod'
+import { useAppConfig } from '#/hooks/use-app-config'
 import { useAuthentication } from '#/hooks/use-auth'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
@@ -37,6 +38,7 @@ export const Route = createFileRoute('/(auth)/login')({
 function RouteComponent() {
   const navigate = useNavigate()
   const { login } = useAuthentication()
+  const { data: config } = useAppConfig()
   const { unauthenticated, loggedOut, return_to } = useSearch({ from: Route.id })
   const [failed, setFailed] = useState<string | null>(null)
   const [remember, setRemember] = useState(false)
@@ -115,18 +117,21 @@ function RouteComponent() {
         </CardHeader>
 
         <CardContent>
-          <ButtonGroup orientation='vertical' style={styles.socialGroup}>
-            <Button type='button' variant='outline' style={socialStyles.socialButton}>
-              <GoogleIcon size={16} />
-              Continue with Google
-            </Button>
-            <Button type='button' variant='outline' style={socialStyles.socialButton}>
-              <GitHubIcon size={16} />
-              Continue with GitHub
-            </Button>
-          </ButtonGroup>
-
-          <FieldSeparator style={styles.divider}>or continue with</FieldSeparator>
+          {config?.oidc.enabled && (
+            <>
+              <ButtonGroup orientation='vertical' style={styles.socialGroup}>
+                <Button type='button' variant='outline' style={socialStyles.socialButton}>
+                  <GoogleIcon size={16} />
+                  Continue with Google
+                </Button>
+                <Button type='button' variant='outline' style={socialStyles.socialButton}>
+                  <GitHubIcon size={16} />
+                  Continue with GitHub
+                </Button>
+              </ButtonGroup>
+              <FieldSeparator style={styles.divider}>or continue with</FieldSeparator>
+            </>
+          )}
 
           <form
             id='login-form'
