@@ -223,6 +223,11 @@ const (
 	// instead of minting a token.
 	SettingMFARequired = "mfa.required"
 
+	// SettingSessionLifetime is the window a session the caller did not
+	// remember holds, in seconds. A remembered session rides
+	// SettingSessionMaxLifetime instead.
+	SettingSessionLifetime = "session.lifetime"
+
 	// SettingSessionMaxLifetime bounds a remembered session, in seconds.
 	// The refresh paths — remembered or not — never outlive it.
 	SettingSessionMaxLifetime = "session.max_lifetime"
@@ -444,9 +449,14 @@ func Catalog() []SettingDef {
 			Description: "The global second-factor gate: on, sign-in and sign-up route an account with zero confirmed factors to enrollment instead of minting a token.",
 		},
 		{
+			Key:         SettingSessionLifetime,
+			Default:     "43200",
+			Description: "How long a session the caller did not remember lives, in seconds (12 hours). A remembered session rides session.max_lifetime instead. Bounds at the reader: 5 minutes to the remembered bound.",
+		},
+		{
 			Key:         SettingSessionMaxLifetime,
 			Default:     "604800",
-			Description: "The longest a remembered session lives, in seconds (168 hours). The refresh paths — remembered or not — never outlive it. Bounds at the reader: 5 minutes to 10 years.",
+			Description: "How long a remembered session lives, in seconds (168 hours) — the bound every session the store may hold rests under. Bounds at the reader: 5 minutes to 10 years.",
 		},
 		{
 			Key:         SettingSessionInactivityTimeout,

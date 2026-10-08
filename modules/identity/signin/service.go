@@ -406,7 +406,7 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		IPAddress:         addrPtr(params.IPAddress),
 		Remember:          params.Remember,
 		CreatedAt:         now,
-		ExpiresAt:         now.Add(s.sessionLifetime(ctx)),
+		ExpiresAt:         now.Add(s.SessionLifetime(ctx, params.Remember)),
 	}
 	repo := s.repo.WithQuerier(db)
 	if createErr := repo.CreateSession(ctx, sessionRow); createErr != nil {
@@ -462,7 +462,7 @@ func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, accoun
 		AccessToken:      access,
 		TokenType:        TokenType,
 		AccessExpiresIn:  int32(s.accessTTL.Seconds()),
-		RefreshExpiresIn: int32(s.sessionLifetime(ctx).Seconds()),
+		RefreshExpiresIn: int32(s.SessionLifetime(ctx, params.Remember).Seconds()),
 		RefreshToken:     refresh.Plain,
 		SessionID:        sessionID.String(),
 		User: User{
@@ -591,15 +591,19 @@ func (s *Service) Challenge(ctx context.Context, userID uuid.UUID, remember bool
 	return PendingSignIn{Token: pending.Token, ExpiresAt: pending.ExpiresAt}, true, nil
 }
 
-// SessionLifetime picks the session lifetime: the remembered and the
-// non-remembered path share one bound, `session.max_lifetime` — the
-// remembered ceiling a deployment sets on every session the store may hold.
-// The read rides the request context, so an operator's change lands at the
-// next mint; an unreadable or out-of-bounds value falls back to the catalog
-// default rather than refusing the sign-in, and the remember flag is kept on
+// SessionLifetime picks the session window: a remembered session rides the
+// `session.max_lifetime` bound — the ceiling a deployment sets on every
+// session the store may hold — and a session the caller did not remember
+// rides the shorter `session.lifetime` window, capped at that bound. The
+// reads ride the request context, so an operator's change lands at the next
+// mint; an unreadable or out-of-bounds value falls back to the catalog
+// default rather than refusing the sign-in, and the remember flag stays on
 // the signature because the store's column still records the caller's
 // choice.
 func (s *Service) SessionLifetime(ctx context.Context, remember bool) time.Duration {
+	if !remember {
+		return s.shortLifetime(ctx)
+	}
 	return s.sessionLifetime(ctx)
 }
 
@@ -612,19 +616,26 @@ type sessionSettings interface {
 	GetString(ctx context.Context, key string) (string, error)
 }
 
-// SettingSessionMaxLifetime is the catalog key the session bound reads. The
-// catalog owns the name; this constant is how this package spells it.
+// SettingSessionLifetime is the catalog key the non-remembered window reads.
+// The catalog owns the name; this constant is how this package spells it.
+const SettingSessionLifetime = "session.lifetime"
+
+// SettingSessionMaxLifetime is the catalog key the remembered bound reads.
+// The catalog owns the name; this constant is how this package spells it.
 const SettingSessionMaxLifetime = "session.max_lifetime"
 
 // SettingMFARequired is the catalog key the global second-factor gate reads.
 // The catalog owns the name; this constant is how this package spells it.
 const SettingMFARequired = "mfa.required"
 
-// The catalog's default for the bound, mirrored so a nil settings feature or
-// an unreadable read still mints a session the deployment set out with.
-const sessionMaxLifetimeDefault = 604800 * time.Second
+// The catalog's defaults, mirrored so a nil settings feature or an
+// unreadable read still mints a session the deployment set out with.
+const (
+	sessionMaxLifetimeDefault   = 604800 * time.Second
+	sessionShortLifetimeDefault = 43200 * time.Second
+)
 
-// The spec's bounds for the remembered session: five minutes to ten years.
+// The spec's bounds for the session windows: five minutes to ten years.
 const (
 	sessionLifetimeFloor = 5 * 60 * time.Second
 	sessionLifetimeCeil  = 10 * 365 * 24 * time.Hour
@@ -708,9 +719,9 @@ func (s *Service) WithPasswordPolicy(policy *password.Validator) *Service {
 	return s
 }
 
-// sessionLifetime reads the bound fresh at every mint. An unreadable or
-// out-of-bounds value falls back to the catalog default: a setting the
-// database cannot answer must not end every sign-in.
+// sessionLifetime reads the remembered bound fresh at every mint. An
+// unreadable or out-of-bounds value falls back to the catalog default: a
+// setting the database cannot answer must not end every sign-in.
 func (s *Service) sessionLifetime(ctx context.Context) time.Duration {
 	if s.settings == nil {
 		return sessionMaxLifetimeDefault
@@ -724,6 +735,30 @@ func (s *Service) sessionLifetime(ctx context.Context) time.Duration {
 	if lifetime < sessionLifetimeFloor || lifetime > sessionLifetimeCeil {
 		s.log.Warn("signin: session.max_lifetime out of bounds; using the default", slog.Int64("seconds", seconds))
 		return sessionMaxLifetimeDefault
+	}
+	return lifetime
+}
+
+// shortLifetime reads the non-remembered window fresh at every mint, capped
+// at the remembered bound — no session outlives the ceiling, however the
+// operator set the two. An unreadable or out-of-bounds value falls back to
+// the catalog default.
+func (s *Service) shortLifetime(ctx context.Context) time.Duration {
+	if s.settings == nil {
+		return sessionShortLifetimeDefault
+	}
+	seconds, err := s.settings.GetInt64(ctx, SettingSessionLifetime)
+	if err != nil {
+		s.log.Warn("signin: session.lifetime unreadable; using the default", slog.Any("error", err))
+		return sessionShortLifetimeDefault
+	}
+	lifetime := time.Duration(seconds) * time.Second
+	if lifetime < sessionLifetimeFloor || lifetime > sessionLifetimeCeil {
+		s.log.Warn("signin: session.lifetime out of bounds; using the default", slog.Int64("seconds", seconds))
+		return sessionShortLifetimeDefault
+	}
+	if bound := s.sessionLifetime(ctx); lifetime > bound {
+		return bound
 	}
 	return lifetime
 }
