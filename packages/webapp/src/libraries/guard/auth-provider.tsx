@@ -2,10 +2,9 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useSelector } from '@tanstack/react-store'
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
 import type { LoginCredentials } from '#/schemas/auth.schema'
-import type { User } from '#/schemas/user.schema'
 import type { AuthLoginOptions } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
-import { authStore, clearAuth, setAuthUser, type AuthState } from './auth-store'
+import { authStore, clearAuth, setAuthUser, type AuthState, type UserProfile } from './auth-store'
 import { safeReturnTo } from './auth-utils'
 import { authWorker } from './auth-worker-client'
 
@@ -18,7 +17,7 @@ export function useAuth(): AuthState {
  * Subscribe to just the user profile — components that only render user
  * data skip re-renders triggered by `isLoading` flips.
  */
-export function useAuthUser(): User | null {
+export function useAuthUser(): UserProfile | null {
   return useSelector(authStore, (state) => state.user)
 }
 
@@ -29,7 +28,7 @@ interface AuthLoginContextOptions extends AuthLoginOptions {
 }
 
 interface AuthContext {
-  user: User | null
+  user: UserProfile | null
   loggedIn: boolean
   isLoading: boolean
   login: (credentials: LoginCredentials, options?: AuthLoginContextOptions) => Promise<void>
@@ -72,7 +71,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [])
 
-  // The worker establishes the cookie session; tokens never reach JS.
+  // The worker holds the token pair and answers the profile; this layer
+  // persists the pair to the cookie via the worker client.
   const handleLogin = useCallback(
     async (credentials: LoginCredentials, options?: AuthLoginContextOptions) => {
       const { redirectTo, ...workerOptions } = options ?? {}

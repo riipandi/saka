@@ -25,9 +25,20 @@ export const queryClient = new QueryClient({
 })
 
 /**
- * - Sends the HttpOnly cookie session with every request (`credentials: 'include'`).
+ * The Bearer header for outgoing calls, resolved from the auth worker. The
+ * worker holds the live pair; it answers null when no unexpired token exists,
+ * so anonymous calls (SignIn, Refresh) go out headerless instead of carrying
+ * a stale credential the guard could refuse.
+ */
+async function bearerHeader(): Promise<Record<string, string>> {
+  const token = await authWorker().accessToken()
+  return token ? { authorization: `Bearer ${token}` } : {}
+}
+
+/**
+ * - Injects the Bearer access token the auth worker holds, when it has one.
  * - On 401, performs a single-flight silent refresh via the auth worker and
- *   retries the request (the browser attaches the fresh cookie automatically).
+ *   retries the request.
  * - Base URL from `PUBLIC_API_URL` envar defaults to `/api`.
  *
  * All backend API calls should import `api` from here.
@@ -37,6 +48,12 @@ export const api = ofetch.create({
   credentials: 'include',
   retry: 1,
   retryStatusCodes: [401],
+  async onRequest({ options }) {
+    options.headers = new Headers(options.headers)
+    for (const [name, value] of Object.entries(await bearerHeader())) {
+      options.headers.set(name, value)
+    }
+  },
   async onResponseError({ response }) {
     if (response.status !== 401) return
     const refreshed = await authWorker().refresh()
@@ -48,11 +65,17 @@ export const api = ofetch.create({
 
 /**
  * The ConnectRPC transport defines what type of endpoint we're hitting.
- * ConnectRPC base URL defaults to `/rpc` — the same-origin Vite dev proxy.
- * In production, point `PUBLIC_RPC_URL`, same parent domain so the
- * HttpOnly session cookies are first-party.
+ * ConnectRPC base URL defaults to `/rpc` — the same-origin dev proxy.
+ * In production, point `PUBLIC_RPC_URL`, same parent domain so the requests
+ * stay first-party against the Bearer credential the auth worker holds.
  */
 export const rpcTransport = createConnectTransport({
   baseUrl: RPC_BASE_URL,
-  fetch: fetch
+  fetch: async (input, init) => {
+    const headers = new Headers(init?.headers)
+    for (const [name, value] of Object.entries(await bearerHeader())) {
+      headers.set(name, value)
+    }
+    return fetch(input, { ...init, headers })
+  }
 })

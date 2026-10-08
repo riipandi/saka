@@ -25,9 +25,15 @@ export const Route = createFileRoute('/(app)/settings')({
 function RouteComponent() {
   const user = useAuthUser()
   const { logout } = useAuthentication()
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Guest'
+  const fullName = user?.displayName?.trim() || user?.username?.trim() || 'Guest'
   const initials =
-    [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'G'
+    (user?.displayName?.trim() || user?.username?.trim() || 'G')
+      .split(/\s+/)
+      .map((part) => part[0])
+      .filter(Boolean)
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'G'
 
   return (
     <div

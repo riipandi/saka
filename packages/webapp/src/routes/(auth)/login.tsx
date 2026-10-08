@@ -10,13 +10,8 @@ import { Field, FieldError, FieldLabel, FieldSeparator } from 'uilibs/components
 import { Input } from 'uilibs/components/base/input'
 import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
 import { ButtonGroup } from 'uilibs/components/extra/button-group'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader
-} from 'uilibs/components/extra/card'
+import { CardFooter, CardHeader } from 'uilibs/components/extra/card'
+import { Card, CardContent, CardDescription } from 'uilibs/components/extra/card'
 import { InputPassword } from 'uilibs/components/extra/input-password'
 import { LoaderText } from 'uilibs/components/extra/loader-text'
 import { Spinner } from 'uilibs/components/extra/spinner'

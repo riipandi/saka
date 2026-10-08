@@ -32,7 +32,7 @@ function RouteComponent() {
   const user = useAuthUser()
   const { logout } = useAuthentication()
   const displayName =
-    user?.firstName?.trim() || user?.username?.trim() || user?.email?.split('@')[0] || 'Guest'
+    user?.displayName?.trim() || user?.username?.trim() || user?.email?.split('@')[0] || 'Guest'
 
   return (
     <div

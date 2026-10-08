@@ -1,10 +1,21 @@
 import { createStore } from '@tanstack/react-store'
-import type { User } from '#/schemas/user.schema'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+/**
+ * The account view the backend answers (`saka.authn.v1.AuthenticatedUser`),
+ * flattened for the UI. The wire form of `id` is the TypeID (`user_…`); the
+ * row's UUID never leaves the server.
+ */
+export interface UserProfile {
+  id: string
+  username: string
+  email: string
+  displayName: string
+}
+
 export interface AuthState {
-  user: User | null
+  user: UserProfile | null
   /** True while the initial session bootstrap is running. */
   isLoading: boolean
 }
@@ -14,10 +25,11 @@ export interface AuthState {
 /**
  * UI-facing session state — memory only.
  *
- * The session itself lives in HttpOnly cookies owned by the backend, so no
- * token or profile is persisted to localStorage (XSS-safe by construction).
- * On reload the session is restored silently via the auth worker before any
- * route guard runs (see `guard/auth-session.ts`).
+ * The live token pair is owned by the auth worker; its cookie copy is
+ * JS-readable by construction (the backend answers tokens in the response
+ * body, not Set-Cookie), so the exposure window is bounded by rotation: the
+ * refresh token dies server-side the moment a renewal lands. On reload the
+ * pair is restored from the cookie into the worker (see `guard/auth-session.ts`).
  */
 export const authStore = createStore<AuthState>({ user: null, isLoading: false })
 
@@ -31,7 +43,7 @@ export function isAuthenticated(): boolean {
 // ── Store actions ──────────────────────────────────────────────────────────
 
 /** Store the authenticated user profile (memory only). */
-export function setAuthUser(user: User | null) {
+export function setAuthUser(user: UserProfile | null) {
   authStore.setState((prev) => ({ ...prev, user }))
 }
 

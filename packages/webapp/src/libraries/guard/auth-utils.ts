@@ -1,10 +1,15 @@
+import { ConnectError } from '@connectrpc/connect'
 import { FetchError } from 'ofetch'
 
 /**
- * Extract a human-readable message from an error.
- * Handles `ofetch` FetchError shapes, standard Errors, and fallback text.
+ * Extract a human-readable message from an error. Handles Connect errors (the
+ * RPC contract reports failures as connect codes with a detail message),
+ * `ofetch` FetchError shapes, standard Errors, and fallback text.
  */
 export function getErrorMessage(error: unknown): string {
+  if (error instanceof ConnectError) {
+    return error.message
+  }
   if (error instanceof FetchError) {
     return error.data?.message ?? error.message
   }

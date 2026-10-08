@@ -24,5 +24,6 @@ plugins:
       - pnpm
       - exec
       - protoc-gen-es
+    include_imports: true
     out: codegen/proto/ts
     opt: target=ts

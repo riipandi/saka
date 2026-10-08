@@ -1,62 +1,17 @@
-import { api } from '#/libraries/api-client'
-import { API_BASE_URL } from '#/libraries/api-client'
-import type { User } from '#/schemas/user.schema'
 import { authStore, clearAuth, setAuthLoading, setAuthUser } from './auth-store'
 import { authWorker } from './auth-worker-client'
-
-/**
- * Fetch the current user profile. The cookie session is attached
- * automatically by the browser (`credentials: 'include'`); a 401 triggers the
- * api client's silent-refresh-and-retry flow via the auth worker.
- */
-export async function me(): Promise<User> {
-  return api<User>('/auth/me')
-}
-
-/**
- * Cheap session presence probe — responds 200 (demo middleware or the real
- * backend), so anonymous visitors never trigger a 401 console error.
- *
- * The endpoint is part of the production backend contract. When it is not
- * reachable (e.g. a purely static deployment without a same-site API), warn
- * once and treat the visitor as logged out.
- */
-let probeWarned = false
-function isSessionPayload(value: unknown): value is { authenticated?: boolean } {
-  if (typeof value !== 'object' || value === null) return false
-  return !('authenticated' in value) || typeof value.authenticated === 'boolean'
-}
-async function hasSessionCookie(): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/session`)
-    if (!response.ok) {
-      throw new Error(`unexpected status ${response.status}`)
-    }
-    const data: unknown = await response.json()
-    return isSessionPayload(data) && data.authenticated === true
-  } catch {
-    if (!probeWarned) {
-      probeWarned = true
-      console.warn(
-        '[auth] GET /auth/session unreachable — treat as logged out. ' +
-          'Cookie auth requires a same-site API: set PUBLIC_BASE_URL to your backend ' +
-          '(same parent domain) or proxy /api server-side. See README "Deploying the SPA".'
-      )
-    }
-    return false
-  }
-}
 
 let bootPromise: Promise<void> | null = null
 
 /**
- * Restore the session once per app lifecycle, from the HttpOnly cookie.
+ * Restore the session once per app lifecycle. Route guards (`beforeLoad`)
+ * await this promise, so navigation never races the restore.
  *
- * Awaited by route guards (`beforeLoad`) and kicked off by `AuthProvider`, so
- * the silent refresh never races navigation. On reload this first probes for
- * cookie presence (never a 401); only when a session cookie exists does it
- * call `me()` — whose 401 path triggers the api client interceptor (refresh
- * through the auth worker, then retry).
+ * The bootstrap is what makes a reload keep its session: the cookie-restored
+ * pair is handed to the worker and the profile is rebuilt from the session
+ * the access token names (`SessionService/GetSession`) — a failed or absent
+ * pair leaves the signed-out shell, which is exactly what the route guard
+ * needs to see.
  */
 export function ensureSessionLoaded(): Promise<void> {
   if (!bootPromise) bootPromise = bootstrap()
@@ -64,13 +19,13 @@ export function ensureSessionLoaded(): Promise<void> {
 }
 
 async function bootstrap() {
-  // Session already in memory (e.g. HMR or a completed bootstrap).
-  if (authStore.state.user) return
-
   setAuthLoading(true)
   try {
-    if (await hasSessionCookie()) {
-      setAuthUser(await me())
+    const worker = authWorker()
+    await worker.restore()
+    const profile = await worker.session()
+    if (profile) {
+      setAuthUser(profile)
     } else {
       clearAuth()
     }
@@ -82,8 +37,8 @@ async function bootstrap() {
 }
 
 /**
- * Proactive refresh for tab-focus events. No-op when logged out; clears the
- * session when the worker reports it can no longer be renewed.
+ * Proactive refresh for tab-focus events. Clears the session state when the
+ * worker reports the pair can no longer be renewed.
  */
 export async function refreshIfExpiring(withinMs: number): Promise<void> {
   if (!authStore.state.user) return
