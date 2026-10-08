@@ -215,6 +215,66 @@ importers:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2)
 
+  packages/components:
+    dependencies:
+      '@base-ui/react':
+        specifier: ^1.8.0
+        version: 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@dnd-kit/modifiers':
+        specifier: ^9.0.0
+        version: 9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
+      '@dnd-kit/sortable':
+        specifier: ^10.0.0
+        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@19.3.0)
+      '@keyline-icons/react':
+        specifier: ^1.7.0
+        version: 1.7.0(react@19.3.0)
+      '@stylexjs/atoms':
+        specifier: ^0.19.1
+        version: 0.19.1(@stylexjs/stylex@0.19.1)
+      '@stylexjs/stylex':
+        specifier: ^0.19.1
+        version: 0.19.1
+      '@tanstack/charts':
+        specifier: ^1.0.0
+        version: 1.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.16)
+      '@tanstack/react-hotkeys':
+        specifier: ^0.13.0
+        version: 0.13.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-table':
+        specifier: ^9.2.6
+        version: 9.2.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-virtual':
+        specifier: ^3.14.13
+        version: 3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      country-flag-icons:
+        specifier: ^1.6.20
+        version: 1.6.20
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-day-picker:
+        specifier: ^10.0.2
+        version: 10.0.2(@types/react@19.3.0)(react@19.3.0)
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      react-phone-number-input:
+        specifier: ^3.4.18
+        version: 3.4.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react-resizable-panels:
+        specifier: ^4.14.2
+        version: 4.14.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+
   packages/e2e-tests:
     devDependencies:
       '@playwright/test':
@@ -335,6 +395,9 @@ importers:
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
+      components:
+        specifier: workspace:*
+        version: link:../components
       country-flag-icons:
         specifier: ^1.6.20
         version: 1.6.20

@@ -37,6 +37,7 @@
         "@tanstack/react-virtual": "^3.14.13",
         "blobatar": "^2.7.0",
         "comlink": "^4.4.2",
+        "components": "workspace:*",
         "country-flag-icons": "^1.6.20",
         "date-fns": "^4.4.0",
         "ofetch": "^1.5.1",
