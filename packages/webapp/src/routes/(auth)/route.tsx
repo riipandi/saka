@@ -3,6 +3,9 @@ import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { ThemeSwitcher } from 'uilibs/theme'
 import { z } from 'zod'
+import { prefetchAppConfig } from '#/hooks/use-app-config'
+import { prefetchOAuthProviders } from '#/hooks/use-oauth-providers'
+import { queryClient } from '#/libraries/api-client'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated } from '#/libraries/guard/auth-store'
 import { safeReturnTo } from '#/libraries/guard/auth-utils'
@@ -16,6 +19,11 @@ export const Route = createFileRoute('/(auth)')({
     if (isAuthenticated()) {
       throw redirect({ href: safeReturnTo(search.return_to) ?? '/overview' })
     }
+    // Warm the login page's two queries while the document renders — the
+    // prefetches ride the same cache the hooks read, so a warm copy is
+    // served instead of a mount-time fetch.
+    void prefetchAppConfig(queryClient)
+    void prefetchOAuthProviders(queryClient)
   }
 })
 

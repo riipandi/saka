@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import { useAppConfig } from '#/hooks/use-app-config'
+import { prefetchAppConfig, useAppConfig } from '#/hooks/use-app-config'
 import { fetcher } from '#/libraries/api-client'
 import { clearAuth, setAuthUser } from '#/libraries/guard/auth-store'
 
@@ -18,8 +18,8 @@ const account = {
   displayName: 'Robert Langdon'
 }
 
-function wrapper(): (props: { children: ReactNode }) => ReactNode {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+function wrapper(client?: QueryClient): (props: { children: ReactNode }) => ReactNode {
+  const queryClient = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return ({ children }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -64,5 +64,30 @@ describe('useAppConfig', () => {
     setAuthUser(account)
     await new Promise((resolve) => setTimeout(resolve, 25))
     expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(2)
+  })
+
+  it('never refetches on its own — the document is immutable for the process', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result, unmount } = renderHook(() => useAppConfig(), { wrapper: wrapper(queryClient) })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(1)
+
+    // A remount far past any staleness window serves the same copy.
+    unmount()
+    const second = renderHook(() => useAppConfig(), { wrapper: wrapper(queryClient) })
+    await waitFor(() => expect(second.result.current.isSuccess).toBe(true))
+    expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(1)
+  })
+
+  it('the prefetch warms the exact key the hook reads', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    await prefetchAppConfig(queryClient)
+    expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(1)
+
+    const { result } = renderHook(() => useAppConfig(), { wrapper: wrapper(queryClient) })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(1)
+    expect(result.current.data?.oidc.enabled).toBe(true)
   })
 })
