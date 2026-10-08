@@ -1,6 +1,6 @@
 import type { StorybookConfig } from '@storybook/tanstack-react'
-import stylex from '@stylexjs/unplugin/vite'
 import { resolve } from 'node:path'
+import { stylexPlugin } from 'plugins/plugin-stylex'
 import remarkGfm from 'remark-gfm'
 import { mergeConfig } from 'vite'
 
@@ -38,9 +38,8 @@ export default {
       build: { chunkSizeWarningLimit: 1024 * 4 },
       server: undefined,
       plugins: [
-        stylex({
-          aliases: { '#/*': resolve(import.meta.dirname, '../src/*') },
-          useCSSLayers: { before: ['reset'], prefix: 'stylex' }
+        stylexPlugin({
+          aliases: { '#/*': resolve(import.meta.dirname, '../src/*') }
         })
       ]
     })

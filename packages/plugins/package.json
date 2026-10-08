@@ -4,9 +4,11 @@
     "private": true,
     "type": "module",
     "exports": {
-        "./plugin-golang": "./plugin-golang.ts"
+        "./plugin-golang": "./plugin-golang.ts",
+        "./plugin-stylex": "./plugin-stylex.ts"
     },
     "devDependencies": {
+        "@stylexjs/unplugin": "^0.19.1",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vite-plus": "catalog:"

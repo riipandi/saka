@@ -1,13 +1,11 @@
-import stylex from '@stylexjs/unplugin/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
-import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import golang from 'plugins/plugin-golang'
+import { stylexPlugin, stylexVitestCleanup } from 'plugins/plugin-stylex'
 import { comlink } from 'vite-plugin-comlink'
-import { defineConfig } from 'vite-plus'
-import type { Plugin, ViteDevServer } from 'vite-plus'
+import { defineConfig, type Plugin } from 'vite-plus'
 import { playwright } from 'vite-plus/test/browser-playwright'
 
 // Version stamps shared by every Go target; release adds its static-link flags.
@@ -38,29 +36,6 @@ function storybookPreviewRedirect(): Plugin {
   }
 }
 
-// StyleX starts a dev HMR interval in configureServer and only clears it on
-// httpServer 'close'. Vitest's server has no httpServer, so the interval
-// keeps the process alive — this fake provides the close signal.
-function vitestStylexCleanup(): Plugin {
-  let server: ViteDevServer | undefined
-  const closeHttpServer = () => {
-    server?.httpServer?.emit('close')
-  }
-  return {
-    name: 'vitest-stylex-cleanup',
-    enforce: 'pre',
-    apply: 'serve',
-    configureServer(devServer) {
-      server = devServer
-      if (!devServer.httpServer) {
-        devServer.httpServer = createServer()
-      }
-    },
-    buildEnd: closeHttpServer,
-    closeWatcher: closeHttpServer
-  }
-}
-
 /**
  * The app's one vite pipeline: `vp build` compiles the SPA into the Go
  * embed (`web/output`), then the go plugin derives `assets.json` from the
@@ -75,12 +50,11 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     // Must precede stylex: the HMR-interval cleanup registers on
     // server.httpServer, absent in vitest's middleware-mode server.
-    vitestStylexCleanup(),
+    stylexVitestCleanup(),
     comlink(),
-    stylex({
+    stylexPlugin({
       aliases: { '#/*': resolve(import.meta.dirname, 'src/*') },
       enableDevClassNames: mode === 'development',
-      useCSSLayers: { before: ['reset'], prefix: 'stylex' },
       // Vitest compiles in StyleX's test mode: debug class names, no CSS.
       test: Boolean(process.env.VITEST)
     }),

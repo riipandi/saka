@@ -32,7 +32,6 @@
         "zod": "^4.6.5"
     },
     "devDependencies": {
-        "@stylexjs/unplugin": "^0.19.1",
         "@tanstack/devtools-vite": "^0.8.5",
         "@tanstack/react-devtools": "^0.10.13",
         "@tanstack/react-query-devtools": "^5.104.1",
