@@ -1,8 +1,9 @@
-/.idea
-/.pnp
+/.delta
 /.husky
 /.atlas
+/.idea
 /.task
+/.pnp
 .pnp.js
 .DS_Store
 .DS_Store?
