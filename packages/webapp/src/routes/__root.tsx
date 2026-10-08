@@ -3,6 +3,7 @@ import type { AnyRouteMatch } from '@tanstack/react-router'
 import { Outlet, createRootRouteWithContext, useMatches } from '@tanstack/react-router'
 import { UIProvider } from 'uilibs/components/base/provider'
 import { ThemeProvider } from 'uilibs/theme'
+import { CookiesProvider } from '#/libraries/cookies'
 import { AuthProvider } from '#/libraries/guard/auth-provider'
 import { GlobalNotFound, GlobalError } from './-boundaries'
 import DevTools from './-devtools'
@@ -28,16 +29,18 @@ function RootComponent() {
   const pageTitle = matches.findLast((match) => match.staticData?.pageTitle)?.staticData?.pageTitle
 
   return (
-    <UIProvider direction='ltr'>
+    <CookiesProvider defaultSetOptions={{ path: '/' }}>
       <title>{pageTitle ? `${pageTitle} - React Application` : 'React Application'}</title>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ThemeProvider disableTransitionOnChange>
-            <Outlet />
-          </ThemeProvider>
-        </AuthProvider>
-        <DevTools queryClient={queryClient} />
-      </QueryClientProvider>
-    </UIProvider>
+      <UIProvider direction='ltr'>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <ThemeProvider disableTransitionOnChange>
+              <Outlet />
+            </ThemeProvider>
+          </AuthProvider>
+          <DevTools queryClient={queryClient} />
+        </QueryClientProvider>
+      </UIProvider>
+    </CookiesProvider>
   )
 }
