@@ -1,6 +1,6 @@
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { QueryClient } from '@tanstack/react-query'
-import { ofetch, fetch } from 'ofetch'
+import { ofetch } from 'ofetch'
 import { clearAuth } from '#/libraries/guard/auth-store'
 import { authWorker } from '#/libraries/guard/auth-worker-client'
 
@@ -13,9 +13,7 @@ export const RPC_BASE_URL = import.meta.env.PUBLIC_RPC_URL ?? '/rpc'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    mutations: {
-      retry: 0
-    },
+    mutations: { retry: 0 },
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 1000 * 60 * 5,
@@ -25,77 +23,69 @@ export const queryClient = new QueryClient({
 })
 
 /**
- * The Bearer header for outgoing calls, resolved from the auth worker. The
- * worker holds the live pair; it answers null when no unexpired token exists,
- * so anonymous calls (SignIn, Refresh) go out headerless instead of carrying
- * a stale credential the guard could refuse.
+ * The 401 recovery: one single-flight silent refresh and one replay. A
+ * refresh the backend refused leaves the session only when the worker holds
+ * no pair any more; a network failure is inconclusive and falls through with
+ * the original 401 for the caller to handle.
  */
-async function bearerHeader(): Promise<Record<string, string>> {
-  const token = await authWorker().accessToken()
-  return token ? { authorization: `Bearer ${token}` } : {}
+async function recoverFrom401(): Promise<boolean> {
+  if (!(await authWorker().refresh())) {
+    if (!(await authWorker().accessToken())) clearAuth()
+    return false
+  }
+  return true
 }
 
 /**
- * - Injects the Bearer access token the auth worker holds, when it has one.
- * - On 401, performs a single-flight silent refresh via the auth worker and
- *   retries the request.
- * - Base URL from `PUBLIC_API_URL` envar defaults to `/api`.
- *
- * All backend API calls should import `fetcher` from here.
+ * The seam both clients ride: injects the Bearer the worker holds, refreshes
+ * proactively near expiry, and on a 401 refreshes once and replays once. The
+ * refresh itself travels on the engine's own transport, so a replay can
+ * never recurse into the seam.
  */
-export const fetcher = ofetch.create({
-  baseURL: API_BASE_URL,
-  credentials: 'include',
-  retry: 1,
-  retryStatusCodes: [401],
-  async onRequest({ options }) {
-    options.headers = new Headers(options.headers)
-    for (const [name, value] of Object.entries(await bearerHeader())) {
-      options.headers.set(name, value)
-    }
+async function withAuth(send: (headers: Record<string, string>) => Promise<Response>) {
+  const response = await send(await authWorker().authorization())
+  if (response.status !== 401) return response
+  if (!(await recoverFrom401())) return response
+  return send(await authWorker().authorization())
+}
+
+function mergeHeaders(existing: HeadersInit | undefined, extra: Record<string, string>): Headers {
+  const merged = new Headers(existing)
+  for (const [name, value] of Object.entries(extra)) merged.set(name, value)
+  return merged
+}
+
+export const authFetch: typeof fetch = async (input, init) => {
+  return withAuth(async (headers) => {
+    const url = input instanceof URL ? input.toString() : input
+    return ofetch.raw(url, {
+      ...init,
+      headers: mergeHeaders(init?.headers, headers),
+      ignoreResponseError: true,
+      retry: 0
+    })
+  })
+}
+
+/**
+ * ofetch is the one HTTP engine under the seam: `fetcher` speaks the REST
+ * envelope, the Connect transport rides the same `authFetch`. No client
+ * calls ofetch directly.
+ */
+export const fetcher = ofetch.create(
+  {
+    baseURL: API_BASE_URL,
+    retry: 0
   },
-  async onResponseError({ response }) {
-    if (response.status !== 401) return
-    const refreshed = await authWorker().refresh()
-    if (!refreshed) {
-      clearAuth()
-    }
-  }
-})
+  { fetch: authFetch }
+)
 
 /**
- * Wrap a fetch with the silent-refresh retry the ofetch `api` client gets
- * from its own hooks: when the backend answers 401, refresh the pair once
- * and replay the request with the fresh Bearer. The refresh itself travels
- * on the engine's own transport, so a retry can never recurse into another.
- * A request the refresh could not save (pair dead, network down) falls
- * through with the original 401 for the caller to handle.
- */
-export function authRetryFetch(base: typeof fetch): typeof fetch {
-  return async (input, init) => {
-    const response = await base(input, init)
-    if (response.status !== 401) return response
-    if (!(await authWorker().refresh())) return response
-    const headers = new Headers(init?.headers)
-    const token = await authWorker().accessToken()
-    if (token) headers.set('authorization', `Bearer ${token}`)
-    return base(input, { ...init, headers })
-  }
-}
-
-/**
- * The ConnectRPC transport defines what type of endpoint we're hitting.
- * ConnectRPC base URL defaults to `/rpc` — the same-origin dev proxy.
- * In production, point `PUBLIC_RPC_URL`, same parent domain so the requests
- * stay first-party against the Bearer credential the auth worker holds.
+ * The Connect transport over the seam. In production, point `PUBLIC_RPC_URL`
+ * — same parent domain so the requests stay first-party against the Bearer
+ * credential the auth worker holds.
  */
 export const rpcTransport = createConnectTransport({
   baseUrl: RPC_BASE_URL,
-  fetch: authRetryFetch(async (input, init) => {
-    const headers = new Headers(init?.headers)
-    for (const [name, value] of Object.entries(await bearerHeader())) {
-      headers.set(name, value)
-    }
-    return fetch(input, { ...init, headers })
-  })
+  fetch: authFetch
 })

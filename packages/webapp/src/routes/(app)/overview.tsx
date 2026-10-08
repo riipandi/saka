@@ -8,7 +8,7 @@ import { Card, CardContent } from 'uilibs/components/extra/card'
 import { Item, ItemContent, ItemDescription } from 'uilibs/components/extra/item'
 import { ItemGroup, ItemActions, ItemMedia, ItemTitle } from 'uilibs/components/extra/item'
 import { Text } from 'uilibs/components/extra/text'
-import { useAuthentication, useAuthUser } from '#/libraries/guard/auth-provider'
+import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 import { pageStyles } from '#/styles/pages/page.stylex'
 
 export const Route = createFileRoute('/(app)/overview')({

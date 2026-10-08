@@ -1,56 +1,12 @@
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { useSelector } from '@tanstack/react-store'
-import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { AuthContext, useAuth, type AuthLoginContextOptions } from '#/hooks/use-auth'
 import { queryClient } from '../api-client'
-import type { AuthLoginOptions, LoginCredentials } from './auth-engine'
+import type { LoginCredentials } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
-import {
-  authStore,
-  clearAuth,
-  setAuthUser,
-  setSigningOut,
-  type AuthState,
-  type UserProfile
-} from './auth-store'
+import { clearAuth, setAuthUser, setSigningOut } from './auth-store'
 import { safeReturnTo } from './auth-utils'
 import { authWorker } from './auth-worker-client'
-
-/** Subscribe to the session state (selector-based, minimal re-renders). */
-export function useAuth(): AuthState {
-  return useSelector(authStore, (state) => state)
-}
-
-/**
- * Subscribe to just the user profile — components that only render user
- * data skip re-renders triggered by `isLoading` flips.
- */
-export function useAuthUser(): UserProfile | null {
-  return useSelector(authStore, (state) => state.user)
-}
-
-/** Worker login options plus the post-login redirect target. */
-interface AuthLoginContextOptions extends AuthLoginOptions {
-  /** Path (with optional query) captured by the auth guard — see `(app)/route.tsx`. */
-  redirectTo?: string
-}
-
-interface AuthContext {
-  user: UserProfile | null
-  loggedIn: boolean
-  isLoading: boolean
-  login: (credentials: LoginCredentials, options?: AuthLoginContextOptions) => Promise<void>
-  logout: () => void
-}
-
-const DefaultAuthContext: AuthContext = {
-  user: null,
-  loggedIn: false,
-  isLoading: false,
-  login: async () => {},
-  logout: () => {}
-}
-
-const AuthContextReact = createContext(DefaultAuthContext)
 
 /** Refresh when the session expires within this window after the tab refocuses. */
 const REFRESH_ON_VISIBLE_WITHIN_MS = 5 * 60_000
@@ -85,6 +41,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       const { redirectTo, ...workerOptions } = options ?? {}
       const profile = await authWorker().login(credentials, workerOptions)
       setAuthUser(profile)
+      // The cache may hold the previous account's data — a re-login as a
+      // different account must never render it.
+      queryClient.clear()
       const target = safeReturnTo(redirectTo)
       if (target) {
         router.history.push(target)
@@ -119,9 +78,5 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [user, loggedIn, isLoading, handleLogin, handleLogout]
   )
 
-  return <AuthContextReact.Provider value={context}>{children}</AuthContextReact.Provider>
-}
-
-export function useAuthentication() {
-  return useContext(AuthContextReact)
+  return <AuthContext.Provider value={context}>{children}</AuthContext.Provider>
 }

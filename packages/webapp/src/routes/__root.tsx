@@ -1,8 +1,10 @@
+import { TransportProvider } from '@connectrpc/connect-query'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { AnyRouteMatch } from '@tanstack/react-router'
 import { Outlet, createRootRouteWithContext, useMatches } from '@tanstack/react-router'
 import { UIProvider } from 'uilibs/components/base/provider'
 import { ThemeProvider } from 'uilibs/theme'
+import { rpcTransport } from '#/libraries/api-client'
 import { CookiesProvider } from '#/libraries/cookies'
 import { AuthProvider } from '#/libraries/guard/auth-provider'
 import { GlobalNotFound, GlobalError } from './-boundaries'
@@ -33,12 +35,14 @@ function RootComponent() {
       <title>{pageTitle ? `${pageTitle} - React Application` : 'React Application'}</title>
       <UIProvider direction='ltr'>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ThemeProvider disableTransitionOnChange>
-              <Outlet />
-            </ThemeProvider>
-          </AuthProvider>
-          <DevTools queryClient={queryClient} />
+          <TransportProvider transport={rpcTransport}>
+            <AuthProvider>
+              <ThemeProvider disableTransitionOnChange>
+                <Outlet />
+              </ThemeProvider>
+            </AuthProvider>
+            <DevTools queryClient={queryClient} />
+          </TransportProvider>
         </QueryClientProvider>
       </UIProvider>
     </CookiesProvider>

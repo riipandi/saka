@@ -5,7 +5,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ThemeSwitcher } from 'uilibs/theme'
-import { useAuthentication } from '#/libraries/guard/auth-provider'
+import { useAuthentication } from '#/hooks/use-auth'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
 interface NavItem {

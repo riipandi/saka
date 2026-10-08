@@ -44,6 +44,12 @@ export interface AuthWorkerClient {
   session(): Promise<UserProfile | null>
   /** The unexpired Bearer token for request interceptors, or null when absent. */
   accessToken(): Promise<string | null>
+  /**
+   * The Bearer header for outgoing requests, refreshing proactively when the
+   * access token expires within the request margin. Resolves empty for an
+   * anonymous caller.
+   */
+  authorization(): Promise<Record<string, string>>
   /** Terminate the session server-side and clear the cookie. */
   logout(): Promise<void>
 }
@@ -58,6 +64,9 @@ let unsubscribeSync: (() => void) | null = null
  * empty (a pair restored before the listener reported it) or expired.
  */
 let cachedAccess: { token: string; expiresAt: number } | null = null
+
+/** Request-time margin ahead of expiry — past it, refresh before sending. */
+const REQUEST_REFRESH_MARGIN_MS = 30_000
 
 /**
  * The custody-change listener the engine reports to. A fresh pair rewrites
@@ -109,6 +118,18 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
       if (cachedAccess && Date.now() < cachedAccess.expiresAt)
         return Promise.resolve(cachedAccess.token)
       return engine.accessToken()
+    },
+    async authorization() {
+      // A fresh cached token answers without a worker round trip; near (or
+      // past) expiry the engine's single-flight refresh runs first.
+      if (cachedAccess && Date.now() < cachedAccess.expiresAt - REQUEST_REFRESH_MARGIN_MS) {
+        return { authorization: `Bearer ${cachedAccess.token}` }
+      }
+      await engine.maybeRefresh(REQUEST_REFRESH_MARGIN_MS)
+      const token = await engine.accessToken()
+      const headers: Record<string, string> = {}
+      if (token) headers.authorization = `Bearer ${token}`
+      return headers
     },
     async logout() {
       await engine.logout()

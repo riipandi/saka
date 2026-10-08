@@ -18,7 +18,7 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { GitHubIcon, GoogleIcon, ViteIcon } from 'uilibs/components/icons'
 import { z } from 'zod'
-import { useAuthentication } from '#/libraries/guard/auth-provider'
+import { useAuthentication } from '#/hooks/use-auth'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
 

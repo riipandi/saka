@@ -11,7 +11,7 @@ import { CardDescription, CardHeader, CardTitle } from 'uilibs/components/extra/
 import { Card, CardAction, CardContent } from 'uilibs/components/extra/card'
 import { Text } from 'uilibs/components/extra/text'
 import { ThemeSwitcher } from 'uilibs/theme'
-import { useAuthentication, useAuthUser } from '#/libraries/guard/auth-provider'
+import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/settings.stylex'
 
