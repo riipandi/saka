@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect, fn, userEvent, waitFor } from 'storybook/test'
 import { Button } from '#/components/base/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/components/base/field'
 import { Input } from '#/components/base/input'
-import { container } from '#/styles/core/tokens.stylex'
 import { Form } from './form.component'
 
 const meta = {

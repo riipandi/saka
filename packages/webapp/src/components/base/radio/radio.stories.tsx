@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { fontFamily, fontSize, radius, stroke } from 'components/styles/core/tokens.stylex'
 import { expect, fn, userEvent } from 'storybook/test'
 import {
   Field,
@@ -9,8 +11,6 @@ import {
   FieldLabel,
   FieldTitle
 } from '#/components/base/field'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontFamily, fontSize, radius, stroke } from '#/styles/core/tokens.stylex'
 import { RadioGroup, RadioGroupItem } from './radio.component'
 
 const meta = {

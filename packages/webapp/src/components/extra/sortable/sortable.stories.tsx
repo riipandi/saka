@@ -2,6 +2,21 @@ import { Image, MusicNote, Film } from '@keyline-icons/react'
 import { ChevronRight, FileText, GripVertical } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import {
+  stroke,
+  unit,
+  duration,
+  easing,
+  radius,
+  zIndex
+} from 'components/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontSize,
+  fontLineHeight,
+  fontWeight
+} from 'components/styles/core/tokens.stylex'
 import { useState } from 'react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#/components/base/collapsible'
 import { Switch } from '#/components/base/switch'
@@ -10,9 +25,6 @@ import { Badge } from '#/components/extra/badge'
 import { Card, CardDescription, CardHeader, CardTitle } from '#/components/extra/card'
 import { Sortable, SortableItem, SortableItemHandle } from '#/components/extra/sortable'
 import type { SortableCommitMeta } from '#/components/extra/sortable'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { stroke, unit, duration, easing, radius, zIndex } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize, fontLineHeight, fontWeight } from '#/styles/core/tokens.stylex'
 
 const meta = {
   title: 'Extra Components/Sortable',

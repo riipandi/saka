@@ -3,10 +3,10 @@ import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { useTable } from '@tanstack/react-table'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
+import { unit } from 'components/styles/core/tokens.stylex'
 import { useMemo, useState } from 'react'
 import { Badge } from '#/components/extra/badge'
 import { Card, CardContent } from '#/components/extra/card'
-import { unit } from '#/styles/core/tokens.stylex'
 import {
   DataGrid,
   DataGridContainer,

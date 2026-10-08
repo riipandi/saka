@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { fontFamily, fontSize } from '#/styles/core/tokens.stylex'
-import { unit } from '#/styles/core/tokens.stylex'
+import { fontFamily, fontSize } from 'components/styles/core/tokens.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
 
 export const paginationStyles = stylex.create({
   nav: {

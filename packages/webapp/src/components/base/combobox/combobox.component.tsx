@@ -30,10 +30,10 @@ import {
   Combobox as BaseComboboxNamespace
 } from '@base-ui/react/combobox'
 import * as stylex from '@stylexjs/stylex'
+import { shadow } from 'components/styles/core/colors.stylex'
+import { popupFx } from 'components/styles/core/popup.stylex'
+import { ring } from 'components/styles/core/utils.stylex'
 import * as React from 'react'
-import { shadow } from '#/styles/core/colors.stylex'
-import { popupFx } from '#/styles/core/popup.stylex'
-import { ring } from '#/styles/core/utils.stylex'
 import { comboboxStyles as s } from './combobox.stylex'
 
 interface StyleProp {

@@ -2,11 +2,11 @@ import { Copy, Search } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent } from 'storybook/test'
 import { Field } from '#/components/base/field'
 import { Kbd } from '#/components/extra/kbd'
 import { Spinner } from '#/components/extra/spinner'
-import { container } from '#/styles/core/tokens.stylex'
 import {
   InputGroup,
   InputGroupAddon,

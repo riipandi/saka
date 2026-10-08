@@ -1,7 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { unit } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
 
 export const fieldStyles = stylex.create({
   set: {

@@ -1,6 +1,14 @@
 import { GripVertical } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import { radius, stroke, unit } from 'components/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontSize,
+  fontLineHeight,
+  fontWeight
+} from 'components/styles/core/tokens.stylex'
 import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/base/avatar'
 import { Button } from '#/components/base/button'
@@ -10,9 +18,6 @@ import { toast } from '#/components/base/toast'
 import { Badge } from '#/components/extra/badge'
 import { Kanban, KanbanBoard, KanbanItem, KanbanOverlay } from '#/components/extra/kanban'
 import { KanbanColumn, KanbanColumnContent, KanbanColumnHandle } from '#/components/extra/kanban'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { radius, stroke, unit } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize, fontLineHeight, fontWeight } from '#/styles/core/tokens.stylex'
 
 const meta = {
   title: 'Extra Components/Kanban',

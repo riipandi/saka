@@ -1,8 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { stroke, container } from '#/styles/core/tokens.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { stroke, container } from 'components/styles/core/tokens.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
 
 export const emptyStyles = stylex.create({
   root: {

@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
 import {
   container,
   fontFamily,
@@ -8,7 +8,7 @@ import {
   radius,
   stroke,
   unit
-} from '#/styles/core/tokens.stylex'
+} from 'components/styles/core/tokens.stylex'
 
 // Tooltip follows the repo's elevated non-inverted card language (same
 // surface as toast: overlay elevation + thin dimmed border, radius.medium).

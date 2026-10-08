@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { fontSize, radius } from 'components/styles/core/tokens.stylex'
 import * as React from 'react'
 import { expect, userEvent } from 'storybook/test'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontSize, radius } from '#/styles/core/tokens.stylex'
 import { OTPField, OTPFieldGroup, OTPFieldSeparator, OTPFieldSlot } from './otp-field.component'
 
 const meta = {

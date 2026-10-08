@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { unit } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize } from '#/styles/core/tokens.stylex'
-import { duration } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
+import { fontFamily, fontSize } from 'components/styles/core/tokens.stylex'
+import { duration } from 'components/styles/core/tokens.stylex'
 
 export const breadcrumbStyles = stylex.create({
   list: {

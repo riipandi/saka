@@ -1,8 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { stroke } from '#/styles/core/tokens.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { stroke } from 'components/styles/core/tokens.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
 
 // `--card-spacing` lets `size` retune the paddings owned by the sections
 // below without prop-drilling: `sizes.sm` sets it, every section's own

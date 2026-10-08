@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, duration, stroke } from 'components/styles/core/tokens.stylex'
 import { expect } from 'storybook/test'
 import { Badge } from '#/components/extra/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#/components/extra/card'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, duration, stroke } from '#/styles/core/tokens.stylex'
 import { DescriptionDetails, DescriptionList, DescriptionTerm } from './description-list.component'
 
 const meta = {

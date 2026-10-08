@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { barY, crosshair, defineChart, lineY, ruleY } from '@tanstack/charts'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { portal } from '@tanstack/charts/tooltip/portal'
+import { colors } from 'components/styles/core/colors.stylex'
 import { expect } from 'storybook/test'
-import { colors } from '#/styles/core/colors.stylex'
 import { Chart, ChartContainer, ChartLegend } from '../chart.component'
 import {
   barHoverStates,

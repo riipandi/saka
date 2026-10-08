@@ -1,6 +1,8 @@
 import { useDirection } from '@base-ui/react/direction-provider'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { stroke, unit } from 'components/styles/core/tokens.stylex'
 import { addDays, format } from 'date-fns'
 import * as React from 'react'
 import type { DayButton } from 'react-day-picker'
@@ -15,8 +17,6 @@ import {
 } from '#/components/base/popover/popover.component'
 import { Card, CardContent, CardFooter } from '#/components/extra/card/card.component'
 import { InputGroup, InputGroupInput } from '#/components/extra/input-group'
-import { colors } from '#/styles/core/colors.stylex'
-import { stroke, unit } from '#/styles/core/tokens.stylex'
 import { Calendar } from './calendar.component'
 import { calendarStyles } from './calendar.stylex'
 

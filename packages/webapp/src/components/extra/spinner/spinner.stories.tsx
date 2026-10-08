@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
 import { expect } from 'storybook/test'
 import { Button } from '#/components/base/button'
 import { Badge } from '#/components/extra/badge'
-import { colors } from '#/styles/core/colors.stylex'
 import { Spinner } from './spinner.component'
 
 const meta = {

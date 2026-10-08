@@ -12,8 +12,8 @@ import type { ChartBarStateStyle, ChartMarkState, ChartMotionDefinition } from '
 import { stagger } from '@tanstack/charts/motion'
 import { scaleBand } from '@tanstack/charts/scales/band'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
-import { colors } from '#/styles/core/colors.stylex'
-import { breakpoints, container, unit } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { breakpoints, container, unit } from 'components/styles/core/tokens.stylex'
 import type { ChartConfig } from './chart.component'
 
 // ---------------------------------------------------------------------------

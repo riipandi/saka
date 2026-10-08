@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { stroke } from '#/styles/core/tokens.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
+import { stroke } from 'components/styles/core/tokens.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
 
 export const toggleGroupStyles = stylex.create({
   root: {

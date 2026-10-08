@@ -2,8 +2,8 @@ import { Bell as BellIcon, User } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent } from 'storybook/test'
-import { container } from '#/styles/core/tokens.stylex'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs.component'
 
 const meta = {

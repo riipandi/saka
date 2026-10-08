@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
 import {
   duration,
   fontFamily,
@@ -9,7 +9,7 @@ import {
   radius,
   stroke,
   unit
-} from '#/styles/core/tokens.stylex'
+} from 'components/styles/core/tokens.stylex'
 
 /**
  * The data-grid table renderer chrome. State-driven styles are applied as

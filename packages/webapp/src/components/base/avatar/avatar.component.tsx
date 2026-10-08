@@ -12,10 +12,10 @@
 
 import { Avatar as BaseAvatar } from '@base-ui/react/avatar'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { stroke } from 'components/styles/core/tokens.stylex'
+import { ring } from 'components/styles/core/utils.stylex'
 import * as React from 'react'
-import { colors } from '#/styles/core/colors.stylex'
-import { stroke } from '#/styles/core/tokens.stylex'
-import { ring } from '#/styles/core/utils.stylex'
 import { avatarStyles as s, avatarSizes as sizes } from './avatar.stylex'
 
 export type AvatarSize = 'sm' | 'md' | 'lg'

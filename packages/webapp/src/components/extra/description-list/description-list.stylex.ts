@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { container } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { stroke, unit } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container } from 'components/styles/core/tokens.stylex'
+import { fontFamily, fontSize, fontLineHeight } from 'components/styles/core/tokens.stylex'
+import { stroke, unit } from 'components/styles/core/tokens.stylex'
 
 /**
  * Key-value rows with hairline separators.

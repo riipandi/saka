@@ -12,12 +12,12 @@ import type {
   RowSelectionState,
   SortingState
 } from '@tanstack/react-table'
+import { unit } from 'components/styles/core/tokens.stylex'
 import { Fragment, useMemo, useState } from 'react'
 import { Avatar, AvatarFallback } from '#/components/base/avatar'
 import { Button } from '#/components/base/button'
 import { Badge } from '#/components/extra/badge'
 import { Card, CardContent, CardFooter, CardHeader } from '#/components/extra/card'
-import { unit } from '#/styles/core/tokens.stylex'
 import {
   DataGrid,
   DataGridColumnHeader,

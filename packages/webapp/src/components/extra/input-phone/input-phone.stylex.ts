@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, duration, radius, stroke, unit } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontLineHeight, fontSize } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, duration, radius, stroke, unit } from 'components/styles/core/tokens.stylex'
+import { fontFamily, fontLineHeight, fontSize } from 'components/styles/core/tokens.stylex'
 
 export const inputPhoneStyles = stylex.create({
   root: {

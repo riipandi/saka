@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, fontFamily, fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
 import * as React from 'react'
 import { expect } from 'storybook/test'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, fontFamily, fontSize, fontWeight } from '#/styles/core/tokens.stylex'
 import { Separator } from './separator.component'
 
 const meta = {

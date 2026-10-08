@@ -20,8 +20,8 @@
 
 import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip'
 import * as stylex from '@stylexjs/stylex'
+import { popupFx } from 'components/styles/core/popup.stylex'
 import * as React from 'react'
-import { popupFx } from '#/styles/core/popup.stylex'
 import { tooltipStyles as s } from './tooltip.stylex'
 
 // Instant tooltips by default (Base UI's own default is 600ms).

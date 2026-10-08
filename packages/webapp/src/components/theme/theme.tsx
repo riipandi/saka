@@ -1,5 +1,5 @@
+import { darkThemeClass } from 'components/styles/core/themes'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { darkThemeClass } from '#/styles/core/themes'
 import { ThemeScript } from './theme-script'
 import { getStorageAdapter } from './theme-storage'
 import { disableAnimation, getSystemTheme, handleAttribute, isServer, MEDIA } from './theme-utils'

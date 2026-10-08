@@ -1,10 +1,10 @@
 import { Mic } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
 import * as React from 'react'
 import { expect, fn, userEvent } from 'storybook/test'
 import { Button } from '#/components/base/button'
-import { colors } from '#/styles/core/colors.stylex'
 import { FileUpload, FileUploadTrigger } from './file-upload.component'
 
 const meta = {

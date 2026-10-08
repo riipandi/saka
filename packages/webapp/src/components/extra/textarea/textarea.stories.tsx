@@ -1,12 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, unit } from 'components/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontSize,
+  fontLineHeight,
+  fontWeight
+} from 'components/styles/core/tokens.stylex'
 import * as React from 'react'
 import { expect, userEvent } from 'storybook/test'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/components/base/field'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, unit } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize, fontLineHeight, fontWeight } from '#/styles/core/tokens.stylex'
 import { Textarea } from './textarea.component'
 
 const meta = {

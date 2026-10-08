@@ -21,9 +21,9 @@
 
 import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import * as stylex from '@stylexjs/stylex'
+import { shadow } from 'components/styles/core/colors.stylex'
+import { ring } from 'components/styles/core/utils.stylex'
 import * as React from 'react'
-import { shadow } from '#/styles/core/colors.stylex'
-import { ring } from '#/styles/core/utils.stylex'
 import { dialogStyles as s } from './dialog.stylex'
 
 interface StyleXStyleProps {

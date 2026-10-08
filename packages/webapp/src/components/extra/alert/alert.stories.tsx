@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect } from 'storybook/test'
 import { Button } from '#/components/base/button'
-import { container } from '#/styles/core/tokens.stylex'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from './alert.component'
 
 const meta = {

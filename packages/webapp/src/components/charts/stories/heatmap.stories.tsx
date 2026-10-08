@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { breakpoints, fontSize, fontWeight, unit } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { Tooltip, TooltipContent, TooltipTrigger } from '#/components/base/tooltip'
-import { colors } from '#/styles/core/colors.stylex'
-import { breakpoints, fontSize, fontWeight, unit } from '#/styles/core/tokens.stylex'
 import {
   canvasDecorator,
   readingDays,

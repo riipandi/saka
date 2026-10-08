@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/base/avatar'
 import { Button } from '#/components/base/button'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontSize, fontWeight } from '#/styles/core/tokens.stylex'
 import { PreviewCard, PreviewCardContent, PreviewCardTrigger } from './preview-card.component'
 
 const meta = {

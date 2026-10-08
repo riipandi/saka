@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
-import * as React from 'react'
-import { expect } from 'storybook/test'
-import { Separator } from '#/components/base/separator'
-import { colors } from '#/styles/core/colors.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
 import {
   container,
   fontFamily,
@@ -12,7 +9,10 @@ import {
   fontWeight,
   radius,
   stroke
-} from '#/styles/core/tokens.stylex'
+} from 'components/styles/core/tokens.stylex'
+import * as React from 'react'
+import { expect } from 'storybook/test'
+import { Separator } from '#/components/base/separator'
 import { ScrollArea, ScrollBar } from './scroll-area.component'
 
 const meta = {

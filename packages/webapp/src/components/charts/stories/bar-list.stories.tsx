@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, fontLineHeight, radius, unit } from 'components/styles/core/tokens.stylex'
 import { expect } from 'storybook/test'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, fontLineHeight, radius, unit } from '#/styles/core/tokens.stylex'
 import { canvasDecorator, hpBooks } from '../chart.samples'
 
 const meta = {

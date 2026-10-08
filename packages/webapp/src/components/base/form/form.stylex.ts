@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { fontFamily } from '#/styles/core/tokens.stylex'
-import { unit } from '#/styles/core/tokens.stylex'
+import { fontFamily } from 'components/styles/core/tokens.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
 
 export const formStyles = stylex.create({
   root: {

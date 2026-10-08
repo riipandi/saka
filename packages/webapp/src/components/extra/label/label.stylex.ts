@@ -1,6 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { unit } from '#/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
 
 export const labelStyles = stylex.create({
   root: {

@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { stroke } from '#/styles/core/tokens.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
-import { duration, easing } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { stroke } from 'components/styles/core/tokens.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
+import { duration, easing } from 'components/styles/core/tokens.stylex'
 
 export const switchStyles = stylex.create({
   root: {

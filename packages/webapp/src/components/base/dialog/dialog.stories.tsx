@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container, fontSize, unit } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { Button } from '#/components/base/button'
 import { Input } from '#/components/base/input'
-import { container, fontSize, unit } from '#/styles/core/tokens.stylex'
 import {
   Dialog,
   DialogClose,

@@ -2,12 +2,12 @@ import { ChevronRight, File as FileIcon, Folder as FolderIcon } from '@keyline-i
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { fontFamily, fontSize, stroke, unit, container } from 'components/styles/core/tokens.stylex'
+import { fontWeight, radius } from 'components/styles/core/tokens.stylex'
 import * as React from 'react'
 import { expect, userEvent } from 'storybook/test'
 import { Button } from '#/components/base/button'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontFamily, fontSize, stroke, unit, container } from '#/styles/core/tokens.stylex'
-import { fontWeight, radius } from '#/styles/core/tokens.stylex'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './collapsible.component'
 
 const meta = {

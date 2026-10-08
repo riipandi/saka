@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { stroke, container } from '#/styles/core/tokens.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontWeight, fontSize } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { stroke, container } from 'components/styles/core/tokens.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
+import { fontFamily, fontWeight, fontSize } from 'components/styles/core/tokens.stylex'
 
 export const contextMenuStyles = stylex.create({
   trigger: {

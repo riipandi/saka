@@ -1,9 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { stroke, container } from '#/styles/core/tokens.stylex'
-import { unit, radius, zIndex } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { duration, easing } from '#/styles/core/tokens.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import { stroke, container } from 'components/styles/core/tokens.stylex'
+import { unit, radius, zIndex } from 'components/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { duration, easing } from 'components/styles/core/tokens.stylex'
 
 export const sheetStyles = stylex.create({
   overlay: {

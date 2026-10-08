@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { duration, easing, radius, unit, zIndex } from '#/styles/core/tokens.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import { duration, easing, radius, unit, zIndex } from 'components/styles/core/tokens.stylex'
 
 /**
  * Styles for the Sortable primitive set (dnd-kit based).

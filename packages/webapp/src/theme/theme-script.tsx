@@ -1,6 +1,6 @@
 import { ScriptOnce } from '@tanstack/react-router'
+import { darkThemeClass } from 'components/styles/core/themes'
 import { memo } from 'react'
-import { darkThemeClass } from '#/styles/core/themes'
 import { isBuiltInStorage } from './theme-storage'
 import type { ThemeProviderProps } from './types'
 

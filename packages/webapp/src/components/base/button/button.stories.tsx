@@ -2,9 +2,9 @@ import { Plus } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { radius } from 'components/styles/core/tokens.stylex'
 import { expect, fn, userEvent } from 'storybook/test'
 import { Spinner } from '#/components/extra/spinner'
-import { radius } from '#/styles/core/tokens.stylex'
 import { Button } from './button.component'
 
 const meta = {

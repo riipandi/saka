@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { container, radius, stroke, unit } from 'components/styles/core/tokens.stylex'
+import { fontLineHeight, fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
 import * as React from 'react'
 import type { GroupImperativeHandle } from 'react-resizable-panels'
 import { expect, userEvent, waitFor } from 'storybook/test'
 import { Button } from '#/components/base/button'
-import { colors } from '#/styles/core/colors.stylex'
-import { container, radius, stroke, unit } from '#/styles/core/tokens.stylex'
-import { fontLineHeight, fontSize, fontWeight } from '#/styles/core/tokens.stylex'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './resizable.component'
 
 const meta = {

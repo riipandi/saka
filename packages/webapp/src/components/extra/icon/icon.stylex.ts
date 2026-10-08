@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { duration, easing } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { duration, easing } from 'components/styles/core/tokens.stylex'
 
 /**
  * Icon styles — ported from Reshaped's Icon utility

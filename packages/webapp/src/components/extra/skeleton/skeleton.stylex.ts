@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { radius } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { radius } from 'components/styles/core/tokens.stylex'
 
 export const skeletonPulse = stylex.keyframes({
   '0%': { opacity: 1 },

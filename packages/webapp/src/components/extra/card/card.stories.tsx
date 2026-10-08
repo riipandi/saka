@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect, userEvent } from 'storybook/test'
 import { Button } from '#/components/base/button'
 import { Input } from '#/components/base/input'
-import { container } from '#/styles/core/tokens.stylex'
 import {
   Card,
   CardAction,

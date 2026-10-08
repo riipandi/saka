@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { unit } from '#/styles/core/tokens.stylex'
+import { unit } from 'components/styles/core/tokens.stylex'
 
-// Mirror of `breakpoints` from `#/styles/core/tokens.stylex` (medium/large/
+// Mirror of `breakpoints` from `components/styles/core/tokens.stylex` (medium/large/
 // xlarge). @stylexjs/babel-plugin 0.19 only inlines `defineConsts` media keys
 // declared in the SAME file, so these cannot be imported cross-file yet —
 // keep the values in sync.

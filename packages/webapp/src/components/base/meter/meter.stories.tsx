@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { container } from 'components/styles/core/tokens.stylex'
 import { expect } from 'storybook/test'
-import { container } from '#/styles/core/tokens.stylex'
 import { Meter, MeterLabel, MeterValue } from './meter.component'
 
 const meta = {

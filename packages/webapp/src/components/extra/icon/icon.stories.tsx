@@ -2,8 +2,8 @@ import { Activity, Zap } from '@keyline-icons/react'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
+import { colors } from 'components/styles/core/colors.stylex'
 import { expect } from 'storybook/test'
-import { colors } from '#/styles/core/colors.stylex'
 import { Icon } from './icon.component'
 
 const meta = {

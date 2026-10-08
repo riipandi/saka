@@ -1,6 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { duration, easing, radius, stroke, unit, zIndex } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import {
+  duration,
+  easing,
+  radius,
+  stroke,
+  unit,
+  zIndex
+} from 'components/styles/core/tokens.stylex'
 
 /**
  * Naming follows the group's `orientation` prop (the panel flow direction).

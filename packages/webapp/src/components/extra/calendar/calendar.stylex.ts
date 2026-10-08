@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { radius, unit, stroke } from '#/styles/core/tokens.stylex'
-import { fontLineHeight, fontSize, fontWeight } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { radius, unit, stroke } from 'components/styles/core/tokens.stylex'
+import { fontLineHeight, fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
 
 export const calendarConsts = stylex.defineConsts({
   cellSize: '2rem'

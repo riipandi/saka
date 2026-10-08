@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { radius } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { radius } from 'components/styles/core/tokens.stylex'
 import { useTheme } from './theme'
 
 const cycle: Record<string, string> = { light: 'dark', dark: 'system', system: 'light' }

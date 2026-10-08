@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
 import {
   unit,
   radius,
@@ -8,7 +8,7 @@ import {
   stroke,
   fontSize,
   fontFamily
-} from '#/styles/core/tokens.stylex'
+} from 'components/styles/core/tokens.stylex'
 
 /**
  * Port of the Reshaped FileUpload: a form field for handling file

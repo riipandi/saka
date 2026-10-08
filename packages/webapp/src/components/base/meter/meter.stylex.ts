@@ -1,8 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { unit, radius } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontWeight, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
-import { duration, easing } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { unit, radius } from 'components/styles/core/tokens.stylex'
+import {
+  fontFamily,
+  fontWeight,
+  fontSize,
+  fontLineHeight
+} from 'components/styles/core/tokens.stylex'
+import { duration, easing } from 'components/styles/core/tokens.stylex'
 
 // Kept in sync with ../progress/progress.stylex.ts — intentional duplication
 // so both components stay independently styled but visually identical.

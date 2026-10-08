@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from '#/styles/core/colors.stylex'
-import { easing, stroke, unit, zIndex } from '#/styles/core/tokens.stylex'
-import { container, duration, radius } from '#/styles/core/tokens.stylex'
-import { fontFamily, fontSize, fontLineHeight } from '#/styles/core/tokens.stylex'
+import { colors, shadow } from 'components/styles/core/colors.stylex'
+import { easing, stroke, unit, zIndex } from 'components/styles/core/tokens.stylex'
+import { container, duration, radius } from 'components/styles/core/tokens.stylex'
+import { fontFamily, fontSize, fontLineHeight } from 'components/styles/core/tokens.stylex'
 
 /**
  * Styles for the Kanban primitive set (dnd-kit based).

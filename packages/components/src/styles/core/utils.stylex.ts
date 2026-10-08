@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { stroke } from '#/styles/core/tokens.stylex'
+import { colors } from './colors.stylex'
+import { stroke } from './tokens.stylex'
 
 /**
  * `ring` — the Tailwind `ring-*` equivalent, defined once as a StyleX dynamic

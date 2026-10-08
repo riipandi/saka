@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from '#/styles/core/colors.stylex'
-import { fontSize, fontWeight } from '#/styles/core/tokens.stylex'
-import { radius, unit, duration } from '#/styles/core/tokens.stylex'
+import { colors } from 'components/styles/core/colors.stylex'
+import { fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
+import { radius, unit, duration } from 'components/styles/core/tokens.stylex'
 
-// Mirrors `breakpoints.small` from `#/styles/core/tokens.stylex` (659px cap).
+// Mirrors `breakpoints.small` from `components/styles/core/tokens.stylex` (659px cap).
 // @stylexjs/babel-plugin only inlines `defineConsts` media keys declared in
 // the SAME file (and bound to a named export), so these cannot be imported
 // cross-file — keep values in sync.

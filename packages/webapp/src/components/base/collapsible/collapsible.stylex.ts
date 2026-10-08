@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { duration, easing } from '#/styles/core/tokens.stylex'
+import { duration, easing } from 'components/styles/core/tokens.stylex'
 
 export const collapsibleStyles = stylex.create({
   // Height transition through Base UI's measured --collapsible-panel-height;
