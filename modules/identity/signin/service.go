@@ -296,7 +296,7 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	var result Result
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		var issueErr error
-		result, issueErr = s.IssueSession(ctx, tx, account, ProviderPassword, audit.EventSignIn, SessionParams{
+		result, issueErr = s.IssueSession(ctx, tx, account, ProviderCredential, audit.EventSignIn, SessionParams{
 			UserAgent:   params.UserAgent,
 			IPAddress:   params.IPAddress,
 			Fingerprint: params.Fingerprint,
@@ -314,7 +314,7 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 			Status: fwaudit.StatusSuccess,
 			UserID: account.ID.String(),
 			Payload: map[string]string{
-				"provider": ProviderPassword,
+				"provider": ProviderCredential,
 			},
 		})
 	}

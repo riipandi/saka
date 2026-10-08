@@ -27,7 +27,7 @@ export const signInJson = { ...tokenJson, user: userJson, status: 'success' }
 
 /** The `SessionService/GetSession` answer — the session the access token names. */
 export const getSessionJson = {
-  session: { id: tokenJson.sessionId, provider: 'password' },
+  session: { id: tokenJson.sessionId, provider: 'credential' },
   user: userJson,
   status: 'success',
   message: 'session restored'

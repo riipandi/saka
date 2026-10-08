@@ -229,7 +229,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	assert.Equal(t, hex.EncodeToString(sum[:]), tokenHash, "the row must hold the hash, not the token")
 	assert.Equal(t, "signin_test/1", userAgent)
 	assert.False(t, remember)
-	assert.Equal(t, ProviderPassword, provider)
+	assert.Equal(t, ProviderCredential, provider)
 	require.NotNil(t, ipAddress)
 	assert.Equal(t, "192.0.2.10", *ipAddress)
 	assert.Equal(t, sid.UUID(), rowID)
@@ -513,7 +513,7 @@ func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
 	issue := func(service *Service) error {
 		account, err := service.repo.FindAccountByIdentity(ctx, "hermione@example.com")
 		require.NoError(t, err)
-		_, err = service.IssueSession(ctx, pool, account, ProviderPassword, audit.EventSignIn, SessionParams{})
+		_, err = service.IssueSession(ctx, pool, account, ProviderCredential, audit.EventSignIn, SessionParams{})
 		return err
 	}
 

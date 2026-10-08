@@ -8,9 +8,9 @@ import (
 	"go.jetify.com/typeid"
 )
 
-// ProviderPassword is the `provider` value a session row carries when the
+// ProviderCredential is the `provider` value a session row carries when the
 // credential that created it was the account's password.
-const ProviderPassword = "password"
+const ProviderCredential = "credential"
 
 // ProviderOneTimeAccess is the `provider` value a session row carries when a
 // one-time access code created it. The values this column takes are the
