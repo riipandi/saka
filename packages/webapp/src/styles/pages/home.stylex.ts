@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, shadow } from 'components/styles/core/colors.stylex'
-import { fontFamily, fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
-import { unit, radius, duration, easing } from 'components/styles/core/tokens.stylex'
+import { colors, shadow } from 'uilibs/styles/colors.stylex'
+import { fontFamily, fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
+import { unit, radius, duration, easing } from 'uilibs/styles/tokens.stylex'
 
 // Mirror of `breakpoints` from `components/styles/core/tokens.stylex` (medium/large/xlarge).
 // @stylexjs/babel-plugin 0.19 only inlines `defineConsts` media keys declared in

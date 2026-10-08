@@ -37,6 +37,7 @@ export default defineConfig({
         : [['default'], ['json', { outputFile: testOutputFile }]],
     projects: [
       './packages/webapp/vite.config.ts',
+      './packages/uilibs/vite.config.ts',
       './packages/plugins/vite.config.ts',
       './packages/email/vite.config.ts'
     ]
@@ -135,7 +136,8 @@ export default defineConfig({
     cache: { tasks: true },
     tasks: {
       typecheck:
-        'pnpm exec tsc -p packages/webapp --noEmit && pnpm exec tsc -p packages/plugins --noEmit && ' +
+        'pnpm exec tsc -p packages/webapp --noEmit && pnpm exec tsc -p packages/uilibs --noEmit && ' +
+        'pnpm exec tsc -p packages/plugins --noEmit && ' +
         'pnpm exec tsc -p packages/email --noEmit && pnpm exec tsc -p packages/e2e-tests --noEmit && ' +
         'pnpm exec tsc -p . --noEmit'
     }

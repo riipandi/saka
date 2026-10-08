@@ -25,7 +25,7 @@ vi.mock('@stylexjs/atoms', () => {
 // Theme renders <ScriptOnce> from @tanstack/react-router, which calls
 // useRouter() returning null in test env (no RouterProvider context at that
 // render point). Mock themer as a passthrough — tests don't need theme logic.
-vi.mock('#/components/theme', () => ({
+vi.mock('uilibs/theme', () => ({
   ThemeProvider: ({ children }: { children: ReactNode }) => children,
   ThemeSwitcher: () => null,
   useTheme: () => ({

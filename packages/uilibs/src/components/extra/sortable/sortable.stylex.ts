@@ -1,0 +1,111 @@
+import * as stylex from '@stylexjs/stylex'
+import { colors, shadow } from '../../../styles/colors.stylex'
+import { duration, easing, radius, unit, zIndex } from '../../../styles/tokens.stylex'
+
+/**
+ * Styles for the Sortable primitive set (dnd-kit based).
+ *
+ * Layout of the list/grid itself stays a caller concern (pass a `style` prop
+ * to `Sortable`); these styles cover drag states, the drag overlay, and the
+ * default handle affordance.
+ */
+export const sortableStyles = stylex.create({
+  root: {
+    touchAction: 'manipulation'
+  },
+  rootDragging: {
+    cursor: 'grabbing',
+    userSelect: 'none'
+  },
+  item: {
+    position: 'relative',
+    touchAction: 'manipulation',
+    transitionDuration: duration.medium,
+    transitionProperty: 'opacity, transform, background-color, border-color, box-shadow',
+    transitionTimingFunction: easing.decelerate
+  },
+  itemFaded: {
+    opacity: {
+      default: 1,
+      [stylex.when.ancestor('[data-dragging="true"]')]: 0.4
+    }
+  },
+  itemDragging: {
+    opacity: 1,
+    zIndex: zIndex.absolute
+  },
+  itemOver: {
+    backgroundColor: colors.backgroundPrimaryFaded,
+    borderColor: colors.borderPrimary
+  },
+  itemDisabled: {
+    opacity: 0.5
+  },
+  handle: {
+    alignItems: 'center',
+    borderRadius: radius.small,
+    color: {
+      default: colors.foregroundNeutral,
+      ':hover': colors.foregroundPrimary,
+      ':active': colors.foregroundPrimary
+    },
+    cursor: {
+      default: 'grab',
+      ':active': 'grabbing'
+    },
+    display: 'flex',
+    flexShrink: 0,
+    height: unit.x6,
+    justifyContent: 'center',
+    opacity: {
+      default: 0.8,
+      ':hover': 1,
+      ':active': 1,
+      '@media (pointer: coarse)': 1
+    },
+    outline: 'none',
+    touchAction: 'none',
+    transitionDuration: duration.medium,
+    transitionProperty: 'color, opacity',
+    transitionTimingFunction: easing.decelerate,
+    width: unit.x6
+  },
+  handleDragging: {
+    color: colors.foregroundPrimary,
+    cursor: 'grabbing',
+    opacity: 1
+  },
+  handleHiddenDuringDrag: {
+    opacity: {
+      default: 0,
+      ':hover': 0,
+      ':focus-visible': 0,
+      ':active': 0,
+      '@media (pointer: coarse)': 0
+    }
+  },
+  handleDisabled: {
+    color: colors.foregroundDisabled,
+    cursor: 'not-allowed',
+    opacity: 0.5
+  },
+  overlayContent: {
+    boxShadow: shadow.raised,
+    cursor: 'grabbing',
+    opacity: 0.85,
+    minWidth: 0,
+    pointerEvents: 'none'
+  },
+  overlayContentAuto: {
+    width: 'fit-content'
+  }
+})
+
+/**
+ * The drag overlay must match the slot the item was dragged out of, which is
+ * only known at runtime — stylex's dynamic style keeps the width compile-safe
+ * without a raw style bag.
+ */
+export const overlayWidthStyle = stylex.create({
+  width: (px: number) => ({ width: `${px}px` })
+})

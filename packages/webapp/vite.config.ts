@@ -1,4 +1,3 @@
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin'
 import stylex from '@stylexjs/unplugin/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
@@ -61,12 +60,6 @@ function vitestStylexCleanup(): Plugin {
     closeWatcher: closeHttpServer
   }
 }
-
-// The Storybook vitest project's plugin; awaited once — the config factory
-// re-runs on every mode change.
-const storybookProject = await storybookTest({
-  configDir: resolve(import.meta.dirname, '.storybook')
-})
 
 /**
  * The app's one vite pipeline: `vp build` compiles the SPA into the Go
@@ -133,9 +126,6 @@ export default defineConfig(({ mode }) => ({
   envPrefix: ['VITE_', 'PUBLIC_'],
   root: resolve(import.meta.dirname),
   publicDir: resolve(import.meta.dirname, 'public'),
-  // Vitest projects ported from the vite-react-template: happy-dom unit
-  // tests, real-browser component tests, and the Storybook project. E2E
-  // lives in packages/e2e-tests — nothing here duplicates it.
   test: {
     projects: [
       {
@@ -166,22 +156,6 @@ export default defineConfig(({ mode }) => ({
           include: ['./**/*.browser.{test,spec}.{ts,tsx}'],
           exclude: ['**/node_modules/**'],
           globals: true
-        }
-      },
-      {
-        // The .storybook/main.ts viteFinal owns this project's plugins,
-        // so it does not extend the app pipeline.
-        extends: false,
-        plugins: [storybookProject],
-        test: {
-          name: 'storybook',
-          exclude: ['./**/*.{test,spec}.{ts,tsx}', '**/node_modules/**'],
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: playwright(),
-            instances: [{ browser: 'chromium' }]
-          }
         }
       }
     ]

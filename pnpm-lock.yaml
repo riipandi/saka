@@ -215,73 +215,6 @@ importers:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2)
 
-  packages/components:
-    dependencies:
-      '@base-ui/react':
-        specifier: ^1.8.0
-        version: 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@dnd-kit/core':
-        specifier: ^6.3.1
-        version: 6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@dnd-kit/modifiers':
-        specifier: ^9.0.0
-        version: 9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
-      '@dnd-kit/sortable':
-        specifier: ^10.0.0
-        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
-      '@dnd-kit/utilities':
-        specifier: ^3.2.2
-        version: 3.2.2(react@19.3.0)
-      '@keyline-icons/react':
-        specifier: ^1.7.0
-        version: 1.7.0(react@19.3.0)
-      '@stylexjs/atoms':
-        specifier: ^0.19.1
-        version: 0.19.1(@stylexjs/stylex@0.19.1)
-      '@stylexjs/stylex':
-        specifier: ^0.19.1
-        version: 0.19.1
-      '@tanstack/charts':
-        specifier: ^1.0.0
-        version: 1.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.16)
-      '@tanstack/react-hotkeys':
-        specifier: ^0.13.0
-        version: 0.13.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-table':
-        specifier: ^9.2.6
-        version: 9.2.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-virtual':
-        specifier: ^3.14.13
-        version: 3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      country-flag-icons:
-        specifier: ^1.6.20
-        version: 1.6.20
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-day-picker:
-        specifier: ^10.0.2
-        version: 10.0.2(@types/react@19.3.0)(react@19.3.0)
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      react-phone-number-input:
-        specifier: ^3.4.18
-        version: 3.4.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      react-resizable-panels:
-        specifier: ^4.14.2
-        version: 4.14.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.3.0
-        version: 19.3.0(@types/react@19.3.0)
-
   packages/e2e-tests:
     devDependencies:
       '@playwright/test':
@@ -331,23 +264,11 @@ importers:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2)
 
-  packages/webapp:
+  packages/uilibs:
     dependencies:
       '@base-ui/react':
         specifier: ^1.8.0
         version: 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@blobatar/react':
-        specifier: ^2.7.0
-        version: 2.7.0(blobatar@2.7.0(react@19.3.0))(react@19.3.0)
-      '@connectrpc/connect':
-        specifier: ^2.2.0
-        version: 2.2.0(@bufbuild/protobuf@2.16.0)
-      '@connectrpc/connect-web':
-        specifier: ^2.2.0
-        version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
-      '@date-fns/tz':
-        specifier: ^1.5.0
-        version: 1.5.0
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -363,9 +284,6 @@ importers:
       '@keyline-icons/react':
         specifier: ^1.7.0
         version: 1.7.0(react@19.3.0)
-      '@simplewebauthn/browser':
-        specifier: ^14.0.0
-        version: 14.0.0
       '@stylexjs/atoms':
         specifier: ^0.19.1
         version: 0.19.1(@stylexjs/stylex@0.19.1)
@@ -375,45 +293,24 @@ importers:
       '@tanstack/charts':
         specifier: ^1.0.0
         version: 1.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.16)
-      '@tanstack/react-form':
-        specifier: ^1.33.5
-        version: 1.33.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-hotkeys':
         specifier: ^0.13.0
         version: 0.13.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-query':
-        specifier: ^5.104.1
-        version: 5.104.1(react@19.3.0)
       '@tanstack/react-router':
         specifier: 1.170.41
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-store':
-        specifier: ^0.11.2
-        version: 0.11.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-table':
         specifier: ^9.2.6
         version: 9.2.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-virtual':
         specifier: ^3.14.13
         version: 3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      blobatar:
-        specifier: ^2.7.0
-        version: 2.7.0(react@19.3.0)
-      comlink:
-        specifier: ^4.4.2
-        version: 4.4.2
-      components:
-        specifier: workspace:*
-        version: link:../components
       country-flag-icons:
         specifier: ^1.6.20
         version: 1.6.20
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
-      ofetch:
-        specifier: ^1.5.1
-        version: 1.5.1
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -429,9 +326,6 @@ importers:
       react-resizable-panels:
         specifier: ^4.14.2
         version: 4.14.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
     devDependencies:
       '@github-ui/storybook-addon-performance-panel':
         specifier: ^1.3.0
@@ -454,6 +348,97 @@ importers:
       '@storybook/tanstack-react':
         specifier: 10.6.1
         version: 10.6.1(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/router-core@1.171.34)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@voidzero-dev/vite-plus-core@1.1.0(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.6.1)(tsx@4.23.15)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(storybook@10.6.1(@types/react@19.3.0)(prettier@3.9.9)(react@19.3.0)(vite-plus@1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2)))(typescript@7.0.2)
+      '@stylexjs/unplugin':
+        specifier: ^0.19.1
+        version: 0.19.1(unplugin@2.3.11)
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.1.1(@voidzero-dev/vite-plus-core@1.1.0(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.6.1)(tsx@4.23.15)(typescript@7.0.2))(oxc-transform-react@0.145.0)
+      oxc-transform-react:
+        specifier: 'catalog:'
+        version: 0.145.0
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
+      storybook:
+        specifier: 10.6.1
+        version: 10.6.1(@types/react@19.3.0)(prettier@3.9.9)(react@19.3.0)(vite-plus@1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2))
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-core@1.1.0(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.6.1)(tsx@4.23.15)(typescript@7.0.2)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2)
+
+  packages/webapp:
+    dependencies:
+      '@blobatar/react':
+        specifier: ^2.7.0
+        version: 2.7.0(blobatar@2.7.0(react@19.3.0))(react@19.3.0)
+      '@connectrpc/connect':
+        specifier: ^2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect-web':
+        specifier: ^2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
+      '@date-fns/tz':
+        specifier: ^1.5.0
+        version: 1.5.0
+      '@keyline-icons/react':
+        specifier: ^1.7.0
+        version: 1.7.0(react@19.3.0)
+      '@simplewebauthn/browser':
+        specifier: ^14.0.0
+        version: 14.0.0
+      '@stylexjs/atoms':
+        specifier: ^0.19.1
+        version: 0.19.1(@stylexjs/stylex@0.19.1)
+      '@stylexjs/stylex':
+        specifier: ^0.19.1
+        version: 0.19.1
+      '@tanstack/react-form':
+        specifier: ^1.33.5
+        version: 1.33.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-query':
+        specifier: ^5.104.1
+        version: 5.104.1(react@19.3.0)
+      '@tanstack/react-router':
+        specifier: 1.170.41
+        version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-store':
+        specifier: ^0.11.2
+        version: 0.11.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      blobatar:
+        specifier: ^2.7.0
+        version: 2.7.0(react@19.3.0)
+      comlink:
+        specifier: ^4.4.2
+        version: 4.4.2
+      ofetch:
+        specifier: ^1.5.1
+        version: 1.5.1
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      uilibs:
+        specifier: workspace:*
+        version: link:../uilibs
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
       '@stylexjs/unplugin':
         specifier: ^0.19.1
         version: 0.19.1(unplugin@2.3.11)
@@ -508,12 +493,6 @@ importers:
       plugins:
         specifier: workspace:*
         version: link:../plugins
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
-      storybook:
-        specifier: 10.6.1
-        version: 10.6.1(@types/react@19.3.0)(prettier@3.9.9)(react@19.3.0)(vite-plus@1.1.0(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.6.1)(jsdom@30.1.1(@noble/hashes@2.4.0))(playwright@1.63.0)(tsx@4.23.15)(typescript@7.0.2))
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -6598,7 +6577,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.29.7
       '@babel/helper-module-imports': 7.29.7
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.29.10
       '@babel/types': 7.29.8
       '@dual-bundle/import-meta-resolve': 4.2.1
       '@stylexjs/shared': 0.19.1

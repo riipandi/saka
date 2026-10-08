@@ -1,11 +1,11 @@
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { ThemeSwitcher } from 'uilibs/theme'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated } from '#/libraries/guard/auth-store'
 import { safeReturnTo } from '#/libraries/guard/auth-utils'
 import { styles } from '#/styles/element/auth-layout.stylex'
-import { ThemeSwitcher } from '#/theme'
 
 export const Route = createFileRoute('/(auth)')({
   component: RouteComponent,

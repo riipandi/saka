@@ -4,7 +4,7 @@ import { queryClient } from '#/libraries/api-client'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import type { BreadcrumbValue } from '#/routes/__root'
 import { routeTree } from './routes.gen'
-import './assets/globals.css'
+import 'uilibs/assets/globals.css'
 
 // Kick off the silent session bootstrap in parallel with the first render.
 // Route guards (`beforeLoad`) await the same cached promise, so the session

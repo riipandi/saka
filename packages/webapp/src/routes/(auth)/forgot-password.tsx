@@ -1,11 +1,17 @@
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Button } from '#/components/base/button'
-import { Field, FieldLabel } from '#/components/base/field'
-import { Input } from '#/components/base/input'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '#/components/extra/card'
-import { Text } from '#/components/extra/text'
+import { Button } from 'uilibs/components/base/button'
+import { Field, FieldLabel } from 'uilibs/components/base/field'
+import { Input } from 'uilibs/components/base/input'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader
+} from 'uilibs/components/extra/card'
+import { Text } from 'uilibs/components/extra/text'
 import { styles } from '#/styles/pages/login.stylex'
 
 export const Route = createFileRoute('/(auth)/forgot-password')({

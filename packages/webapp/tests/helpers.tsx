@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router'
 import { act, render, type RenderResult } from '@testing-library/react'
-import { ThemeProvider } from '#/components/theme'
+import { ThemeProvider } from 'uilibs/theme'
 import { routeTree } from '#/routes.gen'
 import DevTools from '#/routes/-devtools'
 

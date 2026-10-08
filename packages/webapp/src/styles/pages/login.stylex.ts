@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors } from 'components/styles/core/colors.stylex'
-import { fontSize, fontWeight } from 'components/styles/core/tokens.stylex'
-import { duration, easing, radius, stroke, unit } from 'components/styles/core/tokens.stylex'
+import { colors } from 'uilibs/styles/colors.stylex'
+import { fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
+import { duration, easing, radius, stroke, unit } from 'uilibs/styles/tokens.stylex'
 
 export const styles = stylex.create({
   page: {

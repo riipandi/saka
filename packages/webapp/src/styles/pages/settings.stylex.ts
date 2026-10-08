@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { unit } from 'components/styles/core/tokens.stylex'
+import { unit } from 'uilibs/styles/tokens.stylex'
 
 /**
  * Settings-only layout bits; everything else comes from shared components

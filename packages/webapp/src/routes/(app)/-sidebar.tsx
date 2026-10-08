@@ -4,9 +4,9 @@ import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { useState } from 'react'
+import { ThemeSwitcher } from 'uilibs/theme'
 import { useAuthentication } from '#/libraries/guard/auth-provider'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
-import { ThemeSwitcher } from '#/theme'
 
 interface NavItem {
   icon: React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
