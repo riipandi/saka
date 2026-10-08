@@ -15,6 +15,13 @@ import {
   userJson
 } from './auth-connect-mock'
 
+// The wrapper wires the device headers into the engine at boot; in the test
+// realm the fingerprint module answers a fixed pair. (vi.mock is hoisted
+// above the imports.)
+vi.mock('#/libraries/device-fingerprint', () => ({
+  deviceHeaders: async () => ({ 'x-device-fingerprint': 'fp-test', 'user-agent': 'ua-test' })
+}))
+
 describe('auth engine (browser)', () => {
   let fetchMock: ReturnType<typeof fetchStub>
 

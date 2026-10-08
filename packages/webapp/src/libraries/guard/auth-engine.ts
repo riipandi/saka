@@ -113,6 +113,13 @@ export interface AuthEngineApi {
    * across the boundary on every pair it takes or drops.
    */
   setTokenListener(listener: TokenListener | null): Promise<void>
+  /**
+   * Hand the device headers (fingerprint, user agent) the engine's transport
+   * merges into every request. The main thread computes them — the worker
+   * realm has none of the fingerprinting sources — and passes them in at
+   * boot; the server's audit records and session rows read what lands.
+   */
+  configureDevice(headers: Record<string, string>): Promise<void>
   /** Terminate the session server-side and drop the in-memory pair. */
   logout(): Promise<void>
 }
@@ -134,7 +141,22 @@ function readProfile(response: GetSessionResponse): UserProfile | null {
 }
 
 export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi {
-  const transport = createConnectTransport({ baseUrl })
+  /**
+   * The device headers the main thread handed over. They start empty — the
+   * main-thread wrapper awaits their computation before the first
+   * session-establishing call — and once set they ride every request the
+   * engine's transport makes.
+   */
+  let deviceHeaders: Record<string, string> = {}
+
+  const transport = createConnectTransport({
+    baseUrl,
+    fetch: (input, init) => {
+      const merged = new Headers(init?.headers)
+      for (const [name, value] of Object.entries(deviceHeaders)) merged.set(name, value)
+      return fetch(input, { ...init, headers: merged })
+    }
+  })
   const auth = createClient(AuthService, transport)
   const session = createClient(SessionService, transport)
   const oauth = createClient(OAuthSSOService, transport)
@@ -353,6 +375,10 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
 
     async setTokenListener(listener) {
       tokenListener = listener
+    },
+
+    async configureDevice(headers) {
+      deviceHeaders = { ...headers }
     },
 
     async logout() {

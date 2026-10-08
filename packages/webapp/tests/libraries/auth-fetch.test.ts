@@ -28,6 +28,12 @@ vi.mock('#/libraries/guard/auth-store', () => ({
   clearAuth: vi.fn<() => void>()
 }))
 
+// The seam awaits the device headers; in the test realm they answer a fixed
+// pair.
+vi.mock('#/libraries/device-fingerprint', () => ({
+  deviceHeaders: async () => ({ 'x-device-fingerprint': 'fp-test', 'user-agent': 'ua-test' })
+}))
+
 import { clearAuth } from '#/libraries/guard/auth-store'
 
 describe('authFetch (the shared seam)', () => {
@@ -47,6 +53,16 @@ describe('authFetch (the shared seam)', () => {
     const call = send.mock.calls.at(-1)
     expect(new Headers(call?.[1]?.headers).get('authorization')).toBe('Bearer access-a')
     expect(new Headers(call?.[1]?.headers).get('x-trace')).toBe('t')
+  })
+
+  it('rides the device headers on every request', async () => {
+    const send = stubFetch(jsonResponse({ ok: true }))
+
+    await authFetch('/api/x')
+
+    const headers = new Headers(send.mock.calls.at(-1)?.[1]?.headers)
+    expect(headers.get('x-device-fingerprint')).toBe('fp-test')
+    expect(headers.get('user-agent')).toBe('ua-test')
   })
 
   it('goes out headerless for an anonymous caller', async () => {

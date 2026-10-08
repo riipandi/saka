@@ -1,6 +1,7 @@
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { QueryClient } from '@tanstack/react-query'
 import { ofetch } from 'ofetch'
+import { deviceHeaders } from '#/libraries/device-fingerprint'
 import { clearAuth } from '#/libraries/guard/auth-store'
 import { authWorker } from '#/libraries/guard/auth-worker-client'
 
@@ -58,10 +59,11 @@ function mergeHeaders(existing: HeadersInit | undefined, extra: Record<string, s
 export const authFetch: typeof fetch = async (input, init) => {
   return withAuth(async (headers) => {
     const url = input instanceof URL ? input.toString() : input
-    // Plain fetch, not ofetch.raw: the seam's callers — ofetch's own body
-    // parsing and connect-web's — each read the response body once, so the
-    // Response must cross the seam unread.
-    return fetch(url, { ...init, headers: mergeHeaders(init?.headers, headers) })
+    const device = await deviceHeaders()
+    return fetch(url, {
+      ...init,
+      headers: mergeHeaders(mergeHeaders(init?.headers, device), headers)
+    })
   })
 }
 

@@ -15,6 +15,13 @@ import {
   userJson
 } from './auth-connect-mock'
 
+// The wrapper wires the device headers into the engine at boot; in the test
+// realm the fingerprint module answers a fixed pair. (vi.mock is hoisted
+// above the imports.)
+vi.mock('#/libraries/device-fingerprint', () => ({
+  deviceHeaders: async () => ({ 'x-device-fingerprint': 'fp-test', 'user-agent': 'ua-test' })
+}))
+
 describe('auth engine', () => {
   let fetchMock: ReturnType<typeof fetchStub>
 
@@ -38,6 +45,17 @@ describe('auth engine', () => {
     expect(session.user).not.toHaveProperty('accessToken')
     expect(session.user).not.toHaveProperty('refreshToken')
     await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('rides the device headers the main thread configured', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+    await engine.configureDevice({ 'x-device-fingerprint': 'fp-xyz', 'user-agent': 'ua/1' })
+
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
+
+    expect(headerOf(fetchMock.mock.calls.at(-1), 'x-device-fingerprint')).toBe('fp-xyz')
+    expect(headerOf(fetchMock.mock.calls.at(-1), 'user-agent')).toBe('ua/1')
   })
 
   it('refuses the multi-factor fork — it ships in a later slice', async () => {

@@ -1,4 +1,5 @@
 import * as Comlink from 'comlink'
+import { deviceHeaders } from '#/libraries/device-fingerprint'
 import {
   clearTokenCookies,
   readTokenCookies,
@@ -91,20 +92,38 @@ const persistTokens: TokenListener = (tokens) => {
  * persistence and tab sync both paths need.
  */
 function withCookies(engine: AuthEngineApi): AuthWorkerClient {
+  // The device headers are computed once on the main thread — the worker
+  // realm has none of the fingerprinting sources — and handed to the engine
+  // before its first server call: the session-establishing methods below
+  // await this promise, so the sign-in itself already carries the
+  // fingerprint the server's records consume.
+  const deviceReady: Promise<void> = deviceHeaders().then((headers) =>
+    engine.configureDevice(headers)
+  )
+
   return {
     async login(credentials: LoginCredentials, options?: AuthLoginOptions) {
+      await deviceReady
       const result: AuthSession = await engine.login(credentials, options)
       writeUserCookie(result.user, result.tokens.refreshExpiresAt)
       return result.user
     },
     async continueSignIn(flowToken: string) {
+      await deviceReady
       const result: AuthSession = await engine.continueSignIn(flowToken)
       writeUserCookie(result.user, result.tokens.refreshExpiresAt)
       return result.user
     },
-    refresh: () => engine.refresh(),
-    maybeRefresh: (withinMs) => engine.maybeRefresh(withinMs),
+    async refresh() {
+      await deviceReady
+      return engine.refresh()
+    },
+    async maybeRefresh(withinMs: number) {
+      await deviceReady
+      return engine.maybeRefresh(withinMs)
+    },
     async restore() {
+      await deviceReady
       await engine.restore(readTokenCookies())
     },
     async session() {
