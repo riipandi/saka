@@ -16,7 +16,7 @@ description: |-
 
   Saka endpoint GET /api/configuration (replaces Pocket ID GET /api/application-configuration and /all - one endpoint, scope follows the caller).
 
-  Anonymous or non-admin token: the public subset (app mode, base URL, sign-in and announcement toggles). Administrator token: every non-secret setting. Secrets are absent by construction.
+  Anonymous or non-admin token: the public subset (app mode, base URL, sign-in and announcement toggles, the oauth master switch). Administrator token: every non-secret setting. Secrets are absent by construction.
 headers:
 - enabled: true
   name: Connect-Protocol-Version

@@ -37,6 +37,7 @@ type Published struct {
 	KVStore   PublishedKVStore   `json:"kvstore,omitzero"`
 	Log       PublishedLog       `json:"log,omitzero"`
 	Mailer    PublishedMailer    `json:"mailer,omitzero"`
+	OAuth     PublishedOAuth     `json:"oauth,omitzero"`
 	OIDC      PublishedOIDC      `json:"oidc,omitzero"`
 	OTEL      PublishedOTEL      `json:"otel,omitzero"`
 	Queue     PublishedQueue     `json:"queue,omitzero"`
@@ -221,6 +222,14 @@ type PublishedQueue struct {
 	Encrypt         bool     `json:"encrypt,omitzero"`
 }
 
+// PublishedOAuth is the oauth section. The switch is public — it is the
+// login screen's answer to whether sign-in through a provider is offered
+// at all. The providers themselves are runtime data the connection rows
+// own; the public listing that names them is the RPC surface's.
+type PublishedOAuth struct {
+	Enabled bool `json:"enabled,omitzero"`
+}
+
 // PublishedOIDC is the oidc section. The enable switch is public — it is
 // the sign-in option's answer to whether the deployment federates — and
 // the CIMD allowlist is administrative, naming the origins the deployment
@@ -310,6 +319,9 @@ func (c Config) Published(full bool) Published {
 		Auth: PublishedAuth{
 			OneTimeAccessEmailAsAdminEnabled:           c.Auth.OneTimeAccessEmailAsAdminEnabled,
 			OneTimeAccessEmailAsUnauthenticatedEnabled: c.Auth.OneTimeAccessEmailAsUnauthenticatedEnabled,
+		},
+		OAuth: PublishedOAuth{
+			Enabled: c.OAuth.Enabled,
 		},
 		OIDC: PublishedOIDC{
 			Enabled: c.OIDC.Enabled,

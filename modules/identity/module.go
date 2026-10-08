@@ -638,7 +638,8 @@ var Package = do.Package(
 			tokenPosts = oauthsso.FormPostAdapter(fetch)
 		}
 		service := oauthsso.NewService(pool, cipher, recorder, discovery, log).
-			WithBaseURL(c.App.BaseURL)
+			WithBaseURL(c.App.BaseURL).
+			WithOAuthEnabled(c.OAuth.Enabled)
 		// The resolution's seams ride the post-construction wiring: the
 		// session mint, the second factor's fork, the JIT policy's
 		// runtime source, the identifier gate, and the email code's

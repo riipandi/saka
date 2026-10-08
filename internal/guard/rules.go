@@ -178,6 +178,7 @@ var ProcedureRules = map[string]Entry{
 	// Unlinking is the sensitive write: the step-up proof names the
 	// holder, the way the second-factor disable does.
 	authnv1connect.OAuthSSOServiceBeginSignInProcedure:            {Rule: Public},
+	authnv1connect.OAuthSSOServiceListEnabledConnectionsProcedure: {Rule: Public},
 	authnv1connect.OAuthSSOServiceContinueSignInProcedure:         {Rule: Public},
 	authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure:      {Rule: Public},
 	authnv1connect.OAuthSSOServiceListConnectionsProcedure:        {Rule: Admin},

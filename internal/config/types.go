@@ -21,6 +21,7 @@ type Config struct {
 	KVStore   KVStore   `koanf:"kvstore" json:"kvstore"`
 	Log       Log       `koanf:"log" json:"log"`
 	Mailer    Mailer    `koanf:"mailer" json:"mailer"`
+	OAuth     OAuth     `koanf:"oauth" json:"oauth"`
 	OIDC      OIDC      `koanf:"oidc" json:"oidc"`
 	OTEL      OTEL      `koanf:"otel" json:"otel"`
 	Queue     Queue     `koanf:"queue" json:"queue"`
@@ -283,6 +284,18 @@ type LogFile struct {
 	MaxAge     int `koanf:"max_age" json:"max_age"`
 	// Compress gzips a rotated file.
 	Compress bool `koanf:"compress" json:"compress"`
+}
+
+// OAuth holds the sign-in-with-a-provider surface's switch. The providers
+// themselves — the builtin Google and GitHub connections and every custom
+// one — are runtime data the connection CRUD owns, sealed in the database;
+// the configuration carries no credentials. The switch gates the surface
+// wholesale: a change takes the restart every configuration key takes.
+type OAuth struct {
+	// Enabled serves the OAuth SSO surface: the enabled-provider listing
+	// answers and the flow's begin route runs. Off, sign-in through a
+	// provider is refused however the connections are configured.
+	Enabled bool `koanf:"enabled" json:"enabled"`
 }
 
 // OIDC holds the identity-provider surface's settings: the switch the

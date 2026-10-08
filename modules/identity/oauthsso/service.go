@@ -116,6 +116,12 @@ type Service struct {
 	// built from, wired after construction with the base URL.
 	baseURL string
 
+	// ssoEnabled is the configuration's master switch over the whole
+	// surface, wired after construction. It defaults to on: a Service
+	// built without the wiring (a test) has the surface open, the way
+	// the connections it holds decide the rest.
+	ssoEnabled bool
+
 	// now is the instant the service's decisions read. It is a field so a
 	// test can hold the clock still without waiting out a window.
 	now func() time.Time
@@ -173,19 +179,50 @@ func NewService(pool *datastore.Postgres, cipher *crypto.Cipher, recorder *fwaud
 		log = slog.New(slog.DiscardHandler)
 	}
 	return &Service{
-		pool:    pool,
-		repo:    NewRepository(pool),
-		cipher:  cipher,
-		audit:   recorder,
-		fetcher: fetcher,
-		log:     log,
-		now:     time.Now,
+		pool:       pool,
+		repo:       NewRepository(pool),
+		cipher:     cipher,
+		audit:      recorder,
+		fetcher:    fetcher,
+		log:        log,
+		ssoEnabled: true,
+		now:        time.Now,
 	}
 }
 
 // List answers every live connection in provider order.
 func (s *Service) List(ctx context.Context) ([]Connection, error) {
 	return s.repo.List(ctx)
+}
+
+// EnabledConnection is one connection an unauthenticated caller may sign
+// in with: the slug the start route names and the display name the page
+// renders — the button's label and its destination, nothing else.
+type EnabledConnection struct {
+	Provider    string
+	DisplayName string
+}
+
+// EnabledConnections answers the connections an unauthenticated caller may
+// sign in with, ordered by provider. The configuration's master switch
+// gates the surface: while it is off, the answer is empty whatever the
+// rows hold — the switch is the restart-gated word, the rows are the
+// runtime ones.
+func (s *Service) EnabledConnections(ctx context.Context) ([]EnabledConnection, error) {
+	if !s.ssoEnabled {
+		return []EnabledConnection{}, nil
+	}
+	rows, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnabledConnection, 0, len(rows))
+	for _, conn := range rows {
+		if conn.Enabled {
+			out = append(out, EnabledConnection{Provider: conn.Provider, DisplayName: conn.DisplayName})
+		}
+	}
+	return out, nil
 }
 
 // Get reads one connection by its identifier.

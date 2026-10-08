@@ -177,6 +177,7 @@ var recommendedKeys = []string{
 	"mailer.from_email",
 	"mailer.from_name",
 	"mailer.timeout",
+	"oauth.enabled",
 	"oidc.enabled",
 	"oidc.cimd_url_allowlist",
 	"otel.compression",

@@ -106,7 +106,7 @@ const (
 	// sign-in links the provider identity into the account its verified
 	// email names. Off, a provider identity only ever signs in through a
 	// row it was bound by before; the linking is never automatic.
-	SettingOAuthSsoAccountLinkingEnabled = "oauthsso.account_linking_enabled"
+	SettingOAuthSsoAccountLinkingEnabled = "oauth.account_linking_enabled"
 
 	// SettingPasskeyMaxCredentials caps the passkeys one account may hold,
 	// counted separately from the TOTP devices.

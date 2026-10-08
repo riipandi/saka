@@ -374,6 +374,13 @@ func Default() Config {
 			AuthLimit: DefaultRateLimitAuthLimit,
 			Window:    time.Minute,
 		},
+		OAuth: OAuth{
+			// On by default: the connections decide which providers
+			// exist, and a deployment with none configured has nothing
+			// to turn off — the switch exists to darken the surface
+			// wholesale.
+			Enabled: true,
+		},
 		OIDC: OIDC{
 			// Off by default: the provider signs with the database's
 			// stored keys, and a run without one is not an issuer —

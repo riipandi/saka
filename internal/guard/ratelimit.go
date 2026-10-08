@@ -102,8 +102,9 @@ var RateDefaultProcedures = map[string]struct{}{
 // pays for in bandwidth, and the readiness probe the exclusion list also
 // carries.
 var RateExemptProcedures = map[string]struct{}{
-	systemv1connect.HealthServiceCheckProcedure:          {},
-	settingsv1connect.SettingsServiceListPublicProcedure: {},
+	systemv1connect.HealthServiceCheckProcedure:                   {},
+	settingsv1connect.SettingsServiceListPublicProcedure:          {},
+	authnv1connect.OAuthSSOServiceListEnabledConnectionsProcedure: {},
 }
 
 // rpcPathPrefix is the URL prefix the RPC surface is mounted under. The

@@ -50,12 +50,24 @@ func (s *Service) WithBaseURL(baseURL string) *Service {
 	return s
 }
 
+// WithOAuthEnabled wires the configuration's master switch over the whole
+// surface. The providers are runtime data the connection rows own; this
+// switch is the configuration's one word in the matter, and a change to it
+// takes the restart every configuration key takes.
+func (s *Service) WithOAuthEnabled(enabled bool) *Service {
+	s.ssoEnabled = enabled
+	return s
+}
+
 // Begin opens one authorization-code ceremony: it draws the secrets,
 // renders the provider's authorize URL, and stores the pending row the
 // callback will consume. The raw state and verifier never rest anywhere —
 // the row carries their hash and their sealed form, and the browser
 // carries the raw state to the provider and back.
 func (s *Service) Begin(ctx context.Context, provider string) (string, error) {
+	if !s.ssoEnabled {
+		return "", ErrConnectionUnavailable
+	}
 	conn, err := s.repo.ByProvider(ctx, s.pool, provider)
 	if errors.Is(err, ErrConnectionNotFound) {
 		return "", ErrConnectionUnavailable

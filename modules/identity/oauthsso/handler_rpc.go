@@ -58,6 +58,7 @@ func (m *Module) Mount(r chi.Router) {
 func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
 	_, connectHandler := authnv1connect.NewOAuthSSOServiceHandler(m.rpcHandler, opts...)
 	r.Handle(authnv1connect.OAuthSSOServiceBeginSignInProcedure, connectHandler)
+	r.Handle(authnv1connect.OAuthSSOServiceListEnabledConnectionsProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceContinueSignInProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure, connectHandler)
 	r.Handle(authnv1connect.OAuthSSOServiceListConnectionsProcedure, connectHandler)
@@ -188,6 +189,25 @@ func continueError(ctx context.Context, err error) error {
 		slog.ErrorContext(ctx, "oauthsso: the flow's completion failed", "error", err)
 		return connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be completed"))
 	}
+}
+
+// ListEnabledConnections answers the connections an unauthenticated
+// caller may sign in with — the slug and the display name, the button's
+// label and its destination and nothing else.
+func (h *rpcHandler) ListEnabledConnections(ctx context.Context, req *connect.Request[authnv1.ListEnabledConnectionsRequest]) (*connect.Response[authnv1.ListEnabledConnectionsResponse], error) {
+	connections, err := h.service.EnabledConnections(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("the connections could not be read"))
+	}
+
+	out := make([]*authnv1.EnabledConnection, 0, len(connections))
+	for _, conn := range connections {
+		out = append(out, &authnv1.EnabledConnection{
+			Provider:    conn.Provider,
+			DisplayName: conn.DisplayName,
+		})
+	}
+	return connect.NewResponse(&authnv1.ListEnabledConnectionsResponse{Connections: out}), nil
 }
 
 // ListConnections answers the operator's listing, secrets never included.
