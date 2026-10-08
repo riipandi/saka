@@ -3,20 +3,10 @@ import { Code, ConnectError, createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { RPC_BASE_URL } from '#/libraries/api-client'
 import type { LoginCredentials } from '#/schemas/auth.schema'
-import {
-  AuthService,
-  GetSessionRequestSchema,
-  RefreshRequestSchema,
-  SessionService,
-  SignInRequestSchema,
-  SignOutRequestSchema
-} from '~/codegen/authn_pb'
-import type {
-  AuthenticatedUser,
-  GetSessionResponse,
-  RefreshResponse,
-  SignInResponse
-} from '~/codegen/authn_pb'
+import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/codegen/authn_pb'
+import { SessionService, SignInRequestSchema, SignOutRequestSchema } from '~/codegen/authn_pb'
+import type { AuthenticatedUser, SignInResponse } from '~/codegen/authn_pb'
+import type { GetSessionResponse, RefreshResponse } from '~/codegen/authn_pb'
 import type { UserProfile } from './auth-store'
 
 /** Refresh this long before the access token expires. */

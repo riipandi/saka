@@ -5,7 +5,14 @@ import type { LoginCredentials } from '#/schemas/auth.schema'
 import { queryClient } from '../api-client'
 import type { AuthLoginOptions } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
-import { authStore, clearAuth, setAuthUser, type AuthState, type UserProfile } from './auth-store'
+import {
+  authStore,
+  clearAuth,
+  setAuthUser,
+  setSigningOut,
+  type AuthState,
+  type UserProfile
+} from './auth-store'
 import { safeReturnTo } from './auth-utils'
 import { authWorker } from './auth-worker-client'
 
@@ -90,6 +97,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   )
 
   const handleLogout = useCallback(() => {
+    // The eviction effect in the `(app)` layout watches this same profile —
+    // mark the sign-out first so its redirect never races the goodbye one.
+    setSigningOut(true)
     void authWorker()
       .logout()
       .finally(() => {
@@ -97,9 +107,13 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         // a different account must never render it.
         queryClient.clear()
         clearAuth()
-        void navigate({ to: '/login', search: { loggedOut: true } })
+        // The page the user is leaving is where a re-login should land.
+        void navigate({
+          to: '/login',
+          search: { loggedOut: true, return_to: router.state.location.href }
+        }).finally(() => setSigningOut(false))
       })
-  }, [navigate])
+  }, [navigate, router])
 
   const context = useMemo(
     () => ({ user, loggedIn, isLoading, login: handleLogin, logout: handleLogout }),

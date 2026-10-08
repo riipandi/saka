@@ -55,3 +55,22 @@ export function setAuthLoading(isLoading: boolean) {
 export function clearAuth() {
   authStore.setState(() => ({ user: null, isLoading: false }))
 }
+
+// ── Sign-out guard (module-level, deliberately not reactive) ────────────────
+
+let signingOut = false
+
+/**
+ * True while a user-initiated sign-out is under way. The `(app)` layout's
+ * eviction effect watches the profile and redirects on its loss — but a
+ * logout sets the profile to null by design, and the eviction's own redirect
+ * would race the goodbye redirect the logout performs. The flag is read
+ * synchronously by the effect, never rendered from.
+ */
+export function setSigningOut(value: boolean) {
+  signingOut = value
+}
+
+export function isSigningOut() {
+  return signingOut
+}

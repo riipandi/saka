@@ -10,9 +10,7 @@ import { styles } from '#/styles/element/auth-layout.stylex'
 
 export const Route = createFileRoute('/(auth)')({
   component: RouteComponent,
-  validateSearch: z.object({
-    return_to: z.string().optional()
-  }),
+  validateSearch: z.object({ return_to: z.string().optional() }).passthrough(),
   beforeLoad: async ({ search }) => {
     await ensureSessionLoaded()
     if (isAuthenticated()) {

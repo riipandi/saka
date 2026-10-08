@@ -8,7 +8,7 @@ import { closeSidebar, useSidebarOpen, useSidebarCollapsed } from '#/libraries/a
 import { toggleSidebar, toggleSidebarCollapsed } from '#/libraries/app.store'
 import { useAuthUser } from '#/libraries/guard/auth-provider'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
-import { isAuthenticated } from '#/libraries/guard/auth-store'
+import { isAuthenticated, isSigningOut } from '#/libraries/guard/auth-store'
 import { styles } from '#/styles/element/root-layout.stylex'
 import { SideNavbar } from './-sidebar'
 
@@ -45,9 +45,12 @@ function RouteComponent() {
   // The session can end while the user is on a protected page — the
   // background verify found the pair dead, a refresh was refused, the
   // backend revoked it. The guard only runs on navigation, so this effect
-  // is the eviction: the moment the profile is gone, so is the page.
+  // is the eviction: the moment the profile is gone, so is the page. A
+  // user-initiated sign-out clears the profile by design and performs its
+  // own goodbye redirect — the sign-out flag keeps this effect out of that
+  // race (its `unauthenticated` notice would clobber the `loggedOut` one).
   useEffect(() => {
-    if (user) return
+    if (user || isSigningOut()) return
     void router.navigate({
       to: '/login',
       search: { return_to: router.state.location.href, unauthenticated: true }

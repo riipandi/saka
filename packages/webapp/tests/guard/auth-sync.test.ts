@@ -64,6 +64,16 @@ describe('auth sync (cross-tab custody bridge)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('stays silent when a tab boots with no session — no null chatter', async () => {
+    const received: (TokenBundle | null)[] = []
+    tabB.subscribeTokens((tokens) => received.push(tokens))
+
+    // Tab A boots signed-out: restore(null) reports a null custody state.
+    tabA.publishTokens(null)
+
+    expect(received).toEqual([])
+  })
+
   it('delivers a custody change to the other tabs, never to the poster', async () => {
     const received: (TokenBundle | null)[] = []
     tabB.subscribeTokens((tokens) => received.push(tokens))
@@ -88,16 +98,19 @@ describe('auth sync (cross-tab custody bridge)', () => {
     expect(received).toHaveLength(1)
   })
 
-  it('delivers a sign-out from another tab exactly once', async () => {
+  it('delivers a remote sign-out exactly once — the null state is a key too', async () => {
     const received: (TokenBundle | null)[] = []
     tabB.subscribeTokens((tokens) => {
       received.push(tokens)
+      // The signing-out tab re-reports the drop through its own listener.
       tabB.publishTokens(tokens)
     })
 
+    tabA.publishTokens(bundle('refresh-a'))
     tabA.publishTokens(null)
 
-    expect(received).toEqual([null])
+    // Compare by the echo key, not by millisecond timestamps.
+    expect(received.map((tokens) => tokens?.refreshToken ?? null)).toEqual(['refresh-a', null])
   })
 
   it('ignores a dead pair instead of adopting and re-reporting its drop', async () => {

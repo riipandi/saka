@@ -1,4 +1,3 @@
-import { z } from 'zod'
 /**
  * Cross-tab session sync. The token pair lives in each tab's own worker, and
  * every tab holds its own cookie copy — without a bridge, a tab that missed a
@@ -12,6 +11,7 @@ import { z } from 'zod'
  * with every rotation: an adoption re-reports the adopted pair through the
  * engine's own listener, and the identical key stops it from bouncing back.
  */
+import { z } from 'zod'
 import { tokenBundleSchema } from './auth-cookies'
 import type { TokenBundle } from './auth-engine'
 
@@ -30,10 +30,22 @@ function open(): BroadcastChannel | null {
   return channel
 }
 
+/**
+ * The echo key of a custody state: the refresh token, or `null` for "no
+ * session". The key must treat both ends uniformly — `tokens?.refreshToken`
+ * is `undefined` for a null state, and an `undefined === null` miss is what
+ * turned every received sign-out into a re-broadcast (a live ping-pong that
+ * ended the freshly minted session of every signed-in tab).
+ */
+function syncKey(tokens: TokenBundle | null): string | null {
+  return tokens ? tokens.refreshToken : null
+}
+
 /** Publish a custody change to the other tabs. */
 export function publishTokens(tokens: TokenBundle | null): void {
-  if (tokens?.refreshToken === lastSyncedRefresh) return
-  lastSyncedRefresh = tokens?.refreshToken ?? null
+  const key = syncKey(tokens)
+  if (key === lastSyncedRefresh) return
+  lastSyncedRefresh = key
   open()?.postMessage({ tokens })
 }
 
@@ -49,9 +61,10 @@ export function subscribeTokens(handler: (tokens: TokenBundle | null) => void): 
     const parsed = messageSchema.safeParse(event.data)
     if (!parsed.success) return
     const tokens = parsed.data.tokens
-    if (tokens?.refreshToken === lastSyncedRefresh) return
+    const key = syncKey(tokens)
+    if (key === lastSyncedRefresh) return
     if (tokens && tokens.refreshExpiresAt <= Date.now()) return
-    lastSyncedRefresh = tokens?.refreshToken ?? null
+    lastSyncedRefresh = key
     handler(tokens)
   }
   bus.addEventListener('message', listener)

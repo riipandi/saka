@@ -43,19 +43,17 @@ function RouteComponent() {
   const [remember, setRemember] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
-  // The goodbye and sign-in-required notices belong to the redirect that
-  // brought the visitor here — capture them once (initializers run at mount
-  // only) so a refresh or back-navigation never replays them.
+  // Goodbye and sign-in-required notices belong to the redirect that brought
+  // the visitor here, refresh page or back-navigation never replays them.
   const [arrivedLoggedOut] = useState(loggedOut)
   const [arrivedUnauthenticated] = useState(unauthenticated)
   const showGoodbye = Boolean(arrivedLoggedOut) && !dismissed && !failed
   const showSignInPrompt = Boolean(arrivedUnauthenticated) && !dismissed && !failed
 
-  // Consume the notice search params so the browser history stays clean.
   useEffect(() => {
     if (!loggedOut && !unauthenticated) return
-    void navigate({ to: '/login', search: {}, replace: true })
-  }, [loggedOut, unauthenticated, navigate])
+    void navigate({ to: '/login', search: { return_to }, replace: true })
+  }, [loggedOut, unauthenticated, return_to, navigate])
 
   const clearAlerts = () => {
     setFailed(null)
