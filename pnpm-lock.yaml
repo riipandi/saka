@@ -399,6 +399,9 @@ importers:
       '@date-fns/tz':
         specifier: ^1.5.0
         version: 1.5.0
+      '@fingerprintjs/fingerprintjs':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@keyline-icons/react':
         specifier: ^1.7.0
         version: 1.7.0(react@19.3.0)
@@ -1139,6 +1142,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fingerprintjs/fingerprintjs@5.3.0':
+    resolution: {integrity: sha512-goxeuSCF/LR8E/lcsCh/YTjhlFW7AOhj4A9RQ5GHpBOKwkX/OG3z8mY5ADR1xGVRB5bSEJB66WNh5eBwehx2nQ==}
 
   '@floating-ui/core@1.8.0':
     resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
@@ -5709,6 +5715,8 @@ snapshots:
     optionalDependencies:
       '@noble/hashes': 2.4.0
     optional: true
+
+  '@fingerprintjs/fingerprintjs@5.3.0': {}
 
   '@floating-ui/core@1.8.0':
     dependencies:

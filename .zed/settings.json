@@ -5,6 +5,11 @@
         "YAML": ["*.yaml.example", "*.yml.example"]
     },
     "lsp": {
+        "depsy": {
+            "initialization_options": {
+                "ignore": ["uilibs"]
+            }
+        },
         "oxlint": {
             "initialization_options": {
                 "settings": {
