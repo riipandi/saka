@@ -2,6 +2,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useSelector } from '@tanstack/react-store'
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
 import type { LoginCredentials } from '#/schemas/auth.schema'
+import { queryClient } from '../api-client'
 import type { AuthLoginOptions } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
 import { authStore, clearAuth, setAuthUser, type AuthState, type UserProfile } from './auth-store'
@@ -92,6 +93,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     void authWorker()
       .logout()
       .finally(() => {
+        // The query cache holds the previous account's data — a re-login as
+        // a different account must never render it.
+        queryClient.clear()
         clearAuth()
         void navigate({ to: '/login', search: { loggedOut: true } })
       })

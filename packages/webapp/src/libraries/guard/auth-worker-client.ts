@@ -8,7 +8,8 @@ import {
 } from './auth-cookies'
 import type { AuthEngineApi, AuthLoginOptions, AuthSession, TokenListener } from './auth-engine'
 import { createAuthEngine } from './auth-engine'
-import type { UserProfile } from './auth-store'
+import { clearAuth, type UserProfile } from './auth-store'
+import { publishTokens, subscribeTokens } from './auth-sync'
 
 /**
  * Promise-facing handle to the auth engine. Both the Comlink proxy and the
@@ -18,8 +19,9 @@ import type { UserProfile } from './auth-store'
  * `document.cookie` access — and is driven entirely by the engine's token
  * listener: every custody change the engine reports (sign-in, rotation by
  * the proactive timer, failed refresh, sign-out) is mirrored into the cookie
- * the moment it happens. There is deliberately no other write path, so the
- * cookie cannot lag behind the worker's live pair.
+ * and broadcast to the other tabs the moment it happens. There is
+ * deliberately no other write path, so the cookie cannot lag behind the
+ * worker's live pair.
  */
 export interface AuthWorkerClient {
   /** Validate credentials, mint the pair, persist the cookie. Resolves the profile. */
@@ -42,23 +44,35 @@ export interface AuthWorkerClient {
 }
 
 let client: AuthWorkerClient | null = null
+let unsubscribeSync: (() => void) | null = null
+
+/**
+ * The unexpired access token, kept on the main thread so request interceptors
+ * do not pay a Comlink round trip per call. Warmed by the same custody-change
+ * listener that writes the cookies; the engine is consulted when the cache is
+ * empty (a pair restored before the listener reported it) or expired.
+ */
+let cachedAccess: { token: string; expiresAt: number } | null = null
 
 /**
  * The custody-change listener the engine reports to. A fresh pair rewrites
- * the cookie, a dropped pair clears it — both in the same tick the engine
- * took or lost custody, before anything else can observe the stale copy.
+ * the cookie and is broadcast to the other tabs; a dropped pair clears both —
+ * all in the same tick the engine took or lost custody, before anything else
+ * can observe the stale copy.
  */
 const persistTokens: TokenListener = (tokens) => {
+  cachedAccess = tokens ? { token: tokens.accessToken, expiresAt: tokens.accessExpiresAt } : null
   if (tokens) {
     writeTokenCookies(tokens)
   } else {
     clearTokenCookies()
   }
+  publishTokens(tokens)
 }
 
 /**
  * Wrap an engine (worker proxy or main-thread fallback) with the cookie
- * persistence both paths need.
+ * persistence and tab sync both paths need.
  */
 function withCookies(engine: AuthEngineApi): AuthWorkerClient {
   return {
@@ -79,11 +93,18 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
         // half's lifetime — the pair (possibly just rotated) is in the jar.
         writeUserCookie(profile, readTokenCookies()?.refreshExpiresAt)
       } else {
-        clearTokenCookies()
+        // A definite sign-out clears the jar — but only when the engine holds
+        // no pair: a custody change that raced this call (a re-login, a
+        // rotation) owns the jar now and must not be cleared on its behalf.
+        if (!(await engine.accessToken())) clearTokenCookies()
       }
       return profile
     },
-    accessToken: () => engine.accessToken(),
+    accessToken: () => {
+      if (cachedAccess && Date.now() < cachedAccess.expiresAt)
+        return Promise.resolve(cachedAccess.token)
+      return engine.accessToken()
+    },
     async logout() {
       await engine.logout()
     }
@@ -91,8 +112,26 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
 }
 
 /** Wire the cookie persistence to the engine's custody changes. */
-function wireCookies(engine: AuthEngineApi): void {
-  void engine.setTokenListener(Comlink.proxy(persistTokens))
+function wireCookies(engine: AuthEngineApi, proxied: boolean): void {
+  void engine.setTokenListener(proxied ? Comlink.proxy(persistTokens) : persistTokens)
+}
+
+/**
+ * Adopt the other tabs' custody changes: a pair another tab took or rotated
+ * is adopted here (the engine re-reports it through the listener, and the
+ * echo suppression ends the round trip); a sign-out elsewhere ends this
+ * tab's session too — locally, without a round trip a spent token loses.
+ */
+function wireSync(engine: AuthEngineApi): void {
+  unsubscribeSync?.()
+  unsubscribeSync = subscribeTokens((tokens) => {
+    if (tokens) {
+      void engine.restore(tokens)
+    } else {
+      void engine.logout()
+      clearAuth()
+    }
+  })
 }
 
 /**
@@ -119,19 +158,24 @@ export function authWorker(): AuthWorkerClient {
       })
 
       const proxy = Comlink.wrap<AuthEngineApi>(worker)
-      wireCookies(proxy)
+      wireCookies(proxy, true)
+      wireSync(proxy)
       const wired = withCookies(proxy)
       client = wired
 
       // If the worker dies mid-session (script error, extension interference),
       // swap in the main-thread engine and re-restore from the cookie — the
       // dead worker's memory went with it, the cookie copy is what remains.
-      worker.addEventListener('error', () => {
-        if (client !== wired) return
-        const replacement = createMainThreadClient()
-        client = replacement
-        void replacement.restore()
-      })
+      worker.addEventListener(
+        'error',
+        () => {
+          if (client !== wired) return
+          const replacement = createMainThreadClient()
+          client = replacement
+          void replacement.restore()
+        },
+        { once: true }
+      )
 
       return client
     } catch {
@@ -148,8 +192,7 @@ export function authWorker(): AuthWorkerClient {
  */
 function createMainThreadClient(): AuthWorkerClient {
   const engine = createAuthEngine()
-  // The direct engine call skips the Comlink hop the proxy path needs —
-  // the listener is a plain function here.
-  void engine.setTokenListener(persistTokens)
+  wireCookies(engine, false)
+  wireSync(engine)
   return withCookies(engine)
 }

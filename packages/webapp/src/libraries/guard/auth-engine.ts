@@ -189,15 +189,21 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       if (epoch !== sessionEpoch) return false
       takeTokenPair(response)
       return true
-    } catch {
+    } catch (error) {
       if (epoch !== sessionEpoch) return false
-      // A failed refresh means the pair is spent or refused — drop it so a
-      // later attempt does not replay a dead token. The listener clears the
-      // cookie copy in the same breath.
-      tokens = null
+      // Cooldown applies to every failure — the retry must not hammer a
+      // backend that is refusing or unreachable.
       lastFailedRefreshAt = Date.now()
-      clearTimer()
-      notify(null)
+      // A refused refresh (the backend saw the pair and said no) means the
+      // pair is spent or revoked — drop it so a later attempt does not replay
+      // a dead token; the listener clears the cookie copy in the same breath.
+      // A network failure is inconclusive: the backend never judged the
+      // pair, so it stays — the proactive timer retries after the cooldown.
+      if (error instanceof ConnectError && error.code === Code.Unauthenticated) {
+        tokens = null
+        clearTimer()
+        notify(null)
+      }
       return false
     }
   }
@@ -255,7 +261,9 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       // the listener clears a cookie holding that dead pair.
       const accepted = next && next.refreshExpiresAt > Date.now() ? next : null
       tokens = accepted
-      if (!accepted) notify(null)
+      // An accepted pair is reported too: the rewrite is idempotent and the
+      // report warms the main thread's token cache after a restore.
+      notify(accepted)
       scheduleProactiveRefresh()
     },
 
@@ -271,16 +279,21 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         return readProfile(await readSession(tokens.accessToken))
       } catch (error) {
         // An unauthenticated answer means the access token died between the
-        // expiry check and the call — one silent refresh and one retry. Any
-        // other failure is not worth a second round trip: the bootstrap
-        // reports no session either way.
-        if (!(error instanceof ConnectError) || error.code !== Code.Unauthenticated) return null
-        if (!(await api.refresh()) || !tokens) return null
-        try {
-          return readProfile(await readSession(tokens.accessToken))
-        } catch {
-          return null
+        // expiry check and the call — one silent refresh and one retry; the
+        // backend has judged the pair, so this is a definite answer.
+        if (error instanceof ConnectError && error.code === Code.Unauthenticated) {
+          if (!(await api.refresh()) || !tokens) return null
+          try {
+            return readProfile(await readSession(tokens.accessToken))
+          } catch {
+            return null
+          }
         }
+        // Anything else — network trouble, an unavailable backend — is
+        // inconclusive: the session was neither confirmed nor refused.
+        // Rethrow so the caller can keep the state it already shows instead
+        // of reading a connection failure as a sign-out.
+        throw error
       }
     },
 

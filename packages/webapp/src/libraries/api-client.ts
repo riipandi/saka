@@ -8,8 +8,8 @@ import { authWorker } from '#/libraries/guard/auth-worker-client'
  * Base URL for API and RPC requests. Defaults to `/api` and `/rpc`.
  * These are the same-origin Vite dev proxy, see `vite.config.ts`.
  */
-export const RPC_BASE_URL = import.meta.env.PUBLIC_RPC_URL ?? '/rpc'
 export const API_BASE_URL = import.meta.env.PUBLIC_API_URL ?? '/api'
+export const RPC_BASE_URL = import.meta.env.PUBLIC_RPC_URL ?? '/rpc'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,9 +41,9 @@ async function bearerHeader(): Promise<Record<string, string>> {
  *   retries the request.
  * - Base URL from `PUBLIC_API_URL` envar defaults to `/api`.
  *
- * All backend API calls should import `api` from here.
+ * All backend API calls should import `fetcher` from here.
  */
-export const api = ofetch.create({
+export const fetcher = ofetch.create({
   baseURL: API_BASE_URL,
   credentials: 'include',
   retry: 1,
@@ -64,6 +64,26 @@ export const api = ofetch.create({
 })
 
 /**
+ * Wrap a fetch with the silent-refresh retry the ofetch `api` client gets
+ * from its own hooks: when the backend answers 401, refresh the pair once
+ * and replay the request with the fresh Bearer. The refresh itself travels
+ * on the engine's own transport, so a retry can never recurse into another.
+ * A request the refresh could not save (pair dead, network down) falls
+ * through with the original 401 for the caller to handle.
+ */
+export function authRetryFetch(base: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const response = await base(input, init)
+    if (response.status !== 401) return response
+    if (!(await authWorker().refresh())) return response
+    const headers = new Headers(init?.headers)
+    const token = await authWorker().accessToken()
+    if (token) headers.set('authorization', `Bearer ${token}`)
+    return base(input, { ...init, headers })
+  }
+}
+
+/**
  * The ConnectRPC transport defines what type of endpoint we're hitting.
  * ConnectRPC base URL defaults to `/rpc` — the same-origin dev proxy.
  * In production, point `PUBLIC_RPC_URL`, same parent domain so the requests
@@ -71,11 +91,11 @@ export const api = ofetch.create({
  */
 export const rpcTransport = createConnectTransport({
   baseUrl: RPC_BASE_URL,
-  fetch: async (input, init) => {
+  fetch: authRetryFetch(async (input, init) => {
     const headers = new Headers(init?.headers)
     for (const [name, value] of Object.entries(await bearerHeader())) {
       headers.set(name, value)
     }
     return fetch(input, { ...init, headers })
-  }
+  })
 })

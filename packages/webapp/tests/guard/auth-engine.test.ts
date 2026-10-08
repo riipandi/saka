@@ -225,15 +225,53 @@ describe('auth engine', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('does not spend a refresh on a GetSession failure other than unauthenticated', async () => {
+  it('rethrows a GetSession failure other than unauthenticated without spending a refresh', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(signInJson))
     fetchMock.mockResolvedValue(jsonResponse({ code: 'unavailable', message: 'down' }, 503))
     const engine = createAuthEngine('http://test.local')
     await engine.login({ username: 'rlangdon', password: 'sophie' })
 
-    await expect(engine.session()).resolves.toBeNull()
+    await expect(engine.session()).rejects.toThrow(/down|unavailable|HTTP 503/i)
     expect(stringUrl(fetchMock.mock.calls[1]?.[0])).toContain('GetSession')
     expect(fetchMock.mock.calls).toHaveLength(2)
+  })
+
+  it('keeps the pair on a network-failed refresh — inconclusive is not a refusal', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+    await engine.login({ username: 'rlangdon', password: 'sophie' })
+
+    fetchMock.mockResolvedValue(jsonResponse({ code: 'unavailable', message: 'down' }, 503))
+    await expect(engine.refresh()).resolves.toBe(false)
+    // The backend never judged the pair, so it stays; the proactive timer
+    // retries after the cooldown.
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('drops the pair on a refused refresh — a refusal is a dead pair', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+    await engine.login({ username: 'rlangdon', password: 'sophie' })
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: 'unauthenticated', message: 'invalid token' }, 401)
+    )
+    await expect(engine.refresh()).resolves.toBe(false)
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('reports an accepted restore through the listener', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+    const session = await engine.login({ username: 'rlangdon', password: 'sophie' })
+
+    const changes: (TokenBundle | null)[] = []
+    await engine.setTokenListener((tokens) => changes.push(tokens))
+    await engine.restore(session.tokens)
+    expect(changes).toEqual([session.tokens])
+
+    await engine.restore({ ...session.tokens, refreshExpiresAt: Date.now() - 1000 })
+    expect(changes.at(-1)).toBeNull()
   })
 
   it('mirrors every custody change into the cookie — the reload survival path', async () => {

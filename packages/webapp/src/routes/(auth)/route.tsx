@@ -2,6 +2,7 @@ import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { ThemeSwitcher } from 'uilibs/theme'
+import { z } from 'zod'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated } from '#/libraries/guard/auth-store'
 import { safeReturnTo } from '#/libraries/guard/auth-utils'
@@ -9,13 +10,13 @@ import { styles } from '#/styles/element/auth-layout.stylex'
 
 export const Route = createFileRoute('/(auth)')({
   component: RouteComponent,
-  beforeLoad: async ({ location }) => {
+  validateSearch: z.object({
+    return_to: z.string().optional()
+  }),
+  beforeLoad: async ({ search }) => {
     await ensureSessionLoaded()
     if (isAuthenticated()) {
-      // A signed-in visitor opening /login (stale bookmark, saved link)
-      // goes straight to the originally requested path when present.
-      const search = location.search as { return_to?: string } | undefined
-      throw redirect({ href: safeReturnTo(search?.return_to) ?? '/overview' })
+      throw redirect({ href: safeReturnTo(search.return_to) ?? '/overview' })
     }
   }
 })

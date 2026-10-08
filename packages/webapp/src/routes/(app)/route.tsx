@@ -15,11 +15,8 @@ import { SideNavbar } from './-sidebar'
 export const Route = createFileRoute('/(app)')({
   component: RouteComponent,
   beforeLoad: async ({ location }) => {
-    // Wait for the silent cookie-session bootstrap before deciding.
     await ensureSessionLoaded()
     if (!isAuthenticated()) {
-      // Send the visitor back to the attempted path after signing in,
-      // and tell the login page why it was opened (shows a notice).
       throw redirect({
         to: '/login',
         search: {

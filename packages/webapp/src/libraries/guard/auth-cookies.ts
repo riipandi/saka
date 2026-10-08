@@ -75,6 +75,15 @@ export function clearTokenCookies(): void {
   }
 }
 
+/** The wire shape of a token pair — shared by the cookie jar and tab sync. */
+export const tokenBundleSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+  accessExpiresAt: z.number(),
+  refreshExpiresAt: z.number(),
+  sessionId: z.string().min(1)
+})
+
 /** The raw cookie jar shape — all five items, non-empty, still as strings. */
 const jarSchema = z.object({
   [TOKEN_COOKIE]: z.string().min(1),
@@ -122,11 +131,18 @@ export function writeUserCookie(user: UserProfile, expiresAtMs?: number): void {
 
 /**
  * Read the cached profile, or null when absent, malformed, or empty — a
- * cleared cookie leaves the name behind with an empty value in some engines.
+ * cleared cookie leaves the name behind with an empty value in some engines,
+ * and a hand-tampered value must never throw at boot.
  */
 export function readUserCookie(): UserProfile | null {
   const raw = parse(document.cookie)[USER_COOKIE]
   if (!raw) return null
-  const parsed = userSchema.safeParse(JSON.parse(raw))
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  const parsed = userSchema.safeParse(value)
   return parsed.success ? parsed.data : null
 }
