@@ -9,11 +9,13 @@ import {
   RefreshRequestSchema,
   SessionService,
   SignInRequestSchema,
-  SignOutRequestSchema,
-  type AuthenticatedUser,
-  type GetSessionResponse,
-  type RefreshResponse,
-  type SignInResponse
+  SignOutRequestSchema
+} from '~/codegen/authn_pb'
+import type {
+  AuthenticatedUser,
+  GetSessionResponse,
+  RefreshResponse,
+  SignInResponse
 } from '~/codegen/authn_pb'
 import type { UserProfile } from './auth-store'
 

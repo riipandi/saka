@@ -70,13 +70,13 @@ export function clearTokenCookies(): void {
   }
 }
 
-/** The raw cookie jar shape — all five items, still as strings. */
+/** The raw cookie jar shape — all five items, non-empty, still as strings. */
 const jarSchema = z.object({
-  [TOKEN_COOKIE]: z.string(),
+  [TOKEN_COOKIE]: z.string().min(1),
   [TOKEN_EXP_COOKIE]: z.coerce.number().finite(),
-  [REFRESH_COOKIE]: z.string(),
+  [REFRESH_COOKIE]: z.string().min(1),
   [REFRESH_EXP_COOKIE]: z.coerce.number().finite(),
-  [SESSION_ID_COOKIE]: z.string()
+  [SESSION_ID_COOKIE]: z.string().min(1)
 })
 
 /** Read the persisted pair, or null when any item is absent or malformed. */
