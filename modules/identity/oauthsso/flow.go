@@ -21,11 +21,12 @@ const (
 	flowLifetime = 10 * time.Minute
 
 	// spaCallbackPath is the SPA route the callback redirects to, with
-	// the flow token (or the error code) riding the query.
-	// TODO(frontend): the SPA route that receives the OAuth flow.
-	spaCallbackPath = "/oauth/callback"
-
-	secretBytes = 32
+	// the flow token or the error code riding the query. The path sits
+	// OUTSIDE the reserved surface prefixes (/oauth among them) — the
+	// shell never serves those as the SPA document, so a redirect into
+	// one would answer the envelope's 404, never the page.
+	spaCallbackPath = "/auth/callback"
+	secretBytes     = 32
 )
 
 // The failures the flow reports. The handler maps them onto the connect

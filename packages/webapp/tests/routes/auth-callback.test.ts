@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test'
-import { OAUTH_FLOW_ERROR_MESSAGES } from '#/routes/(auth)/oauth-callback'
+import { OAUTH_FLOW_ERROR_MESSAGES } from '#/routes/(auth)/auth/callback'
 
 describe('the OAuth flow error codes', () => {
   it('names every code the backend redirects carry', () => {
