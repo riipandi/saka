@@ -31,6 +31,8 @@ import { publishTokens, subscribeTokens } from './auth-sync'
 export interface AuthWorkerClient {
   /** Validate credentials, mint the pair, persist the cookie. Resolves the profile. */
   login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<UserProfile>
+  /** Complete an OAuth SSO flow the callback redirected with. Resolves the profile. */
+  continueSignIn(flowToken: string): Promise<UserProfile>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -92,6 +94,11 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
   return {
     async login(credentials: LoginCredentials, options?: AuthLoginOptions) {
       const result: AuthSession = await engine.login(credentials, options)
+      writeUserCookie(result.user, result.tokens.refreshExpiresAt)
+      return result.user
+    },
+    async continueSignIn(flowToken: string) {
+      const result: AuthSession = await engine.continueSignIn(flowToken)
       writeUserCookie(result.user, result.tokens.refreshExpiresAt)
       return result.user
     },

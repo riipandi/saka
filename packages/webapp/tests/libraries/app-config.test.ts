@@ -13,6 +13,7 @@ const configData = {
     one_time_access_email_as_admin_enabled: false,
     one_time_access_email_as_unauthenticated_enabled: true
   },
+  oauth: { enabled: true },
   oidc: { enabled: true },
   mailer: { notifications: { announcement_email_enabled: true } }
 }
@@ -38,6 +39,7 @@ describe('readAppConfig', () => {
   it('parses the public subset off the envelope', async () => {
     const config = await readAppConfig()
     expect(config.app.mode).toBe('development')
+    expect(config.oauth.enabled).toBe(true)
     expect(config.oidc.enabled).toBe(true)
     expect(config.auth.one_time_access_email_as_unauthenticated_enabled).toBe(true)
     expect(config.mailer.notifications.announcement_email_enabled).toBe(true)
@@ -49,6 +51,7 @@ describe('readAppConfig', () => {
     vi.mocked(fetcher).mockResolvedValue(envelope({}))
     const config = await readAppConfig()
     expect(config.app.mode).toBe('')
+    expect(config.oauth.enabled).toBe(false)
     expect(config.oidc.enabled).toBe(false)
     expect(config.auth.one_time_access_email_as_admin_enabled).toBe(false)
   })

@@ -27,6 +27,8 @@ export interface AuthContextValue {
   loggedIn: boolean
   isLoading: boolean
   login: (credentials: LoginCredentials, options?: AuthLoginContextOptions) => Promise<void>
+  /** Complete an OAuth SSO flow the callback route redirected with. */
+  continueSignIn: (flowToken: string) => Promise<void>
   logout: () => void
 }
 
@@ -35,6 +37,7 @@ export const AuthContext = createContext<AuthContextValue>({
   loggedIn: false,
   isLoading: false,
   login: async () => {},
+  continueSignIn: async () => {},
   logout: () => {}
 })
 

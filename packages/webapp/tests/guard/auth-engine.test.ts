@@ -52,6 +52,38 @@ describe('auth engine', () => {
     await expect(engine.accessToken()).resolves.toBeNull()
   })
 
+  it('completes an OAuth flow — the flow token is the whole credential', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    const session = await engine.continueSignIn('flow_tok_v1')
+
+    expect(session.user).toEqual(userJson)
+    expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('OAuthSSOService/ContinueSignIn')
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('refuses the OAuth flow that paused at an unhandled stage', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ ...signInJson, accessToken: '', refreshToken: '', stage: 'verify_email' })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.continueSignIn('flow_tok_v1')).rejects.toThrow(/verify_email/)
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('refuses the OAuth flow whose account keeps a second factor', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ ...signInJson, accessToken: '', refreshToken: '', mfaRequired: true })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.continueSignIn('flow_tok_v1')).rejects.toThrow(/multi-factor/i)
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
   it('carries the remember flag on the wire as the contract names it', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')

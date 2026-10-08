@@ -3,6 +3,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useForm } from '@tanstack/react-form'
 import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import type { ComponentType } from 'react'
 import { ViewTransition } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
@@ -20,6 +21,7 @@ import { GitHubIcon, GoogleIcon, ViteIcon } from 'uilibs/components/icons'
 import { z } from 'zod'
 import { useAppConfig } from '#/hooks/use-app-config'
 import { useAuthentication } from '#/hooks/use-auth'
+import { useOAuthProviders } from '#/hooks/use-oauth-providers'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
 
@@ -35,10 +37,17 @@ export const Route = createFileRoute('/(auth)/login')({
   }
 })
 
+/** The icon the two builtin providers render; a custom connection carries none. */
+const PROVIDER_ICONS: Record<string, ComponentType<{ size: number }>> = {
+  google: GoogleIcon,
+  github: GitHubIcon
+}
+
 function RouteComponent() {
   const navigate = useNavigate()
   const { login } = useAuthentication()
   const { data: config } = useAppConfig()
+  const { data: providers } = useOAuthProviders()
   const { unauthenticated, loggedOut, return_to } = useSearch({ from: Route.id })
   const [failed, setFailed] = useState<string | null>(null)
   const [remember, setRemember] = useState(false)
@@ -117,21 +126,31 @@ function RouteComponent() {
         </CardHeader>
 
         <CardContent>
-          {config?.oidc.enabled && (
+          {/* One button per connection the store enabled; the configuration's
+              master switch gates the whole block. The start route is the
+              server's own — the 302 chain is the flow's transport. */}
+          {config?.oauth.enabled && providers?.connections?.length ? (
             <>
               <ButtonGroup orientation='vertical' style={styles.socialGroup}>
-                <Button type='button' variant='outline' style={socialStyles.socialButton}>
-                  <GoogleIcon size={16} />
-                  Continue with Google
-                </Button>
-                <Button type='button' variant='outline' style={socialStyles.socialButton}>
-                  <GitHubIcon size={16} />
-                  Continue with GitHub
-                </Button>
+                {providers.connections.map((conn) => {
+                  const Icon = PROVIDER_ICONS[conn.provider]
+                  return (
+                    <Button
+                      key={conn.provider}
+                      type='button'
+                      variant='outline'
+                      style={socialStyles.socialButton}
+                      render={<a href={`/oauth/${conn.provider}/start`} />}
+                    >
+                      {Icon && <Icon size={16} />}
+                      {conn.displayName}
+                    </Button>
+                  )
+                })}
               </ButtonGroup>
               <FieldSeparator style={styles.divider}>or continue with</FieldSeparator>
             </>
-          )}
+          ) : null}
 
           <form
             id='login-form'

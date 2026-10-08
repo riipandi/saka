@@ -102,9 +102,17 @@ describe('authFetch (the shared seam)', () => {
     expect(response.status).toBe(200)
     expect(send).toHaveBeenCalledTimes(1)
   })
+
+  it('hands the caller an unread body — each side reads the response once', async () => {
+    stubFetch(jsonResponse({ ok: true }))
+
+    const response = await authFetch('/api/x')
+
+    await expect(response.json()).resolves.toEqual({ ok: true })
+  })
 })
 
-/** authFetch rides ofetch, which calls the global fetch — stand in for it. */
+/** authFetch rides the global fetch — stand in for it. */
 function stubFetch(...responses: Response[]): ReturnType<typeof vi.fn<typeof fetch>> {
   const send = vi.fn<typeof fetch>()
   for (const response of responses) send.mockResolvedValueOnce(response)

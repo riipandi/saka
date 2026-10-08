@@ -29,6 +29,7 @@ export const appConfigSchema = z.object({
       one_time_access_email_as_unauthenticated_enabled: z.boolean().default(false)
     })
     .prefault({}),
+  oauth: z.object({ enabled: z.boolean().default(false) }).prefault({}),
   oidc: z.object({ enabled: z.boolean().default(false) }).prefault({}),
   mailer: z
     .object({

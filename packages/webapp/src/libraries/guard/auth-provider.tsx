@@ -54,6 +54,18 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [navigate, router]
   )
 
+  const handleContinueSignIn = useCallback(
+    async (flowToken: string) => {
+      const profile = await authWorker().continueSignIn(flowToken)
+      setAuthUser(profile)
+      // The flow's redirect chain never carried the cache's account — clear it
+      // the same way a password sign-in does.
+      queryClient.clear()
+      void navigate({ to: '/overview' })
+    },
+    [navigate]
+  )
+
   const handleLogout = useCallback(() => {
     // The eviction effect in the `(app)` layout watches this same profile —
     // mark the sign-out first so its redirect never races the goodbye one.
@@ -74,8 +86,15 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, [navigate, router])
 
   const context = useMemo(
-    () => ({ user, loggedIn, isLoading, login: handleLogin, logout: handleLogout }),
-    [user, loggedIn, isLoading, handleLogin, handleLogout]
+    () => ({
+      user,
+      loggedIn,
+      isLoading,
+      login: handleLogin,
+      continueSignIn: handleContinueSignIn,
+      logout: handleLogout
+    }),
+    [user, loggedIn, isLoading, handleLogin, handleContinueSignIn, handleLogout]
   )
 
   return <AuthContext.Provider value={context}>{children}</AuthContext.Provider>

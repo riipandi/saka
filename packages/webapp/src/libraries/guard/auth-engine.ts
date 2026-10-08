@@ -3,9 +3,16 @@ import { Code, ConnectError, createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { RPC_BASE_URL } from '#/libraries/api-client'
 import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/codegen/authn_pb'
-import { SessionService, SignInRequestSchema, SignOutRequestSchema } from '~/codegen/authn_pb'
+import {
+  ContinueOAuthSignInRequestSchema,
+  OAuthSSOService,
+  SessionService,
+  SignInRequestSchema,
+  SignOutRequestSchema
+} from '~/codegen/authn_pb'
 import type {
   AuthenticatedUser,
+  ContinueOAuthSignInResponse,
   GetSessionResponse,
   RefreshResponse,
   SignInRequest,
@@ -75,8 +82,14 @@ export interface AuthLoginOptions {
  * via {@link AuthEngineApi.restore}.
  */
 export interface AuthEngineApi {
-  /** Validate credentials and mint the token pair. Resolves the profile and tokens. */
+  /** Validate credentials, mint the token pair. Resolves the profile and tokens. */
   login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<AuthSession>
+  /**
+   * Complete an OAuth SSO flow the callback redirected with: the flow token
+   * is the whole credential. Resolves the profile and tokens; a flow that
+   * paused at a stage this build does not handle is refused loudly.
+   */
+  continueSignIn(flowToken: string): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -124,6 +137,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   const transport = createConnectTransport({ baseUrl })
   const auth = createClient(AuthService, transport)
   const session = createClient(SessionService, transport)
+  const oauth = createClient(OAuthSSOService, transport)
 
   let tokens: TokenBundle | null = null
   let refreshInFlight: Promise<boolean> | null = null
@@ -165,8 +179,10 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       void api.refresh()
     }, delay)
   }
-  /** Take custody of a fresh pair from SignIn or Refresh and return it. */
-  function takeTokenPair(response: SignInResponse | RefreshResponse): TokenBundle {
+  /** Take custody of a fresh pair from SignIn, ContinueSignIn, or Refresh and return it. */
+  function takeTokenPair(
+    response: SignInResponse | RefreshResponse | ContinueOAuthSignInResponse
+  ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
       accessExpiresAt: Date.now() + response.accessExpiresIn * 1000,
@@ -236,6 +252,37 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       // presence-based, so the guard keeps the mapping honest.
       if (!response.user) {
         throw new ConnectError('Sign-in answered without an account.', Code.Internal)
+      }
+      const pair = takeTokenPair(response)
+      return { user: toProfile(response.user), tokens: pair }
+    },
+
+    async continueSignIn(flowToken) {
+      // A new session supersedes any in-flight refresh from the previous one.
+      sessionEpoch++
+      clearTimer()
+      const response = await oauth.continueSignIn(
+        create(ContinueOAuthSignInRequestSchema, { flowToken })
+      )
+      // The same forks the password sign-in pauses with, the same refusals:
+      // the challenge UI and the stage surfaces ship later, so a flow that
+      // paused is refused loudly rather than half-supported.
+      if (response.mfaRequired) {
+        tokens = null
+        throw new ConnectError(
+          'Multi-factor sign-in is not supported in this build yet.',
+          Code.Unimplemented
+        )
+      }
+      if (response.stage) {
+        tokens = null
+        throw new ConnectError(
+          `The sign-in flow paused at ${response.stage}, which this build does not handle yet.`,
+          Code.Unimplemented
+        )
+      }
+      if (!response.user) {
+        throw new ConnectError('The sign-in flow answered without an account.', Code.Internal)
       }
       const pair = takeTokenPair(response)
       return { user: toProfile(response.user), tokens: pair }

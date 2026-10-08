@@ -11,6 +11,7 @@ export const APP_CONFIG_QUERY_KEY = ['app-config']
  */
 export function useAppConfig(): UseQueryResult<AppConfig> {
   const queryClient = useQueryClient()
+  const query = useQuery({ queryKey: APP_CONFIG_QUERY_KEY, queryFn: readAppConfig })
 
   useEffect(() => {
     let lastAccountId: string | null = authStore.state.user?.id ?? null
@@ -23,5 +24,5 @@ export function useAppConfig(): UseQueryResult<AppConfig> {
     return () => subscription.unsubscribe()
   }, [queryClient])
 
-  return useQuery({ queryKey: APP_CONFIG_QUERY_KEY, queryFn: readAppConfig })
+  return query
 }

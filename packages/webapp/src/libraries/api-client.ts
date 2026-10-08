@@ -58,27 +58,19 @@ function mergeHeaders(existing: HeadersInit | undefined, extra: Record<string, s
 export const authFetch: typeof fetch = async (input, init) => {
   return withAuth(async (headers) => {
     const url = input instanceof URL ? input.toString() : input
-    return ofetch.raw(url, {
-      ...init,
-      headers: mergeHeaders(init?.headers, headers),
-      ignoreResponseError: true,
-      retry: 0
-    })
+    // Plain fetch, not ofetch.raw: the seam's callers — ofetch's own body
+    // parsing and connect-web's — each read the response body once, so the
+    // Response must cross the seam unread.
+    return fetch(url, { ...init, headers: mergeHeaders(init?.headers, headers) })
   })
 }
 
 /**
- * ofetch is the one HTTP engine under the seam: `fetcher` speaks the REST
- * envelope, the Connect transport rides the same `authFetch`. No client
- * calls ofetch directly.
+ * ofetch is the REST client's engine over the seam: it builds the request
+ * through `authFetch` and owns the response parsing and the envelope's
+ * error shapes. The Connect transport rides the same `authFetch` untouched.
  */
-export const fetcher = ofetch.create(
-  {
-    baseURL: API_BASE_URL,
-    retry: 0
-  },
-  { fetch: authFetch }
-)
+export const fetcher = ofetch.create({ baseURL: API_BASE_URL, retry: 0 }, { fetch: authFetch })
 
 /**
  * The Connect transport over the seam. In production, point `PUBLIC_RPC_URL`
