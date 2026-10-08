@@ -1,9 +1,11 @@
 # OAuth SSO: sign in with Google, GitHub, or your own provider
 
-Saka ships with external sign-in built in: a user clicks "Continue with
-Google" (or GitHub, or any OpenID Connect provider the operator has
-connected), proves who they are on the provider's site, and lands back —
-signed in, with no new password to remember.
+Saka ships with external sign-in built in: a user clicks the button of a
+provider the deployment has connected (Google or GitHub out of the box,
+or any OpenID Connect provider the operator has connected), proves who
+they are on the provider's site, and lands back — signed in, with no new
+password to remember. The sign-in page shows one button per enabled
+connection: what it offers is exactly what the operator configured.
 
 For the person running Saka, this page explains what can be connected,
 how the sign-in behaves, and the rules the system enforces. For the
