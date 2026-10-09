@@ -251,9 +251,10 @@ wires against.
   over `-sessions-view.tsx` and `-sessions-dialog.tsx` (phase 4).
 - [x] **Email verification & change** —
   `SendEmail`/`VerifyEmail`/`RequestEmailChange`/`ConfirmEmailChange`
-  (the change flow's completion half — shipped, see `issue-20261010_0017.md`
-  ISS-001 for the reference gap) plus the routes the mailed tokens land on:
-  the verify route. Phase 5 shipped the page (`routes/(app)/account/email.tsx`
+  (the change flow's completion half — the endpoint reference now carries
+  the row; `issue-20261010_0017.md` ISS-001 resolved) plus the routes the
+  mailed tokens land on: the verify route. Phase 5 shipped the page
+  (`routes/(app)/account/email.tsx`
   over `-email-view.tsx`: status card, code-entry verify, the gated change
   flow) and the no-session `/verify-email` door with `?code=` prefill; the
   change-confirm route is the email page's confirm step, not a separate URL —
@@ -272,6 +273,11 @@ wires against.
   (Settings, Sessions, Email, Audit) using the existing active-state
   pattern, and the overview's template residue (DummyJSON sign-out copy,
   template-repo link, invented stats) reads the product's own words.
+- [x] **The flows end to end** — `packages/e2e-tests/workflow/
+  account-{profile,sessions,email,audit}.test.ts` (phase 8, 2026-10-10),
+  19/19 green twice back to back; the deltas and the harness's rate-budget
+  override are in the plan's phase 8 record. The send-cooldown wording
+  stays with the page's browser test — the UI path to it does not exist.
 
 ### Wave 1.5 — the authz foundation (owner decisions, 2026-10-09)
 
