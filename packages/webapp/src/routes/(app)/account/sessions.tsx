@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { parseListPage } from '#/hooks/use-pagination'
-import { SessionsView } from '#/routes/(app)/account/-sessions-view'
+import { SessionsView } from './-sessions-view'
 
 export const Route = createFileRoute('/(app)/account/sessions')({
   component: RouteComponent,
@@ -12,7 +12,6 @@ export const Route = createFileRoute('/(app)/account/sessions')({
   }
 })
 
-/** The route owns the search params; the view owns the data and the actions. */
 function RouteComponent() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()

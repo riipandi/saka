@@ -29,7 +29,6 @@ import { Text } from 'uilibs/components/extra/text'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { SignOutDialog } from '#/routes/(app)/account/-sessions-dialog'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/sessions.stylex'
 import type { Session } from '~/codegen/authn_pb'
@@ -38,6 +37,7 @@ import {
   SignOutAllSessionsRequestSchema,
   SignOutOtherSessionsRequestSchema
 } from '~/codegen/authn_pb'
+import { SignOutDialog } from './-sessions-dialog'
 
 /**
  * The RFC 3339 instants the session view carries, read as the viewer's own
@@ -61,9 +61,7 @@ function formatProvider(provider: string): string {
 
 /**
  * The session center: the account's sessions, newest first, ended ones
- * included, the caller's own marked by the wire's `current` flag. The page
- * and the actions it takes are wired by the caller so the route owns the
- * search params and the view owns the data.
+ * included, the caller's own marked by the wire's `current` flag.
  *
  * The per-row revoke is deliberately absent — `RevokeSession` is step-up
  * guarded, and the reauthentication modal is Wave 2 machinery that this
@@ -230,7 +228,6 @@ export function SessionsView({
   )
 }
 
-/** One session: the device it names, where and when it was opened, its state. */
 function SessionItem({ session }: { session: Session }) {
   const live = !session.revokedAt
   return (

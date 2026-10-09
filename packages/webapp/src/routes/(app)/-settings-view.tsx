@@ -25,7 +25,6 @@ import { usePublicSettings } from '#/hooks/use-public-settings'
 import { fetcher } from '#/libraries/api-client'
 import { setAuthUser } from '#/libraries/guard/auth-store'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { DeleteAccountDialog } from '#/routes/(app)/-settings-dialog'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/settings.stylex'
 import {
@@ -35,8 +34,8 @@ import {
   type User,
   UserService
 } from '~/codegen/identity_pb'
+import { DeleteAccountDialog } from './-settings-dialog'
 
-/** The public settings keys this page gates its actions by. */
 const KEY_CHANGE_USERNAME = 'users.change_username_enabled'
 const KEY_SELF_DELETE = 'users.self_delete_enabled'
 
@@ -45,7 +44,6 @@ const MAX_PICTURE_BYTES = 2 * 1024 * 1024
 /** The kinds the backend's magic-byte sniff accepts. */
 const PICTURE_KINDS = ['image/png', 'image/jpeg', 'image/webp']
 
-/** The profile fields the form edits; strings, because inputs hold strings. */
 interface ProfileDraft {
   firstName: string
   lastName: string

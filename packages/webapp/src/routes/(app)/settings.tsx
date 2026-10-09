@@ -8,7 +8,6 @@ export const Route = createFileRoute('/(app)/settings')({
   }
 })
 
-/** The route owns the wiring; the view owns the data and the actions. */
 function RouteComponent() {
   return <SettingsView />
 }
