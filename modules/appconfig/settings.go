@@ -471,16 +471,19 @@ func Catalog() []SettingDef {
 		{
 			Key:         SettingUsersSelfDeleteEnabled,
 			Default:     "false",
+			Public:      true,
 			Description: "Whether an account may delete itself; the per-account override column turns the decision either way.",
 		},
 		{
 			Key:         SettingUsersChangeEmailEnabled,
 			Default:     "true",
+			Public:      true,
 			Description: "Whether the account email change flow is offered.",
 		},
 		{
 			Key:         SettingUsersChangeUsernameEnabled,
 			Default:     "true",
+			Public:      true,
 			Description: "Whether the username change flow is offered.",
 		},
 		{

@@ -106,10 +106,12 @@ func TestTheAuthCatalogIsWellFormed(t *testing.T) {
 }
 
 // TestThePublicFamilyStaysPreAuthSmall pins the boundary the unauthenticated
-// read answers: only the mode, the allowlist gate, and the identity toggles
-// the sign-up and sign-in screens need before any account exists. A key that
-// leaks policy detail past that set either loses its Public flag or gains a
-// deliberate exception here, with a reason.
+// read answers: the mode and the allowlist gate, the identity toggles the
+// sign-up and sign-in screens need before any account exists, the factor
+// limits the enrollment screens show, and the account toggles the account
+// screens gate their own actions by (self-delete, email change, username
+// change). A key that leaks policy detail past that set either loses its
+// Public flag or gains a deliberate exception here, with a reason.
 func TestThePublicFamilyStaysPreAuthSmall(t *testing.T) {
 	var public []string
 	for _, def := range Catalog() {
@@ -128,6 +130,9 @@ func TestThePublicFamilyStaysPreAuthSmall(t *testing.T) {
 		SettingAuthSignupUsernameEnabled,
 		SettingAuthRequireUsername,
 		SettingAuthSignupPasswordEnabled,
+		SettingUsersSelfDeleteEnabled,
+		SettingUsersChangeEmailEnabled,
+		SettingUsersChangeUsernameEnabled,
 	}
 	require.Len(t, public, len(expected))
 	assert.ElementsMatch(t, expected, public)
