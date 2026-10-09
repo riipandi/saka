@@ -57,7 +57,7 @@ func TestMigrateSeedCreatesTheDefaultUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" created")
-	assert.Contains(t, out, "status: 123 created, 1 skipped")
+	assert.Contains(t, out, "status: 124 created, 1 skipped")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
@@ -72,7 +72,7 @@ func TestMigrateSeedIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" skipped")
-	assert.Contains(t, out, "0 created, 120 skipped")
+	assert.Contains(t, out, "0 created, 121 skipped")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
@@ -84,7 +84,7 @@ func TestMigrateSeedDryRunWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" would create")
-	assert.Contains(t, out, "105 to create, 5 to skip")
+	assert.Contains(t, out, "106 to create, 5 to skip")
 	assert.Zero(t, countUsers(t, envFile))
 }
 
@@ -146,7 +146,7 @@ func TestMigrateSeedAcceptedPromptSeeds(t *testing.T) {
 	out, err := runMigrateSeedCmd(t, "y\n", "--env-file="+envFile)
 	require.NoError(t, err)
 
-	assert.Contains(t, out, "status: 123 created, 1 skipped")
+	assert.Contains(t, out, "status: 124 created, 1 skipped")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
