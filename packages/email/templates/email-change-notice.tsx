@@ -17,7 +17,11 @@ interface EmailChangeNoticeProps {
 }
 
 export const EmailChangeNotice = ({ logoURL, appName, data }: EmailChangeNoticeProps) => {
-  const detailsBoxStyle = { width: '225px', padding: '12px' } satisfies CSSProperties
+  const detailsBoxStyle = {
+    width: '225px',
+    padding: '12px',
+    verticalAlign: 'top'
+  } satisfies CSSProperties
   const detailsLabelStyle = { margin: 0, color: '#747474' } satisfies CSSProperties
   const detailsBoxValueStyle = { margin: 0, fontSize: '14px' } satisfies CSSProperties
 
