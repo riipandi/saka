@@ -151,8 +151,10 @@ jobs:
 
       - name: Run unit tests (frontend)
         run: pnpm exec vp test
-        env:
-          NODE_ENV: production
+        # No NODE_ENV here on purpose: production resolves React's production
+        # CJS builds, where React.act does not exist — every @testing-library
+        # render dies with "React.act is not a function" (seen on PR #7).
+        # Vitest sets NODE_ENV=test itself.
 
       - name: Run unit tests (backend)
         run: gotestsum --format testname ./...
