@@ -1,20 +1,9 @@
 import { create } from '@bufbuild/protobuf'
 import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
-import { Bin, ImagePlus, Power, RotateCcw } from '@keyline-icons/react'
+import { ImagePlus, Power, RotateCcw } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
@@ -36,6 +25,7 @@ import { usePublicSettings } from '#/hooks/use-public-settings'
 import { fetcher } from '#/libraries/api-client'
 import { setAuthUser } from '#/libraries/guard/auth-store'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { DeleteAccountDialog } from '#/routes/(app)/-settings-dialog'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/settings.stylex'
 import {
@@ -458,75 +448,5 @@ export function SettingsView() {
         </Card>
       </div>
     </div>
-  )
-}
-
-/**
- * The typed confirmation the deletion demands: the dialog owns its open
- * state and the typed word, and the confirm button stays disabled until the
- * typed value matches — the account's handle is the one word the deleter
- * cannot mean by accident.
- */
-function DeleteAccountDialog({
-  username,
-  onDelete,
-  pending,
-  error
-}: {
-  username: string
-  onDelete: () => void
-  pending: boolean
-  error: string | null
-}) {
-  const [open, setOpen] = useState(false)
-  const [typed, setTyped] = useState('')
-  return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen)
-        if (!nextOpen) setTyped('')
-      }}
-    >
-      <AlertDialogTrigger render={<Button variant='destructive' />}>
-        <Bin size={16} />
-        Delete account
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete this account?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This removes the account permanently — its sessions end and its profile picture is
-            discarded. Type the username to confirm.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <Field>
-          <FieldLabel htmlFor='delete-account-confirm'>Username</FieldLabel>
-          <Input
-            id='delete-account-confirm'
-            value={typed}
-            placeholder={username}
-            autoComplete='off'
-            onChange={(event) => setTyped(event.target.value)}
-          />
-          {error ? (
-            <Text render={<p />} variant='body-2' color='critical'>
-              {error}
-            </Text>
-          ) : null}
-        </Field>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant='destructive'
-            disabled={typed !== username || pending}
-            onClick={() => onDelete()}
-          >
-            {pending ? <Spinner /> : <Bin size={16} />}
-            Delete account
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   )
 }

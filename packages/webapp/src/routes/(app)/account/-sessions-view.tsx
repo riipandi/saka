@@ -1,20 +1,9 @@
 import { create } from '@bufbuild/protobuf'
 import { createConnectQueryKey, useMutation } from '@connectrpc/connect-query'
-import { LaptopSmartphone, LogOut } from '@keyline-icons/react'
+import { LaptopSmartphone } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
@@ -40,6 +29,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { SignOutDialog } from '#/routes/(app)/account/-sessions-dialog'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/sessions.stylex'
 import type { Session } from '~/codegen/authn_pb'
@@ -267,56 +257,5 @@ function SessionItem({ session }: { session: Session }) {
         )}
       </ItemActions>
     </Item>
-  )
-}
-
-/** The shared confirmation the two bulk sign-outs ride — distinct actions, one shape. */
-function SignOutDialog({
-  trigger,
-  title,
-  description,
-  pending,
-  error,
-  onConfirm
-}: {
-  trigger: string
-  title: string
-  description: string
-  pending: boolean
-  error: string | null
-  onConfirm: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='sm' />}>
-        {trigger}
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-          {error ? (
-            <Text render={<p />} variant='body-2' color='critical'>
-              {error}
-            </Text>
-          ) : null}
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant='destructive'
-            disabled={pending}
-            onClick={() => {
-              setOpen(false)
-              onConfirm()
-            }}
-          >
-            {pending ? <Spinner /> : <LogOut size={16} />}
-            {trigger}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   )
 }
