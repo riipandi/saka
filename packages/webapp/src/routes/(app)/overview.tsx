@@ -19,9 +19,9 @@ export const Route = createFileRoute('/(app)/overview')({
 })
 
 const STATS: Array<[value: string, label: string, description: string]> = [
-  ['Type-safe', 'Routing', 'Routes and links stay in sync across every page.'],
-  ['34', 'UI components', 'Base UI primitives wrapped with StyleX tokens.'],
-  ['72', 'Interaction tests', 'Vitest + Storybook run on every commit.']
+  ['One', 'Account', 'The identity every application here authenticates against.'],
+  ['Passkey', 'First', 'Sign in with what you are, not what you remember.'],
+  ['Self-hosted', 'By design', 'The deployment is yours; the data stays with it.']
 ]
 
 const currentHour = new Date().getHours()
@@ -116,17 +116,13 @@ function RouteComponent() {
             <Item
               size='sm'
               render={
-                <a
-                  href='https://github.com/riipandi/vite-react-template'
-                  target='_blank'
-                  rel='noreferrer'
-                >
+                <a href='https://github.com/riipandi/saka' target='_blank' rel='noreferrer'>
                   <ItemMedia variant='icon'>
                     <Link2 size={16} />
                   </ItemMedia>
                   <ItemContent>
                     <ItemTitle>Source code</ItemTitle>
-                    <ItemDescription>Read the template repository on GitHub.</ItemDescription>
+                    <ItemDescription>Read the source on GitHub.</ItemDescription>
                   </ItemContent>
                   <ItemActions>
                     <Badge variant='secondary'>OSS</Badge>

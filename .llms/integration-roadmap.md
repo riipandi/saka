@@ -232,12 +232,14 @@ wires against.
 
 ### Wave 1 — the account works on real data (self-service)
 
-- [ ] **Profile & preferences** — `GetCurrentUser`/`UpdateCurrentUser`, the
+- [x] **Profile & preferences** — `GetCurrentUser`/`UpdateCurrentUser`, the
   profile-picture PUT/DELETE (raw body through the REST seam),
   `DeleteMyAccount` behind the toggle. Destubs `settings.tsx`; the account
   view the guard carries gets its authoritative source. First
-  Connect-Query mutation consumer and first binary upload.
-- [ ] **Session center** — `ListSessions`, `SignOutOtherSessions`,
+  Connect-Query mutation consumer and first binary upload. Shipped as
+  `routes/(app)/settings.tsx` over `-settings-view.tsx` and
+  `-settings-dialog.tsx` (phase 3).
+- [x] **Session center** — `ListSessions`, `SignOutOtherSessions`,
   `SignOutAllSessions` (the engine already owns `GetSession`/`SignOut`).
   The `unauthenticated`-on-ended-session semantics are already the engine's
   restore signal. **The per-row revoke moved to Wave 2** (owner decision,
@@ -245,7 +247,8 @@ wires against.
   (`internal/guard/rules.go` marks it `StepUp: true`), and the step-up
   modal this page's action becomes the first consumer of lands there —
   shipping the button now would expose an action that always answers
-  `authentication required`.
+  `authentication required`. Shipped as `routes/(app)/account/sessions.tsx`
+  over `-sessions-view.tsx` and `-sessions-dialog.tsx` (phase 4).
 - [x] **Email verification & change** —
   `SendEmail`/`VerifyEmail`/`RequestEmailChange`/`ConfirmEmailChange`
   (the change flow's completion half — shipped, see `issue-20261010_0017.md`
@@ -255,13 +258,20 @@ wires against.
   flow) and the no-session `/verify-email` door with `?code=` prefill; the
   change-confirm route is the email page's confirm step, not a separate URL —
   the mailed code is typed where the session already is.
-- [x] **Audit trail (own)** — `AuditLogService/List` on the account page;
-  the smallest list-with-pagination consumer. Built the shared pagination
+- [x] **Audit trail (own)** — `AuditLogService/List` on the account page;  the smallest list-with-pagination consumer. Built the shared pagination
   hook here. Shipped as `routes/(app)/account/audit.tsx` over
   `-audit-view.tsx`: the records as sentences (event, outcome badge,
   address, when), the delegated-action actor beside the record
   (`actor_username`), the `sort_by` whitelist riding the route search, and
   the empty state. Display-only — the page writes nothing.
+- [x] **Shell residue cleanup** — the root `index.tsx` is a pure redirect now
+  (owner decision, 2026-10-10: no landing page; authed → `/overview`,
+  anonymous → `/login` — the file stays, the hero does not), the sidebar
+  reads the product ("Saka") and replaces the placeholder nav
+  (Search/Analytics/Docs/Products/Messages) with an Account section
+  (Settings, Sessions, Email, Audit) using the existing active-state
+  pattern, and the overview's template residue (DummyJSON sign-out copy,
+  template-repo link, invented stats) reads the product's own words.
 
 ### Wave 1.5 — the authz foundation (owner decisions, 2026-10-09)
 
@@ -570,10 +580,13 @@ hand-edited). Verified in the tree 2026-10-09:
   `isAuthenticated` guard redirecting with `return_to` + `unauthenticated`, the sidebar,
   and the eviction effect that bounces a profile that disappears mid-session. Children
   today: `overview.tsx`, `settings.tsx` (DummyJSON stub).
-- Template residue rides in the shell: the `index.tsx` hero ("Vite React Template",
+- Template residue rode in the shell: the `index.tsx` hero ("Vite React Template",
   "Demo sign in"), the sidebar's logo ("ReactiVite") and placeholder nav items
-  (Search/Analytics/Docs/Products/Messages with `href: undefined`). The de-templating is
-  Wave-1 work under the demo-free principle, not a separate pass.
+  (Search/Analytics/Docs/Products/Messages with `href: undefined`). Resolved in
+  Wave 1 phase 7: the root is a pure redirect now — authed visitors land on
+  `/overview`, anonymous ones on `/login`, and no landing page renders — and the
+  sidebar reads the product ("Saka") with an Account section (Settings, Sessions,
+  Email, Audit) where the placeholders were.
 
 Conventions the waves keep:
 
@@ -608,7 +621,7 @@ Target layout, annotated with the wave that lands each file:
 ```text
 routes/
   __root.tsx                    # providers + pageTitle — unchanged
-  index.tsx                     # landing — destub the hero (Wave 1)
+  index.tsx                     # pure redirect: authed → /overview, anonymous → /login (Wave 1)
     verify-email.tsx              # token consumption, no guard — works signed-in or not (Wave 1)
     -verify-email-view.tsx        #   the implementation; ?code= prefills the slots
   -boundaries.tsx               # shared, not a route
