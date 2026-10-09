@@ -7,6 +7,15 @@ import {
   Settings
 } from '@keyline-icons/react'
 import { PanelLeft, PanelRight } from '@keyline-icons/react'
+// The two-tone variant paints the accent the stroke set only outlines, so
+// the selected item reads filled where its idle siblings stay outlined.
+import {
+  History as HistoryTwoTone,
+  LaptopSmartphone as LaptopSmartphoneTwoTone,
+  LayoutDashboard as LayoutDashboardTwoTone,
+  Mail as MailTwoTone,
+  Settings as SettingsTwoTone
+} from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
@@ -17,17 +26,30 @@ import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
 interface NavItem {
   icon: React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
+  activeIcon?: React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
   href: LinkProps['to'] | undefined
   label: string
 }
 
-const navItems: NavItem[] = [{ icon: LayoutDashboard, label: 'Overview', href: '/overview' }]
+const navItems: NavItem[] = [
+  {
+    icon: LayoutDashboard,
+    activeIcon: LayoutDashboardTwoTone,
+    label: 'Overview',
+    href: '/overview'
+  }
+]
 
 const secondaryItems: NavItem[] = [
-  { icon: Settings, label: 'Settings', href: '/settings' },
-  { icon: LaptopSmartphone, label: 'Sessions', href: '/account/sessions' },
-  { icon: Mail, label: 'Email', href: '/account/email' },
-  { icon: History, label: 'Audit', href: '/account/audit' }
+  { icon: Settings, activeIcon: SettingsTwoTone, label: 'Settings', href: '/settings' },
+  {
+    icon: LaptopSmartphone,
+    activeIcon: LaptopSmartphoneTwoTone,
+    label: 'Sessions',
+    href: '/account/sessions'
+  },
+  { icon: Mail, activeIcon: MailTwoTone, label: 'Email', href: '/account/email' },
+  { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
 
 function LogoMark() {
@@ -60,7 +82,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
   const renderNavItems = (items: NavItem[]) =>
     items.map((item) => {
       const itemActive = isActive(item.href)
-      const Icon = item.icon
+      const Icon = itemActive && item.activeIcon ? item.activeIcon : item.icon
       return (
         <Link
           key={item.label}
