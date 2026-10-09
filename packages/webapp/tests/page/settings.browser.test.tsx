@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 import { render } from 'vitest-browser-react'
 import { AuthContext } from '#/hooks/use-auth'
 import { authStore, type AuthState } from '#/libraries/guard/auth-store'
-import { RouteComponent } from '#/routes/(app)/settings'
+import { SettingsView as RouteComponent } from '#/routes/(app)/-settings-view'
 import {
   DeleteMyAccountResponseSchema,
   GetCurrentUserResponseSchema,

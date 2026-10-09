@@ -237,10 +237,15 @@ wires against.
   `DeleteMyAccount` behind the toggle. Destubs `settings.tsx`; the account
   view the guard carries gets its authoritative source. First
   Connect-Query mutation consumer and first binary upload.
-- [ ] **Session center** — `ListSessions`, `RevokeSession`,
-  `SignOutOtherSessions`, `SignOutAllSessions` (the engine already owns
-  `GetSession`/`SignOut`). The `unauthenticated`-on-ended-session
-  semantics are already the engine's restore signal.
+- [ ] **Session center** — `ListSessions`, `SignOutOtherSessions`,
+  `SignOutAllSessions` (the engine already owns `GetSession`/`SignOut`).
+  The `unauthenticated`-on-ended-session semantics are already the engine's
+  restore signal. **The per-row revoke moved to Wave 2** (owner decision,
+  2026-10-10): `RevokeSession` is step-up-guarded
+  (`internal/guard/rules.go` marks it `StepUp: true`), and the step-up
+  modal this page's action becomes the first consumer of lands there —
+  shipping the button now would expose an action that always answers
+  `authentication required`.
 - [ ] **Email verification & change** —
   `SendEmail`/`VerifyEmail`/`RequestEmailChange`/`ConfirmEmailChange`
   (the change flow's completion half — shipped, see `issue-20261010_0017.md`
@@ -370,8 +375,12 @@ goal, three deltas from its shape:
   as shared infrastructure: the `Reauthenticate` modal (password / passkey
   / email-code factors), the `X-Saka-Reauthentication` header plumbing in
   `authFetch`, and the single-use-token lifetime handling. Every later
-  destructive action reuses it. The E2E passkey ladder and the debug
-  simulation pages are the harness this wave graduates to the real UI.
+  destructive action reuses it — **the session center's per-row
+  `RevokeSession` is its first consumer** (owner decision, 2026-10-10:
+  the action is wired and confirmed in `account/sessions.tsx` the moment
+  the modal exists, since the procedure is step-up-guarded). The E2E
+  passkey ladder and the debug simulation pages are the harness this wave
+  graduates to the real UI.
 
 ### Wave 3 — the admin console core
 
@@ -571,10 +580,18 @@ Conventions the waves keep:
 4. Every route sets `staticData.pageTitle`; query state rides `validateSearch` (zod);
    above-the-fold queries prefetch in the section's `route.tsx` loader, the way
    `(auth)/route.tsx` warms the login page's two queries.
-5. Shared components inside `routes/` keep the `-` prefix; composition reused across
+5. **Route files stay small through dash-file code splitting** (TanStack Router): the
+   route file declares `createFileRoute` — search params, page title, and a thin
+   component that wires `useSearch`/`useNavigate` to the view — while the
+   implementation lives beside it in a `-`-prefixed file (`-settings-view.tsx`);
+   files and folders with the `-` prefix are excluded from the route tree and never
+   answer a URL (<https://tanstack.com/router/latest/docs/routing/file-based-routing>).
+6. Shared components inside `routes/` keep the `-` prefix; composition reused across
    sections lives under `src/components/` or `src/libraries/`, but every primitive is a
    `uilibs` component — a missing one is added to `packages/uilibs/`, never webapp-local,
-   and an existing one's design is never reshaped to fit a feature.
+   and an existing one's design is never reshaped to fit a feature. Compose screens with
+   the skills `emil-design-eng` and `apple-design` in force (owner direction, 2026-10-10),
+   and check the component's Storybook story beside it before building on it.
 
 Target layout, annotated with the wave that lands each file:
 
@@ -598,9 +615,11 @@ routes/
     |                           #   impersonation banner mount (Wave 3)
     overview.tsx
     settings.tsx                 # profile & preferences — destub (Wave 1)
+    -settings-view.tsx           #   the implementation; dash files are not routes
     device.tsx                   # device-login approval: Inspect + Decide (Wave 6)
     account/
       sessions.tsx               # session center (Wave 1)
+      -sessions-view.tsx         #   the implementation
       email.tsx                  # verification & change status (Wave 1)
       security.tsx               # passkeys + MFA + password management + step-up (Wave 2)
       audit.tsx                  # own audit trail (Wave 1)
