@@ -40,6 +40,7 @@ var quietRequestPrefixes = []string{
 	"/__tsd/",
 	"/apple-touch-icon",
 	"/favicon.",
+	"/assets/",
 	"/node_modules/",
 	"/src/",
 	"/virtual:",
