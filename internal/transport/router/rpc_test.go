@@ -3,6 +3,7 @@ package router_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -210,6 +211,20 @@ func (rpcFeature) MountRPC(server *connect.Server) {
 	authnv1connect.RegisterAuthServiceHandler(server, stubAuthService{})
 }
 
+// rpcFailingFeature is the same feature with a service that fails on a plain
+// error — the non-coded failure a database driver leaves behind, not one the
+// handler authored. The masking test needs exactly this shape on the wire.
+type rpcFailingFeature struct{}
+
+func (rpcFailingFeature) Name() string { return "rpc-failing-feature" }
+
+func (rpcFailingFeature) Mount(chi.Router) {}
+
+func (rpcFailingFeature) MountRPC(server *connect.Server) {
+	err := errors.New("sql: duplicate key value violates unique constraint \"accounts_username_key\"")
+	authnv1connect.RegisterAuthServiceHandler(server, stubAuthService{fail: err})
+}
+
 // TestAModuleProcedureMountsBelowThePrefix pins the seam a feature uses to add
 // a procedure: it registers on the same server as the transport's own
 // services, and the mount serves it below the prefix, with the prefix already
@@ -285,10 +300,44 @@ func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
 	assert.NotContains(t, rec.Body.String(), `"access_expires_in":"900"`)
 }
 
-// stubAuthService answers the smallest SignIn response that carries the field.
-type stubAuthService struct{}
+// TestAPlainErrorIsMasked pins the wire verdict v2 hands a service's plain
+// error: the code is `unknown` and the message carries nothing — a driver
+// error's SQL fragments and constraint names are not a caller's to read. The
+// cause stays server-side, which is the improvement over v1's habit of
+// publishing err.Error(). A handler that wants a message authors a
+// *connect.Error, and those keep their text (every refusal test in this
+// package is the proof).
+func TestAPlainErrorIsMasked(t *testing.T) {
+	router := rt.NewRouter(rt.Options{
+		Config:  config.Default(),
+		Checker: health.NewChecker(),
+		Modules: []kernel.Module{rpcFailingFeature{}},
+	})
 
-func (stubAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+
+	var body struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "unknown", body.Code)
+	assert.Empty(t, body.Message, "a plain error's text must not reach the wire")
+	assert.NotContains(t, rec.Body.String(), "constraint")
+}
+
+// stubAuthService answers the smallest SignIn response that carries the field.
+// A stub may carry a plain (non-connect) failure to answer with instead: the
+// masking test needs a service error that is not a coded one.
+type stubAuthService struct{ fail error }
+
+func (s stubAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	if s.fail != nil {
+		return nil, s.fail
+	}
 	return &authnv1.SignInResponse{
 		AccessToken:     "token",
 		TokenType:       "Bearer",
