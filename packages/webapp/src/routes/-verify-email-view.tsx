@@ -88,7 +88,12 @@ export function VerifyEmailView({ initialCode }: { initialCode?: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent {...stylex.props(styles.content)}>
-          <OTPField length={CODE_LENGTH} value={code} onValueChange={setCode}>
+          <OTPField
+            length={CODE_LENGTH}
+            value={code}
+            onValueChange={setCode}
+            validationType='alphanumeric'
+          >
             <OTPFieldSlot />
             <OTPFieldSlot />
             <OTPFieldSlot />

@@ -1,5 +1,5 @@
-import { Hr, CodeInline } from 'react-email'
-import { CardFooter, CardHeader, Text } from '../components'
+import { Hr } from 'react-email'
+import { Code, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
@@ -27,9 +27,7 @@ export const EmailVerification = ({ logoURL, appName, data }: EmailVerificationP
       </Text>
 
       <Text style={{ textAlign: 'center' }}>
-        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>
-          {data.verificationCode}
-        </CodeInline>
+        <Code style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.verificationCode}</Code>
       </Text>
 
       <Text style={{ marginTop: '24px' }}>

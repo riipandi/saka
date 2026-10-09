@@ -1,5 +1,5 @@
-import { Hr, CodeInline } from 'react-email'
-import { Alert, CardFooter, CardHeader, Text } from '../components'
+import { Hr } from 'react-email'
+import { Code, Alert, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
@@ -31,7 +31,7 @@ export const PasswordReset = ({ logoURL, appName, data }: PasswordResetProps) =>
       </Text>
 
       <Text style={{ textAlign: 'center' }}>
-        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.resetCode}</CodeInline>
+        <Code style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.resetCode}</Code>
       </Text>
 
       <Alert variant='warning' style={{ marginTop: '20px' }}>

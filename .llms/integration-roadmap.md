@@ -749,10 +749,18 @@ File: `workflow/session-foundation.test.ts` (happy: shipped; unhappy rows below 
   login route with the `unauthenticated` notice; an SSO flow ending in an error word
   renders its message on `/auth/callback`.
 
-### Wave 1 — account self-service
+### Wave 1 — account self-service — shipped (phase 8, 2026-10-10)
 
 File: `workflow/account-profile.test.ts`, `workflow/account-sessions.test.ts`,
-`workflow/account-email.test.ts`, `workflow/account-audit.test.ts`.
+`workflow/account-email.test.ts`, `workflow/account-audit.test.ts` — all four
+shipped and green twice back to back (19/19 with the session foundation).
+Two deltas the wire checks forced: the send-cooldown wording is not
+reachable through the UI (an unverified account cannot sign in to send its
+own code — the wording stays with the page's browser test), and the
+sessions file holds the per-row revoke's ABSENCE (the step-up boundary D6
+recorded). The harness raises its own rate budgets through
+`packages/e2e-tests/make-config.mjs`; the environment is deliberately not a
+config layer, so the override rides a generated `--config-file`.
 
 - Profile — happy: the settings page renders the account view (`GetCurrentUser`);
   updating names/locale/timezone persists after reload; a valid PNG upload swaps the

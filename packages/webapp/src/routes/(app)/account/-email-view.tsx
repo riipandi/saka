@@ -56,7 +56,15 @@ function CodeEntry({
   disabled?: boolean
 }) {
   return (
-    <OTPField length={CODE_LENGTH} value={value} onValueChange={onValueChange} disabled={disabled}>
+    <OTPField
+      length={CODE_LENGTH}
+      value={value}
+      onValueChange={onValueChange}
+      // The wire's alphabet is letters and digits — the field's numeric
+      // default would reject every code at the keystroke.
+      validationType='alphanumeric'
+      disabled={disabled}
+    >
       <OTPFieldSlot />
       <OTPFieldSlot />
       <OTPFieldSlot />
