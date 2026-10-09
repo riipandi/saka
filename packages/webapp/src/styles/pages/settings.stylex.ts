@@ -6,6 +6,18 @@ import { unit } from 'uilibs/styles/tokens.stylex'
  * (Card, Field, Input, Alert, Badge, Text, ThemeSwitcher).
  */
 export const styles = stylex.create({
+  pictureRow: {
+    alignItems: 'center',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: unit.x5
+  },
+  pictureActions: {
+    alignItems: 'center',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: unit.x2
+  },
   profileRow: {
     display: 'flex',
     alignItems: 'center',
