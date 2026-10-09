@@ -1,7 +1,7 @@
 package devicelogin
 
 import (
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
@@ -40,13 +40,11 @@ func (m *Module) Mount(r chi.Router) {
 	newHandler(m.service).Mount(r)
 }
 
-// MountRPC registers the approval procedures on the RPC router. The
-// handler options are the transport's — the shared snake_case codec and
-// the panic boundary — so the procedures answer exactly like the rest.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, connectHandler := authnv1connect.NewDeviceApprovalServiceHandler(m.rpcHandler, opts...)
-	r.Handle(authnv1connect.DeviceApprovalServiceInspectProcedure, connectHandler)
-	r.Handle(authnv1connect.DeviceApprovalServiceDecideProcedure, connectHandler)
+// MountRPC registers the approval procedures on the RPC server. The server
+// carries the transport's interceptors and the mount the shared snake_case
+// codec, so the procedures answer exactly like the rest.
+func (m *Module) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterDeviceApprovalServiceHandler(server, m.rpcHandler)
 }
 
 // Package registers the services this feature owns.

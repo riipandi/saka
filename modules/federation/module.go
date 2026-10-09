@@ -17,7 +17,7 @@ import (
 
 	"log/slog"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
@@ -80,8 +80,8 @@ func (m *Module) Mount(r chi.Router) {
 
 // MountRPC registers the procedures of every feature that serves any. The
 // area forwards because the composition root names the area alone.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	kernel.MountRPC(r, opts, m.features...)
+func (m *Module) MountRPC(server *connect.Server) {
+	kernel.MountRPC(server, m.features...)
 }
 
 // Package registers the services this area owns.

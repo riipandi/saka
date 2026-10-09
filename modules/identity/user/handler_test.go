@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,13 +63,13 @@ func TestThePictureReadServesTheRESTRoute(t *testing.T) {
 	// test mounts it over the same public route the transport lists, with an
 	// authenticator that answers the verifier's claims.
 	auth := func(ctx context.Context, req *http.Request) (any, error) {
-		bearer, ok := authn.BearerToken(req)
+		bearer, ok := jwtutils.BearerToken(req)
 		if !ok {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		caller, err := verifier.VerifyCaller(ctx, bearer)
 		if err != nil {
-			return nil, authn.Errorf("invalid or expired token")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "invalid or expired token")
 		}
 		return caller, nil
 	}

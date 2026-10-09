@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	fwaudit "github.com/riipandi/saka/framework/audit"
@@ -49,21 +49,11 @@ func (m *Module) Name() string { return ModuleName }
 // plain HTTP route: a procedure is POST-only on the RPC surface.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedure answers exactly like the transport's own.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	handler := newRPCHandler(m.service)
-	_, connectHandler := authnv1connect.NewMultifactorServiceHandler(handler, opts...)
-	r.Handle(authnv1connect.MultifactorServiceBeginTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceConfirmTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceListTotpEnrollmentsProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceDeleteTotpEnrollmentProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceCompleteSignInProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceRegenerateRecoveryCodesProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceDisableMfaProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceVerifyRecoveryCodeProcedure, connectHandler)
-	r.Handle(authnv1connect.MultifactorServiceAdminDisableMfaProcedure, connectHandler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedure answers exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterMultifactorServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the multifactor procedures. The
@@ -123,48 +113,48 @@ func (h *rpcHandler) enrollmentCaller(ctx context.Context, pendingToken string) 
 
 // BeginTotpEnrollment writes an unconfirmed authenticator and answers its
 // secret once.
-func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.BeginTotpEnrollmentRequest]) (*connect.Response[authnv1.BeginTotpEnrollmentResponse], error) {
-	userID, err := h.enrollmentCaller(ctx, req.Msg.GetPendingToken())
+func (h *rpcHandler) BeginTotpEnrollment(ctx context.Context, req *authnv1.BeginTotpEnrollmentRequest) (*authnv1.BeginTotpEnrollmentResponse, error) {
+	userID, err := h.enrollmentCaller(ctx, req.GetPendingToken())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated)
+		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated.Error()).WithCause(errUnauthenticated)
 	}
 
-	result, err := h.service.BeginTotpEnrollment(ctx, userID, req.Msg.Name)
+	result, err := h.service.BeginTotpEnrollment(ctx, userID, req.Name)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.BeginTotpEnrollmentResponse{
+	return &authnv1.BeginTotpEnrollmentResponse{
 		TotpId:     result.TotpID,
 		Name:       result.Name,
 		Secret:     result.Secret,
 		OtpauthUri: result.OTPAuthURI,
 		ExpiresAt:  timestamppb.New(result.ExpiresAt),
-	}), nil
+	}, nil
 }
 
 // ConfirmTotpEnrollment activates the enrollment and answers the recovery
 // set once.
-func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.ConfirmTotpEnrollmentRequest]) (*connect.Response[authnv1.ConfirmTotpEnrollmentResponse], error) {
-	userID, err := h.enrollmentCaller(ctx, req.Msg.GetPendingToken())
+func (h *rpcHandler) ConfirmTotpEnrollment(ctx context.Context, req *authnv1.ConfirmTotpEnrollmentRequest) (*authnv1.ConfirmTotpEnrollmentResponse, error) {
+	userID, err := h.enrollmentCaller(ctx, req.GetPendingToken())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated)
+		return nil, connect.NewError(connect.CodeUnauthenticated, errUnauthenticated.Error()).WithCause(errUnauthenticated)
 	}
 
-	result, err := h.service.ConfirmTotpEnrollment(ctx, userID, req.Msg.TotpId, req.Msg.Code)
+	result, err := h.service.ConfirmTotpEnrollment(ctx, userID, req.TotpId, req.Code)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.ConfirmTotpEnrollmentResponse{
+	return &authnv1.ConfirmTotpEnrollmentResponse{
 		TotpId:        result.TotpID,
 		RecoveryCodes: result.RecoveryCodes,
-	}), nil
+	}, nil
 }
 
 // ListTotpEnrollments answers the account's authenticators.
-func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Request[authnv1.ListTotpEnrollmentsRequest]) (*connect.Response[authnv1.ListTotpEnrollmentsResponse], error) {
+func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *authnv1.ListTotpEnrollmentsRequest) (*authnv1.ListTotpEnrollmentsResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
 	rows, err := h.service.ListTotpEnrollments(ctx, userID)
@@ -187,40 +177,40 @@ func (h *rpcHandler) ListTotpEnrollments(ctx context.Context, req *connect.Reque
 		}
 		out = append(out, view)
 	}
-	return connect.NewResponse(&authnv1.ListTotpEnrollmentsResponse{Enrollments: out}), nil
+	return &authnv1.ListTotpEnrollmentsResponse{Enrollments: out}, nil
 }
 
 // DeleteTotpEnrollment removes one authenticator, with the proof the removal
 // needs when it would disarm the account.
-func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *connect.Request[authnv1.DeleteTotpEnrollmentRequest]) (*connect.Response[authnv1.DeleteTotpEnrollmentResponse], error) {
+func (h *rpcHandler) DeleteTotpEnrollment(ctx context.Context, req *authnv1.DeleteTotpEnrollmentRequest) (*authnv1.DeleteTotpEnrollmentResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	if err := h.service.DeleteTotpEnrollment(ctx, userID, req.Msg.TotpId, req.Msg.Code); err != nil {
+	if err := h.service.DeleteTotpEnrollment(ctx, userID, req.TotpId, req.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.DeleteTotpEnrollmentResponse{
+	return &authnv1.DeleteTotpEnrollmentResponse{
 		Message: "the authenticator was removed",
-	}), nil
+	}, nil
 }
 
 // CompleteSignIn spends the pending bridge plus the second factor on the
 // session.
-func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[authnv1.CompleteSignInRequest]) (*connect.Response[authnv1.CompleteSignInResponse], error) {
+func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *authnv1.CompleteSignInRequest) (*authnv1.CompleteSignInResponse, error) {
 	client := fwaudit.ClientFromContext(ctx)
 
 	var code string
 	var passkey *PasskeyAssertion
-	switch factor := req.Msg.SecondFactor.(type) {
+	switch factor := req.SecondFactor.(type) {
 	case *authnv1.CompleteSignInRequest_Code:
 		code = factor.Code
 	case *authnv1.CompleteSignInRequest_Passkey:
 		passkey = &PasskeyAssertion{SessionID: factor.Passkey.SessionId, Credential: factor.Passkey.Credential}
 	}
 
-	result, err := h.service.CompleteSignIn(ctx, req.Msg.PendingToken, code, passkey, signin.SessionParams{
+	result, err := h.service.CompleteSignIn(ctx, req.PendingToken, code, passkey, signin.SessionParams{
 		UserAgent:   client.UserAgent,
 		IPAddress:   client.IPAddress,
 		Fingerprint: client.Fingerprint,
@@ -228,7 +218,7 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.CompleteSignInResponse{
+	return &authnv1.CompleteSignInResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
 		AccessExpiresIn:  result.AccessExpiresIn,
@@ -243,73 +233,73 @@ func (h *rpcHandler) CompleteSignIn(ctx context.Context, req *connect.Request[au
 		},
 		Status:  webutil.StatusSuccess,
 		Message: "the second factor verified and the session opened",
-	}), nil
+	}, nil
 }
 
 // RegenerateRecoveryCodes rewrites the set and answers it once.
-func (h *rpcHandler) RegenerateRecoveryCodes(ctx context.Context, req *connect.Request[authnv1.RegenerateRecoveryCodesRequest]) (*connect.Response[authnv1.RegenerateRecoveryCodesResponse], error) {
+func (h *rpcHandler) RegenerateRecoveryCodes(ctx context.Context, req *authnv1.RegenerateRecoveryCodesRequest) (*authnv1.RegenerateRecoveryCodesResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	codes, err := h.service.RegenerateRecoveryCodes(ctx, userID, req.Msg.Code)
+	codes, err := h.service.RegenerateRecoveryCodes(ctx, userID, req.Code)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.RegenerateRecoveryCodesResponse{
+	return &authnv1.RegenerateRecoveryCodesResponse{
 		RecoveryCodes: codes,
-	}), nil
+	}, nil
 }
 
 // DisableMfa removes every factor after the proof.
-func (h *rpcHandler) DisableMfa(ctx context.Context, req *connect.Request[authnv1.DisableMfaRequest]) (*connect.Response[authnv1.DisableMfaResponse], error) {
+func (h *rpcHandler) DisableMfa(ctx context.Context, req *authnv1.DisableMfaRequest) (*authnv1.DisableMfaResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	if err := h.service.DisableMfa(ctx, userID, req.Msg.Code); err != nil {
+	if err := h.service.DisableMfa(ctx, userID, req.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.DisableMfaResponse{
+	return &authnv1.DisableMfaResponse{
 		Message: "multifactor authentication was disabled for the account",
-	}), nil
+	}, nil
 }
 
 // VerifyRecoveryCode spends one recovery code as the caller's standalone
 // proof.
-func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *connect.Request[authnv1.VerifyRecoveryCodeRequest]) (*connect.Response[authnv1.VerifyRecoveryCodeResponse], error) {
+func (h *rpcHandler) VerifyRecoveryCode(ctx context.Context, req *authnv1.VerifyRecoveryCodeRequest) (*authnv1.VerifyRecoveryCodeResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	if err := h.service.VerifyRecoveryCode(ctx, userID, req.Msg.Code); err != nil {
+	if err := h.service.VerifyRecoveryCode(ctx, userID, req.Code); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.VerifyRecoveryCodeResponse{
+	return &authnv1.VerifyRecoveryCodeResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the recovery code verified and is now spent",
-	}), nil
+	}, nil
 }
 
 // AdminDisableMfa removes the named account's every factor. The target is
 // the request's wire-form identifier — the one conversion the user package
 // owns — and the reason rides the audit record and the notification.
-func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *connect.Request[authnv1.AdminDisableMfaRequest]) (*connect.Response[authnv1.AdminDisableMfaResponse], error) {
-	targetID, err := user.UUIDFromWire(req.Msg.UserId)
+func (h *rpcHandler) AdminDisableMfa(ctx context.Context, req *authnv1.AdminDisableMfaRequest) (*authnv1.AdminDisableMfaResponse, error) {
+	targetID, err := user.UUIDFromWire(req.UserId)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("the account is not found"))
+		return nil, connect.NewError(connect.CodeNotFound, "the account is not found")
 	}
 
-	if err := h.service.AdminDisableMfa(ctx, targetID, req.Msg.GetReason()); err != nil {
+	if err := h.service.AdminDisableMfa(ctx, targetID, req.GetReason()); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.AdminDisableMfaResponse{
+	return &authnv1.AdminDisableMfaResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "multifactor authentication was disabled for the account",
-	}), nil
+	}, nil
 }
 
 // mapError translates the service's failures into the codes the Connect
@@ -324,39 +314,39 @@ func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrCodeInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the code is not valid"))
+			"the code is not valid")
 	case errors.Is(err, ErrPendingInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the pending token is invalid or expired"))
+			"the pending token is invalid or expired")
 	case errors.Is(err, ErrPendingExhausted):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the pending token is exhausted; sign in again"))
+			"the pending token is exhausted; sign in again")
 	case errors.Is(err, ErrEnrollmentNotFound):
 		return connect.NewError(connect.CodeNotFound,
-			errors.New("the enrollment is not found"))
+			"the enrollment is not found")
 	case errors.Is(err, ErrEnrollmentLimit):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the enrollment limit is reached"))
+			"the enrollment limit is reached")
 	case errors.Is(err, ErrLimitUnreadable):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the enrollment limit is unreadable; contact the operator"))
+			"the enrollment limit is unreadable; contact the operator")
 	case errors.Is(err, ErrEnrollmentExpired):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the enrollment has expired; start again"))
+			"the enrollment has expired; start again")
 	case errors.Is(err, ErrNotConfirmed):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("no confirmed authenticator is enrolled"))
+			"no confirmed authenticator is enrolled")
 	case errors.Is(err, ErrProofRequired):
 		return connect.NewError(connect.CodeInvalidArgument,
-			errors.New("the confirmation code is required for this removal"))
+			"the confirmation code is required for this removal")
 	case errors.Is(err, ErrNoRecoveryCodes):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("no recovery codes are enrolled"))
+			"no recovery codes are enrolled")
 	case errors.Is(err, ErrUserNotFound):
 		return connect.NewError(connect.CodeNotFound,
-			errors.New("the account is not found"))
+			"the account is not found")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return connect.NewError(connect.CodeInternal, "internal error")
 	}
 }
 

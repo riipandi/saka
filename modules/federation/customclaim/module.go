@@ -1,7 +1,7 @@
 package customclaim
 
 import (
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
@@ -30,19 +30,9 @@ func (m *Module) Name() string { return ModuleName }
 // there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. Each procedure is
-// registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := federationv1connect.NewCustomClaimServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(federationv1connect.CustomClaimServiceSuggestProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceListUserClaimsProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceCreateUserClaimProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceUpdateUserClaimProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceDeleteUserClaimProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceListGroupClaimsProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceCreateGroupClaimProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceUpdateGroupClaimProcedure, handler)
-	r.Handle(federationv1connect.CustomClaimServiceDeleteGroupClaimProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	federationv1connect.RegisterCustomClaimServiceHandler(server, newRPCHandler(m.service))
 }

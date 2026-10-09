@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
@@ -36,13 +36,13 @@ type KeyAuthenticator interface {
 // resolved; the middleware itself imports no module.
 func APIKeyAuth(auth Authenticator, machine KeyAuthenticator) Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
-		if _, ok := authn.BearerToken(req); ok {
+		if _, ok := jwtutils.BearerToken(req); ok {
 			return auth(ctx, req)
 		}
 		if presented := req.Header.Get(apiKeyHeader); presented != "" && machine != nil {
 			caller, err := machine.AuthenticateAPIKey(ctx, presented)
 			if err != nil {
-				return nil, authn.Errorf("invalid or expired token")
+				return nil, connect.NewError(connect.CodeUnauthenticated, "invalid or expired token")
 			}
 			return caller, nil
 		}

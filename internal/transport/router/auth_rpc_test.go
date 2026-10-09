@@ -3,17 +3,16 @@ package router_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"connectrpc.com/authn"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	"github.com/riipandi/saka/internal/config"
@@ -26,9 +25,9 @@ import (
 // an administrator's claims; every other token, and an absent one, is refused.
 func stubAuthenticator() router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
-		token, ok := authn.BearerToken(req)
+		token, ok := jwtutils.BearerToken(req)
 		if !ok || token != "secret" {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		return &jwtutils.Caller{
 			UserID:       stubCallerWireID(),
@@ -60,7 +59,7 @@ func TestRPCRefusesACallWithoutAToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, "/saka.system.v1.QueueService/ListQueues", "{}"))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 
@@ -74,13 +73,13 @@ func TestRPCRefusesACallWithoutAToken(t *testing.T) {
 func TestRPCAcceptsTheBearerToken(t *testing.T) {
 	router := newRPCRouterWithAuth(t, stubAuthenticator())
 
-	req := rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}")
+	req := rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}")
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.JSONEq(t, `{"pong":true}`, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"access_token":"token"`)
 }
 
 func TestRPCPublicProcedureNeedsNoToken(t *testing.T) {
@@ -113,7 +112,7 @@ func TestRPCNilAuthenticatorLeavesTheSurfaceOpen(t *testing.T) {
 	router := newRPCRouterWithAuth(t, nil)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }

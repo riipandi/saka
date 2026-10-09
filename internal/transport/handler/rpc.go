@@ -2,12 +2,11 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"slices"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	systemv1 "github.com/riipandi/saka/codegen/proto/go/saka/system/v1"
@@ -33,23 +32,23 @@ func NewRPCHealthService(checker *health.Checker) *rpcHealthService {
 // An unhealthy system fails with `unavailable`, which the transport answers as
 // 503 — the status a probe acts on — and the message names the checks that are
 // down, because a bare status does not say what to look at.
-func (s *rpcHealthService) Check(ctx context.Context, _ *connect.Request[systemv1.CheckRequest]) (*connect.Response[systemv1.CheckResponse], error) {
+func (s *rpcHealthService) Check(ctx context.Context, _ *systemv1.CheckRequest) (*systemv1.CheckResponse, error) {
 	// A router built without a checker is a wiring defect; the registry builds
 	// the two together, so a working composition cannot reach this.
 	if s.checker == nil {
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("health check unavailable"))
+		return nil, connect.NewError(connect.CodeUnavailable, "health check unavailable")
 	}
 
 	result := s.checker.Check(ctx)
 	if !result.Healthy() {
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New(health.Message(result)))
+		return nil, connect.NewError(connect.CodeUnavailable, health.Message(result))
 	}
 
-	return connect.NewResponse(&systemv1.CheckResponse{
+	return &systemv1.CheckResponse{
 		Status:  string(result.Status),
 		Details: rpcCheckDetails(result),
 		TookMs:  milliseconds(result.Duration),
-	}), nil
+	}, nil
 }
 
 // rpcCheckDetails renders the per-check results in check-name order, which is

@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
@@ -39,22 +39,11 @@ func (m *Module) Name() string { return ModuleName }
 // there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own. Each procedure
-// is registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := identityv1connect.NewUserGroupServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(identityv1connect.UserGroupServiceListUserGroupsProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceGetUserGroupProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceCreateUserGroupProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceUpdateUserGroupProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceDeleteUserGroupProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceSetUserGroupMembersProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceGetUserGroupsProcedure, handler)
-	r.Handle(identityv1connect.UserGroupServiceUpdateUserGroupsProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	identityv1connect.RegisterUserGroupServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -69,14 +58,14 @@ func newRPCHandler(service *Service) identityv1connect.UserGroupServiceHandler {
 }
 
 // ListUserGroups answers one page of the groups.
-func (h *rpcHandler) ListUserGroups(ctx context.Context, req *connect.Request[identityv1.ListUserGroupsRequest]) (*connect.Response[identityv1.ListUserGroupsResponse], error) {
-	sortBy := req.Msg.GetSortBy()
-	ascending := req.Msg.GetSortOrder() != "desc"
+func (h *rpcHandler) ListUserGroups(ctx context.Context, req *identityv1.ListUserGroupsRequest) (*identityv1.ListUserGroupsResponse, error) {
+	sortBy := req.GetSortBy()
+	ascending := req.GetSortOrder() != "desc"
 
 	groups, pagination, err := h.service.ListGroups(
 		ctx,
-		req.Msg.GetSearch(), sortBy, ascending,
-		int(req.Msg.GetPage()), int(req.Msg.GetLimit()),
+		req.GetSearch(), sortBy, ascending,
+		int(req.GetPage()), int(req.GetLimit()),
 	)
 	if err != nil {
 		return nil, mapError(err)
@@ -86,112 +75,112 @@ func (h *rpcHandler) ListUserGroups(ctx context.Context, req *connect.Request[id
 	for _, group := range groups {
 		views = append(views, wireGroup(group))
 	}
-	return connect.NewResponse(&identityv1.ListUserGroupsResponse{
+	return &identityv1.ListUserGroupsResponse{
 		Groups:   views,
 		Metadata: listMetadata(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the user groups were listed",
-	}), nil
+	}, nil
 }
 
 // GetUserGroup answers one group with its members.
-func (h *rpcHandler) GetUserGroup(ctx context.Context, req *connect.Request[identityv1.GetUserGroupRequest]) (*connect.Response[identityv1.GetUserGroupResponse], error) {
-	group, err := h.service.GetGroup(ctx, req.Msg.Id)
+func (h *rpcHandler) GetUserGroup(ctx context.Context, req *identityv1.GetUserGroupRequest) (*identityv1.GetUserGroupResponse, error) {
+	group, err := h.service.GetGroup(ctx, req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.GetUserGroupResponse{
+	return &identityv1.GetUserGroupResponse{
 		Group:   wireDetail(group),
 		Status:  webutil.StatusSuccess,
 		Message: "the user group was fetched",
-	}), nil
+	}, nil
 }
 
 // CreateUserGroup creates a group.
-func (h *rpcHandler) CreateUserGroup(ctx context.Context, req *connect.Request[identityv1.CreateUserGroupRequest]) (*connect.Response[identityv1.CreateUserGroupResponse], error) {
+func (h *rpcHandler) CreateUserGroup(ctx context.Context, req *identityv1.CreateUserGroupRequest) (*identityv1.CreateUserGroupResponse, error) {
 	group, err := h.service.CreateUserGroup(ctx, CreateParams{
-		Name:        req.Msg.Name,
-		DisplayName: req.Msg.DisplayName,
+		Name:        req.Name,
+		DisplayName: req.DisplayName,
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.CreateUserGroupResponse{
+	return &identityv1.CreateUserGroupResponse{
 		Group:   wireDetail(group),
 		Status:  webutil.StatusSuccess,
 		Message: "the user group was created",
-	}), nil
+	}, nil
 }
 
 // UpdateUserGroup replaces a group's fields.
-func (h *rpcHandler) UpdateUserGroup(ctx context.Context, req *connect.Request[identityv1.UpdateUserGroupRequest]) (*connect.Response[identityv1.UpdateUserGroupResponse], error) {
-	group, err := h.service.UpdateUserGroup(ctx, req.Msg.Id, CreateParams{
-		Name:        req.Msg.Name,
-		DisplayName: req.Msg.DisplayName,
+func (h *rpcHandler) UpdateUserGroup(ctx context.Context, req *identityv1.UpdateUserGroupRequest) (*identityv1.UpdateUserGroupResponse, error) {
+	group, err := h.service.UpdateUserGroup(ctx, req.Id, CreateParams{
+		Name:        req.Name,
+		DisplayName: req.DisplayName,
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.UpdateUserGroupResponse{
+	return &identityv1.UpdateUserGroupResponse{
 		Group:   wireDetail(group),
 		Status:  webutil.StatusSuccess,
 		Message: "the user group was updated",
-	}), nil
+	}, nil
 }
 
 // DeleteUserGroup removes a group.
-func (h *rpcHandler) DeleteUserGroup(ctx context.Context, req *connect.Request[identityv1.DeleteUserGroupRequest]) (*connect.Response[identityv1.DeleteUserGroupResponse], error) {
-	if err := h.service.DeleteUserGroup(ctx, req.Msg.Id); err != nil {
+func (h *rpcHandler) DeleteUserGroup(ctx context.Context, req *identityv1.DeleteUserGroupRequest) (*identityv1.DeleteUserGroupResponse, error) {
+	if err := h.service.DeleteUserGroup(ctx, req.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.DeleteUserGroupResponse{
+	return &identityv1.DeleteUserGroupResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the user group was deleted",
-	}), nil
+	}, nil
 }
 
 // SetUserGroupMembers replaces a group's member set.
-func (h *rpcHandler) SetUserGroupMembers(ctx context.Context, req *connect.Request[identityv1.SetUserGroupMembersRequest]) (*connect.Response[identityv1.SetUserGroupMembersResponse], error) {
-	group, err := h.service.SetUserGroupMembers(ctx, req.Msg.Id, req.Msg.UserIds)
+func (h *rpcHandler) SetUserGroupMembers(ctx context.Context, req *identityv1.SetUserGroupMembersRequest) (*identityv1.SetUserGroupMembersResponse, error) {
+	group, err := h.service.SetUserGroupMembers(ctx, req.Id, req.UserIds)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.SetUserGroupMembersResponse{
+	return &identityv1.SetUserGroupMembersResponse{
 		Group:   wireDetail(group),
 		Status:  webutil.StatusSuccess,
 		Message: "the user group members were updated",
-	}), nil
+	}, nil
 }
 
 // GetUserGroups answers the groups one account belongs to.
-func (h *rpcHandler) GetUserGroups(ctx context.Context, req *connect.Request[identityv1.GetUserGroupsRequest]) (*connect.Response[identityv1.GetUserGroupsResponse], error) {
-	groups, err := h.service.GetUserGroups(ctx, req.Msg.Id)
+func (h *rpcHandler) GetUserGroups(ctx context.Context, req *identityv1.GetUserGroupsRequest) (*identityv1.GetUserGroupsResponse, error) {
+	groups, err := h.service.GetUserGroups(ctx, req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.GetUserGroupsResponse{
+	return &identityv1.GetUserGroupsResponse{
 		Groups:  wireGroups(groups),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's groups were fetched",
-	}), nil
+	}, nil
 }
 
 // UpdateUserGroups replaces the set of groups one account belongs to.
-func (h *rpcHandler) UpdateUserGroups(ctx context.Context, req *connect.Request[identityv1.UpdateUserGroupsRequest]) (*connect.Response[identityv1.UpdateUserGroupsResponse], error) {
-	groups, err := h.service.UpdateUserGroups(ctx, req.Msg.Id, req.Msg.GroupIds)
+func (h *rpcHandler) UpdateUserGroups(ctx context.Context, req *identityv1.UpdateUserGroupsRequest) (*identityv1.UpdateUserGroupsResponse, error) {
+	groups, err := h.service.UpdateUserGroups(ctx, req.Id, req.GroupIds)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.UpdateUserGroupsResponse{
+	return &identityv1.UpdateUserGroupsResponse{
 		Groups:  wireGroups(groups),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's groups were updated",
-	}), nil
+	}, nil
 }
 
 // SetAllowedOidcClients replaces the group's client allowlist.
-func (h *rpcHandler) SetAllowedOidcClients(ctx context.Context, req *connect.Request[identityv1.SetGroupAllowedOidcClientsRequest]) (*connect.Response[identityv1.SetGroupAllowedOidcClientsResponse], error) {
-	group, allowed, err := h.service.SetAllowedOidcClients(ctx, req.Msg.Id, req.Msg.OidcClientIds)
+func (h *rpcHandler) SetAllowedOidcClients(ctx context.Context, req *identityv1.SetGroupAllowedOidcClientsRequest) (*identityv1.SetGroupAllowedOidcClientsResponse, error) {
+	group, allowed, err := h.service.SetAllowedOidcClients(ctx, req.Id, req.OidcClientIds)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -202,12 +191,12 @@ func (h *rpcHandler) SetAllowedOidcClients(ctx context.Context, req *connect.Req
 			Name: client.Name,
 		})
 	}
-	return connect.NewResponse(&identityv1.SetGroupAllowedOidcClientsResponse{
+	return &identityv1.SetGroupAllowedOidcClientsResponse{
 		Group:          wireGroup(group),
 		AllowedClients: refs,
 		Status:         webutil.StatusSuccess,
 		Message:        "the group's allowed OIDC clients were updated",
-	}), nil
+	}, nil
 }
 
 // wireGroup maps the group view onto the wire message the list answers with.
@@ -320,12 +309,12 @@ func int32Of(value int) int32 {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrGroupNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("user group not found"))
+		return connect.NewError(connect.CodeNotFound, "user group not found")
 	case errors.Is(err, ErrGroupExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("user group already exists"))
+		return connect.NewError(connect.CodeAlreadyExists, "user group already exists")
 	case errors.Is(err, ErrMemberNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+		return connect.NewError(connect.CodeNotFound, "user not found")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("user group operation failed"))
+		return connect.NewError(connect.CodeInternal, "user group operation failed")
 	}
 }

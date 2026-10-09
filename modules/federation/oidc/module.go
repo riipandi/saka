@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
@@ -64,33 +64,10 @@ func (m *Module) Mount(r chi.Router) {
 	})
 }
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own. Each procedure
-// is registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := federationv1connect.NewOidcClientServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(federationv1connect.OidcClientServiceListClientsProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceCreateClientProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceGetClientProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceUpdateClientProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceDeleteClientProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceUpdateAllowedUserGroupsProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceGetClientMetaProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServicePreviewClientProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceUploadLogoProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceDeleteLogoProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceListSecretsProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceCreateSecretProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceDeleteSecretProcedure, handler)
-	r.Handle(federationv1connect.OidcClientServiceRefreshClientProcedure, handler)
-
-	_, consent := federationv1connect.NewOidcConsentServiceHandler(newConsentHandler(m.service), opts...)
-	r.Handle(federationv1connect.OidcConsentServiceListMyAuthorizedClientsProcedure, consent)
-	r.Handle(federationv1connect.OidcConsentServiceRevokeMyAuthorizedClientProcedure, consent)
-	r.Handle(federationv1connect.OidcConsentServiceListMyClientsProcedure, consent)
-	r.Handle(federationv1connect.OidcConsentServiceListUserAuthorizedClientsProcedure, consent)
-	r.Handle(federationv1connect.OidcConsentServiceListAllAuthorizedClientsProcedure, consent)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	federationv1connect.RegisterOidcClientServiceHandler(server, newRPCHandler(m.service))
+	federationv1connect.RegisterOidcConsentServiceHandler(server, newConsentHandler(m.service))
 }

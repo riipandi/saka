@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +19,7 @@ import (
 func authStub(refuse bool) Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if refuse {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		return &jwtutils.Caller{UserID: "01a0", AccessClaims: jwtutils.AccessClaims{Username: "hermione"}}, nil
 	}

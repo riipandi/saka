@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"

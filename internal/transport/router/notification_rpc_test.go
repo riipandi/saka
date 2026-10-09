@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/authn"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,13 +41,13 @@ const (
 func notificationAuthenticator(subject string, admin bool) rt.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if subject == "" {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		// The subject travels the wire form the account surface reads, the
 		// way the real bearer half writes it.
 		id, err := uuid.Parse(subject)
 		if err != nil {
-			return nil, authn.Errorf("the subject is not an account identifier")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "the subject is not an account identifier")
 		}
 		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		return &jwtutils.Caller{UserID: user.FormatID(id), AccessClaims: claims}, nil
@@ -265,12 +265,12 @@ func TestTheWatchStreamDeliversThroughTheSurface(t *testing.T) {
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
 
-	client := notificationv1connect.NewNotificationServiceClient(
-		server.Client(), server.URL+rt.RPCPath)
+	client := notificationv1connect.NewNotificationServiceClient(connect.NewClient(connecthttp.NewTransport(
+		server.Client(), server.URL+rt.RPCPath, connecthttp.WithReadMaxBytes(0))))
 	watchCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	stream, err := client.WatchNotifications(watchCtx,
-		connect.NewRequest(&notificationv1.WatchNotificationsRequest{}))
+		&notificationv1.WatchNotificationsRequest{})
 	require.NoError(t, err)
 	defer stream.Close()
 
@@ -286,10 +286,10 @@ func TestTheWatchStreamDeliversThroughTheSurface(t *testing.T) {
 	// The initial ping confirms the subscription is live; the events that
 	// follow carry the notifications created after it.
 	for {
-		if !stream.Receive() {
-			t.Fatalf("the stream closed before the notification arrived: %v", stream.Err())
+		event, err := stream.Receive()
+		if err != nil {
+			t.Fatalf("the stream closed before the notification arrived: %v", err)
 		}
-		event := stream.Msg()
 		if event.Kind != "notification" {
 			continue
 		}

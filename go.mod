@@ -6,10 +6,9 @@ toolchain go1.27.1
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
-	connectrpc.com/authn v0.2.0
-	connectrpc.com/connect v1.21.0
-	connectrpc.com/otelconnect v0.10.0
-	connectrpc.com/validate v0.7.0
+	connectrpc.com/connect/v2 v2.0.0
+	connectrpc.com/otelconnect v0.12.0
+	connectrpc.com/validate v0.9.0
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.7
@@ -92,6 +91,7 @@ require (
 	buf.build/go/standard v0.1.1-0.20260325175353-2b287e071df5 // indirect
 	cel.dev/cel-go v0.32.0 // indirect
 	cel.dev/expr v0.25.3 // indirect
+	connectrpc.com/connect v1.21.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20260917205352-e937bb47801a // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -242,7 +242,7 @@ require (
 )
 
 tool (
-	connectrpc.com/connect/cmd/protoc-gen-connect-go
+	connectrpc.com/connect/v2/cmd/protoc-gen-connect-go
 	github.com/bufbuild/buf/cmd/buf
 	google.golang.org/protobuf/cmd/protoc-gen-go
 )

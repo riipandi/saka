@@ -53,7 +53,7 @@ tasks:
       - go install github.com/swaggo/swag/cmd/swag@latest
       - go get -tool github.com/bufbuild/buf/cmd/buf@latest
       - go get -tool google.golang.org/protobuf/cmd/protoc-gen-go@latest
-      - go get -tool connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+      - go get -tool connectrpc.com/connect/v2/cmd/protoc-gen-connect-go@latest
 
   update-deps:
     desc: Update dependencies

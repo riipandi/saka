@@ -8,7 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,109 +182,87 @@ func TestRPCCheckIsCallableByTheGeneratedClient(t *testing.T) {
 	server := httptest.NewServer(newRPCRouter(t))
 	defer server.Close()
 
-	client := systemv1connect.NewHealthServiceClient(server.Client(), server.URL+rt.RPCPath)
-	resp, err := client.Check(t.Context(), connect.NewRequest(&systemv1.CheckRequest{}))
+	client := systemv1connect.NewHealthServiceClient(
+		connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL+rt.RPCPath)))
+	ctx, info := connect.NewClientContext(t.Context())
+	resp, err := client.Check(ctx, &systemv1.CheckRequest{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "healthy", resp.Msg.GetStatus())
-	assert.True(t, strings.HasPrefix(resp.Header().Get("X-Request-Id"), "req_"),
+	assert.Equal(t, "healthy", resp.GetStatus())
+	assert.True(t, strings.HasPrefix(info.ResponseHeader().Get("X-Request-Id"), "req_"),
 		"the generated client reads the correlation id from the response header")
-	assert.Len(t, resp.Header().Values("X-Request-Id"), 1,
+	assert.Len(t, info.ResponseHeader().Values("X-Request-Id"), 1,
 		"the generated client must read one id, not a duplicated pair")
 }
 
 // rpcFeature is a module that serves a procedure, the way an application
-// module does once it has a contract. It records the handler options the
-// transport handed it, so a test can prove the shared codec reaches a module's
-// own handler.
-type rpcFeature struct {
-	options []connect.HandlerOption
-}
+// module does once it has a contract. It registers the generated sign-in
+// handler on whatever server it is handed — a service the transport's own
+// registration does not claim — so the tests prove the transport's shared
+// codec and interceptors reach a module's procedure.
+type rpcFeature struct{}
 
 func (rpcFeature) Name() string { return "rpc-feature" }
 
 func (rpcFeature) Mount(chi.Router) {}
 
-func (f *rpcFeature) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	f.options = opts
-	r.Post("/saka.test.v1.FeatureService/Ping", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"pong":true}`))
-	})
+func (rpcFeature) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterAuthServiceHandler(server, stubAuthService{})
 }
 
 // TestAModuleProcedureMountsBelowThePrefix pins the seam a feature uses to add
-// a procedure: it mounts on the same router as the transport's own services,
-// below the prefix, with the prefix already stripped.
+// a procedure: it registers on the same server as the transport's own
+// services, and the mount serves it below the prefix, with the prefix already
+// stripped.
 func TestAModuleProcedureMountsBelowThePrefix(t *testing.T) {
-	feature := &rpcFeature{}
 	router := rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
-		Modules: []kernel.Module{feature},
+		Modules: []kernel.Module{rpcFeature{}},
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
-
-	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.JSONEq(t, `{"pong":true}`, rec.Body.String())
-	assert.NotEmpty(t, feature.options,
-		"the transport must hand a module the options that carry the shared codec")
-}
-
-// TestModuleProcedureGetsTheSnakeCaseCodec is the reason the options travel:
-// a module that registers a generated handler with them answers in the same
-// field names the transport's own services do. Registering without them would
-// silently fall back to protobuf's camelCase mapping, which is the drift the
-// shared codec exists to prevent.
-func TestModuleProcedureGetsTheSnakeCaseCodec(t *testing.T) {
-	feature := &rpcFeature{}
-	rt.NewRouter(rt.Options{
-		Config:  config.Default(),
-		Checker: health.NewChecker(),
-		Modules: []kernel.Module{feature},
-	})
-
-	_, handler := systemv1connect.NewHealthServiceHandler(
-		stubHealthService{}, feature.options...)
-	req := httptest.NewRequest(http.MethodPost,
-		systemv1connect.HealthServiceCheckProcedure, strings.NewReader("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Connect-Protocol-Version", "1")
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), `"took_ms"`,
-		"a module's handler must serialize under the proto field names")
-	assert.NotContains(t, rec.Body.String(), `"tookMs"`)
+	assert.Contains(t, rec.Body.String(), `"access_expires_in"`,
+		"a module's procedure must serialize under the proto field names")
+}
 
-	// Negative control: the same handler without the options falls back to
-	// protobuf's own mapping. Without this the assertion above would also pass
-	// on a codec that never ran, which is what makes it a real check.
+// TestModuleProcedureGetsTheSnakeCaseCodec is the reason the shared codec
+// exists: a module that registers on the transport's server answers in the
+// same field names the transport's own services do. The negative control
+// mounts the same handler on a server with the default codecs — without it
+// the assertion above would also pass on a codec that never ran, which is
+// what makes it a real check.
+func TestModuleProcedureGetsTheSnakeCaseCodec(t *testing.T) {
+	router := rt.NewRouter(rt.Options{
+		Config:  config.Default(),
+		Checker: health.NewChecker(),
+		Modules: []kernel.Module{rpcFeature{}},
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"access_expires_in":900`)
+	assert.NotContains(t, rec.Body.String(), `"access_expires_in":"900"`)
+
+	plain := connect.NewServer()
+	authnv1connect.RegisterAuthServiceHandler(plain, stubAuthService{})
+	mux := http.NewServeMux()
+	connecthttp.Mount(mux, plain)
+
 	controlReq := httptest.NewRequest(http.MethodPost,
-		systemv1connect.HealthServiceCheckProcedure, strings.NewReader("{}"))
+		authnv1connect.AuthServiceSignInProcedure, strings.NewReader("{}"))
 	controlReq.Header.Set("Content-Type", "application/json")
 	controlReq.Header.Set("Connect-Protocol-Version", "1")
 
-	_, plain := systemv1connect.NewHealthServiceHandler(stubHealthService{})
 	control := httptest.NewRecorder()
-	plain.ServeHTTP(control, controlReq)
-	assert.Contains(t, control.Body.String(), `"tookMs"`,
+	mux.ServeHTTP(control, controlReq)
+	assert.Contains(t, control.Body.String(), `"accessExpiresIn"`,
 		"the default mapping is camelCase, so the shared codec is what changes it")
-}
-
-// stubHealthService is a minimal HealthServiceHandler for the codec assertion
-// above; the real one is exercised through the router.
-type stubHealthService struct{}
-
-func (stubHealthService) Check(context.Context, *connect.Request[systemv1.CheckRequest]) (*connect.Response[systemv1.CheckResponse], error) {
-	return connect.NewResponse(&systemv1.CheckResponse{
-		Status: "healthy",
-		TookMs: 1.5,
-	}), nil
 }
 
 // TestTheCodecWritesALifetimeAsANumber pins the int32 answer: protobuf's JSON
@@ -292,22 +271,14 @@ func (stubHealthService) Check(context.Context, *connect.Request[systemv1.CheckR
 // response cannot parse. The shared codec serializes the 32-bit field as a
 // number.
 func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
-	feature := &rpcFeature{}
-	rt.NewRouter(rt.Options{
+	router := rt.NewRouter(rt.Options{
 		Config:  config.Default(),
 		Checker: health.NewChecker(),
-		Modules: []kernel.Module{feature},
+		Modules: []kernel.Module{rpcFeature{}},
 	})
 
-	_, handler := authnv1connect.NewAuthServiceHandler(
-		stubAuthService{}, feature.options...)
-	req := httptest.NewRequest(http.MethodPost,
-		authnv1connect.AuthServiceSignInProcedure, strings.NewReader("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Connect-Protocol-Version", "1")
-
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"access_expires_in":900`)
@@ -317,10 +288,10 @@ func TestTheCodecWritesALifetimeAsANumber(t *testing.T) {
 // stubAuthService answers the smallest SignIn response that carries the field.
 type stubAuthService struct{}
 
-func (stubAuthService) SignIn(context.Context, *connect.Request[authnv1.SignInRequest]) (*connect.Response[authnv1.SignInResponse], error) {
-	return connect.NewResponse(&authnv1.SignInResponse{
+func (stubAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	return &authnv1.SignInResponse{
 		AccessToken:     "token",
 		TokenType:       "Bearer",
 		AccessExpiresIn: 900,
-	}), nil
+	}, nil
 }

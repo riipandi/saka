@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	fwaudit "github.com/riipandi/saka/framework/audit"
@@ -39,12 +39,11 @@ func (m *Module) Name() string { return ModuleName }
 // plain HTTP route: a procedure is POST-only on the RPC surface.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedure answers exactly like the transport's own.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authnv1connect.NewAuthServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(authnv1connect.AuthServiceSignInProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedure answers exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterAuthServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the sign-in procedures. The service
@@ -60,11 +59,11 @@ func newRPCHandler(service *Service) authnv1connect.AuthServiceHandler {
 }
 
 // SignIn verifies the credential and answers the token pair.
-func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.SignInRequest]) (*connect.Response[authnv1.SignInResponse], error) {
-	body := req.Msg
+func (h *rpcHandler) SignIn(ctx context.Context, req *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	body := req
 	if body.Identity == "" || body.Password == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
-			errors.New("identity and password are required"))
+			"identity and password are required")
 	}
 
 	// The client facts are the transport's: one middleware captured them
@@ -96,7 +95,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 	case result.MFARequired:
 		message = "the second factor is required to complete the sign-in"
 	}
-	return connect.NewResponse(&authnv1.SignInResponse{
+	return &authnv1.SignInResponse{
 		AccessToken:           result.AccessToken,
 		TokenType:             result.TokenType,
 		AccessExpiresIn:       result.AccessExpiresIn,
@@ -121,7 +120,7 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 
 		Status:  webutil.StatusSuccess,
 		Message: message,
-	}), nil
+	}, nil
 }
 
 // mapError translates the service's failures into the codes the Connect
@@ -130,18 +129,18 @@ func (h *rpcHandler) SignIn(ctx context.Context, req *connect.Request[authnv1.Si
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrInvalidCredentials):
-		return connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
+		return connect.NewError(connect.CodeUnauthenticated, "invalid credentials")
 	case errors.Is(err, ErrAccountDisabled):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("account is disabled"))
+		return connect.NewError(connect.CodePermissionDenied, "account is disabled")
 	case errors.Is(err, ErrAccountBanned):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("account is banned"))
+		return connect.NewError(connect.CodePermissionDenied, "account is banned")
 	case errors.Is(err, ErrSigninRestricted):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("sign-in is not permitted"))
+		return connect.NewError(connect.CodePermissionDenied, "sign-in is not permitted")
 	case errors.Is(err, ErrEmailUnverified):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("email address is not verified"))
+		return connect.NewError(connect.CodeFailedPrecondition, "email address is not verified")
 	case errors.Is(err, jwks.ErrNoSigningKey):
-		return connect.NewError(connect.CodeInternal, errors.New("sign-in is not answerable"))
+		return connect.NewError(connect.CodeInternal, "sign-in is not answerable")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("sign-in failed"))
+		return connect.NewError(connect.CodeInternal, "sign-in failed")
 	}
 }

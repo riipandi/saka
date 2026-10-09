@@ -1,7 +1,7 @@
 package scimsync
 
 import (
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
@@ -30,15 +30,9 @@ func (m *Module) Name() string { return ModuleName }
 // there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. Each procedure is
-// registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect
-// client cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := federationv1connect.NewScimProviderServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(federationv1connect.ScimProviderServiceGetByClientProcedure, handler)
-	r.Handle(federationv1connect.ScimProviderServiceCreateProcedure, handler)
-	r.Handle(federationv1connect.ScimProviderServiceUpdateProcedure, handler)
-	r.Handle(federationv1connect.ScimProviderServiceDeleteProcedure, handler)
-	r.Handle(federationv1connect.ScimProviderServiceSyncProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	federationv1connect.RegisterScimProviderServiceHandler(server, newRPCHandler(m.service))
 }

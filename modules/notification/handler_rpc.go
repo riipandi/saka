@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -48,20 +48,11 @@ func (m *Module) Name() string { return ModuleName }
 // alone, so there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := notificationv1connect.NewNotificationServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(notificationv1connect.NotificationServiceCreateNotificationProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceGetNotificationProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceListAllNotificationsProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceCancelNotificationProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceListNotificationsProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceMarkNotificationReadProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceMarkAllNotificationsReadProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceUnreadCountProcedure, handler)
-	r.Handle(notificationv1connect.NotificationServiceWatchNotificationsProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	notificationv1connect.RegisterNotificationServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -76,7 +67,7 @@ func newRPCHandler(service *Service) notificationv1connect.NotificationServiceHa
 }
 
 // CreateNotification publishes a notification to its audience.
-func (h *rpcHandler) CreateNotification(ctx context.Context, req *connect.Request[notificationv1.CreateNotificationRequest]) (*connect.Response[notificationv1.CreateNotificationResponse], error) {
+func (h *rpcHandler) CreateNotification(ctx context.Context, req *notificationv1.CreateNotificationRequest) (*notificationv1.CreateNotificationResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
@@ -88,21 +79,21 @@ func (h *rpcHandler) CreateNotification(ctx context.Context, req *connect.Reques
 	}
 
 	params := CreateParams{
-		Category:     req.Msg.Category,
-		Topic:        req.Msg.GetTopic(),
-		Title:        req.Msg.Title,
-		Body:         req.Msg.Body,
-		AudienceKind: req.Msg.GetAudienceKind(),
-		SendEmail:    req.Msg.GetSendEmail(),
+		Category:     req.Category,
+		Topic:        req.GetTopic(),
+		Title:        req.Title,
+		Body:         req.Body,
+		AudienceKind: req.GetAudienceKind(),
+		SendEmail:    req.GetSendEmail(),
 	}
-	for _, id := range req.Msg.UserIds {
+	for _, id := range req.UserIds {
 		parsed, parseErr := user.UUIDFromWire(id)
 		if parseErr != nil {
 			return nil, mapError(ErrUnknownTarget)
 		}
 		params.UserIDs = append(params.UserIDs, parsed)
 	}
-	for _, id := range req.Msg.UserGroupIds {
+	for _, id := range req.UserGroupIds {
 		parsed, parseErr := usergroup.UUIDFromWire(id)
 		if parseErr != nil {
 			return nil, mapError(ErrUnknownTarget)
@@ -114,16 +105,16 @@ func (h *rpcHandler) CreateNotification(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.CreateNotificationResponse{
+	return &notificationv1.CreateNotificationResponse{
 		Notification: wireNotification(row, params.UserIDs, params.GroupIDs, nil),
 		Status:       webutil.StatusSuccess,
 		Message:      "the notification was created",
-	}), nil
+	}, nil
 }
 
 // GetNotification answers one notification's full view.
-func (h *rpcHandler) GetNotification(ctx context.Context, req *connect.Request[notificationv1.GetNotificationRequest]) (*connect.Response[notificationv1.GetNotificationResponse], error) {
-	id, err := parseID(req.Msg.Id)
+func (h *rpcHandler) GetNotification(ctx context.Context, req *notificationv1.GetNotificationRequest) (*notificationv1.GetNotificationResponse, error) {
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -132,36 +123,36 @@ func (h *rpcHandler) GetNotification(ctx context.Context, req *connect.Request[n
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.GetNotificationResponse{
+	return &notificationv1.GetNotificationResponse{
 		Notification: wireNotification(row, userIDs, groupIDs, nil),
 		Status:       webutil.StatusSuccess,
 		Message:      "the notification was read",
-	}), nil
+	}, nil
 }
 
 // ListAllNotifications answers one page of every notification the
 // deployment holds.
-func (h *rpcHandler) ListAllNotifications(ctx context.Context, req *connect.Request[notificationv1.ListAllNotificationsRequest]) (*connect.Response[notificationv1.ListAllNotificationsResponse], error) {
-	rows, pagination, err := h.service.ListAll(ctx, req.Msg.GetCategory(), req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListAllNotifications(ctx context.Context, req *notificationv1.ListAllNotificationsRequest) (*notificationv1.ListAllNotificationsResponse, error) {
+	rows, pagination, err := h.service.ListAll(ctx, req.GetCategory(), req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.ListAllNotificationsResponse{
+	return &notificationv1.ListAllNotificationsResponse{
 		Notifications: wireNotifications(rows),
 		Metadata:      metadataOf(pagination),
 		Status:        webutil.StatusSuccess,
 		Message:       "the notifications were listed",
-	}), nil
+	}, nil
 }
 
 // CancelNotification withdraws one notification.
-func (h *rpcHandler) CancelNotification(ctx context.Context, req *connect.Request[notificationv1.CancelNotificationRequest]) (*connect.Response[notificationv1.CancelNotificationResponse], error) {
+func (h *rpcHandler) CancelNotification(ctx context.Context, req *notificationv1.CancelNotificationRequest) (*notificationv1.CancelNotificationResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := parseID(req.Msg.Id)
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -172,14 +163,14 @@ func (h *rpcHandler) CancelNotification(ctx context.Context, req *connect.Reques
 	if err := h.service.Cancel(ctx, admin, id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.CancelNotificationResponse{
+	return &notificationv1.CancelNotificationResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the notification was cancelled",
-	}), nil
+	}, nil
 }
 
 // ListNotifications answers one page of the caller's inbox.
-func (h *rpcHandler) ListNotifications(ctx context.Context, req *connect.Request[notificationv1.ListNotificationsRequest]) (*connect.Response[notificationv1.ListNotificationsResponse], error) {
+func (h *rpcHandler) ListNotifications(ctx context.Context, req *notificationv1.ListNotificationsRequest) (*notificationv1.ListNotificationsResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
@@ -189,26 +180,26 @@ func (h *rpcHandler) ListNotifications(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, mapError(err)
 	}
-	rows, pagination, err := h.service.ListInbox(ctx, userID, req.Msg.GetUnreadOnly(), req.Msg.GetCategory(), req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	rows, pagination, err := h.service.ListInbox(ctx, userID, req.GetUnreadOnly(), req.GetCategory(), req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.ListNotificationsResponse{
+	return &notificationv1.ListNotificationsResponse{
 		Notifications: wireInbox(rows),
 		Metadata:      metadataOf(pagination),
 		Status:        webutil.StatusSuccess,
 		Message:       "the notifications were listed",
-	}), nil
+	}, nil
 }
 
 // MarkNotificationRead writes the caller's receipt for one notification.
-func (h *rpcHandler) MarkNotificationRead(ctx context.Context, req *connect.Request[notificationv1.MarkNotificationReadRequest]) (*connect.Response[notificationv1.MarkNotificationReadResponse], error) {
+func (h *rpcHandler) MarkNotificationRead(ctx context.Context, req *notificationv1.MarkNotificationReadRequest) (*notificationv1.MarkNotificationReadResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := parseID(req.Msg.Id)
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -219,14 +210,14 @@ func (h *rpcHandler) MarkNotificationRead(ctx context.Context, req *connect.Requ
 	if err := h.service.MarkRead(ctx, userID, id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.MarkNotificationReadResponse{
+	return &notificationv1.MarkNotificationReadResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the notification was marked read",
-	}), nil
+	}, nil
 }
 
 // MarkAllNotificationsRead writes the caller's missing receipts.
-func (h *rpcHandler) MarkAllNotificationsRead(ctx context.Context, req *connect.Request[notificationv1.MarkAllNotificationsReadRequest]) (*connect.Response[notificationv1.MarkAllNotificationsReadResponse], error) {
+func (h *rpcHandler) MarkAllNotificationsRead(ctx context.Context, req *notificationv1.MarkAllNotificationsReadRequest) (*notificationv1.MarkAllNotificationsReadResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
@@ -239,14 +230,14 @@ func (h *rpcHandler) MarkAllNotificationsRead(ctx context.Context, req *connect.
 	if _, err := h.service.MarkAllRead(ctx, userID); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.MarkAllNotificationsReadResponse{
+	return &notificationv1.MarkAllNotificationsReadResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the notifications were marked read",
-	}), nil
+	}, nil
 }
 
 // UnreadCount answers the number the bell badge shows.
-func (h *rpcHandler) UnreadCount(ctx context.Context, req *connect.Request[notificationv1.UnreadCountRequest]) (*connect.Response[notificationv1.UnreadCountResponse], error) {
+func (h *rpcHandler) UnreadCount(ctx context.Context, req *notificationv1.UnreadCountRequest) (*notificationv1.UnreadCountResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
@@ -260,17 +251,17 @@ func (h *rpcHandler) UnreadCount(ctx context.Context, req *connect.Request[notif
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&notificationv1.UnreadCountResponse{
+	return &notificationv1.UnreadCountResponse{
 		Count:   int64(count),
 		Status:  webutil.StatusSuccess,
 		Message: "the unread count was read",
-	}), nil
+	}, nil
 }
 
 // WatchNotifications tails the notifications created while the stream stays
 // open. The stream carries no history: a reconnecting client catches up
 // through the list, which is the durable record the stream tail is not.
-func (h *rpcHandler) WatchNotifications(ctx context.Context, req *connect.Request[notificationv1.WatchNotificationsRequest], stream *connect.ServerStream[notificationv1.WatchEvent]) error {
+func (h *rpcHandler) WatchNotifications(ctx context.Context, req *notificationv1.WatchNotificationsRequest, stream notificationv1connect.NotificationServiceWatchNotificationsServerStream) error {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return err
@@ -389,7 +380,7 @@ func parseID(id string) (uuid.UUID, error) {
 func callerOf(ctx context.Context) (*jwtutils.Caller, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return nil, connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 	return caller, nil
 }
@@ -439,12 +430,12 @@ func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("notification not found"))
+		return connect.NewError(connect.CodeNotFound, "notification not found")
 	case errors.Is(err, ErrInvalidAudience):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the audience does not fit the category"))
+		return connect.NewError(connect.CodeInvalidArgument, "the audience does not fit the category")
 	case errors.Is(err, ErrUnknownTarget):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the audience names an unknown account or group"))
+		return connect.NewError(connect.CodeInvalidArgument, "the audience names an unknown account or group")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("notification operation failed"))
+		return connect.NewError(connect.CodeInternal, "notification operation failed")
 	}
 }

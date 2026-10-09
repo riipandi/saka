@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	authnv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1/authnv1connect"
 	"github.com/riipandi/saka/framework/health"
 	"github.com/riipandi/saka/framework/kernel"
 	fwmiddleware "github.com/riipandi/saka/framework/middleware"
@@ -193,7 +194,7 @@ func TestALimitedProcedureIsRefusedInTheConnectProtocol(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, rpcRequest(t, "/saka.test.v1.FeatureService/Ping", "{}"))
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
 
 	require.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
 

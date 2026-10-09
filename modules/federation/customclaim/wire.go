@@ -3,7 +3,7 @@ package customclaim
 import (
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 )
@@ -14,17 +14,17 @@ import (
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrClaimNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("custom claim not found"))
+		return connect.NewError(connect.CodeNotFound, "custom claim not found")
 	case errors.Is(err, ErrClaimExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("the subject already carries this claim key"))
+		return connect.NewError(connect.CodeAlreadyExists, "the subject already carries this claim key")
 	case errors.Is(err, ErrSubjectNotFound):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the named subject does not exist"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the named subject does not exist")
 	case errors.Is(err, ErrClaimWrongSubject):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the claim belongs to the other subject kind"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the claim belongs to the other subject kind")
 	case errors.Is(err, ErrReservedClaim):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the claim key is reserved by the protocol and cannot be used as a custom claim"))
+		return connect.NewError(connect.CodeInvalidArgument, "the claim key is reserved by the protocol and cannot be used as a custom claim")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("custom claim operation failed"))
+		return connect.NewError(connect.CodeInternal, "custom claim operation failed")
 	}
 }
 

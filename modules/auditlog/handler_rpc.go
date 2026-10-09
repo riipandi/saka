@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"math"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -37,13 +37,11 @@ func (m *Module) Name() string { return ModuleName }
 // HTTP route: every procedure is POST-only on the RPC surface.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := auditlogv1connect.NewAuditLogServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(auditlogv1connect.AuditLogServiceListProcedure, handler)
-	r.Handle(auditlogv1connect.AuditLogServiceListAllProcedure, handler)
-	r.Handle(auditlogv1connect.AuditLogServiceListForUserProcedure, handler)
-	r.Handle(auditlogv1connect.AuditLogServiceFilterOptionsProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	auditlogv1connect.RegisterAuditLogServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the audit-log procedures. The service
@@ -65,68 +63,68 @@ func newRPCHandler(service *Service) auditlogv1connect.AuditLogServiceHandler {
 // somebody else's records with. The guard refuses an impersonated caller
 // before this runs, which is what keeps a delegated session from reading the
 // account's own history as if it were the account.
-func (h *rpcHandler) List(ctx context.Context, req *connect.Request[auditlogv1.ListRequest]) (*connect.Response[auditlogv1.ListResponse], error) {
+func (h *rpcHandler) List(ctx context.Context, req *auditlogv1.ListRequest) (*auditlogv1.ListResponse, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errNoCaller)
+		return nil, connect.NewError(connect.CodeUnauthenticated, errNoCaller.Error()).WithCause(errNoCaller)
 	}
 
 	// Absent a sort order the page answers newest first.
-	ascending := req.Msg.GetSortOrder() == "asc"
+	ascending := req.GetSortOrder() == "asc"
 	views, metadata, err := h.service.List(ctx, Scope{UserID: caller.UserID},
-		req.Msg.GetSortBy(), ascending, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+		req.GetSortBy(), ascending, int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return connect.NewResponse(&auditlogv1.ListResponse{
+	return &auditlogv1.ListResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
 		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
-	}), nil
+	}, nil
 }
 
 // ListAll answers every record the filters admit. It is an administrative
 // procedure: the guard refuses a caller who is not an administrator before
 // this runs.
-func (h *rpcHandler) ListAll(ctx context.Context, req *connect.Request[auditlogv1.ListAllRequest]) (*connect.Response[auditlogv1.ListAllResponse], error) {
+func (h *rpcHandler) ListAll(ctx context.Context, req *auditlogv1.ListAllRequest) (*auditlogv1.ListAllResponse, error) {
 	views, metadata, err := h.service.List(ctx, Scope{
-		UserID: req.Msg.GetUserId(),
-		Event:  req.Msg.GetEvent(),
-		Search: req.Msg.GetSearch(),
-	}, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+		UserID: req.GetUserId(),
+		Event:  req.GetEvent(),
+		Search: req.GetSearch(),
+	}, req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return connect.NewResponse(&auditlogv1.ListAllResponse{
+	return &auditlogv1.ListAllResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
 		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
-	}), nil
+	}, nil
 }
 
 // ListForUser answers one account's records, which is the administrative view
 // of the list `List` gives an account of its own.
-func (h *rpcHandler) ListForUser(ctx context.Context, req *connect.Request[auditlogv1.ListForUserRequest]) (*connect.Response[auditlogv1.ListForUserResponse], error) {
-	views, metadata, err := h.service.List(ctx, Scope{UserID: req.Msg.GetUserId()},
-		"", false, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListForUser(ctx context.Context, req *auditlogv1.ListForUserRequest) (*auditlogv1.ListForUserResponse, error) {
+	views, metadata, err := h.service.List(ctx, Scope{UserID: req.GetUserId()},
+		"", false, int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return connect.NewResponse(&auditlogv1.ListForUserResponse{
+	return &auditlogv1.ListForUserResponse{
 		Logs:     wireLogs(views),
 		Metadata: wireMetadata(metadata),
 		Status:   webutil.StatusSuccess,
 		Message:  "the audit records were read",
-	}), nil
+	}, nil
 }
 
 // FilterOptions answers the facets a filter control is built from.
-func (h *rpcHandler) FilterOptions(ctx context.Context, _ *connect.Request[auditlogv1.FilterOptionsRequest]) (*connect.Response[auditlogv1.FilterOptionsResponse], error) {
+func (h *rpcHandler) FilterOptions(ctx context.Context, _ *auditlogv1.FilterOptionsRequest) (*auditlogv1.FilterOptionsResponse, error) {
 	events, users, err := h.service.Options(ctx)
 	if err != nil {
 		return nil, mapError(err)
@@ -137,12 +135,12 @@ func (h *rpcHandler) FilterOptions(ctx context.Context, _ *connect.Request[audit
 		options = append(options, &auditlogv1.UserOption{Id: user.ID, Username: user.Username})
 	}
 
-	return connect.NewResponse(&auditlogv1.FilterOptionsResponse{
+	return &auditlogv1.FilterOptionsResponse{
 		Events:  events,
 		Users:   options,
 		Status:  webutil.StatusSuccess,
 		Message: "the filter options were read",
-	}), nil
+	}, nil
 }
 
 // wireLogs maps the views onto the contract's shape.
@@ -212,7 +210,7 @@ var errNoCaller = errors.New("authentication required")
 // caller's answer is the same and the detail stays in the log: a read failure
 // names a table and a query, which is nothing a client can act on.
 func mapError(err error) error {
-	return connect.NewError(connect.CodeInternal, errors.New("the audit records could not be read"))
+	return connect.NewError(connect.CodeInternal, "the audit records could not be read")
 }
 
 // wireUserID renders an audit record's subject in the wire form. A record

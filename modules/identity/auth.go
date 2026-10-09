@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/modules/identity/jwks"
@@ -24,16 +24,16 @@ import (
 //
 // The failure text names nothing a caller could aim at: a missing token and a
 // bad one answer alike.
-func Authenticate(keys *jwks.Service, cfg config.Config) authn.AuthFunc {
+func Authenticate(keys *jwks.Service, cfg config.Config) func(context.Context, *http.Request) (any, error) {
 	verifier := jwtutils.NewAccessVerifier(keys, cfg.Auth.Issuer)
 	return func(ctx context.Context, req *http.Request) (any, error) {
-		token, ok := authn.BearerToken(req)
+		token, ok := jwtutils.BearerToken(req)
 		if !ok {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		caller, err := verifier.VerifyCaller(ctx, token)
 		if err != nil {
-			return nil, authn.Errorf("invalid or expired token")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "invalid or expired token")
 		}
 		return caller, nil
 	}

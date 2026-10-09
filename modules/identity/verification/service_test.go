@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
 	"github.com/riipandi/saka/framework/datastore"
@@ -356,7 +356,7 @@ func port(addr string) int {
 func TestSendEmailRefusesACallerWithoutTheClaims(t *testing.T) {
 	handler := &rpcHandler{service: nil} // the gate runs before the service
 
-	_, err := handler.SendEmail(t.Context(), connect.NewRequest(&identityv1.SendVerificationEmailRequest{}))
+	_, err := handler.SendEmail(t.Context(), &identityv1.SendVerificationEmailRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
 }
 

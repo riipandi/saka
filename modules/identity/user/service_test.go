@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"log/slog"
 
