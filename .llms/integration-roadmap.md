@@ -246,11 +246,15 @@ wires against.
   modal this page's action becomes the first consumer of lands there —
   shipping the button now would expose an action that always answers
   `authentication required`.
-- [ ] **Email verification & change** —
+- [x] **Email verification & change** —
   `SendEmail`/`VerifyEmail`/`RequestEmailChange`/`ConfirmEmailChange`
   (the change flow's completion half — shipped, see `issue-20261010_0017.md`
   ISS-001 for the reference gap) plus the routes the mailed tokens land on:
-  the verify route and the change-confirm route.
+  the verify route. Phase 5 shipped the page (`routes/(app)/account/email.tsx`
+  over `-email-view.tsx`: status card, code-entry verify, the gated change
+  flow) and the no-session `/verify-email` door with `?code=` prefill; the
+  change-confirm route is the email page's confirm step, not a separate URL —
+  the mailed code is typed where the session already is.
 - [ ] **Audit trail (own)** — `AuditLogService/List` on the account page;
   the smallest list-with-pagination consumer. Build the shared pagination
   hook (page/limit + `ListMetadata`, `sort_by` whitelists) here.
@@ -601,7 +605,8 @@ Target layout, annotated with the wave that lands each file:
 routes/
   __root.tsx                    # providers + pageTitle — unchanged
   index.tsx                     # landing — destub the hero (Wave 1)
-  verify-email.tsx              # token consumption, no guard — works signed-in or not (Wave 1)
+    verify-email.tsx              # token consumption, no guard — works signed-in or not (Wave 1)
+    -verify-email-view.tsx        #   the implementation; ?code= prefills the slots
   -boundaries.tsx               # shared, not a route
   -devtools.tsx                 # shared, not a route
 
@@ -621,6 +626,8 @@ routes/
     -settings-dialog.tsx         #   the danger zone's typed confirmation
     device.tsx                   # device-login approval: Inspect + Decide (Wave 6)
     account/
+      email.tsx                  # email identity (Wave 1)
+      -email-view.tsx            #   the implementation
       sessions.tsx               # session center (Wave 1)
       -sessions-view.tsx         #   the implementation
       -sessions-dialog.tsx       #   the bulk sign-out confirmations
