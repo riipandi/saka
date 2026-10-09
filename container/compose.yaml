@@ -36,16 +36,15 @@ include:
 #     <<: *common
 #     build:
 #       context: .
-#       dockerfile: ./deploy/Dockerfile
+#       dockerfile: ../deploy/Dockerfile
 #       args:
-#         DISTROLESS_TAG: ${DISTROLESS_TAG:-nonroot}
+#         DISTROLESS_TAG: ${DISTROLESS_TAG:-debug-nonroot}
 #         NODE_VERSION: ${NODE_VERSION:-24.21}
 #         GO_VERSION: ${GO_VERSION:-1.27.1}
-#     # platform: linux/amd64
 #     hostname: saka
 #     expose: ["3000"]
-#     volumes: ["./storage:/srv/storage:rw"]
-#     env_file: "./.env.local"
+#     volumes: ["../storage:/srv/storage:rw"]
+#     env_file: "../.env.local"
 #     environment:
 #       DATABASE_URL: postgresql://postgres:securedb@pgsql:5432/postgres?sslmode=disable
 #       STORAGE_S3_ENDPOINT_URL: http://silo:9100

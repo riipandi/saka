@@ -12,6 +12,7 @@ reference, history, or contract — navigate from here.
 | `.llms/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
 | `.llms/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
 | `.llms/auth-design.md` | The authentication design the auth surface follows. |
+| `.llms/integration-roadmap.md` | The recommended order for wiring the served backend surface into the webapp, as a delivery checklist (`- [ ]`): what is wired, what each wave lands, the reference map (which acknowledged inspiration each flow consults), the recommended route file layout, the E2E happy/unhappy scenario matrix per flow, the supporting-library research, the shared machinery each piece needs. Analysis and recommendation — each wave becomes a plan on the owner's instruction. |
 | `.llms/upstream-deviations.md` | Every intentional departure from Pocket ID upstream, with reasons. |
 | `.llms/endpoint-reference.md` | Shipped endpoints vs the ported upstream reference, at a glance. |
 | `.llms/references/pocket-id-api-reference.md` | The upstream API surface the port maps onto. |
@@ -84,7 +85,7 @@ The open and considering items, newest capture first:
 reopen triggers. The
 rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
 lands there the moment it is found — not in chat memory. Newest:
-`issue-20261006_0050.md`.
+`issue-20261010_0017.md`.
 
 ## Finding history fast
 
