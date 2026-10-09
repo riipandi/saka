@@ -618,10 +618,12 @@ routes/
     overview.tsx
     settings.tsx                 # profile & preferences — destub (Wave 1)
     -settings-view.tsx           #   the implementation; dash files are not routes
+    -settings-dialog.tsx         #   the danger zone's typed confirmation
     device.tsx                   # device-login approval: Inspect + Decide (Wave 6)
     account/
       sessions.tsx               # session center (Wave 1)
       -sessions-view.tsx         #   the implementation
+      -sessions-dialog.tsx       #   the bulk sign-out confirmations
       email.tsx                  # verification & change status (Wave 1)
       security.tsx               # passkeys + MFA + password management + step-up (Wave 2)
       audit.tsx                  # own audit trail (Wave 1)
