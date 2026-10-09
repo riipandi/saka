@@ -50,6 +50,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — the four profiles rehearse green; the hosted submission run is the owner's (runbook in the handover) |
 | `plan-20261009_0025.md` | Frontend foundation: the cookies library, the backend-driven configuration layer, the shared auth-aware fetch, Connect-Query — the decisions list (D1–D10) is the binding record for the webapp's data layer |
 | `plan-20261009_0142.md` | OAuth SSO: one store for every provider, the enabled-provider listing, the SPA flow — the decisions list (D1–D9) is the binding record for the sign-in-with-a-provider surface |
+| `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — **awaiting approval** |
 
 ## Handovers (`.llms/handover/`)
 
