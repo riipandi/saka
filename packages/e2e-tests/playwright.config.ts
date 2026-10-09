@@ -10,16 +10,21 @@ import { resolve } from 'node:path'
 // The runner is Playwright's own; the integration with the vitest suite is
 // the npm scripts (e2e*) and the vitest projects' exclude list.
 
-// The server the tests drive: the debug build is the one that carries the
-// /debug/passkey pages, and the base-url flag binding is where the RP
-// identity derives from.
-const serverBaseURL = 'http://localhost:3080'
-// Paths are relative to this package: the config lives in
-// packages/e2e-tests and the runner's cwd is the package, while the Go
-// module and the build output stay at the repository root.
+// The server the tests drive. The command runs from the repository root —
+// the binary requires app.config.json and .env.local beside it, so a run
+// from inside the package would never boot its own server — and rebuilds
+// the SPA first, because the binary embeds web/output as it stands.
+// The build tag is release: the session flows test the surface a real
+// deployment serves. The passkey ladder is the exception — its devtool
+// pages (/debug/passkey/*) exist only in the debug build, so run it with
+// E2E_BUILD_TAG=debug.
+const serverBaseURL = 'http://localhost:3000'
+const buildTag = process.env.E2E_BUILD_TAG || 'release'
 const serverCommand = [
-  'go build -tags debug -o ../../build/debug/saka ../../cmd',
-  `../../build/debug/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
+  'pnpm exec vp run webapp#prebuild',
+  'pnpm exec vp run webapp#build',
+  `go build -tags ${buildTag} -o build/${buildTag}/saka ./cmd`,
+  `./build/${buildTag}/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
 ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one
@@ -56,6 +61,7 @@ export default defineConfig({
   webServer: {
     command: serverCommand,
     url: `${serverBaseURL}/api/healthz`,
+    cwd: resolve('..', '..'),
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }

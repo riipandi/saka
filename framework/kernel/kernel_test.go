@@ -1,11 +1,12 @@
 package kernel
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,16 +29,26 @@ func (m mountingModule) Mount(r chi.Router) {
 	}
 }
 
-// rpcMountingModule is a module that also registers procedure paths.
+// rpcMountingModule is a module that also registers procedure names.
 type rpcMountingModule struct {
 	mountingModule
 	procedures []string
 }
 
-func (m rpcMountingModule) MountRPC(r chi.Router, _ ...connect.HandlerOption) {
+func (m rpcMountingModule) MountRPC(server *connect.Server) {
+	methods := make([]connect.Method, 0, len(m.procedures))
 	for _, procedure := range m.procedures {
-		r.Handle(procedure, http.NotFoundHandler())
+		methods = append(methods, connect.Method{
+			Spec: connect.Spec{
+				Procedure:  procedure,
+				StreamType: connect.StreamTypeUnary,
+			},
+			Handler: func(context.Context, connect.Spec, connect.ServerStream) error {
+				return nil
+			},
+		})
 	}
+	server.Register(methods...)
 }
 
 // TestMountRegistersEveryModuleRoutes is the base contract: disjoint modules
@@ -86,28 +97,28 @@ func TestMountServesTheSamePathUnderDifferentMethods(t *testing.T) {
 // TestMountRPCSkipsModulesWithoutProcedures keeps the type-assertion seam:
 // a module that serves no procedure says so by not implementing RPCModule.
 func TestMountRPCSkipsModulesWithoutProcedures(t *testing.T) {
-	r := chi.NewRouter()
 	assert.NotPanics(t, func() {
-		MountRPC(r, nil,
+		server := connect.NewServer()
+		MountRPC(server,
 			mountingModule{name: "plain", methods: map[string]string{http.MethodGet: "/plain"}},
 			rpcMountingModule{
 				name:       "rpc",
 				procedures: []string{"/hogwarts.test.v1.FeatureService/Ping"},
 			},
 		)
+		assert.Len(t, serverSpecs(server), 1)
 	})
 }
 
 // TestMountRPCFailsOnAClaimedTwiceProcedure: two modules registering one
-// procedure path fail the mount naming both — the generated handler would
-// otherwise answer whichever registered last.
+// procedure fail the mount naming both — the server would otherwise answer
+// whichever registered last.
 func TestMountRPCFailsOnAClaimedTwiceProcedure(t *testing.T) {
-	r := chi.NewRouter()
-
 	assert.PanicsWithValue(t,
 		`kernel: module "b" claims procedure /hogwarts.test.v1.FeatureService/Ping already claimed by module "a"`,
 		func() {
-			MountRPC(r, nil,
+			server := connect.NewServer()
+			MountRPC(server,
 				rpcMountingModule{
 					name:       "a",
 					procedures: []string{"/hogwarts.test.v1.FeatureService/Ping"},
@@ -118,6 +129,15 @@ func TestMountRPCFailsOnAClaimedTwiceProcedure(t *testing.T) {
 				},
 			)
 		})
+}
+
+// serverSpecs reads the procedure names a server registered.
+func serverSpecs(server *connect.Server) []string {
+	names := []string{}
+	for spec := range server.Specs() {
+		names = append(names, spec.Procedure)
+	}
+	return names
 }
 
 func assertRouteServed(t *testing.T, r chi.Router, method, path string) {

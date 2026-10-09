@@ -31,6 +31,13 @@ export interface GoBuildOptions {
 
 export interface PluginGolangOptions {
   packageName: string
+  /**
+   * The Go module root: where the watcher is armed, the build runs, and the
+   * binary spawns. Defaults to the directory vite was started from, which is
+   * wrong when the config lives in a workspace package — pass the repo root
+   * explicitly (an -C / package-script run changes the cwd).
+   */
+  root?: string
   /** Go toolchain binary (default: "go"). */
   cmd?: string
   packagePath?: string
@@ -120,12 +127,22 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
 
-// Printed relative to the working directory, so a line names the path a
-// developer would type; a path outside it stays absolute.
-function displayPath(target: string): string {
-  const rel = path.relative(process.cwd(), target)
+// Printed relative to the Go module root (the plugin's `root` option), so a
+// line names the path a developer would type from the repo; a path outside
+// it stays absolute.
+// Printed relative to the Go module root (the plugin's `root` option), so a
+// line names the path a developer would type from the repo; a path outside
+// it stays absolute.
+function displayPath(base: string, target: string): string {
+  const rel = path.relative(base, target)
   if (rel === '') return '.'
   return rel.startsWith('..') ? target : rel
+}
+
+function logOutput(output: string) {
+  for (const line of output.split('\n')) {
+    if (line.trim()) console.error(`${PREFIX} ${C.red}${line}${C.reset}`)
+  }
 }
 
 // One arg builder for both paths (dev rebuilds and production targets): flags
@@ -150,7 +167,10 @@ function resolveTarget(
   return { name, outputDir: target.outputDir, binPath, args, buildTags, buildFlags, ldflags }
 }
 
-function formatBuildInfo(target: ResolvedTarget): Array<{ label: string; value: string }> {
+function formatBuildInfo(
+  target: ResolvedTarget,
+  base: string
+): Array<{ label: string; value: string }> {
   const tags = target.buildTags.length > 0 ? target.buildTags.join(', ') : 'none'
 
   const lines: Array<{ label: string; value: string }> = [
@@ -166,7 +186,7 @@ function formatBuildInfo(target: ResolvedTarget): Array<{ label: string; value: 
     lines.push({ label: `ldflags[${index}]`, value: flag })
   }
 
-  lines.push({ label: 'output', value: displayPath(target.binPath) })
+  lines.push({ label: 'output', value: displayPath(base, target.binPath) })
 
   return lines
 }
@@ -207,7 +227,7 @@ function runGoBuild(cmd: string, args: string[], cwd: string): Promise<GoBuildRe
 }
 
 export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
-  if (process.env.VITEST || process.env.STORYBOOK || process.env.SKIP_GO_BUILD) {
+  if (process.env.VITEST || process.env.SKIP_GO_BUILD || process.env.STORYBOOK) {
     return { name: 'vite-plugin-go' }
   }
 
@@ -228,6 +248,9 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
   // shadow an explicit top-level packagePath.
   const packagePath =
     userOptions.build?.packagePath ?? userOptions.packagePath ?? defaults.packagePath
+  // The module root defaults to the cwd; a package-resident config passes it
+  // explicitly because -C / package scripts run from the package directory.
+  const projectRoot = path.resolve(userOptions.root ?? process.cwd())
   const outputBin = userOptions.build?.outputBin ?? userOptions.packageName
   const embedDir = userOptions.build?.embedDir ?? defaults.build.embedDir
   const devTargetName = userOptions.build?.devTarget ?? defaults.build.devTarget
@@ -258,9 +281,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
     ...opts.excludeRegex.map((r) => new RegExp(r))
   ]
 
-  // The Go module and the config file live in the directory vite was started
-  // from, which is not vite's root when the SPA sits in a subdirectory.
-  const projectRoot = process.cwd()
+  // The Go module and the config file live at the module root — see `root`.
   let command: 'serve' | 'build' = 'serve'
   let goProcess: ChildProcess | null = null
   let buildTimer: ReturnType<typeof setTimeout> | null = null
@@ -277,12 +298,6 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
     // Default gutter fits the longest common label; callers may pass an exact width.
     const w = width ?? (label.endsWith(':') ? 10 : 9)
     log(`${C.dim}${label.padEnd(w)}${C.reset}${value}`)
-  }
-
-  function logOutput(output: string) {
-    for (const line of output.split('\n')) {
-      if (line.trim()) console.error(`${PREFIX} ${C.red}${line}${C.reset}`)
-    }
   }
 
   function killGo() {
@@ -437,17 +452,35 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
 
         const embedPath = path.resolve(projectRoot, embedDir)
         if (!fs.existsSync(embedPath)) {
-          log(`embed directory "${displayPath(embedPath)}" not found, skipping go builds`)
+          log(
+            `embed directory "${displayPath(projectRoot, embedPath)}" not found, skipping go builds`
+          )
           process.exitCode = 1
           return
         }
+
+        // The go:embed pattern (`output`) skips dot directories, so Vite's
+        // internal manifest under `.vite/` never ships in the binary — the
+        // fragment resolves against the derived copy written here, after the
+        // SPA pass wrote its manifest and before the binaries compile. A
+        // missing manifest means the SPA pass did not run in this pipeline:
+        // copying nothing would embed a stale assets.json, so fail instead.
+        const manifestSource = path.resolve(embedPath, '.vite/manifest.json')
+        if (!fs.existsSync(manifestSource)) {
+          log(
+            `${C.red}build manifest not found at ${displayPath(projectRoot, manifestSource)} — run the SPA build before the Go build${C.reset}`
+          )
+          process.exitCode = 1
+          return
+        }
+        fs.copyFileSync(manifestSource, path.resolve(embedPath, 'assets.json'))
 
         for (const target of Object.values(targets)) {
           fs.mkdirSync(path.resolve(projectRoot, target.outputDir), { recursive: true })
 
           log(`building binary (${target.name})...`)
 
-          const infoLines = formatBuildInfo(target)
+          const infoLines = formatBuildInfo(target, projectRoot)
           const gutter = Math.max(...infoLines.map((line) => line.label.length)) + 1
           for (const line of infoLines) {
             logInfo(line.label, line.value, gutter)
@@ -470,7 +503,7 @@ export default function VitePlugin(userOptions: PluginGolangOptions): Plugin {
           }
 
           log(
-            `${C.green}binary built → ${displayPath(target.binPath)}${size} in ${formatDuration(duration)}${C.reset}\n`
+            `${C.green}binary built → ${displayPath(projectRoot, target.binPath)}${size} in ${formatDuration(duration)}${C.reset}\n`
           )
         }
       }

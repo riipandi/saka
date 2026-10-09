@@ -1,0 +1,32 @@
+import * as stylex from '@stylexjs/stylex'
+import { colors } from '../../../styles/colors.stylex'
+import { fontFamily } from '../../../styles/tokens.stylex'
+import { stroke } from '../../../styles/tokens.stylex'
+import { unit, radius } from '../../../styles/tokens.stylex'
+
+export const toolbarStyles = stylex.create({
+  root: {
+    alignItems: 'center',
+    borderColor: colors.borderNeutralFaded,
+    borderRadius: radius.large,
+    borderStyle: 'solid',
+    borderWidth: stroke.ring1,
+    display: 'flex',
+    fontFamily: fontFamily.body,
+    gap: unit.x1,
+    padding: unit.x1,
+    width: 'fit-content'
+  },
+  group: {
+    alignItems: 'center',
+    display: 'flex',
+    gap: unit.x1
+  },
+  separator: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.borderNeutralFaded,
+    marginBlock: unit.x1,
+    marginInline: unit.x1,
+    width: stroke.ring1
+  }
+})

@@ -55,9 +55,9 @@ services:
     volumes: ['./otel-collector.yaml:/etc/otelcol/config.yaml:ro']
     environment:
       # The Basic credential the exporter's Authorization header interpolates:
-      # ZO_ROOT_USER_EMAIL : ZO_ROOT_USER_PASSWORD, base64-encoded once — the
-      # same pair the metrics:* tasks and the UI log in with. Regenerate when
-      # either changes: printf '%s' 'admin@example.com:@DMin123' | base64
+      # ZO_ROOT_USER_EMAIL : ZO_ROOT_USER_PASSWORD, base64-encoded once —
+      # the same pair the UI logs in with. Regenerate when either changes:
+      # printf '%s' 'admin@example.com:@DMin123' | base64
       OPENOBSERVE_AUTH: '${OPENOBSERVE_AUTH:-YWRtaW5AZXhhbXBsZS5jb206QERNaW4xMjM=}'
     command: ['--config', '/etc/otelcol/config.yaml']
     #healthcheck:

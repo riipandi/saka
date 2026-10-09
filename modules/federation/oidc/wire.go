@@ -6,7 +6,7 @@ import (
 	"math"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
@@ -162,21 +162,21 @@ func optionalString(value *string) *string {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrClientNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("OIDC client not found"))
+		return connect.NewError(connect.CodeNotFound, "OIDC client not found")
 	case errors.Is(err, ErrPreviewUnknownUser):
-		return connect.NewError(connect.CodeNotFound, errors.New("the account does not exist"))
+		return connect.NewError(connect.CodeNotFound, "the account does not exist")
 	case errors.Is(err, ErrSecretNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("client secret not found"))
+		return connect.NewError(connect.CodeNotFound, "client secret not found")
 	case errors.Is(err, ErrClientExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("the client id is already in use"))
+		return connect.NewError(connect.CodeAlreadyExists, "the client id is already in use")
 	case errors.Is(err, ErrGroupUnknown):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("a named user group does not exist"))
+		return connect.NewError(connect.CodeFailedPrecondition, "a named user group does not exist")
 	case errors.Is(err, ErrUnsupportedLogo):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the logo must be a PNG, JPEG, or WebP image"))
+		return connect.NewError(connect.CodeInvalidArgument, "the logo must be a PNG, JPEG, or WebP image")
 	case errors.Is(err, ErrLogosUnavailable):
-		return connect.NewError(connect.CodeUnavailable, errors.New("logo storage is not available"))
+		return connect.NewError(connect.CodeUnavailable, "logo storage is not available")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("OIDC client operation failed"))
+		return connect.NewError(connect.CodeInternal, "OIDC client operation failed")
 	}
 }
 
@@ -187,11 +187,11 @@ func mapError(err error) error {
 func callerUUID(ctx context.Context) (uuid.UUID, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return uuid.Nil(), connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return uuid.Nil(), connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 	id, err := user.UUIDFromWire(caller.UserID)
 	if err != nil {
-		return uuid.Nil(), connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return uuid.Nil(), connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 	return id, nil
 }

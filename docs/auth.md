@@ -12,7 +12,7 @@ the machinery around them.
 | **Password** | Types an email or username and a password | Length and character-class rules; "remember me" picks the long session window |
 | **Passkey** | Unlocks with the device's fingerprint, face, or security key | The credential is a WebAuthn ceremony — the server never sees a secret, only a proof it can verify |
 | **One-time email code** | Types an email address, receives a short code | The code is single-use, stored only as a hash, and dies in minutes (six characters for short windows, twelve for longer ones) |
-| **External provider** | Clicks "Continue with Google/GitHub/custom" | See [OAuth SSO](oauth-sso.md) |
+| **External provider** | Clicks the provider's button — one per connection the deployment enabled | See [OAuth SSO](oauth-sso.md) |
 | **Device pairing** | A device shows a code (`XXXX-XXXX`); another browser approves it | One decision per request; the code and the pairing secret live only as hashes |
 
 Two flows pause mid-way and ask for more:

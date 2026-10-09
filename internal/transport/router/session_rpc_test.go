@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,7 +84,7 @@ func newSessionRouter(t *testing.T, auth router.Authenticator, pool *datastore.P
 	// The step-up proofs are spent by the webauthn feature's consumer, built
 	// over the same pool; the settings reader is nil because the consumption
 	// reads no setting.
-	cfg.App.BaseURL = "http://localhost:3080"
+	cfg.App.BaseURL = "http://localhost:3000"
 	reauth, err := webauthn.NewService(cfg, pool, webauthn.NewRepository(), issuer, nil,
 		fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func newSessionRouter(t *testing.T, auth router.Authenticator, pool *datastore.P
 func sessionCallerAuthenticator(subject, sessionID string, admin bool) router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if subject == "" {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin), SessionID: sessionID}
 		return &jwtutils.Caller{UserID: subject, AccessClaims: claims}, nil
@@ -122,7 +122,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 		jwks.NewService(cfg, nil, nil, nil), fwaudit.NewRecorder(slog.New(slog.DiscardHandler)), nil)
 	account := signin.Account{ID: mustUUID(t, hermioneSessionOwner), Username: "hermione",
 		Email: "hermione@example.com", DisplayName: "Hermione Granger"}
-	result, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderPassword,
+	result, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderCredential,
 		audit.EventSignIn, signin.SessionParams{})
 	require.NoError(t, err)
 
@@ -193,7 +193,7 @@ func TestTheSessionLifecycleEndsInAStamp(t *testing.T) {
 	// is refused, and the refusal comes with a revocation — the one
 	// competent explanation of a replayed refresh token is a duplicated
 	// credential, and the session it named ends with it.
-	stamp, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderPassword,
+	stamp, err := issuer.IssueSession(t.Context(), pool, &account, signin.ProviderCredential,
 		audit.EventSignIn, signin.SessionParams{})
 	require.NoError(t, err)
 
@@ -227,7 +227,7 @@ func TestTheBulkSignOutsSweepTheAccountSessions(t *testing.T) {
 		t.Helper()
 		_, err := pool.Exec(t.Context(), `
 			INSERT INTO public.sessions (user_id, provider, token_hash, user_agent, remember, created_at, expires_at)
-			VALUES ($1, 'password', $2, 'test-agent/1.0', false, now() - interval '1 minute', now() + interval '24 hours')`,
+			VALUES ($1, 'credential', $2, 'test-agent/1.0', false, now() - interval '1 minute', now() + interval '24 hours')`,
 			hermioneSessionOwner, crypto.HashRefreshToken("refresh-token-"+name))
 		require.NoError(t, err)
 		var rawID string
@@ -288,7 +288,7 @@ func TestARevocationNamingNoSessionAnswersNotFound(t *testing.T) {
 		t.Helper()
 		_, err := pool.Exec(t.Context(), `
 			INSERT INTO public.sessions (user_id, provider, token_hash, user_agent, remember, created_at, expires_at)
-			VALUES ($1, 'password', $2, 'test-agent/1.0', false, now() - interval '1 minute', now() + interval '24 hours')`,
+			VALUES ($1, 'credential', $2, 'test-agent/1.0', false, now() - interval '1 minute', now() + interval '24 hours')`,
 			hermioneSessionOwner, crypto.HashRefreshToken("refresh-token-"+name))
 		require.NoError(t, err)
 		var rawID string

@@ -17,7 +17,7 @@ import (
 
 // The RFC 8414 alias: the authorization-server document answers at the
 // alias path with the same bytes the OIDC discovery document answers
-// with, and names the revocation surface phase 2 delivered.
+// with, and names the revocation surface.
 
 func metadataProvider(t *testing.T) http.Handler {
 	t.Helper()
@@ -72,7 +72,7 @@ func (clientManagerStub) DeleteClient(context.Context, string) error {
 }
 
 // TestTheDiscoveryDocumentPinsThePKCEAndClaimSurface answers for the two
-// metadata hygiene fixes the phase 1 audit asked for: the PKCE method list
+// metadata hygiene requirements: the PKCE method list
 // names S256 alone (RFC 9700 §4.1.3 retires plain), and claims_supported
 // carries the registered claims beside the scope-gated ones — at_hash
 // absent on purpose, the code flow's ID token does not mint it.

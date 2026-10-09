@@ -18,12 +18,12 @@ import (
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
-// ImpersonationTTL is the fixed window a delegated session lives. It does
-// not follow the target's normal lifetimes — remember or not — because the
-// window's purpose is different: it bounds how long a borrowed identity can
-// act, not how long an owner wants to stay signed in. Better Auth's default
-// (one hour) is the reference; the constant keeps it from drifting with the
-// config keys that answer a different question.
+// ImpersonationTTL is the fixed window a delegated session lives: one hour.
+// It does not follow the target's normal lifetimes — remember or not —
+// because the window's purpose is different: it bounds how long a borrowed
+// identity can act, not how long an owner wants to stay signed in. The
+// constant keeps the window from drifting with the config keys that answer
+// a different question.
 const ImpersonationTTL = time.Hour
 
 // ImpersonationProvider is the `provider` value a delegated session row

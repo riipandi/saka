@@ -64,7 +64,7 @@ export function setupStorage(token) {
 
   // Creation-with-upload: the POST declares the length and carries the
   // first (only) chunk, so one request stages and stores the whole file.
-  const res = http.post(`${tusBase}`, STORAGE_BODY, {
+  const res = http.post(tusBase, STORAGE_BODY, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Tus-Resumable': tusVersion,

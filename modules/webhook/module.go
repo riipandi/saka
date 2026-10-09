@@ -1,5 +1,4 @@
-// Package webhook is the webhook area: the outbound event surface saka
-// carries and Pocket ID does not.
+// Package webhook is the webhook area: the outbound event surface.
 //
 // It is an area of its own rather than a feature of identity because a
 // delivery endpoint is not an account fact — it is a destination the

@@ -4,7 +4,7 @@
 // for itself.
 //
 //   k6 run scripts/loadtest/loadtest.mjs
-//   K6_PROFILE=load K6_TARGET=http://localhost:3080 k6 run scripts/loadtest/loadtest.mjs
+//   K6_PROFILE=load K6_TARGET=http://localhost:3000 k6 run scripts/loadtest/loadtest.mjs
 //
 // Prerequisites: a running server (task dev or a built release binary), a
 // seeded database (task db:migrate && task db:seed) whose account matches
@@ -39,6 +39,23 @@ const only = (__ENV.K6_ONLY || '')
   .map((s) => s.trim())
   .filter(Boolean)
 
+// thinkTime is the pause a paced scenario holds between iterations: a
+// virtual user spends a second between calls. Without it, a VU on an
+// endpoint the server answers in microseconds loops flat out, and the run
+// measures k6's own overhead while flooding the request log — one such run
+// wrote a hundred thousand jwks lines in a minute and rotated the log
+// twice. The stress profile needs no think time: its arrival-rate executor
+// paces itself.
+const thinkTime = 1
+
+// signInPace is the pause the sign-in exec holds between iterations, sized
+// to the credential bucket the limiter grants sign-in — ten a minute, spent
+// by nothing else during a run. The smoke pass proves the shape in three
+// attempts; the load profile's two VUs spend about eight a minute; the
+// stress profile's arrival-rate executor paces itself, so its arrival — not
+// an exec sleep — is what stays under the budget.
+const signInPace = { smoke: 5, load: 15, stress: 0 }[PROFILE] ?? 5
+
 function shape(profile, name, spec) {
   // The exec name is a JavaScript export — camelCase; the dashed name is
   // what the tag, the threshold, and the summary read. The refresh scenario
@@ -54,11 +71,27 @@ function shape(profile, name, spec) {
 function smokeScenarios() {
   // Iterations, not duration: a one-VU duration executor loops flat out and
   // the run would measure the rate limiter refusing it. Twenty honest
-  // iterations per scenario is the correctness pass.
+  // iterations per scenario is the correctness pass — except sign-in, whose
+  // iterations the signInPace above already holds under the credential
+  // budget.
   const spec = { executor: 'per-vu-iterations', vus: 1, iterations: 20, maxDuration: '1m' }
   const names = only.length ? scenarioNames.filter((n) => only.includes(n)) : scenarioNames
-  return Object.fromEntries(names.map((name) => [name, shape('smoke', name, spec)]))
+  return Object.fromEntries(
+    names.map((name) => [
+      name,
+      shape('smoke', name, {
+        ...spec,
+        iterations: name === 'signin' ? 3 : spec.iterations
+      })
+    ])
+  )
 }
+
+const stages = (target) => [
+  { duration: '1m', target },
+  { duration: '3m', target },
+  { duration: '30s', target: 0 }
+]
 
 export const options = {
   scenarios:
@@ -80,11 +113,6 @@ function loadScenarios(profile) {
   // finds the ceiling rather than holding a shape.
   if (profile === 'load') {
     const spec = { executor: 'ramping-vus', startVUs: 0, gracefulRampDown: '20s' }
-    const stages = (target) => [
-      { duration: '1m', target },
-      { duration: '3m', target },
-      { duration: '30s', target: 0 }
-    ]
     const weights = {
       healthz: 8,
       jwks: 8,
@@ -99,10 +127,7 @@ function loadScenarios(profile) {
     const scenarios = Object.fromEntries(
       Object.entries(weights)
         .filter(([name]) => !only.length || only.includes(name))
-        .map(([name, weight]) => [
-          name,
-          shape(profile, name, { ...spec, stages: stages(Math.ceil(50 / 12) * weight) })
-        ])
+        .map(([name, weight]) => [name, shape(profile, name, { ...spec, stages: stages(weight) })])
     )
     // The serial refresh rides every profile — its rotations are the write
     // path the reads above lean on.
@@ -194,27 +219,34 @@ export function healthz() {
   // not-found shell answers that path, which is not a health answer.
   const res = get('healthz', '/api/healthz')
   check(res, { 'healthz is 200': (r) => r.status === 200 })
+  sleep(thinkTime)
 }
 
 export function jwks() {
   const res = get('jwks', '/.well-known/jwks.json')
   check(res, { 'jwks is 200': (r) => r.status === 200 })
   check(res, { 'jwks names keys': (r) => r.status === 200 && r.json('keys') !== undefined })
+  sleep(thinkTime)
 }
 
 export function signin() {
   const out = signIn()
   check(out, { 'signin answers the pair': (o) => o.ok && o.accessToken !== '' })
+  if (signInPace > 0) {
+    sleep(signInPace)
+  }
 }
 
 export function getSession(data) {
   const out = callRPC('get-session', procedures.getSession, {}, data.accessToken)
   check(out, { 'get-session names the session': (o) => o.ok && (o.data.session?.id ?? '') !== '' })
+  sleep(thinkTime)
 }
 
 export function listSessions(data) {
   const out = callRPC('list-sessions', procedures.listSessions, {}, data.accessToken)
   check(out, { 'list-sessions is success': (o) => o.ok })
+  sleep(thinkTime)
 }
 
 export function refresh(data) {
@@ -236,6 +268,7 @@ export function notificationList(data) {
     data.accessToken
   )
   check(out, { 'notification list is success': (o) => o.ok })
+  sleep(thinkTime)
 }
 
 export function auditlogList(data) {
@@ -246,16 +279,19 @@ export function auditlogList(data) {
     data.accessToken
   )
   check(out, { 'auditlog list is success': (o) => o.ok })
+  sleep(thinkTime)
 }
 
 export function adminQueues(data) {
   const queues = callRPC('admin-queues', procedures.listQueues, {}, data.accessToken)
   check(queues, { 'list-queues is success': (o) => o.ok })
   if (!queues.ok) {
+    sleep(thinkTime)
     return
   }
   const first = queues.data.queues?.[0]?.name ?? ''
   if (first === '') {
+    sleep(thinkTime)
     return
   }
   const tasks = callRPC(
@@ -265,15 +301,18 @@ export function adminQueues(data) {
     data.accessToken
   )
   check(tasks, { 'list-tasks is success': (o) => o.ok })
+  sleep(thinkTime)
 }
 
 export function storageGet(data) {
   if (!data.storage?.available) {
     fixtureSkipped.add(1)
+    sleep(thinkTime)
     return
   }
   const res = get('storage-get', `/storage/${STORAGE_BUCKET}/${STORAGE_KEY}`)
   check(res, { 'storage serves the object': (r) => r.status === 200 })
+  sleep(thinkTime)
 }
 
 export function teardown() {

@@ -159,12 +159,12 @@ by the caller's context and reported when it misses the deadline. Idempotent.
 
 ## Testing
 
-The console sink takes a writer and the OTLP sink is covered against a real collector
-(testcontainers, `StartVictoriaLogs`); the async drains, the level mapping, the source gate,
-the correlation, and the every-transport-ships-the-same-entry rule each have their suite:
+The console sink takes a writer and the OTLP sink is covered against an in-process
+collector stand-in (`newOTLPTestServer`); the async drains, the level mapping, the source
+gate, and the every-transport-ships-the-same-entry rule each have their suite:
 
 ```bash
-go test ./internal/logger/
+go test ./framework/logger/
 ```
 
 Prove the pipeline end to end with the metrics stack: `task metrics:up`, then

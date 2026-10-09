@@ -87,8 +87,8 @@ const (
 
 	// SettingWebauthnAllowSyncedPasskeys decides whether a credential that
 	// can live in a synced passkey provider — iCloud Keychain, a password
-	// manager — may enroll. Off, only device-bound credentials enroll; on,
-	// the deployment accepts the upstream default.
+	// manager — may enroll. Off by default: only device-bound credentials
+	// enroll; on, credentials held by a synced passkey provider enroll too.
 	SettingWebauthnAllowSyncedPasskeys = "webauthn.allow_synced_passkeys"
 
 	// SettingWebauthnUserVerification is the user-verification level every
@@ -106,7 +106,7 @@ const (
 	// sign-in links the provider identity into the account its verified
 	// email names. Off, a provider identity only ever signs in through a
 	// row it was bound by before; the linking is never automatic.
-	SettingOAuthSsoAccountLinkingEnabled = "oauthsso.account_linking_enabled"
+	SettingOAuthSsoAccountLinkingEnabled = "oauth.account_linking_enabled"
 
 	// SettingPasskeyMaxCredentials caps the passkeys one account may hold,
 	// counted separately from the TOTP devices.
@@ -222,6 +222,11 @@ const (
 	// sign-up route an account with zero confirmed factors to enrollment
 	// instead of minting a token.
 	SettingMFARequired = "mfa.required"
+
+	// SettingSessionLifetime is the window a session the caller did not
+	// remember holds, in seconds. A remembered session rides
+	// SettingSessionMaxLifetime instead.
+	SettingSessionLifetime = "session.lifetime"
 
 	// SettingSessionMaxLifetime bounds a remembered session, in seconds.
 	// The refresh paths — remembered or not — never outlive it.
@@ -444,9 +449,14 @@ func Catalog() []SettingDef {
 			Description: "The global second-factor gate: on, sign-in and sign-up route an account with zero confirmed factors to enrollment instead of minting a token.",
 		},
 		{
+			Key:         SettingSessionLifetime,
+			Default:     "43200",
+			Description: "How long a session the caller did not remember lives, in seconds (12 hours). A remembered session rides session.max_lifetime instead. Bounds at the reader: 5 minutes to the remembered bound.",
+		},
+		{
 			Key:         SettingSessionMaxLifetime,
 			Default:     "604800",
-			Description: "The longest a remembered session lives, in seconds (168 hours). The refresh paths — remembered or not — never outlive it. Bounds at the reader: 5 minutes to 10 years.",
+			Description: "How long a remembered session lives, in seconds (168 hours) — the bound every session the store may hold rests under. Bounds at the reader: 5 minutes to 10 years.",
 		},
 		{
 			Key:         SettingSessionInactivityTimeout,

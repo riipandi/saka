@@ -39,8 +39,8 @@ service AuthService {
 // caller who lost the password back in, carried by an email through the
 // frontend.
 //
-// Pocket ID has no password recovery at all — passkey-only accounts never
-// lose a password — so this service is saka-only. The flow is the
+// The service is saka-only: accounts sign in with passkeys and carry no
+// password to recover. The flow is the
 // email-verification shape: the raw token exists once in the email and once
 // in the request, the database stores only its hash, and an unknown, expired,
 // spent, and refused token answer the same failure. The token travels through
@@ -935,8 +935,7 @@ message AdminDisableMfaResponse {
 // DeviceApprovalService is the approving side of the device login flow:
 // a browser that cannot sign itself in creates a pairing request over
 // REST, and the account holder — signed in on a device that can — reads
-// what the request names and answers it here. The service is saka-only;
-// upstream Pocket ID has no passkey-less sign-in to approve.
+// what the request names and answers it here. The service is saka-only.
 service DeviceApprovalService {
   // Inspect answers the request the presented user code names: the code
   // as the device should render it, the requesting browser's address and
@@ -1013,8 +1012,7 @@ message DecideDeviceLoginResponse {
 
 // OAuthSSOService is the sign-in-with-a-provider surface: the builtin
 // Google and GitHub connections and the operator-configured custom OIDC
-// ones. The service is saka-only — upstream Pocket ID never signed an
-// account in through an external identity provider.
+// ones. The service is saka-only.
 //
 // The flow is a browser round trip: BeginSignIn answers the provider's
 // authorize URL the browser navigates to, the provider returns the browser
@@ -1035,6 +1033,15 @@ service OAuthSSOService {
   // answers not_found, the same answer an error elsewhere carries, so the
   // endpoint is not a connection enumerator.
   rpc BeginSignIn(BeginOAuthSignInRequest) returns (BeginOAuthSignInResponse);
+
+  // ListEnabledConnections answers the connections an unauthenticated
+  // caller may sign in with: the slug and the display name of every
+  // enabled connection, the facts a sign-in page renders. The
+  // configuration's oauth.enabled switch gates the surface; while it is
+  // off, the listing answers empty.
+  rpc ListEnabledConnections(ListEnabledConnectionsRequest) returns (ListEnabledConnectionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   // ContinueSignIn completes a flow the callback paused in a stage that
   // needed more from the caller — the given and family names the provider
@@ -1358,6 +1365,25 @@ message OAuthCustomAttribute {
 
 // ListOAuthConnectionsRequest is empty: the listing answers every
 // connection, the way the operator's screens read them.
+// EnabledConnection is one connection an unauthenticated caller may sign
+// in with: the slug the start route names and the display name the page
+// renders. No credentials, no endpoints, no flags — the anonymous caller
+// needs the button's label and its destination, nothing else.
+message EnabledConnection {
+  // provider is the connection's slug: the word the start route names.
+  string provider = 1;
+
+  // display_name is the name the sign-in page renders.
+  string display_name = 2;
+}
+
+message ListEnabledConnectionsRequest {}
+
+message ListEnabledConnectionsResponse {
+  // connections are the enabled connections, ordered by provider.
+  repeated EnabledConnection connections = 1;
+}
+
 message ListOAuthConnectionsRequest {}
 
 // ListOAuthConnectionsResponse carries the connections in slug order.

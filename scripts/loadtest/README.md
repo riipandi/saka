@@ -23,9 +23,9 @@ shape of the run is one of three profiles.
 ## Running
 
 ```sh
-task bench:loadtest                                   # smoke, localhost:3080
-task bench:loadtest --- K6_PROFILE=load               # the working shape
-K6_PROFILE=stress K6_TARGET=http://host:3080 k6 run scripts/loadtest/loadtest.mjs
+task bench:loadtest                                   # smoke, localhost:3000
+task bench:loadtest K6_PROFILE=load                   # the working shape
+K6_PROFILE=stress K6_TARGET=http://host:3000 k6 run scripts/loadtest/loadtest.mjs
 ```
 
 ## Profiles
@@ -33,11 +33,11 @@ K6_PROFILE=stress K6_TARGET=http://host:3080 k6 run scripts/loadtest/loadtest.mj
 | Profile | Shape | Reads |
 | --- | --- | --- |
 | `smoke` (default) | 1 VU, 20 s, every scenario | a correctness pass: every scenario answers success before a longer run is worth starting |
-| `load` | ramping VUs, 50 across the surface weighted by importance (session reads heaviest), ~4½ min | the working shape of a busy instance |
+| `load` | ramping VUs, 50 across the surface weighted by importance (session reads heaviest), a 1 s think time per iteration so a cheap endpoint holds the shape instead of looping flat out (sign-in paces itself at 15 s to stay under the credential bucket), ~4½ min | the working shape of a busy instance |
 | `stress` | arrival-rate ramps to 300 req/s aggregate, ~11 min | the ceiling: the shape finds where the surface bends, not a target to live at |
 
 `K6_VUS` / `K6_DURATION` override the load profile's targets; `K6_TARGET`
-names the server (default `http://localhost:3080`).
+names the server (default `http://localhost:3000`).
 
 ## Scenarios
 

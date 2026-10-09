@@ -21,6 +21,7 @@ type Config struct {
 	KVStore   KVStore   `koanf:"kvstore" json:"kvstore"`
 	Log       Log       `koanf:"log" json:"log"`
 	Mailer    Mailer    `koanf:"mailer" json:"mailer"`
+	OAuth     OAuth     `koanf:"oauth" json:"oauth"`
 	OIDC      OIDC      `koanf:"oidc" json:"oidc"`
 	OTEL      OTEL      `koanf:"otel" json:"otel"`
 	Queue     Queue     `koanf:"queue" json:"queue"`
@@ -106,9 +107,8 @@ type Auth struct {
 	// answers without the header.
 	HIBPAPIKey string `koanf:"hibp_api_key" json:"hibp_api_key"`
 	// ExpiryEmailEnabled turns the API key's expiry reminder on. Off by
-	// default, the way the upstream feature ships: a mailer that reaches
-	// account holders on a schedule is a decision, not a default. It lives
-	// beside the token lifetimes because the reminder is the tokens'
+	// default: a mailer that reaches account holders on a schedule is a
+	// decision, not a default. It lives beside the token lifetimes because the reminder is the tokens'
 	// housekeeping, not the machine credentials' own surface.
 	ExpiryEmailEnabled bool `koanf:"expiry_email_enabled" json:"expiry_email_enabled"`
 	// SessionDriver is the backend the sign-in session store reads: SessionDB
@@ -118,7 +118,8 @@ type Auth struct {
 	SessionDriver string `koanf:"session_driver" json:"session_driver"`
 	// OneTimeAccessEmailAsAdminEnabled opens the administrative email path:
 	// an operator may have a one-time access code sent to an account's
-	// address. Off by default, the way the upstream feature ships.
+	// address. Off by default: an operator's mailer becomes a credential
+	// sender.
 	OneTimeAccessEmailAsAdminEnabled bool `koanf:"one_time_access_email_as_admin_enabled" json:"one_time_access_email_as_admin_enabled"`
 	// OneTimeAccessEmailAsUnauthenticatedEnabled opens the public email path:
 	// a caller with no session may ask for a code by naming an address. Off
@@ -283,6 +284,18 @@ type LogFile struct {
 	MaxAge     int `koanf:"max_age" json:"max_age"`
 	// Compress gzips a rotated file.
 	Compress bool `koanf:"compress" json:"compress"`
+}
+
+// OAuth holds the sign-in-with-a-provider surface's switch. The providers
+// themselves — the builtin Google and GitHub connections and every custom
+// one — are runtime data the connection CRUD owns, sealed in the database;
+// the configuration carries no credentials. The switch gates the surface
+// wholesale: a change takes the restart every configuration key takes.
+type OAuth struct {
+	// Enabled serves the OAuth SSO surface: the enabled-provider listing
+	// answers and the flow's begin route runs. Off, sign-in through a
+	// provider is refused however the connections are configured.
+	Enabled bool `koanf:"enabled" json:"enabled"`
 }
 
 // OIDC holds the identity-provider surface's settings: the switch the

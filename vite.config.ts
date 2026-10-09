@@ -1,26 +1,16 @@
-import react from '@vitejs/plugin-react'
+/**
+ * Monorepo setup, and nothing else: staged checks, formatter, linter, and
+ * cached run tasks the workspace shares. Every frontend package owns its
+ * own `vite.config.ts` — the test block only references them. The Taskfile
+ * sequences what crosses packages, and `vp dev` / `vp build` at the root
+ * refuse to pick a package: enter through `task dev` / `task build`, or
+ * target one with `vp -C packages/webapp <command>`.
+ */
+
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite-plus'
-import pkg from './package.json' with { type: 'json' }
-import email from './packages/plugins/plugin-email.ts'
-import golang from './packages/plugins/plugin-golang.ts'
-import embedManifest from './packages/plugins/plugin-manifest.ts'
 
-// const isTestOrCI = process.env.CI || process.env.VITEST
-const isStorybook = process.env.STORYBOOK === 'true'
-const APP_VERSION = process.env.BUILD_VERSION || pkg.version
-const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString()
-const BUILD_HASH = process.env.BUILD_HASH || 'dev'
-
-// Must match the module path in go.mod.
-const goModule = 'github.com/riipandi/saka'
-
-// Version stamps shared by every Go target; release adds its static-link flags.
-const goVersionLdflags = [
-  `-X ${goModule}/internal/config.AppVersion=${APP_VERSION}`,
-  `-X ${goModule}/internal/config.BuildHash=${BUILD_HASH}`,
-  `-X ${goModule}/internal/config.BuildDate=${BUILD_DATE}`
-]
+const testOutputFile = resolve('.output/tests-results/vitest-results.json')
 
 const ignoredPatterns = [
   '.output',
@@ -32,51 +22,26 @@ const ignoredPatterns = [
   '**/*.yaml',
   '**/*.toml',
   '**/*.tmpl',
+  '**/e2e-result/**',
+  '**/public/**',
   '/codegen/**',
-  '/public/**',
   '/storage/**',
-  '/temp/**',
-  '/packages/webapp/public/**',
-  '/packages/e2e-tests/e2e-result/**'
+  '/temp/**'
 ]
 
-/**
- * Plugin Comlink owns worker construction and must register first: only
- * plugins that transform ComlinkWorker call sites may precede it.
- *
- * Plugin Email must be registered before the go plugin: its closeBundle
- * compiles the email templates that web/embed.go pulls into the go binary.
- *
- * With plugin Go, the SPA bundle and the email templates are compiled
- * once and embedded into both binaries.
- *
- * Backend integration (the Vite guide's): the Go binary owns the HTML
- * document — web/shell.go renders it — so there is no index.html here.
- * The dev server is the compiler behind the Go port, not an origin of its
- * own: the browser talks to :3080 only, the shell's fragment carries
- * same-origin paths, and the debug build proxies the module graph and the
- * HMR socket to this server. In production the shell resolves every tag
- * from the build manifest, one entry per page.
- *
- * Monorepo: the SPA sources live in packages/webapp (the package builds
- * the same bundle standalone — this config's vite root points at that
- * package, so both builds agree on the manifest keys), the email templates
- * in packages/email (`vp build packages/email` compiles them alone), the
- * Vite plugins in packages/plugins, and Playwright in packages/e2e-tests.
- * This root config is still the canonical binary pipeline: the email
- * plugin compiles the templates into the Go embed directories, and the go
- * plugin closes the pass by compiling both binaries. The manifest keys
- * are webapp-root-relative — web/shell.go names the same key.
- *
- * The manifest lives under `.vite/`, a dot directory go:embed silently
- * skips — deliberate: the Vite-internal manifest never ships in the
- * binary. The Go fragment reads the derived copy (`assets.json`) the
- * shared `VitePluginEmbedManifest` plugin writes after every build, so every
- * pipeline that compiles the frontend (task build, goreleaser, Docker,
- * CI) feeds the embed from one source.
- */
-
 export default defineConfig({
+  test: {
+    reporters:
+      process.env.GITHUB_ACTIONS === 'true'
+        ? [['github-actions']]
+        : [['default'], ['json', { outputFile: testOutputFile }]],
+    projects: [
+      './packages/webapp/vite.config.ts',
+      './packages/uilibs/vite.config.ts',
+      './packages/plugins/vite.config.ts',
+      './packages/email/vite.config.ts'
+    ]
+  },
   staged: {
     '*.{ts,tsx,js,jsx,css,json}': 'vp check --fix',
     '*.go': 'gofmt -w'
@@ -101,72 +66,80 @@ export default defineConfig({
     sortImports: {
       order: 'asc',
       groups: [['builtin', 'external'], ['internal'], ['parent', 'sibling', 'index']],
-      internalPattern: ['#/'],
+      internalPattern: ['#/', '~/codegen/'],
       partitionByComment: false,
       partitionByNewline: false,
       newlinesBetween: false,
       ignoreCase: true
     },
-    ignorePatterns: ignoredPatterns
-  },
-  lint: {
-    options: { typeAware: true, typeCheck: true },
-    rules: {
-      'typescript/no-floating-promises': 'error',
-      'typescript/no-misused-promises': 'error'
+    sortPackageJson: {
+      sortScripts: false
     },
     ignorePatterns: ignoredPatterns
   },
-  run: {
-    cache: true,
-    tasks: {
-      typecheck: 'pnpm exec tsc -b --noEmit'
-    }
-  },
-  plugins: [
-    embedManifest(),
-    react({ compiler: true }),
-    email({
-      templateDir: resolve('packages/email/templates'),
-      outputDir: resolve('web/email')
-    }),
-    golang({
-      packageName: pkg.name,
-      packagePath: resolve('cmd'),
-      binArgs: ['--env-file=.env.local', 'serve'],
-      build: {
-        embedDir: resolve('web/output'),
-        devTarget: 'debug',
-        targets: {
-          debug: {
-            outputDir: resolve('build/debug'),
-            buildTags: ['debug', 'noasm', 'nounsafe'],
-            ldflags: goVersionLdflags
-          },
-          release: {
-            outputDir: resolve('build/release'),
-            buildTags: ['release', 'noasm', 'nounsafe'],
-            buildFlags: ['-trimpath', '-buildmode=pie', '-buildvcs=false'],
-            ldflags: [...goVersionLdflags, '-w -s -extldflags -static']
-          }
+  lint: {
+    jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
+    options: { typeAware: true, typeCheck: true },
+    env: { browser: true, builtin: true, vitest: true },
+    categories: { correctness: 'error', suspicious: 'error' },
+    rules: {
+      'import/default': 'warn',
+      'import/no-absolute-path': 'allow',
+      'import/no-cycle': 'warn',
+      'import/no-unassigned-import': 'off',
+      'jsx-a11y/heading-has-content': 'off',
+      'no-console': 'off',
+      'no-debugger': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unused-vars': ['error', { args: 'after-used' }],
+      'react/jsx-key': 'error',
+      'react/no-array-index-key': 'error',
+      'react/no-children-prop': 'off',
+      'react/react-in-jsx-scope': 'off',
+      'react/self-closing-comp': ['error', { html: true, component: true }],
+      'sort-imports': 'off',
+      'typescript/consistent-type-definitions': ['error', 'interface'],
+      'typescript/no-explicit-any': 'error',
+      'typescript/no-floating-promises': 'error',
+      'typescript/no-misused-promises': 'error',
+      'typescript/no-unnecessary-type-constraint': 'off',
+      'typescript/triple-slash-reference': 'allow',
+      'vite-plus/prefer-vite-plus-imports': 'error'
+    },
+    overrides: [
+      {
+        files: ['**/*.test.ts', '**/*.spec.ts'],
+        plugins: ['vitest'],
+        rules: {
+          'no-console': 'off',
+          'vitest/no-focused-tests': 'error',
+          'vitest/no-disabled-tests': 'warn'
+        }
+      },
+      {
+        files: ['./packages/**/components/**/*.tsx'],
+        rules: {
+          'jsx-a11y/anchor-has-content': 'off',
+          'jsx-a11y/click-events-have-key-events': 'off',
+          'jsx-a11y/control-has-associated-label': 'off',
+          'jsx-a11y/heading-has-content': 'off',
+          'jsx-a11y/label-has-associated-control': 'off',
+          'jsx-a11y/no-noninteractive-element-interactions': 'off',
+          'jsx-a11y/prefer-tag-over-role': 'off',
+          'react/no-array-index-key': 'off'
         }
       }
-    })
-  ],
-  resolve: { tsconfigPaths: true },
-  root: resolve('packages/webapp'),
-  publicDir: resolve('packages/webapp/public'),
-  build: {
-    manifest: true,
-    emptyOutDir: true,
-    chunkSizeWarningLimit: 1024 * 4,
-    outDir: resolve('web/output'),
-    reportCompressedSize: false,
-    rolldownOptions: {
-      input: { app: resolve('packages/webapp/src/main.tsx') }
-    }
+    ],
+    ignorePatterns: ignoredPatterns
   },
-  // The compiler's port: bound to the loopback, proxied by the Go
-  // debug build, and never opened by a developer or a deployment.
-  server: isStorybook ? undefined : { port: 5173, host: '127.0.0.1', strictPort: true }
+  run: {
+    cache: { tasks: true },
+    tasks: {
+      typecheck:
+        'pnpm exec tsc -p packages/webapp --noEmit && pnpm exec tsc -p packages/uilibs --noEmit && ' +
+        'pnpm exec tsc -p packages/plugins --noEmit && ' +
+        'pnpm exec tsc -p packages/email --noEmit && pnpm exec tsc -p packages/e2e-tests --noEmit && ' +
+        'pnpm exec tsc -p . --noEmit'
+    }
+  }
 })

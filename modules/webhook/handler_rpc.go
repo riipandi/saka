@@ -8,7 +8,7 @@ import (
 
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -41,22 +41,11 @@ func (m *Module) Name() string { return ModuleName }
 // alone, so there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. Each procedure is
-// registered at its own path: the generated handler answers a path under its
-// prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := webhookv1connect.NewWebhookServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(webhookv1connect.WebhookServiceListProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceCreateProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceGetProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceUpdateProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceDeleteProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceRotateSecretProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceTestProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceListDeliveriesProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceListAllDeliveriesProcedure, handler)
-	r.Handle(webhookv1connect.WebhookServiceListEventTypesProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	webhookv1connect.RegisterWebhookServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -71,47 +60,47 @@ func newRPCHandler(service *Service) webhookv1connect.WebhookServiceHandler {
 }
 
 // List answers one page of the endpoints.
-func (h *rpcHandler) List(ctx context.Context, req *connect.Request[webhookv1.ListWebhooksRequest]) (*connect.Response[webhookv1.ListWebhooksResponse], error) {
-	enabled := req.Msg.Enabled
-	rows, pagination, err := h.service.List(ctx, enabled, req.Msg.GetEvent(), int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) List(ctx context.Context, req *webhookv1.ListWebhooksRequest) (*webhookv1.ListWebhooksResponse, error) {
+	enabled := req.Enabled
+	rows, pagination, err := h.service.List(ctx, enabled, req.GetEvent(), int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.ListWebhooksResponse{
+	return &webhookv1.ListWebhooksResponse{
 		Webhooks: wireEndpoints(rows),
 		Metadata: metadataOf(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the webhooks were listed",
-	}), nil
+	}, nil
 }
 
 // Create registers an endpoint and shows its signing secret once.
-func (h *rpcHandler) Create(ctx context.Context, req *connect.Request[webhookv1.CreateWebhookRequest]) (*connect.Response[webhookv1.CreateWebhookResponse], error) {
+func (h *rpcHandler) Create(ctx context.Context, req *webhookv1.CreateWebhookRequest) (*webhookv1.CreateWebhookResponse, error) {
 	params := CreateParams{
-		Name:       req.Msg.Name,
-		Endpoint:   req.Msg.Endpoint,
-		Method:     req.Msg.Method,
-		Headers:    req.Msg.Headers,
-		EventTypes: req.Msg.EventTypes,
+		Name:       req.Name,
+		Endpoint:   req.Endpoint,
+		Method:     req.Method,
+		Headers:    req.Headers,
+		EventTypes: req.EventTypes,
 	}
-	if req.Msg.Description != nil {
-		params.Description = *req.Msg.Description
+	if req.Description != nil {
+		params.Description = *req.Description
 	}
 	row, secret, err := h.service.Create(ctx, params)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.CreateWebhookResponse{
+	return &webhookv1.CreateWebhookResponse{
 		Webhook: wireEndpoint(row),
 		Secret:  secret,
 		Status:  webutil.StatusSuccess,
 		Message: "the webhook was created",
-	}), nil
+	}, nil
 }
 
 // Get answers one endpoint's view.
-func (h *rpcHandler) Get(ctx context.Context, req *connect.Request[webhookv1.GetWebhookRequest]) (*connect.Response[webhookv1.GetWebhookResponse], error) {
-	id, idErr := parseID(req.Msg.Id)
+func (h *rpcHandler) Get(ctx context.Context, req *webhookv1.GetWebhookRequest) (*webhookv1.GetWebhookResponse, error) {
+	id, idErr := parseID(req.Id)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
@@ -119,60 +108,60 @@ func (h *rpcHandler) Get(ctx context.Context, req *connect.Request[webhookv1.Get
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.GetWebhookResponse{
+	return &webhookv1.GetWebhookResponse{
 		Webhook: wireEndpoint(row),
 		Status:  webutil.StatusSuccess,
 		Message: "the webhook was read",
-	}), nil
+	}, nil
 }
 
 // Update rewrites the fields the caller named.
-func (h *rpcHandler) Update(ctx context.Context, req *connect.Request[webhookv1.UpdateWebhookRequest]) (*connect.Response[webhookv1.UpdateWebhookResponse], error) {
-	id, idErr := parseID(req.Msg.Id)
+func (h *rpcHandler) Update(ctx context.Context, req *webhookv1.UpdateWebhookRequest) (*webhookv1.UpdateWebhookResponse, error) {
+	id, idErr := parseID(req.Id)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
 	params := UpdateParams{
-		Description: req.Msg.Description,
-		Endpoint:    req.Msg.Endpoint,
-		Method:      req.Msg.Method,
-		Enabled:     req.Msg.Enabled,
+		Description: req.Description,
+		Endpoint:    req.Endpoint,
+		Method:      req.Method,
+		Enabled:     req.Enabled,
 	}
-	if req.Msg.Headers != nil {
-		params.Headers = &req.Msg.Headers.Headers
+	if req.Headers != nil {
+		params.Headers = &req.Headers.Headers
 	}
-	if req.Msg.EventTypes != nil {
-		params.EventTypes = &req.Msg.EventTypes.EventTypes
+	if req.EventTypes != nil {
+		params.EventTypes = &req.EventTypes.EventTypes
 	}
 	row, err := h.service.Update(ctx, id, params)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.UpdateWebhookResponse{
+	return &webhookv1.UpdateWebhookResponse{
 		Webhook: wireEndpoint(row),
 		Status:  webutil.StatusSuccess,
 		Message: "the webhook was updated",
-	}), nil
+	}, nil
 }
 
 // Delete removes one endpoint.
-func (h *rpcHandler) Delete(ctx context.Context, req *connect.Request[webhookv1.DeleteWebhookRequest]) (*connect.Response[webhookv1.DeleteWebhookResponse], error) {
-	id, idErr := parseID(req.Msg.Id)
+func (h *rpcHandler) Delete(ctx context.Context, req *webhookv1.DeleteWebhookRequest) (*webhookv1.DeleteWebhookResponse, error) {
+	id, idErr := parseID(req.Id)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
 	if err := h.service.Delete(ctx, id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.DeleteWebhookResponse{
+	return &webhookv1.DeleteWebhookResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the webhook was deleted",
-	}), nil
+	}, nil
 }
 
 // RotateSecret replaces an endpoint's signing secret and shows it once.
-func (h *rpcHandler) RotateSecret(ctx context.Context, req *connect.Request[webhookv1.RotateWebhookSecretRequest]) (*connect.Response[webhookv1.RotateWebhookSecretResponse], error) {
-	id, idErr := parseID(req.Msg.Id)
+func (h *rpcHandler) RotateSecret(ctx context.Context, req *webhookv1.RotateWebhookSecretRequest) (*webhookv1.RotateWebhookSecretResponse, error) {
+	id, idErr := parseID(req.Id)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
@@ -180,64 +169,64 @@ func (h *rpcHandler) RotateSecret(ctx context.Context, req *connect.Request[webh
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.RotateWebhookSecretResponse{
+	return &webhookv1.RotateWebhookSecretResponse{
 		Webhook: wireEndpoint(row),
 		Secret:  secret,
 		Status:  webutil.StatusSuccess,
 		Message: "the webhook secret was rotated",
-	}), nil
+	}, nil
 }
 
 // Test queues one test delivery.
-func (h *rpcHandler) Test(ctx context.Context, req *connect.Request[webhookv1.TestWebhookRequest]) (*connect.Response[webhookv1.TestWebhookResponse], error) {
-	id, idErr := parseID(req.Msg.Id)
+func (h *rpcHandler) Test(ctx context.Context, req *webhookv1.TestWebhookRequest) (*webhookv1.TestWebhookResponse, error) {
+	id, idErr := parseID(req.Id)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
 	if err := h.service.Test(ctx, id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.TestWebhookResponse{
+	return &webhookv1.TestWebhookResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the test delivery was queued",
-	}), nil
+	}, nil
 }
 
 // ListDeliveries answers one page of an endpoint's deliveries.
-func (h *rpcHandler) ListDeliveries(ctx context.Context, req *connect.Request[webhookv1.ListWebhookDeliveriesRequest]) (*connect.Response[webhookv1.ListWebhookDeliveriesResponse], error) {
-	id, idErr := parseID(req.Msg.WebhookId)
+func (h *rpcHandler) ListDeliveries(ctx context.Context, req *webhookv1.ListWebhookDeliveriesRequest) (*webhookv1.ListWebhookDeliveriesResponse, error) {
+	id, idErr := parseID(req.WebhookId)
 	if idErr != nil {
 		return nil, mapError(idErr)
 	}
-	views, pagination, err := h.service.ListDeliveries(ctx, id, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	views, pagination, err := h.service.ListDeliveries(ctx, id, int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.ListWebhookDeliveriesResponse{
+	return &webhookv1.ListWebhookDeliveriesResponse{
 		Deliveries: wireDeliveries(views),
 		Metadata:   metadataOf(pagination),
 		Status:     webutil.StatusSuccess,
 		Message:    "the webhook deliveries were listed",
-	}), nil
+	}, nil
 }
 
 // ListAllDeliveries answers one page of every delivery the deployment holds.
-func (h *rpcHandler) ListAllDeliveries(ctx context.Context, req *connect.Request[webhookv1.ListAllWebhookDeliveriesRequest]) (*connect.Response[webhookv1.ListAllWebhookDeliveriesResponse], error) {
-	views, pagination, err := h.service.ListAllDeliveries(ctx, req.Msg.GetEvent(), int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListAllDeliveries(ctx context.Context, req *webhookv1.ListAllWebhookDeliveriesRequest) (*webhookv1.ListAllWebhookDeliveriesResponse, error) {
+	views, pagination, err := h.service.ListAllDeliveries(ctx, req.GetEvent(), int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&webhookv1.ListAllWebhookDeliveriesResponse{
+	return &webhookv1.ListAllWebhookDeliveriesResponse{
 		Deliveries: wireDeliveries(views),
 		Metadata:   metadataOf(pagination),
 		Status:     webutil.StatusSuccess,
 		Message:    "the webhook deliveries were listed",
-	}), nil
+	}, nil
 }
 
 // ListEventTypes answers the webhook event catalog: every event a receiver
 // can subscribe to, with the sentence that says what happened.
-func (h *rpcHandler) ListEventTypes(ctx context.Context, req *connect.Request[webhookv1.ListWebhookEventTypesRequest]) (*connect.Response[webhookv1.ListWebhookEventTypesResponse], error) {
+func (h *rpcHandler) ListEventTypes(ctx context.Context, req *webhookv1.ListWebhookEventTypesRequest) (*webhookv1.ListWebhookEventTypesResponse, error) {
 	events := h.service.EventCatalog()
 	types := make([]*webhookv1.WebhookEventType, 0, len(events))
 	for _, event := range events {
@@ -246,11 +235,11 @@ func (h *rpcHandler) ListEventTypes(ctx context.Context, req *connect.Request[we
 			Description: event.Description,
 		})
 	}
-	return connect.NewResponse(&webhookv1.ListWebhookEventTypesResponse{
+	return &webhookv1.ListWebhookEventTypesResponse{
 		EventTypes: types,
 		Status:     webutil.StatusSuccess,
 		Message:    "the webhook event types were listed",
-	}), nil
+	}, nil
 }
 
 // wireEndpoint maps the stored row onto the wire message. The sealed secret
@@ -409,16 +398,16 @@ func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrEndpointNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("webhook not found"))
+		return connect.NewError(connect.CodeNotFound, "webhook not found")
 	case errors.Is(err, ErrEndpointExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("webhook name already in use"))
+		return connect.NewError(connect.CodeAlreadyExists, "webhook name already in use")
 	case errors.Is(err, ErrReservedHeader):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the headers cannot carry the signature set's names"))
+		return connect.NewError(connect.CodeInvalidArgument, "the headers cannot carry the signature set's names")
 	case errors.Is(err, ErrSecretUnavailable):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the application secret is not configured"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the application secret is not configured")
 	case errors.Is(err, ErrUnknownEvent):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the event names must be catalog events, or the wildcard"))
+		return connect.NewError(connect.CodeInvalidArgument, "the event names must be catalog events, or the wildcard")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("webhook operation failed"))
+		return connect.NewError(connect.CodeInternal, "webhook operation failed")
 	}
 }

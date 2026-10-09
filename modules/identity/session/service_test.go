@@ -198,7 +198,7 @@ func TestSignOutStampsTheRowAndTheRefreshTokenDies(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 
 	outcome, err := service.SignOut(t.Context(), sid.String(), wireOf(t, userID))
 	require.NoError(t, err)
@@ -231,8 +231,8 @@ func TestAnEndedSessionCannotManageSessions(t *testing.T) {
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	live, _ := seedSession(t, pool, userID, "live", "password", false)
-	dead, _ := seedSession(t, pool, userID, "dead", "password", false)
+	live, _ := seedSession(t, pool, userID, "live", "credential", false)
+	dead, _ := seedSession(t, pool, userID, "dead", "credential", false)
 
 	// The stamped row: the holder signed out from this client, and the
 	// surface no longer honours the credential it left behind.
@@ -253,7 +253,7 @@ func TestAnEndedSessionCannotManageSessions(t *testing.T) {
 
 	// The window closing without a stamp is the same refusal: the row is
 	// still unstamped, and no procedure of the surface answers for it.
-	live2, _ := seedSession(t, pool, userID, "live-2", "password", false)
+	live2, _ := seedSession(t, pool, userID, "live-2", "credential", false)
 	jump(t, now, 48*time.Hour)
 	_, _, err = service.ListSessions(t.Context(), live2.String(), wireOf(t, userID), 1, 10)
 	assert.ErrorIs(t, err, ErrSessionEnded)
@@ -267,15 +267,15 @@ func TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	current, currentToken := seedSession(t, pool, userID, "current", "password", false)
-	otherA, _ := seedSession(t, pool, userID, "other-a", "password", true)
+	current, currentToken := seedSession(t, pool, userID, "current", "credential", false)
+	otherA, _ := seedSession(t, pool, userID, "other-a", "credential", true)
 	otherB, _ := seedSession(t, pool, userID, "other-b", "one_time_access", false)
 	stranger := seedAccount(t, pool, "vittoria")
-	strangerSID, _ := seedSession(t, pool, stranger, "stranger", "password", false)
+	strangerSID, _ := seedSession(t, pool, stranger, "stranger", "credential", false)
 
 	// A row that was stamped before the sweep is outside it: the sweep ends
 	// live rows, and an ended one is not its business.
-	ended, _ := seedSession(t, pool, userID, "ended", "password", false)
+	ended, _ := seedSession(t, pool, userID, "ended", "credential", false)
 	_, signOutErr := service.SignOut(t.Context(), ended.String(), wireOf(t, userID))
 	require.NoError(t, signOutErr)
 
@@ -319,8 +319,8 @@ func TestSignOutAllSessionsEndsTheCallerOwnRowToo(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "vittoria")
-	current, currentToken := seedSession(t, pool, userID, "current", "password", false)
-	other, _ := seedSession(t, pool, userID, "other", "password", true)
+	current, currentToken := seedSession(t, pool, userID, "current", "credential", false)
+	other, _ := seedSession(t, pool, userID, "other", "credential", true)
 
 	count, err := service.SignOutAllSessions(t.Context(), current.String(), wireOf(t, userID))
 	require.NoError(t, err)
@@ -347,7 +347,7 @@ func TestSignOutOfAnExpiredSessionStampsAndSaysSo(t *testing.T) {
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, _ := seedSession(t, pool, userID, "one", "password", false)
+	sid, _ := seedSession(t, pool, userID, "one", "credential", false)
 
 	// The window closed a day ago; the row was never stamped, because the
 	// expiry refusal is the write that rolls back. The sign-out closes the
@@ -372,7 +372,7 @@ func TestGetSessionAnswersTheLiveRowAndRefusesAnEndedOne(t *testing.T) {
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, _ := seedSession(t, pool, userID, "one", "password", true)
+	sid, _ := seedSession(t, pool, userID, "one", "credential", true)
 
 	row, view, err := service.GetSession(t.Context(), sid.String())
 	require.NoError(t, err)
@@ -394,9 +394,9 @@ func TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers(t *testing.T) {
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
 	second := seedAccount(t, pool, "ron")
-	current, _ := seedSession(t, pool, userID, "current", "password", false)
-	other, _ := seedSession(t, pool, userID, "other", "password", true)
-	theirs, _ := seedSession(t, pool, second, "theirs", "password", false)
+	current, _ := seedSession(t, pool, userID, "current", "credential", false)
+	other, _ := seedSession(t, pool, userID, "other", "credential", true)
+	theirs, _ := seedSession(t, pool, second, "theirs", "credential", false)
 
 	require.NoError(t, service.RevokeSession(t.Context(), current.String(), wireOf(t, userID), other.String()))
 	row, err := service.repo.GetSession(t.Context(), pool, other)
@@ -416,7 +416,7 @@ func TestRevokeSessionEndsOneOfTheAccountsAndRefusesAnOthers(t *testing.T) {
 
 	// Ending the current session is what SignOut does; the event names the
 	// happening so the log can tell the two apart.
-	third, _ := seedSession(t, pool, userID, "third", "password", false)
+	third, _ := seedSession(t, pool, userID, "third", "credential", false)
 	require.NoError(t, service.RevokeSession(t.Context(), third.String(), wireOf(t, userID), current.String()))
 	assert.Equal(t, 1, auditCount(t, pool, audit.EventSessionRevoked, current.UUID()))
 }
@@ -428,10 +428,10 @@ func TestListSessionsAnswersTheAccountsOwnNewestFirst(t *testing.T) {
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
 	second := seedAccount(t, pool, "ron")
-	first, _ := seedSession(t, pool, userID, "first", "password", false)
+	first, _ := seedSession(t, pool, userID, "first", "credential", false)
 	time.Sleep(10 * time.Millisecond)
 	secondOfFirst, _ := seedSession(t, pool, userID, "second", "one_time_access", true)
-	seedSession(t, pool, second, "theirs", "password", false)
+	seedSession(t, pool, second, "theirs", "credential", false)
 
 	rows, pagination, err := service.ListSessions(t.Context(), first.String(), wireOf(t, userID), 1, 10)
 	require.NoError(t, err)
@@ -448,7 +448,7 @@ func TestRefreshRotatesTheTokenAndKeepsTheSession(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 
 	refreshed, err := service.Refresh(t.Context(), token)
 	require.NoError(t, err)
@@ -496,7 +496,7 @@ func TestAnIdleSessionIsRefusedAndRotatedOut(t *testing.T) {
 	pool := migratedPool(t)
 	service, now := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 	service.WithSettings(stubBound{seconds: int64(time.Hour.Seconds())})
 
 	// Inside the window the renewal answers.
@@ -611,7 +611,7 @@ func TestConcurrentRefreshOfOneTokenSerializesAndRevokesTheReuse(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 
 	const callers = 4
 	results := make([]Refreshed, callers)
@@ -666,7 +666,7 @@ func TestRefreshRefusesAReplayedTokenAndRevokesTheSession(t *testing.T) {
 	pool := migratedPool(t)
 	service, _ := testService(t, pool)
 	userID := seedAccount(t, pool, "hermione")
-	sid, token := seedSession(t, pool, userID, "one", "password", false)
+	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 
 	first, err := service.Refresh(t.Context(), token)
 	require.NoError(t, err)
@@ -794,7 +794,7 @@ func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
 	target := seedAccount(t, pool, "sophie_neveu")
 	bystander := seedAccount(t, pool, "rubeus_hagrid")
 
-	sid, token := seedSession(t, pool, target, "plain", "password", false)
+	sid, token := seedSession(t, pool, target, "plain", "credential", false)
 
 	// A live session that is nobody's delegation refuses the stop even when
 	// its caller carries actor claims — the row is the proof, not the token.
@@ -811,7 +811,7 @@ func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
 
 	// The administrator's own ordinary session cannot be ended by naming a
 	// delegation that is not theirs.
-	adminSid, _ := seedSession(t, pool, admin, "own", "password", false)
+	adminSid, _ := seedSession(t, pool, admin, "own", "credential", false)
 	selfCaller := &jwtutils.Caller{
 		UserID: wireOf(t, admin),
 		AccessClaims: jwtutils.AccessClaims{

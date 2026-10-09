@@ -35,8 +35,8 @@ const connectionColumns = `id, kind, provider, display_name, discovery_url, endp
 	client_id, client_secret, scopes, attribute_mapping, enabled, created_at, updated_at`
 
 // Repository reads and writes the connection rows. The linked accounts
-// and the flows get their queries beside these as their phases land; the
-// connection CRUD is the phase 2 surface.
+// and the flows get their queries beside these; the connection CRUD is
+// this package's root surface.
 type Repository struct {
 	pool *datastore.Postgres
 }

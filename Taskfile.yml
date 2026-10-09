@@ -22,12 +22,6 @@ includes:
   build:
     taskfile: ./scripts/task-build.yml
     flatten: true
-  command:
-    taskfile: ./scripts/task-command.yml
-    flatten: true
-  database:
-    taskfile: ./scripts/task-database.yml
-    flatten: true
   cert:
     taskfile: ./scripts/task-generate.yml
     flatten: true
@@ -39,9 +33,6 @@ includes:
     flatten: true
   docker:
     taskfile: ./scripts/task-container.yml
-    flatten: true
-  metrics:
-    taskfile: ./scripts/task-metrics.yml
     flatten: true
 
 tasks:

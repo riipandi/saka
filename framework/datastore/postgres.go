@@ -28,9 +28,9 @@ const (
 
 // Session defaults, applied to every connection in the pool.
 const (
-	// PgSearchPath lists the schemas created by migration 00000. A schema that
-	// does not exist yet is ignored by Postgres, so a pre-migration connection
-	// still succeeds.
+	// PgSearchPath lists the schemas the baseline migration creates. A schema
+	// that does not exist yet is ignored by Postgres, so a pre-migration
+	// connection still succeeds.
 	PgSearchPath = "public,internal,reference"
 	// PgTimezone keeps every session in UTC so timestamps never depend on the
 	// host or container clock.

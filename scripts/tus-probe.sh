@@ -4,7 +4,7 @@
 # /storage read that names the same bytes back.
 set -euo pipefail
 
-BASE="${BASE:-http://localhost:3080}"
+BASE="${BASE:-http://localhost:3000}"
 TOKEN="$1"
 BUCKET="${2:-default}"
 KEY="${3:-probe/tus-e2e.txt}"

@@ -23,7 +23,7 @@
 //	S7  the negative set: a replayed assertion, an expired ceremony, an
 //	    unknown credential, a banned account, a cloned credential.
 //
-// Usage: go run ./tools/e2e-passkey --base-url http://localhost:3080
+// Usage: go run ./tools/e2e-passkey --base-url http://localhost:3000
 //
 // The admin credentials come from the environment: E2E_IDENTITY and
 // E2E_PASSWORD (the seeded administrator). Every artifact the run creates —

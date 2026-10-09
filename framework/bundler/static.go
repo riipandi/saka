@@ -41,33 +41,42 @@ func MountDev(r chi.Router, viteURL string, page Page, reserved ...string) {
 			"the vite dev server is not reachable — run task dev")
 	}
 
-	// One not-found handler for the whole surface: the read-only rule, the
-	// reserved prefixes, and the shell's answer compose in one body, because
-	// chi keeps the not-found handler registered first — a second NotFound
-	// call would never run, and a write that names no claimed route would
-	// be answered with silence.
+	// One not-found handler for the whole surface: the reserved prefixes,
+	// the shell's answer, and the compiler's surface compose in one body,
+	// because chi keeps the not-found handler registered first — a second
+	// NotFound call would never run, and a write that names no claimed
+	// route would be answered with silence.
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		if refuseWrite(w, r) {
-			return
-		}
 		if reservedPath(r.URL.Path, reserved) {
+			// The API and protocol prefixes are the envelope's: any method
+			// an unclaimed path there carries answers the JSON 404, never a
+			// method rule the static surface invented.
 			webutil.NotFoundJSON(w, r)
 			return
 		}
-		if !documentRequest(r) {
-			proxy.ServeHTTP(w, r)
+		if documentRequest(r) {
+			// A navigation is a read: a write method that asks for a
+			// document is refused before the shell renders.
+			if refuseWrite(w, r) {
+				return
+			}
+			tags, err := ViteHTMLFragment(ViteConfig{
+				IsDev:        true,
+				ViteEntry:    page.Entry,
+				ViteTemplate: ViteReact,
+			})
+			if err != nil {
+				webutil.Fail(w, r, http.StatusInternalServerError, "the dev fragment did not resolve: "+err.Error())
+				return
+			}
+			renderShell(w, r, page, tags.Tags)
 			return
 		}
-		tags, err := ViteHTMLFragment(ViteConfig{
-			IsDev:        true,
-			ViteEntry:    page.Entry,
-			ViteTemplate: ViteReact,
-		})
-		if err != nil {
-			webutil.Fail(w, r, http.StatusInternalServerError, "the dev fragment did not resolve: "+err.Error())
-			return
-		}
-		renderShell(w, r, page, tags.Tags)
+		// Everything else on a non-reserved path is the compiler's to
+		// answer, whatever the method carries — the module graph and the
+		// HMR socket, but also the dev tooling's own writes, the TanStack
+		// devtools console pipe among them.
+		proxy.ServeHTTP(w, r)
 	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		refuseWrite(w, r)
@@ -138,11 +147,12 @@ func documentRequest(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 
-// refuseWrite keeps the surface read-only: a write method that names no
-// claimed route is refused here rather than passed to the not-found
-// boundary, and TRACE in particular must never echo a request back to
-// whoever asked. The not-found handlers call it first — the method rule is
-// the surface's first answer, not a competing registration.
+// refuseWrite keeps the navigation surface read-only: a write method that
+// asks for a document is refused rather than rendered, and TRACE in
+// particular must never echo a request back to whoever asked. The release
+// not-found boundary, the dev navigation branch, and the method-mismatch
+// handler call it — on the dev surface the compiler's own non-reserved
+// paths answer before any method rule does.
 func refuseWrite(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")

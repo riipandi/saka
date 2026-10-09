@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"connectrpc.com/connect/v2"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -252,12 +252,12 @@ func TestDeleteRemovesAnEmptyBucket(t *testing.T) {
 func TestTheModuleClaimsEveryProcedureTheContractDeclares(t *testing.T) {
 	module := NewModule(nil)
 
-	router := chi.NewRouter()
-	module.MountRPC(router)
+	server := connect.NewServer()
+	module.MountRPC(server)
 
 	claimed := map[string]bool{}
-	for _, route := range router.Routes() {
-		claimed[route.Pattern] = true
+	for spec := range server.Specs() {
+		claimed[spec.Procedure] = true
 	}
 
 	for _, procedure := range []string{

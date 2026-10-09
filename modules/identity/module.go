@@ -21,7 +21,7 @@ import (
 
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 
@@ -164,10 +164,10 @@ func (m *Module) Mount(r chi.Router) {
 
 // MountRPC registers the procedures of every feature that serves any. The
 // area forwards because the composition root names the area alone: a
-// feature's procedures reach the RPC router through the same seam its HTTP
+// feature's procedures reach the RPC server through the same seam its HTTP
 // routes do, and the transport never learns a feature's name.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	kernel.MountRPC(r, opts, m.features...)
+func (m *Module) MountRPC(server *connect.Server) {
+	kernel.MountRPC(server, m.features...)
 }
 
 // Package registers the services this area owns.
@@ -638,7 +638,8 @@ var Package = do.Package(
 			tokenPosts = oauthsso.FormPostAdapter(fetch)
 		}
 		service := oauthsso.NewService(pool, cipher, recorder, discovery, log).
-			WithBaseURL(c.App.BaseURL)
+			WithBaseURL(c.App.BaseURL).
+			WithOAuthEnabled(c.OAuth.Enabled)
 		// The resolution's seams ride the post-construction wiring: the
 		// session mint, the second factor's fork, the JIT policy's
 		// runtime source, the identifier gate, and the email code's

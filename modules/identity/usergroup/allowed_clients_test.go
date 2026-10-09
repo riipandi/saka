@@ -61,8 +61,7 @@ func TestSetAllowedOidcClientsReplacesTheRollAndRefusesAnUnknownClient(t *testin
 
 // TestGroupDetailCarriesTheClientRoll pins the parity read: the group's
 // detail view answers the allowlist the Set procedure wrote, ordered by
-// name — the same roll the Set response carries, read back where upstream
-// answers it.
+// name — the same roll the Set response carries, read back.
 func TestGroupDetailCarriesTheClientRoll(t *testing.T) {
 	pool := migratedPool(t)
 	service := testService(t, pool)

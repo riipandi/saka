@@ -19,7 +19,7 @@ engine — the shell, the fragment resolver, and the two static mounts — lives
 - **Manifest-driven tags** — the release build resolves every script, stylesheet, and
   modulepreload link from a derived `assets.json` embedded with the binary; Vite's own
   `.vite/manifest.json` stays out of the embed (a dot directory sits below go:embed's floor)
-- **Single-origin** — the browser talks to the Go port (:3080) only; the debug build
+- **Single-origin** — the browser talks to the Go port (:3000) only; the debug build
   proxies the Vite compiler (modules, assets, the HMR socket) behind it
 - **Multi-page by contract** — one entry point owns one fragment (`Page` + the input map in
   `vite.config.ts`); a second page carries its own module, styles, and preloads, never
@@ -99,7 +99,7 @@ task dev
 
 One command, one origin. The `golang` plugin builds `build/debug/saka`, starts it, and
 rebuilds it on every Go change — that is the Go hot reload; Vite keeps the module
-transform and the HMR, but the browser never sees it: **:3080** is the only origin, the
+transform and the HMR, but the browser never sees it: **:3000** is the only origin, the
 shell's fragment carries same-origin paths, and the debug build proxies the compiler's
 traffic (modules, assets, the HMR socket) to the loopback dev server.
 

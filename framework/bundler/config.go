@@ -2,7 +2,7 @@
 // Vite backend integration guide. It is a port of olivere/vite (MIT)
 // reduced to what this repository serves: the fragment of head tags the
 // shell embeds, resolved from the build manifest in release and from the
-// dev server in debug. Upstream is not tracked; the fragment engine is
+// dev server in debug. The fragment engine is
 // owned here. Serving the assets themselves stays with the SetupStatic
 // seam, and the HTML document stays with the shell.
 //

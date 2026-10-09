@@ -11,11 +11,9 @@ import (
 )
 
 const sample = `# application config
-HOST=localhost
-PORT=3080
-
-# secrets
 APP_SECRET_KEY=deadbeef
+SERVER_HOST=localhost
+SERVER_PORT=3000
 `
 
 // The key is shared by the CLI, the config layer, and deployment tooling, so a
@@ -28,7 +26,7 @@ func TestParsePreservesLayout(t *testing.T) {
 	file := Parse(sample)
 	assert.Equal(t, sample, file.Render())
 
-	value, ok := file.Get("HOST")
+	value, ok := file.Get("SERVER_HOST")
 	require.True(t, ok)
 	assert.Equal(t, "localhost", value)
 
@@ -44,17 +42,17 @@ func TestSetReplacesInPlace(t *testing.T) {
 }
 
 func TestSetAppendsMissingKey(t *testing.T) {
-	file := Parse("HOST=localhost")
+	file := Parse("SERVER_HOST=localhost")
 	require.False(t, file.Set("AUTH_SECRET_KEY", "cafe"))
 
-	assert.Equal(t, "HOST=localhost\nAUTH_SECRET_KEY=cafe\n", file.Render())
-	assert.Equal(t, []string{"HOST", "AUTH_SECRET_KEY"}, file.Keys())
+	assert.Equal(t, "SERVER_HOST=localhost\nAUTH_SECRET_KEY=cafe\n", file.Render())
+	assert.Equal(t, []string{"SERVER_HOST", "AUTH_SECRET_KEY"}, file.Keys())
 }
 
 func TestParseHandlesEmptyAndCRLF(t *testing.T) {
 	assert.Equal(t, "", Parse("").Render())
-	assert.Equal(t, "HOST=localhost\n", Parse("HOST=localhost\r\n").Render())
-	assert.Equal(t, "HOST=localhost\n", Parse("HOST=localhost").Render())
+	assert.Equal(t, "SERVER_HOST=localhost\n", Parse("SERVER_HOST=localhost\r\n").Render())
+	assert.Equal(t, "SERVER_HOST=localhost\n", Parse("SERVER_HOST=localhost").Render())
 }
 
 func TestSetQuotesUnsafeValues(t *testing.T) {
@@ -107,11 +105,11 @@ func TestWriteCreatesWithRestrictedMode(t *testing.T) {
 
 func TestWriteKeepsExistingMode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "secrets.env")
-	require.NoError(t, os.WriteFile(path, []byte("HOST=localhost\n"), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte("SERVER_HOST=localhost\n"), 0o644))
 
 	file, err := Load(path)
 	require.NoError(t, err)
-	file.Set("PORT", "3080")
+	file.Set("SERVER_PORT", "3000")
 	require.NoError(t, file.Write(path))
 
 	info, err := os.Stat(path)

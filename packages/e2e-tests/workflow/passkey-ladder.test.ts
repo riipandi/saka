@@ -18,6 +18,14 @@ let context: BrowserContext
 let page: Page
 let accessToken = ''
 
+async function signIn(request: APIRequestContext): Promise<string> {
+  const response = await request.post('/rpc/saka.authn.v1.AuthService/SignIn', {
+    data: { identity, password }
+  })
+  expect(response.status()).toBe(200)
+  return (await response.json()).access_token
+}
+
 test.describe.serial('the passkey ladder', () => {
   test('enroll a passkey on the authenticated session', async ({
     browser
@@ -104,12 +112,4 @@ test.describe.serial('the passkey ladder', () => {
   })
 
   // ---- helpers ----
-
-  async function signIn(request: APIRequestContext): Promise<string> {
-    const response = await request.post('/rpc/saka.authn.v1.AuthService/SignIn', {
-      data: { identity, password }
-    })
-    expect(response.status()).toBe(200)
-    return (await response.json()).access_token
-  }
 })

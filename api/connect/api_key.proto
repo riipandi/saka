@@ -4,9 +4,9 @@
 // An API key is a personal access token a holder issues for their own
 // scripting and integrations. It carries the owner's identity and role
 // through the same guard table a session does — an administrator's key
-// administers — but the surface that manages the keys themselves refuses it,
-// the way the upstream it ports does: a credential that cannot be revoked by
-// itself must not be the one managing credentials.
+// administers — but the surface that manages the keys themselves refuses it:
+// a credential that cannot be revoked by itself must not be the one managing
+// credentials.
 //
 // The key is shown once, in the creation and renewal responses, and stored
 // only as a hash, so a database leak cannot replay it. Revocation is soft:
@@ -28,7 +28,7 @@ option go_package = "github.com/riipandi/saka/codegen/proto/go/saka/apikey/v1;ap
 // the one surface an API key is refused on — the `Session` guard rule, the
 // rule a browser session satisfies and a machine credential does not. The
 // fifth procedure is saka's own: an administrator's view over every key the
-// deployment holds, which the upstream it ports has no equivalent of.
+// deployment holds.
 service ApiKeyService {
   // CreateApiKey issues a key for the caller's own account. The raw key
   // exists in this response alone.
@@ -49,8 +49,8 @@ service ApiKeyService {
   rpc RevokeAPIKey(RevokeAPIKeyRequest) returns (RevokeAPIKeyResponse);
 
   // ListAllApiKeys answers one page of every key the deployment holds,
-  // newest first. It is saka-only: upstream carries no administrative view
-  // over its keys.
+  // newest first. It is saka-only: no administrative view over the keys
+  // exists.
   rpc ListAllAPIKeys(ListAllAPIKeysRequest) returns (ListAllAPIKeysResponse);
 }
 

@@ -8,7 +8,7 @@ import (
 
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -52,22 +52,11 @@ func (m *Module) Mount(r chi.Router) {
 	m.rest.Mount(r)
 }
 
-// MountRPC registers the OAuth SSO procedures on the RPC router. The
-// handler options are the transport's — the shared snake_case codec and
-// the panic boundary — so the procedures answer exactly like the rest.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, connectHandler := authnv1connect.NewOAuthSSOServiceHandler(m.rpcHandler, opts...)
-	r.Handle(authnv1connect.OAuthSSOServiceBeginSignInProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceContinueSignInProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceVerifySignInEmailProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceListConnectionsProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceGetConnectionProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceCreateConnectionProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceUpdateConnectionProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceDeleteConnectionProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceListLinkedConnectionsProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceUnlinkConnectionProcedure, connectHandler)
-	r.Handle(authnv1connect.OAuthSSOServiceGetLinkedAccountTokensProcedure, connectHandler)
+// MountRPC registers the OAuth SSO procedures on the RPC server. The server
+// carries the transport's interceptors and the mount the shared snake_case
+// codec, so the procedures answer exactly like the rest.
+func (m *Module) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterOAuthSSOServiceHandler(server, m.rpcHandler)
 }
 
 // rpcHandler is the transport mapping of the OAuth SSO procedures. The
@@ -98,32 +87,32 @@ func callerID(ctx context.Context) (uuid.UUID, error) {
 
 // BeginSignIn opens the authorization-code flow: the pending row is
 // written, and the answer is the authorize URL the browser navigates to.
-func (h *rpcHandler) BeginSignIn(ctx context.Context, req *connect.Request[authnv1.BeginOAuthSignInRequest]) (*connect.Response[authnv1.BeginOAuthSignInResponse], error) {
-	authorizeURL, err := h.service.Begin(ctx, req.Msg.Connection)
+func (h *rpcHandler) BeginSignIn(ctx context.Context, req *authnv1.BeginOAuthSignInRequest) (*authnv1.BeginOAuthSignInResponse, error) {
+	authorizeURL, err := h.service.Begin(ctx, req.Connection)
 	switch {
 	case errors.Is(err, ErrConnectionUnavailable):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no enabled connection answers this provider"))
+		return nil, connect.NewError(connect.CodeNotFound, "no enabled connection answers this provider")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be opened"))
+		return nil, connect.NewError(connect.CodeInternal, "the sign-in flow could not be opened")
 	}
 
-	return connect.NewResponse(&authnv1.BeginOAuthSignInResponse{
+	return &authnv1.BeginOAuthSignInResponse{
 		AuthorizeUrl: authorizeURL,
 		Status:       "success",
 		Message:      "the sign-in flow was opened",
-	}), nil
+	}, nil
 }
 
 // ContinueSignIn completes a paused flow: the resolution binds the
 // identity, the fork answers the bridge or the session, and the flow
 // spends. The client facts ride the request's context, the way the
 // password sign-in records them.
-func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[authnv1.ContinueOAuthSignInRequest]) (*connect.Response[authnv1.ContinueOAuthSignInResponse], error) {
+func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *authnv1.ContinueOAuthSignInRequest) (*authnv1.ContinueOAuthSignInResponse, error) {
 	client := fwaudit.ClientFromContext(ctx)
 	answer, err := h.service.ContinueSignIn(ctx, ContinueParams{
-		FlowToken:   req.Msg.FlowToken,
-		GivenName:   req.Msg.GivenName,
-		FamilyName:  req.Msg.FamilyName,
+		FlowToken:   req.FlowToken,
+		GivenName:   req.GivenName,
+		FamilyName:  req.FamilyName,
 		UserAgent:   client.UserAgent,
 		IPAddress:   client.IPAddress,
 		Fingerprint: client.Fingerprint,
@@ -161,7 +150,7 @@ func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[au
 	default:
 		out.Message = "the sign-in flow moved to the " + string(answer.Stage) + " stage"
 	}
-	return connect.NewResponse(out), nil
+	return out, nil
 }
 
 // continueError maps the resolution's failures onto the connect codes.
@@ -170,160 +159,179 @@ func (h *rpcHandler) ContinueSignIn(ctx context.Context, req *connect.Request[au
 func continueError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, ErrFlowUnknown), errors.Is(err, ErrConnectionUnavailable):
-		return connect.NewError(connect.CodeNotFound, errors.New("no live flow answers this handle"))
+		return connect.NewError(connect.CodeNotFound, "no live flow answers this handle")
 	case errors.Is(err, ErrNamesRequired):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the flow waits for a given and a family name"))
+		return connect.NewError(connect.CodeInvalidArgument, "the flow waits for a given and a family name")
 	case errors.Is(err, ErrInvalidCode):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the code does not answer the flow's request"))
+		return connect.NewError(connect.CodeInvalidArgument, "the code does not answer the flow's request")
 	case errors.Is(err, ErrFlowEnded):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the flow answered wrong too many times and ended"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the flow answered wrong too many times and ended")
 	case errors.Is(err, ErrLinkingDisabled):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("account linking is disabled"))
+		return connect.NewError(connect.CodeFailedPrecondition, "account linking is disabled")
 	case errors.Is(err, ErrSignUpRefused):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("the sign-up is not allowed"))
+		return connect.NewError(connect.CodePermissionDenied, "the sign-up is not allowed")
 	default:
 		// The mapped failures all name themselves; whatever lands here is
 		// the service's internals, and the wire answer says nothing about
 		// it. The log is where it speaks.
 		slog.ErrorContext(ctx, "oauthsso: the flow's completion failed", "error", err)
-		return connect.NewError(connect.CodeInternal, errors.New("the sign-in flow could not be completed"))
+		return connect.NewError(connect.CodeInternal, "the sign-in flow could not be completed")
 	}
 }
 
+// ListEnabledConnections answers the connections an unauthenticated
+// caller may sign in with — the slug and the display name, the button's
+// label and its destination and nothing else.
+func (h *rpcHandler) ListEnabledConnections(ctx context.Context, req *authnv1.ListEnabledConnectionsRequest) (*authnv1.ListEnabledConnectionsResponse, error) {
+	connections, err := h.service.EnabledConnections(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, "the connections could not be read")
+	}
+
+	out := make([]*authnv1.EnabledConnection, 0, len(connections))
+	for _, conn := range connections {
+		out = append(out, &authnv1.EnabledConnection{
+			Provider:    conn.Provider,
+			DisplayName: conn.DisplayName,
+		})
+	}
+	return &authnv1.ListEnabledConnectionsResponse{Connections: out}, nil
+}
+
 // ListConnections answers the operator's listing, secrets never included.
-func (h *rpcHandler) ListConnections(ctx context.Context, req *connect.Request[authnv1.ListOAuthConnectionsRequest]) (*connect.Response[authnv1.ListOAuthConnectionsResponse], error) {
+func (h *rpcHandler) ListConnections(ctx context.Context, req *authnv1.ListOAuthConnectionsRequest) (*authnv1.ListOAuthConnectionsResponse, error) {
 	connections, err := h.service.List(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the connections could not be read"))
+		return nil, connect.NewError(connect.CodeInternal, "the connections could not be read")
 	}
 
 	out := make([]*authnv1.OAuthConnection, 0, len(connections))
 	for _, conn := range connections {
 		out = append(out, wireConnection(conn))
 	}
-	return connect.NewResponse(&authnv1.ListOAuthConnectionsResponse{
+	return &authnv1.ListOAuthConnectionsResponse{
 		Connections: out,
 		Status:      "success",
 		Message:     "the connections were read",
-	}), nil
+	}, nil
 }
 
 // GetConnection answers one connection by its identifier, secrets never
 // included.
-func (h *rpcHandler) GetConnection(ctx context.Context, req *connect.Request[authnv1.GetOAuthConnectionRequest]) (*connect.Response[authnv1.GetOAuthConnectionResponse], error) {
-	wireID, err := ParseID(req.Msg.Id)
+func (h *rpcHandler) GetConnection(ctx context.Context, req *authnv1.GetOAuthConnectionRequest) (*authnv1.GetOAuthConnectionResponse, error) {
+	wireID, err := ParseID(req.Id)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	}
 	id := IDToUUID(wireID)
 
 	conn, err := h.service.Get(ctx, id)
 	switch {
 	case errors.Is(err, ErrConnectionNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the connection could not be read"))
+		return nil, connect.NewError(connect.CodeInternal, "the connection could not be read")
 	}
 
-	return connect.NewResponse(&authnv1.GetOAuthConnectionResponse{
+	return &authnv1.GetOAuthConnectionResponse{
 		Connection: wireConnection(conn),
 		Status:     "success",
 		Message:    "the connection was read",
-	}), nil
+	}, nil
 }
 
 // CreateConnection validates, seals, and stores a connection.
-func (h *rpcHandler) CreateConnection(ctx context.Context, req *connect.Request[authnv1.CreateOAuthConnectionRequest]) (*connect.Response[authnv1.CreateOAuthConnectionResponse], error) {
-	conn, err := h.service.Create(ctx, paramsOf(req.Msg))
+func (h *rpcHandler) CreateConnection(ctx context.Context, req *authnv1.CreateOAuthConnectionRequest) (*authnv1.CreateOAuthConnectionResponse, error) {
+	conn, err := h.service.Create(ctx, paramsOf(req))
 	switch {
 	case errors.Is(err, ErrInvalidConnection):
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the connection's fields do not compose into a runnable connection"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the connection's fields do not compose into a runnable connection")
 	case errors.Is(err, ErrProviderTaken):
-		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("a connection with this provider slug already exists"))
+		return nil, connect.NewError(connect.CodeAlreadyExists, "a connection with this provider slug already exists")
 	case errors.Is(err, ErrSecretUnavailable):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the application secret is not configured to seal the client secret"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the application secret is not configured to seal the client secret")
 	case errors.Is(err, ErrDiscoveryUnavailable):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the discovery document cannot be fetched from this process"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the discovery document cannot be fetched from this process")
 	case errors.Is(err, ErrDiscoveryFetch), errors.Is(err, ErrDiscoveryInvalid):
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the discovery document is not a usable OIDC document"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the discovery document is not a usable OIDC document")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the connection could not be stored"))
+		return nil, connect.NewError(connect.CodeInternal, "the connection could not be stored")
 	}
 
-	return connect.NewResponse(&authnv1.CreateOAuthConnectionResponse{
+	return &authnv1.CreateOAuthConnectionResponse{
 		Connection: wireConnection(conn),
 		Status:     "success",
 		Message:    "the connection was stored",
-	}), nil
+	}, nil
 }
 
 // UpdateConnection rewrites one connection's editable fields.
-func (h *rpcHandler) UpdateConnection(ctx context.Context, req *connect.Request[authnv1.UpdateOAuthConnectionRequest]) (*connect.Response[authnv1.UpdateOAuthConnectionResponse], error) {
-	wireID, err := ParseID(req.Msg.Id)
+func (h *rpcHandler) UpdateConnection(ctx context.Context, req *authnv1.UpdateOAuthConnectionRequest) (*authnv1.UpdateOAuthConnectionResponse, error) {
+	wireID, err := ParseID(req.Id)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	}
 	id := IDToUUID(wireID)
 
-	conn, err := h.service.Update(ctx, id, updateOf(req.Msg))
+	conn, err := h.service.Update(ctx, id, updateOf(req))
 	switch {
 	case errors.Is(err, ErrConnectionNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	case errors.Is(err, ErrInvalidConnection):
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the connection's fields do not compose into a runnable connection"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the connection's fields do not compose into a runnable connection")
 	case errors.Is(err, ErrProviderTaken):
-		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("a connection with this provider slug already exists"))
+		return nil, connect.NewError(connect.CodeAlreadyExists, "a connection with this provider slug already exists")
 	case errors.Is(err, ErrSecretUnavailable):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the application secret is not configured to seal the client secret"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the application secret is not configured to seal the client secret")
 	case errors.Is(err, ErrDiscoveryUnavailable):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the discovery document cannot be fetched from this process"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the discovery document cannot be fetched from this process")
 	case errors.Is(err, ErrDiscoveryFetch), errors.Is(err, ErrDiscoveryInvalid):
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the discovery document is not a usable OIDC document"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the discovery document is not a usable OIDC document")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the connection could not be rewritten"))
+		return nil, connect.NewError(connect.CodeInternal, "the connection could not be rewritten")
 	}
 
-	return connect.NewResponse(&authnv1.UpdateOAuthConnectionResponse{
+	return &authnv1.UpdateOAuthConnectionResponse{
 		Connection: wireConnection(conn),
 		Status:     "success",
 		Message:    "the connection was rewritten",
-	}), nil
+	}, nil
 }
 
 // DeleteConnection removes one connection and everything that rode it.
-func (h *rpcHandler) DeleteConnection(ctx context.Context, req *connect.Request[authnv1.DeleteOAuthConnectionRequest]) (*connect.Response[authnv1.DeleteOAuthConnectionResponse], error) {
-	wireID, err := ParseID(req.Msg.Id)
+func (h *rpcHandler) DeleteConnection(ctx context.Context, req *authnv1.DeleteOAuthConnectionRequest) (*authnv1.DeleteOAuthConnectionResponse, error) {
+	wireID, err := ParseID(req.Id)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	}
 	id := IDToUUID(wireID)
 
 	err = h.service.Delete(ctx, id)
 	switch {
 	case errors.Is(err, ErrConnectionNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no connection answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no connection answers this identifier")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the connection could not be removed"))
+		return nil, connect.NewError(connect.CodeInternal, "the connection could not be removed")
 	}
 
-	return connect.NewResponse(&authnv1.DeleteOAuthConnectionResponse{
+	return &authnv1.DeleteOAuthConnectionResponse{
 		Status:  "success",
 		Message: "the connection was removed",
-	}), nil
+	}, nil
 }
 
 // ListLinkedConnections answers the calling account's bindings, oldest
 // first. The account is the claims' subject — the guard's Session rule
 // has already admitted a caller holding a session, and this procedure
 // reads no other account's rows.
-func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *connect.Request[authnv1.ListLinkedConnectionsRequest]) (*connect.Response[authnv1.ListLinkedConnectionsResponse], error) {
+func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *authnv1.ListLinkedConnectionsRequest) (*authnv1.ListLinkedConnectionsResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 	linked, err := h.service.ListLinkedAccounts(ctx, userID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the linked accounts could not be read"))
+		return nil, connect.NewError(connect.CodeInternal, "the linked accounts could not be read")
 	}
 
 	out := make([]*authnv1.OAuthLinkedAccount, 0, len(linked))
@@ -339,76 +347,76 @@ func (h *rpcHandler) ListLinkedConnections(ctx context.Context, _ *connect.Reque
 		}
 		out = append(out, entry)
 	}
-	return connect.NewResponse(&authnv1.ListLinkedConnectionsResponse{
+	return &authnv1.ListLinkedConnectionsResponse{
 		LinkedAccounts: out,
 		Status:         webutil.StatusSuccess,
 		Message:        "the linked accounts were read",
-	}), nil
+	}, nil
 }
 
 // VerifySignInEmail spends the email code a verify_email-stage flow waits
 // for. The answer names the stage the flow moved to; the sign-in itself
 // completes through ContinueSignIn.
-func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *connect.Request[authnv1.VerifyOAuthSignInEmailRequest]) (*connect.Response[authnv1.VerifyOAuthSignInEmailResponse], error) {
-	stage, err := h.service.VerifySignInEmail(ctx, req.Msg.FlowToken, req.Msg.Code)
+func (h *rpcHandler) VerifySignInEmail(ctx context.Context, req *authnv1.VerifyOAuthSignInEmailRequest) (*authnv1.VerifyOAuthSignInEmailResponse, error) {
+	stage, err := h.service.VerifySignInEmail(ctx, req.FlowToken, req.Code)
 	if err != nil {
 		return nil, continueError(ctx, err)
 	}
-	return connect.NewResponse(&authnv1.VerifyOAuthSignInEmailResponse{
+	return &authnv1.VerifyOAuthSignInEmailResponse{
 		Stage:   string(stage),
 		Status:  webutil.StatusSuccess,
 		Message: "the address is proven and the sign-in flow moved on",
-	}), nil
+	}, nil
 }
 
 // UnlinkConnection removes one of the calling account's bindings. The
 // stranding refusal is a failed_precondition whose message names the
 // way back in; a foreign or unknown binding answers not_found, the
 // same answer either way.
-func (h *rpcHandler) UnlinkConnection(ctx context.Context, req *connect.Request[authnv1.UnlinkConnectionRequest]) (*connect.Response[authnv1.UnlinkConnectionResponse], error) {
+func (h *rpcHandler) UnlinkConnection(ctx context.Context, req *authnv1.UnlinkConnectionRequest) (*authnv1.UnlinkConnectionResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
-	linkedID, err := ParseLinkedAccountID(req.Msg.LinkedAccountId)
+	linkedID, err := ParseLinkedAccountID(req.LinkedAccountId)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no linked account answers this identifier")
 	}
 
 	switch err := h.service.UnlinkLinkedAccount(ctx, userID, linkedID); {
 	case errors.Is(err, ErrLinkedAccountNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no linked account answers this identifier")
 	case errors.Is(err, ErrLastCredential):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("set a password before unlinking the last provider"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "set a password before unlinking the last provider")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the linked account could not be removed"))
+		return nil, connect.NewError(connect.CodeInternal, "the linked account could not be removed")
 	}
 
-	return connect.NewResponse(&authnv1.UnlinkConnectionResponse{
+	return &authnv1.UnlinkConnectionResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the linked account was removed",
-	}), nil
+	}, nil
 }
 
 // GetLinkedAccountTokens answers the calling account's binding with the
 // provider tokens it carries, opened from their seal. A foreign or
 // unknown binding answers not_found, the same answer either way.
-func (h *rpcHandler) GetLinkedAccountTokens(ctx context.Context, req *connect.Request[authnv1.GetLinkedAccountTokensRequest]) (*connect.Response[authnv1.GetLinkedAccountTokensResponse], error) {
+func (h *rpcHandler) GetLinkedAccountTokens(ctx context.Context, req *authnv1.GetLinkedAccountTokensRequest) (*authnv1.GetLinkedAccountTokensResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
-	linkedID, err := ParseLinkedAccountID(req.Msg.LinkedAccountId)
+	linkedID, err := ParseLinkedAccountID(req.LinkedAccountId)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no linked account answers this identifier")
 	}
 
 	tokens, err := h.service.GetLinkedAccountTokens(ctx, userID, linkedID)
 	switch {
 	case errors.Is(err, ErrLinkedAccountNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("no linked account answers this identifier"))
+		return nil, connect.NewError(connect.CodeNotFound, "no linked account answers this identifier")
 	case err != nil:
-		return nil, connect.NewError(connect.CodeInternal, errors.New("the provider tokens could not be read"))
+		return nil, connect.NewError(connect.CodeInternal, "the provider tokens could not be read")
 	}
 
 	answer := &authnv1.GetLinkedAccountTokensResponse{
@@ -422,7 +430,7 @@ func (h *rpcHandler) GetLinkedAccountTokens(ctx context.Context, req *connect.Re
 	if tokens.ExpiresAt != nil {
 		answer.ExpiresAt = timestamppb.New(*tokens.ExpiresAt)
 	}
-	return connect.NewResponse(answer), nil
+	return answer, nil
 }
 
 // paramsOf maps a create's wire fields onto the service's words.

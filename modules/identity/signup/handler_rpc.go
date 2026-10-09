@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
@@ -39,18 +39,11 @@ func (m *Module) Name() string { return ModuleName }
 // plain HTTP route: a procedure is POST-only on the RPC surface.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own. Each procedure
-// is registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := identityv1connect.NewSignupServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(identityv1connect.SignupServiceSignupProcedure, handler)
-	r.Handle(identityv1connect.SignupServiceCreateSignupTokenProcedure, handler)
-	r.Handle(identityv1connect.SignupServiceListSignupTokensProcedure, handler)
-	r.Handle(identityv1connect.SignupServiceDeleteSignupTokenProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	identityv1connect.RegisterSignupServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -65,8 +58,8 @@ func newRPCHandler(service *Service) identityv1connect.SignupServiceHandler {
 }
 
 // Signup creates an account from a signup token.
-func (h *rpcHandler) Signup(ctx context.Context, req *connect.Request[identityv1.SignupRequest]) (*connect.Response[identityv1.SignupResponse], error) {
-	body := req.Msg
+func (h *rpcHandler) Signup(ctx context.Context, req *identityv1.SignupRequest) (*identityv1.SignupResponse, error) {
+	body := req
 
 	account, err := h.service.Signup(ctx, Params{
 		Username:  body.Username,
@@ -80,18 +73,18 @@ func (h *rpcHandler) Signup(ctx context.Context, req *connect.Request[identityv1
 		return nil, mapError(err)
 	}
 
-	return connect.NewResponse(&identityv1.SignupResponse{
+	return &identityv1.SignupResponse{
 		User: user.WireView(account),
 
 		Status:  webutil.StatusSuccess,
 		Message: "the account was created",
-	}), nil
+	}, nil
 }
 
 // CreateSignupToken issues a signup token. The procedure is administrative:
 // the transport authenticated the caller, and the claims decide the role.
-func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request[identityv1.CreateSignupTokenRequest]) (*connect.Response[identityv1.CreateSignupTokenResponse], error) {
-	body := req.Msg
+func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *identityv1.CreateSignupTokenRequest) (*identityv1.CreateSignupTokenResponse, error) {
+	body := req
 	created, err := h.service.CreateSignupToken(ctx, CreateTokenParams{
 		TTL:        time.Duration(body.TtlSeconds) * time.Second,
 		UsageLimit: body.GetUsageLimit(),
@@ -101,18 +94,18 @@ func (h *rpcHandler) CreateSignupToken(ctx context.Context, req *connect.Request
 		return nil, mapError(err)
 	}
 
-	return connect.NewResponse(&identityv1.CreateSignupTokenResponse{
+	return &identityv1.CreateSignupTokenResponse{
 		Token:    tokenView(created.Token),
 		RawToken: created.RawToken,
 
 		Status:  webutil.StatusSuccess,
 		Message: "the signup token was created",
-	}), nil
+	}, nil
 }
 
 // ListSignupTokens answers the issued tokens with their pagination block.
-func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[identityv1.ListSignupTokensRequest]) (*connect.Response[identityv1.ListSignupTokensResponse], error) {
-	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *identityv1.ListSignupTokensRequest) (*identityv1.ListSignupTokensResponse, error) {
+	tokens, pagination, err := h.service.ListSignupTokens(ctx, req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -121,24 +114,24 @@ func (h *rpcHandler) ListSignupTokens(ctx context.Context, req *connect.Request[
 	for _, token := range tokens {
 		views = append(views, tokenView(token))
 	}
-	return connect.NewResponse(&identityv1.ListSignupTokensResponse{
+	return &identityv1.ListSignupTokensResponse{
 		Tokens:   views,
 		Metadata: listMetadata(pagination),
 
 		Status:  webutil.StatusSuccess,
 		Message: "the signup tokens were listed",
-	}), nil
+	}, nil
 }
 
 // DeleteSignupToken revokes an issued token.
-func (h *rpcHandler) DeleteSignupToken(ctx context.Context, req *connect.Request[identityv1.DeleteSignupTokenRequest]) (*connect.Response[identityv1.DeleteSignupTokenResponse], error) {
-	if err := h.service.DeleteSignupToken(ctx, req.Msg.Id); err != nil {
+func (h *rpcHandler) DeleteSignupToken(ctx context.Context, req *identityv1.DeleteSignupTokenRequest) (*identityv1.DeleteSignupTokenResponse, error) {
+	if err := h.service.DeleteSignupToken(ctx, req.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.DeleteSignupTokenResponse{
+	return &identityv1.DeleteSignupTokenResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the signup token was deleted",
-	}), nil
+	}, nil
 }
 
 // tokenView maps the service's token view onto the wire message.
@@ -191,21 +184,21 @@ func ptr[T any](value T) *T {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrInvalidToken):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("signup token is invalid or expired"))
+		return connect.NewError(connect.CodePermissionDenied, "signup token is invalid or expired")
 	case errors.Is(err, ErrAccountExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("account already exists"))
+		return connect.NewError(connect.CodeAlreadyExists, "account already exists")
 	case errors.Is(err, ErrSignupNotAllowed):
-		return connect.NewError(connect.CodeNotFound, errors.New("sign-up is not available"))
+		return connect.NewError(connect.CodeNotFound, "sign-up is not available")
 	case errors.Is(err, ErrUsernameRequired):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is required"))
+		return connect.NewError(connect.CodeInvalidArgument, "username is required")
 	case errors.Is(err, ErrUsernameInvalid):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("username is invalid"))
+		return connect.NewError(connect.CodeInvalidArgument, "username is invalid")
 	case errors.Is(err, ErrTokenNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("signup token not found"))
+		return connect.NewError(connect.CodeNotFound, "signup token not found")
 	case isPasswordPolicy(err):
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return connect.NewError(connect.CodeInvalidArgument, err.Error()).WithCause(err)
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("sign-up failed"))
+		return connect.NewError(connect.CodeInternal, "sign-up failed")
 	}
 }
 

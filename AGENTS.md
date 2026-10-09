@@ -10,7 +10,7 @@ instructions; the detail lives in `.llms/`. Read in this order:
 
 ## Shape
 
-- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The frontend is a pnpm + Vite+ monorepo under `packages/`: `webapp` (the React 19 + TanStack SPA source, plus `public/`), `email` (React Email templates — `vp build packages/email` compiles them into the Go embed), `plugins` (the Vite plugins: email, golang), `e2e-tests` (Playwright). The production pipeline stays in the root `vite.config.ts`, which compiles the SPA and the templates and embeds both into the binary (`web/output/`, `web/email/`); the Go shell (`web/shell.go`) owns the HTML document, so there is no `index.html`. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3080`.
+- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The frontend is a pnpm + Vite+ monorepo of independent packages under `packages/`: `webapp` (the React 19 + TanStack SPA source, plus `public/` — its `vite.config.ts` owns the SPA pipeline and the Go binary targets), `email` (React Email templates — its own `build.ts` script compiles them into the Go embed, content-hash cached), `plugins` (the shared Vite plugin: golang), `e2e-tests` (Playwright). The root `vite.config.ts` is monorepo setup only (staged/fmt/lint/typecheck), with no app pipeline; the Taskfile sequences the passes (`task build` = email then webapp, `task dev` = webapp dev loop). The Go shell (`web/shell.go`) owns the HTML document, so there is no `index.html`. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3000`.
 - Implemented surfaces are listed in `.llms/index.md` and `.llms/architecture.md`; the rest of `internal/**` and `modules/**` is a scaffold. Do not document, test, or treat a stub as working.
 - Pocket ID is passkey-only. Surfaces it never had are `[Saka]` in Yaak. Auth flows beyond ported endpoints follow Better Auth.
 - Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
@@ -64,9 +64,10 @@ If they already chose in the same thread, do not re-ask. If new facts change the
 
 ## Workflow
 
+- **Cross-check the contract.** Frontend implementation and integration work must be cross-checked against the actual backend state before it is written: the proto specs (`api/connect/*.proto`) name the procedures and wire types, and the serving module (`internal/`, `modules/`) names what really answers — which surface owns which key, and which transport serves it. A plan's or doc's claim is a hypothesis until this check confirms it; a toggle, endpoint, or envelope shape that exists on neither side is not to be invented.
 - **Issues.** A finding that outlives the turn — a defect discovered mid-work, a gap a plan's closure exposed, a parked decision with a named trigger — goes to `.llms/issues/issue-YYYYMMDD_hhmm.md` when found, not to chat memory. The file's frontmatter carries the rollup `status` and `captured`/`updated` timestamps; each item inside carries its own `status` line, the plan documents it came from or touches, and the trigger that reopens it. Statuses: `open`, `considering`, `resolved`, `wontfix`. When an item resolves, mark it in the file it lives in — the file is the tracker, not a diary.
 - **Docs sync.** A change that lands a behavior must land its documentation in the same turn: contract or invariant → `.llms/rules.md`; reasoning, decision, or library record → `.llms/architecture.md`; a shipped endpoint, job, email, audit event, guard rule, or settings key → the endpoint reference, the Yaak collection, and `docs/` where they live. Decide once per turn, before the commit: if the diff changes what a doc claims, the doc rides the same commit. Outdated prose is a defect of the change, not a follow-up.
-- **Validation.** `go test ./...`, `task lint`, and a probe against a freshly built `build/release/saka serve --env-file=.env.local` before claiming a change works — a green unit suite does not exercise the composition root.
+- **Validation.** `go test ./...`, `task lint`, and a probe against a freshly built `build/release/saka serve --env-file=.env.local` before claiming a change works — a green unit suite does not exercise the composition root. Load tests run only when the user asks for them; never start one unprompted.
 - **Plans.** A plan (`.llms/plans/`) is a contract with a fixed shape and hard rules; it executes only on the owner's explicit instruction. The full spec is in `.llms/rules.md` ("Plan documents").
 - **Prose.** Tree documents are English. Technical documentation for agents lives in `.llms/`; product documentation for humans lives in `docs/` — keep `docs/` free of technical references (paths, internals, agent context); its orientation is the human reader. Chat may follow the user's language. Files do not. Use skill `clarity` before writing or rewriting any of them; `handoff` for handovers.
 - **Library docs.** Use the MCP Context7 and DeepWiki tools for external libraries; the module cache is the pinned truth — code wins over docs.
@@ -78,3 +79,7 @@ If they already chose in the same thread, do not re-ask. If new facts change the
 - Message: `{feat,fix,docs,refactor,chore}[(scope)]: <concise message>`. Do not push.
 - Do not commit unless this turn asked for it. When the work is finished, recommend the one-line message and list the paths.
 - Never run `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git commit --no-verify`, or `git push --force`.
+
+## Related Docs
+
+- `.llms/stylex-authoring.md` — read before writing styles. `.llms/stylex-installation.md` — StyleX setup.

@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.27-blue.svg?logo=Go&logoColor=white)](https://go.dev)
 [![PostgreSQL](https://img.shields.io/badge/Postgres-18-blue.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg?logo=typescript&logoColor=blue)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19-blue.svg?logo=react)](https://react.dev)
 [![Release](https://img.shields.io/github/v/release/riipandi/saka?logo=docker&logoColor=white)](https://github.com/riipandi/saka/releases)
 [![Contribution](https://img.shields.io/badge/Contributions-welcome-gray.svg?labelColor=green)](https://github.com/riipandi/saka/graphs/contributors)
@@ -114,7 +114,7 @@ task dev                  # the dev loop: Vite + HMR behind the Go proxy
 
 **The application will be accessible at:**
 
-- Application: <http://localhost:3080>
+- Application: <http://localhost:3000>
 - Mailpit inbox: <http://localhost:8025>
 
 **The task runner.** Run `task`: it lists everything available, from the

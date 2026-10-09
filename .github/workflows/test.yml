@@ -116,10 +116,17 @@ jobs:
         if: steps.gotestsum.outputs.cache-hit != 'true'
         run: go install gotest.tools/gotestsum@v1.13.0
 
-      - name: Generate email template
-        run: pnpm exec vp build
+      # The Go compile steps below embed web/email (templates) and web/output
+      # (the SPA bundle plus the derived assets.json) — both artifacts must
+      # exist first. The webapp pass also compiles the debug and release
+      # binaries with the plugin's own ldflags; there is no separate build
+      # step at the end.
+      - name: Build frontend artifacts
+        run: |
+          pnpm exec vp run email#build
+          pnpm exec vp run webapp#build
         env:
-          SKIP_GO_BUILD: 1
+          NODE_ENV: production
 
       - name: Setup golangci-lint toolchain
         uses: golangci/golangci-lint-action@v9
@@ -142,10 +149,32 @@ jobs:
         env:
           NODE_ENV: production
 
+      # Browser-mode unit tests (vite.config.ts test.browser) launch
+      # Playwright's Chromium. PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD keeps the
+      # install fast, so the browser is fetched here instead — cached by
+      # version across runs. Platform deps are preinstalled on the GitHub
+      # runner images.
+      - name: Restore Playwright Chromium cache
+        id: chromium-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.os == 'macos' && '~/Library/Caches/ms-playwright' || '~/.cache/ms-playwright' }}
+          key: playwright-chromium-1.63.0
+
+      - name: Install Playwright Chromium
+        if: steps.chromium-cache.outputs.cache-hit != 'true'
+        # The CLI lives with the package that owns Playwright (@playwright/test
+        # under packages/e2e-tests); the root workspace has no playwright bin.
+        # The version line (1.63.0) matches @vitest/browser-playwright's
+        # playwright-core, so the browser revision is the one the tests launch.
+        run: pnpm --filter e2e-tests exec playwright install chromium
+
       - name: Run unit tests (frontend)
-        run: pnpm exec vitest run
-        env:
-          NODE_ENV: production
+        run: pnpm exec vp test
+        # No NODE_ENV here on purpose: production resolves React's production
+        # CJS builds, where React.act does not exist — every @testing-library
+        # render dies with "React.act is not a function" (seen on PR #7).
+        # Vitest sets NODE_ENV=test itself.
 
       - name: Run unit tests (backend)
         run: gotestsum --format testname ./...
@@ -154,14 +183,6 @@ jobs:
 
       - name: Run unit tests (backend, debug tags)
         run: gotestsum --format testname -- -tags debug ./cmd/...
-        env:
-          NODE_ENV: production
-
-      - name: Build application binaries
-        run: |
-          pnpm exec vp build
-          go build -tags "debug,noasm,nounsafe" -trimpath -o build/debug/saka ./cmd
-          go build -tags "release,noasm,nounsafe" -trimpath -o build/release/saka ./cmd
         env:
           NODE_ENV: production
 

@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	authzv1 "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1"
@@ -41,25 +41,11 @@ func (m *Module) Name() string { return ModuleName }
 // manages whole — so there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own. Each procedure
-// is registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authzv1connect.NewAuthorizationServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(authzv1connect.AuthorizationServiceListPermissionsProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceListRolesProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceGetRoleProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceCreateRoleProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceUpdateRoleProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceDeleteRoleProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceSetRolePermissionsProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceListUserRolesProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceSetUserRolesProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceListUserPermissionsProcedure, handler)
-	r.Handle(authzv1connect.AuthorizationServiceSetUserPermissionsProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	authzv1connect.RegisterAuthorizationServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -74,10 +60,10 @@ func newRPCHandler(service *Service) authzv1connect.AuthorizationServiceHandler 
 }
 
 // ListPermissions answers the permission catalog.
-func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[authzv1.ListPermissionsRequest]) (*connect.Response[authzv1.ListPermissionsResponse], error) {
-	ascending := req.Msg.GetSortOrder() != "desc"
+func (h *rpcHandler) ListPermissions(ctx context.Context, req *authzv1.ListPermissionsRequest) (*authzv1.ListPermissionsResponse, error) {
+	ascending := req.GetSortOrder() != "desc"
 
-	entries, err := h.service.ListPermissions(ctx, req.Msg.GetNocache(), req.Msg.GetSearch(), req.Msg.GetResource(), req.Msg.GetSortBy(), ascending)
+	entries, err := h.service.ListPermissions(ctx, req.GetNocache(), req.GetSearch(), req.GetResource(), req.GetSortBy(), ascending)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -89,23 +75,23 @@ func (h *rpcHandler) ListPermissions(ctx context.Context, req *connect.Request[a
 			Description: entry.Description,
 		})
 	}
-	return connect.NewResponse(&authzv1.ListPermissionsResponse{
+	return &authzv1.ListPermissionsResponse{
 		Permissions: permissions,
 		Status:      webutil.StatusSuccess,
 		Message:     "the permission catalog was listed",
-	}), nil
+	}, nil
 }
 
 // ListRoles answers one page of the roles.
-func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1.ListRolesRequest]) (*connect.Response[authzv1.ListRolesResponse], error) {
-	sortBy := req.Msg.GetSortBy()
-	ascending := req.Msg.GetSortOrder() != "desc"
+func (h *rpcHandler) ListRoles(ctx context.Context, req *authzv1.ListRolesRequest) (*authzv1.ListRolesResponse, error) {
+	sortBy := req.GetSortBy()
+	ascending := req.GetSortOrder() != "desc"
 
 	roles, pagination, err := h.service.ListRoles(
 		ctx,
-		req.Msg.GetNocache(),
-		req.Msg.GetSearch(), parseRoleType(req.Msg.Type), sortBy, ascending,
-		int(req.Msg.GetPage()), int(req.Msg.GetLimit()),
+		req.GetNocache(),
+		req.GetSearch(), parseRoleType(req.Type), sortBy, ascending,
+		int(req.GetPage()), int(req.GetLimit()),
 	)
 	if err != nil {
 		return nil, mapError(err)
@@ -115,141 +101,141 @@ func (h *rpcHandler) ListRoles(ctx context.Context, req *connect.Request[authzv1
 	for _, role := range roles {
 		views = append(views, wireRole(role))
 	}
-	return connect.NewResponse(&authzv1.ListRolesResponse{
+	return &authzv1.ListRolesResponse{
 		Roles:    views,
 		Metadata: listMetadata(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the roles were listed",
-	}), nil
+	}, nil
 }
 
 // GetRole answers one role with its permission slugs.
-func (h *rpcHandler) GetRole(ctx context.Context, req *connect.Request[authzv1.GetRoleRequest]) (*connect.Response[authzv1.GetRoleResponse], error) {
-	role, err := h.service.GetRole(ctx, req.Msg.GetNocache(), req.Msg.Id)
+func (h *rpcHandler) GetRole(ctx context.Context, req *authzv1.GetRoleRequest) (*authzv1.GetRoleResponse, error) {
+	role, err := h.service.GetRole(ctx, req.GetNocache(), req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.GetRoleResponse{
+	return &authzv1.GetRoleResponse{
 		Role:    wireDetail(role),
 		Status:  webutil.StatusSuccess,
 		Message: "the role was fetched",
-	}), nil
+	}, nil
 }
 
 // CreateRole defines a custom role.
-func (h *rpcHandler) CreateRole(ctx context.Context, req *connect.Request[authzv1.CreateRoleRequest]) (*connect.Response[authzv1.CreateRoleResponse], error) {
+func (h *rpcHandler) CreateRole(ctx context.Context, req *authzv1.CreateRoleRequest) (*authzv1.CreateRoleResponse, error) {
 	role, err := h.service.CreateRole(ctx, CreateParams{
-		Name:        req.Msg.Name,
-		Slug:        req.Msg.Slug,
-		Description: req.Msg.Description,
+		Name:        req.Name,
+		Slug:        req.Slug,
+		Description: req.Description,
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.CreateRoleResponse{
+	return &authzv1.CreateRoleResponse{
 		Role:    wireDetail(role),
 		Status:  webutil.StatusSuccess,
 		Message: "the role was created",
-	}), nil
+	}, nil
 }
 
 // UpdateRole replaces a role's fields.
-func (h *rpcHandler) UpdateRole(ctx context.Context, req *connect.Request[authzv1.UpdateRoleRequest]) (*connect.Response[authzv1.UpdateRoleResponse], error) {
-	role, err := h.service.UpdateRole(ctx, req.Msg.Id, CreateParams{
-		Name:        req.Msg.Name,
-		Description: req.Msg.Description,
+func (h *rpcHandler) UpdateRole(ctx context.Context, req *authzv1.UpdateRoleRequest) (*authzv1.UpdateRoleResponse, error) {
+	role, err := h.service.UpdateRole(ctx, req.Id, CreateParams{
+		Name:        req.Name,
+		Description: req.Description,
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.UpdateRoleResponse{
+	return &authzv1.UpdateRoleResponse{
 		Role:    wireDetail(role),
 		Status:  webutil.StatusSuccess,
 		Message: "the role was updated",
-	}), nil
+	}, nil
 }
 
 // DeleteRole removes a custom role.
-func (h *rpcHandler) DeleteRole(ctx context.Context, req *connect.Request[authzv1.DeleteRoleRequest]) (*connect.Response[authzv1.DeleteRoleResponse], error) {
-	if err := h.service.DeleteRole(ctx, req.Msg.Id); err != nil {
+func (h *rpcHandler) DeleteRole(ctx context.Context, req *authzv1.DeleteRoleRequest) (*authzv1.DeleteRoleResponse, error) {
+	if err := h.service.DeleteRole(ctx, req.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.DeleteRoleResponse{
+	return &authzv1.DeleteRoleResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the role was deleted",
-	}), nil
+	}, nil
 }
 
 // SetRolePermissions replaces a role's permission set.
-func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *connect.Request[authzv1.SetRolePermissionsRequest]) (*connect.Response[authzv1.SetRolePermissionsResponse], error) {
-	role, err := h.service.SetRolePermissions(ctx, req.Msg.Id, req.Msg.PermissionSlugs)
+func (h *rpcHandler) SetRolePermissions(ctx context.Context, req *authzv1.SetRolePermissionsRequest) (*authzv1.SetRolePermissionsResponse, error) {
+	role, err := h.service.SetRolePermissions(ctx, req.Id, req.PermissionSlugs)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.SetRolePermissionsResponse{
+	return &authzv1.SetRolePermissionsResponse{
 		Role:    wireDetail(role),
 		Status:  webutil.StatusSuccess,
 		Message: "the role permissions were updated",
-	}), nil
+	}, nil
 }
 
 // ListUserRoles answers the roles one account holds.
-func (h *rpcHandler) ListUserRoles(ctx context.Context, req *connect.Request[authzv1.ListUserRolesRequest]) (*connect.Response[authzv1.ListUserRolesResponse], error) {
-	roles, err := h.service.ListUserRoles(ctx, req.Msg.UserId)
+func (h *rpcHandler) ListUserRoles(ctx context.Context, req *authzv1.ListUserRolesRequest) (*authzv1.ListUserRolesResponse, error) {
+	roles, err := h.service.ListUserRoles(ctx, req.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.ListUserRolesResponse{
-		UserId:  req.Msg.UserId,
+	return &authzv1.ListUserRolesResponse{
+		UserId:  req.UserId,
 		Roles:   wireRoles(roles),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's roles were fetched",
-	}), nil
+	}, nil
 }
 
 // SetUserRoles replaces the set of roles one account holds. The granter is
 // the caller: the audit record names them from the context, and the grant
 // row does too.
-func (h *rpcHandler) SetUserRoles(ctx context.Context, req *connect.Request[authzv1.SetUserRolesRequest]) (*connect.Response[authzv1.SetUserRolesResponse], error) {
-	roles, err := h.service.SetUserRoles(ctx, req.Msg.UserId, req.Msg.RoleIds, callerID(ctx))
+func (h *rpcHandler) SetUserRoles(ctx context.Context, req *authzv1.SetUserRolesRequest) (*authzv1.SetUserRolesResponse, error) {
+	roles, err := h.service.SetUserRoles(ctx, req.UserId, req.RoleIds, callerID(ctx))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.SetUserRolesResponse{
-		UserId:  req.Msg.UserId,
+	return &authzv1.SetUserRolesResponse{
+		UserId:  req.UserId,
 		Roles:   wireRoles(roles),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's roles were updated",
-	}), nil
+	}, nil
 }
 
 // ListUserPermissions answers the permissions granted to one account
 // directly.
-func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *connect.Request[authzv1.ListUserPermissionsRequest]) (*connect.Response[authzv1.ListUserPermissionsResponse], error) {
-	slugs, err := h.service.ListUserPermissions(ctx, req.Msg.UserId)
+func (h *rpcHandler) ListUserPermissions(ctx context.Context, req *authzv1.ListUserPermissionsRequest) (*authzv1.ListUserPermissionsResponse, error) {
+	slugs, err := h.service.ListUserPermissions(ctx, req.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.ListUserPermissionsResponse{
-		UserId:          req.Msg.UserId,
+	return &authzv1.ListUserPermissionsResponse{
+		UserId:          req.UserId,
 		PermissionSlugs: slugs,
 		Status:          webutil.StatusSuccess,
 		Message:         "the user's permissions were fetched",
-	}), nil
+	}, nil
 }
 
 // SetUserPermissions replaces the direct grants one account carries.
-func (h *rpcHandler) SetUserPermissions(ctx context.Context, req *connect.Request[authzv1.SetUserPermissionsRequest]) (*connect.Response[authzv1.SetUserPermissionsResponse], error) {
-	slugs, err := h.service.SetUserPermissions(ctx, req.Msg.UserId, req.Msg.PermissionSlugs, callerID(ctx))
+func (h *rpcHandler) SetUserPermissions(ctx context.Context, req *authzv1.SetUserPermissionsRequest) (*authzv1.SetUserPermissionsResponse, error) {
+	slugs, err := h.service.SetUserPermissions(ctx, req.UserId, req.PermissionSlugs, callerID(ctx))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authzv1.SetUserPermissionsResponse{
-		UserId:          req.Msg.UserId,
+	return &authzv1.SetUserPermissionsResponse{
+		UserId:          req.UserId,
 		PermissionSlugs: slugs,
 		Status:          webutil.StatusSuccess,
 		Message:         "the user's permissions were updated",
-	}), nil
+	}, nil
 }
 
 // callerID reads the caller's wire identifier, the granter a grant row
@@ -401,18 +387,18 @@ func int32Of(value int) int32 {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrRoleNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("role not found"))
+		return connect.NewError(connect.CodeNotFound, "role not found")
 	case errors.Is(err, ErrRoleExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("role already exists"))
+		return connect.NewError(connect.CodeAlreadyExists, "role already exists")
 	case errors.Is(err, ErrSystemRole):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the role is a system role"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the role is a system role")
 	case errors.Is(err, ErrRoleInUse):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the role is still held by accounts"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the role is still held by accounts")
 	case errors.Is(err, ErrPermissionNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("permission not found"))
+		return connect.NewError(connect.CodeNotFound, "permission not found")
 	case errors.Is(err, ErrUserNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+		return connect.NewError(connect.CodeNotFound, "user not found")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("authorization operation failed"))
+		return connect.NewError(connect.CodeInternal, "authorization operation failed")
 	}
 }

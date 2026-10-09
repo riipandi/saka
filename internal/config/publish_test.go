@@ -20,7 +20,7 @@ func plantedConfig() Config {
 	cfg := Default()
 	cfg.App.SecretKey = planted
 	cfg.Auth.SecretKey = planted
-	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/pocketid"
+	cfg.Database.URL = "postgres://app:hunter2@db.example.com:5432/saka"
 	cfg.KVStore.URL = "redis://:hunter2@cache.example.com:6379/2"
 	cfg.Mailer.SMTPPassword = planted
 	cfg.Storage.S3.AccessKey = planted
@@ -43,6 +43,19 @@ func TestThePublicScopeCarriesNoSecret(t *testing.T) {
 	assert.NotContains(t, string(document), "private_key")
 }
 
+// TestThePublicScopeCarriesTheOauthSwitch pins the login screen's gate in
+// the anonymous body: the master switch is the configuration's one word in
+// the sign-in-through-a-provider matter, and it answers before any
+// credential exists.
+func TestThePublicScopeCarriesTheOauthSwitch(t *testing.T) {
+	cfg := plantedConfig()
+
+	document, err := json.Marshal(cfg.Published(false))
+	require.NoError(t, err)
+
+	assert.Contains(t, string(document), `"oauth":{"enabled":true}`)
+}
+
 // TestTheFullScopeRedactsEverySecret pins the administrator's body: a set
 // secret is the placeholder the fail-safe print uses, an unset one stays
 // empty and omitted, and the datastore URLs are the reduced targets.
@@ -63,7 +76,7 @@ func TestTheFullScopeRedactsEverySecret(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(document, &body))
 	database := body["database"].(map[string]any)
-	assert.Equal(t, "db.example.com:5432/pocketid", database["url"])
+	assert.Equal(t, "db.example.com:5432/saka", database["url"])
 	kvstore := body["kvstore"].(map[string]any)
 	assert.Equal(t, "cache.example.com:6379/2", kvstore["url"])
 

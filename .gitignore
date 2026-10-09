@@ -1,7 +1,9 @@
-/.idea
-/.pnp
+/.delta
 /.husky
 /.atlas
+/.idea
+/.task
+/.pnp
 .pnp.js
 .DS_Store
 .DS_Store?
@@ -25,6 +27,7 @@ npm-debug.log*
 !.vscode/launch.json
 !.vscode/mcp.json
 !.vscode/tasks.json
+.claude/worktrees/
 
 *.bak
 
@@ -49,6 +52,7 @@ output/
 .react-email/
 .tanstack/
 .build/
+.vitest/
 .data
 .cache
 .output

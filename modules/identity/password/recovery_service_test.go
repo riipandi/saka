@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/riipandi/saka/framework/datastore"
 	fwmailer "github.com/riipandi/saka/framework/mailer"
@@ -122,7 +122,7 @@ func testService(t *testing.T, pool *datastore.Postgres, configured bool) (*Serv
 	require.NoError(t, err)
 
 	enqueuer := &countingEnqueuer{}
-	service := NewService(pool, fwmailer.NewService(mail, templates), nil, "http://localhost:3080", nil).
+	service := NewService(pool, fwmailer.NewService(mail, templates), nil, "http://localhost:3000", nil).
 		WithEnqueuer(enqueuer)
 	return service, enqueuer
 }

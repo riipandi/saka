@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.webauthn_credentials (
     public_key BYTEA NOT NULL,
     -- The signature counter the authenticator reports. Persisted so a counter
     -- regression between two assertions is visible: that regression is the
-    -- clone signal, and upstream's choice not to store it disables detection.
+    -- clone signal.
     sign_count BIGINT NOT NULL DEFAULT 0,
     attestation_type TEXT NOT NULL,
     transport JSONB DEFAULT '[]'::jsonb,

@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -43,19 +43,11 @@ func (m *Module) Name() string { return ModuleName }
 // there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own. Each procedure
-// is registered at its own path: the generated handler answers a path under
-// its prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := apikeyv1connect.NewApiKeyServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(apikeyv1connect.ApiKeyServiceCreateAPIKeyProcedure, handler)
-	r.Handle(apikeyv1connect.ApiKeyServiceListAPIKeysProcedure, handler)
-	r.Handle(apikeyv1connect.ApiKeyServiceRenewAPIKeyProcedure, handler)
-	r.Handle(apikeyv1connect.ApiKeyServiceRevokeAPIKeyProcedure, handler)
-	r.Handle(apikeyv1connect.ApiKeyServiceListAllAPIKeysProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	apikeyv1connect.RegisterApiKeyServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -72,18 +64,18 @@ func newRPCHandler(service *Service) apikeyv1connect.ApiKeyServiceHandler {
 }
 
 // CreateApiKey issues a key for the caller's own account.
-func (h *rpcHandler) CreateAPIKey(ctx context.Context, req *connect.Request[apikeyv1.CreateAPIKeyRequest]) (*connect.Response[apikeyv1.CreateAPIKeyResponse], error) {
+func (h *rpcHandler) CreateAPIKey(ctx context.Context, req *apikeyv1.CreateAPIKeyRequest) (*apikeyv1.CreateAPIKeyResponse, error) {
 	caller, err := sessionCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	params := CreateParams{
-		Name:        req.Msg.Name,
-		Description: req.Msg.GetDescription(),
+		Name:        req.Name,
+		Description: req.GetDescription(),
 	}
-	if req.Msg.ExpiresAt != nil {
-		params.ExpiresAt = req.Msg.ExpiresAt.AsTime()
+	if req.ExpiresAt != nil {
+		params.ExpiresAt = req.ExpiresAt.AsTime()
 	}
 	ownerID, ownerErr := parseCallerUUID(caller.UserID)
 	if ownerErr != nil {
@@ -93,16 +85,16 @@ func (h *rpcHandler) CreateAPIKey(ctx context.Context, req *connect.Request[apik
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&apikeyv1.CreateAPIKeyResponse{
+	return &apikeyv1.CreateAPIKeyResponse{
 		ApiKey:  wireKey(issued.Key),
 		Key:     issued.Raw,
 		Status:  webutil.StatusSuccess,
 		Message: "the API key was created",
-	}), nil
+	}, nil
 }
 
 // ListApiKeys answers one page of the caller's own keys.
-func (h *rpcHandler) ListAPIKeys(ctx context.Context, req *connect.Request[apikeyv1.ListAPIKeysRequest]) (*connect.Response[apikeyv1.ListAPIKeysResponse], error) {
+func (h *rpcHandler) ListAPIKeys(ctx context.Context, req *apikeyv1.ListAPIKeysRequest) (*apikeyv1.ListAPIKeysResponse, error) {
 	caller, err := sessionCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -112,32 +104,32 @@ func (h *rpcHandler) ListAPIKeys(ctx context.Context, req *connect.Request[apike
 	if ownerErr != nil {
 		return nil, mapError(ErrKeyNotFound)
 	}
-	keys, pagination, err := h.service.ListOwn(ctx, ownerID, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+	keys, pagination, err := h.service.ListOwn(ctx, ownerID, req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&apikeyv1.ListAPIKeysResponse{
+	return &apikeyv1.ListAPIKeysResponse{
 		ApiKeys:  wireKeys(keys),
 		Metadata: metadataOf(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the API keys were listed",
-	}), nil
+	}, nil
 }
 
 // RenewApiKey replaces an expired key's secret and window.
-func (h *rpcHandler) RenewAPIKey(ctx context.Context, req *connect.Request[apikeyv1.RenewAPIKeyRequest]) (*connect.Response[apikeyv1.RenewAPIKeyResponse], error) {
+func (h *rpcHandler) RenewAPIKey(ctx context.Context, req *apikeyv1.RenewAPIKeyRequest) (*apikeyv1.RenewAPIKeyResponse, error) {
 	caller, err := sessionCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	keyID, keyErr := parseKeyID(req.Msg.Id)
+	keyID, keyErr := parseKeyID(req.Id)
 	if keyErr != nil {
 		return nil, mapError(keyErr)
 	}
 	var expiresAt time.Time
-	if req.Msg.ExpiresAt != nil {
-		expiresAt = req.Msg.ExpiresAt.AsTime()
+	if req.ExpiresAt != nil {
+		expiresAt = req.ExpiresAt.AsTime()
 	}
 	ownerID, ownerErr := parseCallerUUID(caller.UserID)
 	if ownerErr != nil {
@@ -147,22 +139,22 @@ func (h *rpcHandler) RenewAPIKey(ctx context.Context, req *connect.Request[apike
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&apikeyv1.RenewAPIKeyResponse{
+	return &apikeyv1.RenewAPIKeyResponse{
 		ApiKey:  wireKey(issued.Key),
 		Key:     issued.Raw,
 		Status:  webutil.StatusSuccess,
 		Message: "the API key was renewed",
-	}), nil
+	}, nil
 }
 
 // RevokeApiKey stamps one of the caller's own keys revoked.
-func (h *rpcHandler) RevokeAPIKey(ctx context.Context, req *connect.Request[apikeyv1.RevokeAPIKeyRequest]) (*connect.Response[apikeyv1.RevokeAPIKeyResponse], error) {
+func (h *rpcHandler) RevokeAPIKey(ctx context.Context, req *apikeyv1.RevokeAPIKeyRequest) (*apikeyv1.RevokeAPIKeyResponse, error) {
 	caller, err := sessionCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	keyID, keyErr := parseKeyID(req.Msg.Id)
+	keyID, keyErr := parseKeyID(req.Id)
 	if keyErr != nil {
 		return nil, mapError(keyErr)
 	}
@@ -173,24 +165,24 @@ func (h *rpcHandler) RevokeAPIKey(ctx context.Context, req *connect.Request[apik
 	if err := h.service.Revoke(ctx, ownerID, keyID); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&apikeyv1.RevokeAPIKeyResponse{
+	return &apikeyv1.RevokeAPIKeyResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the API key was revoked",
-	}), nil
+	}, nil
 }
 
 // ListAllApiKeys answers one page of every key the deployment holds.
-func (h *rpcHandler) ListAllAPIKeys(ctx context.Context, req *connect.Request[apikeyv1.ListAllAPIKeysRequest]) (*connect.Response[apikeyv1.ListAllAPIKeysResponse], error) {
-	keys, pagination, err := h.service.ListAll(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListAllAPIKeys(ctx context.Context, req *apikeyv1.ListAllAPIKeysRequest) (*apikeyv1.ListAllAPIKeysResponse, error) {
+	keys, pagination, err := h.service.ListAll(ctx, req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&apikeyv1.ListAllAPIKeysResponse{
+	return &apikeyv1.ListAllAPIKeysResponse{
 		ApiKeys:  wireKeys(keys),
 		Metadata: metadataOf(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the API keys were listed",
-	}), nil
+	}, nil
 }
 
 // wireKey maps the stored row onto the wire message. The hash never travels:
@@ -249,7 +241,7 @@ func parseKeyID(id string) (uuid.UUID, error) {
 func sessionCaller(ctx context.Context) (*jwtutils.Caller, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return nil, connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 	return caller, nil
 }
@@ -288,13 +280,13 @@ func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrKeyNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("API key not found"))
+		return connect.NewError(connect.CodeNotFound, "API key not found")
 	case errors.Is(err, ErrKeyExists):
-		return connect.NewError(connect.CodeAlreadyExists, errors.New("API key name already in use"))
+		return connect.NewError(connect.CodeAlreadyExists, "API key name already in use")
 	case errors.Is(err, ErrKeyNotExpired):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the API key has not expired yet"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the API key has not expired yet")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("API key operation failed"))
+		return connect.NewError(connect.CodeInternal, "API key operation failed")
 	}
 }
 

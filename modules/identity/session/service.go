@@ -51,8 +51,8 @@ type Issuer interface {
 	// assembled, for the session identifier the token carries in `sid`.
 	SignSessionToken(ctx context.Context, subject string, claims jwtutils.AccessClaims, sessionID SessionID, at time.Time) (string, error)
 	// SessionLifetime is the window a session's renewal writes, by the
-	// caller's remembered choice; the remembered and the non-remembered
-	// path share the bound the settings own.
+	// caller's remembered choice — the remembered bound or the shorter
+	// non-remembered window, both the settings' own.
 	SessionLifetime(ctx context.Context, remember bool) time.Duration
 	// AccessTokenTTL is the lifetime the access token is signed with, so a
 	// renewal answers the same expires_in the sign-in does.

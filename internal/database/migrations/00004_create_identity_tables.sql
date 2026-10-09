@@ -129,7 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_user_groups_users_user_group_id ON public.user_gr
 CREATE TABLE IF NOT EXISTS public.sessions (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CONSTRAINT chk_sessions_provider CHECK (provider IN ('password', 'one_time_access', 'totp', 'webauthn', 'impersonation', 'oauth_sso')),
+    provider TEXT NOT NULL CONSTRAINT chk_sessions_provider CHECK (provider IN ('credential', 'one_time_access', 'totp', 'webauthn', 'impersonation', 'oauth_sso')),
     token_hash TEXT NOT NULL UNIQUE,
     user_agent TEXT,
     device_fingerprint TEXT,
@@ -234,9 +234,7 @@ CREATE INDEX IF NOT EXISTS idx_signup_tokens_user_groups_user_group_id
     ON public.signup_tokens_user_groups USING btree (user_group_id);
 
 -- --------------------------------------------------------
--- Table: public.device_login_requests — QR / cross-device sign-in
--- state (a plain table is the portable equivalent of the upstream
--- actor framework)
+-- Table: public.device_login_requests — QR / cross-device sign-in state
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.device_login_requests (

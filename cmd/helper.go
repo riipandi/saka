@@ -143,8 +143,8 @@ const migrationFileExt = ".sql"
 // migrationLabel shortens a migration file name for a report row.
 //
 // The version already has its own column and the ".sql" says nothing a reader
-// does not know, so both are dropped: "00009_add_session_remember.sql" reads as
-// "add_session_remember". The prefix is only removed when it really is a version,
+// does not know, so both are dropped: "0001_add_widgets.sql" reads as
+// "add_widgets". The prefix is only removed when it really is a version,
 // so a file named "add_widgets.sql" keeps its name.
 func migrationLabel(name string) string {
 	label := strings.TrimSuffix(name, migrationFileExt)

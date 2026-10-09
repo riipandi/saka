@@ -84,6 +84,51 @@ func customParams() ConnectionParams {
 	}
 }
 
+func TestEnabledConnectionsAnswerTheEnabledRowsOnly(t *testing.T) {
+	service := testService(t, migratedPool(t), nil)
+
+	connections, err := service.EnabledConnections(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, connections, "an empty store answers an empty listing")
+
+	params := customParams()
+	created, err := service.Create(t.Context(), params)
+	require.NoError(t, err)
+	enabled := true
+	_, err = service.Update(t.Context(), created.ID, ConnectionUpdate{Enabled: &enabled})
+	require.NoError(t, err)
+
+	// A second row that rests disabled stays hidden beside the enabled one.
+	disabled := customParams()
+	disabled.Provider = "ministry-sso"
+	disabled.DisplayName = "Ministry SSO"
+	_, err = service.Create(t.Context(), disabled)
+	require.NoError(t, err)
+
+	connections, err = service.EnabledConnections(t.Context())
+	require.NoError(t, err)
+	require.Len(t, connections, 1)
+	assert.Equal(t, params.Provider, connections[0].Provider)
+	assert.Equal(t, params.DisplayName, connections[0].DisplayName)
+}
+
+func TestTheMasterSwitchEmptiesTheListing(t *testing.T) {
+	service := testService(t, migratedPool(t), nil)
+	created, err := service.Create(t.Context(), customParams())
+	require.NoError(t, err)
+	enabled := true
+	_, err = service.Update(t.Context(), created.ID, ConnectionUpdate{Enabled: &enabled})
+	require.NoError(t, err)
+
+	connections, err := service.EnabledConnections(t.Context())
+	require.NoError(t, err)
+	assert.Len(t, connections, 1, "with the switch on, the row answers")
+
+	connections, err = service.WithOAuthEnabled(false).EnabledConnections(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, connections, "the switch off empties the listing whatever the rows hold")
+}
+
 // builtinParams is a valid builtin connection's payload: the slug names a
 // shipped provider, the endpoints ride the code.
 func builtinParams() ConnectionParams {

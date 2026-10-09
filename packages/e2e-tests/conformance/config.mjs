@@ -14,7 +14,7 @@ export const suiteBase = process.env.CONFORMANCE_SUITE_URL ?? 'https://localhost
 
 export const issuer = process.env.SAKA_ISSUER ?? 'https://saka.localhost.test:3443'
 
-export const apiBase = process.env.SAKA_API ?? 'http://localhost:3080'
+export const apiBase = process.env.SAKA_API ?? 'http://localhost:3000'
 
 export const admin = {
   user: process.env.SAKA_USER ?? 'admin',

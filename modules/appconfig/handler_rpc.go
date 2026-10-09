@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -47,18 +47,12 @@ func (m *Module) Mount(r chi.Router) {
 	r.Get("/api/configuration", m.serveConfiguration)
 }
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := systemv1connect.NewAppConfigServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(systemv1connect.AppConfigServiceTestEmailProcedure, handler)
-
-	_, settingsHandler := settingsv1connect.NewSettingsServiceHandler(newSettingsHandler(m.settings), opts...)
-	r.Handle(settingsv1connect.SettingsServiceListProcedure, settingsHandler)
-	r.Handle(settingsv1connect.SettingsServiceUpdateProcedure, settingsHandler)
-	r.Handle(settingsv1connect.SettingsServiceResetProcedure, settingsHandler)
-	r.Handle(settingsv1connect.SettingsServiceListPublicProcedure, settingsHandler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	systemv1connect.RegisterAppConfigServiceHandler(server, newRPCHandler(m.service))
+	settingsv1connect.RegisterSettingsServiceHandler(server, newSettingsHandler(m.settings))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -76,10 +70,10 @@ func newRPCHandler(service *Service) systemv1connect.AppConfigServiceHandler {
 // has already refused a caller who is not an administrator, so reaching here
 // means the claims name an account; a missing caller is the wiring defect it
 // always is, and it is refused rather than dereferenced.
-func (h *rpcHandler) TestEmail(ctx context.Context, req *connect.Request[systemv1.TestEmailRequest]) (*connect.Response[systemv1.TestEmailResponse], error) {
+func (h *rpcHandler) TestEmail(ctx context.Context, req *systemv1.TestEmailRequest) (*systemv1.TestEmailResponse, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return nil, connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 
 	callerID, err := user.UUIDFromWire(caller.UserID)
@@ -87,13 +81,13 @@ func (h *rpcHandler) TestEmail(ctx context.Context, req *connect.Request[systemv
 		return nil, mapError(ErrUnknownAccount)
 	}
 
-	if err := h.service.SendTestEmail(ctx, callerID, req.Msg.GetTo()); err != nil {
+	if err := h.service.SendTestEmail(ctx, callerID, req.GetTo()); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&systemv1.TestEmailResponse{
+	return &systemv1.TestEmailResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the test email was sent",
-	}), nil
+	}, nil
 }
 
 // mapError translates the service's failures into the codes the Connect
@@ -102,17 +96,17 @@ func (h *rpcHandler) TestEmail(ctx context.Context, req *connect.Request[systemv
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrMailUnavailable):
-		return connect.NewError(connect.CodeUnavailable, errors.New("mailer is not configured"))
+		return connect.NewError(connect.CodeUnavailable, "mailer is not configured")
 	case errors.Is(err, ErrUnknownAccount):
-		return connect.NewError(connect.CodeNotFound, errors.New("account not found"))
+		return connect.NewError(connect.CodeNotFound, "account not found")
 	case errors.Is(err, ErrUnknownSetting):
-		return connect.NewError(connect.CodeNotFound, errors.New("setting not found"))
+		return connect.NewError(connect.CodeNotFound, "setting not found")
 	case errors.Is(err, ErrReservedPrefix):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the setting is not writable as asked"))
+		return connect.NewError(connect.CodeInvalidArgument, "the setting is not writable as asked")
 	case errors.Is(err, ErrSealUnavailable):
-		return connect.NewError(connect.CodeUnavailable, errors.New("no cipher is configured to seal a sensitive value"))
+		return connect.NewError(connect.CodeUnavailable, "no cipher is configured to seal a sensitive value")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("the app configuration area could not serve the call"))
+		return connect.NewError(connect.CodeInternal, "the app configuration area could not serve the call")
 	}
 }
 
@@ -131,54 +125,54 @@ func newSettingsHandler(settings *Settings) settingsv1connect.SettingsServiceHan
 // List answers every catalog item with its effective values to an
 // administrator. The guard has already refused anyone else, and the sealed
 // values are opened in the service.
-func (h *settingsHandler) List(ctx context.Context, req *connect.Request[settingsv1.ListRequest]) (*connect.Response[settingsv1.ListResponse], error) {
+func (h *settingsHandler) List(ctx context.Context, req *settingsv1.ListRequest) (*settingsv1.ListResponse, error) {
 	settings, err := h.settings.List(ctx)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&settingsv1.ListResponse{
+	return &settingsv1.ListResponse{
 		Settings: toProtoSettings(settings),
-	}), nil
+	}, nil
 }
 
 // Update replaces one setting's value. The guard has already refused a
 // caller who is not an administrator, so reaching here means the claims
 // name an account; a missing caller is the wiring defect it always is, and
 // it is refused rather than dereferenced.
-func (h *settingsHandler) Update(ctx context.Context, req *connect.Request[settingsv1.UpdateRequest]) (*connect.Response[settingsv1.UpdateResponse], error) {
+func (h *settingsHandler) Update(ctx context.Context, req *settingsv1.UpdateRequest) (*settingsv1.UpdateResponse, error) {
 	callerID, err := callerUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	setting, err := h.settings.UpdateFor(ctx, callerID, req.Msg.GetKey(), req.Msg.GetValue())
+	setting, err := h.settings.UpdateFor(ctx, callerID, req.GetKey(), req.GetValue())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&settingsv1.UpdateResponse{Setting: toProtoSetting(setting)}), nil
+	return &settingsv1.UpdateResponse{Setting: toProtoSetting(setting)}, nil
 }
 
 // Reset removes one setting's override, so the item answers its catalog
 // default again.
-func (h *settingsHandler) Reset(ctx context.Context, req *connect.Request[settingsv1.ResetRequest]) (*connect.Response[settingsv1.ResetResponse], error) {
+func (h *settingsHandler) Reset(ctx context.Context, req *settingsv1.ResetRequest) (*settingsv1.ResetResponse, error) {
 	callerID, err := callerUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	setting, err := h.settings.ResetFor(ctx, callerID, req.Msg.GetKey())
+	setting, err := h.settings.ResetFor(ctx, callerID, req.GetKey())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&settingsv1.ResetResponse{Setting: toProtoSetting(setting)}), nil
+	return &settingsv1.ResetResponse{Setting: toProtoSetting(setting)}, nil
 }
 
 // ListPublic answers the items an unauthenticated client may read. There is
 // no caller to read and nothing that can fail past the service. A request
 // that carries the bypass flag reads the source and leaves the cached
 // listing alone.
-func (h *settingsHandler) ListPublic(ctx context.Context, req *connect.Request[settingsv1.ListPublicRequest]) (*connect.Response[settingsv1.ListPublicResponse], error) {
-	settings, err := h.settings.ListPublicBypassingCache(ctx, req.Msg.GetNocache())
+func (h *settingsHandler) ListPublic(ctx context.Context, req *settingsv1.ListPublicRequest) (*settingsv1.ListPublicResponse, error) {
+	settings, err := h.settings.ListPublicBypassingCache(ctx, req.GetNocache())
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -190,7 +184,7 @@ func (h *settingsHandler) ListPublic(ctx context.Context, req *connect.Request[s
 			Value: setting.Value,
 		})
 	}
-	return connect.NewResponse(&settingsv1.ListPublicResponse{Settings: public}), nil
+	return &settingsv1.ListPublicResponse{Settings: public}, nil
 }
 
 // callerUUID converts the caller's wire identifier into the UUID the
@@ -198,7 +192,7 @@ func (h *settingsHandler) ListPublic(ctx context.Context, req *connect.Request[s
 func callerUUID(ctx context.Context) (string, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return "", connect.NewError(connect.CodeInternal, errors.New("authentication state missing"))
+		return "", connect.NewError(connect.CodeInternal, "authentication state missing")
 	}
 	callerID, err := user.UUIDFromWire(caller.UserID)
 	if err != nil {

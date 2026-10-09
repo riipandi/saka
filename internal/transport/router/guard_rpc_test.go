@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/authn"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +29,7 @@ import (
 func callerAuthenticator(subject string, admin, impersonated bool) router.Authenticator {
 	return func(ctx context.Context, req *http.Request) (any, error) {
 		if subject == "" {
-			return nil, authn.Errorf("authentication required")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		claims := jwtutils.AccessClaims{Username: subject, Roles: adminRoles(admin)}
 		if impersonated {

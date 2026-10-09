@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.jetify.com/typeid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
 	"github.com/riipandi/saka/framework/datastore"
@@ -182,7 +182,8 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	assert.Equal(t, "hermione@example.com", result.User.Email)
 	assert.NotEmpty(t, result.RefreshToken)
 	assert.Equal(t, int32(testConfig().Auth.AccessTTL.Seconds()), result.AccessExpiresIn)
-	assert.Equal(t, int32((7 * 24 * time.Hour).Seconds()), result.RefreshExpiresIn)
+	// No remember: the non-remembered window the catalog defaults to.
+	assert.Equal(t, int32((12 * time.Hour).Seconds()), result.RefreshExpiresIn)
 
 	// The session identifier is the typed id, and the refresh token is
 	// stored under its hash alone.
@@ -229,7 +230,7 @@ func TestSignInIssuesTheTokenPair(t *testing.T) {
 	assert.Equal(t, hex.EncodeToString(sum[:]), tokenHash, "the row must hold the hash, not the token")
 	assert.Equal(t, "signin_test/1", userAgent)
 	assert.False(t, remember)
-	assert.Equal(t, ProviderPassword, provider)
+	assert.Equal(t, ProviderCredential, provider)
 	require.NotNil(t, ipAddress)
 	assert.Equal(t, "192.0.2.10", *ipAddress)
 	assert.Equal(t, sid.UUID(), rowID)
@@ -361,10 +362,11 @@ func TestSignInStoresANullAddressWhenNoneIsKnown(t *testing.T) {
 	assert.Nil(t, ip)
 }
 
-// TestRememberSelectsTheConfiguredLifetime pins the session bound to the
-// settings catalog, not to constants: the remembered and the non-remembered
-// path share session.max_lifetime, so either sign-in writes the same window
-// and the flag only records the caller's choice on the row.
+// TestRememberSelectsTheConfiguredLifetime pins the session windows to the
+// settings catalog: a remembered session rides session.max_lifetime and a
+// session the caller did not remember rides the shorter session.lifetime,
+// capped at the remembered bound — the flag the row records is the same flag
+// the mint and every renewal read.
 func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 	conttest.SkipWithoutDocker(t)
 
@@ -372,7 +374,10 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 
 	cfg := testConfig()
 	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
-	service.WithSessionSettings(stubSettingReader{seconds: int64((2 * time.Hour).Seconds())})
+	service.WithSessionSettings(keyedNumbers{values: map[string]int64{
+		SettingSessionLifetime:    int64((2 * time.Hour).Seconds()),
+		SettingSessionMaxLifetime: int64((48 * time.Hour).Seconds()),
+	}})
 
 	createAccount(t, pool, "hermione", "hermione@example.com", "expecto-patronum", nil)
 
@@ -398,9 +403,33 @@ func TestRememberSelectsTheConfiguredLifetime(t *testing.T) {
 
 			lifetime := expiresAt.Sub(createdAt)
 			assert.Equal(t, params.Remember, remember)
-			assert.Equal(t, 2*time.Hour, lifetime)
+			if params.Remember {
+				assert.Equal(t, 48*time.Hour, lifetime)
+				assert.Equal(t, int32((48 * time.Hour).Seconds()), result.RefreshExpiresIn)
+			} else {
+				assert.Equal(t, 2*time.Hour, lifetime)
+				assert.Equal(t, int32((2 * time.Hour).Seconds()), result.RefreshExpiresIn)
+			}
 		})
 	}
+}
+
+// TestTheShortWindowNeverOutlivesTheRememberedBound pins the cap: however the
+// operator sets session.lifetime, a session the caller did not remember is
+// written with the remembered bound when the two cross.
+func TestTheShortWindowNeverOutlivesTheRememberedBound(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	cfg := testConfig()
+	service := NewService(cfg, pool, NewRepository(pool), jwks.NewService(cfg, nil, nil, nil), nil, nil)
+	service.WithSessionSettings(keyedNumbers{values: map[string]int64{
+		SettingSessionLifetime:    int64((72 * time.Hour).Seconds()),
+		SettingSessionMaxLifetime: int64((48 * time.Hour).Seconds()),
+	}})
+
+	assert.Equal(t, 48*time.Hour, service.SessionLifetime(t.Context(), false))
+	assert.Equal(t, 48*time.Hour, service.SessionLifetime(t.Context(), true))
 }
 
 // stubSettingReader answers the duration keys with one value and the
@@ -434,7 +463,29 @@ func TestSessionLifetimeFallsBackWhenUnreadable(t *testing.T) {
 	service.WithSessionSettings(stubSettingReader{seconds: 0}) // out of bounds
 
 	assert.Equal(t, sessionMaxLifetimeDefault, service.sessionLifetime(t.Context()))
+	assert.Equal(t, sessionShortLifetimeDefault, service.SessionLifetime(t.Context(), false))
 	assert.Equal(t, sessionMaxLifetimeDefault, service.SessionLifetime(t.Context(), true))
+}
+
+// keyedNumbers answers the duration keys per name: the mint's view of a
+// catalog whose session keys disagree.
+type keyedNumbers struct {
+	values map[string]int64
+}
+
+func (s keyedNumbers) GetInt64(_ context.Context, key string) (int64, error) {
+	if seconds, ok := s.values[key]; ok {
+		return seconds, nil
+	}
+	return 0, errors.New("no such int setting in this test")
+}
+
+func (s keyedNumbers) GetString(context.Context, string) (string, error) {
+	return "", errors.New("no string settings in this test")
+}
+
+func (s keyedNumbers) GetBool(context.Context, string) (bool, error) {
+	return false, errors.New("no bool settings in this test")
 }
 
 func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
@@ -454,7 +505,7 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 
 func TestRPCSignInRefusesAnIncompleteCredential(t *testing.T) {
 	handler := &rpcHandler{service: nil} // the guard runs before the service
-	request := connect.NewRequest(&authnv1.SignInRequest{})
+	request := &authnv1.SignInRequest{}
 	_, err := handler.SignIn(t.Context(), request)
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
@@ -513,7 +564,7 @@ func TestIssueSessionTheListsApplyAtSignIn(t *testing.T) {
 	issue := func(service *Service) error {
 		account, err := service.repo.FindAccountByIdentity(ctx, "hermione@example.com")
 		require.NoError(t, err)
-		_, err = service.IssueSession(ctx, pool, account, ProviderPassword, audit.EventSignIn, SessionParams{})
+		_, err = service.IssueSession(ctx, pool, account, ProviderCredential, audit.EventSignIn, SessionParams{})
 		return err
 	}
 

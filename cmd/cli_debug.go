@@ -38,9 +38,6 @@ var rootCmd = &cli.Command{
 		configGenerateCmd,
 		configValidateCmd,
 		configPrintCmd,
-		mailerSmokeCmd,
-		loggerSmokeCmd,
-		otelSmokeCmd,
 	},
 	Flags: []cli.Flag{
 		&cli.StringFlag{

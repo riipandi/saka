@@ -82,7 +82,7 @@ const DefaultCacheMaxMemory = 32 << 20
 // server the SPA is served from in development. Production names its own
 // origin through the configuration, so a browser has to prove where the call
 // comes from rather than being trusted by default.
-var DefaultCORSOrigins = []string{"http://localhost:3080"}
+var DefaultCORSOrigins = []string{"http://localhost:3000"}
 
 // DefaultCORSMethods is the method list the dual surface needs: the GET and
 // POST the Connect protocol answers with, plus the PUT, PATCH, and DELETE the
@@ -217,7 +217,7 @@ const DefaultMailerTimeout = 15 * time.Second
 // with the bucket name and key following it in the path. A deployment may
 // point app.assets_url at an S3 bucket or a CDN origin — the value is one
 // URL, and nothing else changes with it.
-const DefaultAssetsURL = "http://localhost:3080/storage"
+const DefaultAssetsURL = "http://localhost:3000/storage"
 
 // Default returns the built-in configuration. These values are the lowest
 // precedence layer: every other source may replace them, but a key no source
@@ -237,7 +237,7 @@ func Default() Config {
 			// enrollment's one answer is the only channel it travels
 			// through, and development debugging turns this on by hand.
 			ExposeTotpSecret: false,
-			// Ninety days is Pocket ID's own default, and the window a
+			// Ninety days is the default, and the window a
 			// security review usually asks for: long enough to answer "what
 			// happened last quarter", short enough that the table stays a
 			// table rather than an archive.
@@ -251,9 +251,9 @@ func Default() Config {
 			Issuer:        "",
 			AccessTTL:     15 * time.Minute,
 			SessionDriver: SessionDB,
-			// The API key's expiry reminder is off by default, the way the
-			// upstream feature ships: a mailer that reaches account holders
-			// on a schedule is a decision, not a default.
+			// The API key's expiry reminder is off by default: a mailer
+			// that reaches account holders on a schedule is a decision,
+			// not a default.
 			ExpiryEmailEnabled: false,
 			// Both email paths are opt-in: the administrative one because an
 			// operator's mailer becomes a credential sender, the public one
@@ -374,6 +374,13 @@ func Default() Config {
 			AuthLimit: DefaultRateLimitAuthLimit,
 			Window:    time.Minute,
 		},
+		OAuth: OAuth{
+			// On by default: the connections decide which providers
+			// exist, and a deployment with none configured has nothing
+			// to turn off — the switch exists to darken the surface
+			// wholesale.
+			Enabled: true,
+		},
 		OIDC: OIDC{
 			// Off by default: the provider signs with the database's
 			// stored keys, and a run without one is not an issuer —
@@ -388,7 +395,7 @@ func Default() Config {
 		},
 		Server: Server{
 			Host:            "0.0.0.0",
-			Port:            3080,
+			Port:            3000,
 			ReadTimeout:     15 * time.Second,
 			WriteTimeout:    30 * time.Second,
 			IdleTimeout:     60 * time.Second,

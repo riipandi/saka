@@ -34,11 +34,11 @@ file decides.`,
 		&cli.UintFlag{
 			Name:        "port",
 			Usage:       "Port to bind to",
-			DefaultText: "3080",
+			DefaultText: "3000",
 		},
 		&cli.StringFlag{
 			Name:  "base-url",
-			Usage: "Base URL (e.g. http://localhost:3080)",
+			Usage: "Base URL (e.g. http://localhost:3000)",
 		},
 	},
 	Action: func(ctx context.Context, cmd *cli.Command) error {

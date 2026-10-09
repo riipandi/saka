@@ -19,13 +19,13 @@ import (
 // not need more; a lost browser's row is dead weight the sweep collects.
 const (
 	flowLifetime = 10 * time.Minute
-
 	// spaCallbackPath is the SPA route the callback redirects to, with
-	// the flow token (or the error code) riding the query.
-	// TODO(frontend): the SPA route that receives the OAuth flow.
-	spaCallbackPath = "/oauth/callback"
-
-	secretBytes = 32
+	// the flow token or the error code riding the query. The path sits
+	// OUTSIDE the reserved surface prefixes (/oauth among them) — the
+	// shell never serves those as the SPA document, so a redirect into
+	// one would answer the envelope's 404, never the page.
+	spaCallbackPath = "/auth/callback"
+	secretBytes     = 32
 )
 
 // The failures the flow reports. The handler maps them onto the connect
@@ -50,12 +50,24 @@ func (s *Service) WithBaseURL(baseURL string) *Service {
 	return s
 }
 
+// WithOAuthEnabled wires the configuration's master switch over the whole
+// surface. The providers are runtime data the connection rows own; this
+// switch is the configuration's one word in the matter, and a change to it
+// takes the restart every configuration key takes.
+func (s *Service) WithOAuthEnabled(enabled bool) *Service {
+	s.ssoEnabled = enabled
+	return s
+}
+
 // Begin opens one authorization-code ceremony: it draws the secrets,
 // renders the provider's authorize URL, and stores the pending row the
 // callback will consume. The raw state and verifier never rest anywhere —
 // the row carries their hash and their sealed form, and the browser
 // carries the raw state to the provider and back.
 func (s *Service) Begin(ctx context.Context, provider string) (string, error) {
+	if !s.ssoEnabled {
+		return "", ErrConnectionUnavailable
+	}
 	conn, err := s.repo.ByProvider(ctx, s.pool, provider)
 	if errors.Is(err, ErrConnectionNotFound) {
 		return "", ErrConnectionUnavailable

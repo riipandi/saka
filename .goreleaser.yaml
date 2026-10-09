@@ -13,8 +13,6 @@ metadata:
 env:
   - CGO_ENABLED=0
   - NODE_ENV=production
-  - VITEST=true
-  - SKIP_GO_BUILD=1
 
 before:
   hooks:
@@ -23,9 +21,12 @@ before:
     - pnpm install --ignore-scripts --frozen-lockfile
     - go tool buf generate
     - gofmt -w codegen/proto/go
-    - pnpm exec vp build
-    # - swag init --output ./api -d cmd,internal,modules,pkg -g saka/main.go --quiet
-    # - swag fmt --dir ./api
+    # The binaries goreleaser cross-compiles embed web/email (the templates)
+    # and web/output (the SPA bundle plus the derived assets.json) — both
+    # artifacts must exist first. The webapp pass runs the go plugin, whose
+    # closeBundle derives assets.json; SKIP_GO_BUILD would skip exactly that.
+    - pnpm exec vp run email#build
+    - pnpm exec vp run webapp#build
 
 builds:
   - id: build_noncgo
@@ -36,7 +37,9 @@ builds:
     goos: ["darwin", "linux", "windows"]
     goarch: ["amd64", "arm64"]
     buildmode: pie
-    tags: ["release"]
+    # Same tags the webapp plugin's release target builds with, so both build
+    # paths produce the same binary.
+    tags: ["release", "noasm", "nounsafe"]
     flags: ["-trimpath", "-buildvcs=false"]
     ldflags:
       - -w -s -extldflags '-static'

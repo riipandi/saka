@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
@@ -75,12 +76,12 @@ func TestTheAreaForwardsFeatureProcedures(t *testing.T) {
 	rpc, ok := module.(kernel.RPCModule)
 	require.True(t, ok, "the area must implement kernel.RPCModule")
 
-	router := chi.NewRouter()
-	rpc.MountRPC(router)
+	server := connect.NewServer()
+	rpc.MountRPC(server)
 
 	claimed := map[string]bool{}
-	for _, route := range router.Routes() {
-		claimed[route.Pattern] = true
+	for spec := range server.Specs() {
+		claimed[spec.Procedure] = true
 	}
 	assert.True(t, claimed[authnv1connect.AuthServiceSignInProcedure],
 		"the area must forward its features' procedures to the RPC router")
@@ -241,6 +242,6 @@ func testConfig(t *testing.T) config.Config {
 	// The passkey engine derives its RP identity from the public origin at
 	// construction, and a default config carries no base URL; the test names
 	// the dev one.
-	cfg.App.BaseURL = "http://localhost:3080"
+	cfg.App.BaseURL = "http://localhost:3000"
 	return cfg
 }

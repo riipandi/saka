@@ -71,9 +71,8 @@ var (
 )
 
 const (
-	// defaultTTL is the window a request without one asks for: the same
-	// fifteen minutes the upstream feature defaults to and the public email
-	// path fixes.
+	// defaultTTL is the window a request without one asks for: fifteen
+	// minutes, the same window the public email path fixes.
 	defaultTTL = 15 * time.Minute
 
 	// shortCodeWindow is the boundary between the two code forms. A code that

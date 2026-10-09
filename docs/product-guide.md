@@ -39,7 +39,7 @@ so losing one never locks the person out.
 | **Password** | Email or username plus a password | Configurable length and character-class rules |
 | **Passkey** | The device's biometrics or security key | A password can be *removed entirely* once a passkey or linked provider exists — the system refuses to leave an account with no way back in |
 | **One-time email code** | An email address plus a short code | Every email flow delivers a **single-use code, never a link** — codes can't leak through preview bots and can't be replayed |
-| **External provider** | "Continue with Google/GitHub/custom" | See [OAuth SSO](oauth-sso.md) |
+| **External provider** | Clicks the provider's button — one per connection the deployment enabled | See [OAuth SSO](oauth-sso.md) |
 | **One-time access** | A scoped, expiring credential for guests | A contractor or demo gets in without an account |
 | **Device code** | The device shows a short code; the user approves it on their browser | For TVs, kiosks, CLIs — the device never sees a password |
 

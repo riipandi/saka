@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	"uuid"
@@ -41,24 +41,11 @@ func (m *Module) Name() string { return ModuleName }
 // no plain HTTP route: a procedure is POST-only on the RPC surface.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedure answers exactly like the transport's own.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	handler := newRPCHandler(m.service)
-	_, connectHandler := authnv1connect.NewWebAuthnServiceHandler(handler, opts...)
-	r.Handle(authnv1connect.WebAuthnServiceBeginRegistrationProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceVerifyRegistrationProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceBeginLoginProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceVerifyLoginProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceListCredentialsProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceUpdateCredentialProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceDeleteCredentialProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceReauthenticateProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceSendReauthenticationCodeProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceAdminListCredentialsProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceAdminUpdateCredentialProcedure, connectHandler)
-	r.Handle(authnv1connect.WebAuthnServiceAdminDeleteCredentialProcedure, connectHandler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedure answers exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterWebAuthnServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the webauthn procedures. The
@@ -91,54 +78,54 @@ func callerID(ctx context.Context) (uuid.UUID, error) {
 }
 
 // BeginRegistration opens the enrollment ceremony on the caller's account.
-func (h *rpcHandler) BeginRegistration(ctx context.Context, _ *connect.Request[authnv1.BeginRegistrationRequest]) (*connect.Response[authnv1.BeginRegistrationResponse], error) {
+func (h *rpcHandler) BeginRegistration(ctx context.Context, _ *authnv1.BeginRegistrationRequest) (*authnv1.BeginRegistrationResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
 	options, sessionID, err := h.service.BeginRegistration(ctx, userID)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.BeginRegistrationResponse{
+	return &authnv1.BeginRegistrationResponse{
 		Options:   options,
 		SessionId: sessionID,
-	}), nil
+	}, nil
 }
 
 // VerifyRegistration finishes the enrollment with what the browser produced.
-func (h *rpcHandler) VerifyRegistration(ctx context.Context, req *connect.Request[authnv1.VerifyRegistrationRequest]) (*connect.Response[authnv1.VerifyRegistrationResponse], error) {
+func (h *rpcHandler) VerifyRegistration(ctx context.Context, req *authnv1.VerifyRegistrationRequest) (*authnv1.VerifyRegistrationResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	enrolled, err := h.service.VerifyRegistration(ctx, userID, req.Msg.SessionId, req.Msg.Credential, req.Msg.Name)
+	enrolled, err := h.service.VerifyRegistration(ctx, userID, req.SessionId, req.Credential, req.Name)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.VerifyRegistrationResponse{
+	return &authnv1.VerifyRegistrationResponse{
 		Credential: credentialView(enrolled),
-	}), nil
+	}, nil
 }
 
 // BeginLogin opens the usernameless sign-in ceremony.
-func (h *rpcHandler) BeginLogin(ctx context.Context, _ *connect.Request[authnv1.BeginLoginRequest]) (*connect.Response[authnv1.BeginLoginResponse], error) {
+func (h *rpcHandler) BeginLogin(ctx context.Context, _ *authnv1.BeginLoginRequest) (*authnv1.BeginLoginResponse, error) {
 	options, sessionID, err := h.service.BeginLogin(ctx)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.BeginLoginResponse{
+	return &authnv1.BeginLoginResponse{
 		Options:   options,
 		SessionId: sessionID,
-	}), nil
+	}, nil
 }
 
 // VerifyLogin finishes the sign-in and answers the token pair.
-func (h *rpcHandler) VerifyLogin(ctx context.Context, req *connect.Request[authnv1.VerifyLoginRequest]) (*connect.Response[authnv1.VerifyLoginResponse], error) {
+func (h *rpcHandler) VerifyLogin(ctx context.Context, req *authnv1.VerifyLoginRequest) (*authnv1.VerifyLoginResponse, error) {
 	client := fwaudit.ClientFromContext(ctx)
-	result, err := h.service.VerifyLogin(ctx, req.Msg.SessionId, req.Msg.Credential, signin.SessionParams{
+	result, err := h.service.VerifyLogin(ctx, req.SessionId, req.Credential, signin.SessionParams{
 		UserAgent:   client.UserAgent,
 		IPAddress:   client.IPAddress,
 		Fingerprint: client.Fingerprint,
@@ -146,7 +133,7 @@ func (h *rpcHandler) VerifyLogin(ctx context.Context, req *connect.Request[authn
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.VerifyLoginResponse{
+	return &authnv1.VerifyLoginResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
 		AccessExpiresIn:  result.AccessExpiresIn,
@@ -159,14 +146,14 @@ func (h *rpcHandler) VerifyLogin(ctx context.Context, req *connect.Request[authn
 			Email:       result.User.Email,
 			DisplayName: result.User.DisplayName,
 		},
-	}), nil
+	}, nil
 }
 
 // ListCredentials answers the caller's passkey roll.
-func (h *rpcHandler) ListCredentials(ctx context.Context, _ *connect.Request[authnv1.ListCredentialsRequest]) (*connect.Response[authnv1.ListCredentialsResponse], error) {
+func (h *rpcHandler) ListCredentials(ctx context.Context, _ *authnv1.ListCredentialsRequest) (*authnv1.ListCredentialsResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
 	roll, err := h.service.ListCredentials(ctx, userID)
@@ -177,41 +164,41 @@ func (h *rpcHandler) ListCredentials(ctx context.Context, _ *connect.Request[aut
 	for _, entry := range roll {
 		views = append(views, credentialView(entry))
 	}
-	return connect.NewResponse(&authnv1.ListCredentialsResponse{Credentials: views}), nil
+	return &authnv1.ListCredentialsResponse{Credentials: views}, nil
 }
 
 // UpdateCredential renames one of the caller's passkeys.
-func (h *rpcHandler) UpdateCredential(ctx context.Context, req *connect.Request[authnv1.UpdateCredentialRequest]) (*connect.Response[authnv1.UpdateCredentialResponse], error) {
+func (h *rpcHandler) UpdateCredential(ctx context.Context, req *authnv1.UpdateCredentialRequest) (*authnv1.UpdateCredentialResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	renamed, err := h.service.RenameCredential(ctx, userID, req.Msg.CredentialId, req.Msg.Name)
+	renamed, err := h.service.RenameCredential(ctx, userID, req.CredentialId, req.Name)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.UpdateCredentialResponse{
+	return &authnv1.UpdateCredentialResponse{
 		Credential: credentialView(renamed),
-	}), nil
+	}, nil
 }
 
 // DeleteCredential removes one of the caller's passkeys.
-func (h *rpcHandler) DeleteCredential(ctx context.Context, req *connect.Request[authnv1.DeleteCredentialRequest]) (*connect.Response[authnv1.DeleteCredentialResponse], error) {
+func (h *rpcHandler) DeleteCredential(ctx context.Context, req *authnv1.DeleteCredentialRequest) (*authnv1.DeleteCredentialResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
-	if err := h.service.DeleteCredential(ctx, userID, req.Msg.CredentialId); err != nil {
+	if err := h.service.DeleteCredential(ctx, userID, req.CredentialId); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.DeleteCredentialResponse{}), nil
+	return &authnv1.DeleteCredentialResponse{}, nil
 }
 
 // AdminListCredentials names one account's passkeys.
-func (h *rpcHandler) AdminListCredentials(ctx context.Context, req *connect.Request[authnv1.AdminListCredentialsRequest]) (*connect.Response[authnv1.ListCredentialsResponse], error) {
-	roll, err := h.service.AdminListCredentials(ctx, req.Msg.UserId)
+func (h *rpcHandler) AdminListCredentials(ctx context.Context, req *authnv1.AdminListCredentialsRequest) (*authnv1.ListCredentialsResponse, error) {
+	roll, err := h.service.AdminListCredentials(ctx, req.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -219,26 +206,26 @@ func (h *rpcHandler) AdminListCredentials(ctx context.Context, req *connect.Requ
 	for _, entry := range roll {
 		views = append(views, credentialView(entry))
 	}
-	return connect.NewResponse(&authnv1.ListCredentialsResponse{Credentials: views}), nil
+	return &authnv1.ListCredentialsResponse{Credentials: views}, nil
 }
 
 // AdminUpdateCredential renames one of an account's passkeys.
-func (h *rpcHandler) AdminUpdateCredential(ctx context.Context, req *connect.Request[authnv1.AdminUpdateCredentialRequest]) (*connect.Response[authnv1.UpdateCredentialResponse], error) {
-	renamed, err := h.service.AdminRenameCredential(ctx, req.Msg.UserId, req.Msg.CredentialId, req.Msg.Name)
+func (h *rpcHandler) AdminUpdateCredential(ctx context.Context, req *authnv1.AdminUpdateCredentialRequest) (*authnv1.UpdateCredentialResponse, error) {
+	renamed, err := h.service.AdminRenameCredential(ctx, req.UserId, req.CredentialId, req.Name)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.UpdateCredentialResponse{
+	return &authnv1.UpdateCredentialResponse{
 		Credential: credentialView(renamed),
-	}), nil
+	}, nil
 }
 
 // AdminDeleteCredential removes one of an account's passkeys.
-func (h *rpcHandler) AdminDeleteCredential(ctx context.Context, req *connect.Request[authnv1.AdminDeleteCredentialRequest]) (*connect.Response[authnv1.DeleteCredentialResponse], error) {
-	if err := h.service.AdminDeleteCredential(ctx, req.Msg.UserId, req.Msg.CredentialId); err != nil {
+func (h *rpcHandler) AdminDeleteCredential(ctx context.Context, req *authnv1.AdminDeleteCredentialRequest) (*authnv1.DeleteCredentialResponse, error) {
+	if err := h.service.AdminDeleteCredential(ctx, req.UserId, req.CredentialId); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.DeleteCredentialResponse{}), nil
+	return &authnv1.DeleteCredentialResponse{}, nil
 }
 
 // credentialView maps the service's view into the wire message.
@@ -261,14 +248,14 @@ func credentialView(entry View) *authnv1.Credential {
 
 // Reauthenticate re-proves the caller and answers the single-use token the
 // next guarded call spends through its header.
-func (h *rpcHandler) Reauthenticate(ctx context.Context, req *connect.Request[authnv1.ReauthenticateRequest]) (*connect.Response[authnv1.ReauthenticateResponse], error) {
+func (h *rpcHandler) Reauthenticate(ctx context.Context, req *authnv1.ReauthenticateRequest) (*authnv1.ReauthenticateResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 
 	var password, sessionID, credential, emailCode string
-	switch proof := req.Msg.Proof.(type) {
+	switch proof := req.Proof.(type) {
 	case *authnv1.ReauthenticateRequest_Password:
 		password = proof.Password
 	case *authnv1.ReauthenticateRequest_Passkey:
@@ -281,25 +268,25 @@ func (h *rpcHandler) Reauthenticate(ctx context.Context, req *connect.Request[au
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.ReauthenticateResponse{
+	return &authnv1.ReauthenticateResponse{
 		Token:     token,
 		ExpiresAt: timestamppb.New(expiresAt),
-	}), nil
+	}, nil
 }
 
 // SendReauthenticationCode delivers the email-code reverification factor to
 // the caller's own address. The success says nothing about the account; the
 // unavailable-delivery refusal is a failed-precondition the SPA routes to a
 // notice, not an internal error it cannot act on.
-func (h *rpcHandler) SendReauthenticationCode(ctx context.Context, req *connect.Request[authnv1.SendReauthenticationCodeRequest]) (*connect.Response[authnv1.SendReauthenticationCodeResponse], error) {
+func (h *rpcHandler) SendReauthenticationCode(ctx context.Context, req *authnv1.SendReauthenticationCodeRequest) (*authnv1.SendReauthenticationCodeResponse, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return nil, connect.NewError(connect.CodeInternal, "internal error")
 	}
 	if err := h.service.SendReauthenticationCode(ctx, userID); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&authnv1.SendReauthenticationCodeResponse{}), nil
+	return &authnv1.SendReauthenticationCodeResponse{}, nil
 }
 
 // mapError translates the service's failures into the codes the Connect
@@ -314,57 +301,57 @@ func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrCeremonyInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the ceremony is invalid or expired; start again"))
+			"the ceremony is invalid or expired; start again")
 	case errors.Is(err, ErrAssertionInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the credential response failed verification"))
+			"the credential response failed verification")
 	case errors.Is(err, ErrVerificationDue):
 		return connect.NewError(connect.CodeInvalidArgument,
-			errors.New("user verification is required; try again with verification"))
+			"user verification is required; try again with verification")
 	case errors.Is(err, ErrSyncedPasskeyOff):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("synced passkeys are not allowed by this deployment"))
+			"synced passkeys are not allowed by this deployment")
 	case errors.Is(err, ErrTooManyPasskeys), errors.Is(err, ErrTooManyEnrollments):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the enrollment limit is reached"))
+			"the enrollment limit is reached")
 	case errors.Is(err, ErrSettingUnreadable):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the passkey settings are unreadable; contact the operator"))
+			"the passkey settings are unreadable; contact the operator")
 	case errors.Is(err, ErrCredentialForeign):
 		return connect.NewError(connect.CodeNotFound,
-			errors.New("the credential is not found"))
+			"the credential is not found")
 	case errors.Is(err, ErrAccountUnknown):
 		return connect.NewError(connect.CodeNotFound,
-			errors.New("the account is not found"))
+			"the account is not found")
 	case errors.Is(err, ErrCodeSendUnavailable):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the code delivery is not available on this deployment"))
+			"the code delivery is not available on this deployment")
 	case errors.Is(err, ErrResendTooSoon):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("a code was sent recently; wait before asking again"))
+			"a code was sent recently; wait before asking again")
 	case errors.Is(err, ErrClonedCredential):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the credential is refused; contact the operator"))
+			"the credential is refused; contact the operator")
 	case errors.Is(err, ErrCredentialDuplicate):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("the credential is already enrolled"))
+			"the credential is already enrolled")
 	case errors.Is(err, ErrLastWayIn):
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("removing this credential would leave the account no way in"))
+			"removing this credential would leave the account no way in")
 	case errors.Is(err, ErrProofRefused):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the proof failed"))
+			"the proof failed")
 	case errors.Is(err, signin.ErrAccountDisabled):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the account is disabled"))
+			"the account is disabled")
 	case errors.Is(err, signin.ErrAccountBanned):
 		return connect.NewError(connect.CodeUnauthenticated,
-			errors.New("the account is banned"))
+			"the account is banned")
 	case errors.Is(err, signin.ErrSigninRestricted):
 		return connect.NewError(connect.CodePermissionDenied,
-			errors.New("sign-in is not permitted"))
+			"sign-in is not permitted")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+		return connect.NewError(connect.CodeInternal, "internal error")
 	}
 }
 

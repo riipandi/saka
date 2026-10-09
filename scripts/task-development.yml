@@ -3,26 +3,35 @@
 version: "3"
 
 tasks:
+  # One origin (:3000): the webapp's Vite compiles + HMR behind the Go proxy,
+  # the binary rebuilt from build/debug on every Go change.
   dev:
-    desc: Dev loop on one origin (:3080) — Vite compiles + HMR behind the Go proxy, the binary rebuilt from build/debug on every Go change
-    deps: [rpc:generate]
-    cmd: pnpm exec vp dev {{.CLI_ARGS}}
+    desc: Dev loop behind the Go proxy
+    deps: [rpc:generate, email:build]
+    cmds:
+      - pnpm exec vp run webapp#prebuild
+      - pnpm exec vp run webapp#dev {{.CLI_ARGS}}
 
+  # The one door to the application's CLI: `task run -- <command> [args]`
+  # (`serve`, `migrate:up`, `db:export`, `initialize`, `health`, …). Every
+  # subcommand of ./cmd is reachable here — a task per command would be a
+  # second list to keep in sync with the CLI's own help.
+  # Every subcommand of ./cmd is reachable — a task per command would be a
+  # second list to keep in sync with the CLI's own help.
   run:
-    desc: Run the CLI directly (debug build)
+    desc: Run the application CLI — task run -- <command>
+    deps: [rpc:generate]
     cmd: go run -tags debug ./cmd --env-file=.env.local {{.CLI_ARGS}}
 
-  serve:
-    desc: Run the Saka server (debug build)
-    cmd: go run -tags debug ./cmd --env-file=.env.local serve {{.CLI_ARGS}}
-
   conformance:up:
-    desc: Start the OIDF conformance suite stack (mongodb, server, its nginx on :8443) — container/compose-mock.yaml
+    desc: Start the OIDF conformance suite stack
     dir: container
     cmd: docker compose -f compose-mock.yaml up -d
 
+  # Needs the suite stack up, a seeded database (migrate:seed), and the
+  # release binary serving the harness config.
   conformance:run:
-    desc: Run one conformance plan against the local issuer — needs the suite stack up, a seeded database (migrate:seed), and the release binary serving the harness config
+    desc: Run one conformance plan against the local issuer
     dir: packages/e2e-tests
     cmd: node conformance/run.mjs {{.CLI_ARGS}}
 
@@ -31,11 +40,11 @@ tasks:
     cmd: pnpm exec vp run email#dev
 
   email:build:
-    desc: Compile email templates into the Go embed (one Vite pass, no binary)
-    cmd: pnpm exec vp build packages/email
+    desc: Compile email templates into the Go embed
+    cmd: pnpm exec vp run email#build
 
   deps:
-    desc: Install Go toolchain binaries (golangci-lint, goose, etc)
+    desc: Install Go toolchain binaries
     cmds:
       - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
       - go install github.com/pressly/goose/v3/cmd/goose@latest
@@ -44,7 +53,7 @@ tasks:
       - go install github.com/swaggo/swag/cmd/swag@latest
       - go get -tool github.com/bufbuild/buf/cmd/buf@latest
       - go get -tool google.golang.org/protobuf/cmd/protoc-gen-go@latest
-      - go get -tool connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+      - go get -tool connectrpc.com/connect/v2/cmd/protoc-gen-connect-go@latest
 
   update-deps:
     desc: Update dependencies

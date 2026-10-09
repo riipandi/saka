@@ -57,8 +57,9 @@ body takes `service.Templates()`.
 
 ## Templates
 
-The sources live in `email/templates/*.tsx` and are compiled by the Vite build
-(`plugins/plugin-email.ts`) into `web/email/<name>_{html,text}.tmpl`, which `web/embed.go` embeds.
+The sources live in `packages/email/templates/*.tsx` and are compiled by the email package's build
+script (`packages/email/build.ts`, run via `task build` / `task email:build`) into
+`web/email/<name>_{html,text}.tmpl`, which `web/embed.go` embeds.
 A template's fields are the `{{.Data.…}}` names in its `TemplateProps`, and the Go-side struct that
 supplies them lives in `internal/mailer/data.go`. The field names must match exactly: a Go template
 resolves a field by its own name, so a renamed field fails the render rather than printing nothing.
@@ -78,11 +79,11 @@ rendering into a writer, which is what the send path uses: the body goes into th
 The parsed templates **are** the cache: parsing happens once per process, in the registry, and every
 send reuses it. Measured on an M2 Pro (`internal/mailer/bench_test.go`):
 
-| Operation | Time | Allocations |
-| --- | --- | --- |
-| `RenderTo` one rendering (send path) | ~4.5 µs | 58, 1.5 KB |
-| `Render` both renderings | ~10.4 µs | 73, 20 KB |
-| Parse every template (once per process) | ~177 µs | 2318, 276 KB |
+| Operation                               | Time     | Allocations  |
+| --------------------------------------- | -------- | ------------ |
+| `RenderTo` one rendering (send path)    | ~4.5 µs  | 58, 1.5 KB   |
+| `Render` both renderings                | ~10.4 µs | 73, 20 KB    |
+| Parse every template (once per process) | ~177 µs  | 2318, 276 KB |
 
 A submission costs 60–100 ms against a real server, so rendering is ~0.005% of it. There is no
 second cache layer, and one would not pay: memoizing by template data would retain reset tokens in
@@ -91,15 +92,15 @@ content that is already in the binary.
 
 ## Defaults
 
-| Key | Default |
-| --- | --- |
-| `mailer.from_email` | `mailer@example.com` |
-| `mailer.from_name` | `Saka Mailer` |
-| `mailer.smtp_host` | empty — the mailer is off |
-| `mailer.smtp_port` | `587` |
-| `mailer.smtp_secure` | `false` (STARTTLS when offered) |
-| `mailer.smtp_allow_plaintext_auth` | `false` |
-| `mailer.timeout` | 15s |
+| Key                                | Default                         |
+| ---------------------------------- | ------------------------------- |
+| `mailer.from_email`                | `mailer@example.com`            |
+| `mailer.from_name`                 | `Saka Mailer`                   |
+| `mailer.smtp_host`                 | empty — the mailer is off       |
+| `mailer.smtp_port`                 | `587`                           |
+| `mailer.smtp_secure`               | `false` (STARTTLS when offered) |
+| `mailer.smtp_allow_plaintext_auth` | `false`                         |
+| `mailer.timeout`                   | 15s                             |
 
 Durations in the config file are seconds.
 

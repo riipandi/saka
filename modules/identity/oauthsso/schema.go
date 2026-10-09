@@ -1,13 +1,12 @@
 // Package oauthsso is the sign-in-with-a-provider feature: the builtin
 // Google and GitHub connections, the operator-configured custom OIDC ones,
 // the outbound authorization-code flow they run, and the linked accounts
-// they bind into accounts. The feature is saka-only — upstream Pocket ID
-// never signed an account in through an external identity provider.
+// they bind into accounts. The feature is saka-only.
 //
 // The surface splits at the transport: the operator's connection CRUD and
 // the holder's linked-account ledger are procedures, while the flow's start
 // and callback are REST routes the browser crosses mid-redirect. The flow
-// itself lives beside this package's service (phase 3); this package's root
+// itself lives beside this package's service; this package's root
 // owns the connection model, the sealing, and the discovery validation the
 // CRUD runs.
 package oauthsso

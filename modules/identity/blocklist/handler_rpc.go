@@ -6,7 +6,7 @@ import (
 	"math"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -40,15 +40,11 @@ func (m *Module) Name() string { return ModuleName }
 // forms — so there is nothing on the HTTP router to claim.
 func (m *Module) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. Each procedure is
-// registered at its own path: the generated handler answers a path under its
-// prefix it does not know with a plain-text 404, which a Connect client
-// cannot read.
-func (m *Module) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := identityv1connect.NewBlocklistServiceHandler(newRPCHandler(m.service), opts...)
-	r.Handle(identityv1connect.BlocklistServiceListBlocklistEntriesProcedure, handler)
-	r.Handle(identityv1connect.BlocklistServiceAddBlocklistEntryProcedure, handler)
-	r.Handle(identityv1connect.BlocklistServiceRemoveBlocklistEntryProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *Module) MountRPC(server *connect.Server) {
+	identityv1connect.RegisterBlocklistServiceHandler(server, newRPCHandler(m.service))
 }
 
 // rpcHandler is the transport mapping of the procedures. The service carries
@@ -63,21 +59,21 @@ func newRPCHandler(service *Service) identityv1connect.BlocklistServiceHandler {
 }
 
 // ListBlocklistEntries answers one page of the entries.
-func (h *rpcHandler) ListBlocklistEntries(ctx context.Context, req *connect.Request[identityv1.ListBlocklistEntriesRequest]) (*connect.Response[identityv1.ListBlocklistEntriesResponse], error) {
-	entries, pagination, err := h.service.List(ctx, req.Msg.GetSortBy(), req.Msg.GetSortOrder() == "asc", int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *rpcHandler) ListBlocklistEntries(ctx context.Context, req *identityv1.ListBlocklistEntriesRequest) (*identityv1.ListBlocklistEntriesResponse, error) {
+	entries, pagination, err := h.service.List(ctx, req.GetSortBy(), req.GetSortOrder() == "asc", int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.ListBlocklistEntriesResponse{
+	return &identityv1.ListBlocklistEntriesResponse{
 		Entries:  wireEntries(entries),
 		Metadata: metadataOf(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the blocklist entries were listed",
-	}), nil
+	}, nil
 }
 
 // AddBlocklistEntry stores one entry in the administrator's name.
-func (h *rpcHandler) AddBlocklistEntry(ctx context.Context, req *connect.Request[identityv1.AddBlocklistEntryRequest]) (*connect.Response[identityv1.AddBlocklistEntryResponse], error) {
+func (h *rpcHandler) AddBlocklistEntry(ctx context.Context, req *identityv1.AddBlocklistEntryRequest) (*identityv1.AddBlocklistEntryResponse, error) {
 	caller, err := callerOf(ctx)
 	if err != nil {
 		return nil, err
@@ -87,41 +83,41 @@ func (h *rpcHandler) AddBlocklistEntry(ctx context.Context, req *connect.Request
 	if parseErr != nil {
 		return nil, mapError(ErrEntryNotFound)
 	}
-	entry, err := h.service.Add(ctx, adminID, req.Msg.GetPattern())
+	entry, err := h.service.Add(ctx, adminID, req.GetPattern())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.AddBlocklistEntryResponse{
+	return &identityv1.AddBlocklistEntryResponse{
 		Entry:   wireEntry(entry),
 		Status:  webutil.StatusSuccess,
 		Message: "the blocklist entry was stored",
-	}), nil
+	}, nil
 }
 
 // RemoveBlocklistEntry deletes one entry by identifier.
-func (h *rpcHandler) RemoveBlocklistEntry(ctx context.Context, req *connect.Request[identityv1.RemoveBlocklistEntryRequest]) (*connect.Response[identityv1.RemoveBlocklistEntryResponse], error) {
-	entryID, parseErr := uuid.Parse(req.Msg.GetId())
+func (h *rpcHandler) RemoveBlocklistEntry(ctx context.Context, req *identityv1.RemoveBlocklistEntryRequest) (*identityv1.RemoveBlocklistEntryResponse, error) {
+	entryID, parseErr := uuid.Parse(req.GetId())
 	if parseErr != nil {
 		return nil, mapError(ErrEntryNotFound)
 	}
 	if err := h.service.Remove(ctx, entryID); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&identityv1.RemoveBlocklistEntryResponse{
+	return &identityv1.RemoveBlocklistEntryResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the blocklist entry was removed",
-	}), nil
+	}, nil
 }
 
 // mapError translates the service's failures onto the connect codes.
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrEntryNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("blocklist entry not found"))
+		return connect.NewError(connect.CodeNotFound, "blocklist entry not found")
 	case errors.Is(err, ErrPatternInvalid):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the pattern must be an email address or an @domain entry"))
+		return connect.NewError(connect.CodeInvalidArgument, "the pattern must be an email address or an @domain entry")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("blocklist call failed"))
+		return connect.NewError(connect.CodeInternal, "blocklist call failed")
 	}
 }
 
@@ -178,7 +174,7 @@ func metadataOf(p webutil.Pagination) *commonv1.ListMetadata {
 func callerOf(ctx context.Context) (*jwtutils.Caller, error) {
 	caller, ok := jwtutils.CallerFrom(ctx)
 	if !ok || caller == nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+		return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 	}
 	return caller, nil
 }

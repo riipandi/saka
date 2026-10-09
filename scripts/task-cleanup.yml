@@ -11,7 +11,7 @@ tasks:
 
   cleanup:dist:
     desc: Remove build artifacts
-    cmd: pnpm dlx del-cli .{output,tanstack} build web/output codegen packages/webapp/dist packages/e2e-tests/e2e-result storage
+    cmd: pnpm dlx del-cli .{output,tanstack} build web/output codegen packages/e2e-tests/e2e-result storage
 
   cleanup:deps:
     desc: Remove dependencies
@@ -24,7 +24,7 @@ tasks:
       - pnpm exec vp fmt --write .
 
   check:
-    desc: Run all checks (go vet + migration files + JS formatting)
+    desc: Run go vet, migration check, and JS checks
     cmds:
       - go vet ./...
       - go run -tags debug ./cmd migrate:validate

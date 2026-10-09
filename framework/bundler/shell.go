@@ -28,6 +28,11 @@ type Page struct {
 	// public page a later phase adds turns it off and gains the meta the
 	// preview needs.
 	Noindex bool
+	// ExtraHead carries head tags a caller appends after the Vite fragment —
+	// a debug build injects the dev-only tooling scripts (the StyleX runtime)
+	// the compiler's transformIndexHtml would have added, had the document
+	// been Vite's to own. A release page leaves it empty.
+	ExtraHead template.HTML
 }
 
 // RenderPage executes the document for one page with one Vite fragment —
@@ -95,6 +100,7 @@ const shellTmpl = `<!doctype html>
     <title>{{ .Title }}</title>
 
     {{ .ViteTags }}
+    {{ .ExtraHead }}
 
     <!-- Static SPA loader; React clears #root on mount. -->
     <style>

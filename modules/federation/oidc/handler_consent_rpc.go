@@ -2,9 +2,8 @@ package oidc
 
 import (
 	"context"
-	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
@@ -25,7 +24,7 @@ func newConsentHandler(service *Service) federationv1connect.OidcConsentServiceH
 }
 
 // ListMyAuthorizedClients answers the calling account's ledger.
-func (h *consentHandler) ListMyAuthorizedClients(ctx context.Context, _ *connect.Request[federationv1.ListMyAuthorizedClientsRequest]) (*connect.Response[federationv1.ListMyAuthorizedClientsResponse], error) {
+func (h *consentHandler) ListMyAuthorizedClients(ctx context.Context, _ *federationv1.ListMyAuthorizedClientsRequest) (*federationv1.ListMyAuthorizedClientsResponse, error) {
 	caller, err := callerUUID(ctx)
 	if err != nil {
 		return nil, err
@@ -38,31 +37,31 @@ func (h *consentHandler) ListMyAuthorizedClients(ctx context.Context, _ *connect
 	for _, view := range views {
 		clients = append(clients, wireAuthorizedClient(view))
 	}
-	return connect.NewResponse(&federationv1.ListMyAuthorizedClientsResponse{
+	return &federationv1.ListMyAuthorizedClientsResponse{
 		Clients: clients,
 		Status:  webutil.StatusSuccess,
 		Message: "the authorized clients were listed",
-	}), nil
+	}, nil
 }
 
 // RevokeMyAuthorizedClient withdraws the calling account's consent for
 // one client, tokens included.
-func (h *consentHandler) RevokeMyAuthorizedClient(ctx context.Context, req *connect.Request[federationv1.RevokeMyAuthorizedClientRequest]) (*connect.Response[federationv1.RevokeMyAuthorizedClientResponse], error) {
+func (h *consentHandler) RevokeMyAuthorizedClient(ctx context.Context, req *federationv1.RevokeMyAuthorizedClientRequest) (*federationv1.RevokeMyAuthorizedClientResponse, error) {
 	caller, err := callerUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.service.RevokeMyAuthorizedClient(ctx, caller.String(), req.Msg.GetClientId()); err != nil {
+	if err := h.service.RevokeMyAuthorizedClient(ctx, caller.String(), req.GetClientId()); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.RevokeMyAuthorizedClientResponse{
+	return &federationv1.RevokeMyAuthorizedClientResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the client's authorization was revoked",
-	}), nil
+	}, nil
 }
 
 // ListMyClients answers the clients the account may authorize.
-func (h *consentHandler) ListMyClients(ctx context.Context, _ *connect.Request[federationv1.ListMyOidcClientsRequest]) (*connect.Response[federationv1.ListMyOidcClientsResponse], error) {
+func (h *consentHandler) ListMyClients(ctx context.Context, _ *federationv1.ListMyOidcClientsRequest) (*federationv1.ListMyOidcClientsResponse, error) {
 	caller, err := callerUUID(ctx)
 	if err != nil {
 		return nil, err
@@ -71,19 +70,19 @@ func (h *consentHandler) ListMyClients(ctx context.Context, _ *connect.Request[f
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.ListMyOidcClientsResponse{
+	return &federationv1.ListMyOidcClientsResponse{
 		Clients: wireClients(views),
 		Status:  webutil.StatusSuccess,
 		Message: "the accessible clients were listed",
-	}), nil
+	}, nil
 }
 
 // ListUserAuthorizedClients answers one account's ledger — the
 // administrative read.
-func (h *consentHandler) ListUserAuthorizedClients(ctx context.Context, req *connect.Request[federationv1.ListUserAuthorizedClientsRequest]) (*connect.Response[federationv1.ListUserAuthorizedClientsResponse], error) {
-	id, err := user.UUIDFromWire(req.Msg.GetUserId())
+func (h *consentHandler) ListUserAuthorizedClients(ctx context.Context, req *federationv1.ListUserAuthorizedClientsRequest) (*federationv1.ListUserAuthorizedClientsResponse, error) {
+	id, err := user.UUIDFromWire(req.GetUserId())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("the account does not exist"))
+		return nil, connect.NewError(connect.CodeNotFound, "the account does not exist")
 	}
 	views, err := h.service.UserAuthorizedClients(ctx, id.String())
 	if err != nil {
@@ -93,16 +92,16 @@ func (h *consentHandler) ListUserAuthorizedClients(ctx context.Context, req *con
 	for _, view := range views {
 		clients = append(clients, wireAuthorizedClient(view))
 	}
-	return connect.NewResponse(&federationv1.ListUserAuthorizedClientsResponse{
+	return &federationv1.ListUserAuthorizedClientsResponse{
 		Clients: clients,
 		Status:  webutil.StatusSuccess,
 		Message: "the authorized clients were listed",
-	}), nil
+	}, nil
 }
 
 // ListAllAuthorizedClients answers one page of the deployment-wide ledger.
-func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, req *connect.Request[federationv1.ListAllAuthorizedClientsRequest]) (*connect.Response[federationv1.ListAllAuthorizedClientsResponse], error) {
-	entries, pagination, err := h.service.AllAuthorizedClients(ctx, int(req.Msg.GetPage()), int(req.Msg.GetLimit()))
+func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, req *federationv1.ListAllAuthorizedClientsRequest) (*federationv1.ListAllAuthorizedClientsResponse, error) {
+	entries, pagination, err := h.service.AllAuthorizedClients(ctx, int(req.GetPage()), int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -110,10 +109,10 @@ func (h *consentHandler) ListAllAuthorizedClients(ctx context.Context, req *conn
 	for _, entry := range entries {
 		rows = append(rows, wireLedgerEntry(entry))
 	}
-	return connect.NewResponse(&federationv1.ListAllAuthorizedClientsResponse{
+	return &federationv1.ListAllAuthorizedClientsResponse{
 		Entries:  rows,
 		Metadata: metadataOf(pagination),
 		Status:   webutil.StatusSuccess,
 		Message:  "the authorized clients were listed",
-	}), nil
+	}, nil
 }

@@ -57,7 +57,7 @@ func TestValidationAcceptsAConfigWithNoSigningMaterial(t *testing.T) {
 	// neither is a valid deployment: the key pairs come from the rows.
 	_, err := resolveAndValidate(t, config.Options{
 		ConfigFile: writeConfig(t, `{"database": {"url": "env:DATABASE_URL"}}`),
-		Environ:    []string{"DATABASE_URL=" + dsn, "PUBLIC_BASE_URL=http://localhost:3080"},
+		Environ:    []string{"DATABASE_URL=" + dsn, "PUBLIC_BASE_URL=http://localhost:3000"},
 	})
 	require.NoError(t, err)
 }
@@ -736,7 +736,7 @@ func TestValidationRejectsWildcardWithCredentials(t *testing.T) {
 func TestValidationRejectsAnOriginThatIsNotOne(t *testing.T) {
 	// A path is not part of an origin, so it can never match what a browser
 	// sends; accepting it would silently close the policy.
-	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["http://localhost:3080/app"]}}`)
+	err := resolveFile(t, `"server": {"cors": {"allowed_origins": ["http://localhost:3000/app"]}}`)
 	require.ErrorIs(t, err, config.ErrInvalid)
 	assert.Contains(t, err.Error(), "server.cors.allowed_origins")
 }

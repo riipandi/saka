@@ -31,7 +31,7 @@ const (
 	// SettingAccountLinkingEnabled is the feature's own key: the gate the
 	// email-match branch reads before it binds a provider identity to the
 	// account the address already names.
-	SettingAccountLinkingEnabled = "oauthsso.account_linking_enabled"
+	SettingAccountLinkingEnabled = "oauth.account_linking_enabled"
 )
 
 // The email code's shape: the twelve-character unambiguous alphabet the

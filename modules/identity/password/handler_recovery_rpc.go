@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/chi/v5"
 
 	authnv1 "github.com/riipandi/saka/codegen/proto/go/saka/authn/v1"
@@ -46,14 +46,12 @@ func (m *RecoveryModule) Name() string { return RecoveryModuleName }
 // is POST-only on the RPC surface.
 func (m *RecoveryModule) Mount(r chi.Router) {}
 
-// MountRPC registers the procedures on the RPC router. The handler options
-// are the transport's — the shared snake_case codec and the panic boundary —
-// so the procedures answer exactly like the transport's own.
-func (m *RecoveryModule) MountRPC(r chi.Router, opts ...connect.HandlerOption) {
-	_, handler := authnv1connect.NewPasswordRecoveryServiceHandler(newRecoveryHandler(m.service, m.exposeResetToken), opts...)
-	r.Handle(authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure, handler)
-	r.Handle(authnv1connect.PasswordRecoveryServiceResetPasswordProcedure, handler)
-	r.Handle(authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure, handler)
+// MountRPC registers the procedures on the RPC server. The server carries the
+// transport's interceptors and the mount the shared snake_case codec, so the
+// procedures answer exactly like the transport's own.
+func (m *RecoveryModule) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterPasswordRecoveryServiceHandler(
+		server, newRecoveryHandler(m.service, m.exposeResetToken))
 }
 
 // recoveryHandler is the transport mapping of the procedures. The service
@@ -74,8 +72,8 @@ func newRecoveryHandler(service *Service, exposeResetToken bool) authnv1connect.
 // is public — a caller who lost the password holds no credential — and the
 // answer is the same whether the account exists or not. The raw token rides
 // the response only when the deployment exposes it.
-func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Request[authnv1.ForgotPasswordRequest]) (*connect.Response[authnv1.ForgotPasswordResponse], error) {
-	raw, err := h.service.ForgotPassword(ctx, req.Msg.Email)
+func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *authnv1.ForgotPasswordRequest) (*authnv1.ForgotPasswordResponse, error) {
+	raw, err := h.service.ForgotPassword(ctx, req.Email)
 	if err != nil {
 		return nil, mapRecoveryError(err)
 	}
@@ -86,42 +84,42 @@ func (h *recoveryHandler) ForgotPassword(ctx context.Context, req *connect.Reque
 	if h.exposeResetToken {
 		resp.ResetToken = raw
 	}
-	return connect.NewResponse(resp), nil
+	return resp, nil
 }
 
 // ResetPassword spends the token on a new password. The procedure is public:
 // the token is the credential, and the caller carries none — the message
 // linked here from a browser that may hold no session. The sessions the
 // account holds are revoked unless the request spares them.
-func (h *recoveryHandler) ResetPassword(ctx context.Context, req *connect.Request[authnv1.ResetPasswordRequest]) (*connect.Response[authnv1.ResetPasswordResponse], error) {
+func (h *recoveryHandler) ResetPassword(ctx context.Context, req *authnv1.ResetPasswordRequest) (*authnv1.ResetPasswordResponse, error) {
 	terminate := true
-	if req.Msg.TerminateSessions != nil {
-		terminate = *req.Msg.TerminateSessions
+	if req.TerminateSessions != nil {
+		terminate = *req.TerminateSessions
 	}
-	if err := h.service.ResetPassword(ctx, req.Msg.Token, req.Msg.NewPassword, terminate); err != nil {
+	if err := h.service.ResetPassword(ctx, req.Token, req.NewPassword, terminate); err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	return connect.NewResponse(&authnv1.ResetPasswordResponse{
+	return &authnv1.ResetPasswordResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the password was reset",
-	}), nil
+	}, nil
 }
 
 // AdminResetUserPassword triggers the reset email on a named account. The
 // caller is administrative by the guard's default; the service answers the
 // account-level failures the impersonating caller is never allowed to see.
-func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *connect.Request[authnv1.AdminResetUserPasswordRequest]) (*connect.Response[authnv1.AdminResetUserPasswordResponse], error) {
+func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *authnv1.AdminResetUserPasswordRequest) (*authnv1.AdminResetUserPasswordResponse, error) {
 	if _, ok := jwtutils.CallerFrom(ctx); !ok {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+		return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 	}
 
-	if err := h.service.AdminResetUserPassword(ctx, req.Msg.UserId); err != nil {
+	if err := h.service.AdminResetUserPassword(ctx, req.UserId); err != nil {
 		return nil, mapRecoveryError(err)
 	}
-	return connect.NewResponse(&authnv1.AdminResetUserPasswordResponse{
+	return &authnv1.AdminResetUserPasswordResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "a reset email was sent to the account's address",
-	}), nil
+	}, nil
 }
 
 // mapRecoveryError translates the service's failures into the codes the
@@ -130,22 +128,22 @@ func (h *recoveryHandler) AdminResetUserPassword(ctx context.Context, req *conne
 func mapRecoveryError(err error) error {
 	switch {
 	case errors.Is(err, ErrUserNotFound):
-		return connect.NewError(connect.CodeNotFound, errors.New("account not found"))
+		return connect.NewError(connect.CodeNotFound, "account not found")
 	case errors.Is(err, ErrNoPassword):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the account holds no password credential"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the account holds no password credential")
 	case errors.Is(err, ErrAccountForbidden):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("the account is disabled or banned"))
+		return connect.NewError(connect.CodePermissionDenied, "the account is disabled or banned")
 	case errors.Is(err, ErrMailUnavailable):
-		return connect.NewError(connect.CodeUnavailable, errors.New("mailer is not configured"))
+		return connect.NewError(connect.CodeUnavailable, "mailer is not configured")
 	case errors.Is(err, ErrInvalidToken):
-		return connect.NewError(connect.CodePermissionDenied, errors.New("reset token is invalid or expired"))
+		return connect.NewError(connect.CodePermissionDenied, "reset token is invalid or expired")
 	case errors.Is(err, ErrResendTooSoon):
-		return connect.NewError(connect.CodeResourceExhausted, errors.New("a reset email was sent less than a minute ago"))
+		return connect.NewError(connect.CodeResourceExhausted, "a reset email was sent less than a minute ago")
 	case errors.Is(err, ErrSamePassword):
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("the new password must differ from the current one"))
+		return connect.NewError(connect.CodeInvalidArgument, "the new password must differ from the current one")
 	case errors.Is(err, ErrWeakPassword), errors.Is(err, ErrBreachedPassword):
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return connect.NewError(connect.CodeInvalidArgument, err.Error()).WithCause(err)
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("password reset failed"))
+		return connect.NewError(connect.CodeInternal, "password reset failed")
 	}
 }

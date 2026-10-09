@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
@@ -26,67 +26,67 @@ func newRPCHandler(service *Service) federationv1connect.ScimProviderServiceHand
 }
 
 // GetByClient answers the provider one client syncs to.
-func (h *rpcHandler) GetByClient(ctx context.Context, req *connect.Request[federationv1.GetScimProviderRequest]) (*connect.Response[federationv1.GetScimProviderResponse], error) {
-	provider, err := h.service.GetByClient(ctx, req.Msg.ClientId)
+func (h *rpcHandler) GetByClient(ctx context.Context, req *federationv1.GetScimProviderRequest) (*federationv1.GetScimProviderResponse, error) {
+	provider, err := h.service.GetByClient(ctx, req.ClientId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.GetScimProviderResponse{
+	return &federationv1.GetScimProviderResponse{
 		Provider: wireProvider(provider, false),
 		Status:   webutil.StatusSuccess,
 		Message:  "the client's SCIM service provider was read",
-	}), nil
+	}, nil
 }
 
 // Create attaches a provisioning target to a client. The token rides this
 // one answer.
-func (h *rpcHandler) Create(ctx context.Context, req *connect.Request[federationv1.CreateScimProviderRequest]) (*connect.Response[federationv1.CreateScimProviderResponse], error) {
-	provider, err := h.service.Create(ctx, req.Msg.ClientId, req.Msg.Endpoint, req.Msg.Token)
+func (h *rpcHandler) Create(ctx context.Context, req *federationv1.CreateScimProviderRequest) (*federationv1.CreateScimProviderResponse, error) {
+	provider, err := h.service.Create(ctx, req.ClientId, req.Endpoint, req.Token)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.CreateScimProviderResponse{
+	return &federationv1.CreateScimProviderResponse{
 		Provider: wireProvider(provider, true),
 		Status:   webutil.StatusSuccess,
 		Message:  "the SCIM service provider was created; the token is shown once",
-	}), nil
+	}, nil
 }
 
 // Update replaces a provider's endpoint and token.
-func (h *rpcHandler) Update(ctx context.Context, req *connect.Request[federationv1.UpdateScimProviderRequest]) (*connect.Response[federationv1.UpdateScimProviderResponse], error) {
-	id, err := providerIDFromWire(req.Msg.Id)
+func (h *rpcHandler) Update(ctx context.Context, req *federationv1.UpdateScimProviderRequest) (*federationv1.UpdateScimProviderResponse, error) {
+	id, err := providerIDFromWire(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	provider, err := h.service.Update(ctx, id, req.Msg.Endpoint, req.Msg.Token)
+	provider, err := h.service.Update(ctx, id, req.Endpoint, req.Token)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.UpdateScimProviderResponse{
+	return &federationv1.UpdateScimProviderResponse{
 		Provider: wireProvider(provider, false),
 		Status:   webutil.StatusSuccess,
 		Message:  "the SCIM service provider was updated",
-	}), nil
+	}, nil
 }
 
 // Delete removes the provisioning target.
-func (h *rpcHandler) Delete(ctx context.Context, req *connect.Request[federationv1.DeleteScimProviderRequest]) (*connect.Response[federationv1.DeleteScimProviderResponse], error) {
-	id, err := providerIDFromWire(req.Msg.Id)
+func (h *rpcHandler) Delete(ctx context.Context, req *federationv1.DeleteScimProviderRequest) (*federationv1.DeleteScimProviderResponse, error) {
+	id, err := providerIDFromWire(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
 	if err := h.service.Delete(ctx, id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.DeleteScimProviderResponse{
+	return &federationv1.DeleteScimProviderResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the SCIM service provider was deleted",
-	}), nil
+	}, nil
 }
 
 // Sync runs one provisioning pass now.
-func (h *rpcHandler) Sync(ctx context.Context, req *connect.Request[federationv1.SyncScimProviderRequest]) (*connect.Response[federationv1.SyncScimProviderResponse], error) {
-	id, err := providerIDFromWire(req.Msg.Id)
+func (h *rpcHandler) Sync(ctx context.Context, req *federationv1.SyncScimProviderRequest) (*federationv1.SyncScimProviderResponse, error) {
+	id, err := providerIDFromWire(req.Id)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -94,7 +94,7 @@ func (h *rpcHandler) Sync(ctx context.Context, req *connect.Request[federationv1
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.SyncScimProviderResponse{
+	return &federationv1.SyncScimProviderResponse{
 		UsersCreated:  clampToInt32(stats.UsersCreated),
 		UsersUpdated:  clampToInt32(stats.UsersUpdated),
 		UsersDeleted:  clampToInt32(stats.UsersDeleted),
@@ -103,7 +103,7 @@ func (h *rpcHandler) Sync(ctx context.Context, req *connect.Request[federationv1
 		GroupsDeleted: clampToInt32(stats.GroupsDeleted),
 		Status:        webutil.StatusSuccess,
 		Message:       "the SCIM sync pass completed",
-	}), nil
+	}, nil
 }
 
 // clampToInt32 narrows a count to the wire type. A pass that touched more
@@ -129,13 +129,13 @@ func providerIDFromWire(wire string) (uuid.UUID, error) {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, ErrNoProvider):
-		return connect.NewError(connect.CodeNotFound, errors.New("SCIM service provider not found"))
+		return connect.NewError(connect.CodeNotFound, "SCIM service provider not found")
 	case errors.Is(err, ErrProviderExists):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the client already has a SCIM service provider"))
+		return connect.NewError(connect.CodeFailedPrecondition, "the client already has a SCIM service provider")
 	case errors.Is(err, ErrNoDirectory):
-		return connect.NewError(connect.CodeFailedPrecondition, errors.New("no account directory is wired"))
+		return connect.NewError(connect.CodeFailedPrecondition, "no account directory is wired")
 	default:
-		return connect.NewError(connect.CodeInternal, errors.New("SCIM operation failed"))
+		return connect.NewError(connect.CodeInternal, "SCIM operation failed")
 	}
 }
 

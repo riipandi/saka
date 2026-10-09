@@ -3,13 +3,12 @@
     "version": "0.0.0",
     "private": true,
     "type": "module",
-    "dependencies": {
-        "react": "^19.3.0",
-        "react-email": "^6.11.0",
-        "tsx": "^4.23.15"
+    "exports": {
+        "./plugin-golang": "./plugin-golang.ts",
+        "./plugin-stylex": "./plugin-stylex.ts"
     },
     "devDependencies": {
-        "@types/react": "^19.3.0",
+        "@stylexjs/unplugin": "^0.19.1",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vite-plus": "catalog:"

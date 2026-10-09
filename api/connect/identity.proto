@@ -62,9 +62,9 @@ service SignupService {
 //
 // An account's creation through sign-up is the SignupService's procedure;
 // CreateUser is the administrator's own door, for an account that exists
-// without an invitation. Updating is a full replace, the way the upstream
-// endpoint it ports is: every field is specified, an absent optional field
-// clears its column, and the ban fields operate as a unit.
+// without an invitation. Updating is a full replace: every field is
+// specified, an absent optional field clears its column, and the ban fields
+// operate as a unit.
 service UserService {
   // ListUsers answers one page of the accounts, newest first, optionally
   // filtered by a search term matched against the username, the email, and
@@ -96,7 +96,7 @@ service UserService {
 
   // GetCurrentUser answers the account the caller is. The target is the
   // token's subject, never something the request names — this is the `/me`
-  // door upstream answers beside the identifier-addressed `GetUser`.
+  // door beside the identifier-addressed `GetUser`.
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
 
   // UpdateCurrentUser replaces the signed-in account's own profile fields:
@@ -168,8 +168,7 @@ service UserService {
 // gathers are addressed together — a later feature may hang claims on a
 // group or gate a client on it, and every member inherits the outcome. The
 // surface is administrative end to end, and the membership update is a
-// replace, the way the upstream endpoint it ports is: the request names the
-// whole member set, not a delta.
+// replace: the request names the whole member set, not a delta.
 service UserGroupService {
   // ListUserGroups answers one page of the groups, optionally filtered by a
   // search term matched against the name and the display name, and sorted by
@@ -183,8 +182,7 @@ service UserGroupService {
   // is the storage of that rule, and a duplicate answers `already_exists`.
   rpc CreateUserGroup(CreateUserGroupRequest) returns (CreateUserGroupResponse);
 
-  // UpdateUserGroup replaces a group's two fields. Both are required, the
-  // way the upstream endpoint it ports is.
+  // UpdateUserGroup replaces a group's two fields. Both are required.
   rpc UpdateUserGroup(UpdateUserGroupRequest) returns (UpdateUserGroupResponse);
 
   // DeleteUserGroup removes a group. Membership rows die with it by the
@@ -198,8 +196,7 @@ service UserGroupService {
 
   // GetUserGroups answers the groups one account belongs to, ordered by the
   // group's display name. The target is the account the request names; the
-  // administrative procedures address accounts by identifier, which is the
-  // shape the upstream port carries.
+  // administrative procedures address accounts by identifier.
   rpc GetUserGroups(GetUserGroupsRequest) returns (GetUserGroupsResponse);
 
   // UpdateUserGroups replaces the set of groups one account belongs to.
@@ -501,7 +498,7 @@ message CreateSignupTokenRequest {
 
   // user_group_ids are the groups every account signed up under this token
   // joins. Each names a group that exists; a token naming none creates
-  // groupless accounts, the way upstream's empty list does.
+  // groupless accounts.
   repeated string user_group_ids = 3 [
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string.min_len = 1
@@ -700,10 +697,10 @@ message CreateUserRequest {
   // false; verification itself is a later procedure.
   optional bool email_verified = 10;
 
-  // user_group_ids are the groups the created account joins, the way the
-  // upstream create carries them. Every name must be a group the
-  // deployment holds — the creation refuses an audience it cannot name,
-  // the way the group procedures refuse an unknown identifier.
+  // user_group_ids are the groups the created account joins. Every name
+  // must be a group the deployment holds — the creation refuses an audience
+  // it cannot name, the way the group procedures refuse an unknown
+  // identifier.
   repeated string user_group_ids = 11;
 }
 
@@ -1049,8 +1046,7 @@ message UserGroupDetail {
 
   // allowed_oidc_clients are the clients the group's allowlist names — the
   // accounts in the group may only reach these clients when the client is
-  // restricted — ordered by the client's name. Upstream answers the same
-  // roll inside its group detail view.
+  // restricted — ordered by the client's name.
   repeated AllowedOidcClientRef allowed_oidc_clients = 8;
 }
 

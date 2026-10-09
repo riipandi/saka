@@ -2,11 +2,13 @@ package router
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
+	"connectrpc.com/connect/v2/connectproto"
 	"connectrpc.com/otelconnect"
 	"connectrpc.com/validate"
 
@@ -88,24 +90,25 @@ var _ connect.Codec = rpcJSONCodec{}
 
 func (c rpcJSONCodec) Name() string { return c.name }
 
-func (c rpcJSONCodec) Marshal(message any) ([]byte, error) {
+func (c rpcJSONCodec) MarshalWrite(_ context.Context, dst io.Writer, message any) error {
 	msg, err := protoMessage(message)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return protojson.MarshalOptions{UseProtoNames: true}.Marshal(msg)
+	data, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	_, err = dst.Write(data)
+	return err
 }
 
-func (c rpcJSONCodec) MarshalAppend(dst []byte, message any) ([]byte, error) {
+func (c rpcJSONCodec) UnmarshalRead(_ context.Context, src io.Reader, message any) error {
 	msg, err := protoMessage(message)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return protojson.MarshalOptions{UseProtoNames: true}.MarshalAppend(dst, msg)
-}
-
-func (c rpcJSONCodec) Unmarshal(data []byte, message any) error {
-	msg, err := protoMessage(message)
+	data, err := io.ReadAll(src)
 	if err != nil {
 		return err
 	}
@@ -127,8 +130,8 @@ func protoMessage(message any) (proto.Message, error) {
 // behind: it creates the server span a trace follows and records the rpc
 // duration and size histograms. It reads the global providers the observer
 // installs, so a signal that is switched off costs a no-op.
-func otelInterceptor() connect.Interceptor {
-	interceptor, err := otelconnect.NewInterceptor()
+func otelInterceptor() connect.ServerInterceptor {
+	interceptor, err := otelconnect.NewServerInterceptor()
 	if err != nil {
 		// New with no options cannot fail — the error guards an SDK the
 		// repository pins — but the signature demands the check, and a broken
@@ -138,42 +141,54 @@ func otelInterceptor() connect.Interceptor {
 	return interceptor
 }
 
-// rpcHandlerOptions are the options every service on this surface is
-// registered with: the shared codec pair, the panic boundary, the validate
-// interceptor, and the OpenTelemetry interceptor. A module that serves
-// procedures receives them and passes them to every generated handler it
-// registers, so a module's procedure answers exactly like the transport's
-// own — the codec, the panic boundary, and the telemetry included.
-//
-// The read bound rides the same options, so a request body larger than
-// server.max_request_bytes is refused before any procedure — or the
-// authentication wrap in front of them — decodes it.
-func rpcHandlerOptions(maxRequestBytes int, reauth guard.ReauthConsumer) []connect.HandlerOption {
-	return []connect.HandlerOption{
-		connect.WithCodec(rpcJSONCodec{name: rpcCodecJSON}),
-		connect.WithCodec(rpcJSONCodec{name: rpcCodecJSONCharsetUTF8}),
-		connect.WithReadMaxBytes(maxRequestBytes),
-		// Authorization runs before the contract is enforced, so a caller who
-		// may not run a procedure is refused without the request body being
-		// judged: the answer is the same whether the body was well-formed or
-		// not, which keeps a non-administrator from telling an administrative
-		// procedure apart from an absent one. The rule is per-procedure and
-		// the request carries the procedure it calls, so this is an
-		// interceptor rather than a middleware.
-		connect.WithInterceptors(middleware.Guard(reauth)),
-		// The declarative constraints in the contracts are enforced here,
-		// once: a message that fails its protovalidate options never reaches
-		// a handler, and the violations travel as typed error details.
-		connect.WithInterceptors(validate.NewInterceptor()),
-		connect.WithRecover(func(_ context.Context, _ connect.Spec, _ http.Header, recovered any) error {
-			// The recovery middleware above this surface answers a panic with
-			// the REST envelope, which a Connect client cannot parse. A panic
-			// inside a procedure is reported in the protocol the caller used,
-			// and the panic value is not published: it is an internal detail,
-			// and the middleware logs it with the stack and the request id.
-			return connect.NewError(connect.CodeInternal, errors.New("internal error"))
-		}),
-		connect.WithInterceptors(otelInterceptor()),
+// recoveryInterceptor is the panic boundary every procedure is served behind.
+// The recovery middleware above this surface answers a panic with the REST
+// envelope, which a Connect client cannot parse. A panic inside a procedure
+// is reported in the protocol the caller used, and the panic value is not
+// published: it is an internal detail, and the middleware logs it with the
+// stack and the request id. The net/http abort sentinel passes through —
+// the server owns that panic and aborting the response is its answer.
+func recoveryInterceptor(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				if recovered == http.ErrAbortHandler {
+					panic(recovered)
+				}
+				err = connect.NewError(connect.CodeInternal, "internal error")
+			}
+		}()
+		return next(ctx, spec, stream)
+	}
+}
+
+// rpcInterceptors are the interceptors every procedure on this surface is
+// served behind, in wrap order: the panic boundary outermost, then the guard
+// — authorization runs before the contract is enforced, so a caller who may
+// not run a procedure is refused without the request body being judged — then
+// the declarative constraints, whose refusals carry typed protovalidate
+// details, and the OpenTelemetry interceptor innermost.
+func rpcInterceptors(reauth guard.ReauthConsumer) []connect.ServerInterceptor {
+	return []connect.ServerInterceptor{
+		recoveryInterceptor,
+		middleware.Guard(reauth),
+		validate.NewServerInterceptor(),
+		otelInterceptor(),
+	}
+}
+
+// rpcMountOptions are the transport options every procedure on this surface
+// is mounted with: the shared codec set and the read bound. The read bound
+// refuses a request body larger than server.max_request_bytes before any
+// procedure — or the authentication wrap in front of them — decodes it.
+func rpcMountOptions(maxRequestBytes int) []connecthttp.Option {
+	return []connecthttp.Option{
+		connecthttp.WithCodecs(
+			rpcJSONCodec{name: rpcCodecJSON},
+			rpcJSONCodec{name: rpcCodecJSONCharsetUTF8},
+			connectproto.NewBinaryCodec(),
+		),
+		connecthttp.WithReadMaxBytes(maxRequestBytes),
 	}
 }
 
@@ -188,15 +203,15 @@ func mountRPC(r chi.Router, opts Options) {
 
 // rpcRouter builds the Connect handler tree served below RPCPath.
 //
-// Every procedure is registered at its own path rather than the service's
-// shared subtree prefix: the generated handler answers a path under its prefix
-// it does not know with a plain-text 404, which a Connect client cannot read.
-// Registering the procedures keeps the not-found boundary in one place, where
-// the answer is written in the protocol the caller used.
+// Every procedure is registered on one *connect.Server; the mount installs
+// one route per procedure on the router. The mount also answers a request
+// naming a registered service with the protocol's own refusal, so the
+// not-found boundary stays in one place — the error writer below — where the
+// answer is written in the protocol the caller used.
 //
-// The path is registered for every method on purpose. A procedure is POST-only
-// (no procedure in this contract declares `idempotency_level =
-// NO_SIDE_EFFECTS`, which is what would make a GET legal), and the generated
+// The route accepts every method on purpose. A procedure is POST-only (no
+// procedure in this contract declares `idempotency_level =
+// NO_SIDE_EFFECTS`, which is what would make a GET legal), and the mounted
 // handler is what refuses another method with `405` and `Allow: POST`.
 func rpcRouter(opts Options) http.Handler {
 	checker := opts.Checker
@@ -213,45 +228,34 @@ func rpcRouter(opts Options) http.Handler {
 	// renamed procedure breaks the build rather than losing its exemption.
 	r.Use(fwmiddleware.UnboundedFor(rpcStreamingProcedures...))
 
-	options := rpcHandlerOptions(maxRequestBytes, reauth)
-	_, healthHandler := systemv1connect.NewHealthServiceHandler(
-		handler.NewRPCHealthService(checker),
-		options...,
-	)
-	r.Handle(systemv1connect.HealthServiceCheckProcedure, healthHandler)
+	server := connect.NewServer(rpcInterceptors(reauth)...)
+	systemv1connect.RegisterHealthServiceHandler(server, handler.NewRPCHealthService(checker))
 
 	// The engines' own administrative surface: the queue's tables and the
 	// scheduler's state rows an operations console reads and acts on. The
 	// guard names every procedure administrative, so an anonymous miss is a
 	// 404 before the handler ever runs.
-	_, queueHandler := systemv1connect.NewQueueServiceHandler(
+	systemv1connect.RegisterQueueServiceHandler(
+		server,
 		handler.NewRPCQueueService(opts.QueueClient, opts.DB, opts.Audit, opts.Logger),
-		options...,
 	)
-	r.Handle(systemv1connect.QueueServiceListQueuesProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceListTasksProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceGetTaskProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceListDeadTasksProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceCancelTaskProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceReplayDeadTasksProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceFlushPendingTasksProcedure, queueHandler)
-	r.Handle(systemv1connect.QueueServiceFlushCompletedTasksProcedure, queueHandler)
-
-	_, schedulerHandler := systemv1connect.NewSchedulerServiceHandler(
+	systemv1connect.RegisterSchedulerServiceHandler(
+		server,
 		handler.NewRPCSchedulerService(opts.Scheduler, opts.DB, opts.Audit, opts.Logger),
-		options...,
 	)
-	r.Handle(systemv1connect.SchedulerServiceListJobsProcedure, schedulerHandler)
-	r.Handle(systemv1connect.SchedulerServiceRunNowProcedure, schedulerHandler)
 
-	// A module's procedures mount beside the transport's own, on the same
-	// router, so they share the codec and the not-found boundary.
-	kernel.MountRPC(r, options, modules...)
+	// A module's procedures register beside the transport's own, on the same
+	// server, so they share the interceptors, the codec, and the not-found
+	// boundary.
+	kernel.MountRPC(server, modules...)
+
+	mountOptions := rpcMountOptions(maxRequestBytes)
+	connecthttp.Mount(r, server, mountOptions...)
 
 	// The error writer owns the wire form of a miss, so the answer carries the
 	// code and the HTTP status the Connect specification assigns it rather
 	// than a shape invented here or the SPA document.
-	writer := connect.NewErrorWriter(options...)
+	writer := connecthttp.NewErrorWriter(mountOptions...)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeRPCError(writer, w, r, connect.CodeUnimplemented,
 			fmt.Sprintf("unknown procedure %q", r.URL.Path))
@@ -264,12 +268,12 @@ func rpcRouter(opts Options) http.Handler {
 	// Authentication wraps the finished tree, so a refusal happens before the
 	// request is decoded and an unknown procedure is not disclosed to a
 	// caller without a token.
-	return middleware.BearerAuth(auth, rpcPublicProcedures, options, r)
+	return middleware.BearerAuth(auth, rpcPublicProcedures, r)
 }
 
 // rpcRefuseWith answers a limited RPC request in its own protocol. The bound
 // is threaded so the error writer spells refusals with the same options the
-// procedures were registered with.
+// procedures were mounted with.
 func rpcRefuseWith(maxRequestBytes int) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rpcRefuse(w, r, maxRequestBytes)
@@ -277,19 +281,17 @@ func rpcRefuseWith(maxRequestBytes int) func(http.ResponseWriter, *http.Request)
 }
 
 // writeRPCError answers a request that reached no procedure, in the protocol the caller used.
-func writeRPCError(writer *connect.ErrorWriter, w http.ResponseWriter, r *http.Request, code connect.Code, message string) {
-	_ = writer.Write(w, r, connect.NewError(code, errors.New(message)))
+func writeRPCError(writer *connecthttp.ErrorWriter, w http.ResponseWriter, r *http.Request, code connect.Code, message string) {
+	_ = writer.Write(w, r, connect.NewError(code, message))
 }
 
 // rpcRefuse answers a limited procedure call in the protocol the caller used:
 // `resource_exhausted`, the code the Connect specification maps to 429. The
 // X-RateLimit-* and Retry-After headers are already on the response — the
 // middleware wrote them before refusing. The error writer is built from the
-// same handler options the procedures are registered with, so the refusal is
-// serialized under the shared codec, exactly like a refusal from a procedure
-// itself.
+// same transport options the procedures were mounted with, so the refusal is
+// serialized exactly like a refusal from a procedure itself.
 func rpcRefuse(w http.ResponseWriter, r *http.Request, maxRequestBytes int) {
-	options := rpcHandlerOptions(maxRequestBytes, nil)
-	writer := connect.NewErrorWriter(options...)
+	writer := connecthttp.NewErrorWriter(rpcMountOptions(maxRequestBytes)...)
 	writeRPCError(writer, w, r, connect.CodeResourceExhausted, "rate limit exceeded")
 }

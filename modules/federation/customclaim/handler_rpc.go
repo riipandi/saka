@@ -3,8 +3,6 @@ package customclaim
 import (
 	"context"
 
-	"connectrpc.com/connect"
-
 	federationv1 "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1"
 	federationv1connect "github.com/riipandi/saka/codegen/proto/go/saka/federation/v1/federationv1connect"
 	"github.com/riipandi/saka/framework/webutil"
@@ -22,7 +20,7 @@ func newRPCHandler(service *Service) federationv1connect.CustomClaimServiceHandl
 }
 
 // Suggest answers the autocomplete list.
-func (h *rpcHandler) Suggest(ctx context.Context, req *connect.Request[federationv1.SuggestCustomClaimsRequest]) (*connect.Response[federationv1.SuggestCustomClaimsResponse], error) {
+func (h *rpcHandler) Suggest(ctx context.Context, req *federationv1.SuggestCustomClaimsRequest) (*federationv1.SuggestCustomClaimsResponse, error) {
 	keys, err := h.service.Suggest(ctx)
 	if err != nil {
 		return nil, mapError(err)
@@ -34,109 +32,109 @@ func (h *rpcHandler) Suggest(ctx context.Context, req *connect.Request[federatio
 			UsageCount: key.UsageCount,
 		})
 	}
-	return connect.NewResponse(&federationv1.SuggestCustomClaimsResponse{
+	return &federationv1.SuggestCustomClaimsResponse{
 		Keys:    list,
 		Status:  webutil.StatusSuccess,
 		Message: "the custom claim suggestions were listed",
-	}), nil
+	}, nil
 }
 
 // ListUserClaims answers one account's claims.
-func (h *rpcHandler) ListUserClaims(ctx context.Context, req *connect.Request[federationv1.ListUserCustomClaimsRequest]) (*connect.Response[federationv1.ListUserCustomClaimsResponse], error) {
-	claims, err := h.service.ListByUser(ctx, req.Msg.UserId)
+func (h *rpcHandler) ListUserClaims(ctx context.Context, req *federationv1.ListUserCustomClaimsRequest) (*federationv1.ListUserCustomClaimsResponse, error) {
+	claims, err := h.service.ListByUser(ctx, req.UserId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.ListUserCustomClaimsResponse{
+	return &federationv1.ListUserCustomClaimsResponse{
 		Claims:  wireClaims(claims),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claims were listed",
-	}), nil
+	}, nil
 }
 
 // CreateUserClaim hangs a claim on an account.
-func (h *rpcHandler) CreateUserClaim(ctx context.Context, req *connect.Request[federationv1.CreateUserCustomClaimRequest]) (*connect.Response[federationv1.CreateUserCustomClaimResponse], error) {
-	claim, err := h.service.CreateByUser(ctx, req.Msg.UserId, req.Msg.Key, req.Msg.Value)
+func (h *rpcHandler) CreateUserClaim(ctx context.Context, req *federationv1.CreateUserCustomClaimRequest) (*federationv1.CreateUserCustomClaimResponse, error) {
+	claim, err := h.service.CreateByUser(ctx, req.UserId, req.Key, req.Value)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.CreateUserCustomClaimResponse{
+	return &federationv1.CreateUserCustomClaimResponse{
 		Claim:   wireClaim(claim),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was created",
-	}), nil
+	}, nil
 }
 
 // UpdateUserClaim rewrites one of an account's claims.
-func (h *rpcHandler) UpdateUserClaim(ctx context.Context, req *connect.Request[federationv1.UpdateUserCustomClaimRequest]) (*connect.Response[federationv1.UpdateUserCustomClaimResponse], error) {
-	claim, err := h.service.UpdateByUser(ctx, req.Msg.Id, req.Msg.Key, req.Msg.Value)
+func (h *rpcHandler) UpdateUserClaim(ctx context.Context, req *federationv1.UpdateUserCustomClaimRequest) (*federationv1.UpdateUserCustomClaimResponse, error) {
+	claim, err := h.service.UpdateByUser(ctx, req.Id, req.Key, req.Value)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.UpdateUserCustomClaimResponse{
+	return &federationv1.UpdateUserCustomClaimResponse{
 		Claim:   wireClaim(claim),
 		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was updated",
-	}), nil
+	}, nil
 }
 
 // DeleteUserClaim removes one of an account's claims.
-func (h *rpcHandler) DeleteUserClaim(ctx context.Context, req *connect.Request[federationv1.DeleteUserCustomClaimRequest]) (*connect.Response[federationv1.DeleteUserCustomClaimResponse], error) {
-	if err := h.service.DeleteByUser(ctx, req.Msg.Id); err != nil {
+func (h *rpcHandler) DeleteUserClaim(ctx context.Context, req *federationv1.DeleteUserCustomClaimRequest) (*federationv1.DeleteUserCustomClaimResponse, error) {
+	if err := h.service.DeleteByUser(ctx, req.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.DeleteUserCustomClaimResponse{
+	return &federationv1.DeleteUserCustomClaimResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the user's custom claim was deleted",
-	}), nil
+	}, nil
 }
 
 // ListGroupClaims answers one group's claims.
-func (h *rpcHandler) ListGroupClaims(ctx context.Context, req *connect.Request[federationv1.ListGroupCustomClaimsRequest]) (*connect.Response[federationv1.ListGroupCustomClaimsResponse], error) {
-	claims, err := h.service.ListByGroup(ctx, req.Msg.UserGroupId)
+func (h *rpcHandler) ListGroupClaims(ctx context.Context, req *federationv1.ListGroupCustomClaimsRequest) (*federationv1.ListGroupCustomClaimsResponse, error) {
+	claims, err := h.service.ListByGroup(ctx, req.UserGroupId)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.ListGroupCustomClaimsResponse{
+	return &federationv1.ListGroupCustomClaimsResponse{
 		Claims:  wireClaims(claims),
 		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claims were listed",
-	}), nil
+	}, nil
 }
 
 // CreateGroupClaim hangs a claim on a group.
-func (h *rpcHandler) CreateGroupClaim(ctx context.Context, req *connect.Request[federationv1.CreateGroupCustomClaimRequest]) (*connect.Response[federationv1.CreateGroupCustomClaimResponse], error) {
-	claim, err := h.service.CreateByGroup(ctx, req.Msg.UserGroupId, req.Msg.Key, req.Msg.Value)
+func (h *rpcHandler) CreateGroupClaim(ctx context.Context, req *federationv1.CreateGroupCustomClaimRequest) (*federationv1.CreateGroupCustomClaimResponse, error) {
+	claim, err := h.service.CreateByGroup(ctx, req.UserGroupId, req.Key, req.Value)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.CreateGroupCustomClaimResponse{
+	return &federationv1.CreateGroupCustomClaimResponse{
 		Claim:   wireClaim(claim),
 		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was created",
-	}), nil
+	}, nil
 }
 
 // UpdateGroupClaim rewrites one of a group's claims.
-func (h *rpcHandler) UpdateGroupClaim(ctx context.Context, req *connect.Request[federationv1.UpdateGroupCustomClaimRequest]) (*connect.Response[federationv1.UpdateGroupCustomClaimResponse], error) {
-	claim, err := h.service.UpdateByGroup(ctx, req.Msg.Id, req.Msg.Key, req.Msg.Value)
+func (h *rpcHandler) UpdateGroupClaim(ctx context.Context, req *federationv1.UpdateGroupCustomClaimRequest) (*federationv1.UpdateGroupCustomClaimResponse, error) {
+	claim, err := h.service.UpdateByGroup(ctx, req.Id, req.Key, req.Value)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.UpdateGroupCustomClaimResponse{
+	return &federationv1.UpdateGroupCustomClaimResponse{
 		Claim:   wireClaim(claim),
 		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was updated",
-	}), nil
+	}, nil
 }
 
 // DeleteGroupClaim removes one of a group's claims.
-func (h *rpcHandler) DeleteGroupClaim(ctx context.Context, req *connect.Request[federationv1.DeleteGroupCustomClaimRequest]) (*connect.Response[federationv1.DeleteGroupCustomClaimResponse], error) {
-	if err := h.service.DeleteByGroup(ctx, req.Msg.Id); err != nil {
+func (h *rpcHandler) DeleteGroupClaim(ctx context.Context, req *federationv1.DeleteGroupCustomClaimRequest) (*federationv1.DeleteGroupCustomClaimResponse, error) {
+	if err := h.service.DeleteByGroup(ctx, req.Id); err != nil {
 		return nil, mapError(err)
 	}
-	return connect.NewResponse(&federationv1.DeleteGroupCustomClaimResponse{
+	return &federationv1.DeleteGroupCustomClaimResponse{
 		Status:  webutil.StatusSuccess,
 		Message: "the group's custom claim was deleted",
-	}), nil
+	}, nil
 }

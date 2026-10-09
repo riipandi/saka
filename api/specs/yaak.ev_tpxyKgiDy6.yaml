@@ -3,7 +3,7 @@ model: environment
 id: ev_tpxyKgiDy6
 workspaceId: wk_kBiMYTkhPP
 createdAt: 2026-09-12T06:21:47.170038
-updatedAt: 2026-09-26T11:07:57.643890
+updatedAt: 2026-10-08T19:07:24.701019
 name: Global Variables
 public: true
 base: true
@@ -13,18 +13,18 @@ variables:
 - enabled: true
   name: accessToken
   value: ${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=b64'LCA', path=b64'JC5hY2Nlc3NfdG9rZW4') ]}
-  id: EVasUgjAAh
+  id: 6wgMTnUExe
 - enabled: true
   name: refreshToken
   value: ${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=b64'LCA', path=b64'JC5yZWZyZXNoX3Rva2Vu') ]}
-  id: 6ZtnU5Fuat
+  id: ja8YhS4v3F
 - enabled: true
   name: userId
   value: ${[ response.body.path(request='rq_5SgzmJyWWh', behavior='smart', ttl='0', result='first', join=b64'LCA', path=b64'JC51c2VyLmlk') ]}
-  id: uc0Et430qc
+  id: EfcUgKvsm3
 - enabled: true
   name: apiKey
   value: ${[ response.body.path(request='rq_qx9EKAeikN', behavior='smart', ttl='0', result='first', join=', ', path='$.key') ]}
-  id: SwzHmkJyCC
+  id: b6Hq8DEJ6h
 color: null
 sortPriority: 0.0

@@ -34,7 +34,7 @@ func baseEnv() []string {
 	return []string{
 		"DATABASE_URL=" + dsn,
 		"AUTH_SECRET_KEY=" + secret,
-		"PUBLIC_BASE_URL=http://localhost:3080",
+		"PUBLIC_BASE_URL=http://localhost:3000",
 	}
 }
 

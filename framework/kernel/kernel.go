@@ -5,7 +5,7 @@ package kernel
 import (
 	"fmt"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -60,44 +60,39 @@ func Mount(r chi.Router, modules ...Module) {
 // nothing.
 type RPCModule interface {
 	Module
-	// MountRPC registers the module's procedures on the RPC router. The router
-	// is mounted with the RPC prefix stripped, so the paths are the procedure
-	// paths a generated Connect handler answers. MountRPC runs once, before the
-	// listener opens.
-	//
-	// The handler options are the transport's, and a module passes them to every
-	// generated handler it registers. They carry the shared JSON codec — the one
-	// that serializes snake_case, so a procedure answers in the same field names
-	// its REST twin writes — and the panic boundary. A module that registers a
-	// handler without them answers in protobuf's default camelCase instead.
-	MountRPC(r chi.Router, opts ...connect.HandlerOption)
+	// MountRPC registers the module's procedures on the RPC server. The server
+	// is the transport's: it carries the shared interceptors — the guard, the
+	// contract enforcement, the panic boundary, the telemetry — and the mount
+	// carries the shared JSON codec, the one that serializes snake_case, so a
+	// procedure answers in the same field names its REST twin writes. MountRPC
+	// runs once, before the listener opens.
+	MountRPC(server *connect.Server)
 }
 
 // MountRPC registers the procedures of every module that serves any. A module
 // without procedures is skipped, so one list can carry both kinds.
 //
-// Like Mount, the procedures are read back from a scratch router first, so two
-// modules registering one procedure path fails the run naming both — the
-// generated handler would otherwise answer whichever registered last.
-func MountRPC(r chi.Router, opts []connect.HandlerOption, modules ...Module) {
+// Like Mount, the procedures are read back from a scratch server first, so two
+// modules registering one procedure fails the run naming both — the server's
+// own duplicate detection would otherwise answer whichever registered last.
+func MountRPC(server *connect.Server, modules ...Module) {
 	claims := map[string]string{}
 	for _, module := range modules {
 		rpc, ok := module.(RPCModule)
 		if !ok {
 			continue
 		}
-		// The path alone is the claim: the generated handler answers its
-		// procedure path for every method, so two modules on one path conflict
-		// however the methods read back.
-		scratch := chi.NewRouter()
-		rpc.MountRPC(scratch, opts...)
-		for _, route := range scratch.Routes() {
-			if owner, taken := claims[route.Pattern]; taken {
+		// The procedure path alone is the claim: it names the service and the
+		// method, so two modules on one procedure conflict outright.
+		scratch := connect.NewServer()
+		rpc.MountRPC(scratch)
+		for spec := range scratch.Specs() {
+			if owner, taken := claims[spec.Procedure]; taken {
 				panic(fmt.Sprintf("kernel: module %q claims procedure %s already claimed by module %q",
-					module.Name(), route.Pattern, owner))
+					module.Name(), spec.Procedure, owner))
 			}
-			claims[route.Pattern] = module.Name()
+			claims[spec.Procedure] = module.Name()
 		}
-		rpc.MountRPC(r, opts...)
+		rpc.MountRPC(server)
 	}
 }

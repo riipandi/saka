@@ -27,7 +27,7 @@ const fileUploadProbePage = `<!doctype html>
 <h2>File upload (tus)</h2>
 <p>Development instrument — drives <code>/api/uploads</code> with tus-js-client.
 The token is the access token a sign-in answers with:
-<code>scripts/curl-rpc.sh http://localhost:3080/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
+<code>scripts/curl-rpc.sh http://localhost:3000/rpc/saka.authn.v1.AuthService/SignIn '{"identity":"admin","password":"…"}'</code></p>
 <field><input id="token" size="80" placeholder="access token"></field>
 <field><input id="bucket" size="30" value="devbucket"></field>
 <field><input id="key" size="40" placeholder="object key, e.g. logo.png"></field>

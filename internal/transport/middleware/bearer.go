@@ -4,23 +4,31 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 
-	"connectrpc.com/authn"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 
 	"github.com/riipandi/saka/framework/webutil"
 	"github.com/riipandi/saka/internal/guard"
+	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
 // Authenticator authenticates one request and answers the identity the
-// procedures read from the context. It is the authn library's own shape, so
-// the middleware below and the transport that mounts it share one type.
-type Authenticator = authn.AuthFunc
+// procedures read from the context. The middleware below and the transport
+// that mounts it share the one type.
+type Authenticator func(ctx context.Context, req *http.Request) (any, error)
 
-// BearerAuth wraps the RPC surface with authentication. The authn middleware
-// runs before a request is decoded — an unauthenticated call costs no
-// unmarshal — and it receives the same handler options the procedures are
-// registered with, so a refusal is marshaled in the protocol the caller used.
+// bearerRefusals owns the wire form of an authentication refusal, the way the
+// mount owns the wire form of every other miss: the answer carries the code
+// and the HTTP status the Connect specification assigns it, in the protocol
+// the caller used.
+var bearerRefusals = connecthttp.NewErrorWriter()
+
+// BearerAuth wraps the RPC surface with authentication. The middleware runs
+// before a request is decoded — an unauthenticated call costs no unmarshal —
+// and its refusal is marshaled in the protocol the caller used.
 //
 // A procedure named in public is answered without a caller; every other path
 // requires one, so a new procedure is protected by default and a public one
@@ -31,34 +39,54 @@ type Authenticator = authn.AuthFunc
 // Authentication is the whole of this middleware's job: whether the caller
 // may run the procedure is the guard interceptor's decision, made once the
 // request is decoded and the target it names is readable.
-func BearerAuth(auth Authenticator, public map[string]struct{}, options []connect.HandlerOption, inner http.Handler) http.Handler {
+func BearerAuth(auth Authenticator, public map[string]struct{}, inner http.Handler) http.Handler {
 	if auth == nil {
 		return inner
 	}
-	return authn.NewMiddleware(publicOnly(auth, public), options...).Wrap(inner)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A public procedure answers without a caller. A bearer presented on
+		// one is still verified, best-effort: the optional-session shapes —
+		// the MFA enrollment's session-or-bridge caller — read the claims
+		// when the request carries them and answer the public refusal when it
+		// does not. An unknown path is not public, so it is refused as
+		// unauthenticated rather than unimplemented — the refusal hides which
+		// procedures exist from a caller without a token.
+		info, err := auth(r.Context(), r)
+		if err != nil {
+			if procedure, ok := inferProcedure(r.URL); ok {
+				if _, isPublic := public[procedure]; isPublic {
+					inner.ServeHTTP(w, r)
+					return
+				}
+			}
+			refuseBearer(w, r, err)
+			return
+		}
+		inner.ServeHTTP(w, r.WithContext(jwtutils.SetInfo(r.Context(), info)))
+	})
 }
 
-// publicOnly excuses the public procedures from the authenticator's
-// refusal: a public procedure answers without a caller, and an unknown
-// path is not public, so it is refused as unauthenticated rather than
-// unimplemented — the refusal hides which procedures exist from a caller
-// without a token. A bearer presented on a public procedure still
-// attaches its caller, best-effort: the optional-session shapes — the
-// MFA enrollment's session-or-bridge caller — read the claims when the
-// request carries them and answer the public refusal when it does not.
-func publicOnly(auth Authenticator, public map[string]struct{}) Authenticator {
-	return func(ctx context.Context, req *http.Request) (any, error) {
-		if procedure, ok := authn.InferProcedure(req.URL); ok {
-			if _, isPublic := public[procedure]; isPublic {
-				identity, err := auth(ctx, req)
-				if err != nil {
-					return nil, nil
-				}
-				return identity, nil
-			}
-		}
-		return auth(ctx, req)
+// refuseBearer answers a request that presented no usable credential, in the
+// protocol the caller used. The authenticator's own *connect.Error carries
+// the code; anything else is an unauthenticated refusal, so a refusal is
+// always written on purpose.
+func refuseBearer(w http.ResponseWriter, r *http.Request, err error) {
+	var cerr *connect.Error
+	if !errors.As(err, &cerr) {
+		cerr = connect.NewError(connect.CodeUnauthenticated, "authentication required")
 	}
+	_ = bearerRefusals.Write(w, r, cerr)
+}
+
+// inferProcedure reports the "/service/Method" suffix a request path ends
+// with — the name the guard table and the public list key on.
+func inferProcedure(u *url.URL) (string, bool) {
+	ultimate := strings.LastIndex(u.Path, "/")
+	penultimate := strings.LastIndex(u.Path[:ultimate], "/")
+	if ultimate < 0 || penultimate < 0 || ultimate == len(u.Path)-1 || penultimate == ultimate-1 {
+		return "", false
+	}
+	return u.Path[penultimate:], true
 }
 
 // RESTBearer guards the REST surface's routes: it authenticates the caller
@@ -70,7 +98,7 @@ func publicOnly(auth Authenticator, public map[string]struct{}) Authenticator {
 // one, so a new route is protected by default and a public one is a
 // deliberate entry in internal/guard.
 //
-// The verified caller travels through the context the authn library reads,
+// The verified caller travels through the context store `pkg/jwtutils` owns,
 // the same store the RPC surface's middleware fills, so a handler reads its
 // caller the same way on both transports. A refusal is the REST envelope,
 // because the caller here is one that reads envelopes.
@@ -101,7 +129,7 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 					next.ServeHTTP(w, r)
 					return
 				}
-				next.ServeHTTP(w, r.WithContext(authn.SetInfo(r.Context(), info)))
+				next.ServeHTTP(w, r.WithContext(jwtutils.SetInfo(r.Context(), info)))
 				return
 			}
 
@@ -111,7 +139,7 @@ func RESTBearer(auth Authenticator, rules []guard.RestEntry) func(http.Handler) 
 				return
 			}
 
-			ctx := authn.SetInfo(r.Context(), info)
+			ctx := jwtutils.SetInfo(r.Context(), info)
 			if err := rule(guard.CallerOf(info), target); err != nil {
 				refuseREST(w, r, err)
 				return

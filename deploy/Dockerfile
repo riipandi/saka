@@ -17,7 +17,7 @@ ENV VP_NODE_MANAGER=yes VP_PM_MANAGER=yes
 
 # Keep in sync with `devEngines.packageManager` in package.json.
 ARG NODE_VERSION=24.21
-ARG PNPM_VERSION=12.8.1
+ARG PNPM_VERSION=12.9.1
 ARG VP_VERSION=1.0.0
 
 # Install system dependencies (optional tools for building and debugging)
@@ -95,20 +95,9 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     go tool buf generate && gofmt -w codegen/proto/go
 
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    NODE_ENV=production pnpm exec tsc -b --noEmit \
-    && NODE_ENV=production SKIP_GO_BUILD=1 pnpm exec vp build
-
-# The embed is compile-time: the SPA bundle and the derived assets.json the
-# Vite build wrote above must exist before the Go binary compiles.
-RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    go build -tags "release,noasm,nounsafe" -trimpath -buildvcs=false \
-    -ldflags "-w -s \
-      -X github.com/riipandi/saka/internal/config.AppVersion=${BUILD_VERSION:-dev} \
-      -X github.com/riipandi/saka/internal/config.BuildHash=${BUILD_HASH} \
-      -X github.com/riipandi/saka/internal/config.BuildDate=${BUILD_DATE}" \
-    -o build/release/$(jq -r '.name' package.json) ./cmd \
-    && strip build/release/$(jq -r '.name' package.json) \
-    && chmod +x build/release/$(jq -r '.name' package.json)
+    NODE_ENV=production pnpm exec vp run typecheck \
+    && NODE_ENV=production pnpm exec vp run email#build \
+    && NODE_ENV=production pnpm exec vp run webapp#build
 
 # ------------------------------------------------------------------------------
 # Cleanup the builder stage and create necessary directories.

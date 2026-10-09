@@ -100,6 +100,17 @@ func TestBeginRefusesADisabledOrUnknownConnection(t *testing.T) {
 	require.ErrorIs(t, err, ErrConnectionUnavailable, "a disabled connection answers the same refusal")
 }
 
+func TestTheMasterSwitchRefusesTheBegin(t *testing.T) {
+	provider := &fakeProvider{}
+	service := flowService(t, provider)
+	enabledCustom(t, service)
+
+	// The configuration's switch is the surface's word: off, the begin
+	// refuses whatever the rows hold.
+	_, err := service.WithOAuthEnabled(false).Begin(t.Context(), "hogwarts-sso")
+	require.ErrorIs(t, err, ErrConnectionUnavailable)
+}
+
 func TestCallbackConsumesTheFlowAndSealsTheTokens(t *testing.T) {
 	provider := &fakeProvider{identity: ExternalIdentity{
 		ProviderAccountID: "gryffindor-1",
