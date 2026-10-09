@@ -163,7 +163,11 @@ jobs:
 
       - name: Install Playwright Chromium
         if: steps.chromium-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+        # The CLI lives with the package that owns Playwright (@playwright/test
+        # under packages/e2e-tests); the root workspace has no playwright bin.
+        # The version line (1.63.0) matches @vitest/browser-playwright's
+        # playwright-core, so the browser revision is the one the tests launch.
+        run: pnpm --filter e2e-tests exec playwright install chromium
 
       - name: Run unit tests (frontend)
         run: pnpm exec vp test
