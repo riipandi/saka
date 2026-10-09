@@ -255,9 +255,13 @@ wires against.
   flow) and the no-session `/verify-email` door with `?code=` prefill; the
   change-confirm route is the email page's confirm step, not a separate URL —
   the mailed code is typed where the session already is.
-- [ ] **Audit trail (own)** — `AuditLogService/List` on the account page;
-  the smallest list-with-pagination consumer. Build the shared pagination
-  hook (page/limit + `ListMetadata`, `sort_by` whitelists) here.
+- [x] **Audit trail (own)** — `AuditLogService/List` on the account page;
+  the smallest list-with-pagination consumer. Built the shared pagination
+  hook here. Shipped as `routes/(app)/account/audit.tsx` over
+  `-audit-view.tsx`: the records as sentences (event, outcome badge,
+  address, when), the delegated-action actor beside the record
+  (`actor_username`), the `sort_by` whitelist riding the route search, and
+  the empty state. Display-only — the page writes nothing.
 
 ### Wave 1.5 — the authz foundation (owner decisions, 2026-10-09)
 
@@ -626,6 +630,8 @@ routes/
     -settings-dialog.tsx         #   the danger zone's typed confirmation
     device.tsx                   # device-login approval: Inspect + Decide (Wave 6)
     account/
+      audit.tsx                  # the account's own audit trail (Wave 1)
+      -audit-view.tsx            #   the implementation; display-only
       email.tsx                  # email identity (Wave 1)
       -email-view.tsx            #   the implementation
       sessions.tsx               # session center (Wave 1)
