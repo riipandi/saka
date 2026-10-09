@@ -27,6 +27,27 @@ describe('auth utils', () => {
       expect(getErrorMessage(error)).toBe('Invalid credentials.')
     })
 
+    it('reads a bare refusal as its code word, not a code name', () => {
+      // The server's sentence always wins; the table is what an empty
+      // refusal reads as.
+      const cases: Array<[Code, string]> = [
+        [Code.AlreadyExists, 'That value is already taken.'],
+        [Code.NotFound, 'That item no longer exists.'],
+        [Code.FailedPrecondition, 'That action is not available right now.'],
+        [Code.PermissionDenied, 'You do not have permission to do that.'],
+        [Code.ResourceExhausted, 'Too many attempts. Try again in a moment.']
+      ]
+      for (const [code, word] of cases) {
+        expect(getErrorMessage(new ConnectError('', code))).toBe(word)
+      }
+    })
+
+    it('falls back to the plain sentence for a code with no word', () => {
+      expect(getErrorMessage(new ConnectError('', Code.DataLoss))).toBe(
+        'An unexpected error occurred'
+      )
+    })
+
     it('falls back to a plain sentence for unknown shapes', () => {
       expect(getErrorMessage('boom')).toBe('An unexpected error occurred')
       expect(getErrorMessage(new Error('disk full'))).toBe('disk full')
