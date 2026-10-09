@@ -20,7 +20,7 @@ instructions; the detail lives in `.llms/`. Read in this order:
 
 - Compose screens from `packages/uilibs/src/components/` — the library is comprehensive; pick the component that fits the item (Item for list rows, Table for grids, AlertDialog for confirmations, …) and never reshape an existing uilibs design to fit a feature. Check the component's Storybook story beside it before building on it.
 - Apply the skills `emil-design-eng` and `apple-design` when composing or implementing UI.
-- Keep route files small with TanStack Router code splitting: a route file declares `createFileRoute` (search params, page title) and wires the view; the implementation lives beside it in a dash-prefixed file (`-settings-view.tsx`, `-sessions-view.tsx`) — dash-prefixed files are excluded from the route tree and never render as URLs. See <https://tanstack.com/router/latest/docs/routing/file-based-routing>.
+- Keep route files small with TanStack Router code splitting: a route file declares `createFileRoute` with `component: RouteComponent` — a thin wrapper defined in the same file that wires `useSearch`/`useNavigate` to the view — while the implementation lives beside it in a dash-prefixed file (`-settings-view.tsx`, `-sessions-view.tsx`) — dash-prefixed files are excluded from the route tree and never render as URLs. Never mount a dash-file view as the route's component directly. See <https://tanstack.com/router/latest/docs/routing/file-based-routing>.
 
 ## Stack (summary)
 

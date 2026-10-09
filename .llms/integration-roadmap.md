@@ -581,11 +581,13 @@ Conventions the waves keep:
    above-the-fold queries prefetch in the section's `route.tsx` loader, the way
    `(auth)/route.tsx` warms the login page's two queries.
 5. **Route files stay small through dash-file code splitting** (TanStack Router): the
-   route file declares `createFileRoute` — search params, page title, and a thin
-   component that wires `useSearch`/`useNavigate` to the view — while the
-   implementation lives beside it in a `-`-prefixed file (`-settings-view.tsx`);
-   files and folders with the `-` prefix are excluded from the route tree and never
-   answer a URL (<https://tanstack.com/router/latest/docs/routing/file-based-routing>).
+   route file declares `createFileRoute` with `component: RouteComponent` — a thin
+   wrapper defined in the same file that wires `useSearch`/`useNavigate` to the view —
+   while the implementation lives beside it in a `-`-prefixed file
+   (`-settings-view.tsx`); files and folders with the `-` prefix are excluded from the
+   route tree and never answer a URL, and a dash-file view is never mounted as the
+   route's component directly
+   (<https://tanstack.com/router/latest/docs/routing/file-based-routing>).
 6. Shared components inside `routes/` keep the `-` prefix; composition reused across
    sections lives under `src/components/` or `src/libraries/`, but every primitive is a
    `uilibs` component — a missing one is added to `packages/uilibs/`, never webapp-local,
