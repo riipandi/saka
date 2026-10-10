@@ -82,6 +82,9 @@ async function renderSettings() {
             completeSignIn: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            verifyPasskeyLogin: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout
           }}
         >

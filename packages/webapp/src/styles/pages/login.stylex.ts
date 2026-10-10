@@ -80,6 +80,10 @@ export const styles = stylex.create({
   submit: {
     width: '100%'
   },
+  passkeyButton: {
+    width: '100%',
+    marginBottom: unit.x4
+  },
   countdown: {
     marginTop: unit.x2
   },

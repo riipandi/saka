@@ -19,7 +19,11 @@ import {
   ConfirmTotpEnrollmentResponseSchema,
   MultifactorService
 } from '~/codegen/authn_pb'
-import { SendReauthenticationCodeResponseSchema, WebAuthnService } from '~/codegen/webauthn_pb'
+import {
+  BeginLoginResponseSchema,
+  SendReauthenticationCodeResponseSchema,
+  WebAuthnService
+} from '~/codegen/webauthn_pb'
 
 const USER = {
   id: 'usr_langdon',
@@ -57,8 +61,12 @@ async function renderLogin(
       factor: CompleteSignInFactor,
       options?: AuthLoginContextOptions
     ) => Promise<void>
-  >
-): Promise<{ screen: RenderResult; login: Mock }> {
+  >,
+  verifyPasskeyLogin: Mock<
+    (sessionId: string, credential: string, options?: AuthLoginContextOptions) => Promise<void>
+  > = vi.fn(async () => {})
+): Promise<{ screen: RenderResult; login: Mock; transportCalls: { beginLogin: number } }> {
+  const transportCalls = { beginLogin: 0 }
   const transport = createRouterTransport(({ service }) => {
     service(MultifactorService, {
       beginTotpEnrollment: () =>
@@ -75,7 +83,14 @@ async function renderLogin(
         })
     })
     service(WebAuthnService, {
-      sendReauthenticationCode: () => create(SendReauthenticationCodeResponseSchema, {})
+      sendReauthenticationCode: () => create(SendReauthenticationCodeResponseSchema, {}),
+      beginLogin: () => {
+        transportCalls.beginLogin += 1
+        return create(BeginLoginResponseSchema, {
+          options: '{}',
+          sessionId: 'wcs_test'
+        })
+      }
     })
   })
 
@@ -103,6 +118,7 @@ async function renderLogin(
             login,
             continueSignIn: unused,
             completeSignIn,
+            verifyPasskeyLogin,
             logout: () => {}
           }}
         >
@@ -111,7 +127,7 @@ async function renderLogin(
       </TransportProvider>
     </QueryClientProvider>
   )
-  return { screen, login }
+  return { screen, login, transportCalls }
 }
 
 async function submitCredentials(screen: RenderResult) {
@@ -222,5 +238,45 @@ describe('Login (browser)', () => {
         { redirectTo: undefined }
       )
     })
+  })
+
+  it('opens the assertion ceremony from the credentials card\u2019s passkey entry', async () => {
+    const { screen, transportCalls } = await renderLogin(
+      SIGNED_IN,
+      vi.fn(async () => {})
+    )
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+    await screen.getByRole('button', { name: 'Sign in with a passkey' }).click()
+    // The ceremony handle answered; the browser's get() then refuses in a
+    // test realm with no authenticator — the refusal surfaces in the alert.
+    await vi.waitFor(() => {
+      expect(transportCalls.beginLogin).toBe(1)
+    })
+  })
+
+  it('opens the same ceremony from the challenge\u2019s passkey option', async () => {
+    const challenge: SignInOutcome = {
+      kind: 'mfa-challenge',
+      pendingToken: 'bridge_1',
+      expiresAt: Date.now() + 300_000
+    }
+    const completeSignIn = vi.fn<
+      (
+        pendingToken: string,
+        factor: CompleteSignInFactor,
+        options?: AuthLoginContextOptions
+      ) => Promise<void>
+    >(async () => {})
+    const { screen, transportCalls } = await renderLogin(challenge, completeSignIn)
+    await submitCredentials(screen)
+
+    const passkey = screen.getByRole('button', { name: 'Use a passkey instead' })
+    await expect.element(passkey).toBeVisible()
+    await passkey.click()
+    await vi.waitFor(() => {
+      expect(transportCalls.beginLogin).toBe(1)
+    })
+    // The browser refused before any bridge was spent.
+    expect(completeSignIn).not.toHaveBeenCalled()
   })
 })

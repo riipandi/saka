@@ -23,6 +23,8 @@ import type {
   SignInRequest,
   SignInResponse
 } from '~/codegen/authn_pb'
+import { VerifyLoginRequestSchema, WebAuthnService } from '~/codegen/webauthn_pb'
+import type { VerifyLoginResponse } from '~/codegen/webauthn_pb'
 import type { TraceHints } from '../telemetry/seam-span'
 import type { UserProfile } from './auth-store'
 
@@ -158,6 +160,16 @@ export interface AuthEngineApi {
     factor: CompleteSignInFactor,
     hints?: TraceHints
   ): Promise<AuthSession>
+  /**
+   * Finish a discoverable passkey sign-in: the ceremony `BeginLogin` opened
+   * is judged by the assertion the browser produced, and a credential with
+   * user verification is full authentication — the tokens always carry.
+   */
+  verifyPasskeyLogin(
+    sessionId: string,
+    credential: string,
+    hints?: TraceHints
+  ): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -249,6 +261,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   const session = createClient(SessionService, transport)
   const oauth = createClient(OAuthSSOService, transport)
   const mfa = createClient(MultifactorService, transport)
+  const webauthn = createClient(WebAuthnService, transport)
 
   let tokens: TokenBundle | null = null
   let refreshInFlight: Promise<boolean> | null = null
@@ -290,13 +303,14 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       void api.refresh()
     }, delay)
   }
-  /** Take custody of a fresh pair from SignIn, ContinueSignIn, or Refresh and return it. */
+  /** Take custody of a fresh pair from the sign-in completes, ContinueSignIn, or Refresh. */
   function takeTokenPair(
     response:
       | SignInResponse
       | RefreshResponse
       | ContinueOAuthSignInResponse
       | CompleteSignInResponse
+      | VerifyLoginResponse
   ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
@@ -316,7 +330,11 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
    * names its account; the field is presence-based, so the guard keeps the
    * mapping honest. */
   function finishSignIn(
-    response: SignInResponse | ContinueOAuthSignInResponse | CompleteSignInResponse
+    response:
+      | SignInResponse
+      | ContinueOAuthSignInResponse
+      | CompleteSignInResponse
+      | VerifyLoginResponse
   ): AuthSession {
     if (!response.user) {
       throw new ConnectError('Sign-in answered without an account.', Code.Internal)
@@ -423,6 +441,16 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         }),
         callHints(hints)
       )
+      return finishSignIn(response)
+    },
+
+    async verifyPasskeyLogin(sessionId, credential, hints) {
+      const response = await webauthn.verifyLogin(
+        create(VerifyLoginRequestSchema, { sessionId, credential }),
+        callHints(hints)
+      )
+      // A passkey assertion with user verification is full authentication —
+      // the tokens always carry; the MFA fork is not this answer's shape.
       return finishSignIn(response)
     },
 

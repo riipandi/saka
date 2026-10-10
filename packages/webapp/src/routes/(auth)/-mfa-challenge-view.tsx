@@ -1,3 +1,4 @@
+import { useTransport } from '@connectrpc/connect-query'
 import * as stylex from '@stylexjs/stylex'
 import { useForm } from '@tanstack/react-form'
 import { useEffect, useState } from 'react'
@@ -11,6 +12,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { useAuthentication } from '#/hooks/use-auth'
 import type { SignInChallenge } from '#/libraries/guard/auth-engine'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { runPasskeyAssertion } from '#/libraries/webauthn/passkey'
 import { styles } from '#/styles/pages/login.stylex'
 
 /** Seconds the bridge countdown shows between renders. */
@@ -47,9 +49,30 @@ export function MfaChallengeView({
   onRestart: () => void
 }) {
   const { completeSignIn } = useAuthentication()
+  const transport = useTransport()
   const [failed, setFailed] = useState<string | null>(null)
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
   const secondsLeft = useBridgeCountdown(challenge.expiresAt)
   const expired = secondsLeft <= 0
+
+  const proveWithPasskey = async () => {
+    setFailed(null)
+    setPasskeyBusy(true)
+    try {
+      // The same ceremony every passkey proof rides — the account here is
+      // the bridge's, the credential must answer to it.
+      const assertion = await runPasskeyAssertion(transport)
+      await completeSignIn(
+        challenge.pendingToken,
+        { kind: 'passkey', sessionId: assertion.sessionId, credential: assertion.credential },
+        { redirectTo: returnTo }
+      )
+    } catch (error: unknown) {
+      setFailed(getErrorMessage(error))
+    } finally {
+      setPasskeyBusy(false)
+    }
+  }
 
   const form = useForm({
     defaultValues: { code: '' },
@@ -76,7 +99,8 @@ export function MfaChallengeView({
             Two-factor verification
           </Text>
           <CardDescription>
-            Enter the code from your authenticator app, or one of your recovery codes.
+            Enter the code from your authenticator app, one of your recovery codes, or prove with a
+            passkey.
           </CardDescription>
         </CardHeader>
 
@@ -98,6 +122,16 @@ export function MfaChallengeView({
               <Text variant='body-2' color='neutral-faded' style={styles.countdown}>
                 The verification expires in {secondsLeft}s.
               </Text>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={passkeyBusy}
+                onClick={() => void proveWithPasskey()}
+                style={styles.submit}
+              >
+                {passkeyBusy && <Spinner />}
+                {passkeyBusy ? 'Waiting for your authenticator…' : 'Use a passkey instead'}
+              </Button>
               <form
                 id='mfa-challenge-form'
                 autoComplete='one-time-code'

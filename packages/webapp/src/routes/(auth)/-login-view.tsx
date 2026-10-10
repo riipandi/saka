@@ -1,3 +1,4 @@
+import { useTransport } from '@connectrpc/connect-query'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { useForm } from '@tanstack/react-form'
@@ -24,6 +25,7 @@ import { useOAuthProviders } from '#/hooks/use-oauth-providers'
 import type { SignInChallenge } from '#/libraries/guard/auth-engine'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { takeSignInChallenge } from '#/libraries/guard/sign-in-handoff'
+import { runPasskeyAssertion } from '#/libraries/webauthn/passkey'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
 import { MfaChallengeView } from './-mfa-challenge-view'
 import { MfaEnrollmentView } from './-mfa-enrollment-view'
@@ -55,13 +57,15 @@ export function LoginView({
   returnTo?: string
 }) {
   const navigate = useNavigate()
-  const { login } = useAuthentication()
+  const { login, verifyPasskeyLogin } = useAuthentication()
   const { data: config } = useAppConfig()
   const { data: providers } = useOAuthProviders()
+  const transport = useTransport()
   const [failed, setFailed] = useState<string | null>(null)
   const [remember, setRemember] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [phase, setPhase] = useState<LoginPhase>({ name: 'credentials' })
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
 
   // Goodbye and sign-in-required notices belong to the redirect that brought
   // the visitor here, refresh page or back-navigation never replays them.
@@ -113,6 +117,23 @@ export function LoginView({
 
   const restartSignIn = () => {
     setPhase({ name: 'credentials' })
+  }
+
+  const signInWithPasskey = async () => {
+    setFailed(null)
+    setPasskeyBusy(true)
+    try {
+      // The assertion resolves an account the credential names — discoverable
+      // sign-in. The context takes custody and navigates.
+      const assertion = await runPasskeyAssertion(transport)
+      await verifyPasskeyLogin(assertion.sessionId, assertion.credential, {
+        redirectTo: returnTo
+      })
+    } catch (error: unknown) {
+      setFailed(getErrorMessage(error))
+    } finally {
+      setPasskeyBusy(false)
+    }
   }
 
   if (phase.name === 'challenge') {
@@ -200,6 +221,17 @@ export function LoginView({
               <FieldSeparator style={styles.divider}>or continue with</FieldSeparator>
             </>
           ) : null}
+
+          <Button
+            type='button'
+            variant='outline'
+            disabled={passkeyBusy}
+            onClick={() => void signInWithPasskey()}
+            style={styles.passkeyButton}
+          >
+            {passkeyBusy && <Spinner />}
+            {passkeyBusy ? 'Waiting for your authenticator…' : 'Sign in with a passkey'}
+          </Button>
 
           <form
             id='login-form'

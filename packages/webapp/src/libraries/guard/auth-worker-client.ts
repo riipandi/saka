@@ -44,6 +44,8 @@ export interface AuthWorkerClient {
   continueSignIn(flowToken: string): Promise<SignInOutcome>
   /** Spend the pending bridge with the second factor. Resolves the profile. */
   completeSignIn(pendingToken: string, factor: CompleteSignInFactor): Promise<UserProfile>
+  /** Finish a discoverable passkey sign-in. Resolves the profile. */
+  verifyPasskeyLogin(sessionId: string, credential: string): Promise<UserProfile>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -142,6 +144,14 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
       return spanOperation('complete-sign-in', async (hints) => {
         await deviceReady
         const session = await engine.completeSignIn(pendingToken, factor, hints)
+        writeUserCookie(session.user, session.tokens.refreshExpiresAt)
+        return session.user
+      })
+    },
+    async verifyPasskeyLogin(sessionId: string, credential: string) {
+      return spanOperation('verify-passkey-login', async (hints) => {
+        await deviceReady
+        const session = await engine.verifyPasskeyLogin(sessionId, credential, hints)
         writeUserCookie(session.user, session.tokens.refreshExpiresAt)
         return session.user
       })

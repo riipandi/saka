@@ -2,7 +2,8 @@ import { create } from '@bufbuild/protobuf'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { createClient } from '@connectrpc/connect'
 import { createConnectQueryKey, useQuery, useTransport } from '@connectrpc/connect-query'
-import { KeyRound, Smartphone } from '@keyline-icons/react'
+import { KeyRound, Plus, Smartphone } from '@keyline-icons/react'
+import { startRegistration } from '@simplewebauthn/browser'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
@@ -46,6 +47,14 @@ import {
 } from '~/codegen/authn_pb'
 import { GetCurrentUserRequestSchema, UserService } from '~/codegen/identity_pb'
 import { AddPasswordRequestSchema, RemovePasswordRequestSchema } from '~/codegen/identity_pb'
+import {
+  BeginRegistrationRequestSchema,
+  DeleteCredentialRequestSchema,
+  ListCredentialsRequestSchema,
+  UpdateCredentialRequestSchema,
+  VerifyRegistrationRequestSchema,
+  WebAuthnService
+} from '~/codegen/webauthn_pb'
 
 /** The instants the security page renders — read as the viewer's wall
  * clock, the way the session list reads its own. The wire's instants arrive
@@ -180,6 +189,10 @@ export function SecurityView() {
     MultifactorService.method.listTotpEnrollments,
     create(ListTotpEnrollmentsRequestSchema)
   )
+  const passkeys = useQuery(
+    WebAuthnService.method.listCredentials,
+    create(ListCredentialsRequestSchema)
+  )
 
   const userKey = createConnectQueryKey({
     schema: UserService.method.getCurrentUser,
@@ -199,9 +212,15 @@ export function SecurityView() {
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [working, setWorking] = useState(false)
+  const [passkeyDialog, setPasskeyDialog] = useState<
+    { kind: 'enroll' } | { kind: 'rename'; credentialId: string; name: string } | null
+  >(null)
+  const [passkeyName, setPasskeyName] = useState('')
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
 
   const userRpc = useMemo(() => createClient(UserService, transport), [transport])
   const mfaRpc = useMemo(() => createClient(MultifactorService, transport), [transport])
+  const webauthnRpc = useMemo(() => createClient(WebAuthnService, transport), [transport])
 
   const hasPassword = Boolean(account.data?.user?.passwordUpdatedAt)
 
@@ -214,6 +233,13 @@ export function SecurityView() {
     setActionError(null)
     void queryClient.invalidateQueries({ queryKey: userKey })
     void queryClient.invalidateQueries({ queryKey: listKey })
+    void queryClient.invalidateQueries({
+      queryKey: createConnectQueryKey({
+        schema: WebAuthnService.method.listCredentials,
+        input: create(ListCredentialsRequestSchema),
+        cardinality: 'finite'
+      })
+    })
   }
 
   const addPassword = () => {
@@ -291,6 +317,66 @@ export function SecurityView() {
       .catch(swallowCancelled)
       .finally(() => setWorking(false))
   }
+
+  const enrollPasskey = async () => {
+    setPasskeyBusy(true)
+    setActionError(null)
+    try {
+      const ceremony = await webauthnRpc.beginRegistration(create(BeginRegistrationRequestSchema))
+      const credential = await startRegistration({ optionsJSON: JSON.parse(ceremony.options) })
+      await webauthnRpc.verifyRegistration(
+        create(VerifyRegistrationRequestSchema, {
+          sessionId: ceremony.sessionId,
+          credential: JSON.stringify(credential),
+          name: passkeyName
+        })
+      )
+      setPasskeyDialog(null)
+      setPasskeyName('')
+      afterWrite()
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setPasskeyBusy(false)
+    }
+  }
+
+  const renamePasskey = async () => {
+    if (passkeyDialog?.kind !== 'rename') return
+    setPasskeyBusy(true)
+    setActionError(null)
+    try {
+      await webauthnRpc.updateCredential(
+        create(UpdateCredentialRequestSchema, {
+          credentialId: passkeyDialog.credentialId,
+          name: passkeyName
+        })
+      )
+      setPasskeyDialog(null)
+      setPasskeyName('')
+      afterWrite()
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setPasskeyBusy(false)
+    }
+  }
+
+  const deletePasskey = (credentialId: string) => {
+    setWorking(true)
+    stepUp
+      .run(async (options) => {
+        await webauthnRpc.deleteCredential(
+          create(DeleteCredentialRequestSchema, { credentialId }),
+          options
+        )
+      })
+      .then(afterWrite)
+      .catch(swallowCancelled)
+      .finally(() => setWorking(false))
+  }
+
+  const passkeyRows = passkeys.data?.credentials ?? []
 
   const rows = enrollments.data?.enrollments ?? []
   const confirmedCount = rows.filter((row) => row.confirmedAt).length
@@ -451,6 +537,80 @@ export function SecurityView() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Passkeys</CardTitle>
+            <CardDescription>
+              The discoverable credentials this device and others hold — a sign-in that names no
+              password.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {passkeys.isPending ? (
+              <Spinner />
+            ) : passkeyRows.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>No passkeys</EmptyTitle>
+                  <EmptyDescription>
+                    This account holds no passkeys yet — add one on this device.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div {...stylex.props(styles.listStack)}>
+                {passkeyRows.map((row) => (
+                  <div key={row.id} {...stylex.props(styles.factorRow)}>
+                    <Smartphone {...stylex.props(styles.factorIcon)} />
+                    <div {...stylex.props(styles.factorMain)}>
+                      <Text variant='body-2' weight='medium'>
+                        {row.name}
+                      </Text>
+                      <Text variant='body-2' color='neutral-faded'>
+                        {row.lastUsedAt
+                          ? `Last used ${formatInstant(row.lastUsedAt && timestampDate(row.lastUsedAt))}`
+                          : `Added ${formatInstant(row.createdAt && timestampDate(row.createdAt))}`}
+                      </Text>
+                    </div>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={working}
+                      onClick={() => {
+                        setPasskeyName(row.name)
+                        setPasskeyDialog({ kind: 'rename', credentialId: row.id, name: row.name })
+                      }}
+                    >
+                      Rename
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={working}
+                      onClick={() => deletePasskey(row.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div {...stylex.props(styles.toolbarRow, styles.enrollRow)}>
+              <Button
+                variant='primary'
+                disabled={passkeyBusy}
+                onClick={() => {
+                  setPasskeyName('')
+                  setPasskeyDialog({ kind: 'enroll' })
+                }}
+              >
+                {passkeyBusy ? <Spinner /> : <Plus size={16} />}
+                Add a passkey
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Recovery codes</CardTitle>
             <CardDescription>
               Ten single-use codes the sign-in accepts when the authenticator is out of reach. The
@@ -519,6 +679,52 @@ export function SecurityView() {
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setRegeneratedCodes(null)}>
               I saved my recovery codes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={passkeyDialog !== null}
+        onOpenChange={(next) => {
+          if (!next) setPasskeyDialog(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {passkeyDialog?.kind === 'rename' ? 'Rename this passkey' : 'Add a passkey'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {passkeyDialog?.kind === 'rename'
+                ? 'The name is what this list renders — the credential does not change.'
+                : 'The browser will ask for the authenticator once the name is set.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Field id='field-passkey-name'>
+            <FieldLabel htmlFor='passkey-name'>
+              {passkeyDialog?.kind === 'rename' ? 'New name' : 'Name this passkey'}
+            </FieldLabel>
+            <Input
+              id='passkey-name'
+              value={passkeyName}
+              onChange={(e) => setPasskeyName(e.target.value)}
+              placeholder='Aegis on tablet'
+              maxLength={64}
+              autoFocus
+            />
+          </Field>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={passkeyBusy || passkeyName.trim().length === 0}
+              onClick={() => {
+                if (passkeyDialog?.kind === 'rename') void renamePasskey()
+                else void enrollPasskey()
+              }}
+            >
+              {passkeyBusy ? <Spinner /> : null}
+              {passkeyDialog?.kind === 'rename' ? 'Rename' : 'Continue'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

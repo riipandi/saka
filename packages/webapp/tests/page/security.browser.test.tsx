@@ -26,7 +26,12 @@ import {
 import {
   ReauthenticateResponseSchema,
   SendReauthenticationCodeResponseSchema,
-  WebAuthnService
+  WebAuthnService,
+  ListCredentialsResponseSchema,
+  BeginRegistrationResponseSchema,
+  UpdateCredentialResponseSchema,
+  DeleteCredentialResponseSchema,
+  CredentialSchema
 } from '~/codegen/webauthn_pb'
 
 const USER = create(UserSchema, {
@@ -61,11 +66,15 @@ interface Captured {
   regenerated: { code: string } | null
   disabled: { code: string } | null
   added: { newPassword: string } | null
+  credentialDeleted: { credentialId: string; proof: string | null } | null
+  renamed: { credentialId: string; name: string } | null
+  registrationStarted: number
 }
 
 interface SecurityOptions {
   user?: GetCurrentUserResponse
   enrollments?: TotpEnrollment[]
+  passkeys?: TotpEnrollment[]
 }
 
 async function renderSecurity(
@@ -76,8 +85,16 @@ async function renderSecurity(
     deleted: null,
     regenerated: null,
     disabled: null,
-    added: null
+    added: null,
+    credentialDeleted: null,
+    renamed: null,
+    registrationStarted: 0
   }
+  const credential = create(CredentialSchema, {
+    id: 'psk_v1',
+    name: 'Aegis on tablet',
+    createdAt: { seconds: 1790000000n, nanos: 0 }
+  })
   const transport = createRouterTransport(({ service }) => {
     service(UserService, {
       getCurrentUser: (): GetCurrentUserResponse =>
@@ -117,7 +134,29 @@ async function renderSecurity(
     })
     service(WebAuthnService, {
       reauthenticate: () => create(ReauthenticateResponseSchema, { token: 'proof_9' }),
-      sendReauthenticationCode: () => create(SendReauthenticationCodeResponseSchema, {})
+      sendReauthenticationCode: () => create(SendReauthenticationCodeResponseSchema, {}),
+      listCredentials: () =>
+        create(ListCredentialsResponseSchema, {
+          credentials: options.passkeys ? [credential] : []
+        }),
+      beginRegistration: () => {
+        captured.registrationStarted += 1
+        return create(BeginRegistrationResponseSchema, {
+          options: '{}',
+          sessionId: 'wcs_reg'
+        })
+      },
+      updateCredential: (request) => {
+        captured.renamed = { credentialId: request.credentialId, name: request.name }
+        return create(UpdateCredentialResponseSchema, { credential })
+      },
+      deleteCredential: (request, context) => {
+        captured.credentialDeleted = {
+          credentialId: request.credentialId,
+          proof: context.requestHeader.get('x-saka-reauthentication')
+        }
+        return create(DeleteCredentialResponseSchema, {})
+      }
     })
   })
 
@@ -138,6 +177,9 @@ async function renderSecurity(
               throw new Error('sign in is not part of this page test')
             },
             completeSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            verifyPasskeyLogin: async () => {
               throw new Error('sign in is not part of this page test')
             },
             logout: () => {}
@@ -284,6 +326,61 @@ describe('Security (browser)', () => {
     await vi.waitFor(() => {
       expect(captured.proof).toBe('proof_9')
       expect(captured.disabled).toEqual({ code: '039471' })
+    })
+  })
+
+  it('renders the passkey roll with its rename and delete actions', async () => {
+    const { screen, captured } = await renderSecurity({
+      passkeys: [enrollment('psk_v1', 'Aegis on tablet', true)]
+    })
+    await expect.element(screen.getByText('Aegis on tablet')).toBeVisible()
+
+    // The rename rides no proof — the credential does not change.
+    await screen.getByRole('button', { name: 'Rename' }).click()
+    const nameField = screen.getByLabelText('New name')
+    await nameField.fill('Roaming key')
+    // The dialog's backdrop intercepts synthetic pointer events; the DOM
+    // click is what a real activation reduces to here.
+    const renameConfirm = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Rename' })
+      .element()
+    if (!(renameConfirm instanceof HTMLElement)) {
+      throw new Error('the rename button is not an element')
+    }
+    renameConfirm.click()
+    await vi.waitFor(() => {
+      expect(captured.renamed).toEqual({ credentialId: 'psk_v1', name: 'Roaming key' })
+    })
+    expect(captured.proof).toBeNull()
+
+    // The delete is step-up guarded — the proof is spent on the call.
+    await screen.getByRole('button', { name: 'Delete' }).click()
+    await prove(screen)
+    await vi.waitFor(() => {
+      expect(captured.credentialDeleted).toEqual({
+        credentialId: 'psk_v1',
+        proof: 'proof_9'
+      })
+    })
+  })
+
+  it('asks the browser for a credential when the enrollment begins', async () => {
+    const { screen, captured } = await renderSecurity()
+    await screen.getByRole('button', { name: 'Add a passkey' }).click()
+    await screen.getByLabelText('Name this passkey').fill('Roaming key')
+    const enrollContinue = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Continue' })
+      .element()
+    if (!(enrollContinue instanceof HTMLElement)) {
+      throw new Error('the continue button is not an element')
+    }
+    enrollContinue.click()
+    // The ceremony opened; the browser's create() refuses in a test realm
+    // with no authenticator, and the refusal reads in the page's error line.
+    await vi.waitFor(() => {
+      expect(captured.registrationStarted).toBe(1)
     })
   })
 })

@@ -52,6 +52,15 @@ export interface AuthContextValue {
     factor: CompleteSignInFactor,
     options?: AuthLoginContextOptions
   ) => Promise<void>
+  /**
+   * Finish a discoverable passkey sign-in the login entry began. Resolves
+   * after the session was established and the navigation already happened.
+   */
+  verifyPasskeyLogin: (
+    sessionId: string,
+    credential: string,
+    options?: AuthLoginContextOptions
+  ) => Promise<void>
   logout: () => void
 }
 
@@ -66,6 +75,9 @@ export const AuthContext = createContext<AuthContextValue>({
     throw new Error('AuthProvider is not mounted.')
   },
   completeSignIn: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  verifyPasskeyLogin: async () => {
     throw new Error('AuthProvider is not mounted.')
   },
   logout: () => {}

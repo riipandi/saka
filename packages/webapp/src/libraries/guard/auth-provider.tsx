@@ -96,6 +96,23 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [navigate, router]
   )
 
+  const handleVerifyPasskeyLogin = useCallback(
+    async (sessionId: string, credential: string, options?: AuthLoginContextOptions) => {
+      const profile = await authWorker().verifyPasskeyLogin(sessionId, credential)
+      setAuthUser(profile)
+      // The assertion's account was never the cache's — clear it the same
+      // way a password sign-in does.
+      queryClient.clear()
+      const target = safeReturnTo(options?.redirectTo)
+      if (target) {
+        router.history.push(target)
+      } else {
+        void navigate({ to: '/overview' })
+      }
+    },
+    [navigate, router]
+  )
+
   const handleLogout = useCallback(() => {
     // The eviction effect in the `(app)` layout watches this same profile —
     // mark the sign-out first so its redirect never races the goodbye one.
@@ -123,6 +140,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       login: handleLogin,
       continueSignIn: handleContinueSignIn,
       completeSignIn: handleCompleteSignIn,
+      verifyPasskeyLogin: handleVerifyPasskeyLogin,
       logout: handleLogout
     }),
     [
@@ -132,6 +150,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       handleLogin,
       handleContinueSignIn,
       handleCompleteSignIn,
+      handleVerifyPasskeyLogin,
       handleLogout
     ]
   )

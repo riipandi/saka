@@ -31,6 +31,10 @@ export const styles = stylex.create({
     display: 'flex',
     gap: unit.x3
   },
+  enrollRow: {
+    marginTop: unit.x4,
+    justifyContent: 'flex-start'
+  },
   codes: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',

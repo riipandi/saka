@@ -1,6 +1,5 @@
 import { create } from '@bufbuild/protobuf'
-import { useMutation } from '@connectrpc/connect-query'
-import { startAuthentication } from '@simplewebauthn/browser'
+import { useMutation, useTransport } from '@connectrpc/connect-query'
 import { useState } from 'react'
 import {
   AlertDialog,
@@ -20,9 +19,9 @@ import { InputPassword } from 'uilibs/components/extra/input-password'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { runPasskeyAssertion } from '#/libraries/webauthn/passkey'
 import {
   WebAuthnService,
-  BeginLoginRequestSchema,
   PasskeyProofSchema,
   ReauthenticateRequestSchema,
   SendReauthenticationCodeRequestSchema
@@ -74,7 +73,7 @@ export function ReauthenticateDialog({
     onError: (mutationError) => setError(getErrorMessage(mutationError))
   })
 
-  const beginLogin = useMutation(WebAuthnService.method.beginLogin)
+  const transport = useTransport()
 
   // Every opening starts clean: a factor that half-succeeded for a spent
   // proof must not leak its state into the next challenge.
@@ -96,15 +95,14 @@ export function ReauthenticateDialog({
   const proveWithPasskey = async () => {
     setError(null)
     try {
-      const ceremony = await beginLogin.mutateAsync(create(BeginLoginRequestSchema))
-      const assertion = await startAuthentication({ optionsJSON: JSON.parse(ceremony.options) })
+      const assertion = await runPasskeyAssertion(transport)
       reauthenticate.mutate(
         create(ReauthenticateRequestSchema, {
           proof: {
             case: 'passkey',
             value: create(PasskeyProofSchema, {
-              sessionId: ceremony.sessionId,
-              credential: JSON.stringify(assertion)
+              sessionId: assertion.sessionId,
+              credential: assertion.credential
             })
           }
         })
@@ -121,7 +119,7 @@ export function ReauthenticateDialog({
     )
   }
 
-  const proving = reauthenticate.isPending || beginLogin.isPending || sendCode.isPending
+  const proving = reauthenticate.isPending || sendCode.isPending
 
   return (
     <AlertDialog
