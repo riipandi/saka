@@ -80,6 +80,15 @@ export const styles = stylex.create({
   submit: {
     width: '100%'
   },
+  countdown: {
+    marginTop: unit.x2
+  },
+  mfaCodeInput: {
+    letterSpacing: '0.35em',
+    fontSize: fontSize.headline2,
+    textAlign: 'center',
+    width: '100%'
+  },
   alerts: {
     display: 'flex',
     flexDirection: 'column',

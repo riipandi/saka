@@ -22,6 +22,13 @@ vi.mock('#/libraries/device-fingerprint', () => ({
   deviceHeaders: async () => ({ 'x-device-fingerprint': 'fp-test', 'user-agent': 'ua-test' })
 }))
 
+/** The signed-in arm of the outcome — the tests below hold a session only
+ * when the sign-in did not fork. */
+function signedIn(outcome: import('#/libraries/guard/auth-engine').SignInOutcome) {
+  if (outcome.kind !== 'signed-in') throw new Error('the sign-in forked unexpectedly')
+  return outcome.session
+}
+
 describe('auth engine (browser)', () => {
   let fetchMock: ReturnType<typeof fetchStub>
 
@@ -38,7 +45,9 @@ describe('auth engine (browser)', () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
 
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const outcome = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    if (outcome.kind !== 'signed-in') throw new Error('the sign-in forked unexpectedly')
+    const session = outcome.session
 
     expect(session.user).toEqual(userJson)
     expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
@@ -47,15 +56,38 @@ describe('auth engine (browser)', () => {
     await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
   })
 
-  it('refuses the multi-factor fork — it ships in a later slice', async () => {
+  it('answers the multi-factor fork as the outcome, with no tokens issued', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ ...signInJson, accessToken: '', refreshToken: '', mfaRequired: true })
+      jsonResponse({
+        ...signInJson,
+        accessToken: '',
+        refreshToken: '',
+        mfaRequired: true,
+        mfaPendingToken: 'bridge_1',
+        mfaPendingExpiresAt: '2030-01-15T10:00:00Z'
+      })
     )
     const engine = createAuthEngine('http://test.local')
 
-    await expect(engine.login({ identity: 'rlangdon', password: 'sophie' })).rejects.toThrow(
-      /multi-factor/i
+    const outcome = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    expect(outcome).toMatchObject({ kind: 'mfa-challenge', pendingToken: 'bridge_1' })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('answers the forced-enrollment fork as the outcome, with no tokens issued', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...signInJson,
+        accessToken: '',
+        refreshToken: '',
+        mfaEnrollmentRequired: true,
+        mfaPendingToken: 'bridge_2'
+      })
     )
+    const engine = createAuthEngine('http://test.local')
+
+    const outcome = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    expect(outcome).toMatchObject({ kind: 'enrollment-required', pendingToken: 'bridge_2' })
     await expect(engine.accessToken()).resolves.toBeNull()
   })
 
@@ -163,7 +195,7 @@ describe('auth engine (browser)', () => {
   it('restores a still-valid pair and refuses a dead one', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
 
     const freshEngine = createAuthEngine('http://test.local')
     await freshEngine.restore(session.tokens)
@@ -179,7 +211,7 @@ describe('auth engine (browser)', () => {
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
 
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
     expect(changes).toEqual([session.tokens])
 
     fetchMock.mockResolvedValue(jsonResponse({ ...signInJson, accessToken: 'access-b' }))
@@ -270,7 +302,7 @@ describe('auth engine (browser)', () => {
   it('reports an accepted restore through the listener', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
 
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
@@ -287,9 +319,8 @@ describe('auth engine (browser)', () => {
     const worker = authWorker()
 
     // Sign-in writes the fresh pair and caches the profile.
-    await expect(worker.login({ identity: 'rlangdon', password: 'sophie' })).resolves.toEqual(
-      userJson
-    )
+    const outcome = await worker.login({ identity: 'rlangdon', password: 'sophie' })
+    expect(outcome).toMatchObject({ kind: 'signed-in', session: { user: userJson } })
     expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
     expect(readUserCookie()).toEqual(userJson)
 

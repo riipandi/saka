@@ -78,8 +78,15 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
             },
             loggedIn: true,
             isLoading: false,
-            login: async () => {},
-            continueSignIn: async () => {},
+            login: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            continueSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            completeSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout: () => {}
           }}
         >

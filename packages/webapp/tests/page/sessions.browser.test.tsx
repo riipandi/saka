@@ -68,8 +68,15 @@ function wrapperWith(transport: ReturnType<typeof createRouterTransport>, childr
             user: null,
             loggedIn: true,
             isLoading: false,
-            login: async () => {},
-            continueSignIn: async () => {},
+            login: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            completeSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            continueSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout: () => {}
           }}
         >
@@ -128,8 +135,15 @@ async function renderSessions(handlers?: SessionHandlers) {
             user: null,
             loggedIn: true,
             isLoading: false,
-            login: async () => {},
-            continueSignIn: async () => {},
+            login: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            continueSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            completeSignIn: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout
           }}
         >

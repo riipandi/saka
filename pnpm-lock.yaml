@@ -194,6 +194,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    uqr:
+      specifier: ^0.1.3
+      version: 0.1.3
     vite:
       specifier: npm:@voidzero-dev/vite-plus-core@1.1.0
       version: 1.1.0
@@ -483,6 +486,9 @@ importers:
       uilibs:
         specifier: workspace:*
         version: link:../uilibs
+      uqr:
+        specifier: 'catalog:'
+        version: 0.1.3
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -5094,6 +5100,9 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
+
   uri-template-matcher@1.1.2:
     resolution: {integrity: sha512-uZc1h12jdO3m/R77SfTEOuo6VbMhgWznaawKpBjRGSJb7i91x5PgI37NQJtG+Cerxkk0yr1pylBY2qG1kQ+aEQ==}
 
@@ -9511,6 +9520,8 @@ snapshots:
       browserslist: 4.29.3
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   uri-template-matcher@1.1.2: {}
 

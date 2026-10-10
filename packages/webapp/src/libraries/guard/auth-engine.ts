@@ -1,17 +1,22 @@
 import { create } from '@bufbuild/protobuf'
+import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { Code, ConnectError, createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { RPC_BASE_URL } from '#/libraries/api-client'
 import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/codegen/authn_pb'
 import {
+  CompleteSignInRequestSchema,
   ContinueOAuthSignInRequestSchema,
+  MultifactorService,
   OAuthSSOService,
+  PasskeyFactorSchema,
   SessionService,
   SignInRequestSchema,
   SignOutRequestSchema
 } from '~/codegen/authn_pb'
 import type {
   AuthenticatedUser,
+  CompleteSignInResponse,
   ContinueOAuthSignInResponse,
   GetSessionResponse,
   RefreshResponse,
@@ -84,6 +89,36 @@ export interface AuthLoginOptions {
 }
 
 /**
+ * A sign-in the backend paused at the multi-factor fork: no tokens were
+ * issued, the pending bridge is the only credential the caller holds, and it
+ * dies at `expiresAt` (epoch milliseconds) unspent. The bridge lives in the
+ * view's memory alone — never a URL — until the second factor spends it.
+ */
+export type SignInChallenge =
+  | {
+      kind: 'mfa-challenge'
+      pendingToken: string
+      expiresAt: number
+    }
+  | {
+      kind: 'enrollment-required'
+      pendingToken: string
+      expiresAt: number
+    }
+
+/**
+ * The sign-in's outcome: either the session the pair establishes, or the
+ * fork the flow paused at (D8 — a discriminated outcome, not an exception
+ * the view steers by).
+ */
+export type SignInOutcome = { kind: 'signed-in'; session: AuthSession } | SignInChallenge
+
+/** The second factor `completeSignIn` spends the bridge with. */
+export type CompleteSignInFactor =
+  | { kind: 'code'; code: string }
+  | { kind: 'passkey'; sessionId: string; credential: string }
+
+/**
  * Transport-agnostic authn engine. Runs inside the Comlink worker (default) or
  * on the main thread as a fallback (SSR, tests, CSP-restricted environments).
  *
@@ -95,18 +130,34 @@ export interface AuthLoginOptions {
  * via {@link AuthEngineApi.restore}.
  */
 export interface AuthEngineApi {
-  /** Validate credentials, mint the token pair. Resolves the profile and tokens. */
+  /**
+   * Validate credentials. Resolves the outcome: the session's profile and
+   * tokens, or the multi-factor fork the flow paused at — a challenge to
+   * complete through {@link AuthEngineApi.completeSignIn}, or a forced
+   * enrollment the pending bridge admits.
+   */
   login(
     credentials: LoginCredentials,
     options?: AuthLoginOptions,
     hints?: TraceHints
-  ): Promise<AuthSession>
+  ): Promise<SignInOutcome>
   /**
    * Complete an OAuth SSO flow the callback redirected with: the flow token
-   * is the whole credential. Resolves the profile and tokens; a flow that
-   * paused at a stage this build does not handle is refused loudly.
+   * is the whole credential. Resolves the same outcome the password sign-in
+   * does; a flow that paused at a stage this build does not handle is
+   * refused loudly.
    */
-  continueSignIn(flowToken: string, hints?: TraceHints): Promise<AuthSession>
+  continueSignIn(flowToken: string, hints?: TraceHints): Promise<SignInOutcome>
+  /**
+   * Spend the pending bridge with the second factor — a TOTP or recovery
+   * code, or a passkey assertion over a ceremony the sign-in begin answered.
+   * Resolves the profile and tokens the way a one-factor sign-in does.
+   */
+  completeSignIn(
+    pendingToken: string,
+    factor: CompleteSignInFactor,
+    hints?: TraceHints
+  ): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -157,6 +208,26 @@ function readProfile(response: GetSessionResponse): UserProfile | null {
   return response.user ? toProfile(response.user) : null
 }
 
+/** The pending bridge's mint-time lifetime when the wire omits its expiry —
+ * the backend keeps it five minutes (see `.llms/rules.md`, Multifactor). */
+const MFA_BRIDGE_FALLBACK_MS = 5 * 60_000
+
+/** The fork the sign-in paused at, read off the wire's fork fields. The
+ * enrollment fork precedes the challenge fork: the enrollment answer carries
+ * the same bridge and the same expiry. */
+function readFork(response: SignInResponse | ContinueOAuthSignInResponse): SignInChallenge | null {
+  const expiresAt = response.mfaPendingExpiresAt
+    ? timestampDate(response.mfaPendingExpiresAt).getTime()
+    : Date.now() + MFA_BRIDGE_FALLBACK_MS
+  if ('mfaEnrollmentRequired' in response && response.mfaEnrollmentRequired) {
+    return { kind: 'enrollment-required', pendingToken: response.mfaPendingToken, expiresAt }
+  }
+  if (response.mfaRequired && response.mfaPendingToken) {
+    return { kind: 'mfa-challenge', pendingToken: response.mfaPendingToken, expiresAt }
+  }
+  return null
+}
+
 export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi {
   /**
    * The device headers the main thread handed over. They start empty — the
@@ -177,6 +248,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   const auth = createClient(AuthService, transport)
   const session = createClient(SessionService, transport)
   const oauth = createClient(OAuthSSOService, transport)
+  const mfa = createClient(MultifactorService, transport)
 
   let tokens: TokenBundle | null = null
   let refreshInFlight: Promise<boolean> | null = null
@@ -220,7 +292,11 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   }
   /** Take custody of a fresh pair from SignIn, ContinueSignIn, or Refresh and return it. */
   function takeTokenPair(
-    response: SignInResponse | RefreshResponse | ContinueOAuthSignInResponse
+    response:
+      | SignInResponse
+      | RefreshResponse
+      | ContinueOAuthSignInResponse
+      | CompleteSignInResponse
   ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
@@ -233,6 +309,20 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
     scheduleProactiveRefresh()
     notify(next)
     return next
+  }
+
+  /** The custody path every sign-in completion rides — the fork's answer
+   * and the one-factor sign-in land here alike. A success with tokens always
+   * names its account; the field is presence-based, so the guard keeps the
+   * mapping honest. */
+  function finishSignIn(
+    response: SignInResponse | ContinueOAuthSignInResponse | CompleteSignInResponse
+  ): AuthSession {
+    if (!response.user) {
+      throw new ConnectError('Sign-in answered without an account.', Code.Internal)
+    }
+    const pair = takeTokenPair(response)
+    return { user: toProfile(response.user), tokens: pair }
   }
 
   async function doRefresh(hints?: TraceHints): Promise<boolean> {
@@ -280,22 +370,14 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         callHints(hints)
       )
       // The contract forks on multi-factor: no tokens are issued until the
-      // second factor answers. The challenge flow ships later — refuse it
-      // loudly here rather than half-support it.
-      if (response.mfaRequired || response.mfaEnrollmentRequired) {
+      // second factor answers (or the forced enrollment completes). The fork
+      // is the outcome — the bridge rides the view's memory alone.
+      const fork = readFork(response)
+      if (fork) {
         tokens = null
-        throw new ConnectError(
-          'Multi-factor sign-in is not supported in this build yet.',
-          Code.Unimplemented
-        )
+        return fork
       }
-      // A success with tokens always names its account; the field is
-      // presence-based, so the guard keeps the mapping honest.
-      if (!response.user) {
-        throw new ConnectError('Sign-in answered without an account.', Code.Internal)
-      }
-      const pair = takeTokenPair(response)
-      return { user: toProfile(response.user), tokens: pair }
+      return { kind: 'signed-in', session: finishSignIn(response) }
     },
 
     async continueSignIn(flowToken, hints) {
@@ -306,15 +388,13 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         create(ContinueOAuthSignInRequestSchema, { flowToken }),
         callHints(hints)
       )
-      // The same forks the password sign-in pauses with, the same refusals:
-      // the challenge UI and the stage surfaces ship later, so a flow that
-      // paused is refused loudly rather than half-supported.
-      if (response.mfaRequired) {
+      // The same fork the password sign-in pauses with. A stage pause this
+      // build does not handle is still refused loudly rather than
+      // half-supported.
+      const fork = readFork(response)
+      if (fork) {
         tokens = null
-        throw new ConnectError(
-          'Multi-factor sign-in is not supported in this build yet.',
-          Code.Unimplemented
-        )
+        return fork
       }
       if (response.stage) {
         tokens = null
@@ -323,11 +403,27 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
           Code.Unimplemented
         )
       }
-      if (!response.user) {
-        throw new ConnectError('The sign-in flow answered without an account.', Code.Internal)
-      }
-      const pair = takeTokenPair(response)
-      return { user: toProfile(response.user), tokens: pair }
+      return { kind: 'signed-in', session: finishSignIn(response) }
+    },
+
+    async completeSignIn(pendingToken, factor, hints) {
+      const response = await mfa.completeSignIn(
+        create(CompleteSignInRequestSchema, {
+          pendingToken,
+          secondFactor:
+            factor.kind === 'code'
+              ? { case: 'code', value: factor.code }
+              : {
+                  case: 'passkey',
+                  value: create(PasskeyFactorSchema, {
+                    sessionId: factor.sessionId,
+                    credential: factor.credential
+                  })
+                }
+        }),
+        callHints(hints)
+      )
+      return finishSignIn(response)
     },
 
     refresh(hints) {

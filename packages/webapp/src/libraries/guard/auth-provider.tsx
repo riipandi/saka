@@ -1,6 +1,7 @@
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo } from 'react'
 import { AuthContext, useAuth, type AuthLoginContextOptions } from '#/hooks/use-auth'
+import type { CompleteSignInFactor, SignInOutcome } from '#/libraries/guard/auth-engine'
 import { queryClient } from '../api-client'
 import type { LoginCredentials } from './auth-engine'
 import { ensureSessionLoaded, refreshIfExpiring } from './auth-session'
@@ -35,12 +36,17 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, [])
 
   // The worker holds the token pair and answers the profile; this layer
-  // persists the pair to the cookie via the worker client.
+  // persists the pair to the cookie via the worker client. A multi-factor
+  // fork returns its outcome to the view — the fork owns the navigation.
   const handleLogin = useCallback(
-    async (credentials: LoginCredentials, options?: AuthLoginContextOptions) => {
+    async (
+      credentials: LoginCredentials,
+      options?: AuthLoginContextOptions
+    ): Promise<SignInOutcome> => {
       const { redirectTo, ...workerOptions } = options ?? {}
-      const profile = await authWorker().login(credentials, workerOptions)
-      setAuthUser(profile)
+      const outcome = await authWorker().login(credentials, workerOptions)
+      if (outcome.kind !== 'signed-in') return outcome
+      setAuthUser(outcome.session.user)
       // The cache may hold the previous account's data — a re-login as a
       // different account must never render it.
       queryClient.clear()
@@ -50,20 +56,44 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       } else {
         void navigate({ to: '/overview' })
       }
+      return outcome
     },
     [navigate, router]
   )
 
   const handleContinueSignIn = useCallback(
-    async (flowToken: string) => {
-      const profile = await authWorker().continueSignIn(flowToken)
-      setAuthUser(profile)
+    async (flowToken: string): Promise<SignInOutcome> => {
+      const outcome = await authWorker().continueSignIn(flowToken)
+      if (outcome.kind !== 'signed-in') return outcome
+      setAuthUser(outcome.session.user)
       // The flow's redirect chain never carried the cache's account — clear it
       // the same way a password sign-in does.
       queryClient.clear()
       void navigate({ to: '/overview' })
+      return outcome
     },
     [navigate]
+  )
+
+  const handleCompleteSignIn = useCallback(
+    async (
+      pendingToken: string,
+      factor: CompleteSignInFactor,
+      options?: AuthLoginContextOptions
+    ) => {
+      const profile = await authWorker().completeSignIn(pendingToken, factor)
+      setAuthUser(profile)
+      // The bridge's account was never the cache's — clear it the same way a
+      // password sign-in does.
+      queryClient.clear()
+      const target = safeReturnTo(options?.redirectTo)
+      if (target) {
+        router.history.push(target)
+      } else {
+        void navigate({ to: '/overview' })
+      }
+    },
+    [navigate, router]
   )
 
   const handleLogout = useCallback(() => {
@@ -92,9 +122,18 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       isLoading,
       login: handleLogin,
       continueSignIn: handleContinueSignIn,
+      completeSignIn: handleCompleteSignIn,
       logout: handleLogout
     }),
-    [user, loggedIn, isLoading, handleLogin, handleContinueSignIn, handleLogout]
+    [
+      user,
+      loggedIn,
+      isLoading,
+      handleLogin,
+      handleContinueSignIn,
+      handleCompleteSignIn,
+      handleLogout
+    ]
   )
 
   return <AuthContext.Provider value={context}>{children}</AuthContext.Provider>

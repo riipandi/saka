@@ -11,8 +11,9 @@ import {
 import type {
   AuthEngineApi,
   AuthLoginOptions,
-  AuthSession,
+  CompleteSignInFactor,
   LoginCredentials,
+  SignInOutcome,
   TokenListener
 } from './auth-engine'
 import { createAuthEngine } from './auth-engine'
@@ -32,10 +33,17 @@ import { publishTokens, subscribeTokens } from './auth-sync'
  * worker's live pair.
  */
 export interface AuthWorkerClient {
-  /** Validate credentials, mint the pair, persist the cookie. Resolves the profile. */
-  login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<UserProfile>
-  /** Complete an OAuth SSO flow the callback redirected with. Resolves the profile. */
-  continueSignIn(flowToken: string): Promise<UserProfile>
+  /**
+   * Validate credentials. Resolves the sign-in's outcome — the profile when
+   * the session was established, or the multi-factor fork the view finishes
+   * (the pair's custody happened inside, the cookie is written only for a
+   * signed-in answer).
+   */
+  login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<SignInOutcome>
+  /** Complete an OAuth SSO flow the callback redirected with. Resolves the same outcome. */
+  continueSignIn(flowToken: string): Promise<SignInOutcome>
+  /** Spend the pending bridge with the second factor. Resolves the profile. */
+  completeSignIn(pendingToken: string, factor: CompleteSignInFactor): Promise<UserProfile>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -111,17 +119,31 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
     async login(credentials: LoginCredentials, options?: AuthLoginOptions) {
       return spanOperation('login', async (hints) => {
         await deviceReady
-        const result: AuthSession = await engine.login(credentials, options, hints)
-        writeUserCookie(result.user, result.tokens.refreshExpiresAt)
-        return result.user
+        const outcome: SignInOutcome = await engine.login(credentials, options, hints)
+        // Only a signed-in answer establishes custody the cookie mirrors; a
+        // fork carries no tokens and leaves the jar exactly as it was.
+        if (outcome.kind === 'signed-in') {
+          writeUserCookie(outcome.session.user, outcome.session.tokens.refreshExpiresAt)
+        }
+        return outcome
       })
     },
     async continueSignIn(flowToken: string) {
       return spanOperation('continue-sign-in', async (hints) => {
         await deviceReady
-        const result: AuthSession = await engine.continueSignIn(flowToken, hints)
-        writeUserCookie(result.user, result.tokens.refreshExpiresAt)
-        return result.user
+        const outcome: SignInOutcome = await engine.continueSignIn(flowToken, hints)
+        if (outcome.kind === 'signed-in') {
+          writeUserCookie(outcome.session.user, outcome.session.tokens.refreshExpiresAt)
+        }
+        return outcome
+      })
+    },
+    async completeSignIn(pendingToken: string, factor: CompleteSignInFactor) {
+      return spanOperation('complete-sign-in', async (hints) => {
+        await deviceReady
+        const session = await engine.completeSignIn(pendingToken, factor, hints)
+        writeUserCookie(session.user, session.tokens.refreshExpiresAt)
+        return session.user
       })
     },
     async refresh() {
