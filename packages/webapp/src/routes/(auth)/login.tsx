@@ -7,6 +7,7 @@ export const Route = createFileRoute('/(auth)/login')({
   validateSearch: z.object({
     loggedOut: z.coerce.boolean().optional(),
     unauthenticated: z.coerce.boolean().optional(),
+    reset: z.coerce.boolean().optional(),
     return_to: z.string().optional()
   }),
   staticData: {
@@ -15,6 +16,13 @@ export const Route = createFileRoute('/(auth)/login')({
 })
 
 function RouteComponent() {
-  const { loggedOut, unauthenticated, return_to: returnTo } = useSearch({ from: Route.id })
-  return <LoginView loggedOut={loggedOut} unauthenticated={unauthenticated} returnTo={returnTo} />
+  const { loggedOut, unauthenticated, reset, return_to: returnTo } = useSearch({ from: Route.id })
+  return (
+    <LoginView
+      loggedOut={loggedOut}
+      unauthenticated={unauthenticated}
+      reset={reset}
+      returnTo={returnTo}
+    />
+  )
 }

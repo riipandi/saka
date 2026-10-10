@@ -50,10 +50,12 @@ type LoginPhase =
 export function LoginView({
   loggedOut,
   unauthenticated,
+  reset,
   returnTo
 }: {
   loggedOut?: boolean
   unauthenticated?: boolean
+  reset?: boolean
   returnTo?: string
 }) {
   const navigate = useNavigate()
@@ -67,17 +69,20 @@ export function LoginView({
   const [phase, setPhase] = useState<LoginPhase>({ name: 'credentials' })
   const [passkeyBusy, setPasskeyBusy] = useState(false)
 
-  // Goodbye and sign-in-required notices belong to the redirect that brought
-  // the visitor here, refresh page or back-navigation never replays them.
+  // Goodbye, sign-in-required, and password-reset notices belong to the
+  // redirect that brought the visitor here; refresh page or back-navigation
+  // never replays them.
   const [arrivedLoggedOut] = useState(loggedOut)
   const [arrivedUnauthenticated] = useState(unauthenticated)
+  const [arrivedReset] = useState(reset)
   const showGoodbye = Boolean(arrivedLoggedOut) && !dismissed && !failed
   const showSignInPrompt = Boolean(arrivedUnauthenticated) && !dismissed && !failed
+  const showReset = Boolean(arrivedReset) && !dismissed && !failed
 
   useEffect(() => {
-    if (!loggedOut && !unauthenticated) return
+    if (!loggedOut && !unauthenticated && !reset) return
     void navigate({ to: '/login', search: { return_to: returnTo }, replace: true })
-  }, [loggedOut, unauthenticated, returnTo, navigate])
+  }, [loggedOut, unauthenticated, reset, returnTo, navigate])
 
   // A sign-in that forked on another route (the OAuth callback) handed its
   // bridge over before landing here; taking it consumes the slot.
@@ -155,7 +160,7 @@ export function LoginView({
   return (
     <div {...stylex.props(styles.page)}>
       {/* Page-level notices live above the card, matching its width. */}
-      {(failed || showGoodbye || showSignInPrompt) && (
+      {(failed || showGoodbye || showSignInPrompt || showReset) && (
         <div {...stylex.props(styles.alerts)}>
           {failed && (
             <ViewTransition>
@@ -178,6 +183,16 @@ export function LoginView({
               <Alert id='login-alert-signin'>
                 <AlertTitle>Sign in required</AlertTitle>
                 <AlertDescription>You are unauthenticated. Sign in to continue.</AlertDescription>
+              </Alert>
+            </ViewTransition>
+          )}
+          {showReset && (
+            <ViewTransition>
+              <Alert id='login-alert-reset'>
+                <AlertTitle>Password reset</AlertTitle>
+                <AlertDescription>
+                  Your password has been reset — sign in with the new one.
+                </AlertDescription>
               </Alert>
             </ViewTransition>
           )}
