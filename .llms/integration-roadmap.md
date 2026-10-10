@@ -303,23 +303,42 @@ decisions, settled in the same discussion:
   server judge by the same rule, and a requirement written for the guard reads as a
   literal in the UI.
 
-- [ ] **Claims into the store** — the engine (worker) decodes the access token's
+- [x] **Claims into the store** — the engine (worker) decodes the access token's
   `roles`/`permissions` at custody change; the store carries them beside the profile;
   every refresh replaces the snapshot; sign-out clears them with the pair.
-- [ ] **The permission engine** — the TS port of the matcher described above, exposed as
+  Shipped 2026-10-10 (`libraries/guard/auth-claims.ts` + the custody listener): the
+  decode rides the one main-thread custody site `persistTokens`, which both realms
+  wire, and the claims are live on every pair the backend already mints
+  (`signin/service.go:792`, `session/service.go:594`) — no backend change, exactly
+  the owner's shape.
+- [x] **The permission engine** — the TS port of the matcher described above, exposed as
   a `can(requirement)` primitive over the store's grants; unit tests cross-checked
   against the Go matcher's behavior (the same grant/requirement pairs, the same answers).
-- [ ] **React ergonomics** — `usePermissions()` and a `<Can permission="user:list">`
+  Shipped 2026-10-10 (`libraries/guard/permissions.ts` + `permissions-store.ts`): the
+  unit table transcribes `framework/authz/authz_test.go` pair for pair, and `can()`
+  reads the store synchronously so route guards and interceptors can ask it.
+- [x] **React ergonomics** — `usePermissions()` and a `<Can permission="user:list">`
   component in `libraries/guard/` (the namespace stays generic per D10 — no `admin`-only
-  vocabulary in the shared names).
-- [ ] **Administrator signal** — `isAdministrator` derived from the claims (holding the
+  vocabulary in the shared names). Shipped 2026-10-10: `usePermissions()` subscribes
+  the snapshot via `useSelector`; `<Can permission fallback>` hides rather than
+  disables and warns at the render when the slug is not three segments (a matcher's
+  silent false would make a surface vanish for the one account that should see it).
+- [x] **Administrator signal** — `isAdministrator` derived from the claims (holding the
   `administrator` system role), ready for `admin/route.tsx` to consume in Wave 3.
-- [ ] **Refusal mapping** — the Connect codes the guard answers
+  Shipped 2026-10-10: the synchronous `isAdministrator()` in `permissions-store.ts`
+  and the subscribed one inside `usePermissions()`.
+- [x] **Refusal mapping** — the Connect codes the guard answers
   (`permission_required`, `permission_denied`) join the error mapping, so a UI check
   that missed a case degrades to the server's word, never a silent lie.
-- [ ] **Catalog left out** — `ListPermissions` (the code-declared catalog) is an
+  **Corrected by the wire check (2026-10-10, plan-20261010_0610 D4):** the guard
+  answers those refusals as `not_found` (`internal/transport/middleware/guard.go`
+  — the disclosure rule the rules file records); no permission code ever reaches the
+  client. The map already carries `NotFound`'s word, so a missed UI check degrades to
+  the server's sentence; unit tests pin the two shapes the guard's refusals arrive
+  as. No backend change — the owner's "no backend change" stands.
+- [x] **Catalog left out** — `ListPermissions` (the code-declared catalog) is an
   admin-read surface; the screens that render it land in Wave 3. The foundation checks
-  against the snapshot alone.
+  against the snapshot alone. Held as scope: no `ListPermissions` consumer shipped.
 
 ### Wave 1.6 — frontend observability (owner direction, 2026-10-10)
 
