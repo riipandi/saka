@@ -11,7 +11,7 @@ name: Release (stable)
 on:
   push:
     # tags: ["v*.*.*"]
-    tags: ["v20*-*"]
+    tags: ["v20*"]
 
 permissions:
   contents: write
