@@ -16,6 +16,12 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
+        # The SPA exports its own spans here — a browser POST, not a
+        # process dial — so the receiver answers the CORS preflight for the
+        # origin the webapp is served from. Add a production origin the
+        # same way when a deployment opens this door.
+        cors:
+          allowed_origins: ['http://localhost:3000']
 
   postgresql:
     endpoint: pgsql:5432

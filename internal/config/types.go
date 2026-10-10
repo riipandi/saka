@@ -369,6 +369,31 @@ type OTEL struct {
 	Tracing OTELTracing `koanf:"tracing" json:"tracing"`
 	// Metrics holds the metric export settings.
 	Metrics OTELMetrics `koanf:"metrics" json:"metrics"`
+	// Browser is the telemetry fact the SPA reads from the public document:
+	// the OTLP/HTTP address the web client exports its spans to. It is a
+	// different door from Endpoint — the process's collector is often
+	// loopback-only and carries the process's auth headers — so it is named
+	// separately and published in the public scope, where Endpoint is
+	// administrator-only.
+	//
+	// An empty address means frontend tracing is off: the SPA initializes no
+	// provider and dials nothing. A zero ratio means every trace is sampled —
+	// the loud default, because an operator who named a collector wanted
+	// spans, and a silent zero would sample nothing; a partial ratio is set
+	// explicitly.
+	Browser OTELBrowsing `koanf:"browser" json:"browser"`
+}
+
+// OTELBrowsing holds the browser-facing telemetry settings.
+type OTELBrowsing struct {
+	// Endpoint is the collector address the web client exports to, absolute
+	// and browser-reachable. The collector's receiver answers the CORS check
+	// for the origin the SPA is served from.
+	Endpoint string `koanf:"endpoint" json:"endpoint"`
+	// Ratio is the fraction of traces the web client samples. A fraction
+	// rather than a percentage, read by the ratio sampler; zero samples
+	// everything (see OTEL.Browser).
+	Ratio float64 `koanf:"ratio" json:"ratio"`
 }
 
 // OTELTracing holds the trace export settings.

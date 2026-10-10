@@ -37,6 +37,19 @@ export const appConfigSchema = z.object({
         .object({ announcement_email_enabled: z.boolean().default(false) })
         .prefault({})
     })
+    .prefault({}),
+  // The browser-facing telemetry fact: an absent or empty endpoint means
+  // frontend tracing is off, and a zero ratio samples everything (the
+  // loud default the backend's schema comment carries).
+  otel: z
+    .object({
+      browser: z
+        .object({
+          endpoint: z.string().default(''),
+          ratio: z.number().min(0).max(1).default(0)
+        })
+        .prefault({})
+    })
     .prefault({})
 })
 

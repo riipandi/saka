@@ -120,6 +120,7 @@ var envKeys = map[string]string{
 	"mailer.smtp_secure":               "MAILER_SMTP_SECURE",
 	"mailer.smtp_username":             "MAILER_SMTP_USERNAME",
 	"otel.endpoint":                    "OTEL_ENDPOINT",
+	"otel.browser.endpoint":            "OTEL_BROWSER_ENDPOINT",
 	"otel.metrics.enable":              "OTEL_METRICS_ENABLE",
 	"otel.service_name":                "OTEL_SERVICE_NAME",
 	"otel.tracing.enable":              "OTEL_TRACING_ENABLE",

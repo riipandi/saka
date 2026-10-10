@@ -286,7 +286,7 @@ Saka's machine credentials live in `ApiKeyService` (`modules/apikey`) above — 
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
+| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles, `otel.browser` — the SPA's tracing door), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
 | POST | `/rpc/saka.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |

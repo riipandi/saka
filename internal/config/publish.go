@@ -191,6 +191,17 @@ type PublishedOTEL struct {
 	QueueMaxSize int                  `json:"queue_max_size,omitzero"`
 	Tracing      PublishedOTELTracing `json:"tracing,omitzero"`
 	Metrics      PublishedOTELMetrics `json:"metrics,omitzero"`
+	// Browser is the browser-facing telemetry fact. It is published in both
+	// scopes: the public body is what the SPA reads to decide whether
+	// frontend tracing exists, the full body keeps the administrator's
+	// document complete.
+	Browser PublishedOTELBrowsing `json:"browser,omitzero"`
+}
+
+// PublishedOTELBrowsing is the browser-facing telemetry settings.
+type PublishedOTELBrowsing struct {
+	Endpoint string  `json:"endpoint,omitzero"`
+	Ratio    float64 `json:"ratio,omitzero"`
 }
 
 // PublishedOTELTracing is the trace export settings.
@@ -331,6 +342,12 @@ func (c Config) Published(full bool) Published {
 				AnnouncementEmailEnabled: c.Mailer.Notifications.AnnouncementEmailEnabled,
 			},
 		},
+		OTEL: PublishedOTEL{
+			Browser: PublishedOTELBrowsing{
+				Endpoint: c.OTEL.Browser.Endpoint,
+				Ratio:    c.OTEL.Browser.Ratio,
+			},
+		},
 	}
 
 	if !full {
@@ -449,6 +466,10 @@ func (c Config) Published(full bool) Published {
 			PrometheusPath: c.OTEL.Metrics.PrometheusPath,
 			Interval:       seconds(c.OTEL.Metrics.Interval),
 			ExportTimeout:  seconds(c.OTEL.Metrics.ExportTimeout),
+		},
+		Browser: PublishedOTELBrowsing{
+			Endpoint: c.OTEL.Browser.Endpoint,
+			Ratio:    c.OTEL.Browser.Ratio,
 		},
 	}
 	public.Queue = PublishedQueue{
