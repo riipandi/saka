@@ -4,6 +4,7 @@ import { ofetch } from 'ofetch'
 import { deviceHeaders } from '#/libraries/device-fingerprint'
 import { clearAuth } from '#/libraries/guard/auth-store'
 import { authWorker } from '#/libraries/guard/auth-worker-client'
+import { sendWithSeamSpan } from '#/libraries/telemetry/seam-span'
 
 /**
  * Base URL for API and RPC requests. Defaults to `/api` and `/rpc`.
@@ -58,12 +59,23 @@ function mergeHeaders(existing: HeadersInit | undefined, extra: Record<string, s
 
 export const authFetch: typeof fetch = async (input, init) => {
   return withAuth(async (headers) => {
-    const url = input instanceof URL ? input.toString() : input
     const device = await deviceHeaders()
-    return fetch(url, {
-      ...init,
-      headers: mergeHeaders(mergeHeaders(init?.headers, device), headers)
-    })
+    // One client span per request — replays included, each is a real wire
+    // round trip; the refresh that caused a replay is the engine's business.
+    return sendWithSeamSpan(
+      {
+        url: input instanceof Request ? input.url : input instanceof URL ? input.toString() : input,
+        method: init?.method ?? (input instanceof Request ? input.method : undefined)
+      },
+      (spanHeaders) =>
+        fetch(input, {
+          ...init,
+          headers: mergeHeaders(
+            mergeHeaders(mergeHeaders(init?.headers, device), headers),
+            spanHeaders
+          )
+        })
+    )
   })
 }
 
