@@ -5,7 +5,7 @@ name: Test
 on:
   push:
     # branches: ["**"]
-    branches: ["main"]
+    # branches: ["main"]
     paths-ignore:
       - ".vite-hooks/**"
       - ".github/workflows/release.yml"
