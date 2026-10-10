@@ -1,6 +1,6 @@
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { QueryClient } from '@tanstack/react-query'
-import { ofetch } from 'ofetch'
+import { ofetch, type Fetch } from 'ofetch'
 import { deviceHeaders } from '#/libraries/device-fingerprint'
 import { clearAuth } from '#/libraries/guard/auth-store'
 import { authWorker } from '#/libraries/guard/auth-worker-client'
@@ -57,7 +57,7 @@ function mergeHeaders(existing: HeadersInit | undefined, extra: Record<string, s
   return merged
 }
 
-export const authFetch: typeof fetch = async (input, init) => {
+export const authFetch: Fetch = async (input, init) => {
   return withAuth(async (headers) => {
     const device = await deviceHeaders()
     // One client span per request — replays included, each is a real wire
