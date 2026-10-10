@@ -18,6 +18,7 @@ import type {
   SignInRequest,
   SignInResponse
 } from '~/codegen/authn_pb'
+import type { TraceHints } from '../telemetry/seam-span'
 import type { UserProfile } from './auth-store'
 
 /** Refresh this long before the access token expires. */
@@ -28,6 +29,18 @@ const REFRESH_COOLDOWN_MS = 5_000
 
 /** setTimeout ceiling — delays above 2^31-1 ms overflow to ~0 in browsers. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
+
+/** The Connect call options the hints produce: the trace context rides the
+ * call's headers, so concurrent calls carry their own context and none
+ * reads another's. Undefined while the tracer is off. */
+function callHints(hints?: TraceHints): { headers: Record<string, string> } | undefined {
+  return hints?.traceparent ? { headers: { traceparent: hints.traceparent } } : undefined
+}
+
+/** Merge the hints into headers an existing call option already carries. */
+function withHints(headers: Record<string, string>, hints?: TraceHints): Record<string, string> {
+  return hints?.traceparent ? { ...headers, traceparent: hints.traceparent } : headers
+}
 
 /** The token pair the worker holds in memory and the main thread persists to cookies. */
 export interface TokenBundle {
@@ -83,17 +96,21 @@ export interface AuthLoginOptions {
  */
 export interface AuthEngineApi {
   /** Validate credentials, mint the token pair. Resolves the profile and tokens. */
-  login(credentials: LoginCredentials, options?: AuthLoginOptions): Promise<AuthSession>
+  login(
+    credentials: LoginCredentials,
+    options?: AuthLoginOptions,
+    hints?: TraceHints
+  ): Promise<AuthSession>
   /**
    * Complete an OAuth SSO flow the callback redirected with: the flow token
    * is the whole credential. Resolves the profile and tokens; a flow that
    * paused at a stage this build does not handle is refused loudly.
    */
-  continueSignIn(flowToken: string): Promise<AuthSession>
+  continueSignIn(flowToken: string, hints?: TraceHints): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
-  refresh(): Promise<boolean>
+  refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
-  maybeRefresh(withinMs: number): Promise<boolean>
+  maybeRefresh(withinMs: number, hints?: TraceHints): Promise<boolean>
   /**
    * Hand a cookie-restored token pair to the engine at boot. The worker has no
    * cookie access, so the main thread reads the cookies and passes them in.
@@ -104,7 +121,7 @@ export interface AuthEngineApi {
    * (`SessionService/GetSession`), refreshing once first when the access
    * token has expired. Resolves `null` when no live session remains.
    */
-  session(): Promise<UserProfile | null>
+  session(hints?: TraceHints): Promise<UserProfile | null>
   /** The unexpired Bearer token for request interceptors, or null when absent. */
   accessToken(): Promise<string | null>
   /**
@@ -121,7 +138,7 @@ export interface AuthEngineApi {
    */
   configureDevice(headers: Record<string, string>): Promise<void>
   /** Terminate the session server-side and drop the in-memory pair. */
-  logout(): Promise<void>
+  logout(hints?: TraceHints): Promise<void>
 }
 
 /**
@@ -175,9 +192,9 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   }
 
   /** The GetSession call the profile rebuild is made of, with the pair's Bearer. */
-  function readSession(bearer: string) {
+  function readSession(bearer: string, hints?: TraceHints) {
     return session.getSession(create(GetSessionRequestSchema), {
-      headers: { authorization: `Bearer ${bearer}` }
+      headers: withHints({ authorization: `Bearer ${bearer}` }, hints)
     })
   }
 
@@ -218,14 +235,15 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
     return next
   }
 
-  async function doRefresh(): Promise<boolean> {
+  async function doRefresh(hints?: TraceHints): Promise<boolean> {
     if (!tokens?.refreshToken) return false
     // Snapshot the generation: if logout (or a fresh login) happens while the
     // request is in flight, its result must not resurrect the old session.
     const epoch = sessionEpoch
     try {
       const response = await session.refresh(
-        create(RefreshRequestSchema, { refreshToken: tokens.refreshToken })
+        create(RefreshRequestSchema, { refreshToken: tokens.refreshToken }),
+        callHints(hints)
       )
       if (epoch !== sessionEpoch) return false
       takeTokenPair(response)
@@ -250,7 +268,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   }
 
   const api: AuthEngineApi = {
-    async login(credentials, { rememberMe = false }: AuthLoginOptions = {}) {
+    async login(credentials, { rememberMe = false }: AuthLoginOptions = {}, hints) {
       // A new session supersedes any in-flight refresh from the previous one.
       sessionEpoch++
       clearTimer()
@@ -258,7 +276,8 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         create(SignInRequestSchema, {
           ...credentials,
           remember: rememberMe || undefined
-        })
+        }),
+        callHints(hints)
       )
       // The contract forks on multi-factor: no tokens are issued until the
       // second factor answers. The challenge flow ships later — refuse it
@@ -279,12 +298,13 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       return { user: toProfile(response.user), tokens: pair }
     },
 
-    async continueSignIn(flowToken) {
+    async continueSignIn(flowToken, hints) {
       // A new session supersedes any in-flight refresh from the previous one.
       sessionEpoch++
       clearTimer()
       const response = await oauth.continueSignIn(
-        create(ContinueOAuthSignInRequestSchema, { flowToken })
+        create(ContinueOAuthSignInRequestSchema, { flowToken }),
+        callHints(hints)
       )
       // The same forks the password sign-in pauses with, the same refusals:
       // the challenge UI and the stage surfaces ship later, so a flow that
@@ -310,20 +330,20 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       return { user: toProfile(response.user), tokens: pair }
     },
 
-    refresh() {
+    refresh(hints) {
       // Single-flight: concurrent callers share one in-flight refresh.
       if (refreshInFlight) return refreshInFlight
       // Cooldown: a refresh that just failed stays failed for a moment.
       if (Date.now() - lastFailedRefreshAt < REFRESH_COOLDOWN_MS) return Promise.resolve(false)
-      refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = doRefresh(hints).finally(() => {
         refreshInFlight = null
       })
       return refreshInFlight
     },
 
-    async maybeRefresh(withinMs) {
+    async maybeRefresh(withinMs, hints) {
       if (tokens && Date.now() < tokens.accessExpiresAt - withinMs) return true
-      return api.refresh()
+      return api.refresh(hints)
     },
 
     async restore(next) {
@@ -338,16 +358,16 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       scheduleProactiveRefresh()
     },
 
-    async session() {
+    async session(hints) {
       if (!tokens) return null
       // An expired access token is refreshed before the call — GetSession
       // carries the pair's own credential, so a proactive renewal is free.
       if (Date.now() >= tokens.accessExpiresAt) {
-        const ok = await api.refresh()
+        const ok = await api.refresh(hints)
         if (!ok || !tokens) return null
       }
       try {
-        return readProfile(await readSession(tokens.accessToken))
+        return readProfile(await readSession(tokens.accessToken, hints))
       } catch (error) {
         // An unauthenticated answer means the access token died between the
         // expiry check and the call — one silent refresh and one retry; the
@@ -381,7 +401,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       deviceHeaders = { ...headers }
     },
 
-    async logout() {
+    async logout(hints) {
       // Invalidate any in-flight refresh first — its result must not land
       // after the session is gone.
       sessionEpoch++
@@ -395,7 +415,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         // still leaves the caller signed out locally — the pair is dropped
         // above and the refresh token simply lapses server-side.
         await session.signOut(create(SignOutRequestSchema), {
-          headers: { authorization: `Bearer ${spent.accessToken}` }
+          headers: withHints({ authorization: `Bearer ${spent.accessToken}` }, hints)
         })
       } catch {
         // Session cleanup is not critical — the refresh token lapses on its own.
