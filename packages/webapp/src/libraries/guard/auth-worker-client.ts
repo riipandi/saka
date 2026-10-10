@@ -46,6 +46,10 @@ export interface AuthWorkerClient {
   completeSignIn(pendingToken: string, factor: CompleteSignInFactor): Promise<UserProfile>
   /** Finish a discoverable passkey sign-in. Resolves the profile. */
   verifyPasskeyLogin(sessionId: string, credential: string): Promise<UserProfile>
+  /** Ask the backend to email a one-time code. Resolves the device token to pair at the exchange. */
+  requestOneTimeAccess(email: string): Promise<string>
+  /** Spend a one-time code. Resolves the outcome — signed-in or the MFA fork the view finishes. */
+  exchangeOneTimeToken(token: string, deviceToken?: string): Promise<SignInOutcome>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -154,6 +158,24 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
         const session = await engine.verifyPasskeyLogin(sessionId, credential, hints)
         writeUserCookie(session.user, session.tokens.refreshExpiresAt)
         return session.user
+      })
+    },
+    async requestOneTimeAccess(email: string) {
+      return spanOperation('request-one-time-access', async (hints) => {
+        await deviceReady
+        return engine.requestOneTimeAccess(email, hints)
+      })
+    },
+    async exchangeOneTimeToken(token: string, deviceToken?: string) {
+      return spanOperation('exchange-one-time-token', async (hints) => {
+        await deviceReady
+        const outcome: SignInOutcome = await engine.exchangeOneTimeToken(token, deviceToken, hints)
+        // The same rule the password sign-in keeps: only a signed-in answer
+        // establishes custody the cookie mirrors.
+        if (outcome.kind === 'signed-in') {
+          writeUserCookie(outcome.session.user, outcome.session.tokens.refreshExpiresAt)
+        }
+        return outcome
       })
     },
     async refresh() {

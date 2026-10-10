@@ -90,6 +90,12 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
             verifyPasskeyLogin: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            requestOneTimeAccess: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            exchangeOneTimeToken: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout: () => {}
           }}
         >

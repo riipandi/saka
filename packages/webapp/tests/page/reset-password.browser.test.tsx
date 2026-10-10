@@ -73,6 +73,8 @@ async function renderReset(
             continueSignIn: notUsed,
             completeSignIn: notUsed,
             verifyPasskeyLogin: notUsed,
+            requestOneTimeAccess: notUsed,
+            exchangeOneTimeToken: notUsed,
             logout: () => {}
           }}
         >

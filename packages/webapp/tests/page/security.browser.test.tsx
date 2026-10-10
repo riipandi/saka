@@ -182,6 +182,12 @@ async function renderSecurity(
             verifyPasskeyLogin: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            requestOneTimeAccess: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
+            exchangeOneTimeToken: async () => {
+              throw new Error('sign in is not part of this page test')
+            },
             logout: () => {}
           }}
         >

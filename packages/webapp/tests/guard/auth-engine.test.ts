@@ -1,3 +1,4 @@
+import { Code } from '@connectrpc/connect'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { clearTokenCookies, readTokenCookies, readUserCookie } from '#/libraries/guard/auth-cookies'
 import { createAuthEngine } from '#/libraries/guard/auth-engine'
@@ -411,6 +412,86 @@ describe('auth engine', () => {
     // A reload: the worker's memory is gone, the cookie copy is what remains.
     await worker.restore()
     await expect(worker.session()).resolves.toEqual(userJson)
+    expect(readUserCookie()).toEqual(userJson)
+  })
+
+  it('asks for the one-time email and answers the device token back', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ deviceToken: 'devtok_1', status: 'success', message: 'sent' })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.requestOneTimeAccess('robert@langdon.dev')).resolves.toBe('devtok_1')
+
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(stringUrl(url)).toContain('OneTimeAccessService/RequestEmail')
+    const body = JSON.parse(stringBody(init?.body))
+    expect(body.email).toBe('robert@langdon.dev')
+  })
+
+  it('exchanges a code into custody: the pair rides the same sign-in shape', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    const session = signedIn(await engine.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1'))
+
+    expect(session.user).toEqual(userJson)
+    expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(stringUrl(url)).toContain('OneTimeAccessService/ExchangeToken')
+    const body = JSON.parse(stringBody(init?.body))
+    expect(body.token).toBe('GRYFFINDOR')
+    expect(body.deviceToken).toBe('devtok_1')
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('exchanges a code without a device token — the administrator-issued kind', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    signedIn(await engine.exchangeOneTimeToken('GRYFFINDOR'))
+
+    const body = JSON.parse(stringBody(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(body.deviceToken).toBeUndefined()
+  })
+
+  it('forks the MFA answer the code exchange can carry, with no tokens issued', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        accessToken: '',
+        refreshToken: '',
+        mfaRequired: true,
+        mfaPendingToken: 'bridge_2',
+        mfaPendingExpiresAt: '2030-01-15T10:00:00Z'
+      })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    const outcome = await engine.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1')
+    expect(outcome).toMatchObject({ kind: 'mfa-challenge', pendingToken: 'bridge_2' })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('keeps no custody when the exchange refuses the code', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: 'failed_precondition', message: 'expired code' }, 400)
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.exchangeOneTimeToken('GRYFFINDOR')).rejects.toMatchObject({
+      code: Code.FailedPrecondition
+    })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('mirrors the one-time exchange through the worker client into the cookie jar', async () => {
+    clearTokenCookies()
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const worker = authWorker()
+
+    const outcome = await worker.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1')
+    expect(outcome).toMatchObject({ kind: 'signed-in', session: { user: userJson } })
+    expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
     expect(readUserCookie()).toEqual(userJson)
   })
 })

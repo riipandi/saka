@@ -61,6 +61,22 @@ export interface AuthContextValue {
     credential: string,
     options?: AuthLoginContextOptions
   ) => Promise<void>
+  /**
+   * Ask the backend to email a one-time access code to the address named.
+   * Resolves the device token the exchange demands back — the caller holds
+   * it in memory alone until the code arrives.
+   */
+  requestOneTimeAccess: (email: string) => Promise<string>
+  /**
+   * Spend the one-time code the email carried. A signed-in answer has
+   * already navigated; the MFA fork is the view's to finish, same as
+   * `login`'s.
+   */
+  exchangeOneTimeToken: (
+    token: string,
+    deviceToken?: string,
+    options?: AuthLoginContextOptions
+  ) => Promise<SignInOutcome>
   logout: () => void
 }
 
@@ -78,6 +94,12 @@ export const AuthContext = createContext<AuthContextValue>({
     throw new Error('AuthProvider is not mounted.')
   },
   verifyPasskeyLogin: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  requestOneTimeAccess: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  exchangeOneTimeToken: async () => {
     throw new Error('AuthProvider is not mounted.')
   },
   logout: () => {}

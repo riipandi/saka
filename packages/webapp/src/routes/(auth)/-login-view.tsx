@@ -30,12 +30,106 @@ import { socialStyles, styles } from '#/styles/pages/login.stylex'
 import { MfaChallengeView } from './-mfa-challenge-view'
 import { MfaEnrollmentView } from './-mfa-enrollment-view'
 
+/**
+ * The code the one-time email carries — six or twelve characters per the
+ * wire's validation, and uppercase: the emails render it that way.
+ */
+const ONE_TIME_CODE_PATTERN = /^[A-Za-z0-9]{6,12}$/
+
 /** The icon the two builtin providers render; a custom connection carries none. */
 const PROVIDER_ICONS: Record<string, ComponentType<{ size: number }>> = {
   google: GoogleIcon,
   github: GitHubIcon
 }
 
+/**
+ * The one-time code entry — the email phase's second half. The code is
+ * typed, never linked (the wire reserved its redirect path away): the email
+ * names no device, so the device token this entry spends lives in the
+ * login mount's memory alone, and a code read from a mailbox alone cannot
+ * sign anyone in.
+ */
+function OneTimeCodeEntry({
+  notice,
+  failed,
+  onFailed,
+  onDismissFailed,
+  onSubmit,
+  onRestart
+}: {
+  notice: string
+  failed: string | null
+  onFailed: (message: string | null) => void
+  onDismissFailed: () => void
+  onSubmit: (code: string) => void
+  onRestart: () => void
+}) {
+  const [code, setCode] = useState('')
+  const valid = ONE_TIME_CODE_PATTERN.test(code.trim())
+  const busy = false
+
+  return (
+    <Card size='md' id='login-one-time-card' style={styles.cardRoot}>
+      <CardHeader style={styles.header}>
+        <div {...stylex.props(styles.logo)}>
+          <ViteIcon size={28} />
+        </div>
+        <Text render={<h1 />} variant='featured-5' weight='semibold'>
+          {notice}
+        </Text>
+        <CardDescription>
+          Enter the one-time code we emailed you. It works once and expires in fifteen minutes.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent>
+        <form
+          id='one-time-code-form'
+          onSubmit={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (valid) onSubmit(code.trim())
+          }}
+        >
+          {failed ? (
+            <Alert variant='destructive' id='one-time-code-error'>
+              <AlertTitle>Sign in failed</AlertTitle>
+              <AlertDescription>{failed}</AlertDescription>
+            </Alert>
+          ) : null}
+          <Field id='field-one-time-code'>
+            <FieldLabel htmlFor='one-time-code'>One-time code</FieldLabel>
+            <Input
+              id='one-time-code'
+              name='one-time-code'
+              placeholder='GRYFFINDOR'
+              autoComplete='one-time-code'
+              value={code}
+              onChange={(e) => {
+                onFailed(null)
+                onDismissFailed()
+                setCode(e.target.value)
+              }}
+            />
+          </Field>
+          <div {...stylex.props(styles.submitWrapper)}>
+            <Button type='submit' variant='primary' disabled={!valid || busy} style={styles.submit}>
+              Sign in
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+
+      <CardFooter style={atoms.justifyContent.center}>
+        <Text variant='body-2' color='neutral-faded'>
+          <Link to='/login' onClick={onRestart} replace {...stylex.props(styles.backLink)}>
+            Use another sign-in method
+          </Link>
+        </Text>
+      </CardFooter>
+    </Card>
+  )
+}
 /**
  * The login flow's phases. The credentials form, the multi-factor challenge,
  * and the forced enrollment are states of one machine in one mount — the
@@ -46,6 +140,7 @@ type LoginPhase =
   | { name: 'credentials' }
   | { name: 'challenge'; challenge: SignInChallenge }
   | { name: 'enrollment'; challenge: SignInChallenge }
+  | { name: 'one-time-code'; deviceToken?: string; notice: string }
 
 export function LoginView({
   loggedOut,
@@ -59,7 +154,8 @@ export function LoginView({
   returnTo?: string
 }) {
   const navigate = useNavigate()
-  const { login, verifyPasskeyLogin } = useAuthentication()
+  const { login, verifyPasskeyLogin, requestOneTimeAccess, exchangeOneTimeToken } =
+    useAuthentication()
   const { data: config } = useAppConfig()
   const { data: providers } = useOAuthProviders()
   const transport = useTransport()
@@ -68,6 +164,7 @@ export function LoginView({
   const [dismissed, setDismissed] = useState(false)
   const [phase, setPhase] = useState<LoginPhase>({ name: 'credentials' })
   const [passkeyBusy, setPasskeyBusy] = useState(false)
+  const oneTimeEnabled = config?.auth.one_time_access_email_as_unauthenticated_enabled ?? false
 
   // Goodbye, sign-in-required, and password-reset notices belong to the
   // redirect that brought the visitor here; refresh page or back-navigation
@@ -141,6 +238,39 @@ export function LoginView({
     }
   }
 
+  // The email request always answers success — the address list is not the
+  // page's to disclose — and carries the device token the exchange demands
+  // back. Both travel to the code phase in this mount's memory alone.
+  const requestOneTimeCode = async (email: string) => {
+    setFailed(null)
+    try {
+      const deviceToken = await requestOneTimeAccess(email)
+      setPhase({
+        name: 'one-time-code',
+        deviceToken: deviceToken || undefined,
+        notice: 'Check your inbox'
+      })
+    } catch (error: unknown) {
+      setFailed(getErrorMessage(error))
+    }
+  }
+
+  const signInWithOneTimeCode = async (code: string, deviceToken?: string) => {
+    setFailed(null)
+    try {
+      const outcome = await exchangeOneTimeToken(code, deviceToken)
+      // A signed-in answer has already navigated. A fork moves this mount
+      // to its next phase — the same machine the credentials form feeds.
+      if (outcome.kind === 'mfa-challenge') {
+        setPhase({ name: 'challenge', challenge: outcome })
+      } else if (outcome.kind === 'enrollment-required') {
+        setPhase({ name: 'enrollment', challenge: outcome })
+      }
+    } catch (error: unknown) {
+      setFailed(getErrorMessage(error))
+    }
+  }
+
   if (phase.name === 'challenge') {
     return (
       <MfaChallengeView challenge={phase.challenge} returnTo={returnTo} onRestart={restartSignIn} />
@@ -152,6 +282,19 @@ export function LoginView({
       <MfaEnrollmentView
         challenge={phase.challenge}
         returnTo={returnTo}
+        onRestart={restartSignIn}
+      />
+    )
+  }
+
+  if (phase.name === 'one-time-code') {
+    return (
+      <OneTimeCodeEntry
+        notice={phase.notice}
+        failed={failed}
+        onFailed={setFailed}
+        onDismissFailed={clearAlerts}
+        onSubmit={(code) => void signInWithOneTimeCode(code, phase.deviceToken)}
         onRestart={restartSignIn}
       />
     )
@@ -350,6 +493,29 @@ export function LoginView({
                 )}
               />
             </div>
+
+            {/* The one-time entry rides the deployment's public toggle: an
+                absent query would ask the server for a surface it may not
+                serve. The email field doubles as the address the code goes
+                to — one form, two asks. */}
+            {oneTimeEnabled && (
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={() => {
+                  const email = form.getFieldValue('identity').trim()
+                  const looksLikeEmail = /.+@.+\..+/.test(email)
+                  if (!looksLikeEmail) {
+                    setFailed('Enter your email address first, then request the code.')
+                    return
+                  }
+                  void requestOneTimeCode(email)
+                }}
+                style={styles.ghostEntry}
+              >
+                Email me a one-time sign-in code
+              </Button>
+            )}
           </form>
         </CardContent>
 

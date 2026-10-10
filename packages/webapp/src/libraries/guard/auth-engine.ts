@@ -23,6 +23,12 @@ import type {
   SignInRequest,
   SignInResponse
 } from '~/codegen/authn_pb'
+import {
+  ExchangeOneTimeAccessTokenRequestSchema,
+  OneTimeAccessService,
+  RequestOneTimeAccessEmailRequestSchema
+} from '~/codegen/one_time_access_pb'
+import type { ExchangeOneTimeAccessTokenResponse } from '~/codegen/one_time_access_pb'
 import { VerifyLoginRequestSchema, WebAuthnService } from '~/codegen/webauthn_pb'
 import type { VerifyLoginResponse } from '~/codegen/webauthn_pb'
 import type { TraceHints } from '../telemetry/seam-span'
@@ -170,6 +176,24 @@ export interface AuthEngineApi {
     credential: string,
     hints?: TraceHints
   ): Promise<AuthSession>
+  /**
+   * Ask the backend to email a one-time access code to the address named.
+   * The answer carries the device token the exchange demands back — the
+   * caller holds it in memory alone; the code travels by email and the pair
+   * never meets in a URL.
+   */
+  requestOneTimeAccess(email: string, hints?: TraceHints): Promise<string>
+  /**
+   * Spend a one-time access code. The exchange answers the same fork the
+   * password sign-in does — a code for an MFA-enabled account still owes
+   * its second factor — and the email path's device token rides beside the
+   * code (undefined for one an administrator handed over).
+   */
+  exchangeOneTimeToken(
+    token: string,
+    deviceToken?: string,
+    hints?: TraceHints
+  ): Promise<SignInOutcome>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -227,7 +251,9 @@ const MFA_BRIDGE_FALLBACK_MS = 5 * 60_000
 /** The fork the sign-in paused at, read off the wire's fork fields. The
  * enrollment fork precedes the challenge fork: the enrollment answer carries
  * the same bridge and the same expiry. */
-function readFork(response: SignInResponse | ContinueOAuthSignInResponse): SignInChallenge | null {
+function readFork(
+  response: SignInResponse | ContinueOAuthSignInResponse | ExchangeOneTimeAccessTokenResponse
+): SignInChallenge | null {
   const expiresAt = response.mfaPendingExpiresAt
     ? timestampDate(response.mfaPendingExpiresAt).getTime()
     : Date.now() + MFA_BRIDGE_FALLBACK_MS
@@ -260,6 +286,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
   const auth = createClient(AuthService, transport)
   const session = createClient(SessionService, transport)
   const oauth = createClient(OAuthSSOService, transport)
+  const oneTimeAccess = createClient(OneTimeAccessService, transport)
   const mfa = createClient(MultifactorService, transport)
   const webauthn = createClient(WebAuthnService, transport)
 
@@ -311,6 +338,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | ContinueOAuthSignInResponse
       | CompleteSignInResponse
       | VerifyLoginResponse
+      | ExchangeOneTimeAccessTokenResponse
   ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
@@ -335,6 +363,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | ContinueOAuthSignInResponse
       | CompleteSignInResponse
       | VerifyLoginResponse
+      | ExchangeOneTimeAccessTokenResponse
   ): AuthSession {
     if (!response.user) {
       throw new ConnectError('Sign-in answered without an account.', Code.Internal)
@@ -452,6 +481,39 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       // A passkey assertion with user verification is full authentication —
       // the tokens always carry; the MFA fork is not this answer's shape.
       return finishSignIn(response)
+    },
+
+    async requestOneTimeAccess(email, hints) {
+      // The answer's device token pairs with the code the email carries;
+      // the caller holds both until the exchange. The response's sentence
+      // is the disclosure-safe same-shape answer — the view renders it.
+      const response = await oneTimeAccess.requestEmail(
+        create(RequestOneTimeAccessEmailRequestSchema, { email }),
+        callHints(hints)
+      )
+      return response.deviceToken
+    },
+
+    async exchangeOneTimeToken(token, deviceToken, hints) {
+      // A new session supersedes any in-flight refresh from the previous one.
+      sessionEpoch++
+      clearTimer()
+      const response = await oneTimeAccess.exchangeToken(
+        create(ExchangeOneTimeAccessTokenRequestSchema, {
+          token,
+          deviceToken: deviceToken || undefined
+        }),
+        callHints(hints)
+      )
+      // The same fork the password sign-in pauses with: a code for an
+      // MFA-enabled account still owes its second factor, and no tokens
+      // were issued in that case.
+      const fork = readFork(response)
+      if (fork) {
+        tokens = null
+        return fork
+      }
+      return { kind: 'signed-in', session: finishSignIn(response) }
     },
 
     refresh(hints) {

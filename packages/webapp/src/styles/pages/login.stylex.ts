@@ -84,6 +84,10 @@ export const styles = stylex.create({
     width: '100%',
     marginBottom: unit.x4
   },
+  ghostEntry: {
+    width: '100%',
+    marginTop: unit.x2
+  },
   countdown: {
     marginTop: unit.x2
   },

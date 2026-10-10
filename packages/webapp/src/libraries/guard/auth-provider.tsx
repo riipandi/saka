@@ -113,6 +113,29 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [navigate, router]
   )
 
+  const handleRequestOneTimeAccess = useCallback((email: string) => {
+    return authWorker().requestOneTimeAccess(email)
+  }, [])
+
+  const handleExchangeOneTimeToken = useCallback(
+    async (token: string, deviceToken?: string, options?: AuthLoginContextOptions) => {
+      const outcome = await authWorker().exchangeOneTimeToken(token, deviceToken)
+      if (outcome.kind !== 'signed-in') return outcome
+      setAuthUser(outcome.session.user)
+      // The code's account was never the cache's — clear it the same way a
+      // password sign-in does.
+      queryClient.clear()
+      const target = safeReturnTo(options?.redirectTo)
+      if (target) {
+        router.history.push(target)
+      } else {
+        void navigate({ to: '/overview' })
+      }
+      return outcome
+    },
+    [navigate, router]
+  )
+
   const handleLogout = useCallback(() => {
     // The eviction effect in the `(app)` layout watches this same profile —
     // mark the sign-out first so its redirect never races the goodbye one.
@@ -141,6 +164,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       continueSignIn: handleContinueSignIn,
       completeSignIn: handleCompleteSignIn,
       verifyPasskeyLogin: handleVerifyPasskeyLogin,
+      requestOneTimeAccess: handleRequestOneTimeAccess,
+      exchangeOneTimeToken: handleExchangeOneTimeToken,
       logout: handleLogout
     }),
     [
@@ -151,6 +176,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       handleContinueSignIn,
       handleCompleteSignIn,
       handleVerifyPasskeyLogin,
+      handleRequestOneTimeAccess,
+      handleExchangeOneTimeToken,
       handleLogout
     ]
   )

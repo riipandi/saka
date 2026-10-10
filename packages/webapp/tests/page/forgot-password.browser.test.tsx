@@ -37,6 +37,8 @@ function wrapper(children: React.ReactNode, transport: ReturnType<typeof createR
             continueSignIn: notUsed,
             completeSignIn: notUsed,
             verifyPasskeyLogin: notUsed,
+            requestOneTimeAccess: notUsed,
+            exchangeOneTimeToken: notUsed,
             logout: () => {}
           }}
         >

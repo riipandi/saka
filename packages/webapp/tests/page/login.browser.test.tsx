@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-router'
 import { describe, expect, it, vi, type Mock } from 'vite-plus/test'
 import { render, type RenderResult } from 'vitest-browser-react'
+import { prefetchAppConfig } from '#/hooks/use-app-config'
 import { AuthContext } from '#/hooks/use-auth'
 import type { AuthLoginContextOptions } from '#/hooks/use-auth'
 import type { CompleteSignInFactor, SignInOutcome } from '#/libraries/guard/auth-engine'
@@ -64,8 +65,31 @@ async function renderLogin(
   >,
   verifyPasskeyLogin: Mock<
     (sessionId: string, credential: string, options?: AuthLoginContextOptions) => Promise<void>
-  > = vi.fn(async () => {})
-): Promise<{ screen: RenderResult; login: Mock; transportCalls: { beginLogin: number } }> {
+  > = vi.fn(async () => {}),
+  options: {
+    oneTimeEnabled?: boolean
+    requestOneTimeAccess?: Mock<(email: string) => Promise<string>>
+    exchangeOneTimeToken?: Mock<
+      (
+        token: string,
+        deviceToken?: string,
+        options?: AuthLoginContextOptions
+      ) => Promise<SignInOutcome>
+    >
+  } = {}
+): Promise<{
+  screen: RenderResult
+  login: Mock
+  transportCalls: { beginLogin: number }
+  requestOneTimeAccess: Mock<(email: string) => Promise<string>>
+  exchangeOneTimeToken: Mock<
+    (
+      token: string,
+      deviceToken?: string,
+      options?: AuthLoginContextOptions
+    ) => Promise<SignInOutcome>
+  >
+}> {
   const transportCalls = { beginLogin: 0 }
   const transport = createRouterTransport(({ service }) => {
     service(MultifactorService, {
@@ -99,6 +123,23 @@ async function renderLogin(
     return loginOutcome
   })
 
+  // The one-time entry reads the deployment document from the query cache —
+  // priming it here keeps the vi.mock-free test realm honest.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  if (options.oneTimeEnabled) {
+    queryClient.setQueryData(['app-config'], {
+      auth: {
+        one_time_access_email_as_unauthenticated_enabled: true,
+        one_time_access_email_as_admin_enabled: false
+      },
+      oauth: { enabled: false }
+    })
+    await prefetchAppConfig(queryClient)
+  }
+
+  const requestOneTimeAccess = options.requestOneTimeAccess ?? vi.fn(async () => 'devtok_test')
+  const exchangeOneTimeToken = options.exchangeOneTimeToken ?? vi.fn(async () => SIGNED_IN)
+
   const RootRoute = createRootRoute({ component: () => <LoginView /> })
   const router = createRouter({
     routeTree: RootRoute,
@@ -106,9 +147,7 @@ async function renderLogin(
   })
 
   const screen = await render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={queryClient}>
       <TransportProvider transport={transport}>
         <AuthContext.Provider
           value={{
@@ -119,6 +158,8 @@ async function renderLogin(
             continueSignIn: unused,
             completeSignIn,
             verifyPasskeyLogin,
+            requestOneTimeAccess,
+            exchangeOneTimeToken,
             logout: () => {}
           }}
         >
@@ -127,7 +168,7 @@ async function renderLogin(
       </TransportProvider>
     </QueryClientProvider>
   )
-  return { screen, login, transportCalls }
+  return { screen, login, transportCalls, requestOneTimeAccess, exchangeOneTimeToken }
 }
 
 async function submitCredentials(screen: RenderResult) {
@@ -278,5 +319,130 @@ describe('Login (browser)', () => {
     })
     // The browser refused before any bridge was spent.
     expect(completeSignIn).not.toHaveBeenCalled()
+  })
+
+  it('hides the one-time entry while the deployment toggle is off', async () => {
+    const { screen } = await renderLogin(
+      SIGNED_IN,
+      vi.fn(async () => {})
+    )
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+    expect(screen.container.textContent).not.toContain('Email me a one-time sign-in code')
+  })
+
+  it('asks for the email, then spends the typed code with its device token', async () => {
+    const exchangeOneTimeToken = vi.fn<
+      (
+        token: string,
+        deviceToken?: string,
+        options?: AuthLoginContextOptions
+      ) => Promise<SignInOutcome>
+    >(async () => SIGNED_IN)
+    const { screen } = await renderLogin(
+      SIGNED_IN,
+      vi.fn(async () => {}),
+      vi.fn(),
+      {
+        oneTimeEnabled: true,
+        exchangeOneTimeToken
+      }
+    )
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+
+    await screen.getByLabelText('Username or email').fill('robert@langdon.dev')
+    await screen.getByRole('button', { name: 'Email me a one-time sign-in code' }).click()
+
+    // The entry asks with the identity field's address; the view moved to
+    // the code phase — the machine's next state, no URL.
+    await expect.element(screen.getByLabelText('One-time code')).toBeVisible()
+    await expect.element(screen.getByText('Check your inbox')).toBeVisible()
+
+    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await screen.getByRole('button', { name: 'Sign in' }).click()
+    await vi.waitFor(() => {
+      expect(exchangeOneTimeToken).toHaveBeenCalledWith('GRYFFINDOR', 'devtok_test')
+    })
+  })
+
+  it('keeps the code entry disabled until the field holds a candidate', async () => {
+    const { screen } = await renderLogin(
+      SIGNED_IN,
+      vi.fn(async () => {}),
+      vi.fn(),
+      {
+        oneTimeEnabled: true
+      }
+    )
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+    await screen.getByLabelText('Username or email').fill('robert@langdon.dev')
+    await screen.getByRole('button', { name: 'Email me a one-time sign-in code' }).click()
+    await expect.element(screen.getByLabelText('One-time code')).toBeVisible()
+
+    const submit = screen.getByRole('button', { name: 'Sign in' })
+    await expect.element(submit).toBeDisabled()
+    await screen.getByLabelText('One-time code').fill('AB12')
+    await expect.element(submit).toBeDisabled()
+    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await expect.element(submit).toBeEnabled()
+  })
+
+  it('refuses the identity field that names no address before any request', async () => {
+    const requestOneTimeAccess = vi.fn(async () => 'devtok_test')
+    const { screen } = await renderLogin(
+      SIGNED_IN,
+      vi.fn(async () => {}),
+      vi.fn(),
+      {
+        oneTimeEnabled: true,
+        requestOneTimeAccess
+      }
+    )
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+
+    await screen.getByLabelText('Username or email').fill('rlangdon')
+    await screen.getByRole('button', { name: 'Email me a one-time sign-in code' }).click()
+
+    await expect
+      .element(screen.getByText('Enter your email address first, then request the code.'))
+      .toBeVisible()
+    expect(requestOneTimeAccess).not.toHaveBeenCalled()
+  })
+
+  it('hands a forked exchange to the challenge, carrying the same machine', async () => {
+    const challenge: SignInOutcome = {
+      kind: 'mfa-challenge',
+      pendingToken: 'bridge_9',
+      expiresAt: Date.now() + 300_000
+    }
+    const completeSignIn = vi.fn<
+      (
+        pendingToken: string,
+        factor: CompleteSignInFactor,
+        options?: AuthLoginContextOptions
+      ) => Promise<void>
+    >(async () => {})
+    const { screen } = await renderLogin(SIGNED_IN, completeSignIn, vi.fn(), {
+      oneTimeEnabled: true,
+      exchangeOneTimeToken: vi.fn(async () => challenge)
+    })
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+
+    await screen.getByLabelText('Username or email').fill('robert@langdon.dev')
+    await screen.getByRole('button', { name: 'Email me a one-time sign-in code' }).click()
+    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await screen.getByRole('button', { name: 'Sign in' }).click()
+
+    // The fork lands in the challenge the credentials form feeds — the
+    // exchange's second factor is the machine's, not a new flow.
+    await expect.element(screen.getByLabelText('Verification code')).toBeVisible()
+    await screen.getByLabelText('Verification code').fill('039471')
+    await screen.getByRole('button', { name: 'Verify' }).click()
+    await vi.waitFor(() => {
+      expect(completeSignIn).toHaveBeenCalledWith(
+        'bridge_9',
+        { kind: 'code', code: '039471' },
+        { redirectTo: undefined }
+      )
+    })
   })
 })
