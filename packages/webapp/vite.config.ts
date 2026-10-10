@@ -98,6 +98,17 @@ export default defineConfig(({ mode }) => ({
         ])
   ],
   envPrefix: ['VITE_', 'PUBLIC_'],
+  // Vitest's browser client re-optimizes these on a cold cache and reloads
+  // mid-run, which flakes CI with no test summary; naming them here keeps
+  // the optimizer quiet from the first run.
+  optimizeDeps: {
+    include: [
+      '@stylexjs/atoms',
+      '@tanstack/react-devtools',
+      '@tanstack/react-query-devtools',
+      '@tanstack/react-router-devtools'
+    ]
+  },
   root: resolve(import.meta.dirname),
   publicDir: resolve(import.meta.dirname, 'public'),
   test: {

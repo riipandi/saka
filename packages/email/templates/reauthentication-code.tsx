@@ -1,5 +1,5 @@
-import { Hr, CodeInline } from 'react-email'
-import { CardFooter, CardHeader, Text } from '../components'
+import { Hr } from 'react-email'
+import { Code, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
@@ -29,7 +29,7 @@ export const ReauthenticationCodeEmail = ({
       </Text>
 
       <Text style={{ textAlign: 'center' }}>
-        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.code}</CodeInline>
+        <Code style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.code}</Code>
       </Text>
 
       <Hr style={{ marginTop: '24px' }} />

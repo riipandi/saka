@@ -36,6 +36,31 @@ queues and outbound calls.
 The `otelsmoke` command (debug build) proves the pipe end to end: one
 synthetic trace, sent for real.
 
+## Browser tracing (optional)
+
+The web client can join the same trace picture. It is off until the
+configuration names a browser-facing collector:
+
+```json
+{ "otel": { "browser": { "endpoint": "https://collector.example.com:4318", "ratio": 0.25 } } }
+```
+
+- An empty `endpoint` (the default) keeps frontend tracing off — the
+  browser initializes no tracer and sends nothing.
+- `ratio` is the fraction of traces sampled; `0` samples everything,
+  because an operator who named a collector wanted traces.
+- The address must be reachable by the browser (not loopback-only) and
+  the collector's OTLP/HTTP receiver must answer the CORS preflight for
+  the origin the web client is served from — the bundled dev collector
+  config in `container/otel-collector.yaml` shows the shape.
+
+When enabled, the browser exports one service (`saka-web`) alongside
+the server process: one span per API request it sends, a span per
+navigation, and the sign-in/refresh operations with the server's spans
+as their children. Query strings never leave the page — the reset
+token, one-time-access code, and OAuth flow tokens travel in search
+params and are stripped before export.
+
 ## The operations console
 
 Two admin RPC surfaces expose the machinery's state to an operations

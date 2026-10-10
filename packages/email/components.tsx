@@ -2,6 +2,16 @@ import type { CSSProperties } from 'react'
 import { Column, Heading, Row } from 'react-email'
 import { Button as EmailButton, Text as BaseText, Link as BaseLink } from 'react-email'
 
+/**
+ * The code the flow asks the reader to type back, rendered once. The
+ * `CodeInline` react-email ships renders its children twice — a visible
+ * copy and a hidden one for one client's stylesheet — and the plain-text
+ * render carries both, so a mailed code reads as one doubled word.
+ */
+export function Code({ style, children }: { style?: CSSProperties; children: string }) {
+  return <code style={style}>{children}</code>
+}
+
 const textSizes = {
   sm: { fontSize: '14px', lineHeight: '20px' },
   md: { fontSize: '16px', lineHeight: '24px' },

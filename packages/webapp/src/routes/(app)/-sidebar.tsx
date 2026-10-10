@@ -1,5 +1,21 @@
-import { ChartColumn, FileText, LayoutDashboard, Power, MessageSquare } from '@keyline-icons/react'
-import { PanelLeft, Search, Settings, ShoppingCart, PanelRight } from '@keyline-icons/react'
+import {
+  History,
+  LaptopSmartphone,
+  LayoutDashboard,
+  Mail,
+  Power,
+  Settings
+} from '@keyline-icons/react'
+import { PanelLeft, PanelRight } from '@keyline-icons/react'
+// The two-tone variant paints the accent the stroke set only outlines, so
+// the selected item reads filled where its idle siblings stay outlined.
+import {
+  History as HistoryTwoTone,
+  LaptopSmartphone as LaptopSmartphoneTwoTone,
+  LayoutDashboard as LayoutDashboardTwoTone,
+  Mail as MailTwoTone,
+  Settings as SettingsTwoTone
+} from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
@@ -10,22 +26,30 @@ import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
 interface NavItem {
   icon: React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
+  activeIcon?: React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
   href: LinkProps['to'] | undefined
   label: string
-  badge?: boolean
 }
 
 const navItems: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Overview', href: '/overview' },
-  { icon: Search, label: 'Search', href: undefined },
-  { icon: ChartColumn, label: 'Analytics', href: undefined },
-  { icon: FileText, label: 'Docs', href: undefined }
+  {
+    icon: LayoutDashboard,
+    activeIcon: LayoutDashboardTwoTone,
+    label: 'Overview',
+    href: '/overview'
+  }
 ]
 
 const secondaryItems: NavItem[] = [
-  { icon: ShoppingCart, label: 'Products', href: undefined },
-  { icon: Settings, label: 'Settings', href: '/settings' },
-  { icon: MessageSquare, label: 'Messages', href: undefined, badge: true }
+  { icon: Settings, activeIcon: SettingsTwoTone, label: 'Settings', href: '/settings' },
+  {
+    icon: LaptopSmartphone,
+    activeIcon: LaptopSmartphoneTwoTone,
+    label: 'Sessions',
+    href: '/account/sessions'
+  },
+  { icon: Mail, activeIcon: MailTwoTone, label: 'Email', href: '/account/email' },
+  { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
 
 function LogoMark() {
@@ -58,7 +82,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
   const renderNavItems = (items: NavItem[]) =>
     items.map((item) => {
       const itemActive = isActive(item.href)
-      const Icon = item.icon
+      const Icon = itemActive && item.activeIcon ? item.activeIcon : item.icon
       return (
         <Link
           key={item.label}
@@ -72,12 +96,6 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         >
           <Icon {...stylex.props(sidebarStyles.navIcon)} />
           {!collapsed && <span {...stylex.props(sidebarStyles.navLabel)}>{item.label}</span>}
-          {item.badge && (
-            <span
-              {...stylex.props(collapsed ? sidebarStyles.badgeCollapsed : sidebarStyles.badge)}
-              aria-hidden
-            />
-          )}
         </Link>
       )
     })
@@ -116,7 +134,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
             </div>
             {!collapsed && (
               <div>
-                <div {...stylex.props(sidebarStyles.logoText)}>ReactiVite</div>
+                <div {...stylex.props(sidebarStyles.logoText)}>Saka</div>
                 <div {...stylex.props(sidebarStyles.logoVersion)}>
                   {import.meta.env.PUBLIC_APP_VERSION}
                 </div>
@@ -148,7 +166,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Main</p>}
         {renderNavItems(navItems)}
         {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
-        {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Workspace</p>}
+        {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Account</p>}
         {renderNavItems(secondaryItems)}
       </div>
 

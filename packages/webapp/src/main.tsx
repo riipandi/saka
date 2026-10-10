@@ -2,6 +2,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import ReactDOM from 'react-dom/client'
 import { queryClient } from '#/libraries/api-client'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
+import { wireNavigationSpans } from '#/libraries/telemetry/navigation'
 import type { BreadcrumbValue } from '#/routes/__root'
 import { routeTree } from './routes.gen'
 import 'uilibs/assets/globals.css'
@@ -20,6 +21,10 @@ const appRoutes = createRouter({
     queryClient: undefined!
   }
 })
+
+// One trace per navigation for the whole application lifetime. While the
+// tracer is off the spans are the SDK's no-ops — a nil check per navigation.
+wireNavigationSpans(appRoutes)
 
 // Register the router instance for type safety.
 declare module '@tanstack/react-router' {

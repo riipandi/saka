@@ -261,6 +261,76 @@ func TestAnEndedSessionCannotManageSessions(t *testing.T) {
 	assert.ErrorIs(t, err, ErrSessionEnded)
 }
 
+// seedShortSession inserts a session whose window is nearly closed — the
+// table's write-time expiry check only compares against the insert instant,
+// so a minute of future is enough, and the clock jump after it makes the row
+// expired without any further write to it.
+func seedShortSession(t *testing.T, pool *datastore.Postgres, userID uuid.UUID, name string) SessionID {
+	t.Helper()
+
+	token := "refresh-token-" + name
+
+	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
+	ib.InsertInto(entity.TableSessions)
+	ib.Cols("user_id", "provider", "token_hash", "user_agent", "remember", "created_at", "expires_at")
+	ib.Values(userID, "credential", crypto.HashRefreshToken(token), "test-agent/1.0", false,
+		time.Now().Add(-time.Minute), time.Now().Add(time.Minute))
+
+	query, args := ib.Build()
+	_, err := pool.Exec(t.Context(), query, args...)
+	require.NoError(t, err)
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("id")
+	sb.From(entity.TableSessions)
+	sb.Where(sb.Equal("token_hash", crypto.HashRefreshToken(token)))
+
+	query, args = sb.Build()
+	var rawID string
+	require.NoError(t, pool.QueryRow(t.Context(), query, args...).Scan(&rawID))
+	sid, err := typeid.FromUUID[SessionID](rawID)
+	require.NoError(t, err)
+	return sid
+}
+
+// TestSignOutOtherSweepLeavesExpiredUnstampedRowsAlone pins the sweep's
+// liveness predicate: a session whose window closed — but whose stamp was
+// never written, because nothing writes on expiry — is not live, and the
+// sweep must leave it exactly as it is. Stamping it would re-evaluate the
+// table's `expires_at > CURRENT_TIMESTAMP` check on the updated row and
+// refuse the whole write: the bulk sign-outs of any account holding such a
+// row would answer 500 (the release probe caught exactly that).
+func TestSignOutOtherSweepLeavesExpiredUnstampedRowsAlone(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, now := testService(t, pool)
+	userID := seedAccount(t, pool, "norbert")
+	current, _ := seedSession(t, pool, userID, "current", "credential", false)
+	fresh, _ := seedSession(t, pool, userID, "fresh", "credential", false)
+	stale := seedShortSession(t, pool, userID, "stale")
+
+	// The stale row's window closes under the service's clock; the fresh and
+	// current rows keep hours.
+	jump(t, now, 2*time.Minute)
+
+	count, err := service.SignOutOtherSessions(t.Context(), current.String(), wireOf(t, userID))
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	_, _, err = service.GetSession(t.Context(), current.String())
+	require.NoError(t, err)
+	_, _, err = service.GetSession(t.Context(), fresh.String())
+	assert.ErrorIs(t, err, ErrSessionEnded)
+
+	// The expired row keeps its NULL stamp: the sweep neither counted it nor
+	// touched it.
+	var stamped int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"select count(*) from sessions where id = $1 and revoked_at is not null", stale.UUID()).Scan(&stamped))
+	assert.Equal(t, 0, stamped)
+}
+
 func TestSignOutOtherSessionsSweepsEveryLiveRowButTheCallerOwn(t *testing.T) {
 	conttest.SkipWithoutDocker(t)
 

@@ -232,12 +232,14 @@ wires against.
 
 ### Wave 1 — the account works on real data (self-service)
 
-- [ ] **Profile & preferences** — `GetCurrentUser`/`UpdateCurrentUser`, the
+- [x] **Profile & preferences** — `GetCurrentUser`/`UpdateCurrentUser`, the
   profile-picture PUT/DELETE (raw body through the REST seam),
   `DeleteMyAccount` behind the toggle. Destubs `settings.tsx`; the account
   view the guard carries gets its authoritative source. First
-  Connect-Query mutation consumer and first binary upload.
-- [ ] **Session center** — `ListSessions`, `SignOutOtherSessions`,
+  Connect-Query mutation consumer and first binary upload. Shipped as
+  `routes/(app)/settings.tsx` over `-settings-view.tsx` and
+  `-settings-dialog.tsx` (phase 3).
+- [x] **Session center** — `ListSessions`, `SignOutOtherSessions`,
   `SignOutAllSessions` (the engine already owns `GetSession`/`SignOut`).
   The `unauthenticated`-on-ended-session semantics are already the engine's
   restore signal. **The per-row revoke moved to Wave 2** (owner decision,
@@ -245,15 +247,37 @@ wires against.
   (`internal/guard/rules.go` marks it `StepUp: true`), and the step-up
   modal this page's action becomes the first consumer of lands there —
   shipping the button now would expose an action that always answers
-  `authentication required`.
-- [ ] **Email verification & change** —
+  `authentication required`. Shipped as `routes/(app)/account/sessions.tsx`
+  over `-sessions-view.tsx` and `-sessions-dialog.tsx` (phase 4).
+- [x] **Email verification & change** —
   `SendEmail`/`VerifyEmail`/`RequestEmailChange`/`ConfirmEmailChange`
-  (the change flow's completion half — shipped, see `issue-20261010_0017.md`
-  ISS-001 for the reference gap) plus the routes the mailed tokens land on:
-  the verify route and the change-confirm route.
-- [ ] **Audit trail (own)** — `AuditLogService/List` on the account page;
-  the smallest list-with-pagination consumer. Build the shared pagination
-  hook (page/limit + `ListMetadata`, `sort_by` whitelists) here.
+  (the change flow's completion half — the endpoint reference now carries
+  the row; `issue-20261010_0017.md` ISS-001 resolved) plus the routes the
+  mailed tokens land on: the verify route. Phase 5 shipped the page
+  (`routes/(app)/account/email.tsx`
+  over `-email-view.tsx`: status card, code-entry verify, the gated change
+  flow) and the no-session `/verify-email` door with `?code=` prefill; the
+  change-confirm route is the email page's confirm step, not a separate URL —
+  the mailed code is typed where the session already is.
+- [x] **Audit trail (own)** — `AuditLogService/List` on the account page;  the smallest list-with-pagination consumer. Built the shared pagination
+  hook here. Shipped as `routes/(app)/account/audit.tsx` over
+  `-audit-view.tsx`: the records as sentences (event, outcome badge,
+  address, when), the delegated-action actor beside the record
+  (`actor_username`), the `sort_by` whitelist riding the route search, and
+  the empty state. Display-only — the page writes nothing.
+- [x] **Shell residue cleanup** — the root `index.tsx` is a pure redirect now
+  (owner decision, 2026-10-10: no landing page; authed → `/overview`,
+  anonymous → `/login` — the file stays, the hero does not), the sidebar
+  reads the product ("Saka") and replaces the placeholder nav
+  (Search/Analytics/Docs/Products/Messages) with an Account section
+  (Settings, Sessions, Email, Audit) using the existing active-state
+  pattern, and the overview's template residue (DummyJSON sign-out copy,
+  template-repo link, invented stats) reads the product's own words.
+- [x] **The flows end to end** — `packages/e2e-tests/workflow/
+  account-{profile,sessions,email,audit}.test.ts` (phase 8, 2026-10-10),
+  19/19 green twice back to back; the deltas and the harness's rate-budget
+  override are in the plan's phase 8 record. The send-cooldown wording
+  stays with the page's browser test — the UI path to it does not exist.
 
 ### Wave 1.5 — the authz foundation (owner decisions, 2026-10-09)
 
@@ -279,23 +303,42 @@ decisions, settled in the same discussion:
   server judge by the same rule, and a requirement written for the guard reads as a
   literal in the UI.
 
-- [ ] **Claims into the store** — the engine (worker) decodes the access token's
+- [x] **Claims into the store** — the engine (worker) decodes the access token's
   `roles`/`permissions` at custody change; the store carries them beside the profile;
   every refresh replaces the snapshot; sign-out clears them with the pair.
-- [ ] **The permission engine** — the TS port of the matcher described above, exposed as
+  Shipped 2026-10-10 (`libraries/guard/auth-claims.ts` + the custody listener): the
+  decode rides the one main-thread custody site `persistTokens`, which both realms
+  wire, and the claims are live on every pair the backend already mints
+  (`signin/service.go:792`, `session/service.go:594`) — no backend change, exactly
+  the owner's shape.
+- [x] **The permission engine** — the TS port of the matcher described above, exposed as
   a `can(requirement)` primitive over the store's grants; unit tests cross-checked
   against the Go matcher's behavior (the same grant/requirement pairs, the same answers).
-- [ ] **React ergonomics** — `usePermissions()` and a `<Can permission="user:list">`
+  Shipped 2026-10-10 (`libraries/guard/permissions.ts` + `permissions-store.ts`): the
+  unit table transcribes `framework/authz/authz_test.go` pair for pair, and `can()`
+  reads the store synchronously so route guards and interceptors can ask it.
+- [x] **React ergonomics** — `usePermissions()` and a `<Can permission="user:list">`
   component in `libraries/guard/` (the namespace stays generic per D10 — no `admin`-only
-  vocabulary in the shared names).
-- [ ] **Administrator signal** — `isAdministrator` derived from the claims (holding the
+  vocabulary in the shared names). Shipped 2026-10-10: `usePermissions()` subscribes
+  the snapshot via `useSelector`; `<Can permission fallback>` hides rather than
+  disables and warns at the render when the slug is not three segments (a matcher's
+  silent false would make a surface vanish for the one account that should see it).
+- [x] **Administrator signal** — `isAdministrator` derived from the claims (holding the
   `administrator` system role), ready for `admin/route.tsx` to consume in Wave 3.
-- [ ] **Refusal mapping** — the Connect codes the guard answers
+  Shipped 2026-10-10: the synchronous `isAdministrator()` in `permissions-store.ts`
+  and the subscribed one inside `usePermissions()`.
+- [x] **Refusal mapping** — the Connect codes the guard answers
   (`permission_required`, `permission_denied`) join the error mapping, so a UI check
   that missed a case degrades to the server's word, never a silent lie.
-- [ ] **Catalog left out** — `ListPermissions` (the code-declared catalog) is an
+  **Corrected by the wire check (2026-10-10, plan-20261010_0610 D4):** the guard
+  answers those refusals as `not_found` (`internal/transport/middleware/guard.go`
+  — the disclosure rule the rules file records); no permission code ever reaches the
+  client. The map already carries `NotFound`'s word, so a missed UI check degrades to
+  the server's sentence; unit tests pin the two shapes the guard's refusals arrive
+  as. No backend change — the owner's "no backend change" stands.
+- [x] **Catalog left out** — `ListPermissions` (the code-declared catalog) is an
   admin-read surface; the screens that render it land in Wave 3. The foundation checks
-  against the snapshot alone.
+  against the snapshot alone. Held as scope: no `ListPermissions` consumer shipped.
 
 ### Wave 1.6 — frontend observability (owner direction, 2026-10-10)
 
@@ -322,34 +365,56 @@ goal, three deltas from its shape:
   demo shortcut — saka batches, the way the backend's queue keeps export off the
   request path.
 
-- [ ] **The web tracer** — `WebTracerProvider` with a resource naming the SPA
+- [x] **The web tracer** — `WebTracerProvider` with a resource naming the SPA
   (`service.name` the app identifier + `.web`, the deployment's `environment`), the
   OTLP/HTTP trace exporter, and lazy initialization after first paint so the SDK's
   weight never lands on first load.
-- [ ] **Spans at the seam** — `authFetch` opens one client span per request (the HTTP
+  Shipped 2026-10-10 (`libraries/telemetry/telemetry.ts` + `TelemetryProvider` in
+  the root stack): `saka-web` / the public `app.mode` / the build's version, the
+  D5 sampler, a batch processor, and an idle-tick init once the document
+  answered — off means no provider at all.
+- [x] **Spans at the seam** — `authFetch` opens one client span per request (the HTTP
   client semantic conventions), injects `traceparent`, and records the refusal as the
   span's status — one instrumentation point serving both the REST `fetcher` and the
   Connect transport, the same reason the seam exists. No
   `instrumentation-fetch`/`instrumentation-xml-http-request` monkey-patching, no
   `context-zone`.
-- [ ] **Navigation spans** — a router span per navigation from TanStack Router's
+  Shipped 2026-10-10 (`libraries/telemetry/seam-span.ts`): the span injects its
+  own context, a replay is its own span, and the network failure is recorded.
+- [x] **Navigation spans** — a router span per navigation from TanStack Router's
   lifecycle hooks, naming the route id.
-- [ ] **Redaction before export** — URL attributes drop query strings: the reset
+  Shipped 2026-10-10 (`libraries/telemetry/navigation.ts`, wired in `main.tsx`):
+  opened at `onBeforeLoad`, renamed to the resolved route id, ended at
+  `onResolved`; a redirect-superseded navigation ends silently and an errored
+  load ends as an error.
+- [x] **Redaction before export** — URL attributes drop query strings: the reset
   token, the one-time-access code, and the OAuth flow token travel in search params,
   and none of them may reach a collector. The redaction is written once at the
   exporter/processor seam, not per-span.
-- [ ] **The worker joins the trace** — the engine's transport injects the trace
+  Shipped 2026-10-10 (`libraries/telemetry/-redaction.ts`): one exporter wrapper —
+  the strip, and the drop of the telemetry endpoint's own and any third-party
+  span.
+- [x] **The worker joins the trace** — the engine's transport injects the trace
   context the main thread passes it, so the auth RPCs are children of the span that
   caused them; the worker never instruments independently.
-- [ ] **The enable switch and sampler** — frontend tracing is opt-in like every
+  Shipped 2026-10-10 (plan-20261010_0925 D4 refinement): the hints ride the
+  **Connect call headers**, not mutable transport state — a concurrent call
+  cannot read another's context — through the facade's `spanOperation` in
+  `auth-worker-client.ts`; `accessToken`/`authorization` stay uninstrumented.
+- [x] **The enable switch and sampler** — frontend tracing is opt-in like every
   backend signal: it follows the configuration document, and a sampling ratio rides
   with it. The decision the wave's plan settles: the public configuration gains a
   browser telemetry field (the deployment exposes its collector to browsers, or
   explicitly chooses not to), or the endpoint arrives at build time — the first
   keeps the capability source in one place, the second avoids a backend change but
   splits the source of truth.
-- [ ] **Metrics and logs stay backend-only for now** — the browser contributes
-  traces; console errors and client metrics wait for a named need.
+  **Settled 2026-10-10 (owner pick 1, plan-20261010_0925 D1/D5):** the public
+  scope carries `otel.browser.endpoint` + `otel.browser.ratio` (publisher test
+  pinned, empty = off, zero ratio = everything); the build-time variable and the
+  Go proxy are the recorded rejections.
+- [x] **Metrics and logs stay backend-only for now** — the browser contributes
+  traces; console errors and client metrics wait for a named need. (Scope, not a
+  deliverable — held by plan-20261010_0925's out-of-scope section.)
 
 ### Wave 2 — sign-in completeness
 
@@ -544,6 +609,12 @@ updated in the file it lives in, never only in this snapshot.
    deployment's reverse proxy answers a fixed path (e.g. `/otel/*`) to
    the collector, the SPA posts to same-origin, and no Go change is
    needed. Until decided, the exporter has nowhere to dial.
+   **Resolved 2026-10-10** (plan-20261010_0925 D1, owner pick 1): the
+   public scope now carries `otel.browser` (endpoint + ratio, empty =
+   off); the browser dials the collector directly and the collector's
+   receiver answers the CORS check (`container/otel-collector.yaml`
+   carries the dev value). The proxy and build-time shapes are the
+   recorded rejections in the wave's decision records.
 
 ## Route structure (recommended file layout)
 
@@ -562,10 +633,13 @@ hand-edited). Verified in the tree 2026-10-09:
   `isAuthenticated` guard redirecting with `return_to` + `unauthenticated`, the sidebar,
   and the eviction effect that bounces a profile that disappears mid-session. Children
   today: `overview.tsx`, `settings.tsx` (DummyJSON stub).
-- Template residue rides in the shell: the `index.tsx` hero ("Vite React Template",
+- Template residue rode in the shell: the `index.tsx` hero ("Vite React Template",
   "Demo sign in"), the sidebar's logo ("ReactiVite") and placeholder nav items
-  (Search/Analytics/Docs/Products/Messages with `href: undefined`). The de-templating is
-  Wave-1 work under the demo-free principle, not a separate pass.
+  (Search/Analytics/Docs/Products/Messages with `href: undefined`). Resolved in
+  Wave 1 phase 7: the root is a pure redirect now — authed visitors land on
+  `/overview`, anonymous ones on `/login`, and no landing page renders — and the
+  sidebar reads the product ("Saka") with an Account section (Settings, Sessions,
+  Email, Audit) where the placeholders were.
 
 Conventions the waves keep:
 
@@ -600,8 +674,9 @@ Target layout, annotated with the wave that lands each file:
 ```text
 routes/
   __root.tsx                    # providers + pageTitle — unchanged
-  index.tsx                     # landing — destub the hero (Wave 1)
-  verify-email.tsx              # token consumption, no guard — works signed-in or not (Wave 1)
+  index.tsx                     # pure redirect: authed → /overview, anonymous → /login (Wave 1)
+    verify-email.tsx              # token consumption, no guard — works signed-in or not (Wave 1)
+    -verify-email-view.tsx        #   the implementation; ?code= prefills the slots
   -boundaries.tsx               # shared, not a route
   -devtools.tsx                 # shared, not a route
 
@@ -621,6 +696,10 @@ routes/
     -settings-dialog.tsx         #   the danger zone's typed confirmation
     device.tsx                   # device-login approval: Inspect + Decide (Wave 6)
     account/
+      audit.tsx                  # the account's own audit trail (Wave 1)
+      -audit-view.tsx            #   the implementation; display-only
+      email.tsx                  # email identity (Wave 1)
+      -email-view.tsx            #   the implementation
       sessions.tsx               # session center (Wave 1)
       -sessions-view.tsx         #   the implementation
       -sessions-dialog.tsx       #   the bulk sign-out confirmations
@@ -723,10 +802,18 @@ File: `workflow/session-foundation.test.ts` (happy: shipped; unhappy rows below 
   login route with the `unauthenticated` notice; an SSO flow ending in an error word
   renders its message on `/auth/callback`.
 
-### Wave 1 — account self-service
+### Wave 1 — account self-service — shipped (phase 8, 2026-10-10)
 
 File: `workflow/account-profile.test.ts`, `workflow/account-sessions.test.ts`,
-`workflow/account-email.test.ts`, `workflow/account-audit.test.ts`.
+`workflow/account-email.test.ts`, `workflow/account-audit.test.ts` — all four
+shipped and green twice back to back (19/19 with the session foundation).
+Two deltas the wire checks forced: the send-cooldown wording is not
+reachable through the UI (an unverified account cannot sign in to send its
+own code — the wording stays with the page's browser test), and the
+sessions file holds the per-row revoke's ABSENCE (the step-up boundary D6
+recorded). The harness raises its own rate budgets through
+`packages/e2e-tests/make-config.mjs`; the environment is deliberately not a
+config layer, so the override rides a generated `--config-file`.
 
 - Profile — happy: the settings page renders the account view (`GetCurrentUser`);
   updating names/locale/timezone persists after reload; a valid PNG upload swaps the
@@ -915,7 +1002,9 @@ store), ConnectRPC + connect-query, ofetch, StyleX, zod, cookie-es, Comlink,
   `@opentelemetry/resources`, `@opentelemetry/semantic-conventions`, and
   `@opentelemetry/exporter-trace-otlp-http`. The five-package shape is the
   OpenTelemetry project's own packaging; this set is the minimal one that yields a
-  tracing provider. Rejected: the auto-instrumentation packages
+  tracing provider. Adopted 2026-10-10 (plus `@opentelemetry/core` for the W3C
+  propagator and the export result codes — both already in the graph as the SDK's
+  own dependency). Rejected: the auto-instrumentation packages
   (`instrumentation-fetch`, `instrumentation-xml-http-request`, `context-zone`) —
   they monkey-patch globals where the `authFetch` seam is the single honest
   instrumentation point; Sentry/APM SaaS SDKs — a hosted dependency where the

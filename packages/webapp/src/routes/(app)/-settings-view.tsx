@@ -72,11 +72,14 @@ export function SettingsView() {
 
   const account = useQuery(UserService.method.getCurrentUser, create(GetCurrentUserRequestSchema))
 
-  // The form holds a draft the account view seeds — the response is the
-  // authority (D2 of the wave plan), and every refetch re-seeds it.
+  // The form holds a draft the account view seeds once — after that the
+  // draft is the caller's: the save re-seeds it from the response (D2), and
+  // a refetch never clobbers the edit a keystroke is mid-writing.
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
   useEffect(() => {
-    if (account.data?.user) setDraft(draftFrom(account.data.user))
+    const answered = account.data?.user
+    if (!answered) return
+    setDraft((current) => current ?? draftFrom(answered))
   }, [account.data])
 
   const [formError, setFormError] = useState<string | null>(null)
@@ -101,9 +104,8 @@ export function SettingsView() {
   const update = useMutation(UserService.method.updateCurrentUser, {
     onSuccess: (response) => {
       setFormError(null)
-      // The answered view is the authority: the store's profile is patched
-      // from it (the claims stay stale until the next mint — cosmetic only),
-      // and the draft re-seeds from the same response.
+      // The draft keeps the caller's edits; the save's answer re-seeds it
+      // from the same response.
       if (response.user) {
         setAuthUser({
           id: response.user.id,

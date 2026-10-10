@@ -1,5 +1,7 @@
 import * as Comlink from 'comlink'
 import { deviceHeaders } from '#/libraries/device-fingerprint'
+import { spanOperation } from '#/libraries/telemetry/seam-span'
+import { decodeAccessClaims } from './auth-claims'
 import {
   clearTokenCookies,
   readTokenCookies,
@@ -14,7 +16,7 @@ import type {
   TokenListener
 } from './auth-engine'
 import { createAuthEngine } from './auth-engine'
-import { clearAuth, type UserProfile } from './auth-store'
+import { clearAuth, setAuthGrants, type UserProfile } from './auth-store'
 import { publishTokens, subscribeTokens } from './auth-sync'
 
 /**
@@ -79,6 +81,10 @@ const REQUEST_REFRESH_MARGIN_MS = 30_000
  */
 const persistTokens: TokenListener = (tokens) => {
   cachedAccess = tokens ? { token: tokens.accessToken, expiresAt: tokens.accessExpiresAt } : null
+  // The grant snapshot rides the same custody tick: a fresh pair replaces
+  // the store's claims before anything can render the stale ones, and the
+  // drop clears them with the pair.
+  setAuthGrants(tokens ? decodeAccessClaims(tokens.accessToken) : null)
   if (tokens) {
     writeTokenCookies(tokens)
   } else {
@@ -103,42 +109,54 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
 
   return {
     async login(credentials: LoginCredentials, options?: AuthLoginOptions) {
-      await deviceReady
-      const result: AuthSession = await engine.login(credentials, options)
-      writeUserCookie(result.user, result.tokens.refreshExpiresAt)
-      return result.user
+      return spanOperation('login', async (hints) => {
+        await deviceReady
+        const result: AuthSession = await engine.login(credentials, options, hints)
+        writeUserCookie(result.user, result.tokens.refreshExpiresAt)
+        return result.user
+      })
     },
     async continueSignIn(flowToken: string) {
-      await deviceReady
-      const result: AuthSession = await engine.continueSignIn(flowToken)
-      writeUserCookie(result.user, result.tokens.refreshExpiresAt)
-      return result.user
+      return spanOperation('continue-sign-in', async (hints) => {
+        await deviceReady
+        const result: AuthSession = await engine.continueSignIn(flowToken, hints)
+        writeUserCookie(result.user, result.tokens.refreshExpiresAt)
+        return result.user
+      })
     },
     async refresh() {
-      await deviceReady
-      return engine.refresh()
+      return spanOperation('refresh', async (hints) => {
+        await deviceReady
+        return engine.refresh(hints)
+      })
     },
     async maybeRefresh(withinMs: number) {
-      await deviceReady
-      return engine.maybeRefresh(withinMs)
+      return spanOperation('maybe-refresh', async (hints) => {
+        await deviceReady
+        return engine.maybeRefresh(withinMs, hints)
+      })
     },
     async restore() {
-      await deviceReady
-      await engine.restore(readTokenCookies())
+      return spanOperation('restore', async () => {
+        await deviceReady
+        await engine.restore(readTokenCookies())
+      })
     },
     async session() {
-      const profile = await engine.session()
-      if (profile) {
-        // Cache the confirmed profile for the next reload, with the refresh
-        // half's lifetime — the pair (possibly just rotated) is in the jar.
-        writeUserCookie(profile, readTokenCookies()?.refreshExpiresAt)
-      } else {
-        // A definite sign-out clears the jar — but only when the engine holds
-        // no pair: a custody change that raced this call (a re-login, a
-        // rotation) owns the jar now and must not be cleared on its behalf.
-        if (!(await engine.accessToken())) clearTokenCookies()
-      }
-      return profile
+      return spanOperation('session', async (hints) => {
+        const profile = await engine.session(hints)
+        if (profile) {
+          // Cache the confirmed profile for the next reload, with the refresh
+          // half's lifetime — the pair (possibly just rotated) is in the jar.
+          writeUserCookie(profile, readTokenCookies()?.refreshExpiresAt)
+        } else {
+          // A definite sign-out clears the jar — but only when the engine holds
+          // no pair: a custody change that raced this call (a re-login, a
+          // rotation) owns the jar now and must not be cleared on its behalf.
+          if (!(await engine.accessToken())) clearTokenCookies()
+        }
+        return profile
+      })
     },
     accessToken: () => {
       if (cachedAccess && Date.now() < cachedAccess.expiresAt)
@@ -158,7 +176,9 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
       return headers
     },
     async logout() {
-      await engine.logout()
+      return spanOperation('logout', async (hints) => {
+        await engine.logout(hints)
+      })
     }
   }
 }

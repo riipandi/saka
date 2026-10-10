@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
-import { Hr, CodeInline, Row, Column } from 'react-email'
-import { Alert, CardFooter, CardHeader, Text } from '../components'
+import { Hr, Row, Column } from 'react-email'
+import { Code, Alert, CardFooter, CardHeader, Text } from '../components'
 import { sharedPreviewProps, sharedTemplateProps } from '../constants'
 import { BaseTemplate } from '../layouts'
 
@@ -18,7 +18,11 @@ interface EmailChangeRequestProps {
 }
 
 export const EmailChangeRequest = ({ logoURL, appName, data }: EmailChangeRequestProps) => {
-  const detailsBoxStyle = { width: '225px', padding: '12px' } satisfies CSSProperties
+  const detailsBoxStyle = {
+    width: '225px',
+    padding: '12px',
+    verticalAlign: 'top'
+  } satisfies CSSProperties
   const detailsLabelStyle = { margin: 0, color: '#747474' } satisfies CSSProperties
   const detailsBoxValueStyle = { margin: 0, fontSize: '14px' } satisfies CSSProperties
 
@@ -53,9 +57,7 @@ export const EmailChangeRequest = ({ logoURL, appName, data }: EmailChangeReques
       </Text>
 
       <Text style={{ textAlign: 'center' }}>
-        <CodeInline style={{ fontSize: '24px', letterSpacing: '4px' }}>
-          {data.confirmCode}
-        </CodeInline>
+        <Code style={{ fontSize: '24px', letterSpacing: '4px' }}>{data.confirmCode}</Code>
       </Text>
 
       <Hr style={{ marginTop: '20px' }} />

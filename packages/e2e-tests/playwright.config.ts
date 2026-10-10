@@ -24,7 +24,8 @@ const serverCommand = [
   'pnpm exec vp run webapp#prebuild',
   'pnpm exec vp run webapp#build',
   `go build -tags ${buildTag} -o build/${buildTag}/saka ./cmd`,
-  `./build/${buildTag}/saka --env-file=.env.local serve --base-url=${serverBaseURL}`
+  'node packages/e2e-tests/make-config.mjs',
+  `./build/${buildTag}/saka --config-file=build/${buildTag}/app.config.e2e.json --env-file=.env.local serve --base-url=${serverBaseURL}`
 ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one

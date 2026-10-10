@@ -7,6 +7,7 @@ import { ThemeProvider } from 'uilibs/theme'
 import { rpcTransport } from '#/libraries/api-client'
 import { CookiesProvider } from '#/libraries/cookies'
 import { AuthProvider } from '#/libraries/guard/auth-provider'
+import { TelemetryProvider } from '#/libraries/telemetry/telemetry-provider'
 import { GlobalNotFound, GlobalError } from './-boundaries'
 import DevTools from './-devtools'
 
@@ -42,6 +43,7 @@ function RootComponent() {
               </ThemeProvider>
             </AuthProvider>
             <DevTools queryClient={queryClient} />
+            <TelemetryProvider />
           </TransportProvider>
         </QueryClientProvider>
       </UIProvider>

@@ -52,5 +52,25 @@ describe('auth utils', () => {
       expect(getErrorMessage('boom')).toBe('An unexpected error occurred')
       expect(getErrorMessage(new Error('disk full'))).toBe('disk full')
     })
+
+    it('passes the guard unauthenticated refusal through as the server wrote it', () => {
+      // The guard answers a missing credential `unauthenticated` with its own
+      // sentence (internal/transport/middleware/guard.go); the map must not
+      // replace it.
+      expect(
+        getErrorMessage(new ConnectError('authentication required', Code.Unauthenticated))
+      ).toBe('authentication required')
+    })
+
+    it('answers a guard permission refusal with the server word, not a permission code', () => {
+      // The disclosure rule answers `not_found` for every non-auth refusal —
+      // no `permission_required`/`permission_denied` code ever reaches the
+      // client from the guard. The pin keeps the map honest: a UI check that
+      // missed a case degrades to the server's sentence.
+      expect(getErrorMessage(new ConnectError('not found', Code.NotFound))).toBe('not found')
+      expect(getErrorMessage(new ConnectError('', Code.NotFound))).toBe(
+        'That item no longer exists.'
+      )
+    })
   })
 })

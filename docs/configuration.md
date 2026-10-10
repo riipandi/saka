@@ -40,7 +40,7 @@ flowchart LR
 | `storage` | Where files live | local or S3 backend |
 | `mailer` | Outbound email | SMTP host/credentials (secret), from address |
 | `log` | Log transports and levels | console, file, OTLP |
-| `otel` | Tracing and metrics | the collector endpoint, per-signal switches, Prometheus path |
+| `otel` | Tracing and metrics | the collector endpoint, per-signal switches, Prometheus path, the browser-facing collector (`otel.browser`) |
 | `queue` | The task queue | concurrency, retention |
 | `rate_limit` | The throttles | per-bucket budgets |
 | `auth` | Authentication behavior | session lifetimes, one-time-access email switches |

@@ -65,6 +65,33 @@ describe('readAppConfig', () => {
     expect(config).not.toHaveProperty('database')
   })
 
+  it('reads the browser telemetry fact when the deployment publishes it', async () => {
+    vi.mocked(fetcher).mockResolvedValue(
+      envelope({
+        ...configData,
+        otel: { browser: { endpoint: 'http://localhost:4318', ratio: 0.25 } }
+      })
+    )
+    const config = await readAppConfig()
+    expect(config.otel.browser.endpoint).toBe('http://localhost:4318')
+    expect(config.otel.browser.ratio).toBe(0.25)
+  })
+
+  it('defaults the browser telemetry fact to off when the backend omits it', async () => {
+    // `omitzero` drops an unset browser section — the deployment where
+    // frontend tracing does not exist reads as an empty endpoint.
+    vi.mocked(fetcher).mockResolvedValue(envelope({}))
+    const config = await readAppConfig()
+    expect(config.otel.browser.endpoint).toBe('')
+  })
+
+  it('refuses a browser ratio outside the fraction range', async () => {
+    vi.mocked(fetcher).mockResolvedValue(
+      envelope({ ...configData, otel: { browser: { ratio: 42 } } })
+    )
+    await expect(readAppConfig()).rejects.toThrow(/too big/i)
+  })
+
   it('refuses a malformed body', async () => {
     vi.mocked(fetcher).mockResolvedValue(envelope({ app: { mode: 42 } }))
     await expect(readAppConfig()).rejects.toThrow(/invalid/i)

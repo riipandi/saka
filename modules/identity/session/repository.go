@@ -215,17 +215,20 @@ func (r *Repository) Rotate(ctx context.Context, db datastore.Querier, id Sessio
 }
 
 // RevokeLiveForUser stamps the end of every live session the account holds,
-// except the one the caller asked to keep — a nil `keep` keeps nothing. The
-// read takes row locks before the write, so a session a concurrent actor
-// stamps between the two statements waits and then answers as already ended:
-// every row the caller sees back is one this write stamped. The refresh
-// token of each stamped row dies with it; the access tokens do not, by the
-// statelessness the protocol settles.
+// except the one the caller asked to keep — a nil `keep` keeps nothing. Live
+// means unexpired: a row whose window has closed but whose stamp was never
+// written must not join the sweep, because stamping it would re-evaluate the
+// table's `expires_at > CURRENT_TIMESTAMP` check on the updated row and
+// refuse the whole write. The read takes row locks before the write, so a
+// session a concurrent actor stamps between the two statements waits and
+// then answers as already ended: every row the caller sees back is one this
+// write stamped. The refresh token of each stamped row dies with it; the
+// access tokens do not, by the statelessness the protocol settles.
 func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID, keep *SessionID, by uuid.UUID, at time.Time) ([]SessionSchema, error) {
 	lb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	lb.Select(sessionColumns...)
 	lb.From(entity.TableSessions)
-	lb.Where(lb.Equal("user_id", userID), lb.IsNull("revoked_at"))
+	lb.Where(lb.Equal("user_id", userID), lb.IsNull("revoked_at"), lb.GreaterThan("expires_at", at))
 	if keep != nil {
 		lb.Where(lb.NE("id", keep.UUID()))
 	}
@@ -261,7 +264,10 @@ func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier
 		ub.Assign("revoked_at", at),
 		ub.Assign("revoked_by", by),
 	)
-	ub.Where(ub.In("id", ids...), ub.IsNull("revoked_at"))
+	// The same unexpired predicate rides the write: a row that expired after
+	// the lock read must not be stamped, for the same constraint the lock
+	// filters on.
+	ub.Where(ub.In("id", ids...), ub.IsNull("revoked_at"), ub.GreaterThan("expires_at", at))
 
 	query, args := ub.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {

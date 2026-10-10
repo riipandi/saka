@@ -18,7 +18,11 @@ interface NewSignInEmailProps {
 }
 
 export const NewSignInEmail = ({ logoURL, appName, data }: NewSignInEmailProps) => {
-  const detailsBoxStyle = { width: '225px', padding: '12px' } satisfies CSSProperties
+  const detailsBoxStyle = {
+    width: '225px',
+    padding: '12px',
+    verticalAlign: 'top'
+  } satisfies CSSProperties
   const detailsLabelStyle = { margin: 0, color: '#747474' } satisfies CSSProperties
   const detailsBoxValueStyle = { margin: 0, fontSize: '14px' } satisfies CSSProperties
 
@@ -92,7 +96,8 @@ NewSignInEmail.PreviewProps = {
   data: {
     location: 'San Francisco, USA',
     ipAddress: '127.0.0.1',
-    device: 'Chrome on macOS',
+    device:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)',
     dateTime: '2024-01-01 12:00 PM UTC'
   }
 }

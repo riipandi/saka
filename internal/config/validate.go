@@ -165,6 +165,17 @@ func (c Config) Validate() error {
 		check(c.OTEL.ServiceName != "", "otel.service_name: must not be empty")
 	}
 
+	// The browser-facing address is read only when it is named: frontend
+	// tracing is off on an empty one, so an unset entry reports no problem.
+	// A typo here would surface in the browser as a failed export — the
+	// refusal is loud there — so the shape is held where the file is read.
+	if c.OTEL.Browser.Endpoint != "" {
+		check(isHTTPURL(c.OTEL.Browser.Endpoint),
+			"otel.browser.endpoint: %q must be an absolute http or https URL", c.OTEL.Browser.Endpoint)
+	}
+	check(c.OTEL.Browser.Ratio >= 0 && c.OTEL.Browser.Ratio <= 1,
+		"otel.browser.ratio: %v must be between 0 and 1", c.OTEL.Browser.Ratio)
+
 	// The trace section is read only when tracing is switched on: holding a
 	// sampler that never runs to anything would report a problem in a part of
 	// the file nothing reads.

@@ -92,6 +92,28 @@ role grants, sign-up modes, and the blocklist — has its own page:
 
 ---
 
+## Managing your own account
+
+Once signed in, each person manages their own account from the Account
+section in the sidebar — no administrator needed:
+
+- **Settings** — your names, language, and time zone; your picture (upload
+  or reset it); and, when the deployment allows it, the dangerous choice to
+  delete your own account (confirming it signs you out and closes the
+  account for good).
+- **Sessions** — every device currently signed in as you, the current one
+  marked. Sign out everything else in one step (say, a lost phone), or
+  everywhere including here.
+- **Email** — verify your address with the code the confirmation mail
+  carries, and change it: you receive a second code at the new address to
+  confirm the move, and the old address is told as well. A deployment can
+  switch each of these abilities off.
+- **Audit** — your own security record: recent sign-ins, sign-outs, and
+  changes to your account, with the time, the address, and whether they
+  succeeded.
+
+---
+
 ## Letting other applications in
 
 The auth core is a full OpenID provider, so other applications are

@@ -230,22 +230,6 @@ export const sidebarStyles = stylex.create({
     fontWeight: fontWeight.medium,
     whiteSpace: 'nowrap'
   },
-  badge: {
-    width: '0.375rem',
-    height: '0.375rem',
-    borderRadius: '9999px',
-    backgroundColor: colors.backgroundCritical,
-    flexShrink: 0
-  },
-  badgeCollapsed: {
-    position: 'absolute',
-    top: '0.375rem',
-    right: '0.375rem',
-    height: '0.35rem',
-    width: '0.35rem',
-    borderRadius: '9999px',
-    backgroundColor: colors.backgroundCritical
-  },
 
   // Bottom: sign out + theme switcher
   bottomSection: {

@@ -56,6 +56,31 @@ func TestThePublicScopeCarriesTheOauthSwitch(t *testing.T) {
 	assert.Contains(t, string(document), `"oauth":{"enabled":true}`)
 }
 
+// TestTheBrowserTelemetryFactIsPublic pins the SPA's tracing door in the
+// anonymous body: the browser dials the collector the deployment names, so
+// the fact is public in both scopes — and the ratio rides with it.
+func TestTheBrowserTelemetryFactIsPublic(t *testing.T) {
+	cfg := plantedConfig()
+	cfg.OTEL.Browser.Endpoint = "https://collector.example.com:4318"
+	cfg.OTEL.Browser.Ratio = 0.25
+
+	for _, full := range []bool{false, true} {
+		document, err := json.Marshal(cfg.Published(full))
+		require.NoError(t, err)
+		assert.Contains(t, string(document),
+			`"browser":{"endpoint":"https://collector.example.com:4318","ratio":0.25}`)
+	}
+}
+
+// TestAnUnsetBrowserFactOmitsTheOtelSection pins the off shape: an empty
+// browser endpoint means frontend tracing does not exist, and the public
+// body says so by absence — no otel section at all, not an empty one.
+func TestAnUnsetBrowserFactOmitsTheOtelSection(t *testing.T) {
+	document, err := json.Marshal(Default().Published(false))
+	require.NoError(t, err)
+	assert.NotContains(t, string(document), `"otel"`)
+}
+
 // TestTheFullScopeRedactsEverySecret pins the administrator's body: a set
 // secret is the placeholder the fail-safe print uses, an unset one stays
 // empty and omitted, and the datastore URLs are the reduced targets.
