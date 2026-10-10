@@ -365,34 +365,56 @@ goal, three deltas from its shape:
   demo shortcut — saka batches, the way the backend's queue keeps export off the
   request path.
 
-- [ ] **The web tracer** — `WebTracerProvider` with a resource naming the SPA
+- [x] **The web tracer** — `WebTracerProvider` with a resource naming the SPA
   (`service.name` the app identifier + `.web`, the deployment's `environment`), the
   OTLP/HTTP trace exporter, and lazy initialization after first paint so the SDK's
   weight never lands on first load.
-- [ ] **Spans at the seam** — `authFetch` opens one client span per request (the HTTP
+  Shipped 2026-10-10 (`libraries/telemetry/telemetry.ts` + `TelemetryProvider` in
+  the root stack): `saka-web` / the public `app.mode` / the build's version, the
+  D5 sampler, a batch processor, and an idle-tick init once the document
+  answered — off means no provider at all.
+- [x] **Spans at the seam** — `authFetch` opens one client span per request (the HTTP
   client semantic conventions), injects `traceparent`, and records the refusal as the
   span's status — one instrumentation point serving both the REST `fetcher` and the
   Connect transport, the same reason the seam exists. No
   `instrumentation-fetch`/`instrumentation-xml-http-request` monkey-patching, no
   `context-zone`.
-- [ ] **Navigation spans** — a router span per navigation from TanStack Router's
+  Shipped 2026-10-10 (`libraries/telemetry/seam-span.ts`): the span injects its
+  own context, a replay is its own span, and the network failure is recorded.
+- [x] **Navigation spans** — a router span per navigation from TanStack Router's
   lifecycle hooks, naming the route id.
-- [ ] **Redaction before export** — URL attributes drop query strings: the reset
+  Shipped 2026-10-10 (`libraries/telemetry/navigation.ts`, wired in `main.tsx`):
+  opened at `onBeforeLoad`, renamed to the resolved route id, ended at
+  `onResolved`; a redirect-superseded navigation ends silently and an errored
+  load ends as an error.
+- [x] **Redaction before export** — URL attributes drop query strings: the reset
   token, the one-time-access code, and the OAuth flow token travel in search params,
   and none of them may reach a collector. The redaction is written once at the
   exporter/processor seam, not per-span.
-- [ ] **The worker joins the trace** — the engine's transport injects the trace
+  Shipped 2026-10-10 (`libraries/telemetry/-redaction.ts`): one exporter wrapper —
+  the strip, and the drop of the telemetry endpoint's own and any third-party
+  span.
+- [x] **The worker joins the trace** — the engine's transport injects the trace
   context the main thread passes it, so the auth RPCs are children of the span that
   caused them; the worker never instruments independently.
-- [ ] **The enable switch and sampler** — frontend tracing is opt-in like every
+  Shipped 2026-10-10 (plan-20261010_0925 D4 refinement): the hints ride the
+  **Connect call headers**, not mutable transport state — a concurrent call
+  cannot read another's context — through the facade's `spanOperation` in
+  `auth-worker-client.ts`; `accessToken`/`authorization` stay uninstrumented.
+- [x] **The enable switch and sampler** — frontend tracing is opt-in like every
   backend signal: it follows the configuration document, and a sampling ratio rides
   with it. The decision the wave's plan settles: the public configuration gains a
   browser telemetry field (the deployment exposes its collector to browsers, or
   explicitly chooses not to), or the endpoint arrives at build time — the first
   keeps the capability source in one place, the second avoids a backend change but
   splits the source of truth.
-- [ ] **Metrics and logs stay backend-only for now** — the browser contributes
-  traces; console errors and client metrics wait for a named need.
+  **Settled 2026-10-10 (owner pick 1, plan-20261010_0925 D1/D5):** the public
+  scope carries `otel.browser.endpoint` + `otel.browser.ratio` (publisher test
+  pinned, empty = off, zero ratio = everything); the build-time variable and the
+  Go proxy are the recorded rejections.
+- [x] **Metrics and logs stay backend-only for now** — the browser contributes
+  traces; console errors and client metrics wait for a named need. (Scope, not a
+  deliverable — held by plan-20261010_0925's out-of-scope section.)
 
 ### Wave 2 — sign-in completeness
 
@@ -587,6 +609,12 @@ updated in the file it lives in, never only in this snapshot.
    deployment's reverse proxy answers a fixed path (e.g. `/otel/*`) to
    the collector, the SPA posts to same-origin, and no Go change is
    needed. Until decided, the exporter has nowhere to dial.
+   **Resolved 2026-10-10** (plan-20261010_0925 D1, owner pick 1): the
+   public scope now carries `otel.browser` (endpoint + ratio, empty =
+   off); the browser dials the collector directly and the collector's
+   receiver answers the CORS check (`container/otel-collector.yaml`
+   carries the dev value). The proxy and build-time shapes are the
+   recorded rejections in the wave's decision records.
 
 ## Route structure (recommended file layout)
 
@@ -974,7 +1002,9 @@ store), ConnectRPC + connect-query, ofetch, StyleX, zod, cookie-es, Comlink,
   `@opentelemetry/resources`, `@opentelemetry/semantic-conventions`, and
   `@opentelemetry/exporter-trace-otlp-http`. The five-package shape is the
   OpenTelemetry project's own packaging; this set is the minimal one that yields a
-  tracing provider. Rejected: the auto-instrumentation packages
+  tracing provider. Adopted 2026-10-10 (plus `@opentelemetry/core` for the W3C
+  propagator and the export result codes — both already in the graph as the SDK's
+  own dependency). Rejected: the auto-instrumentation packages
   (`instrumentation-fetch`, `instrumentation-xml-http-request`, `context-zone`) —
   they monkey-patch globals where the `authFetch` seam is the single honest
   instrumentation point; Sentry/APM SaaS SDKs — a hosted dependency where the
