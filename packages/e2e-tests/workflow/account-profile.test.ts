@@ -59,7 +59,13 @@ test.describe.serial('the account profile flow', () => {
     // the not-yet-dirty (disabled) button is swallowed by the browser.
     await expect(saveBtn).toBeEnabled()
     await saveBtn.click()
-    await expect(saveBtn).toBeEnabled()
+    // The save settles when the form is clean again: the mutation answered,
+    // the answer re-seeded the draft, and the refetched view agrees with it.
+    // A button-enabled check alone is not a settle signal — it passes before
+    // React has rendered the pending state, and a reload firing then aborts
+    // the save mid-body (the server answers context canceled, the old name
+    // survives).
+    await expect(saveBtn).toBeDisabled()
 
     // The answered view is the authority: the reload reads the server, and
     // the server holds the name the save wrote. (The store patch the save
