@@ -1,5 +1,6 @@
 import * as Comlink from 'comlink'
 import { deviceHeaders } from '#/libraries/device-fingerprint'
+import { decodeAccessClaims } from './auth-claims'
 import {
   clearTokenCookies,
   readTokenCookies,
@@ -14,7 +15,7 @@ import type {
   TokenListener
 } from './auth-engine'
 import { createAuthEngine } from './auth-engine'
-import { clearAuth, type UserProfile } from './auth-store'
+import { clearAuth, setAuthGrants, type UserProfile } from './auth-store'
 import { publishTokens, subscribeTokens } from './auth-sync'
 
 /**
@@ -79,6 +80,10 @@ const REQUEST_REFRESH_MARGIN_MS = 30_000
  */
 const persistTokens: TokenListener = (tokens) => {
   cachedAccess = tokens ? { token: tokens.accessToken, expiresAt: tokens.accessExpiresAt } : null
+  // The grant snapshot rides the same custody tick: a fresh pair replaces
+  // the store's claims before anything can render the stale ones, and the
+  // drop clears them with the pair.
+  setAuthGrants(tokens ? decodeAccessClaims(tokens.accessToken) : null)
   if (tokens) {
     writeTokenCookies(tokens)
   } else {

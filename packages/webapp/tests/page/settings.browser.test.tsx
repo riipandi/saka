@@ -62,6 +62,7 @@ async function renderSettings() {
       email: PROFILE.email,
       displayName: PROFILE.displayName
     },
+    grants: { roles: ['administrator'], permissions: [] },
     isLoading: false
   }
 

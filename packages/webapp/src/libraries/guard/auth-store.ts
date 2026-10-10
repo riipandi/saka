@@ -1,5 +1,6 @@
 import { createStore } from '@tanstack/react-store'
 import type { AuthenticatedUser } from '~/codegen/authn_pb'
+import type { AccessGrants } from './auth-claims'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,13 @@ export type UserProfile = Pick<AuthenticatedUser, 'id' | 'username' | 'email' | 
 
 export interface AuthState {
   user: UserProfile | null
+  /**
+   * The grant snapshot the access token's claims carried at custody — the
+   * mint-time truth the backend judges its own requests by. It replaces
+   * itself at every custody change and never refetches: the refresh is the
+   * refetch.
+   */
+  grants: AccessGrants
   /** True while the initial session bootstrap is running. */
   isLoading: boolean
 }
@@ -27,7 +35,11 @@ export interface AuthState {
  * refresh token dies server-side the moment a renewal lands. On reload the
  * pair is restored from the cookie into the worker (see `guard/auth-session.ts`).
  */
-export const authStore = createStore<AuthState>({ user: null, isLoading: false })
+export const authStore = createStore<AuthState>({
+  user: null,
+  grants: { roles: [], permissions: [] },
+  isLoading: false
+})
 
 // ── Sync reads (for non-React contexts: route guards, API interceptors) ────
 
@@ -43,13 +55,23 @@ export function setAuthUser(user: UserProfile | null) {
   authStore.setState((prev) => ({ ...prev, user }))
 }
 
+/** Replace the grant snapshot; `null` is the signed-out shape. */
+export function setAuthGrants(grants: AccessGrants | null) {
+  const next = grants ?? { roles: [], permissions: [] }
+  authStore.setState((prev) => ({ ...prev, grants: next }))
+}
+
 export function setAuthLoading(isLoading: boolean) {
   authStore.setState((prev) => ({ ...prev, isLoading }))
 }
 
 /** Clear the session — used on logout / failed validation. */
 export function clearAuth() {
-  authStore.setState(() => ({ user: null, isLoading: false }))
+  authStore.setState(() => ({
+    user: null,
+    grants: { roles: [], permissions: [] },
+    isLoading: false
+  }))
 }
 
 // ── Sign-out guard (module-level, deliberately not reactive) ────────────────
