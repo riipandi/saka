@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf'
-import { createRouterTransport } from '@connectrpc/connect'
+import { Code, ConnectError, createRouterTransport } from '@connectrpc/connect'
 import { TransportProvider } from '@connectrpc/connect-query'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -10,6 +10,9 @@ import { SessionsView as SessionsPage } from '#/routes/(app)/account/-sessions-v
 import {
   ListSessionsResponseSchema,
   type ListSessionsResponse,
+  type RevokeSessionRequest,
+  type RevokeSessionResponse,
+  RevokeSessionResponseSchema,
   SessionSchema,
   SessionService,
   type SignOutAllSessionsResponse,
@@ -18,6 +21,14 @@ import {
   SignOutOtherSessionsResponseSchema,
   type Session
 } from '~/codegen/authn_pb'
+import {
+  BeginLoginResponseSchema,
+  type ReauthenticateRequest,
+  type ReauthenticateResponse,
+  ReauthenticateResponseSchema,
+  SendReauthenticationCodeResponseSchema,
+  WebAuthnService
+} from '~/codegen/webauthn_pb'
 
 type SessionOverrides = Partial<Omit<Session, '$typeName' | '$unknown'>>
 
@@ -42,6 +53,8 @@ interface SessionHandlers {
   listSessions?: () => ListSessionsResponse
   signOutOtherSessions?: () => SignOutOtherSessionsResponse
   signOutAllSessions?: () => SignOutAllSessionsResponse
+  reauthenticate?: (request: ReauthenticateRequest) => ReauthenticateResponse
+  revokeSession?: (request: RevokeSessionRequest, requestHeader: Headers) => RevokeSessionResponse
   onPageChange?: (next: number) => void
 }
 
@@ -68,6 +81,9 @@ function wrapperWith(transport: ReturnType<typeof createRouterTransport>, childr
 }
 
 async function renderSessions(handlers?: SessionHandlers) {
+  const reauthenticateHandler =
+    handlers?.reauthenticate ??
+    (() => create(ReauthenticateResponseSchema, { token: 'proof_from_modal' }))
   const transport = createRouterTransport(({ service }) => {
     service(SessionService, {
       listSessions:
@@ -82,7 +98,22 @@ async function renderSessions(handlers?: SessionHandlers) {
         (() => create(SignOutOtherSessionsResponseSchema, { revokedCount: 1, status: 'success' })),
       signOutAllSessions:
         handlers?.signOutAllSessions ??
-        (() => create(SignOutAllSessionsResponseSchema, { revokedCount: 3, status: 'success' }))
+        (() => create(SignOutAllSessionsResponseSchema, { revokedCount: 3, status: 'success' })),
+      revokeSession: (request, context) =>
+        handlers?.revokeSession
+          ? handlers.revokeSession(request, context.requestHeader)
+          : create(RevokeSessionResponseSchema, {
+              status: context.requestHeader.get('x-saka-reauthentication') ? 'success' : 'refused'
+            })
+    })
+    service(WebAuthnService, {
+      reauthenticate: (request) => reauthenticateHandler(request),
+      beginLogin: () =>
+        create(BeginLoginResponseSchema, {
+          options: '{}',
+          sessionId: 'wcs_test'
+        }),
+      sendReauthenticationCode: () => create(SendReauthenticationCodeResponseSchema, {})
     })
   })
 
@@ -119,9 +150,72 @@ describe('Sessions (browser)', () => {
     await expect.element(screen.getByText('Ended')).toBeVisible()
   })
 
-  it('carries no per-row revoke — the action waits for the Wave 2 step-up modal', async () => {
+  it('offers the per-row revoke on the live rows that are not the caller’s own', async () => {
     const { screen } = await renderSessions()
-    expect(screen.getByRole('button', { name: 'Revoke' }).elements()).toHaveLength(0)
+    await expect.element(screen.getByText('Phone Browser')).toBeVisible()
+    const revokeButtons = screen.getByRole('button', { name: 'Revoke' }).elements()
+    expect(revokeButtons).toHaveLength(1)
+  })
+
+  it('revokes through the step-up: the proof is minted by the modal and spent on the call', async () => {
+    const spentHeaders: string[] = []
+    const revokedIds: string[] = []
+    const { screen } = await renderSessions({
+      reauthenticate: () => create(ReauthenticateResponseSchema, { token: 'proof_9' }),
+      revokeSession: (request, requestHeader) => {
+        spentHeaders.push(requestHeader.get('x-saka-reauthentication') ?? '')
+        revokedIds.push(request.id)
+        return create(RevokeSessionResponseSchema, { status: 'success' })
+      }
+    })
+    await expect.element(screen.getByText('Phone Browser')).toBeVisible()
+    const revokeButton = screen.getByRole('button', { name: 'Revoke' })
+    await expect.element(revokeButton).toBeVisible()
+    await revokeButton.click()
+    const dialog = screen.getByRole('alertdialog')
+    await expect.element(dialog).toBeVisible()
+    await dialog.getByLabelText('Account password').fill('correct-horse-battery')
+    const confirm = dialog.getByRole('button', { name: 'Confirm' }).element()
+    if (!(confirm instanceof HTMLElement)) throw new Error('the confirm button is not an element')
+    confirm.click()
+    await vi.waitFor(() => {
+      expect(revokedIds).toEqual(['sess_other'])
+      expect(spentHeaders).toEqual(['proof_9'])
+    })
+  })
+
+  it('reopens the challenge when the spent proof answers its refusal', async () => {
+    let spent = 0
+    const { screen } = await renderSessions({
+      revokeSession: () => {
+        spent += 1
+        if (spent === 1) throw new ConnectError('spent', Code.Unauthenticated)
+        return create(RevokeSessionResponseSchema, { status: 'success' })
+      }
+    })
+    await expect.element(screen.getByText('Phone Browser')).toBeVisible()
+    await screen.getByRole('button', { name: 'Revoke' }).click()
+    const dialog = screen.getByRole('alertdialog')
+    await dialog.getByLabelText('Account password').fill('correct-horse-battery')
+    const confirm = dialog.getByRole('button', { name: 'Confirm' }).element()
+    if (!(confirm instanceof HTMLElement)) throw new Error('the confirm button is not an element')
+    confirm.click()
+    // The first proof is spent between mint and spend; the dialog returns
+    // for the second proof and the revoke lands on it.
+    await vi.waitFor(() => {
+      expect(spent).toBe(1)
+    })
+    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
+    const secondDialog = screen.getByRole('alertdialog')
+    await secondDialog.getByLabelText('Account password').fill('correct-horse-battery')
+    const confirmAgain = secondDialog.getByRole('button', { name: 'Confirm' }).element()
+    if (!(confirmAgain instanceof HTMLElement)) {
+      throw new Error('the confirm button is not an element')
+    }
+    confirmAgain.click()
+    await vi.waitFor(() => {
+      expect(spent).toBe(2)
+    })
   })
 
   it('signs out everywhere and drops the pair client-side too', async () => {

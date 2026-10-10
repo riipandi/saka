@@ -1,9 +1,10 @@
 import { create } from '@bufbuild/protobuf'
-import { createConnectQueryKey, useMutation } from '@connectrpc/connect-query'
+import { createClient } from '@connectrpc/connect'
+import { createConnectQueryKey, useMutation, useTransport } from '@connectrpc/connect-query'
 import { LaptopSmartphone } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
@@ -29,21 +30,23 @@ import { Text } from 'uilibs/components/extra/text'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
+import { StepUpCancelled } from '#/libraries/reauth/reauth'
+import { useStepUp } from '#/libraries/reauth/use-step-up'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/sessions.stylex'
 import type { Session } from '~/codegen/authn_pb'
 import {
+  RevokeSessionRequestSchema,
   SessionService,
   SignOutAllSessionsRequestSchema,
   SignOutOtherSessionsRequestSchema
 } from '~/codegen/authn_pb'
 import { SignOutDialog } from './-sessions-dialog'
 
-/**
- * The RFC 3339 instants the session view carries, read as the viewer's own
+/** The RFC 3339 instants the session view carries, read as the viewer's own
  * wall clock — a session list is recognized by when it was opened, not by
- * the zone the server wrote.
- */
+ * the zone the server wrote. */
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
 function formatInstant(value: string | undefined): string {
@@ -61,12 +64,11 @@ function formatProvider(provider: string): string {
 
 /**
  * The session center: the account's sessions, newest first, ended ones
- * included, the caller's own marked by the wire's `current` flag.
- *
- * The per-row revoke is deliberately absent — `RevokeSession` is step-up
- * guarded, and the reauthentication modal is Wave 2 machinery that this
- * page's action becomes its first consumer of. Until then the bulk
- * sign-outs, which carry no step-up, are the page's whole write surface.
+ * included, the caller's own marked by the wire's `current` flag. The
+ * per-row revoke is the step-up machinery's first consumer: the row action
+ * opens the reauthentication modal and spends its proof on `RevokeSession`,
+ * which is step-up guarded. The caller's own row keeps no revoke — leaving
+ * is what the bulk sign-outs are for.
  */
 export function SessionsView({
   page = 1,
@@ -78,7 +80,16 @@ export function SessionsView({
   const queryClient = useQueryClient()
   const { logout } = useAuthentication()
 
+  // The revoke rides a promise client over the provided transport: its proof
+  // arrives per call, so the transport cannot carry it as shared state two
+  // revokes could race on.
+  const transport = useTransport()
+  const sessionRpc = useMemo(() => createClient(SessionService, transport), [transport])
+
   const [actionError, setActionError] = useState<string | null>(null)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
+
+  const stepUp = useStepUp()
 
   const sessions = usePaginatedList(SessionService.method.listSessions, listPageInput(page))
 
@@ -87,6 +98,23 @@ export function SessionsView({
     input: listPageInput(page),
     cardinality: 'finite'
   })
+
+  const revoke = (session: Session) => {
+    setRevokingId(session.id)
+    stepUp
+      .run((options) =>
+        sessionRpc.revokeSession(create(RevokeSessionRequestSchema, { id: session.id }), options)
+      )
+      .then(() => {
+        setActionError(null)
+        return queryClient.invalidateQueries({ queryKey: listKey })
+      })
+      .catch((revokeError) => {
+        if (revokeError instanceof StepUpCancelled) return
+        setActionError(getErrorMessage(revokeError))
+      })
+      .finally(() => setRevokingId(null))
+  }
 
   const signOutOthers = useMutation(SessionService.method.signOutOtherSessions, {
     onSuccess: () => {
@@ -183,7 +211,12 @@ export function SessionsView({
             ) : (
               <ItemGroup>
                 {rows.map((session) => (
-                  <SessionItem key={session.id} session={session} />
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    revoking={revokingId === session.id}
+                    onRevoke={() => revoke(session)}
+                  />
                 ))}
               </ItemGroup>
             )}
@@ -224,11 +257,24 @@ export function SessionsView({
           </CardContent>
         </Card>
       </div>
+      <ReauthenticateDialog
+        open={stepUp.dialogOpen}
+        onProven={stepUp.onProven}
+        onDismissed={stepUp.onDismissed}
+      />
     </div>
   )
 }
 
-function SessionItem({ session }: { session: Session }) {
+function SessionItem({
+  session,
+  revoking,
+  onRevoke
+}: {
+  session: Session
+  revoking: boolean
+  onRevoke: () => void
+}) {
   const live = !session.revokedAt
   return (
     <Item variant='outline'>
@@ -248,7 +294,13 @@ function SessionItem({ session }: { session: Session }) {
         {session.current ? (
           <Badge variant='secondary'>This device</Badge>
         ) : live ? (
-          <Badge variant='outline'>Live</Badge>
+          <>
+            <Button variant='outline' size='sm' disabled={revoking} onClick={onRevoke}>
+              {revoking ? <Spinner /> : null}
+              Revoke
+            </Button>
+            <Badge variant='outline'>Live</Badge>
+          </>
         ) : (
           <Badge variant='ghost'>Ended</Badge>
         )}
