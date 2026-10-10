@@ -4,7 +4,8 @@ import {
   LayoutDashboard,
   Mail,
   Power,
-  Settings
+  Settings,
+  ShieldCheck
 } from '@keyline-icons/react'
 import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // The two-tone variant paints the accent the stroke set only outlines, so
@@ -14,7 +15,8 @@ import {
   LaptopSmartphone as LaptopSmartphoneTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
   Mail as MailTwoTone,
-  Settings as SettingsTwoTone
+  Settings as SettingsTwoTone,
+  ShieldCheck as ShieldCheckTwoTone
 } from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
@@ -49,6 +51,12 @@ const secondaryItems: NavItem[] = [
     href: '/account/sessions'
   },
   { icon: Mail, activeIcon: MailTwoTone, label: 'Email', href: '/account/email' },
+  {
+    icon: ShieldCheck,
+    activeIcon: ShieldCheckTwoTone,
+    label: 'Security',
+    href: '/account/security'
+  },
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
 

@@ -37,21 +37,29 @@ var UserColumns = []string{
 	"ar.started_at AS banned_at", "ar.expires_at AS ban_expires", "ar.reason AS ban_reason",
 	"b.name AS picture_bucket", "so.key AS picture_key",
 	"u.self_delete_override",
+	// The credential's last-set instant — the row's update stamp, or its
+	// creation when the password was set once and never changed. Absent
+	// when the account holds none, which is the presence the security
+	// surface reads.
+	"COALESCE(p.updated_at, p.created_at) AS password_updated_at",
 }
 
 // ActiveBanJoin arms the ban read model (the account's active ban
-// restriction, one row at most — a re-ban replaces the open row's terms) and
+// restriction, one row at most — a re-ban replaces the open row's terms),
 // the picture read model (the filestore object the account's picture
-// reference names). Both joins are left ones on purpose: an account the
-// restriction row or the object row does not name is the unbanned account
-// and the default-picture account, rows the read must keep. The reads that
-// scan UserColumns call it; a caller that does not must answer the ban and
-// picture fields some other way.
+// reference names), and the credential read model (the password row's
+// last-set instant). All three joins are left ones on purpose: an account
+// the restriction row, the object row, or the password row does not name is
+// the unbanned account, the default-picture account, and the passwordless
+// account, rows the read must keep. The reads that scan UserColumns call
+// it; a caller that does not must answer the ban, picture, and password
+// fields some other way.
 func ActiveBanJoin(sb *sqlbuilder.SelectBuilder) {
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableAccountRestrictions+" ar",
 		"ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now())")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageObjects+" so", "so.id = u.picture_file_id")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableStorageBuckets+" b", "b.id = so.bucket_id")
+	sb.JoinWithOption(sqlbuilder.LeftJoin, entity.TableUserPasswords+" p", "p.user_id = u.id")
 }
 
 // ScanSchema reads one row into the schema. The nullable columns scan through
@@ -67,6 +75,7 @@ func ScanSchema(scan func(dest ...any) error) (UserSchema, error) {
 		&row.EmailVerifiedAt, &row.CreatedAt, &row.UpdatedAt,
 		&row.BannedAt, &row.BanExpires, &banReason, &pictureBucket, &pictureKey,
 		&row.SelfDeleteOverride,
+		&row.PasswordUpdatedAt,
 	)
 	if err != nil {
 		return UserSchema{}, err

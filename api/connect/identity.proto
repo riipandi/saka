@@ -438,6 +438,13 @@ message User {
   // no picture: the client then shows its bundled default, the same
   // picture the profile-picture read answers by redirect.
   string picture = 17;
+
+  // password_updated_at is when the account's password credential was last
+  // set, RFC 3339 — absent when the account holds none. The presence is
+  // the flag: a client rendering the account's security page picks the
+  // add-password or the remove-password action from it, and the instant
+  // answers the "changed on" line the card renders.
+  optional string password_updated_at = 18;
 }
 
 // UserMetadata is the account's preference document, the typed view of the
