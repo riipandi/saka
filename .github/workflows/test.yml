@@ -3,21 +3,20 @@
 name: Test
 
 on:
-  push:
-    # branches: ["**"]
-    # branches: ["main"]
-    paths-ignore:
-      - ".vite-hooks/**"
-      - ".github/workflows/release.yml"
-      - ".goreleaser.yaml"
-      - ".llms/**"
-      - ".vscode/**"
-      - ".zed/**"
-      - "container/**"
-      - "deploy/**"
-      - "docs/**"
-      - "packages/**"
-      - "scripts/**"
+  # push:
+  #   branches: ["**"]
+  #   paths-ignore:
+  #     - ".vite-hooks/**"
+  #     - ".github/workflows/release.yml"
+  #     - ".goreleaser.yaml"
+  #     - ".llms/**"
+  #     - ".vscode/**"
+  #     - ".zed/**"
+  #     - "container/**"
+  #     - "deploy/**"
+  #     - "docs/**"
+  #     - "packages/**"
+  #     - "scripts/**"
   pull_request:
   workflow_dispatch:
     inputs:
