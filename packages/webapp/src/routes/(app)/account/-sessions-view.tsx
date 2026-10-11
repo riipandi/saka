@@ -43,6 +43,7 @@ import {
   SignOutAllSessionsRequestSchema,
   SignOutOtherSessionsRequestSchema
 } from '~/codegen/authn_pb'
+import { AccountFrame } from './-account-frame'
 import { SignOutDialog } from './-sessions-dialog'
 
 /** The RFC 3339 instants the session view carries, read as the viewer's own
@@ -73,10 +74,12 @@ function formatProvider(provider: string): string {
  */
 export function SessionsView({
   page = 1,
-  onPageChange
+  onPageChange,
+  embedded = false
 }: {
   page?: number
   onPageChange?: (next: number) => void
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const { logout } = useAuthentication()
@@ -141,34 +144,11 @@ export function SessionsView({
   }
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Sessions'
+      description='The devices this account is signed in from, newest first.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Sessions
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The devices this account is signed in from, newest first.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -245,7 +225,7 @@ export function SessionsView({
         onProven={stepUp.onProven}
         onDismissed={stepUp.onDismissed}
       />
-    </div>
+    </AccountFrame>
   )
 }
 

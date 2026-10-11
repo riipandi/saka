@@ -39,6 +39,7 @@ import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { OidcConsentService, RevokeMyAuthorizedClientRequestSchema } from '~/codegen/federation_pb'
 import type { AuthorizedOidcClient } from '~/codegen/federation_pb'
+import { AccountFrame } from './-account-frame'
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** The wire's Timestamp printed as the operator reads it. */
@@ -54,7 +55,7 @@ function formatInstant(value?: Timestamp | null): string {
  * kills the client's live grants and tokens for the account with the
  * ledger row.
  */
-export function AuthorizedAppsView() {
+export function AuthorizedAppsView({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient()
   const consents = useQuery(OidcConsentService.method.listMyAuthorizedClients, {}, { retry: false })
   const [revoking, setRevoking] = useState<AuthorizedOidcClient | null>(null)
@@ -77,35 +78,11 @@ export function AuthorizedAppsView() {
   const rows = consents.data?.clients ?? []
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Authorized apps'
+      description='The applications you signed in to with this account, and what each one may read. Withdrawing a consent kills its live grants.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Authorized apps
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The applications you signed in to with this account, and what each one may read.
-            Withdrawing a consent kills its live grants.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -203,7 +180,7 @@ export function AuthorizedAppsView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AccountFrame>
   )
 }
 

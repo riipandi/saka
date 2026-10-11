@@ -17,15 +17,8 @@ import { ThemeSwitcher } from 'uilibs/theme'
 import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 
 export const accountLinks: Array<{ label: string; to: LinkProps['to'] }> = [
-  { label: 'Profile & settings', to: '/settings' },
-  { label: 'Security', to: '/account/security' },
-  { label: 'Sessions', to: '/account/sessions' },
-  { label: 'Email', to: '/account/email' },
-  { label: 'Notifications', to: '/account/notifications' },
-  { label: 'Connected accounts', to: '/account/connections' },
-  { label: 'Authorized apps', to: '/account/authorized-apps' },
-  { label: 'API keys', to: '/account/api-keys' },
-  { label: 'Audit', to: '/account/audit' }
+  { label: 'Settings', to: '/account/profile' },
+  { label: 'Notifications', to: '/account/notifications' }
 ]
 
 const styles = stylex.create({

@@ -55,6 +55,7 @@ import {
   VerifyRegistrationRequestSchema,
   WebAuthnService
 } from '~/codegen/webauthn_pb'
+import { AccountFrame } from './-account-frame'
 
 /** The instants the security page renders — read as the viewer's wall
  * clock, the way the session list reads its own. The wire's instants arrive
@@ -180,7 +181,7 @@ function CodeRequestDialog({
  * MFA writes carry a factor code in the body. The dialogs chain: proof
  * first, code second, the call spends both.
  */
-export function SecurityView() {
+export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient()
   const transport = useTransport()
 
@@ -382,34 +383,11 @@ export function SecurityView() {
   const confirmedCount = rows.filter((row) => row.confirmedAt).length
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Security'
+      description='The credentials this account signs in with, and the second factor that guards them.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Security
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The credentials this account signs in with, and the second factor that guards them.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         {actionError ? (
           <Text render={<p />} variant='body-2' color='critical' id='security-error'>
@@ -729,6 +707,6 @@ export function SecurityView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AccountFrame>
   )
 }

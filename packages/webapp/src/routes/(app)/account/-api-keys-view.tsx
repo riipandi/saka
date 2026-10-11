@@ -33,6 +33,7 @@ import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
+import { AccountFrame } from './-account-frame'
 import { ApiKeyCreateDialog } from './-api-key-dialog'
 
 /** The RFC 3339 instants the key view carries, read as the viewer's own
@@ -61,10 +62,12 @@ function keyState(
  */
 export function ApiKeysView({
   page,
-  onPageChange
+  onPageChange,
+  embedded = false
 }: {
   page?: number
   onPageChange: (page: number) => void
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
@@ -91,32 +94,16 @@ export function ApiKeysView({
   const revoke = useMutation(ApiKeyService.method.revokeAPIKey, { onSuccess: invalidate })
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
-    >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text render={<p />} variant='body-2' weight='medium' color='primary'>
-            API keys
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Personal access tokens
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Machine credentials that act as this account. The raw key is shown once at creation and
-            at renewal — only its hash is stored.
-          </Text>
-        </div>
+    <AccountFrame
+      embedded={embedded}
+      title='Personal access tokens'
+      description='Machine credentials that act as this account. The raw key is shown once at creation and at renewal — only its hash is stored.'
+      actions={
         <Button onClick={() => setCreateOpen(true)}>
           <Plus size={16} /> New key
         </Button>
-      </div>
-
+      }
+    >
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
           <Spinner />
@@ -271,7 +258,7 @@ export function ApiKeysView({
         secret={renewal?.key ?? ''}
         secretLabel='API key'
       />
-    </div>
+    </AccountFrame>
   )
 }
 

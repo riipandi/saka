@@ -1,28 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { parseListPage } from '#/hooks/use-pagination'
-import { ApiKeysView } from './-api-keys-view'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+/** Personal API keys joined the Access tab of the account settings shell. */
 export const Route = createFileRoute('/(app)/account/api-keys')({
-  component: RouteComponent,
-  validateSearch: (search: Record<string, unknown>) => ({
-    page: parseListPage(search.page)
-  }),
-  staticData: {
-    pageTitle: 'API keys'
-  }
+  beforeLoad: () => {
+    throw redirect({ to: '/account/access', search: () => ({ page: undefined }), replace: true })
+  },
+  staticData: { pageTitle: 'API keys' }
 })
-
-function RouteComponent() {
-  const search = Route.useSearch()
-  const navigate = Route.useNavigate()
-  return (
-    <ApiKeysView
-      page={search.page}
-      onPageChange={(next) => {
-        void navigate({
-          search: (prev: { page?: number }) => ({ ...prev, page: next })
-        })
-      }}
-    />
-  )
-}

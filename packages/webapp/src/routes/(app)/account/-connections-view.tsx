@@ -41,6 +41,7 @@ import { useStepUp } from '#/libraries/reauth/use-step-up'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { OAuthSSOService, UnlinkConnectionRequestSchema } from '~/codegen/authn_pb'
 import type { OAuthLinkedAccount } from '~/codegen/authn_pb'
+import { AccountFrame } from './-account-frame'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -58,7 +59,7 @@ function formatInstant(value?: Timestamp | null): string {
  * refused — and the provider tokens a binding carries are opened for
  * this one read, never stored.
  */
-export function ConnectionsView() {
+export function ConnectionsView({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient()
   const transport = useTransport()
   const linkedRpc = useMemo(() => createClient(OAuthSSOService, transport), [transport])
@@ -97,35 +98,11 @@ export function ConnectionsView() {
   const rows = linked.data?.linkedAccounts ?? []
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Connected accounts'
+      description='The provider identities bound to this account — sign in through them, and unlink the ones you no longer hold.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Connected accounts
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The provider identities bound to this account — sign in through them, and unlink the
-            ones you no longer hold.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -201,7 +178,7 @@ export function ConnectionsView() {
         onProven={stepUp.onProven}
         onDismissed={stepUp.onDismissed}
       />
-    </div>
+    </AccountFrame>
   )
 }
 

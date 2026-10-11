@@ -1,13 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { SettingsView } from '#/routes/(app)/-settings-view'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+/** The old `/settings` path moved under the account settings shell as the Profile tab. */
 export const Route = createFileRoute('/(app)/settings')({
-  component: RouteComponent,
-  staticData: {
-    pageTitle: 'Settings'
-  }
+  beforeLoad: () => {
+    throw redirect({ to: '/account/profile', replace: true })
+  },
+  staticData: { pageTitle: 'Settings' }
 })
-
-function RouteComponent() {
-  return <SettingsView />
-}

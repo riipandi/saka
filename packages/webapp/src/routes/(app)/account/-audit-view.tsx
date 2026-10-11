@@ -35,6 +35,7 @@ import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { AuditLogService, ListRequestSchema } from '~/codegen/auditlog_pb'
+import { AccountFrame } from './-account-frame'
 
 /** The combined choices the sort control offers; the newest-first default sends nothing. */
 const SORT_CHOICES = [
@@ -83,8 +84,10 @@ export function AuditView({
   sortBy,
   sortOrder,
   onPageChange,
-  onSortChange
+  onSortChange,
+  embedded = false
 }: {
+  embedded?: boolean
   page?: number
   sortBy?: string
   sortOrder?: SortOrder
@@ -122,34 +125,11 @@ export function AuditView({
   }
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Audit trail'
+      description='What happened to this account, newest first, as the record was written.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Audit trail
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            What happened to this account, newest first, as the record was written.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -239,6 +219,6 @@ export function AuditView({
           ) : null}
         </Card>
       </div>
-    </div>
+    </AccountFrame>
   )
 }

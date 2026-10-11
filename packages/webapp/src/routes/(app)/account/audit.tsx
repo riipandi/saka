@@ -22,6 +22,7 @@ function RouteComponent() {
   const navigate = Route.useNavigate()
   return (
     <AuditView
+      embedded
       page={search.page}
       sortBy={search.sortBy}
       sortOrder={search.sortOrder}

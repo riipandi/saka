@@ -32,6 +32,8 @@ const LABELS: Record<string, string> = {
   email: 'Email',
   connections: 'Connected accounts',
   'authorized-apps': 'Authorized apps',
+  access: 'Access',
+  profile: 'Profile',
   new: 'New client'
 }
 

@@ -130,7 +130,7 @@ function RouteComponent() {
             <Item
               size='sm'
               render={
-                <Link to='/settings'>
+                <Link to='/account/profile'>
                   <ItemMedia variant='icon'>
                     <Settings size={16} />
                   </ItemMedia>
