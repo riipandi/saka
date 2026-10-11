@@ -31,12 +31,16 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import { ItemGroup } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
+import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
+import { AuditLogService, ListForUserRequestSchema } from '~/codegen/auditlog_pb'
 import {
   AdminDisableMfaRequestSchema,
   MultifactorService,
@@ -60,6 +64,7 @@ import {
   WebAuthnService,
   type Credential
 } from '~/codegen/webauthn_pb'
+import { AuditItem } from '../-audit-view'
 
 const localStyles = stylex.create({
   form: {
@@ -91,6 +96,17 @@ const localStyles = stylex.create({
   },
   error: {
     marginTop: 8
+  },
+  activityPager: {
+    alignItems: 'center',
+    display: 'flex',
+    gap: '1rem',
+    justifyContent: 'space-between',
+    marginTop: '1rem'
+  },
+  pagerActions: {
+    display: 'flex',
+    gap: '0.5rem'
   }
 })
 
@@ -219,6 +235,7 @@ export function UserDetailView({ userId }: { userId: string }) {
         <BanCard user={user} onSettled={() => invalidateUser()} />
         <SecurityCard user={user} onSettled={() => invalidateUser()} />
         <DelegationCard onImpersonate={(reason) => impersonateUser(user.id, reason)} />
+        <ActivityCard userId={user.id} />
         <DangerCard
           onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
           pending={remove.isPending}
@@ -996,5 +1013,78 @@ function DangerCard({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+/**
+ * The account's activity (D6): `ListForUser` as the detail's tab — one page
+ * of the account's own records with the shared pager, the same rows the
+ * console renders. The page state is the card's own; the card rides the
+ * detail page and carries no URL of its own.
+ */
+function ActivityCard({ userId }: { userId: string }) {
+  const [page, setPage] = useState(1)
+  const logs = usePaginatedList(
+    AuditLogService.method.listForUser,
+    create(ListForUserRequestSchema, { userId, ...listPageInput(page) })
+  )
+  const rows = logs.data?.logs ?? []
+  const summary = logs.summary
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Activity</CardTitle>
+        <CardDescription>
+          The actions the record keeps about this account, newest first.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {logs.isPending ? (
+          <Spinner />
+        ) : rows.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No activity yet</EmptyTitle>
+              <EmptyDescription>The account has no recorded actions.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <ItemGroup>
+            {rows.map((record) => (
+              <AuditItem key={record.id} record={record} />
+            ))}
+          </ItemGroup>
+        )}
+
+        {summary && (summary.hasPrevious || summary.hasNext) ? (
+          <div {...stylex.props(localStyles.activityPager)}>
+            <Text variant='body-2' color='neutral-faded'>
+              {summary.totalItems === null
+                ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
+                : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
+            </Text>
+            <div {...stylex.props(localStyles.pagerActions)}>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={!summary.hasPrevious}
+                onClick={() => setPage(summary.page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={summary.hasNext === false}
+                onClick={() => setPage(summary.page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }
