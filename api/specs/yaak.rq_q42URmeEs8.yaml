@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_q42URmeEs8
 createdAt: 2026-09-26T11:36:51.173537
-updatedAt: 2026-09-26T11:47:11.699990
+updatedAt: 2026-10-11T22:03:12.670486
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YFXTtzfvhT
 authentication:
@@ -30,7 +30,7 @@ headers:
   id: bEP77pys06
 method: POST
 name: '[Saka] Refresh token pair'
-sortPriority: 0.0
+sortPriority: 1000.0
 url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/Refresh
 urlParameters: []
 settingSendCookies:

@@ -2,9 +2,9 @@ type: http_request
 model: http_request
 id: rq_JqyTwZhWe4
 createdAt: 2026-09-26T18:07:11.767026
-updatedAt: 2026-09-26T18:15:06.059278
+updatedAt: 2026-10-11T22:02:36.287387
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_YFXTtzfvhT
+folderId: fl_6Mz7cAXBrj
 authentication: {}
 authenticationType: null
 body:
@@ -31,7 +31,7 @@ headers:
   id: QFBNheJfzY
 method: POST
 name: '[Saka] Impersonate user'
-sortPriority: 0.0
+sortPriority: 25333.333333333332
 url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/ImpersonateUser
 urlParameters: []
 settingSendCookies:
