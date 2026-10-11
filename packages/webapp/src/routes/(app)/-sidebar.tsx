@@ -144,6 +144,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     permission: 'oidc_client:*:list'
   },
   {
+    icon: Settings,
+    activeIcon: SettingsTwoTone,
+    label: 'Platform settings',
+    href: '/admin/settings',
+    permission: 'setting:*:read'
+  },
+  {
     icon: Globe,
     activeIcon: GlobeTwoTone,
     label: 'OAuth providers',

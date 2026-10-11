@@ -59,7 +59,7 @@ func TestInitializePreparesAFreshDatabase(t *testing.T) {
 	assert.Contains(t, out, "password: ",
 		"the generated credential is labeled, so an unattended run reads it from the output")
 	assert.Contains(t, out, "the generated credential — store it now; it is not recoverable")
-	assert.Contains(t, out, "authorization: 78 created, 0 skipped",
+	assert.Contains(t, out, "authorization: 80 created, 0 skipped",
 		"the seed answers one summary line per seeder, not one line per record")
 	assert.Equal(t, 1, strings.Count(out, "status:"),
 		"the outcome is one status line — a second one is a second answer")
