@@ -342,11 +342,6 @@ type ProfileParams struct {
 // DefaultTimezone is the preference every account starts with and an empty
 // presented value resolves to. Timestamps leave the server in UTC regardless;
 // this is the hint the frontend formats them against.
-//
-// TODO(frontend): the SPA has no profile surface yet. When one lands, it
-// should render `User.timezone` over the browser's own detection — offer a
-// picker of IANA zones, defaulting to UTC — and format every instant the
-// API answers in that zone.
 const DefaultTimezone = "UTC"
 
 // The metadata document's read and write paths are the UserMetadata type's

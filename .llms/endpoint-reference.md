@@ -653,7 +653,10 @@ the session RPCs (`ListSessions`, `RevokeSession`,
 `SignOutAllSessions`) do not already cover. A decision someone makes,
 not an accident; the discovery document does not advertise the field
 until it ships. `TODO(frontend)`: the consent screen's `login_hint`
-prefill.
+prefill and `offline_access` persistent-access line — the interaction
+page itself does not exist in the SPA yet (the ledger half ships:
+`/admin/consents`, `/account/authorized-apps`); the screen is its own
+surface, not a wording patch.
 
 **Token issuance.** Grants `authorization_code`, `refresh_token`, and
 `urn:ietf:params:oauth:grant-type:device_code`, plus `client_credentials`
@@ -689,9 +692,8 @@ the other grants ride `oidc.refresh_token_hours` (default 336 hours;
 zero on either is the never-expiring token the historical behavior
 kept), both settings read fresh at every issuance and rotation. The
 scope is consent-gated: the consent question names it like any other
-requested word, and the SPA's consent screen renders it distinctly.
-`TODO(frontend)`: the consent screen's offline_access line (persistent
-access wording). Claims: `sub` always; `profile` adds the
+requested word, and the SPA's consent screen renders it distinctly
+(see the interaction-page TODO above). Claims: `sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
 exists; `groups` adds group names. **Group restriction is enforced server-side**
