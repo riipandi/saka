@@ -4,7 +4,7 @@ id: rq_YqCUdPXiqY
 createdAt: 2026-09-26T15:42:28.373873
 updatedAt: 2026-09-26T18:47:27.386293
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_xxFhnsiD2K
+folderId: fl_6Mz7cAXBrj
 authentication:
   prefix: Bearer
   token: ${[ accessToken ]}
