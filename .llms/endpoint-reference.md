@@ -189,6 +189,22 @@ mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an
 lists no events, or lists the `*` wildcard, receives every one of them. All procedures carry the
 admin guard.
 
+SPA: `/admin/webhooks` (list + create + delete) and `/admin/webhooks/$id` (detail, enable
+toggle, test dispatch, rotation, delivery log) — `modules/webhook` served by the webapp's
+`WebhookService` clients, show-once secret dialogs on create and rotate. Live probe
+(2026-10-12, release binary): a test delivery answered HTTP 200 at the receiver with
+`X-Webhook-Event`, `X-Signature: t=…,v1=…`, and the canonical body.
+
+---
+
+## API Keys
+
+The machine credentials an account issues for its own scripting and integrations. A key acts as
+its owner through the same guard table a session does — an administrator's key administers — but
+the surface that manages the keys refuses it, the way the upstream it ports disables API-key
+authentication on its own routes: a credential that cannot revoke itself must not be the one
+managing credentials.
+
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
 | POST | `/rpc/saka.webhook.v1.WebhookService/List` | List webhook endpoints | done — guard `Admin`; `enabled` and `event` filters; the `event` filter names a catalog event or the wildcard; secrets never present | `modules/webhook.TestEmissionMatchesSubscriptions`, `internal/guard` webhook rules |
@@ -240,6 +256,13 @@ its owner through the same guard table a session does — an administrator's key
 the surface that manages the keys refuses it, the way the upstream it ports disables API-key
 authentication on its own routes: a credential that cannot revoke itself must not be the one
 managing credentials.
+
+SPA: `/account/api-keys` (own list, issue with expiry window, show-once raw key, renewal of
+expired keys, revocation) and `/admin/api-keys` (read-only oversight with owner lookup) —
+`modules/apikey` served by the webapp's `ApiKeyService` clients. The machine-credential refusal
+on this surface is live-probed (2026-10-12): an `X-API-Key` call to `ListAPIKeys` answers
+`not_found` while the same key reads account surfaces normally, and renewal of an unexpired key
+answers `failed_precondition`.
 
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
@@ -319,6 +342,12 @@ it, and a key not in the catalog is refused everywhere.
 | POST | `/rpc/saka.settings.v1.SettingsService/Update` | Update setting | implemented — admin; catalog keys only; a sealed item seals the value (AES-256-GCM, `enc:` prefix) | `modules/appconfig/settings.go` |
 | POST | `/rpc/saka.settings.v1.SettingsService/Reset` | Reset setting to default | implemented — admin; drops the override; an item already at its default answers unchanged | `modules/appconfig/settings.go` |
 | POST | `/rpc/saka.settings.v1.SettingsService/ListPublic` | List public settings | implemented — public; only catalog items flagged `public`, names and values, never a sealed value; served from one cache entry a change drops, `nocache` in the body reads the source | `modules/appconfig/settings.go`, `internal/guard/rules.go` |
+
+SPA: `/admin/settings` — the settings screen renders the catalog through a frontend metadata
+catalog (`-settings-catalog.ts`: kinds, taxonomy tabs, Runtime document card) with per-row
+update/reset and the `TestEmail` dialog; sealed items mask to their `enc:` state and are never
+sent a plaintext. Live probe (2026-10-12): update `password.min_length` → 14, reset → 8, and a
+test email received by Mailpit.
 
 Whether a value rests sealed is told by its `enc:` prefix alone — there is
 no flag column — and a public item never rests sealed: the catalog refuses
@@ -930,6 +959,12 @@ with a 404 envelope by a release build. Yaak folder `Utilities`.
 | POST | `/rpc/saka.notification.v1.NotificationService/MarkAllNotificationsRead` | [Saka] Mark all notifications read | done — Authenticated; one INSERT..SELECT over the visibility predicate, answers how many it marked | `modules/notification` |
 | POST | `/rpc/saka.notification.v1.NotificationService/UnreadCount` | [Saka] Unread count | done — Authenticated; the bell-badge number | `modules/notification` |
 | POST | `/rpc/saka.notification.v1.NotificationService/WatchNotifications` | [Saka] Watch notifications (stream) | done — Authenticated; server-streaming, in-process broker, ping keepalive (immediate + 25s), no history — catch-up via List; deadline exemption via `middleware.UnboundedFor` | `modules/notification` + `internal/transport/router_rpc.go` |
+
+SPA: `/admin/notifications` (ledger + publish dialog + cancel) and `/account/notifications`
+(inbox tabs, unread-only toggle, per-item and mark-all read) with the header bell riding
+`hooks/use-notification-stream.ts` — the streaming consumer that settled D4's fallback clause
+(live-probed with a generated Connect client: stream open → ping → notification). Toasts fire
+from the same stream; the unread count and the inbox list invalidate on every event.
 
 Identifiers are TypeIDs on the wire, the columns stay UUIDs: a notification is `ntf_…` (`modules/notification.IDFromUUID`/`UUIDFromWire`), the audience accounts and groups arrive and leave as `usr_…`/`ugrp_…`, and `created_by` renders in the account's wire form.
 
