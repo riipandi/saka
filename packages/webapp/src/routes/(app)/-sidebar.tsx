@@ -9,6 +9,8 @@ import {
   Layers,
   LayoutDashboard,
   Link2,
+  AppWindow,
+  Lock,
   Mail,
   Power,
   Settings,
@@ -30,6 +32,8 @@ import {
   Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
   Link2 as Link2TwoTone,
+  AppWindow as AppWindowTwoTone,
+  Lock as LockTwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
   ShieldCheck as ShieldCheckTwoTone,
@@ -81,6 +85,12 @@ const secondaryItems: NavItem[] = [
     activeIcon: Link2TwoTone,
     label: 'Connected accounts',
     href: '/account/connections'
+  },
+  {
+    icon: AppWindow,
+    activeIcon: AppWindowTwoTone,
+    label: 'Authorized apps',
+    href: '/account/authorized-apps'
   },
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
@@ -146,6 +156,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'Custom claims',
     href: '/admin/claims',
     permission: 'custom_claim:*:list'
+  },
+  {
+    icon: Lock,
+    activeIcon: LockTwoTone,
+    label: 'Consents',
+    href: '/admin/consents',
+    permission: 'oidc_consent:*:list'
   },
   {
     icon: BadgeCheck,

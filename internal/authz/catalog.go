@@ -80,6 +80,11 @@ var resources = []authz.Resource{
 		Description: "an external sign-in provider the deployment trusts",
 	},
 	{
+		Name:        "oidc_consent",
+		Actions:     []string{"read", "list"},
+		Description: "an account's consent grant to a relying party",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",
