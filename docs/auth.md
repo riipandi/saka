@@ -76,10 +76,13 @@ user's account — the support tool. Its shape:
 
 ## Recovery and lockouts
 
-- **Forgot password** — a reset request emails a 256-bit token (stored
-  only as a hash). Asking for an unknown address answers exactly the
-  same as a known one: the response cannot be used to learn who has an
-  account.
+- **Forgot password** — a reset request emails a twelve-character code,
+  stored only as a hash, that the reset screen asks the user to type (an
+  emailed code, never a link, and never the secret itself). Asking for an
+  unknown address answers exactly the same as a known one: the response
+  cannot be used to learn who has an account. Spending the code signs the
+  account out everywhere — the old credential and its sessions are dead
+  together.
 - **Administrator reset** — an administrator can trigger the same reset
   for one account, which signs that account out everywhere.
 - **Lockout** — repeated failed sign-ins lock the account; an
@@ -93,10 +96,16 @@ user's account — the support tool. Its shape:
 ## One-time access for guests
 
 For a person who needs in once without an account: an administrator
-mints a code (or an emailed one-time link-less code), the guest exchanges
-it for a session, and it cannot be used again. The email path is a
-separate switch, off by default — and its response to an unknown address
-is identical to a known one, so it cannot enumerate accounts either.
+mints a code (or has one emailed to the account's address), the guest
+exchanges it for a session, and it cannot be used again. A code minted
+beside an email request refuses to work without the device token the
+request answered — a code read out of a mailbox alone signs nobody in.
+The account holder can also ask for their own code from the sign-in
+page: they type their address, receive the code, and type it back where
+they asked. The email path is a separate switch, off by default — and
+its response to an unknown address is identical to a known one, so it
+cannot enumerate accounts either. A code for a multi-factor account
+still pauses at the second factor like any other sign-in.
 
 ---
 
