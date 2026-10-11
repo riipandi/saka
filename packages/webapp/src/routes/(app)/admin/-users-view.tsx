@@ -50,6 +50,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { UserAvatar } from '#/components/user-avatar'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { Can } from '#/libraries/guard/can'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -382,9 +383,11 @@ function CreateUserDialog({ onCreated }: { onCreated: (user: User) => void }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button size='sm' />}>
-        <Plus size={16} /> Create user
-      </AlertDialogTrigger>
+      <Can permission='user:*:create'>
+        <AlertDialogTrigger render={<Button size='sm' />}>
+          <Plus size={16} /> Create user
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Create an account</AlertDialogTitle>

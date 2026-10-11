@@ -41,6 +41,7 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { Can } from '#/libraries/guard/can'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -225,9 +226,11 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button size='sm' />}>
-        <Plus size={16} /> Add entry
-      </AlertDialogTrigger>
+      <Can permission='blocklist:*:create'>
+        <AlertDialogTrigger render={<Button size='sm' />}>
+          <Plus size={16} /> Add entry
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Block an identifier</AlertDialogTitle>
@@ -291,9 +294,11 @@ function RemoveEntryDialog({ entry }: { entry: BlocklistEntry }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
-        Remove
-      </AlertDialogTrigger>
+      <Can permission='blocklist:*:delete'>
+        <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
+          Remove
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Unblock {entry.pattern}?</AlertDialogTitle>

@@ -48,6 +48,7 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { LIST_MAX_LIMIT, listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { Can } from '#/libraries/guard/can'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -328,9 +329,11 @@ function IssueTokenDialog({ onIssued }: { onIssued: () => void }) {
 
   return (
     <AlertDialog open={open} onOpenChange={enter}>
-      <AlertDialogTrigger render={<Button size='sm' />}>
-        <Plus size={16} /> Issue token
-      </AlertDialogTrigger>
+      <Can permission='signup_token:*:create'>
+        <AlertDialogTrigger render={<Button size='sm' />}>
+          <Plus size={16} /> Issue token
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         {issued ? (
           <>
@@ -468,9 +471,11 @@ function RevokeTokenDialog({ token }: { token: SignupToken }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
-        Revoke
-      </AlertDialogTrigger>
+      <Can permission='signup_token:*:delete'>
+        <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
+          Revoke
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>

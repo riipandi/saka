@@ -52,6 +52,7 @@ import {
   type SortOrder
 } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { Can } from '#/libraries/guard/can'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -380,22 +381,24 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger
-        render={
-          <Button
-            variant={mode === 'create' ? undefined : 'outline'}
-            size={mode === 'create' ? undefined : 'xs'}
-          />
-        }
-      >
-        {mode === 'create' ? (
-          <>
-            <Plus size={16} /> Create group
-          </>
-        ) : (
-          'Edit'
-        )}
-      </AlertDialogTrigger>
+      <Can permission={mode === 'create' ? 'user_group:*:create' : 'user_group:*:update'}>
+        <AlertDialogTrigger
+          render={
+            <Button
+              variant={mode === 'create' ? undefined : 'outline'}
+              size={mode === 'create' ? undefined : 'xs'}
+            />
+          }
+        >
+          {mode === 'create' ? (
+            <>
+              <Plus size={16} /> Create group
+            </>
+          ) : (
+            'Edit'
+          )}
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
@@ -519,9 +522,11 @@ function MembersDialog({ group }: { group: UserGroup }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
-        <Users size={14} /> Members
-      </AlertDialogTrigger>
+      <Can permission='user_group:*:set_members'>
+        <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
+          <Users size={14} /> Members
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Members of {group.displayName}</AlertDialogTitle>
@@ -640,9 +645,11 @@ function ClientsDialog({ group }: { group: UserGroup }) {
 
   return (
     <AlertDialog open={open} onOpenChange={enter}>
-      <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
-        Clients
-      </AlertDialogTrigger>
+      <Can permission='user_group:*:update'>
+        <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
+          Clients
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Allowed OIDC clients of {group.displayName}</AlertDialogTitle>
@@ -699,9 +706,11 @@ function DeleteGroupDialog({ group }: { group: UserGroup }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
-        Delete
-      </AlertDialogTrigger>
+      <Can permission='user_group:*:delete'>
+        <AlertDialogTrigger render={<Button variant='outline' size='xs' />}>
+          Delete
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {group.displayName}?</AlertDialogTitle>

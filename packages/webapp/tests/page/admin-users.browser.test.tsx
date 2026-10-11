@@ -11,8 +11,27 @@ import {
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { render, type RenderResult } from 'vitest-browser-react'
 import { AuthContext } from '#/hooks/use-auth'
+import { setAuthGrants } from '#/libraries/guard/auth-store'
 import { UsersView } from '#/routes/(app)/admin/-users-view'
 import { UserDetailView } from '#/routes/(app)/admin/users/-user-detail-view'
+
+// The action triggers now sit behind the permission gates, so the file's
+// tests run as an administrator holding every action the screens offer.
+setAuthGrants({
+  roles: ['administrator'],
+  permissions: [
+    'user:*:read',
+    'user:*:list',
+    'user:*:create',
+    'user:*:update',
+    'user:*:delete',
+    'user:*:ban',
+    'user:*:unban',
+    'user:*:assign_role',
+    'user:*:grant_permission',
+    'session:*:impersonate'
+  ]
+})
 import { AdminResetUserPasswordResponseSchema, PasswordRecoveryService } from '~/codegen/authn_pb'
 import type { ListMetadata } from '~/codegen/common_pb'
 import {

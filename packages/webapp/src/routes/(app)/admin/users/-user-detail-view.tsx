@@ -6,7 +6,7 @@ import { Ban, Clock, Delete, Eye, KeyRound, MailX, ShieldOff } from '@keyline-ic
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import { Checkbox } from 'uilibs/components/base/checkbox'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import { Switch } from 'uilibs/components/base/switch'
@@ -37,8 +38,9 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
-import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
+import { listPageInput, usePaginatedList, LIST_MAX_LIMIT } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { AuditLogService, ListForUserRequestSchema } from '~/codegen/auditlog_pb'
 import {
@@ -47,6 +49,15 @@ import {
   PasswordRecoveryService,
   AdminResetUserPasswordRequestSchema
 } from '~/codegen/authn_pb'
+import {
+  AuthorizationService,
+  ListPermissionsRequestSchema,
+  ListRolesRequestSchema,
+  ListUserPermissionsRequestSchema,
+  ListUserRolesRequestSchema,
+  SetUserPermissionsRequestSchema,
+  SetUserRolesRequestSchema
+} from '~/codegen/authz_pb'
 import {
   BanUserRequestSchema,
   DeleteUserRequestSchema,
@@ -107,6 +118,21 @@ const localStyles = stylex.create({
   pagerActions: {
     display: 'flex',
     gap: '0.5rem'
+  },
+  grantList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    marginBlock: '0.5rem 1rem'
+  },
+  grantRow: {
+    alignItems: 'center',
+    display: 'flex',
+    gap: '0.5rem'
+  },
+  grantSection: {
+    display: 'block',
+    marginTop: '0.5rem'
   }
 })
 
@@ -236,6 +262,7 @@ export function UserDetailView({ userId }: { userId: string }) {
         <SecurityCard user={user} onSettled={() => invalidateUser()} />
         <DelegationCard onImpersonate={(reason) => impersonateUser(user.id, reason)} />
         <ActivityCard userId={user.id} />
+        <GrantsCard user={user} />
         <DangerCard
           onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
           pending={remove.isPending}
@@ -411,8 +438,18 @@ function BanCard({ user, onSettled }: { user: User; onSettled: () => void }) {
       </CardHeader>
       <CardContent>
         <div {...stylex.props(localStyles.actions)}>
-          {banned ? <UnbanDialog onSettled={onSettled} /> : <BanDialog onSettled={onSettled} />}
-          <UnlockDialog onSettled={onSettled} />
+          {banned ? (
+            <Can permission='user:*:unban'>
+              <UnbanDialog onSettled={onSettled} />
+            </Can>
+          ) : (
+            <Can permission='user:*:ban'>
+              <BanDialog onSettled={onSettled} />
+            </Can>
+          )}
+          <Can permission='user:*:update'>
+            <UnlockDialog onSettled={onSettled} />
+          </Can>
         </div>
       </CardContent>
     </Card>
@@ -988,9 +1025,11 @@ function DangerCard({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant='outline' size='sm' />}>
-        <Delete size={16} /> Delete account
-      </AlertDialogTrigger>
+      <Can permission='user:*:delete'>
+        <AlertDialogTrigger render={<Button variant='outline' size='sm' />}>
+          <Delete size={16} /> Delete account
+        </AlertDialogTrigger>
+      </Can>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this account?</AlertDialogTitle>
@@ -1013,6 +1052,200 @@ function DangerCard({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+/**
+ * The account's grants (phase 6, D7): the roles the account carries and the
+ * permissions granted directly, each as a checkbox set over the catalog and
+ * saved as a whole replacement (`SetUserRoles`, `SetUserPermissions`). The
+ * copy names the custody rule — grants move at the account's next token,
+ * not in place — and when the operator edits their own account the screen
+ * says so too, because the server refuses nothing there. The editing
+ * controls sit behind the assignment grants; a caller without them reads
+ * the card only.
+ */
+/** Toggle one slug in an immutable checkbox set; shared by the two sets. */
+function toggleSlug(
+  set: Set<string>,
+  slug: string,
+  on: boolean,
+  apply: (next: Set<string>) => void
+) {
+  const next = new Set(set)
+  if (on) {
+    next.add(slug)
+  } else {
+    next.delete(slug)
+  }
+  apply(next)
+}
+
+function GrantsCard({ user }: { user: User }) {
+  const { user: viewer } = useAuthentication()
+  const editingSelf = viewer?.id === user.id
+  const [failed, setFailed] = useState<string | null>(null)
+  const [rolePicked, setRolePicked] = useState<Set<string>>(new Set())
+  const [permissionPicked, setPermissionPicked] = useState<Set<string>>(new Set())
+
+  const heldRoles = useQuery(
+    AuthorizationService.method.listUserRoles,
+    create(ListUserRolesRequestSchema, { userId: user.id })
+  )
+  const directGrants = useQuery(
+    AuthorizationService.method.listUserPermissions,
+    create(ListUserPermissionsRequestSchema, { userId: user.id })
+  )
+  const roles = useQuery(
+    AuthorizationService.method.listRoles,
+    create(ListRolesRequestSchema, { ...listPageInput(1, LIST_MAX_LIMIT) })
+  )
+  const catalog = useQuery(
+    AuthorizationService.method.listPermissions,
+    create(ListPermissionsRequestSchema, {})
+  )
+
+  // Each set seeds from its read once; from there the set is the
+  // operator's, and the save sends it whole.
+  useEffect(() => {
+    if (!heldRoles.data) return
+    setRolePicked(new Set((heldRoles.data.roles ?? []).map((role) => role.id)))
+  }, [heldRoles.data])
+
+  useEffect(() => {
+    if (!directGrants.data) return
+    setPermissionPicked(new Set(directGrants.data.permissionSlugs ?? []))
+  }, [directGrants.data])
+
+  const saveRoles = useMutation(AuthorizationService.method.setUserRoles, {
+    onSuccess: () => {
+      setFailed(null)
+      void heldRoles.refetch()
+    },
+    onError: (error) => setFailed(getErrorMessage(error))
+  })
+  const savePermissions = useMutation(AuthorizationService.method.setUserPermissions, {
+    onSuccess: () => {
+      setFailed(null)
+      void directGrants.refetch()
+    },
+    onError: (error) => setFailed(getErrorMessage(error))
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Grants</CardTitle>
+        <CardDescription>
+          {editingSelf
+            ? 'You are editing your own grants. They move at your next token, not in place — the server refuses nothing here, so this note is the honesty.'
+            : 'Grants move at this account’s next token, not in place.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {failed ? (
+          <Text render={<p />} variant='body-2' color='critical'>
+            {failed}
+          </Text>
+        ) : null}
+
+        <Text variant='body-2' weight='semibold'>
+          Roles
+        </Text>
+        {heldRoles.isPending || roles.isPending ? (
+          <Spinner />
+        ) : (
+          <div {...stylex.props(localStyles.grantList)}>
+            {(roles.data?.roles ?? []).map((role) => (
+              <label key={role.id} {...stylex.props(localStyles.grantRow)}>
+                <Can permission='user:*:assign_role'>
+                  <Checkbox
+                    checked={rolePicked.has(role.id)}
+                    onCheckedChange={(on) => toggleSlug(rolePicked, role.id, on, setRolePicked)}
+                    aria-label={`Role: ${role.name}`}
+                  />
+                </Can>
+                <span>
+                  {role.name}
+                  <Text variant='caption-1' color='neutral-faded'>
+                    {' '}
+                    ({role.slug}) · {role.permissionCount} permission
+                    {role.permissionCount === 1 ? '' : 's'}
+                  </Text>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        <Can permission='user:*:assign_role'>
+          <Button
+            variant='outline'
+            size='sm'
+            disabled={saveRoles.isPending}
+            onClick={() =>
+              saveRoles.mutate(
+                create(SetUserRolesRequestSchema, { userId: user.id, roleIds: [...rolePicked] })
+              )
+            }
+          >
+            {saveRoles.isPending ? <Spinner /> : null}
+            Save roles
+          </Button>
+        </Can>
+
+        <Text variant='body-2' weight='semibold' style={localStyles.grantSection}>
+          Direct permissions
+        </Text>
+        {directGrants.isPending || catalog.isPending ? (
+          <Spinner />
+        ) : (
+          <div {...stylex.props(localStyles.grantList)}>
+            {(catalog.data?.permissions ?? []).map((entry) => (
+              <label key={entry.slug} {...stylex.props(localStyles.grantRow)}>
+                <Can permission='user:*:grant_permission'>
+                  <Checkbox
+                    checked={permissionPicked.has(entry.slug)}
+                    onCheckedChange={(on) =>
+                      toggleSlug(permissionPicked, entry.slug, on, setPermissionPicked)
+                    }
+                    aria-label={`Grant: ${entry.slug}`}
+                  />
+                </Can>
+                <span>
+                  <Text render={<code />} variant='caption-1'>
+                    {entry.slug}
+                  </Text>
+                  {entry.description ? (
+                    <Text variant='caption-1' color='neutral-faded'>
+                      {' '}
+                      · {entry.description}
+                    </Text>
+                  ) : null}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        <Can permission='user:*:grant_permission'>
+          <Button
+            variant='outline'
+            size='sm'
+            disabled={savePermissions.isPending}
+            onClick={() =>
+              savePermissions.mutate(
+                create(SetUserPermissionsRequestSchema, {
+                  userId: user.id,
+                  permissionSlugs: [...permissionPicked]
+                })
+              )
+            }
+          >
+            {savePermissions.isPending ? <Spinner /> : null}
+            Save permissions
+          </Button>
+        </Can>
+      </CardContent>
+    </Card>
   )
 }
 

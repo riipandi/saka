@@ -10,9 +10,27 @@ import {
 } from '@tanstack/react-router'
 import { describe, expect, it } from 'vite-plus/test'
 import { render, type RenderResult } from 'vitest-browser-react'
+import { setAuthGrants } from '#/libraries/guard/auth-store'
 import { BlocklistView } from '#/routes/(app)/admin/-blocklist-view'
 import { GroupsView } from '#/routes/(app)/admin/-groups-view'
 import { SignupTokensView } from '#/routes/(app)/admin/-signup-tokens-view'
+
+// The action triggers now sit behind the permission gates, so the file's
+// tests run as an administrator holding every action the screens offer.
+setAuthGrants({
+  roles: ['administrator'],
+  permissions: [
+    'user_group:*:create',
+    'user_group:*:update',
+    'user_group:*:delete',
+    'user_group:*:set_members',
+    'blocklist:*:list',
+    'blocklist:*:create',
+    'blocklist:*:delete',
+    'signup_token:*:create',
+    'signup_token:*:delete'
+  ]
+})
 import {
   AddBlocklistEntryResponseSchema,
   BlocklistEntrySchema,
