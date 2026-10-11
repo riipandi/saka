@@ -12,6 +12,7 @@ import {
   Link2,
   Megaphone,
   AppWindow,
+  Plug,
   Lock,
   Mail,
   Power,
@@ -37,6 +38,7 @@ import {
   Link2 as Link2TwoTone,
   Megaphone as MegaphoneTwoTone,
   AppWindow as AppWindowTwoTone,
+  Plug as PlugTwoTone,
   Lock as LockTwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
@@ -109,8 +111,12 @@ const secondaryItems: NavItem[] = [
  * The Administration section. Each item carries the catalog slug its page
  * consumes (`internal/authz/catalog.go`) and hides individually — the
  * section header renders only when at least one item survives its gate.
+ * `adminOnly` marks the surfaces the guard serves by role (the guard's
+ * `Rule: Admin`) rather than by a catalog slug: the webhook surface has
+ * no `webhook` resource in the catalog, so a slug gate would hide the
+ * section from the only callers the backend admits.
  */
-const adminItems: Array<NavItem & { permission: string }> = [
+const adminItems: Array<NavItem & { permission?: string; adminOnly?: boolean }> = [
   {
     icon: Users,
     activeIcon: UsersTwoTone,
@@ -175,6 +181,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     permission: 'oauth_connection:*:list'
   },
   {
+    icon: Plug,
+    activeIcon: PlugTwoTone,
+    label: 'Webhooks',
+    href: '/admin/webhooks',
+    adminOnly: true
+  },
+  {
     icon: Braces,
     activeIcon: BracesTwoTone,
     label: 'Custom claims',
@@ -219,7 +232,7 @@ interface SideNavbarProps {
 export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { logout } = useAuthentication()
-  const { can } = usePermissions()
+  const { can, isAdministrator } = usePermissions()
   const [headerHover, setHeaderHover] = useState(false)
 
   const isActive = (href: LinkProps['to']) =>
@@ -246,7 +259,11 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
       )
     })
 
-  const visibleAdminItems = adminItems.filter((item) => can(item.permission))
+  const visibleAdminItems = adminItems.filter(
+    (item) =>
+      (item.adminOnly === true && isAdministrator) ||
+      (item.permission !== undefined && can(item.permission))
+  )
 
   return (
     <nav
