@@ -9,6 +9,7 @@ import {
   Layers,
   LayoutDashboard,
   Link2,
+  Megaphone,
   AppWindow,
   Lock,
   Mail,
@@ -32,6 +33,7 @@ import {
   Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
   Link2 as Link2TwoTone,
+  Megaphone as MegaphoneTwoTone,
   AppWindow as AppWindowTwoTone,
   Lock as LockTwoTone,
   Mail as MailTwoTone,
@@ -142,6 +144,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'OIDC clients',
     href: '/admin/oidc-clients',
     permission: 'oidc_client:*:list'
+  },
+  {
+    icon: Megaphone,
+    activeIcon: MegaphoneTwoTone,
+    label: 'Notifications',
+    href: '/admin/notifications',
+    permission: 'notification:*:list'
   },
   {
     icon: Settings,
