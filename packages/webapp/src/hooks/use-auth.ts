@@ -1,6 +1,11 @@
 import { useSelector } from '@tanstack/react-store'
 import { createContext, useContext } from 'react'
-import type { AuthLoginOptions, LoginCredentials } from '#/libraries/guard/auth-engine'
+import type {
+  AuthLoginOptions,
+  CompleteSignInFactor,
+  LoginCredentials,
+  SignInOutcome
+} from '#/libraries/guard/auth-engine'
 import { authStore, type AuthState, type UserProfile } from '#/libraries/guard/auth-store'
 
 /** Subscribe to the whole session state. */
@@ -26,9 +31,52 @@ export interface AuthContextValue {
   user: UserProfile | null
   loggedIn: boolean
   isLoading: boolean
-  login: (credentials: LoginCredentials, options?: AuthLoginContextOptions) => Promise<void>
-  /** Complete an OAuth SSO flow the callback route redirected with. */
-  continueSignIn: (flowToken: string) => Promise<void>
+  /**
+   * Sign in. Resolves the sign-in's outcome — a signed-in answer has already
+   * navigated; a fork (`mfa-challenge`, `enrollment-required`) is the view's
+   * to finish, in its own state machine, without a URL.
+   */
+  login: (
+    credentials: LoginCredentials,
+    options?: AuthLoginContextOptions
+  ) => Promise<SignInOutcome>
+  /** Complete an OAuth SSO flow the callback route redirected with. Same outcome shape. */
+  continueSignIn: (flowToken: string) => Promise<SignInOutcome>
+  /**
+   * Spend the pending bridge the sign-in forked with. Resolves after the
+   * session was established and the navigation already happened — the view's
+   * machine hands the bridge over and is done.
+   */
+  completeSignIn: (
+    pendingToken: string,
+    factor: CompleteSignInFactor,
+    options?: AuthLoginContextOptions
+  ) => Promise<void>
+  /**
+   * Finish a discoverable passkey sign-in the login entry began. Resolves
+   * after the session was established and the navigation already happened.
+   */
+  verifyPasskeyLogin: (
+    sessionId: string,
+    credential: string,
+    options?: AuthLoginContextOptions
+  ) => Promise<void>
+  /**
+   * Ask the backend to email a one-time access code to the address named.
+   * Resolves the device token the exchange demands back — the caller holds
+   * it in memory alone until the code arrives.
+   */
+  requestOneTimeAccess: (email: string) => Promise<string>
+  /**
+   * Spend the one-time code the email carried. A signed-in answer has
+   * already navigated; the MFA fork is the view's to finish, same as
+   * `login`'s.
+   */
+  exchangeOneTimeToken: (
+    token: string,
+    deviceToken?: string,
+    options?: AuthLoginContextOptions
+  ) => Promise<SignInOutcome>
   logout: () => void
 }
 
@@ -36,8 +84,24 @@ export const AuthContext = createContext<AuthContextValue>({
   user: null,
   loggedIn: false,
   isLoading: false,
-  login: async () => {},
-  continueSignIn: async () => {},
+  login: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  continueSignIn: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  completeSignIn: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  verifyPasskeyLogin: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  requestOneTimeAccess: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  exchangeOneTimeToken: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
   logout: () => {}
 })
 

@@ -1,3 +1,4 @@
+import { Code } from '@connectrpc/connect'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { clearTokenCookies, readTokenCookies, readUserCookie } from '#/libraries/guard/auth-cookies'
 import { createAuthEngine } from '#/libraries/guard/auth-engine'
@@ -22,6 +23,13 @@ vi.mock('#/libraries/device-fingerprint', () => ({
   deviceHeaders: async () => ({ 'x-device-fingerprint': 'fp-test', 'user-agent': 'ua-test' })
 }))
 
+/** The signed-in arm of the outcome — the tests below hold a session only
+ * when the sign-in did not fork. */
+function signedIn(outcome: import('#/libraries/guard/auth-engine').SignInOutcome) {
+  if (outcome.kind !== 'signed-in') throw new Error('the sign-in forked unexpectedly')
+  return outcome.session
+}
+
 describe('auth engine', () => {
   let fetchMock: ReturnType<typeof fetchStub>
 
@@ -38,7 +46,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
 
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
 
     expect(session.user).toEqual(userJson)
     expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
@@ -58,15 +66,49 @@ describe('auth engine', () => {
     expect(headerOf(fetchMock.mock.calls.at(-1), 'user-agent')).toBe('ua/1')
   })
 
-  it('refuses the multi-factor fork — it ships in a later slice', async () => {
+  it('answers the multi-factor fork as the outcome, with no tokens issued', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ ...signInJson, accessToken: '', refreshToken: '', mfaRequired: true })
+      jsonResponse({
+        ...signInJson,
+        accessToken: '',
+        refreshToken: '',
+        mfaRequired: true,
+        mfaPendingToken: 'bridge_1',
+        mfaPendingExpiresAt: '2030-01-15T10:00:00Z'
+      })
     )
     const engine = createAuthEngine('http://test.local')
 
-    await expect(engine.login({ identity: 'rlangdon', password: 'sophie' })).rejects.toThrow(
-      /multi-factor/i
+    const outcome = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    expect(outcome).toMatchObject({ kind: 'mfa-challenge', pendingToken: 'bridge_1' })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('completes the forked sign-in: the bridge is spent with the second factor', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    const session = await engine.completeSignIn('bridge_1', { kind: 'code', code: '039471' })
+
+    expect(session.user).toEqual(userJson)
+    expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(stringUrl(url)).toContain('MultifactorService/CompleteSignIn')
+    const body = JSON.parse(stringBody(init?.body))
+    expect(body.pendingToken).toBe('bridge_1')
+    expect(body.code).toBe('039471')
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('holds no custody when the second factor is refused', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: 'failed_precondition', message: 'wrong code' }, 400)
     )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(
+      engine.completeSignIn('bridge_1', { kind: 'code', code: '000000' })
+    ).rejects.toThrow(/wrong code/)
     await expect(engine.accessToken()).resolves.toBeNull()
   })
 
@@ -74,7 +116,7 @@ describe('auth engine', () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
 
-    const session = await engine.continueSignIn('flow_tok_v1')
+    const session = signedIn(await engine.continueSignIn('flow_tok_v1'))
 
     expect(session.user).toEqual(userJson)
     expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
@@ -92,13 +134,20 @@ describe('auth engine', () => {
     await expect(engine.accessToken()).resolves.toBeNull()
   })
 
-  it('refuses the OAuth flow whose account keeps a second factor', async () => {
+  it('answers the OAuth flow fork as the outcome, with no tokens issued', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ ...signInJson, accessToken: '', refreshToken: '', mfaRequired: true })
+      jsonResponse({
+        ...signInJson,
+        accessToken: '',
+        refreshToken: '',
+        mfaRequired: true,
+        mfaPendingToken: 'bridge_oauth'
+      })
     )
     const engine = createAuthEngine('http://test.local')
 
-    await expect(engine.continueSignIn('flow_tok_v1')).rejects.toThrow(/multi-factor/i)
+    const outcome = await engine.continueSignIn('flow_tok_v1')
+    expect(outcome).toMatchObject({ kind: 'mfa-challenge', pendingToken: 'bridge_oauth' })
     await expect(engine.accessToken()).resolves.toBeNull()
   })
 
@@ -206,7 +255,7 @@ describe('auth engine', () => {
   it('restores a still-valid pair and refuses a dead one', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
 
     const freshEngine = createAuthEngine('http://test.local')
     await freshEngine.restore(session.tokens)
@@ -222,7 +271,7 @@ describe('auth engine', () => {
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
 
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
     expect(changes).toEqual([session.tokens])
 
     fetchMock.mockResolvedValue(jsonResponse({ ...signInJson, accessToken: 'access-b' }))
@@ -313,7 +362,7 @@ describe('auth engine', () => {
   it('reports an accepted restore through the listener', async () => {
     fetchMock.mockResolvedValue(jsonResponse(signInJson))
     const engine = createAuthEngine('http://test.local')
-    const session = await engine.login({ identity: 'rlangdon', password: 'sophie' })
+    const session = signedIn(await engine.login({ identity: 'rlangdon', password: 'sophie' }))
 
     const changes: (TokenBundle | null)[] = []
     await engine.setTokenListener((tokens) => changes.push(tokens))
@@ -330,9 +379,8 @@ describe('auth engine', () => {
     const worker = authWorker()
 
     // Sign-in writes the fresh pair and caches the profile.
-    await expect(worker.login({ identity: 'rlangdon', password: 'sophie' })).resolves.toEqual(
-      userJson
-    )
+    const outcome = await worker.login({ identity: 'rlangdon', password: 'sophie' })
+    expect(outcome).toMatchObject({ kind: 'signed-in', session: { user: userJson } })
     expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
     expect(readUserCookie()).toEqual(userJson)
 
@@ -364,6 +412,86 @@ describe('auth engine', () => {
     // A reload: the worker's memory is gone, the cookie copy is what remains.
     await worker.restore()
     await expect(worker.session()).resolves.toEqual(userJson)
+    expect(readUserCookie()).toEqual(userJson)
+  })
+
+  it('asks for the one-time email and answers the device token back', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ deviceToken: 'devtok_1', status: 'success', message: 'sent' })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.requestOneTimeAccess('robert@langdon.dev')).resolves.toBe('devtok_1')
+
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(stringUrl(url)).toContain('OneTimeAccessService/RequestEmail')
+    const body = JSON.parse(stringBody(init?.body))
+    expect(body.email).toBe('robert@langdon.dev')
+  })
+
+  it('exchanges a code into custody: the pair rides the same sign-in shape', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    const session = signedIn(await engine.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1'))
+
+    expect(session.user).toEqual(userJson)
+    expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(stringUrl(url)).toContain('OneTimeAccessService/ExchangeToken')
+    const body = JSON.parse(stringBody(init?.body))
+    expect(body.token).toBe('GRYFFINDOR')
+    expect(body.deviceToken).toBe('devtok_1')
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('exchanges a code without a device token — the administrator-issued kind', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    signedIn(await engine.exchangeOneTimeToken('GRYFFINDOR'))
+
+    const body = JSON.parse(stringBody(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(body.deviceToken).toBeUndefined()
+  })
+
+  it('forks the MFA answer the code exchange can carry, with no tokens issued', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        accessToken: '',
+        refreshToken: '',
+        mfaRequired: true,
+        mfaPendingToken: 'bridge_2',
+        mfaPendingExpiresAt: '2030-01-15T10:00:00Z'
+      })
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    const outcome = await engine.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1')
+    expect(outcome).toMatchObject({ kind: 'mfa-challenge', pendingToken: 'bridge_2' })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('keeps no custody when the exchange refuses the code', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: 'failed_precondition', message: 'expired code' }, 400)
+    )
+    const engine = createAuthEngine('http://test.local')
+
+    await expect(engine.exchangeOneTimeToken('GRYFFINDOR')).rejects.toMatchObject({
+      code: Code.FailedPrecondition
+    })
+    await expect(engine.accessToken()).resolves.toBeNull()
+  })
+
+  it('mirrors the one-time exchange through the worker client into the cookie jar', async () => {
+    clearTokenCookies()
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const worker = authWorker()
+
+    const outcome = await worker.exchangeOneTimeToken('GRYFFINDOR', 'devtok_1')
+    expect(outcome).toMatchObject({ kind: 'signed-in', session: { user: userJson } })
+    expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
     expect(readUserCookie()).toEqual(userJson)
   })
 })

@@ -71,9 +71,10 @@ behalf (impersonation) — its own visible, revocable session.
 [Authentication](auth.md) carries the machinery: recovery, lockouts,
 bans, one-time guest access.
 
-**Recovery.** Forgot-password flows send single-use codes. An
-administrator can reset a user's password directly — the user is signed
-out everywhere and the act is audited.
+**Recovery.** Forgot-password flows send single-use codes the reset
+screen asks you to type; spending one signs the account out everywhere.
+An administrator can reset a user's password directly — the user is
+signed out everywhere and the act is audited.
 
 ---
 
@@ -103,7 +104,14 @@ section in the sidebar — no administrator needed:
   account for good).
 - **Sessions** — every device currently signed in as you, the current one
   marked. Sign out everything else in one step (say, a lost phone), or
-  everywhere including here.
+  everywhere including here. Revoke one device at a time, each with its
+  own confirmation.
+- **Security** — the credentials themselves, in one place: enroll a
+  passkey (and rename or delete it), turn multi-factor on by enrolling an
+  authenticator app (the QR codes into any TOTP app), view the recovery
+  codes, regenerate them, or turn multi-factor off, and add or remove a
+  password. The sensitive moves ask you to prove yourself again first —
+  your password, a passkey tap, or an emailed code.
 - **Email** — verify your address with the code the confirmation mail
   carries, and change it: you receive a second code at the new address to
   confirm the move, and the old address is told as well. A deployment can

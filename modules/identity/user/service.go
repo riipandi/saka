@@ -398,6 +398,10 @@ type UserView struct {
 	BannedAt   *time.Time
 	BanExpires *time.Time
 	BanReason  *string
+	// PasswordUpdatedAt is when the account's password credential was last
+	// set. Nil is the passwordless account — the presence flag the security
+	// surface reads and the "changed on" line it renders.
+	PasswordUpdatedAt *time.Time
 	// Picture is the account's picture's public URL — the storage
 	// serving origin plus the referenced object's bucket and key. Empty
 	// when the account has no picture: the client shows its bundled
@@ -910,6 +914,11 @@ func WireView(user UserView) *identityv1.User {
 	if user.BanExpires != nil {
 		view.BanExpires = new(user.BanExpires.Format(rfc3339))
 	}
+	// The credential's presence rides the instant: absent means the account
+	// holds no password, present names the moment it was last set.
+	if user.PasswordUpdatedAt != nil {
+		view.PasswordUpdatedAt = new(user.PasswordUpdatedAt.Format(rfc3339))
+	}
 	for _, group := range user.Groups {
 		wire := &identityv1.UserGroup{
 			Id:          group.ID,
@@ -984,21 +993,22 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 func view(row UserSchema) UserView {
 	metadata := ParseUserMetadata(row.Metadata)
 	return UserView{
-		ID:            FormatID(row.ID),
-		Username:      row.Username,
-		Email:         row.Email,
-		DisplayName:   row.DisplayName,
-		FirstName:     optional(row.FirstName),
-		LastName:      optional(row.LastName),
-		Locale:        optional(metadata.Locale),
-		Timezone:      metadata.TimezoneOrDefault(),
-		Disabled:      row.Disabled,
-		EmailVerified: row.EmailVerifiedAt != nil,
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
-		BannedAt:      row.BannedAt,
-		BanExpires:    row.BanExpires,
-		BanReason:     row.BanReason,
+		ID:                FormatID(row.ID),
+		Username:          row.Username,
+		Email:             row.Email,
+		DisplayName:       row.DisplayName,
+		FirstName:         optional(row.FirstName),
+		LastName:          optional(row.LastName),
+		Locale:            optional(metadata.Locale),
+		Timezone:          metadata.TimezoneOrDefault(),
+		Disabled:          row.Disabled,
+		EmailVerified:     row.EmailVerifiedAt != nil,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
+		BannedAt:          row.BannedAt,
+		BanExpires:        row.BanExpires,
+		BanReason:         row.BanReason,
+		PasswordUpdatedAt: row.PasswordUpdatedAt,
 	}
 }
 

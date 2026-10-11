@@ -418,21 +418,32 @@ goal, three deltas from its shape:
 
 ### Wave 2 — sign-in completeness
 
-- [ ] **MFA challenge & enrollment** — the sign-in fork: `CompleteSignIn`
+- [x] **MFA challenge & enrollment** — the sign-in fork: `CompleteSignIn`
   on `mfa_required`; the enrollment fork's `pending_token` into
   `BeginTotpEnrollment`/`ConfirmTotpEnrollment`. Then the management set
   (`ListTotpEnrollments`, `DeleteTotpEnrollment`, `VerifyRecoveryCode`,
   `RegenerateRecoveryCodes`, `DisableMfa`). This unblocks every
-  MFA-enabled account the backend already serves.
-- [ ] **Password recovery** — destub `forgot-password.tsx`
+  MFA-enabled account the backend already serves. Shipped as the login
+  state machine (`login.tsx` over `-login-view.tsx`,
+  `-mfa-challenge-view.tsx`, `-mfa-enrollment-view.tsx`) and the security
+  page's MFA card (phase 2 + phase 3).
+- [x] **Password recovery** — destub `forgot-password.tsx`
   (`ForgotPassword`), add the reset route consuming the emailed token
   (`ResetPassword` with `terminate_sessions`),
-  `AdminResetUserPassword` rides the admin wave's user page.
-- [ ] **One-time access** — `RequestEmail` (+ device-token state) and the
+  `AdminResetUserPassword` rides the admin wave's user page. Shipped as
+  `-forgot-password-view.tsx` and `reset-password.tsx` over
+  `-reset-password-view.tsx`; the email carries a code to type (phase 5).
+- [x] **One-time access** — `RequestEmail` (+ device-token state) and the
   `/login-code` route the email links to, `ExchangeToken` issuing the pair
   into the existing custody path. Gated by the two public toggles
   `useAppConfig` already carries; admin issuance rides the admin wave.
-- [ ] **Passkeys & step-up** — discoverable sign-in
+  Shipped with a recorded delta: the wire reserved the email's
+  `redirect_path` away ("the login code is typed, never linked") and the
+  email-path exchange demands the `device_token` back, so there is no
+  `/login-code` route — the code is typed into the login machine's own
+  `one-time-code` phase, the device token held in that mount's memory
+  (phase 6).
+- [x] **Passkeys & step-up** — discoverable sign-in
   (`BeginLogin`/`VerifyLogin`), enrollment and credential management
   (`BeginRegistration`/`VerifyRegistration`,
   `ListCredentials`/`UpdateCredential`/`DeleteCredential`),
@@ -445,7 +456,10 @@ goal, three deltas from its shape:
   the action is wired and confirmed in `account/sessions.tsx` the moment
   the modal exists, since the procedure is step-up-guarded). The E2E
   passkey ladder and the debug simulation pages are the harness this wave
-  graduates to the real UI.
+  graduates to the real UI. Shipped across phases 1 and 4; E2E coverage in
+  `workflow/sign-in-completeness.test.ts` (MFA challenge, password reset,
+  one-time access — the ladder keeps the passkey harness, now excluded
+  from release runs in the Playwright config it cannot pass against).
 
 ### Wave 3 — the admin console core
 
@@ -530,9 +544,13 @@ goal, three deltas from its shape:
   `guard/auth-utils`.
 - [ ] File upload over the REST seam (raw body) — lands with Wave 1
   (profile picture); reused by OIDC logos.
-- [ ] Step-up modal + `X-Saka-Reauthentication` in `authFetch` — lands
+- [x] Step-up modal + `X-Saka-Reauthentication` in `authFetch` — lands
   with Wave 2 (passkeys/password); shared by `DeleteCredential`,
-  `RemovePassword`, `UnlinkConnection`.
+  `RemovePassword`, `UnlinkConnection`. Shipped as
+  `libraries/reauth/` (`reauth.ts` runner, `-reauthenticate-dialog.tsx`,
+  `use-step-up.ts`) — the proof rides per-call Connect options through the
+  `callHints` channel, not a rewritten `authFetch` (all the step-up
+  procedures the SPA calls are Connect RPCs; recorded delta, phase 1).
 - [ ] Permission engine (`can()` over the claims snapshot, the `framework/authz`
   matcher ported) + `usePermissions()`/`<Can>` — lands with Wave 1.5; every later
   permission-aware UI rides it.
@@ -683,8 +701,9 @@ routes/
   (auth)/route.tsx              # anonymous-only guard + prefetches — unchanged
     login.tsx                   # password + SSO + the MFA fork handoff (Wave 0 / Wave 2)
     forgot-password.tsx         # ForgotPassword (Wave 2)
-    reset-password.tsx          # ResetPassword; the emailed token in search (Wave 2)
-    login-code.tsx              # OneTimeAccess ExchangeToken; ?code=… (Wave 2)
+    reset-password.tsx          # ResetPassword; the emailed code prefills via search (Wave 2)
+                                # one-time access has no route of its own — the login machine
+                                # owns it (the wire forbids a linked code; see phase 6 delta)
     signup.tsx                  # Signup, access.mode-gated (Wave 3)
     auth/callback.tsx           # OAuth flow landing — shipped (Wave 0)
 
@@ -848,9 +867,9 @@ File: `workflow/authz-foundation.test.ts`.
 
 ### Wave 2 — sign-in completeness
 
-Files: `workflow/mfa-totp.test.ts`, `workflow/password-recovery.test.ts`,
-`workflow/one-time-access.test.ts`, `workflow/passkeys.test.ts` (the ladder's graduate),
-`workflow/step-up.test.ts`.
+File: `workflow/sign-in-completeness.test.ts` (the passkey ladder stays
+`workflow/passkey-ladder.test.ts`, the debug-build harness it has always
+been — release runs exclude it in the Playwright config).
 
 - MFA — happy: enroll (begin answers the secret → the computed code confirms → the
   recovery set answers exactly once); a subsequent password sign-in pauses at the
@@ -859,28 +878,33 @@ Files: `workflow/mfa-totp.test.ts`, `workflow/password-recovery.test.ts`,
   three wrong codes exhaust the budget and the bridge dies; a recovery code works once
   and is gone; disabling MFA demands the second-factor proof and refuses without it;
   the challenge's expired bridge returns the visitor to the login route with the
-  sign-in again message.
+  sign-in again message. **Shipped subset** (shipped in the file): a seeded
+  enrollment wires the secret before the browser act, the form forks into the
+  challenge on the same mount, a wrong code reads as a refusal on that screen, and
+  the authenticator's computed code (the `otpauth` devDependency) lands in the shell.
+  The recovery-code and budget arms stay browser/unit-covered for now.
 - Password recovery — happy: forgot-password → Mailpit holds the token → the reset
   route swaps the credential → the old sessions are dead (`terminate_sessions`) → the
   new password signs in. Unhappy: an unknown address answers the same success as a
   known one (asserted as identical copy); a weak password is refused by the policy
   words; an unknown, spent, or expired token refuses; a mailer-less run refuses the
-  ask loudly.
+  ask loudly. **Shipped subset** (shipped in the file): the mailed code spends at the
+  reset screen with the notice on the login route, the old credential is dead, and
+  the new one signs in. The unhappy arms stay unit/browser-covered.
 - One-time access — happy: request email (the toggle on) → the device token pairs with
   the code → `/login-code?code=…` completes → the session's provider names
   `one_time_access`. Unhappy: the toggle off hides the entry and the procedure answers
   `permission_denied` (the same refusal either toggle-off path gives); a mismatched
   device token leaves the code spendable; an expired code refuses; a re-request inside
-  the cooldown answers the same success as the first.
-- Passkeys — happy: discoverable sign-in issues the session in one step — including on
-  an MFA-enabled account, no bridge; enrollment, rename, and the roll render. Unhappy:
-  deleting the last credential while no password stands refuses with the
-  precondition's message; the cloned-credential refusal (counter rewind, the debug
-  harness) ends the ceremony silently by design.
-- Step-up — happy: the password proof spends into the guarded call
-  (`X-Saka-Reauthentication`); the email-code factor delivers via Mailpit and proves.
-  Unhappy: a spent proof token is refused on the second guarded call; a wrong code
-  never mints a proof.
+  the cooldown answers the same success as the first. **Shipped subset** (shipped in
+  the file, with the phase-6 delta): the emailed code is typed into the login
+  machine's `one-time-code` phase — no `/login-code` route exists, the wire reserved
+  the email's redirect path away and the exchange demands the device token back,
+  which a URL cannot carry. The unhappy arms stay unit/browser-covered.
+- Passkeys — the ladder (debug build) keeps this surface; no CI passkey flow (D7).
+- Step-up — the browser and unit suites own the modal's factors and the refusal
+  mapping; a dedicated wire file waits for the Wave 4 `UnlinkConnection` consumer
+  that gives it a second guarded procedure to pair.
 
 ### Wave 3 — the admin console core
 

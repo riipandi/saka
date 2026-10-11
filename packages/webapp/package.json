@@ -38,6 +38,7 @@
         "react": "^19.3.0",
         "react-dom": "^19.3.0",
         "uilibs": "workspace:*",
+        "uqr": "catalog:",
         "zod": "^4.6.5"
     },
     "devDependencies": {

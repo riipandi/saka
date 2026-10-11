@@ -16,7 +16,7 @@ instructions; the detail lives in `.llms/`. Read in this order:
 - Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
 - Porting a plan into code means implementing it. A doc may describe a larger surface than the code has.
 - No self-evident comments: a comment must carry what the code cannot (a why, a contract, a trap), never restate what the next line already says.
- 
+
 ## Frontend UI
 
 - Compose screens from `packages/uilibs/src/components/` — the library is comprehensive; pick the component that fits the item (Item for list rows, Table for grids, AlertDialog for confirmations, …) and never reshape an existing uilibs design to fit a feature. Check the component's Storybook story beside it before building on it.
@@ -26,7 +26,7 @@ instructions; the detail lives in `.llms/`. Read in this order:
 
 ## Stack (summary)
 
-Go 1.27.1, Node ≥ 24.21, pnpm, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do` DI, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, local and S3 storage. DI rules (`do.Package`, no singletons, no package `init`) and the registry seams are in `.llms/rules.md` and the skill `golang-samber-do`.
+Go 1.27.2, Node ≥ 24.21, pnpm, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do` DI, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, local and S3 storage. DI rules (`do.Package`, no singletons, no package `init`) and the registry seams are in `.llms/rules.md` and the skill `golang-samber-do`.
 
 ## Vite+ toolchain
 

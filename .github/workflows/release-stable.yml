@@ -43,7 +43,7 @@ jobs:
         id: setup-sdk
         uses: ./.github/setup-sdk
         with:
-          goVersion: "1.27.1"
+          goVersion: "1.27.2"
 
       - name: Install dependencies
         run: |

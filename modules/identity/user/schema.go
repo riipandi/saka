@@ -52,6 +52,10 @@ type UserSchema struct {
 	PictureBucket      *string `db:"picture_bucket"`
 	PictureKey         *string `db:"picture_key"`
 	SelfDeleteOverride *bool   `db:"self_delete_override"`
+	// PasswordUpdatedAt is when the account's password credential was last
+	// set — the joined row's update stamp, or its creation when the password
+	// was set once. NULL is the passwordless account.
+	PasswordUpdatedAt *time.Time `db:"password_updated_at"`
 }
 
 // UserMetadata is the account's preference document — the typed shape of

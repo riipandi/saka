@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
@@ -10,6 +10,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { z } from 'zod'
 import { useAuthentication } from '#/hooks/use-auth'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { offerSignInChallenge } from '#/libraries/guard/sign-in-handoff'
 import { styles } from '#/styles/pages/login.stylex'
 
 export const Route = createFileRoute('/(auth)/auth/callback')({
@@ -41,14 +42,25 @@ export const OAUTH_FLOW_ERROR_MESSAGES: Record<string, string> = {
 function RouteComponent() {
   const { flow_token: flowToken, error } = useSearch({ from: Route.id })
   const { continueSignIn } = useAuthentication()
+  const navigate = useNavigate()
   const [failed, setFailed] = useState<string | null>(null)
   const started = useRef(false)
 
   useEffect(() => {
     if (!flowToken || started.current) return
     started.current = true
-    continueSignIn(flowToken).catch((cause: unknown) => setFailed(getErrorMessage(cause)))
-  }, [flowToken, continueSignIn])
+    continueSignIn(flowToken)
+      .then((outcome) => {
+        // A multi-factor fork carries no tokens — its bridge is offered to
+        // the login flow's machine in memory and the browser goes there; the
+        // URL never carries the bridge.
+        if (outcome.kind !== 'signed-in') {
+          offerSignInChallenge(outcome)
+          void navigate({ to: '/login', replace: true })
+        }
+      })
+      .catch((cause: unknown) => setFailed(getErrorMessage(cause)))
+  }, [flowToken, continueSignIn, navigate])
 
   const message = error
     ? (OAUTH_FLOW_ERROR_MESSAGES[error] ?? 'The sign-in could not be completed.')
