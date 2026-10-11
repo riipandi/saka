@@ -94,6 +94,9 @@ async function renderSettings() {
             stopImpersonation: async () => {
               throw new Error('the impersonation banner is not part of this page test')
             },
+            impersonateUser: async () => {
+              throw new Error('impersonation is not part of this page test')
+            },
             logout
           }}
         >

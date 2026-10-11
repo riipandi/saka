@@ -40,6 +40,7 @@ function authContext(stopImpersonation: () => Promise<void>) {
     requestOneTimeAccess: vi.fn(),
     exchangeOneTimeToken: vi.fn(),
     stopImpersonation,
+    impersonateUser: vi.fn(async () => {}),
     logout: vi.fn()
   }
 }

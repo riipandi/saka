@@ -147,6 +147,20 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     void navigate({ to: '/overview' })
   }, [navigate])
 
+  const handleImpersonate = useCallback(
+    async (userId: string, reason: string) => {
+      // The delegation is a session on the target account; the custody
+      // listener already swapped the claims — the profile follows here.
+      const profile = await authWorker().impersonate(userId, reason)
+      setAuthUser(profile)
+      // The caller's account data was the cache's — clear it the same way a
+      // sign-in as a different account does.
+      queryClient.clear()
+      void navigate({ to: '/overview' })
+    },
+    [navigate]
+  )
+
   const handleLogout = useCallback(() => {
     // The eviction effect in the `(app)` layout watches this same profile —
     // mark the sign-out first so its redirect never races the goodbye one.
@@ -178,6 +192,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       requestOneTimeAccess: handleRequestOneTimeAccess,
       exchangeOneTimeToken: handleExchangeOneTimeToken,
       stopImpersonation: handleStopImpersonation,
+      impersonateUser: handleImpersonate,
       logout: handleLogout
     }),
     [
@@ -191,6 +206,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       handleRequestOneTimeAccess,
       handleExchangeOneTimeToken,
       handleStopImpersonation,
+      handleImpersonate,
       handleLogout
     ]
   )

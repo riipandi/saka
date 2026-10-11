@@ -90,6 +90,12 @@ export interface AuthContextValue {
    * navigation to the overview already happened when this resolves.
    */
   stopImpersonation: () => Promise<void>
+  /**
+   * Begin a delegation onto the named account. Resolves after the custody
+   * change landed and the navigation to the overview already happened — the
+   * banner is the browser's evidence from there.
+   */
+  impersonateUser: (userId: string, reason: string) => Promise<void>
   logout: () => void
 }
 
@@ -116,6 +122,9 @@ export const AuthContext = createContext<AuthContextValue>({
     throw new Error('AuthProvider is not mounted.')
   },
   stopImpersonation: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  impersonateUser: async () => {
     throw new Error('AuthProvider is not mounted.')
   },
   logout: () => {}

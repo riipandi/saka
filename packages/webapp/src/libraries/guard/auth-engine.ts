@@ -7,6 +7,7 @@ import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/co
 import {
   CompleteSignInRequestSchema,
   ContinueOAuthSignInRequestSchema,
+  ImpersonateUserRequestSchema,
   MultifactorService,
   OAuthSSOService,
   PasskeyFactorSchema,
@@ -20,6 +21,7 @@ import type {
   CompleteSignInResponse,
   ContinueOAuthSignInResponse,
   GetSessionResponse,
+  ImpersonateUserResponse,
   RefreshResponse,
   SignInRequest,
   SignInResponse,
@@ -205,6 +207,15 @@ export interface AuthEngineApi {
    * caller owns that word.
    */
   stopImpersonation(hints?: TraceHints): Promise<AuthSession>
+  /**
+   * Begin a delegation onto the named account: the backend opens a new
+   * session on the target (its own one-hour window), mints a pair whose
+   * subject is the target and whose actor pair names this caller, and the
+   * answer rides the same custody path a sign-in completion does. An
+   * administrator target answers `permission_denied` without confirming the
+   * role; an unknown target answers the ordinary `not_found`.
+   */
+  impersonate(userId: string, reason: string, hints?: TraceHints): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -351,6 +362,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | VerifyLoginResponse
       | ExchangeOneTimeAccessTokenResponse
       | StopImpersonatingResponse
+      | ImpersonateUserResponse
   ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
@@ -377,6 +389,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | VerifyLoginResponse
       | ExchangeOneTimeAccessTokenResponse
       | StopImpersonatingResponse
+      | ImpersonateUserResponse
   ): AuthSession {
     if (!response.user) {
       throw new ConnectError('Sign-in answered without an account.', Code.Internal)
@@ -539,6 +552,20 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         // the call goes anonymous and the backend answers the refusal word.
         headers: withHints(tokens ? { authorization: `Bearer ${tokens.accessToken}` } : {}, hints)
       })
+      return finishSignIn(response)
+    },
+
+    async impersonate(userId, reason, hints) {
+      // The delegation is a new session on the target — a new custody, so an
+      // in-flight refresh of the caller's own session must not land after it.
+      sessionEpoch++
+      clearTimer()
+      const response = await session.impersonateUser(
+        create(ImpersonateUserRequestSchema, { user: userId, reason }),
+        {
+          headers: withHints(tokens ? { authorization: `Bearer ${tokens.accessToken}` } : {}, hints)
+        }
+      )
       return finishSignIn(response)
     },
 

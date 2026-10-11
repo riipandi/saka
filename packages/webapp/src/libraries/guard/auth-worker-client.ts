@@ -57,6 +57,13 @@ export interface AuthWorkerClient {
    * profile.
    */
   stopImpersonation(): Promise<UserProfile>
+  /**
+   * Begin a delegation onto the named account. Resolves the target's
+   * profile; the custody change rides the same listener the sign-ins
+   * report through, and the banner is the browser's evidence of the new
+   * session.
+   */
+  impersonate(userId: string, reason: string): Promise<UserProfile>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -191,6 +198,16 @@ function withCookies(engine: AuthEngineApi): AuthWorkerClient {
         const session = await engine.stopImpersonation(hints)
         // The administrator's own pair is a fresh custody the cookie mirrors,
         // exactly as a sign-in's would be.
+        writeUserCookie(session.user, session.tokens.refreshExpiresAt)
+        return session.user
+      })
+    },
+    async impersonate(userId: string, reason: string) {
+      return spanOperation('impersonate', async (hints) => {
+        await deviceReady
+        const session = await engine.impersonate(userId, reason, hints)
+        // The target's pair is a fresh custody the cookie mirrors, exactly
+        // as a sign-in's would be.
         writeUserCookie(session.user, session.tokens.refreshExpiresAt)
         return session.user
       })
