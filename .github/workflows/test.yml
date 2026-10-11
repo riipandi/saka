@@ -132,7 +132,10 @@ jobs:
         with:
           github-token: ${{ github.token }}
           install-mode: binary
-          version: v2.13
+          # v2.14 is the first build on Go 1.27.2: the v2.13 binaries were
+          # built with 1.27.1 and cannot read the newer stdlib's export data
+          # ("export data version 5 is greater than maximum supported version 4").
+          version: v2.14
 
       - name: Check code quality
         run: |
