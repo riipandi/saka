@@ -65,6 +65,16 @@ var resources = []authz.Resource{
 		Description: "a federated OIDC client",
 	},
 	{
+		Name:        "custom_claim",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "a custom claim on an account or group",
+	},
+	{
+		Name:        "scim_provider",
+		Actions:     []string{"read", "list", "create", "update", "delete", "sync"},
+		Description: "an outbound SCIM provisioning target",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",

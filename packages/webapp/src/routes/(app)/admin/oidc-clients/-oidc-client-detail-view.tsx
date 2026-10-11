@@ -68,6 +68,7 @@ import {
   validateClientForm,
   type OidcClientFormState
 } from './-oidc-client-form'
+import { ScimProviderCard } from './-scim-provider-card'
 
 /** The largest logo the backend accepts — the client pre-check is UX, the
  * byte cap is the server's. */
@@ -262,6 +263,7 @@ export function OidcClientDetailView({ clientId }: { clientId: string }) {
         ) : null}
 
         <SecretsCard clientId={view.id} />
+        <ScimProviderCard clientId={view.id} />
         <LogoCard client={view} onChanged={() => void invalidateClient()} />
         <GroupsCard client={view} onChanged={() => void invalidateClient()} />
         <EditCard client={view} onSaved={() => void invalidateClient()} />

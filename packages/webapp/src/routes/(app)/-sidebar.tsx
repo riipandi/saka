@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Blocks,
+  Braces,
   History,
   KeyRound,
   LaptopSmartphone,
@@ -19,6 +20,7 @@ import { PanelLeft, PanelRight } from '@keyline-icons/react'
 import {
   BadgeCheck as BadgeCheckTwoTone,
   Blocks as BlocksTwoTone,
+  Braces as BracesTwoTone,
   History as HistoryTwoTone,
   KeyRound as KeyRoundTwoTone,
   LaptopSmartphone as LaptopSmartphoneTwoTone,
@@ -120,6 +122,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'OIDC clients',
     href: '/admin/oidc-clients',
     permission: 'oidc_client:*:list'
+  },
+  {
+    icon: Braces,
+    activeIcon: BracesTwoTone,
+    label: 'Custom claims',
+    href: '/admin/claims',
+    permission: 'custom_claim:*:list'
   },
   {
     icon: BadgeCheck,
