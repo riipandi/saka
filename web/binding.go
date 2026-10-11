@@ -11,14 +11,16 @@ import (
 // and the embedded build output the release mount serves. The engine lives
 // in framework/bundler; this package carries what is Saka's own.
 
-//go:embed output
+//go:embed all:output
 var webFS embed.FS
 
 // OutputFS answers the embedded build output — the derived manifest the
 // fragment resolves against, and the hashed assets the surface serves.
-// The release build is the only one that carries it. Vite's own
-// `.vite/manifest.json` stays out: a dot directory is below the embed
-// pattern's floor.
+// The release build is the only one that carries it. The `all:` prefix is
+// load-bearing: the plain pattern excludes files whose names begin with an
+// underscore or a dot, and the router's code-split chunks are named
+// `_route-…` — a release build without it answers every route chunk with
+// the document and no code-split page ever loads.
 func OutputFS() fs.FS {
 	artifact, _ := fs.Sub(webFS, "output")
 	return artifact

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { parseListPage, parseSortOrder } from '#/hooks/use-pagination'
-import { UsersView } from './-users-view'
+import { UsersView } from '../-users-view'
 
 /** The columns the wire's own `sort_by` whitelist answers. */
 const SORT_COLUMNS = [
@@ -13,7 +13,7 @@ const SORT_COLUMNS = [
   'last_login_at'
 ] as const
 
-export const Route = createFileRoute('/(app)/admin/users')({
+export const Route = createFileRoute('/(app)/admin/users/')({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>) => ({
     // Every key answers optional, so a plain navigation never owes the
