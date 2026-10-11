@@ -544,9 +544,12 @@ goal, three deltas from its shape:
 
 - [ ] **Device login approval** — the approval screen ships at `/device`
   (OTP input, `?code=` deep link, approve/deny) reached from the user
-  menu; the device side is REST and needed no SPA work beyond it.
-- [ ] **Ops console** — `QueueService`/`SchedulerService` screens and
-  health reads; the pagination and admin-shell patterns carry it.
+  menu; the device side is REST and needed no SPA work beyond it. The
+  E2E client tool lives at `tools/e2e-device-login`.
+- [ ] **Ops console** — the queue half ships at `/admin/ops/queue`
+  (queues overview, pending table, dead archive, task drawer, cancel /
+  replay / flush with confirmation); the scheduler half waits on its
+  phase.
 - [ ] **Storage** — blocked on the endpoint-reference gap (see
   `issue-20261009_2356.md`); plan it only after the shipped storage
   surface is inventoried and the tus/REST split is on the reference's
