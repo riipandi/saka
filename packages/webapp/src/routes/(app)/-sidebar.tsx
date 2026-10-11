@@ -8,6 +8,7 @@ import {
   LaptopSmartphone,
   Layers,
   LayoutDashboard,
+  Link2,
   Mail,
   Power,
   Settings,
@@ -28,6 +29,7 @@ import {
   LaptopSmartphone as LaptopSmartphoneTwoTone,
   Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
+  Link2 as Link2TwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
   ShieldCheck as ShieldCheckTwoTone,
@@ -73,6 +75,12 @@ const secondaryItems: NavItem[] = [
     activeIcon: ShieldCheckTwoTone,
     label: 'Security',
     href: '/account/security'
+  },
+  {
+    icon: Link2,
+    activeIcon: Link2TwoTone,
+    label: 'Connected accounts',
+    href: '/account/connections'
   },
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
