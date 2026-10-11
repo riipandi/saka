@@ -25,11 +25,26 @@ const MAX_DELAY_MS = 30_000
  * Disconnects retry with exponential backoff and jitter; the retry loop
  * ends when the component (or session) that asked for the stream goes
  * away. Renders nothing — mount it once in the authenticated layout.
+ *
+ * `onNotification` rides the same event before the invalidation — the
+ * toast the shell shows. The callback is read through a ref, so passing
+ * an inline closure does not re-open the stream.
  */
-export function useNotificationStream(enabled: boolean): void {
+export function useNotificationStream(
+  enabled: boolean,
+  onNotification?: (notification: {
+    id: string
+    category: string
+    topic: string
+    title: string
+    body: string
+  }) => void
+): void {
   const queryClient = useQueryClient()
   const transport = useTransport()
   const generation = useRef(0)
+  const listener = useRef(onNotification)
+  listener.current = onNotification
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -70,7 +85,15 @@ export function useNotificationStream(enabled: boolean): void {
         for await (const event of events) {
           // A clean event loop resets the backoff — the connection works.
           attempt = 0
-          if (event.kind === 'notification') invalidate()
+          if (event.kind !== 'notification' || !event.notification) continue
+          listener.current?.({
+            id: event.notification.id,
+            category: event.notification.category,
+            topic: event.notification.topic ?? '',
+            title: event.notification.title,
+            body: event.notification.body
+          })
+          invalidate()
         }
         // The server closed the stream politely; treat it as a drop.
       } catch {
@@ -87,5 +110,5 @@ export function useNotificationStream(enabled: boolean): void {
       closed = true
       if (timer !== null) clearTimeout(timer)
     }
-  }, [enabled, queryClient, transport])
+  }, [enabled, queryClient, transport, listener])
 }

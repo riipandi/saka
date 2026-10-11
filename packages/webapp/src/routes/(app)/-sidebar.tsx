@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  Bell,
   Blocks,
   Braces,
   History,
@@ -24,6 +25,7 @@ import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // the selected item reads filled where its idle siblings stay outlined.
 import {
   BadgeCheck as BadgeCheckTwoTone,
+  Bell as BellTwoTone,
   Blocks as BlocksTwoTone,
   Braces as BracesTwoTone,
   History as HistoryTwoTone,
@@ -76,6 +78,12 @@ const secondaryItems: NavItem[] = [
     href: '/account/sessions'
   },
   { icon: Mail, activeIcon: MailTwoTone, label: 'Email', href: '/account/email' },
+  {
+    icon: Bell,
+    activeIcon: BellTwoTone,
+    label: 'Notifications',
+    href: '/account/notifications'
+  },
   {
     icon: ShieldCheck,
     activeIcon: ShieldCheckTwoTone,
