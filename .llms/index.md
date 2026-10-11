@@ -53,6 +53,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — **awaiting approval** |
 | `plan-20261010_0925.md` | Wave 1.6: frontend observability — the browser tracer, seam/navigation/worker spans, redaction, the public collector field (D1–D8) |
 | `plan-20261010_1830.md` | Wave 2: sign-in completeness — the MFA challenge & enrollment fork, passkey sign-in/management, password recovery, one-time access, the shared step-up machinery (D1–D8; the one-time access delta is recorded in the phase-6 note) |
+| `plan-20261011_1545.md` | Wave 3: the admin console core — shell & guard, impersonation banner, user center, groups/blocklist/signup tokens, the public signup page, the audit console, the authorization screens (D1–D9) — **awaiting approval** |
 
 ## Handovers (`.llms/handover/`)
 
