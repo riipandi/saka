@@ -74,6 +74,7 @@ COPY --link package.json pnpm-lock.yaml pnpm-workspace.yaml go.mod go.sum ./
 COPY --link packages/e2e-tests/package.json packages/e2e-tests/
 COPY --link packages/email/package.json packages/email/
 COPY --link packages/plugins/package.json packages/plugins/
+COPY --link packages/uilibs/package.json packages/uilibs/
 COPY --link packages/webapp/package.json packages/webapp/
 
 # The Vite+ shims resolve node and pnpm without shell setup, so the default
