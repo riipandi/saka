@@ -52,6 +52,7 @@ import {
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { TimeValue } from '#/components/time-value'
 import { UserAvatar } from '#/components/user-avatar'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
@@ -145,9 +146,10 @@ export function UsersView({
     onSortChange?.(choice.sortBy, choice.sortOrder)
   }
 
-  const submitSearch = () => {
+  const submitSearch = (next: string) => {
     setError(null)
-    onSearchChange?.(term.trim() || undefined)
+    setTerm(next)
+    onSearchChange?.(next.trim() || undefined)
   }
 
   return (
@@ -188,20 +190,14 @@ export function UsersView({
             </CardDescription>
             <CardAction>
               <div {...stylex.props(localStyles.toolbar)}>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    submitSearch()
-                  }}
-                  {...stylex.props(localStyles.search)}
-                >
-                  <Input
-                    aria-label='Search users'
-                    placeholder='Search…'
-                    value={term}
-                    onChange={(event) => setTerm(event.target.value)}
-                  />
-                </form>
+                <ListSearch
+                  label='Search users'
+                  placeholder='Search…'
+                  value={term}
+                  onValueChange={setTerm}
+                  onSubmit={submitSearch}
+                  style={localStyles.search}
+                />
                 <Select value={currentSort} onValueChange={chooseSort} items={[...SORT_CHOICES]}>
                   <SelectTrigger aria-label='Sort users'>
                     <SelectValue />

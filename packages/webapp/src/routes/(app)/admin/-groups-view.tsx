@@ -62,6 +62,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import {
   LIST_MAX_LIMIT,
   listPageInput,
@@ -149,9 +150,10 @@ export function GroupsView({
     onSortChange?.(choice.sortBy, choice.sortOrder)
   }
 
-  const submitSearch = () => {
+  const submitSearch = (next: string) => {
     setError(null)
-    onSearchChange?.(term.trim() || undefined)
+    setTerm(next)
+    onSearchChange?.(next.trim() || undefined)
   }
 
   return (
@@ -190,20 +192,14 @@ export function GroupsView({
             <CardDescription>Search matches the name and the display name.</CardDescription>
             <CardAction>
               <div {...stylex.props(localStyles.toolbar)}>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    submitSearch()
-                  }}
-                  {...stylex.props(localStyles.search)}
-                >
-                  <Input
-                    aria-label='Search groups'
-                    placeholder='Search…'
-                    value={term}
-                    onChange={(event) => setTerm(event.target.value)}
-                  />
-                </form>
+                <ListSearch
+                  label='Search groups'
+                  placeholder='Search…'
+                  value={term}
+                  onValueChange={setTerm}
+                  onSubmit={submitSearch}
+                  style={localStyles.search}
+                />
                 <Select value={currentSort} onValueChange={chooseSort} items={[...SORT_CHOICES]}>
                   <SelectTrigger aria-label='Sort groups'>
                     <SelectValue />

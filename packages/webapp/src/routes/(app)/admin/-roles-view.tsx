@@ -61,6 +61,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -209,22 +210,17 @@ export function RolesView({
           </CardHeader>
           <CardContent>
             <div {...stylex.props(localStyles.searchRow)}>
-              <Input
-                id='roles-search'
+              <ListSearch
+                label='Search roles'
                 placeholder='Search name or slug…'
                 value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    onSearchChange?.(term.trim())
-                  }
+                onValueChange={setTerm}
+                onSubmit={(next) => {
+                  setTerm(next)
+                  onSearchChange?.(next.trim())
                 }}
                 style={localStyles.search}
               />
-              <Button variant='outline' size='sm' onClick={() => onSearchChange?.(term.trim())}>
-                Search
-              </Button>
             </div>
 
             {roles.isPending ? (

@@ -16,7 +16,7 @@ import { fontSize, fontWeight, unit } from 'uilibs/styles/tokens.stylex'
 import { ThemeSwitcher } from 'uilibs/theme'
 import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 
-const accountLinks: Array<{ label: string; to: LinkProps['to'] }> = [
+export const accountLinks: Array<{ label: string; to: LinkProps['to'] }> = [
   { label: 'Profile & settings', to: '/settings' },
   { label: 'Security', to: '/account/security' },
   { label: 'Sessions', to: '/account/sessions' },

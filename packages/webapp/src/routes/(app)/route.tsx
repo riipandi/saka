@@ -13,6 +13,8 @@ import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated, isSigningOut } from '#/libraries/guard/auth-store'
 import { styles } from '#/styles/element/root-layout.stylex'
 import { AdminBanner } from './-admin-banner'
+import { AppBreadcrumb } from './-app-breadcrumb'
+import { CommandPalette, CommandPaletteButton } from './-command-palette'
 import { NotificationBell } from './-notification-bell'
 import { SideNavbar } from './-sidebar'
 import { UserMenu } from './-user-menu'
@@ -73,48 +75,55 @@ function RouteComponent() {
   return (
     <TooltipProvider>
       <ToastProvider>
-        <main {...stylex.props(styles.layout)}>
-          {/* Mobile header — full width on mobile, hidden on desktop */}
-          <div {...stylex.props(styles.mobileHeader)}>
-            <button
-              type='button'
-              onClick={toggleSidebar}
-              {...stylex.props(styles.hamburger)}
-              aria-label='Toggle navigation'
-            >
-              <Menu size={20} strokeWidth={1.8} />
-            </button>
-            <span {...stylex.props(styles.mobileHeaderTitle)}>Dashboard</span>
-            <div {...stylex.props(styles.headerActions)}>
-              <NotificationBell />
-              <UserMenu />
-            </div>
-          </div>
-
-          {/* Body row: sidebar + content */}
-          <div {...stylex.props(styles.body)}>
-            <div {...stylex.props(styles.sidebarWrapper, sidebarOpen && styles.sidebarOpen)}>
-              <SideNavbar
-                collapsed={!isMobile && collapsed}
-                onToggleCollapse={!isMobile ? toggleSidebarCollapsed : undefined}
-              />
-            </div>
-
-            {sidebarOpen && (
-              <div {...stylex.props(styles.backdrop)} onClick={toggleSidebar} aria-hidden />
-            )}
-
-            <div {...stylex.props(styles.contentArea)}>
-              <AdminBanner />
-              <div {...stylex.props(styles.bellRow)}>
+        <CommandPalette>
+          <main {...stylex.props(styles.layout)}>
+            {/* Mobile header — full width on mobile, hidden on desktop */}
+            <div {...stylex.props(styles.mobileHeader)}>
+              <button
+                type='button'
+                onClick={toggleSidebar}
+                {...stylex.props(styles.hamburger)}
+                aria-label='Toggle navigation'
+              >
+                <Menu size={20} strokeWidth={1.8} />
+              </button>
+              <AppBreadcrumb />
+              <div {...stylex.props(styles.headerActions)}>
+                <CommandPaletteButton />
                 <NotificationBell />
                 <UserMenu />
               </div>
-              <Outlet />
             </div>
-          </div>
-          <Toaster />
-        </main>
+
+            {/* Body row: sidebar + content */}
+            <div {...stylex.props(styles.body)}>
+              <div {...stylex.props(styles.sidebarWrapper, sidebarOpen && styles.sidebarOpen)}>
+                <SideNavbar
+                  collapsed={!isMobile && collapsed}
+                  onToggleCollapse={!isMobile ? toggleSidebarCollapsed : undefined}
+                />
+              </div>
+
+              {sidebarOpen && (
+                <div {...stylex.props(styles.backdrop)} onClick={toggleSidebar} aria-hidden />
+              )}
+
+              <div {...stylex.props(styles.contentArea)}>
+                <AdminBanner />
+                <div {...stylex.props(styles.bellRow)}>
+                  <AppBreadcrumb />
+                  <div {...stylex.props(styles.headerActions)}>
+                    <CommandPaletteButton />
+                    <NotificationBell />
+                    <UserMenu />
+                  </div>
+                </div>
+                <Outlet />
+              </div>
+            </div>
+            <Toaster />
+          </main>
+        </CommandPalette>
       </ToastProvider>
     </TooltipProvider>
   )

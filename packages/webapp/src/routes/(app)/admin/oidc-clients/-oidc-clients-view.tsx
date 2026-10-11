@@ -5,7 +5,6 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from 'uilibs/components/base/avatar'
 import { Button } from 'uilibs/components/base/button'
-import { Input } from 'uilibs/components/base/input'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
   Card,
@@ -28,6 +27,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -113,13 +113,14 @@ export function OidcClientsView({
           </CardHeader>
           <CardContent>
             <div {...stylex.props(localStyles.toolbar)}>
-              <Input
-                value={query}
+              <ListSearch
+                label='Search clients'
                 placeholder='Search by name'
-                aria-label='Search clients'
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') onSearchChange?.(query.trim() || undefined)
+                value={query}
+                onValueChange={setQuery}
+                onSubmit={(next) => {
+                  setQuery(next)
+                  onSearchChange?.(next.trim() || undefined)
                 }}
               />
             </div>

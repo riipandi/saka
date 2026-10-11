@@ -96,7 +96,7 @@ export const styles = stylex.create({
   bellRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: unit.x2,
     paddingTop: unit.x2,
     paddingRight: unit.x4,

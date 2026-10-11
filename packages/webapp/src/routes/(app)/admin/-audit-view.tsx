@@ -2,8 +2,6 @@ import { create } from '@bufbuild/protobuf'
 import { useQuery } from '@connectrpc/connect-query'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { Button } from 'uilibs/components/base/button'
-import { Input } from 'uilibs/components/base/input'
 import {
   Select,
   SelectContent,
@@ -33,6 +31,7 @@ import {
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { TimeValue } from '#/components/time-value'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { styles, facetStyles } from '#/styles/pages/audit.stylex'
@@ -129,11 +128,6 @@ export function AdminAuditView({
   const turnPage = (next: number) => {
     setError(null)
     onPageChange?.(next)
-  }
-
-  const applyTerm = () => {
-    setError(null)
-    onFilterChange?.({ event, userId, search: term.trim() || undefined })
   }
 
   return (
@@ -242,23 +236,22 @@ export function AdminAuditView({
                 </SelectContent>
               </Select>
 
-              <Input
-                id='audit-search'
-                aria-label='Search by account'
+              <ListSearch
+                label='Search by account'
                 placeholder='Search username or email…'
                 value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    applyTerm()
-                  }
+                onValueChange={setTerm}
+                onSubmit={(next) => {
+                  setTerm(next)
+                  setError(null)
+                  onFilterChange?.({
+                    event,
+                    userId,
+                    search: next.trim() || undefined
+                  })
                 }}
                 style={facetStyles.search}
               />
-              <Button variant='outline' size='sm' onClick={applyTerm}>
-                Search
-              </Button>
             </div>
 
             {logs.isPending ? (

@@ -4,6 +4,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
+import { Checkbox } from 'uilibs/components/base/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -318,10 +319,9 @@ function AudiencePicker({
         const checked = selected.includes(option.id)
         return (
           <label key={option.id} {...stylex.props(styles.audienceRow)}>
-            <input
-              type='checkbox'
+            <Checkbox
               checked={checked}
-              onChange={() => onToggle(option.id)}
+              onCheckedChange={() => onToggle(option.id)}
               aria-label={option.label}
             />
             <span>{option.label}</span>

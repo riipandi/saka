@@ -73,7 +73,7 @@ interface AdminNavItem extends NavItem {
  * slug gate would hide them from the only callers the backend admits.
  * Account routes are not here; the header user menu owns them.
  */
-const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
+export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
   {
     label: 'Identity & Access',
     items: [
@@ -213,7 +213,7 @@ interface SideNavbarProps {
   onToggleCollapse?: () => void
 }
 
-function admits(
+export function admitsAdminNav(
   item: AdminNavItem,
   can: (permission: string) => boolean,
   isAdministrator: boolean
@@ -318,7 +318,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
       >
         {renderNavItems(navItems)}
         {adminGroups.map((group) => {
-          const items = group.items.filter((item) => admits(item, can, isAdministrator))
+          const items = group.items.filter((item) => admitsAdminNav(item, can, isAdministrator))
           if (items.length === 0) return null
           return (
             <Fragment key={group.label}>
