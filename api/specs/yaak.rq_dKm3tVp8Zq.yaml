@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_dKm3tVp8Zq
-createdAt: 2026-10-11T20:40:00.000000
-updatedAt: 2026-10-11T20:40:00.000000
+createdAt: 2026-10-11T20:40:00
+updatedAt: 2026-10-11T13:09:04.530092
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_TofiUEyN5c
 authentication:
@@ -11,22 +11,21 @@ authentication:
   type: bearer
 authenticationType: null
 body:
-  bodyType: application/json
   text: |-
     {
       "linked_account_id": "olink_"
     }
-bodyType: null
+bodyType: application/json
 description: 'Opens one of the calling account''s linked connections and reads the provider tokens it carries — the access token, the refresh token, and the expiry the provider named. A binding the provider answered no tokens for carries empty fields, not an error. Guard: session.'
 headers:
 - enabled: true
-  name: Content-Type
-  value: application/json
-  id: null
-- enabled: true
   name: Connect-Protocol-Version
   value: '1'
-  id: null
+  id: TdFNHUsHaT
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: ep6vesD0pa
 method: POST
 name: '[Saka] Get linked account tokens'
 sortPriority: 921.0
