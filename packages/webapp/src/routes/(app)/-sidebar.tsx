@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  Blocks,
   History,
   KeyRound,
   LaptopSmartphone,
@@ -17,6 +18,7 @@ import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // the selected item reads filled where its idle siblings stay outlined.
 import {
   BadgeCheck as BadgeCheckTwoTone,
+  Blocks as BlocksTwoTone,
   History as HistoryTwoTone,
   KeyRound as KeyRoundTwoTone,
   LaptopSmartphone as LaptopSmartphoneTwoTone,
@@ -111,6 +113,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'Audit trail',
     href: '/admin/audit',
     permission: 'audit_log:*:list'
+  },
+  {
+    icon: Blocks,
+    activeIcon: BlocksTwoTone,
+    label: 'OIDC clients',
+    href: '/admin/oidc-clients',
+    permission: 'oidc_client:*:list'
   },
   {
     icon: BadgeCheck,

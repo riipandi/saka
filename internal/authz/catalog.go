@@ -60,6 +60,11 @@ var resources = []authz.Resource{
 		Description: "the sign-up blocklist",
 	},
 	{
+		Name:        "oidc_client",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "a federated OIDC client",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",
