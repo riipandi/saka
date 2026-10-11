@@ -2,12 +2,11 @@ type: folder
 model: folder
 id: fl_YFXTtzfvhT
 createdAt: 2026-09-19T11:59:42.194257
-updatedAt: 2026-09-25T19:25:50.842441
+updatedAt: 2026-10-11T22:17:23.900611
 workspaceId: wk_kBiMYTkhPP
 folderId: null
-authentication:
-  token: ${[ accessToken ]}
-authenticationType: bearer
+authentication: {}
+authenticationType: none
 description: 'Saka-only password authentication: session, password, MFA, OAuth extension flows'
 headers: []
 name: Authentication

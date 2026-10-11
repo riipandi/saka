@@ -18,23 +18,25 @@ confirmed TOTP enrollment turns a successful sign-in into a pending bridge inste
 `MultifactorService/CompleteSignIn` spends it (see MFA below). The session rows
 the sign-in opened live under User Account below; `Sign out` rides the same
 folder as its siblings there — this section carries the credentials half only.
+The self-service recovery pair rides the same folder in the collection.
 
 | Method   | Procedure / Endpoint                                          | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
 | POST     | `/rpc/saka.authn.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
 | POST     | `/rpc/saka.authn.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
 | POST     | `/rpc/saka.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
 
 ## Password Recovery (saka-only)
 
+The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
+email and stored only as a hash. The administrative trigger is a User Management
+action in the collection (see the table there); the two self-service rows above
+ride Authentication.
+
 | Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
-| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
-| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
-| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
-
-The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
-email and stored only as a hash.
 
 ## One-Time Access
 
@@ -201,6 +203,7 @@ administrative halves of the credential surfaces.
 | POST     | `/rpc/saka.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
 | POST     | `/rpc/saka.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
 | POST     | `/rpc/saka.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
 | PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
 | GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture (public)               |
 | POST     | `/rpc/saka.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |

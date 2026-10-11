@@ -92,7 +92,8 @@ Upstream has no passwords, so the whole flow is saka's. The contract lives in
 
 Shared rules: the password-changed notice to the account's address rides the durable queue and is
 gated by `mailer.notifications.password_changed_notice_enabled`; a reset that ends sessions ends
-them in the same transaction. Impersonating administrators are refused.
+them in the same transaction. Impersonating administrators are refused. Collection folders: the
+two self-service rows ride `Authentication`; the admin trigger rides `User Management`.
 
 ## One-Time Access
 

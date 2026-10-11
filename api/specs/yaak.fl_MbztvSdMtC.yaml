@@ -2,7 +2,7 @@ type: folder
 model: folder
 id: fl_MbztvSdMtC
 createdAt: 2026-09-27T11:20:43.569793
-updatedAt: 2026-09-27T11:45:47.363665
+updatedAt: 2026-10-11T22:18:13.352991
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication:
@@ -11,7 +11,7 @@ authenticationType: bearer
 description: ''
 headers: []
 name: Authorization
-sortPriority: 15037.037037037036
+sortPriority: 9666.666666666666
 settingSendCookies:
   enabled: false
   value: true
