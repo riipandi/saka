@@ -2,16 +2,16 @@ type: folder
 model: folder
 id: fl_6Mz7cAXBrj
 createdAt: 2026-10-11T20:33:53.887035
-updatedAt: 2026-10-11T20:33:53.887036
+updatedAt: 2026-10-11T20:39:38.745629
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_xxFhnsiD2K
+folderId: null
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
 description: ''
 headers: []
 name: User Management
-sortPriority: 1.0
+sortPriority: 5423.868312757201
 settingSendCookies:
   enabled: false
   value: true
