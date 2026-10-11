@@ -35,6 +35,7 @@ import {
   UserService
 } from '~/codegen/identity_pb'
 import { DeleteAccountDialog } from './-settings-dialog'
+import { AccountFrame } from './account/-account-frame'
 
 const KEY_CHANGE_USERNAME = 'users.change_username_enabled'
 const KEY_SELF_DELETE = 'users.self_delete_enabled'
@@ -64,7 +65,7 @@ function draftFrom(user: User): ProfileDraft {
   }
 }
 
-export function SettingsView() {
+export function SettingsView({ embedded = false }: { embedded?: boolean } = {}) {
   const storeUser = useAuthUser()
   const { logout } = useAuthentication()
   const queryClient = useQueryClient()
@@ -193,34 +194,11 @@ export function SettingsView() {
   }
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Settings'
+      description='Adjust your workspace preferences.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Settings
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Adjust your workspace preferences.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -447,6 +425,6 @@ export function SettingsView() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AccountFrame>
   )
 }

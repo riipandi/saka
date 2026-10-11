@@ -17,6 +17,21 @@ import {
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -30,6 +45,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardFooter,
   CardDescription,
   CardHeader,
   CardTitle
@@ -45,6 +61,8 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import {
   LIST_MAX_LIMIT,
   listPageInput,
@@ -53,7 +71,6 @@ import {
 } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   CreateUserGroupRequestSchema,
@@ -133,9 +150,10 @@ export function GroupsView({
     onSortChange?.(choice.sortBy, choice.sortOrder)
   }
 
-  const submitSearch = () => {
+  const submitSearch = (next: string) => {
     setError(null)
-    onSearchChange?.(term.trim() || undefined)
+    setTerm(next)
+    onSearchChange?.(next.trim() || undefined)
   }
 
   return (
@@ -174,20 +192,14 @@ export function GroupsView({
             <CardDescription>Search matches the name and the display name.</CardDescription>
             <CardAction>
               <div {...stylex.props(localStyles.toolbar)}>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    submitSearch()
-                  }}
-                  {...stylex.props(localStyles.search)}
-                >
-                  <Input
-                    aria-label='Search groups'
-                    placeholder='Search…'
-                    value={term}
-                    onChange={(event) => setTerm(event.target.value)}
-                  />
-                </form>
+                <ListSearch
+                  label='Search groups'
+                  placeholder='Search…'
+                  value={term}
+                  onValueChange={setTerm}
+                  onSubmit={submitSearch}
+                  style={localStyles.search}
+                />
                 <Select value={currentSort} onValueChange={chooseSort} items={[...SORT_CHOICES]}>
                   <SelectTrigger aria-label='Sort groups'>
                     <SelectValue />
@@ -231,35 +243,18 @@ export function GroupsView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -277,10 +272,20 @@ function GroupRow({ group }: { group: UserGroup }) {
         </ItemDescription>
       </ItemContent>
       <ItemActions>
-        <MembersDialog group={group} />
-        <ClientsDialog group={group} />
-        <GroupFormDialog mode='edit' group={group} />
-        <DeleteGroupDialog group={group} />
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+            Actions
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(group.id)}>
+              Copy ID
+            </DropdownMenuItem>
+            <MembersDialog group={group} />
+            <ClientsDialog group={group} />
+            <GroupFormDialog mode='edit' group={group} />
+            <DeleteGroupDialog group={group} />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </ItemActions>
     </Item>
   )
@@ -380,9 +385,9 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission={mode === 'create' ? 'user_group:*:create' : 'user_group:*:update'}>
-        <AlertDialogTrigger
+        <DialogTrigger
           render={
             <Button
               variant={mode === 'create' ? undefined : 'outline'}
@@ -397,17 +402,15 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
           ) : (
             'Edit'
           )}
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {mode === 'create' ? 'Create a group' : 'Edit this group'}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Create a group' : 'Edit this group'}</DialogTitle>
+          <DialogDescription>
             The name is the unique handle; the display name is what the UI shows.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div {...stylex.props(localStyles.form)}>
           <Field id='group-name'>
             <FieldLabel htmlFor='group-name'>Name</FieldLabel>
@@ -432,9 +435,11 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
             </Text>
           ) : null}
         </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={
               saving.isPending ||
               form.name.trim().length === 0 ||
@@ -444,10 +449,10 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
           >
             {saving.isPending ? <Spinner /> : <Layers size={16} />}
             {mode === 'create' ? 'Create group' : 'Save changes'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

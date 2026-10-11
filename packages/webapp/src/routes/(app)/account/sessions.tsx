@@ -17,6 +17,7 @@ function RouteComponent() {
   const navigate = Route.useNavigate()
   return (
     <SessionsView
+      embedded
       page={search.page}
       onPageChange={(next) => {
         void navigate({

@@ -9,5 +9,5 @@ export const Route = createFileRoute('/(app)/account/email')({
 })
 
 function RouteComponent() {
-  return <EmailView />
+  return <EmailView embedded />
 }

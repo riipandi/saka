@@ -124,7 +124,8 @@ test.describe.serial('the session foundation flow', () => {
   })
 
   test('sign out returns to the login route', async () => {
-    await page.click('[aria-label="Sign Out"]')
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await page.getByRole('menuitem', { name: 'Sign Out' }).click()
     await expect(page).toHaveURL(/\/login/)
     await expect(page.locator('#identity')).toBeVisible()
   })

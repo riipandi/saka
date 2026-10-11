@@ -85,6 +85,11 @@ var resources = []authz.Resource{
 		Description: "an account's consent grant to a relying party",
 	},
 	{
+		Name:        "setting",
+		Actions:     []string{"read", "update"},
+		Description: "a deployment's database-backed configuration item",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",

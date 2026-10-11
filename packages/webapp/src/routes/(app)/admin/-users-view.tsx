@@ -5,18 +5,22 @@ import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -32,26 +36,28 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
+import { TimeValue } from '#/components/time-value'
 import { UserAvatar } from '#/components/user-avatar'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   UserService,
@@ -87,14 +93,6 @@ const localStyles = stylex.create({
     maxWidth: '22rem'
   }
 })
-
-const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' })
-
-function formatInstant(value: string | undefined): string {
-  if (!value) return '—'
-  const instant = new Date(value)
-  return Number.isNaN(instant.getTime()) ? '—' : instantFormat.format(instant)
-}
 
 /**
  * The user management center's list page (D4): one page of the accounts
@@ -148,9 +146,10 @@ export function UsersView({
     onSortChange?.(choice.sortBy, choice.sortOrder)
   }
 
-  const submitSearch = () => {
+  const submitSearch = (next: string) => {
     setError(null)
-    onSearchChange?.(term.trim() || undefined)
+    setTerm(next)
+    onSearchChange?.(next.trim() || undefined)
   }
 
   return (
@@ -191,20 +190,14 @@ export function UsersView({
             </CardDescription>
             <CardAction>
               <div {...stylex.props(localStyles.toolbar)}>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    submitSearch()
-                  }}
-                  {...stylex.props(localStyles.search)}
-                >
-                  <Input
-                    aria-label='Search users'
-                    placeholder='Search…'
-                    value={term}
-                    onChange={(event) => setTerm(event.target.value)}
-                  />
-                </form>
+                <ListSearch
+                  label='Search users'
+                  placeholder='Search…'
+                  value={term}
+                  onValueChange={setTerm}
+                  onSubmit={submitSearch}
+                  style={localStyles.search}
+                />
                 <Select value={currentSort} onValueChange={chooseSort} items={[...SORT_CHOICES]}>
                   <SelectTrigger aria-label='Sort users'>
                     <SelectValue />
@@ -242,11 +235,23 @@ export function UsersView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((row) => (
-                  <UserRow key={row.id} user={row} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <UserRow key={row.id} user={row} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -254,35 +259,18 @@ export function UsersView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -299,27 +287,72 @@ const DEFAULT_USERS_SEARCH = {
 } as const
 
 function UserRow({ user }: { user: User }) {
+  const name = user.displayName || user.username
   return (
-    <Item
-      variant='outline'
-      render={<Link to='/admin/users/$id' params={{ id: user.id }} search={DEFAULT_USERS_SEARCH} />}
-    >
-      <ItemMedia>
-        <UserAvatar name={user.displayName || user.username} picture={user.picture} size='md' />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{user.displayName || user.username}</ItemTitle>
-        <ItemDescription>
-          {user.username} · {user.email} · joined {formatInstant(user.createdAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
+    <TableRow>
+      <TableCell>
+        <Link
+          to='/admin/users/$id'
+          params={{ id: user.id }}
+          search={DEFAULT_USERS_SEARCH}
+          {...stylex.props(userRowStyles.link)}
+        >
+          <UserAvatar name={name} picture={user.picture} size='sm' />
+          {name}
+        </Link>
+      </TableCell>
+      <TableCell>{user.username}</TableCell>
+      <TableCell>{user.email}</TableCell>
+      <TableCell>
+        <TimeValue value={user.createdAt} />
+      </TableCell>
+      <TableCell>
         {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
         {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
-      </ItemActions>
-    </Item>
+        {!user.bannedAt && !user.disabled ? <Badge variant='secondary'>Active</Badge> : null}
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+            Actions
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem
+              render={
+                <Link
+                  to='/admin/users/$id'
+                  params={{ id: user.id }}
+                  search={DEFAULT_USERS_SEARCH}
+                />
+              }
+            >
+              View details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(user.id)}>
+              Copy ID
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   )
 }
+
+const userRowStyles = stylex.create({
+  link: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'inherit',
+    textDecoration: 'none',
+    fontWeight: 600
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16
+  }
+})
 
 /**
  * The administrator's own door for an account that exists without an
@@ -382,81 +415,85 @@ function CreateUserDialog({ onCreated }: { onCreated: (user: User) => void }) {
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission='user:*:create'>
-        <AlertDialogTrigger render={<Button size='sm' />}>
+        <DialogTrigger render={<Button size='sm' />}>
           <Plus size={16} /> Create user
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Create an account</AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create an account</DialogTitle>
+          <DialogDescription>
             An account made here exists without an invitation. Leave the password empty and the
             account carries no credential until one is set.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <Field id='create-username'>
-          <FieldLabel htmlFor='create-username'>Username</FieldLabel>
-          <Input
-            id='create-username'
-            value={form.username}
-            onChange={(event) => setForm({ ...form, username: event.target.value })}
-          />
-          <FieldDescription>3–32 letters, digits, underscores.</FieldDescription>
-        </Field>
-        <Field id='create-email'>
-          <FieldLabel htmlFor='create-email'>Email</FieldLabel>
-          <Input
-            id='create-email'
-            type='email'
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
-          />
-        </Field>
-        <Field id='create-first-name'>
-          <FieldLabel htmlFor='create-first-name'>First name</FieldLabel>
-          <Input
-            id='create-first-name'
-            value={form.firstName}
-            onChange={(event) => setForm({ ...form, firstName: event.target.value })}
-          />
-        </Field>
-        <Field id='create-last-name'>
-          <FieldLabel htmlFor='create-last-name'>Last name</FieldLabel>
-          <Input
-            id='create-last-name'
-            value={form.lastName}
-            onChange={(event) => setForm({ ...form, lastName: event.target.value })}
-          />
-        </Field>
-        <Field id='create-display-name'>
-          <FieldLabel htmlFor='create-display-name'>Display name</FieldLabel>
-          <Input
-            id='create-display-name'
-            value={form.displayName}
-            onChange={(event) => setForm({ ...form, displayName: event.target.value })}
-            placeholder='Composed from the names when empty'
-          />
-        </Field>
-        <Field id='create-password'>
-          <FieldLabel htmlFor='create-password'>Password</FieldLabel>
-          <Input
-            id='create-password'
-            type='password'
-            value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
-          />
-          <FieldDescription>Leave empty for an account without a credential.</FieldDescription>
-        </Field>
-        {failed ? (
-          <Text render={<p />} variant='body-2' color='critical'>
-            {failed}
-          </Text>
-        ) : null}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          </DialogDescription>
+        </DialogHeader>
+        <div {...stylex.props(userRowStyles.form)}>
+          <Field id='create-username'>
+            <FieldLabel htmlFor='create-username'>Username</FieldLabel>
+            <Input
+              id='create-username'
+              value={form.username}
+              onChange={(event) => setForm({ ...form, username: event.target.value })}
+            />
+            <FieldDescription>3–32 letters, digits, underscores.</FieldDescription>
+          </Field>
+          <Field id='create-email'>
+            <FieldLabel htmlFor='create-email'>Email</FieldLabel>
+            <Input
+              id='create-email'
+              type='email'
+              value={form.email}
+              onChange={(event) => setForm({ ...form, email: event.target.value })}
+            />
+          </Field>
+          <Field id='create-first-name'>
+            <FieldLabel htmlFor='create-first-name'>First name</FieldLabel>
+            <Input
+              id='create-first-name'
+              value={form.firstName}
+              onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+            />
+          </Field>
+          <Field id='create-last-name'>
+            <FieldLabel htmlFor='create-last-name'>Last name</FieldLabel>
+            <Input
+              id='create-last-name'
+              value={form.lastName}
+              onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+            />
+          </Field>
+          <Field id='create-display-name'>
+            <FieldLabel htmlFor='create-display-name'>Display name</FieldLabel>
+            <Input
+              id='create-display-name'
+              value={form.displayName}
+              onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+              placeholder='Composed from the names when empty'
+            />
+          </Field>
+          <Field id='create-password'>
+            <FieldLabel htmlFor='create-password'>Password</FieldLabel>
+            <Input
+              id='create-password'
+              type='password'
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+            />
+            <FieldDescription>Leave empty for an account without a credential.</FieldDescription>
+          </Field>
+          {failed ? (
+            <Text render={<p />} variant='body-2' color='critical'>
+              {failed}
+            </Text>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={
               creating.isPending ||
               form.username.trim().length === 0 ||
@@ -468,9 +505,9 @@ function CreateUserDialog({ onCreated }: { onCreated: (user: User) => void }) {
           >
             {creating.isPending ? <Spinner /> : <Users size={16} />}
             Create user
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

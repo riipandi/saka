@@ -1,10 +1,7 @@
 import { create } from '@bufbuild/protobuf'
 import { useQuery } from '@connectrpc/connect-query'
-import { Activity } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { Button } from 'uilibs/components/base/button'
-import { Input } from 'uilibs/components/base/input'
 import {
   Select,
   SelectContent,
@@ -18,21 +15,24 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
+import { TimeValue } from '#/components/time-value'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { styles, facetStyles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -65,17 +65,6 @@ export function formatAuditEvent(event: string): string {
     profile_picture_reset: 'Profile picture reset'
   }
   return KNOWN[event] ?? event.replaceAll('_', ' ')
-}
-
-const instantFormat = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short'
-})
-
-function formatInstant(value: { seconds: bigint } | undefined): string {
-  if (!value) return '—'
-  const instant = new Date(Number(value.seconds) * 1000)
-  return Number.isNaN(instant.getTime()) ? '—' : instantFormat.format(instant)
 }
 
 /**
@@ -139,11 +128,6 @@ export function AdminAuditView({
   const turnPage = (next: number) => {
     setError(null)
     onPageChange?.(next)
-  }
-
-  const applyTerm = () => {
-    setError(null)
-    onFilterChange?.({ event, userId, search: term.trim() || undefined })
   }
 
   return (
@@ -252,23 +236,22 @@ export function AdminAuditView({
                 </SelectContent>
               </Select>
 
-              <Input
-                id='audit-search'
-                aria-label='Search by account'
+              <ListSearch
+                label='Search by account'
                 placeholder='Search username or email…'
                 value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    applyTerm()
-                  }
+                onValueChange={setTerm}
+                onSubmit={(next) => {
+                  setTerm(next)
+                  setError(null)
+                  onFilterChange?.({
+                    event,
+                    userId,
+                    search: next.trim() || undefined
+                  })
                 }}
                 style={facetStyles.search}
               />
-              <Button variant='outline' size='sm' onClick={applyTerm}>
-                Search
-              </Button>
             </div>
 
             {logs.isPending ? (
@@ -281,11 +264,7 @@ export function AdminAuditView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((record) => (
-                  <AuditItem key={record.id} record={record} />
-                ))}
-              </ItemGroup>
+              <AuditTable records={rows} />
             )}
 
             {error ? (
@@ -293,35 +272,18 @@ export function AdminAuditView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => turnPage(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => turnPage(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={turnPage}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -330,30 +292,42 @@ export function AdminAuditView({
 
 /** The facet source: `FilterOptions` derives both lists from the table, so
  * the controls offer what occurs rather than a fixed vocabulary. */
-/** One audit record as the console and the user detail both render it. */
-export function AuditItem({ record }: { record: AuditLog }) {
+/** One page of audit records, shared by the console and the user detail. */
+export function AuditTable({ records }: { records: AuditLog[] }) {
   return (
-    <Item variant='outline'>
-      <ItemMedia variant='icon'>
-        <Activity {...stylex.props(styles.icon)} />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{formatAuditEvent(record.event)}</ItemTitle>
-        <ItemDescription>
-          {record.username ? record.username : '—'}
-          {record.triggerType === 'system' ? ' · system' : ''}
-          {record.ipAddress ? ` · from ${record.ipAddress}` : ''}
-          {` · ${formatInstant(record.createdAt)}`}
-          {record.actorUsername ? ` · by ${record.actorUsername} (delegated)` : ''}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        {record.actionStatus === 'failed' ? (
-          <Badge variant='destructive'>Failed</Badge>
-        ) : (
-          <Badge variant='secondary'>Success</Badge>
-        )}
-      </ItemActions>
-    </Item>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Timestamp</TableHead>
+          <TableHead>Event</TableHead>
+          <TableHead>Account</TableHead>
+          <TableHead>IP address</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {records.map((record) => (
+          <TableRow key={record.id}>
+            <TableCell>
+              <TimeValue value={record.createdAt} />
+            </TableCell>
+            <TableCell>{formatAuditEvent(record.event)}</TableCell>
+            <TableCell>
+              {record.username ? record.username : '—'}
+              {record.triggerType === 'system' ? ' · system' : ''}
+              {record.actorUsername ? ` · by ${record.actorUsername}` : ''}
+            </TableCell>
+            <TableCell>{record.ipAddress || '—'}</TableCell>
+            <TableCell>
+              {record.actionStatus === 'failed' ? (
+                <Badge variant='destructive'>Failed</Badge>
+              ) : (
+                <Badge variant='secondary'>Success</Badge>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }

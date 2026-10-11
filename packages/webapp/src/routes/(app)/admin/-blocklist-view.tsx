@@ -18,6 +18,15 @@ import {
   AlertDialogTrigger
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -25,24 +34,26 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   AddBlocklistEntryRequestSchema,
@@ -132,11 +143,21 @@ export function BlocklistView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pattern</TableHead>
+                    <TableHead>Added by</TableHead>
+                    <TableHead>Added</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((entry) => (
+                    <EntryRow key={entry.id} entry={entry} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -144,35 +165,18 @@ export function BlocklistView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -181,18 +185,14 @@ export function BlocklistView({
 
 function EntryRow({ entry }: { entry: BlocklistEntry }) {
   return (
-    <Item variant='outline'>
-      <ItemContent>
-        <ItemTitle>{entry.pattern}</ItemTitle>
-        <ItemDescription>
-          {entry.createdBy ? `added by ${entry.createdBy} · ` : ''}added{' '}
-          {formatWireInstant(entry.createdAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
+    <TableRow>
+      <TableCell>{entry.pattern}</TableCell>
+      <TableCell>{entry.createdBy || '—'}</TableCell>
+      <TableCell style={dataTableStyles.instant}>{formatWireInstant(entry.createdAt)}</TableCell>
+      <TableCell>
         <RemoveEntryDialog entry={entry} />
-      </ItemActions>
-    </Item>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -225,20 +225,20 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
   })
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission='blocklist:*:create'>
-        <AlertDialogTrigger render={<Button size='sm' />}>
+        <DialogTrigger render={<Button size='sm' />}>
           <Plus size={16} /> Add entry
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Block an identifier</AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Block an identifier</DialogTitle>
+          <DialogDescription>
             One email address (`john.doe@example.com`) or one domain (`@example.com`, every address
             at it). The entry is stored lowercased and matched case-insensitively.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <Field id='blocklist-pattern'>
           <FieldLabel htmlFor='blocklist-pattern'>Identifier</FieldLabel>
           <Input
@@ -256,9 +256,11 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
             {failed}
           </Text>
         ) : null}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={adding.isPending || pattern.trim().length === 0}
             onClick={() =>
               adding.mutate(create(AddBlocklistEntryRequestSchema, { pattern: pattern.trim() }))
@@ -266,10 +268,10 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
           >
             {adding.isPending ? <Spinner /> : <ShieldOff size={16} />}
             Add entry
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

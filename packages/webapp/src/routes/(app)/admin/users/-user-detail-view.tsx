@@ -32,10 +32,16 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
+import {
+  DescriptionDetails,
+  DescriptionList,
+  DescriptionTerm
+} from 'uilibs/components/extra/description-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { ItemGroup } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { DateTimePicker } from '#/components/-date-time-picker'
+import { ListPagination } from '#/components/list-pagination'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList, LIST_MAX_LIMIT } from '#/hooks/use-pagination'
@@ -75,7 +81,7 @@ import {
   WebAuthnService,
   type Credential
 } from '~/codegen/webauthn_pb'
-import { AuditItem } from '../-audit-view'
+import { AuditTable } from '../-audit-view'
 
 const localStyles = stylex.create({
   form: {
@@ -242,14 +248,25 @@ export function UserDetailView({ userId }: { userId: string }) {
           <Text render={<h1 />} variant='featured-4' weight='bold'>
             {user.displayName || user.username}
           </Text>
-          <div {...stylex.props(localStyles.metaRow)}>
-            <Text variant='body-2' color='neutral-faded'>
-              {user.username} · {user.email} · joined {formatInstant(user.createdAt)}
-            </Text>
-            {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
-            {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
-            {!user.emailVerified ? <Badge variant='secondary'>Unverified</Badge> : null}
-          </div>
+          <DescriptionList>
+            <DescriptionTerm>Username</DescriptionTerm>
+            <DescriptionDetails>{user.username}</DescriptionDetails>
+            <DescriptionTerm>Email</DescriptionTerm>
+            <DescriptionDetails>{user.email}</DescriptionDetails>
+            <DescriptionTerm>Joined</DescriptionTerm>
+            <DescriptionDetails>{formatInstant(user.createdAt)}</DescriptionDetails>
+            <DescriptionTerm>Identifier</DescriptionTerm>
+            <DescriptionDetails>{user.id}</DescriptionDetails>
+            <DescriptionTerm>Status</DescriptionTerm>
+            <DescriptionDetails>
+              {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
+              {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
+              {!user.emailVerified ? <Badge variant='secondary'>Unverified</Badge> : null}
+              {!user.bannedAt && !user.disabled && user.emailVerified ? (
+                <Badge variant='secondary'>Active</Badge>
+              ) : null}
+            </DescriptionDetails>
+          </DescriptionList>
         </div>
         <CardAction>
           <UserAvatar name={user.displayName || user.username} picture={user.picture} size='lg' />
@@ -460,14 +477,14 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
   const [open, setOpen] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [expires, setExpires] = useState('')
+  const [expires, setExpires] = useState<Date | undefined>(undefined)
 
   const ban = useMutation(UserService.method.banUser, {
     onSuccess: () => {
       setOpen(false)
       setFailed(null)
       setReason('')
-      setExpires('')
+      setExpires(undefined)
       onSettled()
     },
     onError: (error) => setFailed(getErrorMessage(error))
@@ -475,9 +492,8 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
 
   const submit = () => {
     setFailed(null)
-    const parsed = expires ? new Date(expires) : null
-    const instant =
-      parsed && !Number.isNaN(parsed.getTime()) ? wireTimestamp(parsed.toISOString()) : undefined
+    const parsed = expires && !Number.isNaN(expires.getTime()) ? expires : null
+    const instant = parsed ? wireTimestamp(parsed.toISOString()) : undefined
     ban.mutate(
       create(BanUserRequestSchema, {
         reason: reason.trim(),
@@ -512,13 +528,13 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
         </Field>
         <Field id='ban-expiry'>
           <FieldLabel htmlFor='ban-expiry'>Expires at</FieldLabel>
-          <Input
-            id='ban-expiry'
-            type='datetime-local'
+          <DateTimePicker
             value={expires}
-            onChange={(event) => setExpires(event.target.value)}
+            onChange={setExpires}
+            id='ban-expiry'
+            ariaLabel='Expires at'
+            placeholder='Empty — the ban never lifts by itself'
           />
-          <FieldDescription>Empty means the ban never lifts by itself.</FieldDescription>
         </Field>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical' style={localStyles.error}>
@@ -1283,39 +1299,17 @@ function ActivityCard({ userId }: { userId: string }) {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ItemGroup>
-            {rows.map((record) => (
-              <AuditItem key={record.id} record={record} />
-            ))}
-          </ItemGroup>
+          <AuditTable records={rows} />
         )}
 
         {summary && (summary.hasPrevious || summary.hasNext) ? (
-          <div {...stylex.props(localStyles.activityPager)}>
-            <Text variant='body-2' color='neutral-faded'>
-              {summary.totalItems === null
-                ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-            </Text>
-            <div {...stylex.props(localStyles.pagerActions)}>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={!summary.hasPrevious}
-                onClick={() => setPage(summary.page - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={summary.hasNext === false}
-                onClick={() => setPage(summary.page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <ListPagination
+            page={summary.page}
+            totalPages={summary.totalPages}
+            hasPrevious={summary.hasPrevious}
+            hasNext={summary.hasNext}
+            onPageChange={setPage}
+          />
         ) : null}
       </CardContent>
     </Card>

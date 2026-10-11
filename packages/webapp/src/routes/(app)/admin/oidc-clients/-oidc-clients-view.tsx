@@ -5,7 +5,6 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from 'uilibs/components/base/avatar'
 import { Button } from 'uilibs/components/base/button'
-import { Input } from 'uilibs/components/base/input'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
   Card,
@@ -27,9 +26,10 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   ListOidcClientsRequestSchema,
@@ -113,13 +113,14 @@ export function OidcClientsView({
           </CardHeader>
           <CardContent>
             <div {...stylex.props(localStyles.toolbar)}>
-              <Input
-                value={query}
+              <ListSearch
+                label='Search clients'
                 placeholder='Search by name'
-                aria-label='Search clients'
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') onSearchChange?.(query.trim() || undefined)
+                value={query}
+                onValueChange={setQuery}
+                onSubmit={(next) => {
+                  setQuery(next)
+                  onSearchChange?.(next.trim() || undefined)
                 }}
               />
             </div>
@@ -143,31 +144,13 @@ export function OidcClientsView({
             )}
 
             {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
             ) : null}
           </CardContent>
         </Card>

@@ -3,6 +3,7 @@ import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
 import { RefreshCw } from '@keyline-icons/react'
+import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import {
@@ -37,6 +38,7 @@ import {
 } from 'uilibs/components/extra/card'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { fontFamily } from 'uilibs/styles/tokens.stylex'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
@@ -110,7 +112,7 @@ export function ScimProviderCard({ clientId }: { clientId: string }) {
         </CardDescription>
         {view && !unconfigured ? (
           <CardAction>
-            <div className='flex items-center gap-2'>
+            <div {...stylex.props(scimStyles.row)}>
               <Can permission='scim_provider:*:update'>
                 <Button variant='outline' size='sm' onClick={() => setDialogOpen(true)}>
                   Update
@@ -140,9 +142,9 @@ export function ScimProviderCard({ clientId }: { clientId: string }) {
         {provider.isPending ? (
           <Spinner />
         ) : view && !unconfigured ? (
-          <div className='flex flex-col gap-1'>
+          <div {...stylex.props(scimStyles.stackTight)}>
             <Text render={<p />} variant='body-2'>
-              Endpoint: <span className='font-mono text-xs'>{view.endpoint}</span>
+              Endpoint: <span {...stylex.props(scimStyles.mono)}>{view.endpoint}</span>
             </Text>
             <Text variant='body-2' color='neutral-faded'>
               {view.lastSyncedAt
@@ -151,7 +153,7 @@ export function ScimProviderCard({ clientId }: { clientId: string }) {
             </Text>
           </div>
         ) : (
-          <div className='flex flex-col gap-2'>
+          <div {...stylex.props(scimStyles.stack)}>
             <Text variant='body-2' color='neutral-faded'>
               No provisioning target is attached to this client.
             </Text>
@@ -380,3 +382,25 @@ function ProviderDialog({
     </>
   )
 }
+
+const scimStyles = stylex.create({
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8
+  },
+  stackTight: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8
+  },
+  mono: {
+    fontFamily: fontFamily.monospace,
+    fontSize: 12
+  }
+})

@@ -2,7 +2,6 @@ import * as stylex from '@stylexjs/stylex'
 import { colors } from 'uilibs/styles/colors.stylex'
 import { fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
 import { radius, unit, duration } from 'uilibs/styles/tokens.stylex'
-
 // Mirrors `breakpoints.small` from `components/styles/core/tokens.stylex` (659px cap).
 // @stylexjs/babel-plugin only inlines `defineConsts` media keys declared in
 // the SAME file (and bound to a named export), so these cannot be imported
@@ -93,5 +92,22 @@ export const styles = stylex.create({
     flex: 1,
     overflowY: 'auto',
     minWidth: 0
+  },
+  bellRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: unit.x2,
+    paddingTop: unit.x2,
+    paddingRight: unit.x4,
+    paddingLeft: unit.x4,
+    [breakpoints.small]: {
+      display: 'none'
+    }
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: unit.x1
   }
 })

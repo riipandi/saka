@@ -1,8 +1,8 @@
 type: folder
 model: folder
-id: fl_xxFhnsiD2K
-createdAt: 2026-09-25T10:32:40.773280
-updatedAt: 2026-09-26T14:40:44.497248
+id: fl_6Mz7cAXBrj
+createdAt: 2026-10-11T20:33:53.887035
+updatedAt: 2026-10-11T20:39:38.745629
 workspaceId: wk_kBiMYTkhPP
 folderId: null
 authentication:
@@ -10,8 +10,8 @@ authentication:
 authenticationType: bearer
 description: ''
 headers: []
-name: Users
-sortPriority: 5555.555555555556
+name: User Management
+sortPriority: 5423.868312757201
 settingSendCookies:
   enabled: false
   value: true

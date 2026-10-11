@@ -231,27 +231,6 @@ export const sidebarStyles = stylex.create({
     whiteSpace: 'nowrap'
   },
 
-  // Bottom: sign out + theme switcher
-  bottomSection: {
-    paddingLeft: unit.x3,
-    paddingRight: unit.x2,
-    paddingTop: unit.x2,
-    paddingBottom: unit.x2,
-    borderTopWidth: 1,
-    borderTopStyle: 'solid',
-    borderTopColor: colors.borderNeutralFaded,
-    width: '100%'
-  },
-  switcherBox: {
-    height: '2.25rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: unit.x1,
-    paddingRight: unit.x1,
-    borderRadius: radius.large
-  },
-
   // Collapse/expand trigger (desktop only)
   collapseTrigger: {
     position: 'absolute',
@@ -297,49 +276,5 @@ export const sidebarStyles = stylex.create({
   },
   logoFade: {
     opacity: 0
-  },
-  bottomSectionCollapsed: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: unit.x2,
-    paddingTop: unit.x3,
-    paddingBottom: unit.x0_5
-  },
-  bottomRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: unit.x2
-  },
-  bottomRowCollapsed: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: unit.x1
-  },
-  switcherBoxCollapsed: {
-    height: '2.5rem'
-  },
-  signOutButton: {
-    gap: unit.x2,
-    borderWidth: 0,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    flexShrink: 0,
-    color: {
-      default: colors.foregroundNeutralFaded,
-      ':hover': colors.foregroundCritical
-    },
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': colors.backgroundCriticalFaded
-    },
-    boxShadow: {
-      ':hover': `inset 0 0 0 1px ${colors.borderCriticalFaded}`
-    }
-  },
-  signOutButtonExpanded: {
-    flex: 1
   }
 })

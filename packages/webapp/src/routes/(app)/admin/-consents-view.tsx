@@ -4,7 +4,6 @@ import type { Timestamp } from '@bufbuild/protobuf/wkt'
 import { useQuery } from '@connectrpc/connect-query'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { Button } from 'uilibs/components/base/button'
 import {
   Select,
   SelectContent,
@@ -30,6 +29,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { LIST_MAX_LIMIT, listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ScopeChip } from '#/routes/(app)/account/-authorized-apps-view'
@@ -187,29 +187,15 @@ function AllConsentsCard({ page, onPage }: { page: number; onPage: (next: number
                 </Item>
               ))}
             </ItemGroup>
-            {summary !== null && summary.totalPages !== null && summary.totalPages > 1 && (
-              <div {...stylex.props(styles.pager)}>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={summary.page <= 1}
-                  onClick={() => onPage(summary.page - 1)}
-                >
-                  Previous
-                </Button>
-                <Text variant='body-2' color='neutral-faded'>
-                  Page {summary.page} of {summary.totalPages}
-                </Text>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={summary.page >= (summary.totalPages ?? 1)}
-                  onClick={() => onPage(summary.page + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
+            {summary !== null && (summary.hasPrevious || summary.hasNext) ? (
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={onPage}
+              />
+            ) : null}
           </>
         )}
       </CardContent>

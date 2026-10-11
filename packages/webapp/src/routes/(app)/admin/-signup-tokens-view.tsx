@@ -17,6 +17,15 @@ import {
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -32,24 +41,26 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { LIST_MAX_LIMIT, listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   CreateSignupTokenRequestSchema,
@@ -151,11 +162,22 @@ export function SignupTokensView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((token) => (
-                  <TokenRow key={token.id} token={token} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Issued</TableHead>
+                    <TableHead>Usage</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((token) => (
+                    <TokenRow key={token.id} token={token} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -163,35 +185,18 @@ export function SignupTokensView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -201,24 +206,19 @@ export function SignupTokensView({
 function TokenRow({ token }: { token: SignupToken }) {
   const spent = token.usageLimit > 0 && token.usageCount >= token.usageLimit
   return (
-    <Item variant='outline'>
-      <ItemContent>
-        <ItemTitle>
-          {formatInstant(token.createdAt)}
-          {spent ? ' — spent' : ''}
-        </ItemTitle>
-        <ItemDescription>
-          {token.usageCount} of {token.usageLimit > 0 ? token.usageLimit : '1 (single)'} used ·
-          expires {formatInstant(token.expiresAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        <Badge variant={spent ? 'secondary' : 'outline'}>
-          {token.usageCount}/{token.usageLimit > 0 ? token.usageLimit : 1}
-        </Badge>
+    <TableRow>
+      <TableCell style={dataTableStyles.instant}>{formatInstant(token.createdAt)}</TableCell>
+      <TableCell>
+        {token.usageCount} of {token.usageLimit > 0 ? token.usageLimit : '1 (single)'}
+      </TableCell>
+      <TableCell style={dataTableStyles.instant}>{formatInstant(token.expiresAt)}</TableCell>
+      <TableCell>
+        <Badge variant={spent ? 'secondary' : 'outline'}>{spent ? 'Spent' : 'Active'}</Badge>
+      </TableCell>
+      <TableCell>
         <RevokeTokenDialog token={token} />
-      </ItemActions>
-    </Item>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -328,22 +328,22 @@ function IssueTokenDialog({ onIssued }: { onIssued: () => void }) {
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={enter}>
+    <Dialog open={open} onOpenChange={enter}>
       <Can permission='signup_token:*:create'>
-        <AlertDialogTrigger render={<Button size='sm' />}>
+        <DialogTrigger render={<Button size='sm' />}>
           <Plus size={16} /> Issue token
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
+      <DialogContent>
         {issued ? (
           <>
-            <AlertDialogHeader>
-              <AlertDialogTitle>The token — shown once</AlertDialogTitle>
-              <AlertDialogDescription>
+            <DialogHeader>
+              <DialogTitle>The token — shown once</DialogTitle>
+              <DialogDescription>
                 This value is the invitation's whole credential. It is not stored and cannot be read
                 back; close this dialog and it is gone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
+              </DialogDescription>
+            </DialogHeader>
             <Text render={<p />} variant='body-1' weight='semibold' style={localStyles.rawToken}>
               {issued.rawToken}
             </Text>
@@ -352,18 +352,18 @@ function IssueTokenDialog({ onIssued }: { onIssued: () => void }) {
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied ? 'Copied' : 'Copy'}
               </Button>
-              <AlertDialogAction>Done</AlertDialogAction>
+              <Button onClick={() => enter(false)}>Done</Button>
             </div>
           </>
         ) : (
           <>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Issue a signup token</AlertDialogTitle>
-              <AlertDialogDescription>
+            <DialogHeader>
+              <DialogTitle>Issue a signup token</DialogTitle>
+              <DialogDescription>
                 The token admits sign-ups for its window and joins every account it creates to the
                 groups checked here. Unset usage means the single invitation.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
+              </DialogDescription>
+            </DialogHeader>
             <div {...stylex.props(localStyles.form)}>
               <Field id='token-ttl'>
                 <FieldLabel htmlFor='token-ttl'>Window</FieldLabel>
@@ -436,17 +436,19 @@ function IssueTokenDialog({ onIssued }: { onIssued: () => void }) {
                 </Text>
               ) : null}
             </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction disabled={issuing.isPending} onClick={submit}>
+            <DialogFooter>
+              <Button variant='ghost' onClick={() => enter(false)}>
+                Cancel
+              </Button>
+              <Button disabled={issuing.isPending} onClick={submit}>
                 {issuing.isPending ? <Spinner /> : <KeyRound size={16} />}
                 Issue token
-              </AlertDialogAction>
-            </AlertDialogFooter>
+              </Button>
+            </DialogFooter>
           </>
         )}
-      </AlertDialogContent>
-    </AlertDialog>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -35,6 +35,7 @@ import {
   UserService,
   VerifyEmailRequestSchema
 } from '~/codegen/identity_pb'
+import { AccountFrame } from './-account-frame'
 
 const KEY_CHANGE_EMAIL = 'users.change_email_enabled'
 
@@ -96,7 +97,7 @@ function isAlreadyVerified(error: unknown): error is ConnectError {
  * flow — request the new address, then confirm by the code the new
  * address receives — gated by the deployment's `users/change_email_enabled`.
  */
-export function EmailView() {
+export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient()
   const user = useAuthUser()
   const settings = usePublicSettings()
@@ -173,34 +174,11 @@ export function EmailView() {
   const changeEnabled = settings.isOn(KEY_CHANGE_EMAIL)
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Email'
+      description='The address this account answers to, its proof, and its changes.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Email
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The address this account answers to, its proof, and its changes.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -368,6 +346,6 @@ export function EmailView() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AccountFrame>
   )
 }

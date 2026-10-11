@@ -30,6 +30,11 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
+import {
+  DescriptionDetails,
+  DescriptionList,
+  DescriptionTerm
+} from 'uilibs/components/extra/description-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import {
   Item,
@@ -41,6 +46,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { fontFamily } from 'uilibs/styles/tokens.stylex'
 import { LIST_MAX_LIMIT, listPageInput } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
@@ -201,10 +207,16 @@ export function OidcClientDetailView({ clientId }: { clientId: string }) {
           <Text render={<h1 />} variant='featured-4' weight='bold'>
             {view.name}
           </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Created {formatInstant(view.createdAt)} ·{' '}
-            {isCimd ? 'materialized from a metadata document' : 'registered here'}
-          </Text>
+          <DescriptionList>
+            <DescriptionTerm>Client ID</DescriptionTerm>
+            <DescriptionDetails>{view.id}</DescriptionDetails>
+            <DescriptionTerm>Created</DescriptionTerm>
+            <DescriptionDetails>{formatInstant(view.createdAt)}</DescriptionDetails>
+            <DescriptionTerm>Origin</DescriptionTerm>
+            <DescriptionDetails>
+              {isCimd ? 'Materialized from a metadata document' : 'Registered here'}
+            </DescriptionDetails>
+          </DescriptionList>
         </div>
         <div {...stylex.props(localStyles.headerActions)}>
           <Can permission='oidc_client:*:update'>
@@ -368,7 +380,7 @@ function SecretRow({
     <Item variant='outline'>
       <ItemContent>
         <ItemTitle>
-          <span className='font-mono'>{prefix}••••••••</span>
+          <span {...stylex.props(localStyles.mono)}>{prefix}••••••••</span>
         </ItemTitle>
         <ItemDescription>
           minted {formatInstant(createdAt)}
@@ -553,7 +565,7 @@ function GroupsCard({ client, onChanged }: { client: OidcClient; onChanged: () =
       <CardContent>
         <div {...stylex.props(localStyles.groupList)}>
           {rows.map((group) => (
-            <label key={group.id} className='flex items-center gap-2 text-sm'>
+            <label key={group.id} {...stylex.props(localStyles.choice)}>
               <Checkbox
                 checked={picked.has(group.id)}
                 onCheckedChange={(checked) => toggle(group.id, checked)}
@@ -697,5 +709,14 @@ const localStyles = stylex.create({
     display: 'flex',
     justifyContent: 'flex-end',
     marginTop: 12
+  },
+  mono: {
+    fontFamily: fontFamily.monospace
+  },
+  choice: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14
   }
 })

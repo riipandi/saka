@@ -9,5 +9,5 @@ export const Route = createFileRoute('/(app)/account/security')({
 })
 
 function RouteComponent() {
-  return <SecurityView />
+  return <SecurityView embedded />
 }

@@ -429,7 +429,7 @@ export function OAuthProviderDialog({
 
         <Field>
           <FieldLabel>Enabled</FieldLabel>
-          <label className='flex items-center gap-2 text-sm'>
+          <label {...stylex.props(styles.choice)}>
             <Checkbox checked={enabled} onCheckedChange={(checked) => setEnabled(checked)} />
             Accept sign-ins through this provider
           </label>
@@ -506,5 +506,11 @@ const styles = stylex.create({
   grid: {
     display: 'grid',
     gap: 12
+  },
+  choice: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14
   }
 })

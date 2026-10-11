@@ -1,6 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
-import { KeyRound, Lock, Plus, ShieldCheck } from '@keyline-icons/react'
+import { Lock, Plus, ShieldCheck } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
@@ -16,6 +16,20 @@ import {
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from 'uilibs/components/base/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -46,6 +60,8 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -194,22 +210,17 @@ export function RolesView({
           </CardHeader>
           <CardContent>
             <div {...stylex.props(localStyles.searchRow)}>
-              <Input
-                id='roles-search'
+              <ListSearch
+                label='Search roles'
                 placeholder='Search name or slug…'
                 value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    onSearchChange?.(term.trim())
-                  }
+                onValueChange={setTerm}
+                onSubmit={(next) => {
+                  setTerm(next)
+                  onSearchChange?.(next.trim())
                 }}
                 style={localStyles.search}
               />
-              <Button variant='outline' size='sm' onClick={() => onSearchChange?.(term.trim())}>
-                Search
-              </Button>
             </div>
 
             {roles.isPending ? (
@@ -250,20 +261,34 @@ export function RolesView({
                       </ItemDescription>
                     </ItemContent>
                     <ItemActions>
-                      <Button variant='outline' size='sm' onClick={() => setPermissionsFor(role)}>
-                        <KeyRound size={14} />
-                        Permissions
-                      </Button>
-                      {role.type === RoleType.CUSTOM ? (
-                        <>
-                          <Button variant='outline' size='sm' onClick={() => setEditing(role)}>
-                            Edit
-                          </Button>
-                          <Button variant='outline' size='sm' onClick={() => setDeleting(role)}>
-                            Delete
-                          </Button>
-                        </>
-                      ) : null}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+                          Actions
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end'>
+                          <DropdownMenuItem onClick={() => setPermissionsFor(role)}>
+                            Permissions
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => void navigator.clipboard.writeText(role.id)}
+                          >
+                            Copy ID
+                          </DropdownMenuItem>
+                          {role.type === RoleType.CUSTOM ? (
+                            <DropdownMenuItem onClick={() => setEditing(role)}>
+                              Edit
+                            </DropdownMenuItem>
+                          ) : null}
+                          {role.type === RoleType.CUSTOM ? (
+                            <DropdownMenuItem
+                              variant='destructive'
+                              onClick={() => setDeleting(role)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </ItemActions>
                   </Item>
                 ))}
@@ -277,31 +302,13 @@ export function RolesView({
             ) : null}
 
             {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(localStyles.pager)}>
-                <Text variant='body-2' color='neutral-faded'>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(localStyles.pagerActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
             ) : null}
           </CardContent>
         </Card>
@@ -370,14 +377,14 @@ function CreateRoleDialog({
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Create a role</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create a role</DialogTitle>
+          <DialogDescription>
             The role is born with no permissions; the tree opens after creation.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical' id='create-role-error'>
             {failed}
@@ -412,21 +419,17 @@ function CreateRoleDialog({
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={creating.isPending}
-            onClick={(event) => {
-              event.preventDefault()
-              submit()
-            }}
-          >
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={creating.isPending} onClick={submit}>
             {creating.isPending ? <Spinner /> : null}
             Create role
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -470,14 +473,14 @@ function EditRoleDialog({ role, onClose }: { role: Role; onClose: () => void }) 
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Edit {role.name}</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit {role.name}</DialogTitle>
+          <DialogDescription>
             The slug {role.slug} never moves — the claims and the code reference it.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical'>
             {failed}
@@ -495,21 +498,17 @@ function EditRoleDialog({ role, onClose }: { role: Role; onClose: () => void }) 
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={updating.isPending}
-            onClick={(event) => {
-              event.preventDefault()
-              submit()
-            }}
-          >
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={updating.isPending} onClick={submit}>
             {updating.isPending ? <Spinner /> : null}
             Save role
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -647,16 +646,16 @@ function PermissionsDialog({
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent style={localStyles.treeDialog}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Permissions of {role.name}</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent style={localStyles.treeDialog}>
+        <DialogHeader>
+          <DialogTitle>Permissions of {role.name}</DialogTitle>
+          <DialogDescription>
             {system
               ? 'A system role carries the seed’s set; it is shown read-only here.'
               : 'The set saves as a whole replacement. The accounts carrying the role pick it up at their next token, not in place.'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical'>
             {failed}
@@ -687,23 +686,19 @@ function PermissionsDialog({
             ))}
           </div>
         )}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Close</AlertDialogCancel>
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Close
+          </Button>
           {!system ? (
-            <AlertDialogAction
-              disabled={saving.isPending}
-              onClick={(event) => {
-                event.preventDefault()
-                save()
-              }}
-            >
+            <Button disabled={saving.isPending} onClick={save}>
               {saving.isPending ? <Spinner /> : null}
               Save permissions
-            </AlertDialogAction>
+            </Button>
           ) : null}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

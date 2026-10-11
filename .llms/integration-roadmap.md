@@ -513,22 +513,32 @@ goal, three deltas from its shape:
   on either screen — no SPA surface asks "which clients may I authorize";
   recorded delta.) (commit `147dbe47`)
 
-### Wave 5 — platform administration
+### Wave 5 — platform administration (complete 2026-10-12)
 
-- [ ] **Settings** — the `SettingsService` CRUD screens (sealed items
+- [x] **Settings** — the `SettingsService` CRUD screens (sealed items
   render their `enc:` state, never a value), `TestEmail`, the admin
-  configuration document.
-- [ ] **Notifications** — admin publish/cancel/list + the user inbox
+  configuration document. Frontend ships a metadata catalog
+  (`-settings-catalog.ts`) driving taxonomy tabs and typed controls; the
+  live probe answered `AppConfigService/TestEmail` (Mailpit received the
+  message). (commit `f2b927d8`)
+- [x] **Notifications** — admin publish/cancel/list + the user inbox
   (`ListNotifications`, `MarkNotificationRead`, `MarkAllNotificationsRead`,
   `UnreadCount`) and **`WatchNotifications`** — the streaming consumer
-  that settles D4's fallback clause; plan it with that decision's terms in
-  hand.
-- [ ] **Webhooks** — the ten-procedure surface; the show-once secret and
-  rotate flows reuse the OIDC-secret UI pattern.
-- [ ] **API keys** — self-service CRUD (`CreateAPIKey` show-once, renew,
-  revoke) + the admin `ListAllAPIKeys`. The machine-credential refusal on
-  self-service surfaces is backend behavior the UI never needs to route
-  around.
+  settled D4's fallback clause with a real Connect client (server-streaming
+  over the same transport; the raw-curl "no push" was a half-closed-request
+  artifact, not a backend defect). Bell badge, toasts, and catch-up via
+  list invalidation ride the same stream. (commits `4bcaec6d`, `2b3caccc`)
+- [x] **Webhooks** — the ten-procedure surface; the show-once secret and
+  rotate flows reuse the show-once dialog pattern. Delivery logs render
+  redacted response metadata only. Live probe: signed delivery answered
+  HTTP 200 at the receiver (`X-Signature: t=…,v1=…`). (commit `9678426e`)
+- [x] **API keys** — self-service issue/renew/revoke (`CreateAPIKey`
+  show-once, renewal refused while unexpired — live probe answered
+  `failed_precondition`) + the admin `ListAllAPIKeys` (read-only oversight;
+  machine credentials are refused on the self-service surface by the
+  backend's `Session` rule, verified with an `X-API-Key` probe). Sidebar
+  gates the two `Rule: Admin` surfaces (webhooks, all-keys) by role, not
+  slug — neither resource exists in the authz catalog. (commit `e93cb733`)
 
 ### Wave 6 — device, ops, storage
 
@@ -568,9 +578,15 @@ goal, three deltas from its shape:
 - [x] Show-once secret presentation pattern — lands with Wave 4 (OIDC
   secrets); reused by webhooks, SCIM, API keys, signup tokens. Shipped as
   `components/dialogs/-show-once-secret-dialog.tsx` — consumed by the OIDC
-  client detail's SecretsCard and the SCIM provider's attach flow.
-- [ ] Streaming consumer (`WatchNotifications`) — lands with Wave 5;
-  settles the D4 fallback clause.
+  client detail's SecretsCard, the SCIM provider's attach flow, the webhook
+  create/rotate dialogs, and the API key issue/renewal dialogs.
+- [x] Streaming consumer (`WatchNotifications`) — landed with Wave 5
+  (`hooks/use-notification-stream.ts`); settles the D4 fallback clause. A
+  generated Connect client proved server-streaming end to end
+  (`STREAM-OPEN → ping → notification`); reconnect uses exponential
+  backoff with jitter, events invalidate the unread count and the inbox
+  list. Raw-curl is the wrong probe — a half-closed request ends the
+  handler.
 - [ ] Public-settings hook (`usePublicSettings` over
   `SettingsService/ListPublic`) — lands with Wave 3 (the signup page);
   the deployment document and the product settings are separate surfaces.

@@ -1,8 +1,6 @@
 import { create } from '@bufbuild/protobuf'
-import { Activity } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { Button } from 'uilibs/components/base/button'
 import {
   Select,
   SelectContent,
@@ -16,25 +14,28 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
-import { AuditLogService, ListRequestSchema, type AuditLog } from '~/codegen/auditlog_pb'
+import { AuditLogService, ListRequestSchema } from '~/codegen/auditlog_pb'
+import { AccountFrame } from './-account-frame'
 
 /** The combined choices the sort control offers; the newest-first default sends nothing. */
 const SORT_CHOICES = [
@@ -83,8 +84,10 @@ export function AuditView({
   sortBy,
   sortOrder,
   onPageChange,
-  onSortChange
+  onSortChange,
+  embedded = false
 }: {
+  embedded?: boolean
   page?: number
   sortBy?: string
   sortOrder?: SortOrder
@@ -122,34 +125,11 @@ export function AuditView({
   }
 
   return (
-    <div
-      {...stylex.props(
-        pageStyles.container,
-        pageStyles.containerPadMedium,
-        pageStyles.containerPadLarge,
-        pageStyles.containerPadXLarge
-      )}
+    <AccountFrame
+      embedded={embedded}
+      title='Audit trail'
+      description='What happened to this account, newest first, as the record was written.'
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Audit trail
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            What happened to this account, newest first, as the record was written.
-          </Text>
-        </div>
-      </div>
-
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
           <CardHeader>
@@ -185,11 +165,39 @@ export function AuditView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((record) => (
-                  <AuditItem key={record.id} record={record} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>IP address</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell style={dataTableStyles.instant}>
+                        {formatInstant(record.createdAt)}
+                      </TableCell>
+                      <TableCell>{formatEvent(record.event)}</TableCell>
+                      <TableCell>
+                        {record.username ? record.username : '—'}
+                        {record.actorUsername ? ` · by ${record.actorUsername}` : ''}
+                      </TableCell>
+                      <TableCell>{record.ipAddress || '—'}</TableCell>
+                      <TableCell>
+                        {record.actionStatus === 'failed' ? (
+                          <Badge variant='destructive'>Failed</Badge>
+                        ) : (
+                          <Badge variant='secondary'>Success</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -197,63 +205,20 @@ export function AuditView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => turnPage(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => turnPage(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={turnPage}
+              />
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
-    </div>
-  )
-}
-
-function AuditItem({ record }: { record: AuditLog }) {
-  return (
-    <Item variant='outline'>
-      <ItemMedia variant='icon'>
-        <Activity {...stylex.props(styles.icon)} />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{formatEvent(record.event)}</ItemTitle>
-        <ItemDescription>
-          {record.username ? record.username : '—'}
-          {record.ipAddress ? ` · from ${record.ipAddress}` : ''}
-          {` · ${formatInstant(record.createdAt)}`}
-          {record.actorUsername ? ` · by ${record.actorUsername} (delegated)` : ''}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        {record.actionStatus === 'failed' ? (
-          <Badge variant='destructive'>Failed</Badge>
-        ) : (
-          <Badge variant='secondary'>Success</Badge>
-        )}
-      </ItemActions>
-    </Item>
+    </AccountFrame>
   )
 }
