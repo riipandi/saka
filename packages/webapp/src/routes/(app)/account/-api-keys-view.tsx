@@ -14,7 +14,15 @@ import {
 } from 'uilibs/components/base/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from 'uilibs/components/base/tooltip'
 import { Badge } from 'uilibs/components/extra/badge'
-import { Card, CardContent, CardFooter } from 'uilibs/components/extra/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import {
@@ -94,16 +102,7 @@ export function ApiKeysView({
   const revoke = useMutation(ApiKeyService.method.revokeAPIKey, { onSuccess: invalidate })
 
   return (
-    <AccountFrame
-      embedded={embedded}
-      title='Personal access tokens'
-      description='Machine credentials that act as this account. The raw key is shown once at creation and at renewal — only its hash is stored.'
-      actions={
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus size={16} /> New key
-        </Button>
-      }
-    >
+    <AccountFrame embedded={embedded}>
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
           <Spinner />
@@ -124,6 +123,18 @@ export function ApiKeysView({
         ) : (
           <>
             <Card>
+              <CardHeader>
+                <CardTitle>Personal access tokens</CardTitle>
+                <CardDescription>
+                  Machine credentials that act as this account. The raw key is shown once at
+                  creation and at renewal — only its hash is stored.
+                </CardDescription>
+                <CardAction>
+                  <Button onClick={() => setCreateOpen(true)}>
+                    <Plus size={16} /> New key
+                  </Button>
+                </CardAction>
+              </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>

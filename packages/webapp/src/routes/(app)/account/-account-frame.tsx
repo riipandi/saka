@@ -26,8 +26,8 @@ export function AccountFrame({
   children
 }: {
   embedded?: boolean
-  title: string
-  description: string
+  title?: string
+  description?: string
   actions?: ReactNode
   children: ReactNode
 }) {

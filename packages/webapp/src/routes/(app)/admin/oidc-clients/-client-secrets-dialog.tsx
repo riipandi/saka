@@ -16,6 +16,7 @@ import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/fiel
 import { Input } from 'uilibs/components/base/input'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { DateTimePicker } from '#/components/-date-time-picker'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { CreateOidcClientSecretRequestSchema, OidcClientService } from '~/codegen/federation_pb'
@@ -29,7 +30,7 @@ export function MintSecretDialog({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
-  const [expiresAt, setExpiresAt] = useState('')
+  const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined)
   const [custom, setCustom] = useState('')
   const [minted, setMinted] = useState<string | null>(null)
 
@@ -52,17 +53,13 @@ export function MintSecretDialog({ clientId }: { clientId: string }) {
     if (next) {
       setFailed(null)
       setMinted(null)
-      setExpiresAt('')
+      setExpiresAt(undefined)
       setCustom('')
     }
   }
 
   const submit = () => {
-    const when = expiresAt ? new Date(expiresAt) : undefined
-    if (when && Number.isNaN(when.getTime())) {
-      setFailed('The expiry is not a date the browser can read.')
-      return
-    }
+    const when = expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : undefined
     minting.mutate(
       create(CreateOidcClientSecretRequestSchema, {
         id: clientId,
@@ -88,12 +85,12 @@ export function MintSecretDialog({ clientId }: { clientId: string }) {
           </DialogHeader>
           <Field>
             <FieldLabel>Expires at</FieldLabel>
-            <Input
-              type='datetime-local'
+            <DateTimePicker
               value={expiresAt}
-              onChange={(event) => setExpiresAt(event.target.value)}
+              onChange={setExpiresAt}
+              ariaLabel='Expires at'
+              placeholder='Empty — the secret never expires'
             />
-            <FieldDescription>Empty — the secret never expires.</FieldDescription>
           </Field>
           <Field>
             <FieldLabel>Custom value</FieldLabel>

@@ -188,6 +188,9 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: ^6.1.1
       version: 6.1.1
+    date-fns:
+      specifier: ^4.4.0
+      version: 4.4.0
     oxc-transform-react:
       specifier: ^0.145.0
       version: 0.145.0
@@ -477,6 +480,9 @@ importers:
       cookie-es:
         specifier: ^3.1.1
         version: 3.1.1
+      date-fns:
+        specifier: 'catalog:'
+        version: 4.4.0
       ofetch:
         specifier: ^1.5.1
         version: 1.5.1

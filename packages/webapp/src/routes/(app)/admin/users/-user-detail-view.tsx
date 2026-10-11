@@ -40,6 +40,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { DateTimePicker } from '#/components/-date-time-picker'
 import { ListPagination } from '#/components/list-pagination'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
@@ -476,14 +477,14 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
   const [open, setOpen] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [expires, setExpires] = useState('')
+  const [expires, setExpires] = useState<Date | undefined>(undefined)
 
   const ban = useMutation(UserService.method.banUser, {
     onSuccess: () => {
       setOpen(false)
       setFailed(null)
       setReason('')
-      setExpires('')
+      setExpires(undefined)
       onSettled()
     },
     onError: (error) => setFailed(getErrorMessage(error))
@@ -491,9 +492,8 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
 
   const submit = () => {
     setFailed(null)
-    const parsed = expires ? new Date(expires) : null
-    const instant =
-      parsed && !Number.isNaN(parsed.getTime()) ? wireTimestamp(parsed.toISOString()) : undefined
+    const parsed = expires && !Number.isNaN(expires.getTime()) ? expires : null
+    const instant = parsed ? wireTimestamp(parsed.toISOString()) : undefined
     ban.mutate(
       create(BanUserRequestSchema, {
         reason: reason.trim(),
@@ -528,13 +528,13 @@ function BanDialog({ onSettled }: { onSettled: () => void }) {
         </Field>
         <Field id='ban-expiry'>
           <FieldLabel htmlFor='ban-expiry'>Expires at</FieldLabel>
-          <Input
-            id='ban-expiry'
-            type='datetime-local'
+          <DateTimePicker
             value={expires}
-            onChange={(event) => setExpires(event.target.value)}
+            onChange={setExpires}
+            id='ban-expiry'
+            ariaLabel='Expires at'
+            placeholder='Empty — the ban never lifts by itself'
           />
-          <FieldDescription>Empty means the ban never lifts by itself.</FieldDescription>
         </Field>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical' style={localStyles.error}>
