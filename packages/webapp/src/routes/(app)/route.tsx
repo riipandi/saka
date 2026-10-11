@@ -3,6 +3,7 @@ import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { ToastProvider, Toaster, toast } from 'uilibs/components/base/toast'
+import { TooltipProvider } from 'uilibs/components/base/tooltip'
 import { useIsMobile } from 'uilibs/hooks/use-media-query'
 import { useAuthUser } from '#/hooks/use-auth'
 import { useNotificationStream } from '#/hooks/use-notification-stream'
@@ -70,49 +71,51 @@ function RouteComponent() {
   }, [user, router])
 
   return (
-    <ToastProvider>
-      <main {...stylex.props(styles.layout)}>
-        {/* Mobile header — full width on mobile, hidden on desktop */}
-        <div {...stylex.props(styles.mobileHeader)}>
-          <button
-            type='button'
-            onClick={toggleSidebar}
-            {...stylex.props(styles.hamburger)}
-            aria-label='Toggle navigation'
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
-          <span {...stylex.props(styles.mobileHeaderTitle)}>Dashboard</span>
-          <div {...stylex.props(styles.headerActions)}>
-            <NotificationBell />
-            <UserMenu />
-          </div>
-        </div>
-
-        {/* Body row: sidebar + content */}
-        <div {...stylex.props(styles.body)}>
-          <div {...stylex.props(styles.sidebarWrapper, sidebarOpen && styles.sidebarOpen)}>
-            <SideNavbar
-              collapsed={!isMobile && collapsed}
-              onToggleCollapse={!isMobile ? toggleSidebarCollapsed : undefined}
-            />
-          </div>
-
-          {sidebarOpen && (
-            <div {...stylex.props(styles.backdrop)} onClick={toggleSidebar} aria-hidden />
-          )}
-
-          <div {...stylex.props(styles.contentArea)}>
-            <AdminBanner />
-            <div {...stylex.props(styles.bellRow)}>
+    <TooltipProvider>
+      <ToastProvider>
+        <main {...stylex.props(styles.layout)}>
+          {/* Mobile header — full width on mobile, hidden on desktop */}
+          <div {...stylex.props(styles.mobileHeader)}>
+            <button
+              type='button'
+              onClick={toggleSidebar}
+              {...stylex.props(styles.hamburger)}
+              aria-label='Toggle navigation'
+            >
+              <Menu size={20} strokeWidth={1.8} />
+            </button>
+            <span {...stylex.props(styles.mobileHeaderTitle)}>Dashboard</span>
+            <div {...stylex.props(styles.headerActions)}>
               <NotificationBell />
               <UserMenu />
             </div>
-            <Outlet />
           </div>
-        </div>
-        <Toaster />
-      </main>
-    </ToastProvider>
+
+          {/* Body row: sidebar + content */}
+          <div {...stylex.props(styles.body)}>
+            <div {...stylex.props(styles.sidebarWrapper, sidebarOpen && styles.sidebarOpen)}>
+              <SideNavbar
+                collapsed={!isMobile && collapsed}
+                onToggleCollapse={!isMobile ? toggleSidebarCollapsed : undefined}
+              />
+            </div>
+
+            {sidebarOpen && (
+              <div {...stylex.props(styles.backdrop)} onClick={toggleSidebar} aria-hidden />
+            )}
+
+            <div {...stylex.props(styles.contentArea)}>
+              <AdminBanner />
+              <div {...stylex.props(styles.bellRow)}>
+                <NotificationBell />
+                <UserMenu />
+              </div>
+              <Outlet />
+            </div>
+          </div>
+          <Toaster />
+        </main>
+      </ToastProvider>
+    </TooltipProvider>
   )
 }

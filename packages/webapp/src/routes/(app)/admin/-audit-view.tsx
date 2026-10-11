@@ -32,8 +32,9 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
+import { TimeValue } from '#/components/time-value'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
-import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles, facetStyles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -65,17 +66,6 @@ export function formatAuditEvent(event: string): string {
     profile_picture_reset: 'Profile picture reset'
   }
   return KNOWN[event] ?? event.replaceAll('_', ' ')
-}
-
-const instantFormat = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short'
-})
-
-function formatInstant(value: { seconds: bigint } | undefined): string {
-  if (!value) return '—'
-  const instant = new Date(Number(value.seconds) * 1000)
-  return Number.isNaN(instant.getTime()) ? '—' : instantFormat.format(instant)
 }
 
 /**
@@ -292,31 +282,13 @@ export function AdminAuditView({
           </CardContent>
           {summary && (summary.hasPrevious || summary.hasNext) ? (
             <CardFooter>
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => turnPage(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => turnPage(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={turnPage}
+              />
             </CardFooter>
           ) : null}
         </Card>
@@ -343,7 +315,9 @@ export function AuditTable({ records }: { records: AuditLog[] }) {
       <TableBody>
         {records.map((record) => (
           <TableRow key={record.id}>
-            <TableCell style={dataTableStyles.instant}>{formatInstant(record.createdAt)}</TableCell>
+            <TableCell>
+              <TimeValue value={record.createdAt} />
+            </TableCell>
             <TableCell>{formatAuditEvent(record.event)}</TableCell>
             <TableCell>
               {record.username ? record.username : '—'}

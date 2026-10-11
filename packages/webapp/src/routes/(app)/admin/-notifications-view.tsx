@@ -35,6 +35,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -179,29 +180,15 @@ export function NotificationsView() {
                     </Item>
                   ))}
                 </ItemGroup>
-                {summary !== null && summary.totalPages !== null && summary.totalPages > 1 && (
-                  <div {...stylex.props(styles.pager)}>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page <= 1}
-                      onClick={() => setPage(summary.page - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <Text variant='body-2' color='neutral-faded'>
-                      Page {summary.page} of {summary.totalPages}
-                    </Text>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page >= (summary.totalPages ?? 1)}
-                      onClick={() => setPage(summary.page + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
+                {summary !== null && (summary.hasPrevious || summary.hasNext) ? (
+                  <ListPagination
+                    page={summary.page}
+                    totalPages={summary.totalPages}
+                    hasPrevious={summary.hasPrevious}
+                    hasNext={summary.hasNext}
+                    onPageChange={setPage}
+                  />
+                ) : null}
               </>
             )}
           </CardContent>

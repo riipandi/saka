@@ -26,6 +26,12 @@ import {
   DialogTitle,
   DialogTrigger
 } from 'uilibs/components/base/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -55,6 +61,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import {
   LIST_MAX_LIMIT,
   listPageInput,
@@ -63,7 +70,6 @@ import {
 } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
-import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
   CreateUserGroupRequestSchema,
@@ -244,31 +250,13 @@ export function GroupsView({
           </CardContent>
           {summary && (summary.hasPrevious || summary.hasNext) ? (
             <CardFooter>
-              <div {...stylex.props(styles.pager)}>
-                <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(styles.toolbarActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
             </CardFooter>
           ) : null}
         </Card>
@@ -288,10 +276,20 @@ function GroupRow({ group }: { group: UserGroup }) {
         </ItemDescription>
       </ItemContent>
       <ItemActions>
-        <MembersDialog group={group} />
-        <ClientsDialog group={group} />
-        <GroupFormDialog mode='edit' group={group} />
-        <DeleteGroupDialog group={group} />
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+            Actions
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(group.id)}>
+              Copy ID
+            </DropdownMenuItem>
+            <MembersDialog group={group} />
+            <ClientsDialog group={group} />
+            <GroupFormDialog mode='edit' group={group} />
+            <DeleteGroupDialog group={group} />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </ItemActions>
     </Item>
   )

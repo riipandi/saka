@@ -1,11 +1,18 @@
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt'
 import type { Timestamp } from '@bufbuild/protobuf/wkt'
 import { createConnectQueryKey, useMutation } from '@connectrpc/connect-query'
-import { KeyRound, Plus } from '@keyline-icons/react'
+import { Plus } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from 'uilibs/components/base/tooltip'
 import { Badge } from 'uilibs/components/extra/badge'
 import { Card, CardContent, CardFooter } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
@@ -20,9 +27,10 @@ import {
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
+import { ListPagination } from '#/components/list-pagination'
+import { TimeValue } from '#/components/time-value'
 import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
 import { ApiKeyCreateDialog } from './-api-key-dialog'
@@ -30,14 +38,6 @@ import { ApiKeyCreateDialog } from './-api-key-dialog'
 /** The RFC 3339 instants the key view carries, read as the viewer's own
  * wall clock — a key list is recognized by when it lives, not by the zone
  * the server wrote. */
-const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
-
-function formatInstant(value?: Timestamp | null): string {
-  if (!value) return '—'
-  const instant = timestampDate(value)
-  return Number.isNaN(instant.getTime()) ? '—' : instantFormat.format(instant)
-}
-
 /** The key's one-line state: revoked dominates, then expired, then live. */
 function keyState(
   expiresAt?: Timestamp | null,
@@ -158,45 +158,62 @@ export function ApiKeysView({
                         <TableRow key={key.id}>
                           <TableCell>{key.name}</TableCell>
                           <TableCell>
-                            <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
+                            <Tooltip>
+                              <TooltipTrigger {...stylex.props(styles.mono)}>
+                                {key.prefix}…
+                              </TooltipTrigger>
+                              <TooltipContent>{key.id}</TooltipContent>
+                            </Tooltip>
                           </TableCell>
-                          <TableCell style={dataTableStyles.instant}>
-                            {formatInstant(key.createdAt)}
+                          <TableCell>
+                            <TimeValue value={key.createdAt} />
                           </TableCell>
-                          <TableCell style={dataTableStyles.instant}>
-                            {formatInstant(key.expiresAt)}
+                          <TableCell>
+                            <TimeValue value={key.expiresAt} />
                           </TableCell>
-                          <TableCell style={dataTableStyles.instant}>
-                            {key.lastUsedAt ? formatInstant(key.lastUsedAt) : 'Never'}
+                          <TableCell>
+                            {key.lastUsedAt ? <TimeValue value={key.lastUsedAt} /> : 'Never'}
                           </TableCell>
                           <TableCell>
                             <Badge color={state.color}>{state.word}</Badge>
                           </TableCell>
                           <TableCell>
-                            {expired && !key.revokedAt && (
-                              <Button
-                                variant='outline'
-                                size='sm'
-                                disabled={renew.isPending}
-                                onClick={() => {
-                                  const window = new Date()
-                                  window.setMonth(window.getMonth() + 3)
-                                  renew.mutate({ id: key.id, expiresAt: timestampFromDate(window) })
-                                }}
-                              >
-                                {renew.isPending ? <Spinner /> : <KeyRound size={14} />} Renew
-                              </Button>
-                            )}
-                            {!key.revokedAt && (
-                              <Button
-                                variant='outline'
-                                size='sm'
-                                disabled={revoke.isPending}
-                                onClick={() => revoke.mutate({ id: key.id })}
-                              >
-                                Revoke
-                              </Button>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+                                Actions
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align='end'>
+                                <DropdownMenuItem
+                                  onClick={() => void navigator.clipboard.writeText(key.id)}
+                                >
+                                  Copy ID
+                                </DropdownMenuItem>
+                                {expired && !key.revokedAt ? (
+                                  <DropdownMenuItem
+                                    disabled={renew.isPending}
+                                    onClick={() => {
+                                      const window = new Date()
+                                      window.setMonth(window.getMonth() + 3)
+                                      renew.mutate({
+                                        id: key.id,
+                                        expiresAt: timestampFromDate(window)
+                                      })
+                                    }}
+                                  >
+                                    Renew
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {!key.revokedAt ? (
+                                  <DropdownMenuItem
+                                    variant='destructive'
+                                    disabled={revoke.isPending}
+                                    onClick={() => revoke.mutate({ id: key.id })}
+                                  >
+                                    Revoke
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       )
@@ -206,27 +223,13 @@ export function ApiKeysView({
               </CardContent>
               {keys.summary !== null && (keys.summary.totalPages ?? 1) > 1 && (
                 <CardFooter>
-                  <div {...stylex.props(styles.pager)}>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={!keys.summary.hasPrevious}
-                      onClick={() => onPageChange(keys.summary!.page - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <Text variant='body-2' color='neutral-faded'>
-                      Page {keys.summary.page} of {keys.summary.totalPages ?? '—'}
-                    </Text>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={keys.summary.hasNext === false || keys.summary.hasNext === null}
-                      onClick={() => onPageChange(keys.summary!.page + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
+                  <ListPagination
+                    page={keys.summary.page}
+                    totalPages={keys.summary.totalPages}
+                    hasPrevious={keys.summary.hasPrevious}
+                    hasNext={keys.summary.hasNext}
+                    onPageChange={onPageChange}
+                  />
                 </CardFooter>
               )}
             </Card>

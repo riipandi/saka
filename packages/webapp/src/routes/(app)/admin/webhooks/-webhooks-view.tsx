@@ -18,6 +18,12 @@ import {
   AlertDialogTrigger
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
   Card,
@@ -38,6 +44,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -162,38 +169,41 @@ export function WebhooksView() {
                         <Badge color={webhook.enabled ? 'success' : 'neutral'}>
                           {webhook.enabled ? 'enabled' : 'disabled'}
                         </Badge>
-                        <DeleteButton
-                          name={webhook.name}
-                          pending={remove.isPending}
-                          onConfirm={() => remove.mutate({ id: webhook.id })}
-                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+                            Actions
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align='end'>
+                            <DropdownMenuItem
+                              render={<Link to='/admin/webhooks/$id' params={{ id: webhook.id }} />}
+                            >
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void navigator.clipboard.writeText(webhook.id)}
+                            >
+                              Copy ID
+                            </DropdownMenuItem>
+                            <DeleteButton
+                              name={webhook.name}
+                              pending={remove.isPending}
+                              onConfirm={() => remove.mutate({ id: webhook.id })}
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </ItemActions>
                     </Item>
                   ))}
                 </ItemGroup>
-                {summary !== null && summary.totalPages !== null && summary.totalPages > 1 && (
-                  <div {...stylex.props(styles.pager)}>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page <= 1}
-                      onClick={() => setPage(summary.page - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <Text variant='body-2' color='neutral-faded'>
-                      Page {summary.page} of {summary.totalPages}
-                    </Text>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page >= (summary.totalPages ?? 1)}
-                      onClick={() => setPage(summary.page + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
+                {summary !== null && (summary.hasPrevious || summary.hasNext) ? (
+                  <ListPagination
+                    page={summary.page}
+                    totalPages={summary.totalPages}
+                    hasPrevious={summary.hasPrevious}
+                    hasNext={summary.hasNext}
+                    onPageChange={setPage}
+                  />
+                ) : null}
               </>
             )}
           </CardContent>

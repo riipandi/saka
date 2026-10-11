@@ -1,6 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
-import { KeyRound, Lock, Plus, ShieldCheck } from '@keyline-icons/react'
+import { Lock, Plus, ShieldCheck } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
@@ -24,6 +24,12 @@ import {
   DialogHeader,
   DialogTitle
 } from 'uilibs/components/base/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from 'uilibs/components/base/dropdown-menu'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -54,6 +60,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -258,20 +265,34 @@ export function RolesView({
                       </ItemDescription>
                     </ItemContent>
                     <ItemActions>
-                      <Button variant='outline' size='sm' onClick={() => setPermissionsFor(role)}>
-                        <KeyRound size={14} />
-                        Permissions
-                      </Button>
-                      {role.type === RoleType.CUSTOM ? (
-                        <>
-                          <Button variant='outline' size='sm' onClick={() => setEditing(role)}>
-                            Edit
-                          </Button>
-                          <Button variant='outline' size='sm' onClick={() => setDeleting(role)}>
-                            Delete
-                          </Button>
-                        </>
-                      ) : null}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
+                          Actions
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end'>
+                          <DropdownMenuItem onClick={() => setPermissionsFor(role)}>
+                            Permissions
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => void navigator.clipboard.writeText(role.id)}
+                          >
+                            Copy ID
+                          </DropdownMenuItem>
+                          {role.type === RoleType.CUSTOM ? (
+                            <DropdownMenuItem onClick={() => setEditing(role)}>
+                              Edit
+                            </DropdownMenuItem>
+                          ) : null}
+                          {role.type === RoleType.CUSTOM ? (
+                            <DropdownMenuItem
+                              variant='destructive'
+                              onClick={() => setDeleting(role)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </ItemActions>
                   </Item>
                 ))}
@@ -285,31 +306,13 @@ export function RolesView({
             ) : null}
 
             {summary && (summary.hasPrevious || summary.hasNext) ? (
-              <div {...stylex.props(localStyles.pager)}>
-                <Text variant='body-2' color='neutral-faded'>
-                  {summary.totalItems === null
-                    ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                    : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-                </Text>
-                <div {...stylex.props(localStyles.pagerActions)}>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={!summary.hasPrevious}
-                    onClick={() => onPageChange?.(summary.page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={summary.hasNext === false}
-                    onClick={() => onPageChange?.(summary.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                page={summary.page}
+                totalPages={summary.totalPages}
+                hasPrevious={summary.hasPrevious}
+                hasNext={summary.hasNext}
+                onPageChange={(next) => onPageChange?.(next)}
+              />
             ) : null}
           </CardContent>
         </Card>

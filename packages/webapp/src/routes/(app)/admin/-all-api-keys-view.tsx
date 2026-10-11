@@ -2,7 +2,7 @@ import { timestampDate } from '@bufbuild/protobuf/wkt'
 import type { Timestamp } from '@bufbuild/protobuf/wkt'
 import { useQuery } from '@connectrpc/connect-query'
 import * as stylex from '@stylexjs/stylex'
-import { Button } from 'uilibs/components/base/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from 'uilibs/components/base/tooltip'
 import { Badge } from 'uilibs/components/extra/badge'
 import { Card, CardContent, CardFooter } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
@@ -16,6 +16,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { dataTableStyles } from '#/styles/element/data-table.stylex'
@@ -143,7 +144,12 @@ export function AllApiKeysView({
                         <TableRow key={key.id}>
                           <TableCell>{key.name}</TableCell>
                           <TableCell>
-                            <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
+                            <Tooltip>
+                              <TooltipTrigger {...stylex.props(styles.mono)}>
+                                {key.prefix}…
+                              </TooltipTrigger>
+                              <TooltipContent>{key.id}</TooltipContent>
+                            </Tooltip>
                           </TableCell>
                           <TableCell>
                             <OwnerName ownerId={key.ownerId} />
@@ -167,35 +173,17 @@ export function AllApiKeysView({
                   </TableBody>
                 </Table>
               </CardContent>
-              {(() => {
-                const summary = keys.summary
-                if (summary === null || (summary.totalPages ?? 1) <= 1) return null
-                return (
-                  <CardFooter>
-                    <div {...stylex.props(styles.pager)}>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={!summary.hasPrevious}
-                        onClick={() => onPageChange(summary.page - 1)}
-                      >
-                        Previous
-                      </Button>
-                      <Text variant='body-2' color='neutral-faded'>
-                        Page {summary.page} of {summary.totalPages ?? '—'}
-                      </Text>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={summary.hasNext === false}
-                        onClick={() => onPageChange(summary.page + 1)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </CardFooter>
-                )
-              })()}
+              {keys.summary && (keys.summary.hasPrevious || keys.summary.hasNext) ? (
+                <CardFooter>
+                  <ListPagination
+                    page={keys.summary.page}
+                    totalPages={keys.summary.totalPages}
+                    hasPrevious={keys.summary.hasPrevious}
+                    hasNext={keys.summary.hasNext}
+                    onPageChange={onPageChange}
+                  />
+                </CardFooter>
+              ) : null}
             </Card>
           </>
         )}
