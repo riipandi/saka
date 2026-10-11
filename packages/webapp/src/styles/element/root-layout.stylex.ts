@@ -97,8 +97,17 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    gap: unit.x2,
     paddingTop: unit.x2,
     paddingRight: unit.x4,
-    paddingLeft: unit.x4
+    paddingLeft: unit.x4,
+    [breakpoints.small]: {
+      display: 'none'
+    }
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: unit.x1
   }
 })

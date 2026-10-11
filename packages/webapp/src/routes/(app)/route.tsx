@@ -2,9 +2,10 @@ import { Menu } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { ToastProvider, Toaster } from 'uilibs/components/base/toast'
+import { ToastProvider, Toaster, toast } from 'uilibs/components/base/toast'
 import { useIsMobile } from 'uilibs/hooks/use-media-query'
 import { useAuthUser } from '#/hooks/use-auth'
+import { useNotificationStream } from '#/hooks/use-notification-stream'
 import { closeSidebar, useSidebarOpen, useSidebarCollapsed } from '#/libraries/app.store'
 import { toggleSidebar, toggleSidebarCollapsed } from '#/libraries/app.store'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
@@ -13,6 +14,7 @@ import { styles } from '#/styles/element/root-layout.stylex'
 import { AdminBanner } from './-admin-banner'
 import { NotificationBell } from './-notification-bell'
 import { SideNavbar } from './-sidebar'
+import { UserMenu } from './-user-menu'
 
 export const Route = createFileRoute('/(app)')({
   component: RouteComponent,
@@ -39,6 +41,14 @@ function RouteComponent() {
   const sidebarOpen = useSidebarOpen()
   const collapsed = useSidebarCollapsed()
   const isMobile = useIsMobile()
+
+  // One live tail for the shell. The bell renders twice (mobile header
+  // and desktop bar); mounting the stream there would open two sockets.
+  useNotificationStream(true, (notification) => {
+    toast(notification.title, {
+      description: notification.body === '' ? undefined : notification.body
+    })
+  })
 
   // Close sidebar on route change (mobile). `onResolved` fires after every
   // navigation; closing an already-closed sidebar is a no-op state write.
@@ -73,7 +83,10 @@ function RouteComponent() {
             <Menu size={20} strokeWidth={1.8} />
           </button>
           <span {...stylex.props(styles.mobileHeaderTitle)}>Dashboard</span>
-          <NotificationBell />
+          <div {...stylex.props(styles.headerActions)}>
+            <NotificationBell />
+            <UserMenu />
+          </div>
         </div>
 
         {/* Body row: sidebar + content */}
@@ -92,8 +105,8 @@ function RouteComponent() {
           <div {...stylex.props(styles.contentArea)}>
             <AdminBanner />
             <div {...stylex.props(styles.bellRow)}>
-              <div />
               <NotificationBell />
+              <UserMenu />
             </div>
             <Outlet />
           </div>

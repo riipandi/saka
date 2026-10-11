@@ -1,24 +1,17 @@
 import {
   BadgeCheck,
-  Bell,
   Blocks,
   Braces,
   History,
   Globe,
   KeyRound,
-  LaptopSmartphone,
   Layers,
   LayoutDashboard,
-  Link2,
   Megaphone,
-  AppWindow,
   Plug,
   SquareAsterisk,
   Lock,
-  Mail,
-  Power,
   Settings,
-  ShieldCheck,
   ShieldOff,
   Users
 } from '@keyline-icons/react'
@@ -27,33 +20,25 @@ import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // the selected item reads filled where its idle siblings stay outlined.
 import {
   BadgeCheck as BadgeCheckTwoTone,
-  Bell as BellTwoTone,
   Blocks as BlocksTwoTone,
   Braces as BracesTwoTone,
   History as HistoryTwoTone,
   Globe as GlobeTwoTone,
   KeyRound as KeyRoundTwoTone,
-  LaptopSmartphone as LaptopSmartphoneTwoTone,
   Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
-  Link2 as Link2TwoTone,
   Megaphone as MegaphoneTwoTone,
-  AppWindow as AppWindowTwoTone,
   Plug as PlugTwoTone,
   SquareAsterisk as SquareAsteriskTwoTone,
   Lock as LockTwoTone,
-  Mail as MailTwoTone,
   Settings as SettingsTwoTone,
-  ShieldCheck as ShieldCheckTwoTone,
   ShieldOff as ShieldOffTwoTone,
   Users as UsersTwoTone
 } from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
-import { useState } from 'react'
-import { ThemeSwitcher } from 'uilibs/theme'
-import { useAuthentication } from '#/hooks/use-auth'
+import { Fragment, useState } from 'react'
 import { usePermissions } from '#/libraries/guard/use-permissions'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
@@ -73,155 +58,139 @@ const navItems: NavItem[] = [
   }
 ]
 
-const secondaryItems: NavItem[] = [
-  { icon: Settings, activeIcon: SettingsTwoTone, label: 'Settings', href: '/settings' },
-  {
-    icon: LaptopSmartphone,
-    activeIcon: LaptopSmartphoneTwoTone,
-    label: 'Sessions',
-    href: '/account/sessions'
-  },
-  { icon: Mail, activeIcon: MailTwoTone, label: 'Email', href: '/account/email' },
-  {
-    icon: Bell,
-    activeIcon: BellTwoTone,
-    label: 'Notifications',
-    href: '/account/notifications'
-  },
-  {
-    icon: ShieldCheck,
-    activeIcon: ShieldCheckTwoTone,
-    label: 'Security',
-    href: '/account/security'
-  },
-  {
-    icon: Link2,
-    activeIcon: Link2TwoTone,
-    label: 'Connected accounts',
-    href: '/account/connections'
-  },
-  {
-    icon: AppWindow,
-    activeIcon: AppWindowTwoTone,
-    label: 'Authorized apps',
-    href: '/account/authorized-apps'
-  },
-  {
-    icon: KeyRound,
-    activeIcon: KeyRoundTwoTone,
-    label: 'API keys',
-    href: '/account/api-keys'
-  },
-  { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
-]
+interface AdminNavItem extends NavItem {
+  permission?: string
+  adminOnly?: boolean
+}
 
 /**
- * The Administration section. Each item carries the catalog slug its page
- * consumes (`internal/authz/catalog.go`) and hides individually — the
- * section header renders only when at least one item survives its gate.
- * `adminOnly` marks the surfaces the guard serves by role (the guard's
- * `Rule: Admin`) rather than by a catalog slug: the webhook surface has
- * no `webhook` resource in the catalog, so a slug gate would hide the
- * section from the only callers the backend admits.
+ * Administration, split by the job the page does. Each item carries the
+ * catalog slug its page consumes (`internal/authz/catalog.go`) and hides
+ * individually — a group label renders only when at least one item
+ * survives its gate. `adminOnly` marks the surfaces the guard serves by
+ * role (the guard's `Rule: Admin`) rather than by a catalog slug: the
+ * webhook and platform API-key surfaces have no catalog resource, so a
+ * slug gate would hide them from the only callers the backend admits.
+ * Account routes are not here; the header user menu owns them.
  */
-const adminItems: Array<NavItem & { permission?: string; adminOnly?: boolean }> = [
+const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
   {
-    icon: Users,
-    activeIcon: UsersTwoTone,
-    label: 'Users',
-    href: '/admin/users',
-    permission: 'user:*:list'
+    label: 'Identity & Access',
+    items: [
+      {
+        icon: Users,
+        activeIcon: UsersTwoTone,
+        label: 'Users',
+        href: '/admin/users',
+        permission: 'user:*:list'
+      },
+      {
+        icon: Layers,
+        activeIcon: LayersTwoTone,
+        label: 'Groups',
+        href: '/admin/groups',
+        permission: 'user_group:*:list'
+      },
+      {
+        icon: BadgeCheck,
+        activeIcon: BadgeCheckTwoTone,
+        label: 'Roles',
+        href: '/admin/roles',
+        permission: 'role:*:list'
+      },
+      {
+        icon: Lock,
+        activeIcon: LockTwoTone,
+        label: 'Consents',
+        href: '/admin/consents',
+        permission: 'oidc_consent:*:list'
+      }
+    ]
   },
   {
-    icon: Layers,
-    activeIcon: LayersTwoTone,
-    label: 'Groups',
-    href: '/admin/groups',
-    permission: 'user_group:*:list'
+    label: 'Security & Governance',
+    items: [
+      {
+        icon: History,
+        activeIcon: HistoryTwoTone,
+        label: 'Audit trail',
+        href: '/admin/audit',
+        permission: 'audit_log:*:list'
+      },
+      {
+        icon: ShieldOff,
+        activeIcon: ShieldOffTwoTone,
+        label: 'Blocklist',
+        href: '/admin/blocklist',
+        permission: 'blocklist:*:list'
+      },
+      {
+        icon: KeyRound,
+        activeIcon: KeyRoundTwoTone,
+        label: 'Signup tokens',
+        href: '/admin/signup-tokens',
+        permission: 'signup_token:*:list'
+      }
+    ]
   },
   {
-    icon: KeyRound,
-    activeIcon: KeyRoundTwoTone,
-    label: 'Signup tokens',
-    href: '/admin/signup-tokens',
-    permission: 'signup_token:*:list'
+    label: 'Developer & Integrations',
+    items: [
+      {
+        icon: Blocks,
+        activeIcon: BlocksTwoTone,
+        label: 'OIDC clients',
+        href: '/admin/oidc-clients',
+        permission: 'oidc_client:*:list'
+      },
+      {
+        icon: Plug,
+        activeIcon: PlugTwoTone,
+        label: 'Webhooks',
+        href: '/admin/webhooks',
+        adminOnly: true
+      },
+      {
+        icon: SquareAsterisk,
+        activeIcon: SquareAsteriskTwoTone,
+        label: 'API keys',
+        href: '/admin/api-keys',
+        adminOnly: true
+      },
+      {
+        icon: Braces,
+        activeIcon: BracesTwoTone,
+        label: 'Custom claims',
+        href: '/admin/claims',
+        permission: 'custom_claim:*:list'
+      },
+      {
+        icon: Globe,
+        activeIcon: GlobeTwoTone,
+        label: 'OAuth providers',
+        href: '/admin/oauth-providers',
+        permission: 'oauth_connection:*:list'
+      }
+    ]
   },
   {
-    icon: ShieldOff,
-    activeIcon: ShieldOffTwoTone,
-    label: 'Blocklist',
-    href: '/admin/blocklist',
-    permission: 'blocklist:*:list'
-  },
-  {
-    icon: History,
-    activeIcon: HistoryTwoTone,
-    label: 'Audit trail',
-    href: '/admin/audit',
-    permission: 'audit_log:*:list'
-  },
-  {
-    icon: Blocks,
-    activeIcon: BlocksTwoTone,
-    label: 'OIDC clients',
-    href: '/admin/oidc-clients',
-    permission: 'oidc_client:*:list'
-  },
-  {
-    icon: Megaphone,
-    activeIcon: MegaphoneTwoTone,
-    label: 'Notifications',
-    href: '/admin/notifications',
-    permission: 'notification:*:list'
-  },
-  {
-    icon: Settings,
-    activeIcon: SettingsTwoTone,
-    label: 'Platform settings',
-    href: '/admin/settings',
-    permission: 'setting:*:read'
-  },
-  {
-    icon: Globe,
-    activeIcon: GlobeTwoTone,
-    label: 'OAuth providers',
-    href: '/admin/oauth-providers',
-    permission: 'oauth_connection:*:list'
-  },
-  {
-    icon: Plug,
-    activeIcon: PlugTwoTone,
-    label: 'Webhooks',
-    href: '/admin/webhooks',
-    adminOnly: true
-  },
-  {
-    icon: SquareAsterisk,
-    activeIcon: SquareAsteriskTwoTone,
-    label: 'API keys',
-    href: '/admin/api-keys',
-    adminOnly: true
-  },
-  {
-    icon: Braces,
-    activeIcon: BracesTwoTone,
-    label: 'Custom claims',
-    href: '/admin/claims',
-    permission: 'custom_claim:*:list'
-  },
-  {
-    icon: Lock,
-    activeIcon: LockTwoTone,
-    label: 'Consents',
-    href: '/admin/consents',
-    permission: 'oidc_consent:*:list'
-  },
-  {
-    icon: BadgeCheck,
-    activeIcon: BadgeCheckTwoTone,
-    label: 'Roles',
-    href: '/admin/roles',
-    permission: 'role:*:list'
+    label: 'Platform',
+    items: [
+      {
+        icon: Settings,
+        activeIcon: SettingsTwoTone,
+        label: 'Settings',
+        href: '/admin/settings',
+        permission: 'setting:*:read'
+      },
+      {
+        icon: Megaphone,
+        activeIcon: MegaphoneTwoTone,
+        label: 'Notifications',
+        href: '/admin/notifications',
+        permission: 'notification:*:list'
+      }
+    ]
   }
 ]
 
@@ -244,9 +213,19 @@ interface SideNavbarProps {
   onToggleCollapse?: () => void
 }
 
+function admits(
+  item: AdminNavItem,
+  can: (permission: string) => boolean,
+  isAdministrator: boolean
+) {
+  return (
+    (item.adminOnly === true && isAdministrator) ||
+    (item.permission !== undefined && can(item.permission))
+  )
+}
+
 export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const { logout } = useAuthentication()
   const { can, isAdministrator } = usePermissions()
   const [headerHover, setHeaderHover] = useState(false)
 
@@ -273,12 +252,6 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         </Link>
       )
     })
-
-  const visibleAdminItems = adminItems.filter(
-    (item) =>
-      (item.adminOnly === true && isAdministrator) ||
-      (item.permission !== undefined && can(item.permission))
-  )
 
   return (
     <nav
@@ -343,54 +316,18 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
       <div
         {...stylex.props(sidebarStyles.navContent, collapsed && sidebarStyles.navContentCollapsed)}
       >
-        {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Main</p>}
         {renderNavItems(navItems)}
-        {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
-        {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Account</p>}
-        {renderNavItems(secondaryItems)}
-        {visibleAdminItems.length > 0 && (
-          <>
-            {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
-            {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Administration</p>}
-            {renderNavItems(visibleAdminItems)}
-          </>
-        )}
-      </div>
-
-      {/* Bottom: sign out + theme switcher */}
-      <div
-        {...stylex.props(
-          sidebarStyles.bottomSection,
-          collapsed && sidebarStyles.bottomSectionCollapsed
-        )}
-      >
-        <div
-          {...stylex.props(sidebarStyles.bottomRow, collapsed && sidebarStyles.bottomRowCollapsed)}
-        >
-          <button
-            type='button'
-            onClick={logout}
-            aria-label='Sign Out'
-            title={collapsed ? 'Sign Out' : undefined}
-            {...stylex.props(
-              sidebarStyles.navItem,
-              collapsed && sidebarStyles.navItemCollapsed,
-              sidebarStyles.signOutButton,
-              !collapsed && sidebarStyles.signOutButtonExpanded
-            )}
-          >
-            <Power {...stylex.props(sidebarStyles.navIcon)} />
-            {!collapsed && <span {...stylex.props(sidebarStyles.navLabel)}>Sign Out</span>}
-          </button>
-          <div
-            {...stylex.props(
-              sidebarStyles.switcherBox,
-              collapsed && sidebarStyles.switcherBoxCollapsed
-            )}
-          >
-            <ThemeSwitcher />
-          </div>
-        </div>
+        {adminGroups.map((group) => {
+          const items = group.items.filter((item) => admits(item, can, isAdministrator))
+          if (items.length === 0) return null
+          return (
+            <Fragment key={group.label}>
+              {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
+              {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>{group.label}</p>}
+              {renderNavItems(items)}
+            </Fragment>
+          )
+        })}
       </div>
     </nav>
   )
