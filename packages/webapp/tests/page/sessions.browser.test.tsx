@@ -86,6 +86,12 @@ function wrapperWith(transport: ReturnType<typeof createRouterTransport>, childr
             continueSignIn: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            stopImpersonation: async () => {
+              throw new Error('the impersonation banner is not part of this page test')
+            },
+            impersonateUser: async () => {
+              throw new Error('impersonation is not part of this page test')
+            },
             logout: () => {}
           }}
         >
@@ -161,6 +167,12 @@ async function renderSessions(handlers?: SessionHandlers) {
             },
             exchangeOneTimeToken: async () => {
               throw new Error('sign in is not part of this page test')
+            },
+            stopImpersonation: async () => {
+              throw new Error('the impersonation banner is not part of this page test')
+            },
+            impersonateUser: async () => {
+              throw new Error('impersonation is not part of this page test')
             },
             logout
           }}

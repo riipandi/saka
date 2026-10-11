@@ -188,6 +188,12 @@ async function renderSecurity(
             exchangeOneTimeToken: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            stopImpersonation: async () => {
+              throw new Error('the impersonation banner is not part of this page test')
+            },
+            impersonateUser: async () => {
+              throw new Error('impersonation is not part of this page test')
+            },
             logout: () => {}
           }}
         >

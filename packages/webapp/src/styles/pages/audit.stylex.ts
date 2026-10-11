@@ -25,3 +25,25 @@ export const styles = stylex.create({
     flexShrink: 0
   }
 })
+
+/** The console's facet row: the two selects and the search input that sit
+ * above the records (the account page reads no filters). */
+export const facetStyles = stylex.create({
+  row: {
+    alignItems: 'center',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: unit.x2,
+    marginBottom: unit.x4
+  },
+  event: {
+    width: '11rem'
+  },
+  user: {
+    width: '13rem'
+  },
+  search: {
+    flex: '1 1 14rem',
+    minWidth: '12rem'
+  }
+})

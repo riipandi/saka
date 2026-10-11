@@ -75,4 +75,41 @@ describe('access claims decoder', () => {
       'group:grp_9:create'
     ])
   })
+
+  it('reads the actor pair off a delegated token — the impersonation signal', () => {
+    const token = jwtWithClaims({
+      roles: ['editor'],
+      permissions: [],
+      actor_id: 'usr_veteri',
+      actor_username: 'veteri'
+    })
+
+    const claims = decodeAccessClaims(token)
+    expect(claims.actorId).toBe('usr_veteri')
+    expect(claims.actorUsername).toBe('veteri')
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('answers no actor pair for an ordinary session (the omit contract)', () => {
+    const token = jwtWithClaims({
+      roles: ['editor'],
+      permissions: ['user:*:read']
+    })
+
+    const claims = decodeAccessClaims(token)
+    expect(claims.actorId).toBeUndefined()
+    expect(claims.actorUsername).toBeUndefined()
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps the actor pair when the claims name nothing else', () => {
+    // A delegation whose target holds no grants: the actor pair alone is
+    // still the impersonation signal.
+    const token = jwtWithClaims({ actor_id: 'usr_veteri' })
+
+    const claims = decodeAccessClaims(token)
+    expect(claims.roles).toEqual([])
+    expect(claims.actorId).toBe('usr_veteri')
+    expect(claims.actorUsername).toBeUndefined()
+  })
 })

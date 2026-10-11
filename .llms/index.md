@@ -50,16 +50,17 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — the four profiles rehearse green; the hosted submission run is the owner's (runbook in the handover) |
 | `plan-20261009_0025.md` | Frontend foundation: the cookies library, the backend-driven configuration layer, the shared auth-aware fetch, Connect-Query — the decisions list (D1–D10) is the binding record for the webapp's data layer |
 | `plan-20261009_0142.md` | OAuth SSO: one store for every provider, the enabled-provider listing, the SPA flow — the decisions list (D1–D9) is the binding record for the sign-in-with-a-provider surface |
-| `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — **awaiting approval** |
-| `plan-20261010_0925.md` | Wave 1.6: frontend observability — the browser tracer, seam/navigation/worker spans, redaction, the public collector field (D1–D8) |
-| `plan-20261010_1830.md` | Wave 2: sign-in completeness — the MFA challenge & enrollment fork, passkey sign-in/management, password recovery, one-time access, the shared step-up machinery (D1–D8; the one-time access delta is recorded in the phase-6 note) |
+| `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — shipped |
+| `plan-20261010_0925.md` | Wave 1.6: frontend observability — the browser tracer, seam/navigation/worker spans, redaction, the public collector field (D1–D8) — shipped |
+| `plan-20261010_1830.md` | Wave 2: sign-in completeness — the MFA challenge & enrollment fork, passkey sign-in/management, password recovery, one-time access, the shared step-up machinery (D1–D8; the one-time access delta is recorded in the phase-6 note) — shipped |
+| `plan-20261011_1545.md` | Wave 3: the admin console core — shell & guard, impersonation banner, user center, groups/blocklist/signup tokens, the public signup page, the audit console, the authorization screens (D1–D9) — shipped |
 
 ## Handovers (`.llms/handover/`)
 
 Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
 few matter — each summarizes its session and what stayed open; anything still
 true is folded into the core documents above. Newest:
-`handover-20261011_1025.md`.
+`handover-20261011_1750.md`.
 
 ## Audits (`.llms/audit/`)
 
@@ -74,8 +75,8 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 ## Product docs (`docs/`)
 
 For humans, not agents: `api-endpoint.md`, `api-response.md`,
-`product-guide.md`, `oauth-sso.md`, `oidc.md`, `oidc-profiles.md`,
-`deployment.md`. The rule `AGENTS.md`
+`product-guide.md`, `users.md`, `auth.md`, `oauth-sso.md`, `oidc.md`,
+`oidc-profiles.md`, `deployment.md`. The rule `AGENTS.md`
 carries: no technical references here — internals, engine paths, and agent
 context belong in `.llms/`; keep the orientation on the human reader. Keep
 aligned when a shipped surface changes.

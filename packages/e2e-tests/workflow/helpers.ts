@@ -8,13 +8,14 @@ import { expect, type APIRequestContext } from '@playwright/test'
 
 const identity = process.env.E2E_IDENTITY || 'admin'
 const adminPassword = process.env.E2E_PASSWORD || '@dmin123'
+export const ADMIN_IDENTITY = identity
 export const MAILPIT = process.env.E2E_MAILPIT || 'http://127.0.0.1:8025/api/v1'
 
-/** A 1×1 transparent PNG — the bytes the picture upload needs to carry. */
-export const PNG_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64'
-)
+/** A 1×1 transparent PNG — the bytes the picture upload needs to carry. */ export const PNG_BYTES =
+  Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64'
+  )
 
 /** Sign in over the wire and answer the Bearer the procedures judge. */
 export async function adminToken(request: APIRequestContext): Promise<string> {
@@ -134,7 +135,8 @@ export async function closeSignInContexts(): Promise<void> {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** Whether the parsed JSON is an object the readers can index. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 

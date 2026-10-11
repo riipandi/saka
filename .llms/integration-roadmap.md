@@ -463,32 +463,36 @@ goal, three deltas from its shape:
 
 ### Wave 3 — the admin console core
 
-- [ ] **Admin shell & route guard** — the admin layout, the route-level
-  guard (profile's administrator status today; `AuthorizationService`-backed
-  permission checks when D10's frontend half lands), impersonation banner
-  + `StopImpersonating`.
-- [ ] **Users** — `ListUsers`/`GetUser`/`CreateUser`/`UpdateUser`/
+- [x] **Admin shell & route guard** — the admin layout, the route-level
+  guard (claims snapshot in `beforeLoad`; redirect to `/overview?notice=admin`
+  — no 403 page), impersonation banner + `StopImpersonating`.
+- [x] **Users** — `ListUsers`/`GetUser`/`CreateUser`/`UpdateUser`/
   `DeleteUser`, `BanUser`/`UnbanUser`/`UnlockUser`,
   `AdminResetUserPassword`, the admin passkey roll
   (`AdminListCredentials`/`AdminUpdateCredential`/`AdminDeleteCredential`),
   `AdminDisableMfa`, `ImpersonateUser`. The pagination hook generalizes.
-- [ ] **Groups, blocklist, signup** — `UserGroupService` (members and
-  allowed-clients replaces), `BlocklistService`, the signup-token CRUD and
-  the public signup page. The signup page's shape is decided by the
+- [x] **Groups, blocklist, signup** — `UserGroupService` (members and
+  allowed-clients replaces), `BlocklistService` (with its catalog
+  resource), the signup-token CRUD (show-once `raw_token`), and the public
+  signup page. The signup page's shape is decided by the
   **public settings**, not the configuration document: `access.mode`
   (open vs invite), the allowlist toggle, and the form-field toggles
   (email/username/password, verification-at-signup) are all `Public: true`
   catalog items served by `SettingsService/ListPublic` — the foundation
   plan deferred that surface to "the phase that needs it", and this is
-  the phase: it lands the `usePublicSettings` hook beside `useAppConfig`
+  the phase: it landed the `usePublicSettings` hook beside `useAppConfig`
   (a different document, a different cache entry).
-- [ ] **Audit (admin)** — `ListAll`, `ListForUser`, `FilterOptions` facets.
-- [ ] **Authorization** — the `AuthorizationService` screens (roles, permissions,
-  per-user grants) built **on the Wave 1.5 foundation**: the screens consume the claims
-  store and the `can()` engine; permission-aware UI guards (route sections and nav items
-  judged by the catalog slugs) land here as the foundation's first real consumers. The
-  claims snapshot only refreshes at sign-in/renewal — the screens' writes note that the
-  caller's own grants move at the next token, not in place.
+- [x] **Audit (admin)** — `ListAll`, `FilterOptions` facets (event and
+  account selects, term search), `ListForUser` as the user detail's
+  activity card.
+- [x] **Authorization** — the `AuthorizationService` screens (roles with
+  the permission tree, per-user grants) built **on the Wave 1.5
+  foundation**: the screens consume the claims store and the `can()`
+  engine; permission-aware UI guards (route sections, nav items, and the
+  mutating action triggers judged by the catalog slugs) landed as the
+  foundation's first real consumers. The claims snapshot only refreshes
+  at sign-in/renewal — the screens' writes note that the caller's own
+  grants move at the next token, not in place.
 
 ### Wave 4 — federation administration
 
@@ -906,35 +910,29 @@ been — release runs exclude it in the Playwright config).
   mapping; a dedicated wire file waits for the Wave 4 `UnlinkConnection` consumer
   that gives it a second guarded procedure to pair.
 
-### Wave 3 — the admin console core
+### Wave 3 — the admin console core (shipped subset, 2026-10-11)
 
-Files: `workflow/admin-shell.test.ts`, `workflow/admin-users.test.ts`,
-`workflow/admin-groups.test.ts`, `workflow/admin-audit.test.ts`,
-`workflow/admin-roles.test.ts`, `workflow/signup.test.ts`.
+Files: `workflow/admin-console.test.ts`, `workflow/signup.test.ts` — the two
+the wave's plan named; the rest of the rows below stay browser/unit-covered
+until a phase names them.
 
-- Shell & impersonation — happy: the administrator reaches the admin screens; the
-  impersonation banner names the borrowed account; `StopImpersonating` returns the
-  actor's own session. Unhappy: a non-administrator is refused at the guard; an
-  impersonated caller's self-service procedure answers the refusal the guard carries
-  (the delegated caller cannot delete the account it wears).
-- Users — happy: create with groups, update, ban (the ban ends the target's live
-  sessions in the same act — assert the target's second context dies), unban,
-  unlock-after-lockout; the admin passkey roll renames and removes. Unhappy: deleting
-  the signed-in account refuses; banning another administrator is refused at the
-  impersonation line; `AdminResetUserPassword` reports the states
-  (`unknown`/`banned`/`no address`) distinctly.
-- Groups, blocklist, signup — happy: a group's member replace and allowed-clients roll
-  persist; the public signup page (open mode from the public settings) creates the
-  account and joins the token's groups. Unhappy: a blocklisted address is refused at
-  signup (and the block-email-subaddresses rule holds); an invite-mode deployment
-  refuses a tokenless signup; an unknown signup token refuses; a duplicate group name
-  answers `already_exists`.
-- Audit (admin) — happy: `ListAll` filters by event and user; `FilterOptions` feeds the
-  facets. Unhappy: a search with no matches renders the empty state, not an error.
-- Authorization — happy: a role is created, granted catalog slugs, assigned; the
-  assignee's fresh sign-in carries the permission (assert the UI gate flips). Unhappy:
-  a slug outside the catalog refuses; a system role refuses update/delete; deleting a
-  role accounts still hold refuses.
+- Admin console (shipped in the file) — the guard's refusal for a non-admin
+  (the redirect lands on `/overview?notice=admin` with the notice showing);
+  the impersonation round trip driven through the real screens (the banner
+  names the borrowed account, `StopImpersonating` returns the actor's own
+  URL); a ban ends the target's live session (asserted on the wire: the
+  session's renewal refuses after the ban — the access token dies on its own
+  TTL, so the renewal is the honest probe).
+- Signup (shipped in the file) — an invited signup through the form joins the
+  token's groups (read back over the admin wire); invite mode refuses a
+  tokenless submit at the form (no call leaves); a blocklisted address
+  refuses with `sign-up is not available`, verbatim on the form; a duplicate
+  account answers `account already exists` (bulk enumeration mode).
+- Users / groups / audit / roles — the browser suites own the CRUD and the
+  refusals (`admin-users`, `admin-catalog`, `admin-audit`, `admin-roles`);
+  the remaining E2E rows (groups persist, the role grant flipping a fresh
+  sign-in's gates, `AdminResetUserPassword`'s states over the wire) wait for
+  a phase that names them.
 
 ### Wave 4 — federation administration
 

@@ -1,22 +1,32 @@
 import {
+  BadgeCheck,
   History,
+  KeyRound,
   LaptopSmartphone,
+  Layers,
   LayoutDashboard,
   Mail,
   Power,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  ShieldOff,
+  Users
 } from '@keyline-icons/react'
 import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // The two-tone variant paints the accent the stroke set only outlines, so
 // the selected item reads filled where its idle siblings stay outlined.
 import {
+  BadgeCheck as BadgeCheckTwoTone,
   History as HistoryTwoTone,
+  KeyRound as KeyRoundTwoTone,
   LaptopSmartphone as LaptopSmartphoneTwoTone,
+  Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
-  ShieldCheck as ShieldCheckTwoTone
+  ShieldCheck as ShieldCheckTwoTone,
+  ShieldOff as ShieldOffTwoTone,
+  Users as UsersTwoTone
 } from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
@@ -24,6 +34,7 @@ import type { LinkProps } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ThemeSwitcher } from 'uilibs/theme'
 import { useAuthentication } from '#/hooks/use-auth'
+import { usePermissions } from '#/libraries/guard/use-permissions'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
 interface NavItem {
@@ -60,6 +71,56 @@ const secondaryItems: NavItem[] = [
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
 
+/**
+ * The Administration section. Each item carries the catalog slug its page
+ * consumes (`internal/authz/catalog.go`) and hides individually — the
+ * section header renders only when at least one item survives its gate.
+ */
+const adminItems: Array<NavItem & { permission: string }> = [
+  {
+    icon: Users,
+    activeIcon: UsersTwoTone,
+    label: 'Users',
+    href: '/admin/users',
+    permission: 'user:*:list'
+  },
+  {
+    icon: Layers,
+    activeIcon: LayersTwoTone,
+    label: 'Groups',
+    href: '/admin/groups',
+    permission: 'user_group:*:list'
+  },
+  {
+    icon: KeyRound,
+    activeIcon: KeyRoundTwoTone,
+    label: 'Signup tokens',
+    href: '/admin/signup-tokens',
+    permission: 'signup_token:*:list'
+  },
+  {
+    icon: ShieldOff,
+    activeIcon: ShieldOffTwoTone,
+    label: 'Blocklist',
+    href: '/admin/blocklist',
+    permission: 'blocklist:*:list'
+  },
+  {
+    icon: History,
+    activeIcon: HistoryTwoTone,
+    label: 'Audit trail',
+    href: '/admin/audit',
+    permission: 'audit_log:*:list'
+  },
+  {
+    icon: BadgeCheck,
+    activeIcon: BadgeCheckTwoTone,
+    label: 'Roles',
+    href: '/admin/roles',
+    permission: 'role:*:list'
+  }
+]
+
 function LogoMark() {
   return (
     <svg
@@ -82,6 +143,7 @@ interface SideNavbarProps {
 export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { logout } = useAuthentication()
+  const { can } = usePermissions()
   const [headerHover, setHeaderHover] = useState(false)
 
   const isActive = (href: LinkProps['to']) =>
@@ -107,6 +169,8 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         </Link>
       )
     })
+
+  const visibleAdminItems = adminItems.filter((item) => can(item.permission))
 
   return (
     <nav
@@ -176,6 +240,13 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
         {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Account</p>}
         {renderNavItems(secondaryItems)}
+        {visibleAdminItems.length > 0 && (
+          <>
+            {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
+            {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>Administration</p>}
+            {renderNavItems(visibleAdminItems)}
+          </>
+        )}
       </div>
 
       {/* Bottom: sign out + theme switcher */}

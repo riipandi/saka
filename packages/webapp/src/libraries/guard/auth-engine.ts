@@ -7,21 +7,25 @@ import { AuthService, GetSessionRequestSchema, RefreshRequestSchema } from '~/co
 import {
   CompleteSignInRequestSchema,
   ContinueOAuthSignInRequestSchema,
+  ImpersonateUserRequestSchema,
   MultifactorService,
   OAuthSSOService,
   PasskeyFactorSchema,
   SessionService,
   SignInRequestSchema,
-  SignOutRequestSchema
+  SignOutRequestSchema,
+  StopImpersonatingRequestSchema
 } from '~/codegen/authn_pb'
 import type {
   AuthenticatedUser,
   CompleteSignInResponse,
   ContinueOAuthSignInResponse,
   GetSessionResponse,
+  ImpersonateUserResponse,
   RefreshResponse,
   SignInRequest,
-  SignInResponse
+  SignInResponse,
+  StopImpersonatingResponse
 } from '~/codegen/authn_pb'
 import {
   ExchangeOneTimeAccessTokenRequestSchema,
@@ -194,6 +198,24 @@ export interface AuthEngineApi {
     deviceToken?: string,
     hints?: TraceHints
   ): Promise<SignInOutcome>
+  /**
+   * End the delegation the access token names: the backend mints the
+   * administrator's own fresh pair (the shape a sign-in answers with), the
+   * delegated session dies server-side, and the answer rides the same
+   * custody path a sign-in completion does. A caller that is not
+   * impersonating has no delegation to end — the backend refuses, and the
+   * caller owns that word.
+   */
+  stopImpersonation(hints?: TraceHints): Promise<AuthSession>
+  /**
+   * Begin a delegation onto the named account: the backend opens a new
+   * session on the target (its own one-hour window), mints a pair whose
+   * subject is the target and whose actor pair names this caller, and the
+   * answer rides the same custody path a sign-in completion does. An
+   * administrator target answers `permission_denied` without confirming the
+   * role; an unknown target answers the ordinary `not_found`.
+   */
+  impersonate(userId: string, reason: string, hints?: TraceHints): Promise<AuthSession>
   /** Silent refresh — single-flight. Resolves `true` when a session is established. */
   refresh(hints?: TraceHints): Promise<boolean>
   /** Refresh only when the access token expires within `withinMs`. Resolves `true` when still valid. */
@@ -330,7 +352,7 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       void api.refresh()
     }, delay)
   }
-  /** Take custody of a fresh pair from the sign-in completes, ContinueSignIn, or Refresh. */
+  /** Take custody of a fresh pair from the sign-in completes, ContinueSignIn, Refresh, or StopImpersonating. */
   function takeTokenPair(
     response:
       | SignInResponse
@@ -339,6 +361,8 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | CompleteSignInResponse
       | VerifyLoginResponse
       | ExchangeOneTimeAccessTokenResponse
+      | StopImpersonatingResponse
+      | ImpersonateUserResponse
   ): TokenBundle {
     const next: TokenBundle = {
       accessToken: response.accessToken,
@@ -364,6 +388,8 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
       | CompleteSignInResponse
       | VerifyLoginResponse
       | ExchangeOneTimeAccessTokenResponse
+      | StopImpersonatingResponse
+      | ImpersonateUserResponse
   ): AuthSession {
     if (!response.user) {
       throw new ConnectError('Sign-in answered without an account.', Code.Internal)
@@ -514,6 +540,33 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
         return fork
       }
       return { kind: 'signed-in', session: finishSignIn(response) }
+    },
+
+    async stopImpersonation(hints) {
+      // The stop mints the administrator's own session — a new custody, so
+      // an in-flight refresh of the delegation must not land after it.
+      sessionEpoch++
+      clearTimer()
+      const response = await session.stopImpersonating(create(StopImpersonatingRequestSchema), {
+        // The presented token names the delegation that ends; without a pair
+        // the call goes anonymous and the backend answers the refusal word.
+        headers: withHints(tokens ? { authorization: `Bearer ${tokens.accessToken}` } : {}, hints)
+      })
+      return finishSignIn(response)
+    },
+
+    async impersonate(userId, reason, hints) {
+      // The delegation is a new session on the target — a new custody, so an
+      // in-flight refresh of the caller's own session must not land after it.
+      sessionEpoch++
+      clearTimer()
+      const response = await session.impersonateUser(
+        create(ImpersonateUserRequestSchema, { user: userId, reason }),
+        {
+          headers: withHints(tokens ? { authorization: `Bearer ${tokens.accessToken}` } : {}, hints)
+        }
+      )
+      return finishSignIn(response)
     },
 
     refresh(hints) {

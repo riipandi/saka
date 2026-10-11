@@ -494,4 +494,36 @@ describe('auth engine', () => {
     expect(readTokenCookies()?.refreshToken).toBe('refresh-r')
     expect(readUserCookie()).toEqual(userJson)
   })
+
+  it('ends the delegation: StopImpersonating answers the actor own fresh pair', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+    await engine.login({ identity: 'rlangdon', password: 'sophie' })
+
+    // The delegation's pair is in custody; the stop presents it and takes
+    // the administrator's own session in the same breath.
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const session = await engine.stopImpersonation()
+
+    expect(session.user).toEqual(userJson)
+    expect(session.tokens.sessionId).toBe(tokenJson.sessionId)
+    const stopCall = fetchMock.mock.calls.findLast?.((call) =>
+      stringUrl(call[0]).includes('StopImpersonating')
+    )
+    expect(stringUrl(stopCall?.[0])).toContain('/saka.authn.v1.SessionService/StopImpersonating')
+    expect(headerOf(stopCall, 'authorization')).toBe(`Bearer ${tokenJson.accessToken}`)
+    await expect(engine.accessToken()).resolves.toBe(tokenJson.accessToken)
+  })
+
+  it('goes anonymous on the stop when no pair is held — the backend owns the refusal', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(signInJson))
+    const engine = createAuthEngine('http://test.local')
+
+    await engine.stopImpersonation()
+
+    const stopCall = fetchMock.mock.calls.findLast?.((call) =>
+      stringUrl(call[0]).includes('StopImpersonating')
+    )
+    expect(headerOf(stopCall, 'authorization')).toBeNull()
+  })
 })
