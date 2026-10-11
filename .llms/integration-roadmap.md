@@ -496,18 +496,22 @@ goal, three deltas from its shape:
 
 ### Wave 4 — federation administration
 
-- [ ] **OIDC clients** — CRUD, secrets (show-once patterns), logo upload,
+- [x] **OIDC clients** — CRUD, secrets (show-once patterns), logo upload,
   allowed groups, `PreviewClient`, `RefreshClient`; the four parked
-  `TODO(frontend)` items land here.
-- [ ] **Custom claims & SCIM** — `CustomClaimService` (user + group claims,
+  `TODO(frontend)` items land here. (commit `24597c35`)
+- [x] **Custom claims & SCIM** — `CustomClaimService` (user + group claims,
   the reserved-key refusal surfaced as form validation),
-  `ScimProviderService`.
-- [ ] **OAuth SSO admin** — the connection CRUD (builtin vs custom kinds),
+  `ScimProviderService` — one provider per client, the token shown once,
+  sync with its counts. (commit `a2f727c4`)
+- [x] **OAuth SSO admin** — the connection CRUD (builtin vs custom kinds),
   and the account-side linked-connections page (`ListLinkedConnections`,
   `UnlinkConnection` behind the wave-2 step-up, `GetLinkedAccountTokens`).
-- [ ] **Consent surfaces** — the user's authorized clients
+  (commits `37557428`, `b3b01ef0`)
+- [x] **Consent surfaces** — the user's authorized clients
   (`ListMyAuthorizedClients`, `RevokeMyAuthorizedClient`,
-  `ListMyClients`) and the admin ledger views.
+  `ListMyClients`) and the admin ledger views. (`ListMyClients` is not
+  on either screen — no SPA surface asks "which clients may I authorize";
+  recorded delta.) (commit `147dbe47`)
 
 ### Wave 5 — platform administration
 
@@ -561,8 +565,10 @@ goal, three deltas from its shape:
 - [ ] Admin route guard + admin shell + impersonation banner — guard prototype with
   Wave 1.5 (consumes `isAdministrator`), the shell lands with Wave 3; permissions gate
   it when D10's screens land.
-- [ ] Show-once secret presentation pattern — lands with Wave 4 (OIDC
-  secrets); reused by webhooks, SCIM, API keys, signup tokens.
+- [x] Show-once secret presentation pattern — lands with Wave 4 (OIDC
+  secrets); reused by webhooks, SCIM, API keys, signup tokens. Shipped as
+  `components/dialogs/-show-once-secret-dialog.tsx` — consumed by the OIDC
+  client detail's SecretsCard and the SCIM provider's attach flow.
 - [ ] Streaming consumer (`WatchNotifications`) — lands with Wave 5;
   settles the D4 fallback clause.
 - [ ] Public-settings hook (`usePublicSettings` over
@@ -601,9 +607,9 @@ updated in the file it lives in, never only in this snapshot.
    saka procedure, and the three real ones (`ForgotPassword`,
    `ResetPassword`, `AdminResetUserPassword`) have no requests at all:
    Wave 2's recovery work has no collection coverage (ISS-002).
-4. **`GetLinkedAccountTokens` has no Yaak request** — shipped, guarded,
-   documented, but the collection omits it; the Wave 4 linked-connections
-   page lacks its checklist row (ISS-003).
+4. **`GetLinkedAccountTokens` has no Yaak request** — resolved in Wave 4
+   phase 4: the request landed as `api/specs/yaak.rq_dKm3tVp8Zq.yaml`
+   beside the linked-connections page (ISS-003 closed).
 5. **The streaming clause is still armed** — `WatchNotifications` is the
    only server-streaming procedure, and the `ofetch.raw` body-read defect
    that bit the SSO plan's probe (plan-20261009_0142, phase 2) is exactly
@@ -726,10 +732,12 @@ routes/
       sessions.tsx               # session center (Wave 1)
       -sessions-view.tsx         #   the implementation
       -sessions-dialog.tsx       #   the bulk sign-out confirmations
-      email.tsx                  # verification & change status (Wave 1)
       security.tsx               # passkeys + MFA + password management + step-up (Wave 2)
       audit.tsx                  # own audit trail (Wave 1)
-      connections.tsx            # linked OAuth + authorized clients (Wave 4)
+      connections.tsx            # linked OAuth accounts + provider tokens (Wave 4)
+      -connections-view.tsx      #   the implementation; unlink rides the step-up
+      authorized-apps.tsx        # the account's consent ledger (Wave 4)
+      -authorized-apps-view.tsx  #   the implementation; withdraw kills the grants
       api-keys.tsx               # self-service keys (Wave 5)
       notifications.tsx          # inbox + WatchNotifications (Wave 5)
     admin/
@@ -744,13 +752,13 @@ routes/
       signup-tokens.tsx          # (Wave 3)
       audit.tsx                  # ListAll + FilterOptions (Wave 3)
       roles.tsx                  # AuthorizationService screens (Wave 3)
+      claims.tsx                 # custom claims on accounts and groups (Wave 4)
       consents.tsx               # admin consent ledger (Wave 4)
-      oidc/
+      oidc-clients/
         index.tsx                # client list (Wave 4)
-        $id.tsx                  # detail: secrets, logo, groups, preview (Wave 4)
-      oauth.tsx                  # SSO connections CRUD (Wave 4)
-      claims.tsx                 # custom claims (Wave 4)
-      scim.tsx                   # providers (Wave 4)
+        new.tsx                  # client creation (Wave 4)
+        $id.tsx                  # detail: secrets, SCIM, logo, groups, preview (Wave 4)
+      oauth-providers.tsx        # OAuth SSO connections CRUD (Wave 4)
       notifications.tsx          # admin publish/cancel (Wave 5)
       webhooks/
         index.tsx                # endpoints (Wave 5)

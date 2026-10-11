@@ -62,21 +62,27 @@ deployment.
 ## Connecting an application
 
 An administrator registers the application first: its identifier, its
-callback URLs, and the credentials it authenticates with. Registration is a
-management-API operation; the endpoints live under `/oidc/`, and the
-machine-readable metadata at `/.well-known/openid-configuration` describes
-everything a client library needs — endpoints, algorithms, scopes, and
-claims. Most platforms' standard OIDC libraries work with no custom code.
+callback URLs, and the credentials it authenticates with. Registration
+happens on the admin console's OIDC clients screen — create the client,
+mint its secret (shown once, replaced as rows afterwards), upload a logo,
+and restrict which groups may authorize it if it should not serve every
+account. The machine-readable metadata at `/.well-known/openid-configuration`
+describes everything a client library needs — endpoints, algorithms,
+scopes, and claims. Most platforms' standard OIDC libraries work with no
+custom code.
 
 ## Extra claims for a client
 
 Beyond the standard profile claims, an administrator can attach **custom
 claims** to a user or a group — a value of the deployment's choosing
 (an employee ID, a department, a tier) that the client's tokens and
-userinfo answers carry. Claim keys are suggested from a catalog the
-deployment knows, listed per subject, and replaced or removed as rows —
-and a preview procedure shows exactly which claims a given user would
-receive before anything is committed.
+userinfo answers carry. The admin console's custom claims screen keeps
+the ledger: claim keys are suggested from a catalog the deployment knows,
+listed per subject, and replaced or removed as rows — and the client's
+preview shows exactly which claims a given user would receive before
+anything is committed. Users can see and withdraw an app's access on
+their account's authorized-apps screen; withdrawing kills the app's live
+access immediately.
 
 ## Conformance
 

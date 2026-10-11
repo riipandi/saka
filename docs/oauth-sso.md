@@ -41,7 +41,12 @@ Three kinds of provider can be connected:
     connection alone.
 
 Provider secrets are stored encrypted and are never returned after the
-fact — a connection's secret can be replaced, not read back.
+fact — a connection's secret can be replaced, not read back. The admin
+console's OAuth providers screen keeps the registry: add a provider (with
+the defaults filled in for Google and GitHub, or a discovery URL or manual
+endpoints for a custom one), rewrite its display name and scopes, switch
+it off without deleting it, and remove it entirely — removing a provider
+takes every account identity linked through it with it.
 
 ### Mapping what the provider says to who the user is
 
@@ -86,11 +91,13 @@ multi-factor enabled, the OAuth sign-in pauses at the same second-factor
 step a password sign-in would — approving the sign-in is what opens the
 session, and the provider login alone never does.
 
-**After the first sign-in.** The user sees their linked providers and
-can remove one — provided they would not be locked out: the last
-remaining way in (another provider, a password, a passkey) cannot be
-unlinked. Removing a provider requires proving the current session
-(step-up) and, if the account has multi-factor, that factor too.
+**After the first sign-in.** The user sees their linked providers on the
+account's connected-accounts screen and can remove one — provided they
+would not be locked out: the last remaining way in (another provider, a
+password, a passkey) cannot be unlinked. Removing a provider requires
+proving the current session (step-up) and, if the account has
+multi-factor, that factor too. The same screen can show the provider
+tokens the account holds.
 
 **Provider tokens are kept for the user's future use** (calling the
 provider's API on their behalf). They are stored encrypted, they rotate
