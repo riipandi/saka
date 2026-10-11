@@ -196,6 +196,13 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
         label: 'Task queues',
         href: '/admin/ops/queue',
         adminOnly: true
+      },
+      {
+        icon: History,
+        activeIcon: HistoryTwoTone,
+        label: 'Scheduler',
+        href: '/admin/ops/scheduler',
+        adminOnly: true
       }
     ]
   }
