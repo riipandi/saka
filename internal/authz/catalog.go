@@ -60,6 +60,31 @@ var resources = []authz.Resource{
 		Description: "the sign-up blocklist",
 	},
 	{
+		Name:        "oidc_client",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "a federated OIDC client",
+	},
+	{
+		Name:        "custom_claim",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "a custom claim on an account or group",
+	},
+	{
+		Name:        "scim_provider",
+		Actions:     []string{"read", "list", "create", "update", "delete", "sync"},
+		Description: "an outbound SCIM provisioning target",
+	},
+	{
+		Name:        "oauth_connection",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "an external sign-in provider the deployment trusts",
+	},
+	{
+		Name:        "oidc_consent",
+		Actions:     []string{"read", "list"},
+		Description: "an account's consent grant to a relying party",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",

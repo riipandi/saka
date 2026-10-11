@@ -13,11 +13,13 @@ flowchart LR
 
 ## How it attaches
 
-Provisioning is configured **per OpenID client**: one provider row names
+Provisioning is configured **per OpenID client**: on the client's detail
+screen in the admin console, the SCIM card attaches the provider row —
 the remote base URL and the bearer token the sync presents. The token is
 stored encrypted and shown exactly once — after that it can be replaced,
-not read. When a client stops provisioning, its row is removed; the
-accounts it pushed are untouched.
+not read. The card also runs a manual sync pass (the counts answer in
+place) and detaches the provider. When a client stops provisioning, its
+row is removed; the accounts it pushed are untouched.
 
 ## When it runs
 

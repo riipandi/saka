@@ -1,10 +1,16 @@
 import {
   BadgeCheck,
+  Blocks,
+  Braces,
   History,
+  Globe,
   KeyRound,
   LaptopSmartphone,
   Layers,
   LayoutDashboard,
+  Link2,
+  AppWindow,
+  Lock,
   Mail,
   Power,
   Settings,
@@ -17,11 +23,17 @@ import { PanelLeft, PanelRight } from '@keyline-icons/react'
 // the selected item reads filled where its idle siblings stay outlined.
 import {
   BadgeCheck as BadgeCheckTwoTone,
+  Blocks as BlocksTwoTone,
+  Braces as BracesTwoTone,
   History as HistoryTwoTone,
+  Globe as GlobeTwoTone,
   KeyRound as KeyRoundTwoTone,
   LaptopSmartphone as LaptopSmartphoneTwoTone,
   Layers as LayersTwoTone,
   LayoutDashboard as LayoutDashboardTwoTone,
+  Link2 as Link2TwoTone,
+  AppWindow as AppWindowTwoTone,
+  Lock as LockTwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
   ShieldCheck as ShieldCheckTwoTone,
@@ -68,6 +80,18 @@ const secondaryItems: NavItem[] = [
     label: 'Security',
     href: '/account/security'
   },
+  {
+    icon: Link2,
+    activeIcon: Link2TwoTone,
+    label: 'Connected accounts',
+    href: '/account/connections'
+  },
+  {
+    icon: AppWindow,
+    activeIcon: AppWindowTwoTone,
+    label: 'Authorized apps',
+    href: '/account/authorized-apps'
+  },
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
 
@@ -111,6 +135,34 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'Audit trail',
     href: '/admin/audit',
     permission: 'audit_log:*:list'
+  },
+  {
+    icon: Blocks,
+    activeIcon: BlocksTwoTone,
+    label: 'OIDC clients',
+    href: '/admin/oidc-clients',
+    permission: 'oidc_client:*:list'
+  },
+  {
+    icon: Globe,
+    activeIcon: GlobeTwoTone,
+    label: 'OAuth providers',
+    href: '/admin/oauth-providers',
+    permission: 'oauth_connection:*:list'
+  },
+  {
+    icon: Braces,
+    activeIcon: BracesTwoTone,
+    label: 'Custom claims',
+    href: '/admin/claims',
+    permission: 'custom_claim:*:list'
+  },
+  {
+    icon: Lock,
+    activeIcon: LockTwoTone,
+    label: 'Consents',
+    href: '/admin/consents',
+    permission: 'oidc_consent:*:list'
   },
   {
     icon: BadgeCheck,
