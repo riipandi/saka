@@ -13,6 +13,7 @@ import {
   Megaphone,
   AppWindow,
   Plug,
+  SquareAsterisk,
   Lock,
   Mail,
   Power,
@@ -39,6 +40,7 @@ import {
   Megaphone as MegaphoneTwoTone,
   AppWindow as AppWindowTwoTone,
   Plug as PlugTwoTone,
+  SquareAsterisk as SquareAsteriskTwoTone,
   Lock as LockTwoTone,
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
@@ -103,6 +105,12 @@ const secondaryItems: NavItem[] = [
     activeIcon: AppWindowTwoTone,
     label: 'Authorized apps',
     href: '/account/authorized-apps'
+  },
+  {
+    icon: KeyRound,
+    activeIcon: KeyRoundTwoTone,
+    label: 'API keys',
+    href: '/account/api-keys'
   },
   { icon: History, activeIcon: HistoryTwoTone, label: 'Audit', href: '/account/audit' }
 ]
@@ -185,6 +193,13 @@ const adminItems: Array<NavItem & { permission?: string; adminOnly?: boolean }> 
     activeIcon: PlugTwoTone,
     label: 'Webhooks',
     href: '/admin/webhooks',
+    adminOnly: true
+  },
+  {
+    icon: SquareAsterisk,
+    activeIcon: SquareAsteriskTwoTone,
+    label: 'API keys',
+    href: '/admin/api-keys',
     adminOnly: true
   },
   {
