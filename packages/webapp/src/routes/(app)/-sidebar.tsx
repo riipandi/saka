@@ -9,6 +9,7 @@ import {
   Power,
   Settings,
   ShieldCheck,
+  ShieldOff,
   Users
 } from '@keyline-icons/react'
 import { PanelLeft, PanelRight } from '@keyline-icons/react'
@@ -24,6 +25,7 @@ import {
   Mail as MailTwoTone,
   Settings as SettingsTwoTone,
   ShieldCheck as ShieldCheckTwoTone,
+  ShieldOff as ShieldOffTwoTone,
   Users as UsersTwoTone
 } from '@keyline-icons/react/two-tone'
 import * as stylex from '@stylexjs/stylex'
@@ -95,6 +97,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'Signup tokens',
     href: '/admin/signup-tokens',
     permission: 'signup_token:*:list'
+  },
+  {
+    icon: ShieldOff,
+    activeIcon: ShieldOffTwoTone,
+    label: 'Blocklist',
+    href: '/admin/blocklist',
+    permission: 'blocklist:*:list'
   },
   {
     icon: History,

@@ -55,6 +55,11 @@ var resources = []authz.Resource{
 		Description: "a signup token",
 	},
 	{
+		Name:        "blocklist",
+		Actions:     []string{"list", "create", "delete"},
+		Description: "the sign-up blocklist",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",
