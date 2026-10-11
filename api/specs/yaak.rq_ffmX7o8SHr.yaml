@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_ffmX7o8SHr
 createdAt: 2026-10-02T23:38:24.413104
-updatedAt: 2026-10-02T23:45:55.008991
+updatedAt: 2026-10-11T21:45:11.058309
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_TofiUEyN5c
 authentication: {}
@@ -12,7 +12,7 @@ bodyType: null
 description: 'The hop the provider returns the browser with: the code and the state ride the query, the flow row is consumed by a guarded update that binds the resolved identity and mints the flow token, and the answer is a 302 to the SPA route carrying ?flow_token= (or ?error= with one of the feature''s own words: unknown_flow, provider_error, internal_error). The code and the state are the provider''s values — paste them from the authorize redirect, never hand-written. Guard: public.'
 headers: []
 method: GET
-name: '[Saka] OAuth provider callback (REST)'
+name: '[Saka] OAuth provider callback'
 sortPriority: 912.2
 url: ${[ apiBaseURL ]}/oauth/google/callback?code=&state=
 urlParameters: []
