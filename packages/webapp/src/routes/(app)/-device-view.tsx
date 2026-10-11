@@ -37,11 +37,12 @@ import {
 
 const CODE_LENGTH = 8
 
-/** `12345678` renders as `1234-5678`; a typed hyphen folds away — the
- * server's normalization accepts either shape, the display keeps one. */
-function formatCode(raw: string): string {
-  const digits = raw.replaceAll('-', '').slice(0, CODE_LENGTH)
-  return digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits
+/** The field's alphabet is the server's user-code charset — letters and
+ * digits, no punctuation. The OTP field's numeric default would reject
+ * every code at the keystroke. The display hyphen is the wire's job
+ * (`user_code` answers `XXXX-XXXX`); the field's own state stays bare. */
+function bareCode(raw: string): string {
+  return raw.replaceAll('-', '').toUpperCase().slice(0, CODE_LENGTH)
 }
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
@@ -73,7 +74,7 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
 
   const deviceRpc = useMemo(() => createClient(DeviceApprovalService, transport), [transport])
 
-  const [code, setCode] = useState(() => formatCode(initialCode ?? ''))
+  const [code, setCode] = useState(() => bareCode(initialCode ?? ''))
   const [inspection, setInspection] = useState<InspectDeviceLoginResponse | null>(null)
   const [inspecting, setInspecting] = useState(false)
   const [deciding, setDeciding] = useState<'approve' | 'deny' | null>(null)
@@ -85,7 +86,7 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
   // not-found surface covers that too.
   useEffect(() => {
     if (!initialCode) return
-    const normalized = formatCode(initialCode)
+    const normalized = bareCode(initialCode)
     if (normalized.length !== CODE_LENGTH) return
     void runInspect(normalized)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the inspection is a one-shot on the deep link's code
@@ -146,7 +147,7 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
       .finally(() => setDeciding(null))
   }
 
-  const ready = code.replaceAll('-', '').length === CODE_LENGTH
+  const ready = code.length === CODE_LENGTH
 
   return (
     <div
@@ -190,13 +191,14 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
               <div {...stylex.props(styles.inputStack)}>
                 <OTPField
                   length={CODE_LENGTH}
-                  value={code.replaceAll('-', '')}
+                  value={code}
                   onValueChange={(value) => {
-                    setCode(formatCode(value))
+                    setCode(bareCode(value))
                     setNotFound(false)
                     setInspection(null)
                     setError(null)
                   }}
+                  validationType='alphanumeric'
                   disabled={inspecting || deciding !== null}
                 >
                   <OTPFieldGroup>

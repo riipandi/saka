@@ -4,7 +4,7 @@ import { DeviceApprovalView } from './-device-view'
 export const Route = createFileRoute('/(app)/device')({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>) => ({
-    code: typeof search.code === 'string' ? search.code : undefined
+    user_code: typeof search.user_code === 'string' ? search.user_code : undefined
   }),
   staticData: {
     pageTitle: 'Device approval'
@@ -13,5 +13,5 @@ export const Route = createFileRoute('/(app)/device')({
 
 function RouteComponent() {
   const search = Route.useSearch()
-  return <DeviceApprovalView initialCode={search.code} />
+  return <DeviceApprovalView initialCode={search.user_code} />
 }
