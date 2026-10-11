@@ -548,8 +548,10 @@ goal, three deltas from its shape:
   E2E client tool lives at `tools/e2e-device-login`.
 - [ ] **Ops console** — the queue half ships at `/admin/ops/queue`
   (queues overview, pending table, dead archive, task drawer, cancel /
-  replay / flush with confirmation); the scheduler half waits on its
-  phase.
+  replay / flush with confirmation); the scheduler half ships at
+  `/admin/ops/scheduler` (registered jobs, next-due state badges, and
+  the run-now trigger that starts a tick early without moving the
+  schedule).
 - [ ] **Storage** — blocked on the endpoint-reference gap (see
   `issue-20261009_2356.md`); plan it only after the shipped storage
   surface is inventoried and the tus/REST split is on the reference's
