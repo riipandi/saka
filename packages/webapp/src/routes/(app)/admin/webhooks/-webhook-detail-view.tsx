@@ -13,6 +13,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
@@ -30,6 +31,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { WebhookService } from '~/codegen/webhook_pb'
 
@@ -203,7 +205,7 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
                     {(deliveries.data?.deliveries ?? []).map((delivery) => (
                       <TableRow key={delivery.id}>
                         <TableCell>{delivery.event}</TableCell>
-                        <TableCell>
+                        <TableCell style={dataTableStyles.instant}>
                           {formatInstant(delivery.createdAt)}
                           {delivery.deliveredAt
                             ? ` · delivered ${formatInstant(delivery.deliveredAt)}`
@@ -240,37 +242,41 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
                     ))}
                   </TableBody>
                 </Table>
-                {(() => {
-                  const summary = decodeListMetadata(deliveries.data?.metadata)
-                  return summary !== null &&
-                    summary.totalPages !== null &&
-                    summary.totalPages > 1 ? (
-                    <div {...stylex.props(styles.pager)}>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={summary.page <= 1}
-                        onClick={() => setPage(summary.page - 1)}
-                      >
-                        Previous
-                      </Button>
-                      <Text variant='body-2' color='neutral-faded'>
-                        Page {summary.page} of {summary.totalPages}
-                      </Text>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={summary.page >= (summary.totalPages ?? 1)}
-                        onClick={() => setPage(summary.page + 1)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  ) : null
-                })()}
               </>
             )}
           </CardContent>
+          {deliveries.isSuccess &&
+            (() => {
+              const summary = decodeListMetadata(deliveries.data?.metadata)
+              if (summary === null || summary.totalPages === null || summary.totalPages <= 1) {
+                return null
+              }
+              return (
+                <CardFooter>
+                  <div {...stylex.props(styles.pager)}>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={summary.page <= 1}
+                      onClick={() => setPage(summary.page - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Text variant='body-2' color='neutral-faded'>
+                      Page {summary.page} of {summary.totalPages}
+                    </Text>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={summary.page >= (summary.totalPages ?? 1)}
+                      onClick={() => setPage(summary.page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </CardFooter>
+              )
+            })()}
         </Card>
       </div>
 
@@ -316,8 +322,8 @@ const styles = stylex.create({
   pager: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 12,
-    marginTop: 16
+    width: '100%'
   }
 })

@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Badge } from 'uilibs/components/extra/badge'
+import { Card, CardContent, CardFooter } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import {
@@ -21,6 +22,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
 import { ApiKeyCreateDialog } from './-api-key-dialog'
@@ -134,90 +136,100 @@ export function ApiKeysView({
           </Empty>
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key prefix</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Last used</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(keys.data?.apiKeys ?? []).map((key) => {
-                  const state = keyState(key.expiresAt, key.revokedAt)
-                  const expired = state.word === 'expired'
-                  return (
-                    <TableRow key={key.id}>
-                      <TableCell>{key.name}</TableCell>
-                      <TableCell>
-                        <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
-                      </TableCell>
-                      <TableCell>{formatInstant(key.createdAt)}</TableCell>
-                      <TableCell>{formatInstant(key.expiresAt)}</TableCell>
-                      <TableCell>
-                        {key.lastUsedAt ? formatInstant(key.lastUsedAt) : 'Never'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge color={state.color}>{state.word}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {expired && !key.revokedAt && (
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            disabled={renew.isPending}
-                            onClick={() => {
-                              const window = new Date()
-                              window.setMonth(window.getMonth() + 3)
-                              renew.mutate({ id: key.id, expiresAt: timestampFromDate(window) })
-                            }}
-                          >
-                            {renew.isPending ? <Spinner /> : <KeyRound size={14} />} Renew
-                          </Button>
-                        )}
-                        {!key.revokedAt && (
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            disabled={revoke.isPending}
-                            onClick={() => revoke.mutate({ id: key.id })}
-                          >
-                            Revoke
-                          </Button>
-                        )}
-                      </TableCell>
+            <Card>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Key prefix</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Last used</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-            {keys.summary !== null && (keys.summary.totalPages ?? 1) > 1 && (
-              <div {...stylex.props(styles.pager)}>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={!keys.summary.hasPrevious}
-                  onClick={() => onPageChange(keys.summary!.page - 1)}
-                >
-                  Previous
-                </Button>
-                <Text variant='body-2' color='neutral-faded'>
-                  Page {keys.summary.page} of {keys.summary.totalPages ?? '—'}
-                </Text>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={keys.summary.hasNext === false || keys.summary.hasNext === null}
-                  onClick={() => onPageChange(keys.summary!.page + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {(keys.data?.apiKeys ?? []).map((key) => {
+                      const state = keyState(key.expiresAt, key.revokedAt)
+                      const expired = state.word === 'expired'
+                      return (
+                        <TableRow key={key.id}>
+                          <TableCell>{key.name}</TableCell>
+                          <TableCell>
+                            <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
+                          </TableCell>
+                          <TableCell style={dataTableStyles.instant}>
+                            {formatInstant(key.createdAt)}
+                          </TableCell>
+                          <TableCell style={dataTableStyles.instant}>
+                            {formatInstant(key.expiresAt)}
+                          </TableCell>
+                          <TableCell style={dataTableStyles.instant}>
+                            {key.lastUsedAt ? formatInstant(key.lastUsedAt) : 'Never'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge color={state.color}>{state.word}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {expired && !key.revokedAt && (
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                disabled={renew.isPending}
+                                onClick={() => {
+                                  const window = new Date()
+                                  window.setMonth(window.getMonth() + 3)
+                                  renew.mutate({ id: key.id, expiresAt: timestampFromDate(window) })
+                                }}
+                              >
+                                {renew.isPending ? <Spinner /> : <KeyRound size={14} />} Renew
+                              </Button>
+                            )}
+                            {!key.revokedAt && (
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                disabled={revoke.isPending}
+                                onClick={() => revoke.mutate({ id: key.id })}
+                              >
+                                Revoke
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+              {keys.summary !== null && (keys.summary.totalPages ?? 1) > 1 && (
+                <CardFooter>
+                  <div {...stylex.props(styles.pager)}>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={!keys.summary.hasPrevious}
+                      onClick={() => onPageChange(keys.summary!.page - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Text variant='body-2' color='neutral-faded'>
+                      Page {keys.summary.page} of {keys.summary.totalPages ?? '—'}
+                    </Text>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={keys.summary.hasNext === false || keys.summary.hasNext === null}
+                      onClick={() => onPageChange(keys.summary!.page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </CardFooter>
+              )}
+            </Card>
           </>
         )}
       </div>
@@ -267,8 +279,8 @@ const styles = stylex.create({
   pager: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 12,
-    marginTop: 16
+    width: '100%'
   }
 })

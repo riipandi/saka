@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from 'uilibs/components/base/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -104,10 +105,12 @@ export function UserMenu() {
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={8}>
-        <div {...stylex.props(styles.identity)}>
-          <DropdownMenuLabel style={styles.name}>{name}</DropdownMenuLabel>
-          {user?.email ? <span {...stylex.props(styles.email)}>{user.email}</span> : null}
-        </div>
+        <DropdownMenuGroup>
+          <div {...stylex.props(styles.identity)}>
+            <DropdownMenuLabel style={styles.name}>{name}</DropdownMenuLabel>
+            {user?.email ? <span {...stylex.props(styles.email)}>{user.email}</span> : null}
+          </div>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {accountLinks.map((item) => (
           <DropdownMenuItem key={item.to} render={<Link to={item.to} />}>

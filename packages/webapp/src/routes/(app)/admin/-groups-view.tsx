@@ -17,6 +17,15 @@ import {
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -30,6 +39,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardFooter,
   CardDescription,
   CardHeader,
   CardTitle
@@ -231,8 +241,9 @@ export function GroupsView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
+          </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
               <div {...stylex.props(styles.pager)}>
                 <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
                   {summary.totalItems === null
@@ -258,8 +269,8 @@ export function GroupsView({
                   </Button>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -380,9 +391,9 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission={mode === 'create' ? 'user_group:*:create' : 'user_group:*:update'}>
-        <AlertDialogTrigger
+        <DialogTrigger
           render={
             <Button
               variant={mode === 'create' ? undefined : 'outline'}
@@ -397,17 +408,15 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
           ) : (
             'Edit'
           )}
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {mode === 'create' ? 'Create a group' : 'Edit this group'}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Create a group' : 'Edit this group'}</DialogTitle>
+          <DialogDescription>
             The name is the unique handle; the display name is what the UI shows.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div {...stylex.props(localStyles.form)}>
           <Field id='group-name'>
             <FieldLabel htmlFor='group-name'>Name</FieldLabel>
@@ -432,9 +441,11 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
             </Text>
           ) : null}
         </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={
               saving.isPending ||
               form.name.trim().length === 0 ||
@@ -444,10 +455,10 @@ function GroupFormDialog({ mode, group }: { mode: 'create' | 'edit'; group?: Use
           >
             {saving.isPending ? <Spinner /> : <Layers size={16} />}
             {mode === 'create' ? 'Create group' : 'Save changes'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

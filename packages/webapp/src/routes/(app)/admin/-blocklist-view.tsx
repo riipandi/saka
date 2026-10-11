@@ -18,6 +18,15 @@ import {
   AlertDialogTrigger
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -25,6 +34,7 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
@@ -42,6 +52,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -154,8 +165,9 @@ export function BlocklistView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
+          </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
               <div {...stylex.props(styles.pager)}>
                 <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
                   {summary.totalItems === null
@@ -181,8 +193,8 @@ export function BlocklistView({
                   </Button>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -194,7 +206,7 @@ function EntryRow({ entry }: { entry: BlocklistEntry }) {
     <TableRow>
       <TableCell>{entry.pattern}</TableCell>
       <TableCell>{entry.createdBy || '—'}</TableCell>
-      <TableCell>{formatWireInstant(entry.createdAt)}</TableCell>
+      <TableCell style={dataTableStyles.instant}>{formatWireInstant(entry.createdAt)}</TableCell>
       <TableCell>
         <RemoveEntryDialog entry={entry} />
       </TableCell>
@@ -231,20 +243,20 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
   })
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission='blocklist:*:create'>
-        <AlertDialogTrigger render={<Button size='sm' />}>
+        <DialogTrigger render={<Button size='sm' />}>
           <Plus size={16} /> Add entry
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Block an identifier</AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Block an identifier</DialogTitle>
+          <DialogDescription>
             One email address (`john.doe@example.com`) or one domain (`@example.com`, every address
             at it). The entry is stored lowercased and matched case-insensitively.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <Field id='blocklist-pattern'>
           <FieldLabel htmlFor='blocklist-pattern'>Identifier</FieldLabel>
           <Input
@@ -262,9 +274,11 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
             {failed}
           </Text>
         ) : null}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={adding.isPending || pattern.trim().length === 0}
             onClick={() =>
               adding.mutate(create(AddBlocklistEntryRequestSchema, { pattern: pattern.trim() }))
@@ -272,10 +286,10 @@ function AddEntryDialog({ onAdded }: { onAdded: () => void }) {
           >
             {adding.isPending ? <Spinner /> : <ShieldOff size={16} />}
             Add entry
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

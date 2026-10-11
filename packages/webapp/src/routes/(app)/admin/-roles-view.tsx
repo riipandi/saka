@@ -16,6 +16,14 @@ import {
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
 import { Checkbox } from 'uilibs/components/base/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -370,14 +378,14 @@ function CreateRoleDialog({
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Create a role</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create a role</DialogTitle>
+          <DialogDescription>
             The role is born with no permissions; the tree opens after creation.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical' id='create-role-error'>
             {failed}
@@ -412,21 +420,17 @@ function CreateRoleDialog({
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={creating.isPending}
-            onClick={(event) => {
-              event.preventDefault()
-              submit()
-            }}
-          >
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={creating.isPending} onClick={submit}>
             {creating.isPending ? <Spinner /> : null}
             Create role
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -470,14 +474,14 @@ function EditRoleDialog({ role, onClose }: { role: Role; onClose: () => void }) 
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Edit {role.name}</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit {role.name}</DialogTitle>
+          <DialogDescription>
             The slug {role.slug} never moves — the claims and the code reference it.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical'>
             {failed}
@@ -495,21 +499,17 @@ function EditRoleDialog({ role, onClose }: { role: Role; onClose: () => void }) 
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={updating.isPending}
-            onClick={(event) => {
-              event.preventDefault()
-              submit()
-            }}
-          >
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={updating.isPending} onClick={submit}>
             {updating.isPending ? <Spinner /> : null}
             Save role
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -647,16 +647,16 @@ function PermissionsDialog({
   }
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent style={localStyles.treeDialog}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Permissions of {role.name}</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent style={localStyles.treeDialog}>
+        <DialogHeader>
+          <DialogTitle>Permissions of {role.name}</DialogTitle>
+          <DialogDescription>
             {system
               ? 'A system role carries the seed’s set; it is shown read-only here.'
               : 'The set saves as a whole replacement. The accounts carrying the role pick it up at their next token, not in place.'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         {failed ? (
           <Text render={<p />} variant='body-2' color='critical'>
             {failed}
@@ -687,23 +687,19 @@ function PermissionsDialog({
             ))}
           </div>
         )}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Close</AlertDialogCancel>
+        <DialogFooter>
+          <Button variant='ghost' onClick={onClose}>
+            Close
+          </Button>
           {!system ? (
-            <AlertDialogAction
-              disabled={saving.isPending}
-              onClick={(event) => {
-                event.preventDefault()
-                save()
-              }}
-            >
+            <Button disabled={saving.isPending} onClick={save}>
               {saving.isPending ? <Spinner /> : null}
               Save permissions
-            </AlertDialogAction>
+            </Button>
           ) : null}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

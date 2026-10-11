@@ -15,6 +15,7 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
@@ -30,6 +31,7 @@ import {
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { AuditLogService, ListRequestSchema } from '~/codegen/auditlog_pb'
@@ -196,7 +198,9 @@ export function AuditView({
                 <TableBody>
                   {rows.map((record) => (
                     <TableRow key={record.id}>
-                      <TableCell>{formatInstant(record.createdAt)}</TableCell>
+                      <TableCell style={dataTableStyles.instant}>
+                        {formatInstant(record.createdAt)}
+                      </TableCell>
                       <TableCell>{formatEvent(record.event)}</TableCell>
                       <TableCell>
                         {record.username ? record.username : '—'}
@@ -221,8 +225,9 @@ export function AuditView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
+          </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
               <div {...stylex.props(styles.pager)}>
                 <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
                   {summary.totalItems === null
@@ -248,8 +253,8 @@ export function AuditView({
                   </Button>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>

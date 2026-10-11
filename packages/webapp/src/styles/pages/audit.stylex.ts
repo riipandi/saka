@@ -19,7 +19,8 @@ export const styles = stylex.create({
     alignItems: 'center',
     display: 'flex',
     gap: unit.x3,
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    width: '100%'
   },
   pagerStatus: {
     flexShrink: 0

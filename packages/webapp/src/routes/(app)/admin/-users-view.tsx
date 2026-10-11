@@ -5,18 +5,16 @@ import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -32,6 +30,7 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
@@ -50,6 +49,7 @@ import { UserAvatar } from '#/components/user-avatar'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
+import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -264,8 +264,9 @@ export function UsersView({
                 {error}
               </Text>
             ) : null}
-
-            {summary && (summary.hasPrevious || summary.hasNext) ? (
+          </CardContent>
+          {summary && (summary.hasPrevious || summary.hasNext) ? (
+            <CardFooter>
               <div {...stylex.props(styles.pager)}>
                 <Text variant='body-2' color='neutral-faded' style={styles.pagerStatus}>
                   {summary.totalItems === null
@@ -291,8 +292,8 @@ export function UsersView({
                   </Button>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
+            </CardFooter>
+          ) : null}
         </Card>
       </div>
     </div>
@@ -325,7 +326,7 @@ function UserRow({ user }: { user: User }) {
       </TableCell>
       <TableCell>{user.username}</TableCell>
       <TableCell>{user.email}</TableCell>
-      <TableCell>{formatInstant(user.createdAt)}</TableCell>
+      <TableCell style={dataTableStyles.instant}>{formatInstant(user.createdAt)}</TableCell>
       <TableCell>
         {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
         {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
@@ -343,6 +344,11 @@ const userRowStyles = stylex.create({
     color: 'inherit',
     textDecoration: 'none',
     fontWeight: 600
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16
   }
 })
 
@@ -407,81 +413,85 @@ function CreateUserDialog({ onCreated }: { onCreated: (user: User) => void }) {
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Can permission='user:*:create'>
-        <AlertDialogTrigger render={<Button size='sm' />}>
+        <DialogTrigger render={<Button size='sm' />}>
           <Plus size={16} /> Create user
-        </AlertDialogTrigger>
+        </DialogTrigger>
       </Can>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Create an account</AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create an account</DialogTitle>
+          <DialogDescription>
             An account made here exists without an invitation. Leave the password empty and the
             account carries no credential until one is set.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <Field id='create-username'>
-          <FieldLabel htmlFor='create-username'>Username</FieldLabel>
-          <Input
-            id='create-username'
-            value={form.username}
-            onChange={(event) => setForm({ ...form, username: event.target.value })}
-          />
-          <FieldDescription>3–32 letters, digits, underscores.</FieldDescription>
-        </Field>
-        <Field id='create-email'>
-          <FieldLabel htmlFor='create-email'>Email</FieldLabel>
-          <Input
-            id='create-email'
-            type='email'
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
-          />
-        </Field>
-        <Field id='create-first-name'>
-          <FieldLabel htmlFor='create-first-name'>First name</FieldLabel>
-          <Input
-            id='create-first-name'
-            value={form.firstName}
-            onChange={(event) => setForm({ ...form, firstName: event.target.value })}
-          />
-        </Field>
-        <Field id='create-last-name'>
-          <FieldLabel htmlFor='create-last-name'>Last name</FieldLabel>
-          <Input
-            id='create-last-name'
-            value={form.lastName}
-            onChange={(event) => setForm({ ...form, lastName: event.target.value })}
-          />
-        </Field>
-        <Field id='create-display-name'>
-          <FieldLabel htmlFor='create-display-name'>Display name</FieldLabel>
-          <Input
-            id='create-display-name'
-            value={form.displayName}
-            onChange={(event) => setForm({ ...form, displayName: event.target.value })}
-            placeholder='Composed from the names when empty'
-          />
-        </Field>
-        <Field id='create-password'>
-          <FieldLabel htmlFor='create-password'>Password</FieldLabel>
-          <Input
-            id='create-password'
-            type='password'
-            value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
-          />
-          <FieldDescription>Leave empty for an account without a credential.</FieldDescription>
-        </Field>
-        {failed ? (
-          <Text render={<p />} variant='body-2' color='critical'>
-            {failed}
-          </Text>
-        ) : null}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          </DialogDescription>
+        </DialogHeader>
+        <div {...stylex.props(userRowStyles.form)}>
+          <Field id='create-username'>
+            <FieldLabel htmlFor='create-username'>Username</FieldLabel>
+            <Input
+              id='create-username'
+              value={form.username}
+              onChange={(event) => setForm({ ...form, username: event.target.value })}
+            />
+            <FieldDescription>3–32 letters, digits, underscores.</FieldDescription>
+          </Field>
+          <Field id='create-email'>
+            <FieldLabel htmlFor='create-email'>Email</FieldLabel>
+            <Input
+              id='create-email'
+              type='email'
+              value={form.email}
+              onChange={(event) => setForm({ ...form, email: event.target.value })}
+            />
+          </Field>
+          <Field id='create-first-name'>
+            <FieldLabel htmlFor='create-first-name'>First name</FieldLabel>
+            <Input
+              id='create-first-name'
+              value={form.firstName}
+              onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+            />
+          </Field>
+          <Field id='create-last-name'>
+            <FieldLabel htmlFor='create-last-name'>Last name</FieldLabel>
+            <Input
+              id='create-last-name'
+              value={form.lastName}
+              onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+            />
+          </Field>
+          <Field id='create-display-name'>
+            <FieldLabel htmlFor='create-display-name'>Display name</FieldLabel>
+            <Input
+              id='create-display-name'
+              value={form.displayName}
+              onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+              placeholder='Composed from the names when empty'
+            />
+          </Field>
+          <Field id='create-password'>
+            <FieldLabel htmlFor='create-password'>Password</FieldLabel>
+            <Input
+              id='create-password'
+              type='password'
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+            />
+            <FieldDescription>Leave empty for an account without a credential.</FieldDescription>
+          </Field>
+          {failed ? (
+            <Text render={<p />} variant='body-2' color='critical'>
+              {failed}
+            </Text>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant='ghost' onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
             disabled={
               creating.isPending ||
               form.username.trim().length === 0 ||
@@ -493,9 +503,9 @@ function CreateUserDialog({ onCreated }: { onCreated: (user: User) => void }) {
           >
             {creating.isPending ? <Spinner /> : <Users size={16} />}
             Create user
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
