@@ -17,7 +17,21 @@ on:
   #     - "docs/**"
   #     - "packages/**"
   #     - "scripts/**"
+  #     - "**/*.md"
   pull_request:
+    paths-ignore:
+      - ".vite-hooks/**"
+      - ".github/workflows/release.yml"
+      - ".goreleaser.yaml"
+      - ".llms/**"
+      - ".vscode/**"
+      - ".zed/**"
+      - "container/**"
+      - "deploy/**"
+      - "docs/**"
+      - "packages/**"
+      - "scripts/**"
+      - "**/*.md"
   workflow_dispatch:
     inputs:
       os:
