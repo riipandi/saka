@@ -3,6 +3,7 @@ import {
   Blocks,
   Braces,
   History,
+  Globe,
   KeyRound,
   LaptopSmartphone,
   Layers,
@@ -22,6 +23,7 @@ import {
   Blocks as BlocksTwoTone,
   Braces as BracesTwoTone,
   History as HistoryTwoTone,
+  Globe as GlobeTwoTone,
   KeyRound as KeyRoundTwoTone,
   LaptopSmartphone as LaptopSmartphoneTwoTone,
   Layers as LayersTwoTone,
@@ -122,6 +124,13 @@ const adminItems: Array<NavItem & { permission: string }> = [
     label: 'OIDC clients',
     href: '/admin/oidc-clients',
     permission: 'oidc_client:*:list'
+  },
+  {
+    icon: Globe,
+    activeIcon: GlobeTwoTone,
+    label: 'OAuth providers',
+    href: '/admin/oauth-providers',
+    permission: 'oauth_connection:*:list'
   },
   {
     icon: Braces,

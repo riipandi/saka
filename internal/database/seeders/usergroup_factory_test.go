@@ -26,7 +26,7 @@ func TestAuthorizationSeederSeedsTheScenarioRolesAndGrants(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	require.Len(t, results[0].Created, 71)
+	require.Len(t, results[0].Created, 76)
 	assert.Contains(t, results[0].Created, "editor (6 permissions)")
 	assert.Contains(t, results[0].Created, "moderator (5 permissions)")
 	assert.Contains(t, results[0].Created, "service (4 permissions)")
@@ -34,7 +34,7 @@ func TestAuthorizationSeederSeedsTheScenarioRolesAndGrants(t *testing.T) {
 	assert.Equal(t, 4, countRows(t, pool, `SELECT count(*) FROM public.roles`))
 	assert.Equal(t, 3, countRows(t, pool, `SELECT count(*) FROM public.roles WHERE type = 'custom'`))
 
-	for role, want := range map[string]int{"editor": 6, "moderator": 5, "service": 4, "administrator": 67} {
+	for role, want := range map[string]int{"editor": 6, "moderator": 5, "service": 4, "administrator": 72} {
 		count := countRows(t, pool, `SELECT count(*) FROM public.role_permissions rp
 			JOIN public.roles r ON r.id = rp.role_id WHERE r.slug = '`+role+`'`)
 		assert.Equal(t, want, count, role)

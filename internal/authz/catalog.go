@@ -75,6 +75,11 @@ var resources = []authz.Resource{
 		Description: "an outbound SCIM provisioning target",
 	},
 	{
+		Name:        "oauth_connection",
+		Actions:     []string{"read", "list", "create", "update", "delete"},
+		Description: "an external sign-in provider the deployment trusts",
+	},
+	{
 		Name:        "audit_log",
 		Actions:     []string{"read", "list", "filter_options"},
 		Description: "the audit trail",
