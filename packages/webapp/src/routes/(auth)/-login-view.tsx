@@ -22,6 +22,7 @@ import { GitHubIcon, GoogleIcon, ViteIcon } from 'uilibs/components/icons'
 import { useAppConfig } from '#/hooks/use-app-config'
 import { useAuthentication } from '#/hooks/use-auth'
 import { useOAuthProviders } from '#/hooks/use-oauth-providers'
+import { usePublicSettings } from '#/hooks/use-public-settings'
 import type { SignInChallenge } from '#/libraries/guard/auth-engine'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { takeSignInChallenge } from '#/libraries/guard/sign-in-handoff'
@@ -165,6 +166,10 @@ export function LoginView({
   const [phase, setPhase] = useState<LoginPhase>({ name: 'credentials' })
   const [passkeyBusy, setPasskeyBusy] = useState(false)
   const oneTimeEnabled = config?.auth.one_time_access_email_as_unauthenticated_enabled ?? false
+  // The signup door the deployment opens: only the open mode advertises
+  // itself on the sign-in card — invite-mode visitors carry their tokens.
+  const signupSettings = usePublicSettings()
+  const openSignup = signupSettings.get('access.mode') === 'open'
 
   // Goodbye, sign-in-required, and password-reset notices belong to the
   // redirect that brought the visitor here; refresh page or back-navigation
@@ -520,6 +525,14 @@ export function LoginView({
         </CardContent>
 
         <CardFooter style={atoms.justifyContent.center}>
+          {openSignup ? (
+            <Text variant='body-2' color='neutral-faded'>
+              New here?{' '}
+              <Link to='/signup' search={{ token: undefined }} {...stylex.props(styles.backLink)}>
+                Create an account
+              </Link>
+            </Text>
+          ) : null}
           <Text variant='body-2' color='neutral-faded'>
             Back to{' '}
             <Link to='/' {...stylex.props(styles.backLink)}>
