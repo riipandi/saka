@@ -1,5 +1,4 @@
 import { create } from '@bufbuild/protobuf'
-import { Activity } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
@@ -20,21 +19,20 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
-import { AuditLogService, ListRequestSchema, type AuditLog } from '~/codegen/auditlog_pb'
+import { AuditLogService, ListRequestSchema } from '~/codegen/auditlog_pb'
 
 /** The combined choices the sort control offers; the newest-first default sends nothing. */
 const SORT_CHOICES = [
@@ -185,11 +183,37 @@ export function AuditView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((record) => (
-                  <AuditItem key={record.id} record={record} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>IP address</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>{formatInstant(record.createdAt)}</TableCell>
+                      <TableCell>{formatEvent(record.event)}</TableCell>
+                      <TableCell>
+                        {record.username ? record.username : '—'}
+                        {record.actorUsername ? ` · by ${record.actorUsername}` : ''}
+                      </TableCell>
+                      <TableCell>{record.ipAddress || '—'}</TableCell>
+                      <TableCell>
+                        {record.actionStatus === 'failed' ? (
+                          <Badge variant='destructive'>Failed</Badge>
+                        ) : (
+                          <Badge variant='secondary'>Success</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -229,31 +253,5 @@ export function AuditView({
         </Card>
       </div>
     </div>
-  )
-}
-
-function AuditItem({ record }: { record: AuditLog }) {
-  return (
-    <Item variant='outline'>
-      <ItemMedia variant='icon'>
-        <Activity {...stylex.props(styles.icon)} />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{formatEvent(record.event)}</ItemTitle>
-        <ItemDescription>
-          {record.username ? record.username : '—'}
-          {record.ipAddress ? ` · from ${record.ipAddress}` : ''}
-          {` · ${formatInstant(record.createdAt)}`}
-          {record.actorUsername ? ` · by ${record.actorUsername} (delegated)` : ''}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        {record.actionStatus === 'failed' ? (
-          <Badge variant='destructive'>Failed</Badge>
-        ) : (
-          <Badge variant='secondary'>Success</Badge>
-        )}
-      </ItemActions>
-    </Item>
   )
 }

@@ -8,15 +8,15 @@ import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Badge } from 'uilibs/components/extra/badge'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { usePaginatedList } from '#/hooks/use-pagination'
@@ -134,57 +134,67 @@ export function ApiKeysView({
           </Empty>
         ) : (
           <>
-            <ItemGroup>
-              {(keys.data?.apiKeys ?? []).map((key) => {
-                const state = keyState(key.expiresAt, key.revokedAt)
-                const expired = state.word === 'expired'
-                return (
-                  <Item key={key.id}>
-                    <ItemContent>
-                      <ItemTitle>{key.name}</ItemTitle>
-                      <ItemDescription>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Key prefix</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Last used</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(keys.data?.apiKeys ?? []).map((key) => {
+                  const state = keyState(key.expiresAt, key.revokedAt)
+                  const expired = state.word === 'expired'
+                  return (
+                    <TableRow key={key.id}>
+                      <TableCell>{key.name}</TableCell>
+                      <TableCell>
                         <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
-                        {' · issued '}
-                        {formatInstant(key.createdAt)}
-                        {' · expires '}
-                        {formatInstant(key.expiresAt)}
-                        {key.lastUsedAt
-                          ? ` · last used ${formatInstant(key.lastUsedAt)}`
-                          : ' · never used'}
-                        {key.revokedAt ? ` · revoked ${formatInstant(key.revokedAt)}` : ''}
-                      </ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      {expired && !key.revokedAt && (
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          disabled={renew.isPending}
-                          onClick={() => {
-                            const window = new Date()
-                            window.setMonth(window.getMonth() + 3)
-                            renew.mutate({ id: key.id, expiresAt: timestampFromDate(window) })
-                          }}
-                        >
-                          {renew.isPending ? <Spinner /> : <KeyRound size={14} />} Renew
-                        </Button>
-                      )}
-                      {!key.revokedAt && (
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          disabled={revoke.isPending}
-                          onClick={() => revoke.mutate({ id: key.id })}
-                        >
-                          Revoke
-                        </Button>
-                      )}
-                      <Badge color={state.color}>{state.word}</Badge>
-                    </ItemActions>
-                  </Item>
-                )
-              })}
-            </ItemGroup>
+                      </TableCell>
+                      <TableCell>{formatInstant(key.createdAt)}</TableCell>
+                      <TableCell>{formatInstant(key.expiresAt)}</TableCell>
+                      <TableCell>
+                        {key.lastUsedAt ? formatInstant(key.lastUsedAt) : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge color={state.color}>{state.word}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {expired && !key.revokedAt && (
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            disabled={renew.isPending}
+                            onClick={() => {
+                              const window = new Date()
+                              window.setMonth(window.getMonth() + 3)
+                              renew.mutate({ id: key.id, expiresAt: timestampFromDate(window) })
+                            }}
+                          >
+                            {renew.isPending ? <Spinner /> : <KeyRound size={14} />} Renew
+                          </Button>
+                        )}
+                        {!key.revokedAt && (
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            disabled={revoke.isPending}
+                            onClick={() => revoke.mutate({ id: key.id })}
+                          >
+                            Revoke
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
             {keys.summary !== null && (keys.summary.totalPages ?? 1) > 1 && (
               <div {...stylex.props(styles.pager)}>
                 <Button

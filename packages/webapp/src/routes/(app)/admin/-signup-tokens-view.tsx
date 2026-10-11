@@ -36,15 +36,15 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { LIST_MAX_LIMIT, listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -151,11 +151,22 @@ export function SignupTokensView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((token) => (
-                  <TokenRow key={token.id} token={token} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Issued</TableHead>
+                    <TableHead>Usage</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((token) => (
+                    <TokenRow key={token.id} token={token} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -201,24 +212,19 @@ export function SignupTokensView({
 function TokenRow({ token }: { token: SignupToken }) {
   const spent = token.usageLimit > 0 && token.usageCount >= token.usageLimit
   return (
-    <Item variant='outline'>
-      <ItemContent>
-        <ItemTitle>
-          {formatInstant(token.createdAt)}
-          {spent ? ' — spent' : ''}
-        </ItemTitle>
-        <ItemDescription>
-          {token.usageCount} of {token.usageLimit > 0 ? token.usageLimit : '1 (single)'} used ·
-          expires {formatInstant(token.expiresAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        <Badge variant={spent ? 'secondary' : 'outline'}>
-          {token.usageCount}/{token.usageLimit > 0 ? token.usageLimit : 1}
-        </Badge>
+    <TableRow>
+      <TableCell>{formatInstant(token.createdAt)}</TableCell>
+      <TableCell>
+        {token.usageCount} of {token.usageLimit > 0 ? token.usageLimit : '1 (single)'}
+      </TableCell>
+      <TableCell>{formatInstant(token.expiresAt)}</TableCell>
+      <TableCell>
+        <Badge variant={spent ? 'secondary' : 'outline'}>{spent ? 'Spent' : 'Active'}</Badge>
+      </TableCell>
+      <TableCell>
         <RevokeTokenDialog token={token} />
-      </ItemActions>
-    </Item>
+      </TableCell>
+    </TableRow>
   )
 }
 

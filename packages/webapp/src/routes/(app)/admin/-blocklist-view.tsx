@@ -29,15 +29,15 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -132,11 +132,21 @@ export function BlocklistView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pattern</TableHead>
+                    <TableHead>Added by</TableHead>
+                    <TableHead>Added</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((entry) => (
+                    <EntryRow key={entry.id} entry={entry} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -181,18 +191,14 @@ export function BlocklistView({
 
 function EntryRow({ entry }: { entry: BlocklistEntry }) {
   return (
-    <Item variant='outline'>
-      <ItemContent>
-        <ItemTitle>{entry.pattern}</ItemTitle>
-        <ItemDescription>
-          {entry.createdBy ? `added by ${entry.createdBy} · ` : ''}added{' '}
-          {formatWireInstant(entry.createdAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
+    <TableRow>
+      <TableCell>{entry.pattern}</TableCell>
+      <TableCell>{entry.createdBy || '—'}</TableCell>
+      <TableCell>{formatWireInstant(entry.createdAt)}</TableCell>
+      <TableCell>
         <RemoveEntryDialog entry={entry} />
-      </ItemActions>
-    </Item>
+      </TableCell>
+    </TableRow>
   )
 }
 

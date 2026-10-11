@@ -1,6 +1,5 @@
 import { create } from '@bufbuild/protobuf'
 import { useQuery } from '@connectrpc/connect-query'
-import { Activity } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
@@ -22,16 +21,15 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { styles, facetStyles } from '#/styles/pages/audit.stylex'
@@ -281,11 +279,7 @@ export function AdminAuditView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((record) => (
-                  <AuditItem key={record.id} record={record} />
-                ))}
-              </ItemGroup>
+              <AuditTable records={rows} />
             )}
 
             {error ? (
@@ -330,30 +324,40 @@ export function AdminAuditView({
 
 /** The facet source: `FilterOptions` derives both lists from the table, so
  * the controls offer what occurs rather than a fixed vocabulary. */
-/** One audit record as the console and the user detail both render it. */
-export function AuditItem({ record }: { record: AuditLog }) {
+/** One page of audit records, shared by the console and the user detail. */
+export function AuditTable({ records }: { records: AuditLog[] }) {
   return (
-    <Item variant='outline'>
-      <ItemMedia variant='icon'>
-        <Activity {...stylex.props(styles.icon)} />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{formatAuditEvent(record.event)}</ItemTitle>
-        <ItemDescription>
-          {record.username ? record.username : '—'}
-          {record.triggerType === 'system' ? ' · system' : ''}
-          {record.ipAddress ? ` · from ${record.ipAddress}` : ''}
-          {` · ${formatInstant(record.createdAt)}`}
-          {record.actorUsername ? ` · by ${record.actorUsername} (delegated)` : ''}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
-        {record.actionStatus === 'failed' ? (
-          <Badge variant='destructive'>Failed</Badge>
-        ) : (
-          <Badge variant='secondary'>Success</Badge>
-        )}
-      </ItemActions>
-    </Item>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Timestamp</TableHead>
+          <TableHead>Event</TableHead>
+          <TableHead>Account</TableHead>
+          <TableHead>IP address</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {records.map((record) => (
+          <TableRow key={record.id}>
+            <TableCell>{formatInstant(record.createdAt)}</TableCell>
+            <TableCell>{formatAuditEvent(record.event)}</TableCell>
+            <TableCell>
+              {record.username ? record.username : '—'}
+              {record.triggerType === 'system' ? ' · system' : ''}
+              {record.actorUsername ? ` · by ${record.actorUsername}` : ''}
+            </TableCell>
+            <TableCell>{record.ipAddress || '—'}</TableCell>
+            <TableCell>
+              {record.actionStatus === 'failed' ? (
+                <Badge variant='destructive'>Failed</Badge>
+              ) : (
+                <Badge variant='secondary'>Success</Badge>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }

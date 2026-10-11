@@ -36,16 +36,15 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { UserAvatar } from '#/components/user-avatar'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
@@ -242,11 +241,22 @@ export function UsersView({
                 </EmptyHeader>
               </Empty>
             ) : (
-              <ItemGroup>
-                {rows.map((row) => (
-                  <UserRow key={row.id} user={row} />
-                ))}
-              </ItemGroup>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <UserRow key={row.id} user={row} />
+                  ))}
+                </TableBody>
+              </Table>
             )}
 
             {error ? (
@@ -299,27 +309,42 @@ const DEFAULT_USERS_SEARCH = {
 } as const
 
 function UserRow({ user }: { user: User }) {
+  const name = user.displayName || user.username
   return (
-    <Item
-      variant='outline'
-      render={<Link to='/admin/users/$id' params={{ id: user.id }} search={DEFAULT_USERS_SEARCH} />}
-    >
-      <ItemMedia>
-        <UserAvatar name={user.displayName || user.username} picture={user.picture} size='md' />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{user.displayName || user.username}</ItemTitle>
-        <ItemDescription>
-          {user.username} · {user.email} · joined {formatInstant(user.createdAt)}
-        </ItemDescription>
-      </ItemContent>
-      <ItemActions>
+    <TableRow>
+      <TableCell>
+        <Link
+          to='/admin/users/$id'
+          params={{ id: user.id }}
+          search={DEFAULT_USERS_SEARCH}
+          {...stylex.props(userRowStyles.link)}
+        >
+          <UserAvatar name={name} picture={user.picture} size='sm' />
+          {name}
+        </Link>
+      </TableCell>
+      <TableCell>{user.username}</TableCell>
+      <TableCell>{user.email}</TableCell>
+      <TableCell>{formatInstant(user.createdAt)}</TableCell>
+      <TableCell>
         {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
         {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
-      </ItemActions>
-    </Item>
+        {!user.bannedAt && !user.disabled ? <Badge variant='secondary'>Active</Badge> : null}
+      </TableCell>
+    </TableRow>
   )
 }
+
+const userRowStyles = stylex.create({
+  link: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'inherit',
+    textDecoration: 'none',
+    fontWeight: 600
+  }
+})
 
 /**
  * The administrator's own door for an account that exists without an

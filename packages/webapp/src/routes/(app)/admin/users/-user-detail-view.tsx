@@ -33,7 +33,6 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { ItemGroup } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { UserAvatar } from '#/components/user-avatar'
@@ -75,7 +74,7 @@ import {
   WebAuthnService,
   type Credential
 } from '~/codegen/webauthn_pb'
-import { AuditItem } from '../-audit-view'
+import { AuditTable } from '../-audit-view'
 
 const localStyles = stylex.create({
   form: {
@@ -1283,11 +1282,7 @@ function ActivityCard({ userId }: { userId: string }) {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ItemGroup>
-            {rows.map((record) => (
-              <AuditItem key={record.id} record={record} />
-            ))}
-          </ItemGroup>
+          <AuditTable records={rows} />
         )}
 
         {summary && (summary.hasPrevious || summary.hasNext) ? (

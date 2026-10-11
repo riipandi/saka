@@ -17,15 +17,15 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -188,43 +188,58 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
               </Empty>
             ) : (
               <>
-                <ItemGroup>
-                  {(deliveries.data?.deliveries ?? []).map((delivery) => (
-                    <Item key={delivery.id}>
-                      <ItemContent>
-                        <ItemTitle>{delivery.event}</ItemTitle>
-                        <ItemDescription>
-                          {formatInstant(delivery.createdAt)} · attempt {delivery.attemptCount}
-                          {delivery.latestAttempt?.responseStatus
-                            ? ` · answered ${delivery.latestAttempt.responseStatus}`
-                            : ''}
-                          {delivery.latestAttempt?.error
-                            ? ` · ${delivery.latestAttempt.error}`
-                            : ''}
-                          {delivery.latestAttempt?.durationMs
-                            ? ` · ${delivery.latestAttempt.durationMs}ms`
-                            : ''}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event</TableHead>
+                      <TableHead>When</TableHead>
+                      <TableHead>Attempt</TableHead>
+                      <TableHead>Response</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(deliveries.data?.deliveries ?? []).map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>{delivery.event}</TableCell>
+                        <TableCell>
+                          {formatInstant(delivery.createdAt)}
                           {delivery.deliveredAt
                             ? ` · delivered ${formatInstant(delivery.deliveredAt)}`
                             : ''}
-                        </ItemDescription>
-                      </ItemContent>
-                      <ItemActions>
-                        <Badge
-                          color={
-                            delivery.status === 'succeeded'
-                              ? 'success'
-                              : delivery.status === 'failed'
-                                ? 'critical'
-                                : 'neutral'
-                          }
-                        >
-                          {delivery.status}
-                        </Badge>
-                      </ItemActions>
-                    </Item>
-                  ))}
-                </ItemGroup>
+                        </TableCell>
+                        <TableCell>{delivery.attemptCount}</TableCell>
+                        <TableCell>
+                          {delivery.latestAttempt?.responseStatus
+                            ? delivery.latestAttempt.responseStatus
+                            : '—'}
+                          {delivery.latestAttempt?.error
+                            ? ` · ${delivery.latestAttempt.error}`
+                            : ''}
+                        </TableCell>
+                        <TableCell>
+                          {delivery.latestAttempt?.durationMs
+                            ? `${delivery.latestAttempt.durationMs}ms`
+                            : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            color={
+                              delivery.status === 'succeeded'
+                                ? 'success'
+                                : delivery.status === 'failed'
+                                  ? 'critical'
+                                  : 'neutral'
+                            }
+                          >
+                            {delivery.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
                 {(() => {
                   const summary = decodeListMetadata(deliveries.data?.metadata)
                   return summary !== null &&

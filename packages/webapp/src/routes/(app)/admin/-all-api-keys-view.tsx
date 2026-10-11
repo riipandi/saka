@@ -5,15 +5,15 @@ import * as stylex from '@stylexjs/stylex'
 import { Button } from 'uilibs/components/base/button'
 import { Badge } from 'uilibs/components/extra/badge'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle
-} from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -120,34 +120,44 @@ export function AllApiKeysView({
           </Empty>
         ) : (
           <>
-            <ItemGroup>
-              {(keys.data?.apiKeys ?? []).map((key) => {
-                const state = keyState(key.expiresAt, key.revokedAt)
-                return (
-                  <Item key={key.id}>
-                    <ItemContent>
-                      <ItemTitle>{key.name}</ItemTitle>
-                      <ItemDescription>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Key prefix</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Last used</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(keys.data?.apiKeys ?? []).map((key) => {
+                  const state = keyState(key.expiresAt, key.revokedAt)
+                  return (
+                    <TableRow key={key.id}>
+                      <TableCell>{key.name}</TableCell>
+                      <TableCell>
                         <span {...stylex.props(styles.mono)}>{key.prefix}…</span>
-                        {' · owner '}
+                      </TableCell>
+                      <TableCell>
                         <OwnerName ownerId={key.ownerId} />
-                        {' · issued '}
-                        {formatInstant(key.createdAt)}
-                        {' · expires '}
-                        {formatInstant(key.expiresAt)}
-                        {key.lastUsedAt
-                          ? ` · last used ${formatInstant(key.lastUsedAt)}`
-                          : ' · never used'}
-                        {key.revokedAt ? ` · revoked ${formatInstant(key.revokedAt)}` : ''}
-                      </ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      <Badge color={state.color}>{state.word}</Badge>
-                    </ItemActions>
-                  </Item>
-                )
-              })}
-            </ItemGroup>
+                      </TableCell>
+                      <TableCell>{formatInstant(key.createdAt)}</TableCell>
+                      <TableCell>{formatInstant(key.expiresAt)}</TableCell>
+                      <TableCell>
+                        {key.lastUsedAt ? formatInstant(key.lastUsedAt) : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge color={state.color}>{state.word}</Badge>
+                        {key.revokedAt ? ` · ${formatInstant(key.revokedAt)}` : ''}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
             {(() => {
               const summary = keys.summary
               if (summary === null || (summary.totalPages ?? 1) <= 1) return null
