@@ -450,6 +450,13 @@ the approval. Audit events: `device_login_approved`,
 | POST | `/rpc/saka.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
 | POST | `/rpc/saka.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
 
+The approval screen the account holder uses lives at `/device`
+(`packages/webapp/src/routes/(app)/device.tsx` over `-device-view.tsx`):
+the code's OTP-style input accepts `XXXX-XXXX` or the bare eight
+characters, `?code=` deep-links the inspection, and the decide is
+approve-first with deny beside it. Reached from the header user menu
+("Approve a device").
+
 ## Health
 
 | Method | Endpoint | Summary / Yaak Title | Status | Evidence |

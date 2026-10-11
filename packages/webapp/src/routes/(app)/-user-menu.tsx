@@ -18,7 +18,8 @@ import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 
 export const accountLinks: Array<{ label: string; to: LinkProps['to'] }> = [
   { label: 'Settings', to: '/account/profile' },
-  { label: 'Notifications', to: '/account/notifications' }
+  { label: 'Notifications', to: '/account/notifications' },
+  { label: 'Approve a device', to: '/device' }
 ]
 
 const styles = stylex.create({

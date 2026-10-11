@@ -542,9 +542,9 @@ goal, three deltas from its shape:
 
 ### Wave 6 — device, ops, storage
 
-- [ ] **Device login approval** — `Inspect`/`Decide` rendered for the
-  signed-in holder; the device side is REST and needs no SPA work beyond
-  documenting the flow.
+- [ ] **Device login approval** — the approval screen ships at `/device`
+  (OTP input, `?code=` deep link, approve/deny) reached from the user
+  menu; the device side is REST and needed no SPA work beyond it.
 - [ ] **Ops console** — `QueueService`/`SchedulerService` screens and
   health reads; the pagination and admin-shell patterns carry it.
 - [ ] **Storage** — blocked on the endpoint-reference gap (see
