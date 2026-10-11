@@ -1,8 +1,10 @@
+import * as stylex from '@stylexjs/stylex'
 import { Checkbox } from 'uilibs/components/base/checkbox'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import { Text } from 'uilibs/components/extra/text'
 import { Textarea } from 'uilibs/components/extra/textarea'
+import { fontFamily } from 'uilibs/styles/tokens.stylex'
 import type { OidcClient } from '~/codegen/federation_pb'
 
 /**
@@ -144,7 +146,7 @@ export function OidcClientFields({
     })
 
   return (
-    <div className='flex flex-col gap-4'>
+    <div {...stylex.props(formStyles.stack)}>
       {mode === 'create' ? (
         <Field>
           <FieldLabel>Client ID</FieldLabel>
@@ -202,39 +204,39 @@ export function OidcClientFields({
         </FieldDescription>
       </Field>
 
-      <div className='flex flex-col gap-2'>
+      <div {...stylex.props(formStyles.stackTight)}>
         <Text render={<p />} variant='body-2' weight='semibold'>
           Capabilities
         </Text>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.isPublic}
             onCheckedChange={(checked) => set({ isPublic: checked })}
           />
           Public client — cannot keep a secret, authenticates with PKCE
         </label>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.pkceEnabled}
             onCheckedChange={(checked) => set({ pkceEnabled: checked })}
           />
           Require PKCE at the code exchange
         </label>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.requiresReauthentication}
             onCheckedChange={(checked) => set({ requiresReauthentication: checked })}
           />
           Require a fresh sign-in at every authorization
         </label>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.requiresPar}
             onCheckedChange={(checked) => set({ requiresPar: checked })}
           />
           Require pushed authorization requests (PAR)
         </label>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.skipConsent}
             onCheckedChange={(checked) => set({ skipConsent: checked })}
@@ -243,17 +245,17 @@ export function OidcClientFields({
         </label>
       </div>
 
-      <div className='flex flex-col gap-2'>
+      <div {...stylex.props(formStyles.stackTight)}>
         <Text render={<p />} variant='body-2' weight='semibold'>
           Grant types
         </Text>
         {GRANT_TYPES.map((grant) => (
-          <label key={grant.value} className='flex items-center gap-2 text-sm'>
+          <label key={grant.value} {...stylex.props(formStyles.choice)}>
             <Checkbox
               checked={state.grantTypes.includes(grant.value)}
               onCheckedChange={(checked) => toggleGrant(grant.value, checked)}
             />
-            <span className='font-mono text-xs'>{grant.value}</span> — {grant.label}
+            <span {...stylex.props(formStyles.mono)}>{grant.value}</span> — {grant.label}
           </label>
         ))}
         <Text render={<p />} variant='body-2' color='neutral-faded'>
@@ -262,7 +264,7 @@ export function OidcClientFields({
         </Text>
       </div>
 
-      <div className='flex flex-col gap-2'>
+      <div {...stylex.props(formStyles.stackTight)}>
         <Text render={<p />} variant='body-2' weight='semibold'>
           Back-channel logout
         </Text>
@@ -278,7 +280,7 @@ export function OidcClientFields({
             out.
           </FieldDescription>
         </Field>
-        <label className='flex items-center gap-2 text-sm'>
+        <label {...stylex.props(formStyles.choice)}>
           <Checkbox
             checked={state.backchannelSessionRequired}
             onCheckedChange={(checked) => set({ backchannelSessionRequired: checked })}
@@ -287,7 +289,7 @@ export function OidcClientFields({
         </label>
       </div>
 
-      <div className='grid grid-cols-2 gap-4'>
+      <div {...stylex.props(formStyles.grid)}>
         <Field>
           <FieldLabel>Access token lifetime (minutes)</FieldLabel>
           <Input
@@ -312,3 +314,31 @@ export function OidcClientFields({
     </div>
   )
 }
+
+const formStyles = stylex.create({
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16
+  },
+  stackTight: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8
+  },
+  choice: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14
+  },
+  mono: {
+    fontFamily: fontFamily.monospace,
+    fontSize: 12
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 16
+  }
+})

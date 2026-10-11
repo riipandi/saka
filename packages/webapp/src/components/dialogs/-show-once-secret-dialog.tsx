@@ -1,4 +1,5 @@
 import { Check, Copy } from '@keyline-icons/react'
+import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import {
@@ -57,7 +58,7 @@ export function ShowOnceSecretDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <div className='flex items-center gap-2'>
+        <div {...stylex.props(secretStyles.row)}>
           <Input readOnly value={secret} aria-label={secretLabel} />
           <Button variant='outline' size='sm' onClick={() => void copy()}>
             {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -78,3 +79,11 @@ export function ShowOnceSecretDialog({
     </Dialog>
   )
 }
+
+const secretStyles = stylex.create({
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8
+  }
+})

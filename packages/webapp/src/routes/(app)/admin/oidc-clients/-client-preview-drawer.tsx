@@ -1,5 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { useQuery } from '@connectrpc/connect-query'
+import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import {
   Dialog,
@@ -18,22 +19,36 @@ import {
 } from 'uilibs/components/base/select'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { colors } from 'uilibs/styles/colors.stylex'
+import { fontFamily } from 'uilibs/styles/tokens.stylex'
 import { LIST_MAX_LIMIT, listPageInput } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { OidcClientService, PreviewOidcClientRequestSchema } from '~/codegen/federation_pb'
 import { ListUsersRequestSchema, UserService } from '~/codegen/identity_pb'
 
-const previewBlockStyles = {
-  maxHeight: '16rem',
-  overflow: 'auto',
-  background: 'var(--color-bg-neutral, #f5f5f5)',
-  borderRadius: 8,
-  padding: 12,
-  fontSize: 12,
-  fontFamily: 'monospace',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-all'
-} as const
+const previewStyles = stylex.create({
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12
+  },
+  block: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4
+  },
+  pre: {
+    maxHeight: '16rem',
+    overflow: 'auto',
+    backgroundColor: colors.backgroundNeutralFaded,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 12,
+    fontFamily: fontFamily.monospace,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all'
+  }
+})
 
 /**
  * The claims a client would receive for one account — the preview builds the
@@ -99,7 +114,7 @@ export function PreviewClientDialog({
             {getErrorMessage(preview.error)}
           </Text>
         ) : (
-          <div className='flex flex-col gap-3'>
+          <div {...stylex.props(previewStyles.stack)}>
             <PreviewBlock title='ID token' struct={preview.data?.preview?.idToken} />
             <PreviewBlock title='Access token' struct={preview.data?.preview?.accessToken} />
             <PreviewBlock title='Userinfo' struct={preview.data?.preview?.userInfo} />
@@ -114,11 +129,13 @@ export function PreviewClientDialog({
  * shape, and the preview prints it as the token would have carried it. */
 function PreviewBlock({ title, struct }: { title: string; struct?: unknown }) {
   return (
-    <div className='flex flex-col gap-1'>
+    <div {...stylex.props(previewStyles.block)}>
       <Text render={<p />} variant='body-2' weight='semibold'>
         {title}
       </Text>
-      <pre style={previewBlockStyles}>{struct ? JSON.stringify(struct, null, 2) : '{}'}</pre>
+      <pre {...stylex.props(previewStyles.pre)}>
+        {struct ? JSON.stringify(struct, null, 2) : '{}'}
+      </pre>
     </div>
   )
 }

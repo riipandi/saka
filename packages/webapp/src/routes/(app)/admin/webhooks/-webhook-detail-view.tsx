@@ -5,8 +5,15 @@ import { ArrowLeft } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle
+} from 'uilibs/components/base/drawer'
 import { Switch } from 'uilibs/components/base/switch'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
@@ -17,6 +24,11 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
+import {
+  DescriptionDetails,
+  DescriptionList,
+  DescriptionTerm
+} from 'uilibs/components/extra/description-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import {
@@ -29,11 +41,12 @@ import {
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
+import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
-import { WebhookService } from '~/codegen/webhook_pb'
+import { WebhookService, type WebhookDelivery } from '~/codegen/webhook_pb'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -53,6 +66,7 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [rotatedSecret, setRotatedSecret] = useState<string | null>(null)
+  const [inspected, setInspected] = useState<WebhookDelivery | null>(null)
 
   const detail = useQuery(WebhookService.method.get, { id: webhookId }, { retry: false })
   const deliveries = useQuery(
@@ -105,10 +119,14 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
             {webhook?.name ?? 'Webhook endpoint'}
           </Text>
           {webhook && (
-            <Text variant='body-2' color='neutral-faded'>
-              {webhook.method} {webhook.endpoint}
-              {webhook.description ? ` · ${webhook.description}` : ''}
-            </Text>
+            <DescriptionList>
+              <DescriptionTerm>Method</DescriptionTerm>
+              <DescriptionDetails>{webhook.method}</DescriptionDetails>
+              <DescriptionTerm>Endpoint</DescriptionTerm>
+              <DescriptionDetails>{webhook.endpoint}</DescriptionDetails>
+              <DescriptionTerm>Description</DescriptionTerm>
+              <DescriptionDetails>{webhook.description || '—'}</DescriptionDetails>
+            </DescriptionList>
           )}
         </div>
         <div {...stylex.props(styles.headerActions)}>
@@ -199,6 +217,7 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
                       <TableHead>Response</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -238,6 +257,15 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
                             {delivery.status}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => setInspected(delivery)}
+                          >
+                            Inspect
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -248,37 +276,67 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
           {deliveries.isSuccess &&
             (() => {
               const summary = decodeListMetadata(deliveries.data?.metadata)
-              if (summary === null || summary.totalPages === null || summary.totalPages <= 1) {
+              if (summary === null || (!summary.hasPrevious && summary.hasNext !== true)) {
                 return null
               }
               return (
                 <CardFooter>
-                  <div {...stylex.props(styles.pager)}>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page <= 1}
-                      onClick={() => setPage(summary.page - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <Text variant='body-2' color='neutral-faded'>
-                      Page {summary.page} of {summary.totalPages}
-                    </Text>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      disabled={summary.page >= (summary.totalPages ?? 1)}
-                      onClick={() => setPage(summary.page + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
+                  <ListPagination
+                    page={summary.page}
+                    totalPages={summary.totalPages}
+                    hasPrevious={summary.hasPrevious}
+                    hasNext={summary.hasNext}
+                    onPageChange={setPage}
+                  />
                 </CardFooter>
               )
             })()}
         </Card>
       </div>
+
+      <Drawer
+        open={inspected !== null}
+        onOpenChange={(open) => {
+          if (!open) setInspected(null)
+        }}
+        swipeDirection='right'
+      >
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{inspected?.event ?? 'Delivery'}</DrawerTitle>
+            <DrawerDescription>
+              The attempt record. A response body is never stored, so this is the metadata the
+              receiver answered with.
+            </DrawerDescription>
+          </DrawerHeader>
+          {inspected ? (
+            <DescriptionList>
+              <DescriptionTerm>Status</DescriptionTerm>
+              <DescriptionDetails>{inspected.status}</DescriptionDetails>
+              <DescriptionTerm>Attempts</DescriptionTerm>
+              <DescriptionDetails>{inspected.attemptCount}</DescriptionDetails>
+              <DescriptionTerm>HTTP status</DescriptionTerm>
+              <DescriptionDetails>
+                {inspected.latestAttempt?.responseStatus ?? '—'}
+              </DescriptionDetails>
+              <DescriptionTerm>Error</DescriptionTerm>
+              <DescriptionDetails>{inspected.latestAttempt?.error || '—'}</DescriptionDetails>
+              <DescriptionTerm>Duration</DescriptionTerm>
+              <DescriptionDetails>
+                {inspected.latestAttempt?.durationMs
+                  ? `${inspected.latestAttempt.durationMs} ms`
+                  : '—'}
+              </DescriptionDetails>
+              {Object.entries(inspected.latestAttempt?.response ?? {}).map(([key, value]) => (
+                <Fragment key={key}>
+                  <DescriptionTerm>{key}</DescriptionTerm>
+                  <DescriptionDetails>{value}</DescriptionDetails>
+                </Fragment>
+              ))}
+            </DescriptionList>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
 
       <ShowOnceSecretDialog
         open={rotatedSecret !== null}

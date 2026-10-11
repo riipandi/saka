@@ -130,7 +130,7 @@ export function OidcClientNewView() {
                 {failed}
               </Text>
             ) : null}
-            <div className='mt-4 flex justify-end'>
+            <div {...stylex.props(createStyles.actions)}>
               <Button disabled={creating.isPending} onClick={submit}>
                 {creating.isPending ? <Spinner /> : null}
                 Create client
@@ -159,3 +159,11 @@ export function OidcClientNewView() {
     </div>
   )
 }
+
+const createStyles = stylex.create({
+  actions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: 16
+  }
+})

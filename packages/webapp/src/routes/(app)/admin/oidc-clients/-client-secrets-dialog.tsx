@@ -15,6 +15,7 @@ import {
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import { Spinner } from 'uilibs/components/extra/spinner'
+import { Text } from 'uilibs/components/extra/text'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { CreateOidcClientSecretRequestSchema, OidcClientService } from '~/codegen/federation_pb'
@@ -107,7 +108,11 @@ export function MintSecretDialog({ clientId }: { clientId: string }) {
               characters.
             </FieldDescription>
           </Field>
-          {failed ? <p className='text-sm text-red-600'>{failed}</p> : null}
+          {failed ? (
+            <Text render={<p />} variant='body-2' color='critical'>
+              {failed}
+            </Text>
+          ) : null}
           <DialogFooter>
             <Button variant='outline' onClick={() => enter(false)}>
               Cancel

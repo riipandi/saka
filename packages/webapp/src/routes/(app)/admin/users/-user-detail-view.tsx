@@ -32,9 +32,15 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
+import {
+  DescriptionDetails,
+  DescriptionList,
+  DescriptionTerm
+} from 'uilibs/components/extra/description-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListPagination } from '#/components/list-pagination'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList, LIST_MAX_LIMIT } from '#/hooks/use-pagination'
@@ -241,14 +247,25 @@ export function UserDetailView({ userId }: { userId: string }) {
           <Text render={<h1 />} variant='featured-4' weight='bold'>
             {user.displayName || user.username}
           </Text>
-          <div {...stylex.props(localStyles.metaRow)}>
-            <Text variant='body-2' color='neutral-faded'>
-              {user.username} · {user.email} · joined {formatInstant(user.createdAt)}
-            </Text>
-            {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
-            {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
-            {!user.emailVerified ? <Badge variant='secondary'>Unverified</Badge> : null}
-          </div>
+          <DescriptionList>
+            <DescriptionTerm>Username</DescriptionTerm>
+            <DescriptionDetails>{user.username}</DescriptionDetails>
+            <DescriptionTerm>Email</DescriptionTerm>
+            <DescriptionDetails>{user.email}</DescriptionDetails>
+            <DescriptionTerm>Joined</DescriptionTerm>
+            <DescriptionDetails>{formatInstant(user.createdAt)}</DescriptionDetails>
+            <DescriptionTerm>Identifier</DescriptionTerm>
+            <DescriptionDetails>{user.id}</DescriptionDetails>
+            <DescriptionTerm>Status</DescriptionTerm>
+            <DescriptionDetails>
+              {user.bannedAt ? <Badge variant='destructive'>Banned</Badge> : null}
+              {user.disabled ? <Badge variant='secondary'>Disabled</Badge> : null}
+              {!user.emailVerified ? <Badge variant='secondary'>Unverified</Badge> : null}
+              {!user.bannedAt && !user.disabled && user.emailVerified ? (
+                <Badge variant='secondary'>Active</Badge>
+              ) : null}
+            </DescriptionDetails>
+          </DescriptionList>
         </div>
         <CardAction>
           <UserAvatar name={user.displayName || user.username} picture={user.picture} size='lg' />
@@ -1286,31 +1303,13 @@ function ActivityCard({ userId }: { userId: string }) {
         )}
 
         {summary && (summary.hasPrevious || summary.hasNext) ? (
-          <div {...stylex.props(localStyles.activityPager)}>
-            <Text variant='body-2' color='neutral-faded'>
-              {summary.totalItems === null
-                ? `Page ${summary.page}${summary.totalPages ? ` of ${summary.totalPages}` : ''}`
-                : `${(summary.firstItemIndex ?? 0) + 1}–${summary.lastItemIndex ?? ''} of ${summary.totalItems}`}
-            </Text>
-            <div {...stylex.props(localStyles.pagerActions)}>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={!summary.hasPrevious}
-                onClick={() => setPage(summary.page - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={summary.hasNext === false}
-                onClick={() => setPage(summary.page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <ListPagination
+            page={summary.page}
+            totalPages={summary.totalPages}
+            hasPrevious={summary.hasPrevious}
+            hasNext={summary.hasNext}
+            onPageChange={setPage}
+          />
         ) : null}
       </CardContent>
     </Card>
