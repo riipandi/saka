@@ -136,6 +136,17 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [navigate, router]
   )
 
+  const handleStopImpersonation = useCallback(async () => {
+    // The backend answered the administrator's own fresh pair; the custody
+    // listener already swapped the claims — the profile follows here.
+    const profile = await authWorker().stopImpersonation()
+    setAuthUser(profile)
+    // The delegated account's data was the cache's — clear it the same way a
+    // sign-in as a different account does.
+    queryClient.clear()
+    void navigate({ to: '/overview' })
+  }, [navigate])
+
   const handleLogout = useCallback(() => {
     // The eviction effect in the `(app)` layout watches this same profile —
     // mark the sign-out first so its redirect never races the goodbye one.
@@ -166,6 +177,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       verifyPasskeyLogin: handleVerifyPasskeyLogin,
       requestOneTimeAccess: handleRequestOneTimeAccess,
       exchangeOneTimeToken: handleExchangeOneTimeToken,
+      stopImpersonation: handleStopImpersonation,
       logout: handleLogout
     }),
     [
@@ -178,6 +190,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       handleVerifyPasskeyLogin,
       handleRequestOneTimeAccess,
       handleExchangeOneTimeToken,
+      handleStopImpersonation,
       handleLogout
     ]
   )

@@ -96,6 +96,9 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
             exchangeOneTimeToken: async () => {
               throw new Error('sign in is not part of this page test')
             },
+            stopImpersonation: async () => {
+              throw new Error('the impersonation banner is not part of this page test')
+            },
             logout: () => {}
           }}
         >

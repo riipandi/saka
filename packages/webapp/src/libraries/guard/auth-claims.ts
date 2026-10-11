@@ -8,6 +8,16 @@ import { z } from 'zod'
 export interface AccessGrants {
   roles: string[]
   permissions: string[]
+  /**
+   * The delegation the token carries — `actor_id`/`actor_username` from the
+   * payload (see `pkg/jwtutils` `AccessClaims`). Present only when the token
+   * acts for someone else, which is the whole signal an impersonation session
+   * gives: an absent pair is an ordinary session. The renewal keeps
+   * `actor_id` but drops `actor_username`, so the id is the stable fact and
+   * the username is best-effort display sugar.
+   */
+  actorId?: string
+  actorUsername?: string
 }
 
 /** The empty snapshot every absent or unreadable answer normalizes to. */
@@ -15,7 +25,11 @@ export const emptyGrants = (): AccessGrants => ({ roles: [], permissions: [] })
 
 const accessClaimsSchema = z.object({
   roles: z.array(z.string()).optional(),
-  permissions: z.array(z.string()).optional()
+  permissions: z.array(z.string()).optional(),
+  // The delegation's wire spelling is snake_case (`pkg/jwtutils` writes the
+  // claims as `actor_id`/`actor_username`); the snapshot answers camelCase.
+  actor_id: z.string().optional(),
+  actor_username: z.string().optional()
 })
 
 /**
@@ -50,7 +64,9 @@ export function decodeAccessClaims(accessToken: string | null | undefined): Acce
 
   return {
     roles: parsed.data.roles ?? [],
-    permissions: parsed.data.permissions ?? []
+    permissions: parsed.data.permissions ?? [],
+    actorId: parsed.data.actor_id,
+    actorUsername: parsed.data.actor_username
   }
 }
 

@@ -10,6 +10,7 @@ import { toggleSidebar, toggleSidebarCollapsed } from '#/libraries/app.store'
 import { ensureSessionLoaded } from '#/libraries/guard/auth-session'
 import { isAuthenticated, isSigningOut } from '#/libraries/guard/auth-store'
 import { styles } from '#/styles/element/root-layout.stylex'
+import { AdminBanner } from './-admin-banner'
 import { SideNavbar } from './-sidebar'
 
 export const Route = createFileRoute('/(app)')({
@@ -87,6 +88,7 @@ function RouteComponent() {
         )}
 
         <div {...stylex.props(styles.contentArea)}>
+          <AdminBanner />
           <Outlet />
         </div>
       </div>

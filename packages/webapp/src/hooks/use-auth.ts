@@ -1,5 +1,6 @@
 import { useSelector } from '@tanstack/react-store'
 import { createContext, useContext } from 'react'
+import type { AccessGrants } from '#/libraries/guard/auth-claims'
 import type {
   AuthLoginOptions,
   CompleteSignInFactor,
@@ -19,6 +20,12 @@ export function useAuth(): AuthState {
  */
 export function useAuthUser(): UserProfile | null {
   return useSelector(authStore, (state) => state.user)
+}
+
+/** Subscribe to the grant snapshot — the claims the current access token
+ * carried at custody, the actor pair included. */
+export function useAuthGrants(): AccessGrants {
+  return useSelector(authStore, (state) => state.grants)
 }
 
 /** Worker login options plus the post-login redirect target. */
@@ -77,6 +84,12 @@ export interface AuthContextValue {
     deviceToken?: string,
     options?: AuthLoginContextOptions
   ) => Promise<SignInOutcome>
+  /**
+   * End the impersonation the session carries: the backend answers the
+   * administrator's own fresh pair, the profile swaps back, and the
+   * navigation to the overview already happened when this resolves.
+   */
+  stopImpersonation: () => Promise<void>
   logout: () => void
 }
 
@@ -100,6 +113,9 @@ export const AuthContext = createContext<AuthContextValue>({
     throw new Error('AuthProvider is not mounted.')
   },
   exchangeOneTimeToken: async () => {
+    throw new Error('AuthProvider is not mounted.')
+  },
+  stopImpersonation: async () => {
     throw new Error('AuthProvider is not mounted.')
   },
   logout: () => {}

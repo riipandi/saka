@@ -1,18 +1,28 @@
 import { ChevronRight, Link2, Power, Settings } from '@keyline-icons/react'
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
+import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
 import { Badge } from 'uilibs/components/extra/badge'
 import { Card, CardContent } from 'uilibs/components/extra/card'
 import { Item, ItemContent, ItemDescription } from 'uilibs/components/extra/item'
 import { ItemGroup, ItemActions, ItemMedia, ItemTitle } from 'uilibs/components/extra/item'
 import { Text } from 'uilibs/components/extra/text'
+import { z } from 'zod'
 import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 import { pageStyles } from '#/styles/pages/page.stylex'
 
+// The one-shot notice the admin guard's redirect carries. Anything else on
+// the URL is not this page's business.
+const overviewSearchSchema = z.object({
+  notice: z.enum(['admin']).optional()
+})
+
 export const Route = createFileRoute('/(app)/overview')({
   component: RouteComponent,
+  validateSearch: (search: Record<string, unknown>) => overviewSearchSchema.parse(search),
   staticData: {
     pageTitle: 'Overview'
   }
@@ -31,6 +41,17 @@ const greeting =
 function RouteComponent() {
   const user = useAuthUser()
   const { logout } = useAuthentication()
+  const navigate = useNavigate()
+  const { notice } = Route.useSearch()
+
+  // The guard-refusal notice belongs to the redirect that brought the visit
+  // here; a refresh or back-navigation never replays it.
+  const [arrivedAdminNotice] = useState(notice === 'admin')
+  useEffect(() => {
+    if (!notice) return
+    void navigate({ to: '/overview', replace: true })
+  }, [notice, navigate])
+
   const displayName =
     user?.displayName?.trim() || user?.username?.trim() || user?.email?.split('@')[0] || 'Guest'
 
@@ -63,6 +84,16 @@ function RouteComponent() {
           </Text>
         </div>
       </div>
+
+      {arrivedAdminNotice && (
+        <Alert style={pageStyles.quickCard}>
+          <AlertTitle>Administration is for administrators</AlertTitle>
+          <AlertDescription>
+            The console screens stayed out of reach — your account does not carry the administrator
+            role.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div
         {...stylex.props(
