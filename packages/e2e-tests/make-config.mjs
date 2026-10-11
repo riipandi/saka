@@ -20,6 +20,14 @@ source.rate_limit = {
   window: 60
 }
 
+// The one-time access email path is the sign-in completeness suite's act;
+// the deployment ships it off by default (the mailer must not be something
+// anyone on the internet can drive), so the harness turns it on here only.
+source.auth = {
+  ...source.auth,
+  one_time_access_email_as_unauthenticated_enabled: true
+}
+
 const target = resolve(root, 'build', buildTag, 'app.config.e2e.json')
 mkdirSync(dirname(target), { recursive: true })
 writeFileSync(target, JSON.stringify(source, null, 2))

@@ -59,6 +59,10 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   projects: process.env.E2E_ALL_BROWSERS ? projects : chromiumOnly(projects),
+  // The ladder's pages (/debug/passkey/*) exist only in the debug build —
+  // a release run excludes it here, and the ladder run carries
+  // `E2E_BUILD_TAG=debug` itself (the debug tree builds both).
+  testIgnore: buildTag === 'release' ? [/passkey-ladder/] : [],
   webServer: {
     command: serverCommand,
     url: `${serverBaseURL}/api/healthz`,
