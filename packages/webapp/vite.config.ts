@@ -140,7 +140,13 @@ export default defineConfig(({ mode }) => ({
           setupFiles: ['./tests/setup-browser.ts'],
           include: ['./**/*.browser.{test,spec}.{ts,tsx}'],
           exclude: ['**/node_modules/**'],
-          globals: true
+          globals: true,
+          // Browser-mode steps are at the mercy of CI runner CPU contention
+          // (the whole unit suite shares the machine); the 15s default
+          // timed out on healthy tests (PR #13, job 114637215633).
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+          retry: process.env.CI ? 1 : 0
         }
       }
     ]
