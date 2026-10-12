@@ -15,10 +15,11 @@ on:
   #     - "container/**"
   #     - "deploy/**"
   #     - "docs/**"
-  #     - "packages/**"
-  #     - "scripts/**"
   #     - "**/*.md"
   pull_request:
+    # Only documentation-adjacent paths skip the suite; everything the
+    # binaries are built from — including packages/** (the frontend) and
+    # scripts/** — must run the tests.
     paths-ignore:
       - ".vite-hooks/**"
       - ".github/workflows/release.yml"
@@ -29,8 +30,6 @@ on:
       - "container/**"
       - "deploy/**"
       - "docs/**"
-      - "packages/**"
-      - "scripts/**"
       - "**/*.md"
   workflow_dispatch:
     inputs:
@@ -123,7 +122,11 @@ jobs:
           gofmt -w codegen/proto/go
 
       - name: Tidy dependencies
-        run: go mod tidy
+        run: |
+          go mod tidy
+          # A tidy that changes the committed files must fail the run, not
+          # quietly mask drift in go.mod/go.sum.
+          git diff --exit-code go.mod go.sum
 
       - name: Install gotestsum
         if: steps.gotestsum.outputs.cache-hit != 'true'
