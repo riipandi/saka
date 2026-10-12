@@ -1,11 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError, createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
 import { SessionsView as SessionsPage } from '#/routes/(app)/account/-sessions-view'
 import {
   ListSessionsResponseSchema,
@@ -29,6 +24,7 @@ import {
   SendReauthenticationCodeResponseSchema,
   WebAuthnService
 } from '~/codegen/webauthn_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 type SessionOverrides = Partial<Omit<Session, '$typeName' | '$unknown'>>
 
@@ -56,50 +52,6 @@ interface SessionHandlers {
   reauthenticate?: (request: ReauthenticateRequest) => ReauthenticateResponse
   revokeSession?: (request: RevokeSessionRequest, requestHeader: Headers) => RevokeSessionResponse
   onPageChange?: (next: number) => void
-}
-
-function wrapperWith(transport: ReturnType<typeof createRouterTransport>, children: ReactNode) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: true,
-            isLoading: false,
-            login: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            completeSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            verifyPasskeyLogin: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            requestOneTimeAccess: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            exchangeOneTimeToken: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            continueSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          {children}
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
 }
 
 async function renderSessions(handlers?: SessionHandlers) {
@@ -140,48 +92,10 @@ async function renderSessions(handlers?: SessionHandlers) {
   })
 
   const logout = vi.fn()
-  const screen = await render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: true,
-            isLoading: false,
-            login: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            continueSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            completeSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            verifyPasskeyLogin: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            requestOneTimeAccess: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            exchangeOneTimeToken: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout
-          }}
-        >
-          <SessionsPage page={1} onPageChange={handlers?.onPageChange} />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  const screen = await renderView(<SessionsPage page={1} onPageChange={handlers?.onPageChange} />, {
+    transport,
+    auth: signedInAuth({ logout })
+  })
   return { screen, logout }
 }
 
@@ -300,9 +214,9 @@ describe('Sessions (browser)', () => {
           })
       })
     })
-    const screen = await render(
-      wrapperWith(transport, <SessionsPage page={1} onPageChange={onPageChange} />)
-    )
+    const screen = await renderView(<SessionsPage page={1} onPageChange={onPageChange} />, {
+      transport
+    })
 
     // The pager is the numbered window the summary implies; the next button
     // carries the turn to page 2.

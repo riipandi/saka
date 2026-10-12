@@ -1,7 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -9,9 +8,8 @@ import {
   createRouter
 } from '@tanstack/react-router'
 import { describe, expect, it, vi, type Mock } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
+import { type RenderResult } from 'vitest-browser-react'
 import { prefetchAppConfig } from '#/hooks/use-app-config'
-import { AuthContext } from '#/hooks/use-auth'
 import type { AuthLoginContextOptions } from '#/hooks/use-auth'
 import type { CompleteSignInFactor, SignInOutcome } from '#/libraries/guard/auth-engine'
 import { LoginView } from '#/routes/(auth)/-login-view'
@@ -25,6 +23,7 @@ import {
   SendReauthenticationCodeResponseSchema,
   WebAuthnService
 } from '~/codegen/webauthn_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 const USER = {
   id: 'usr_langdon',
@@ -45,13 +44,6 @@ const SIGNED_IN: SignInOutcome = {
       sessionId: 'sess_r'
     }
   }
-}
-
-const NOT_USED = 'sign in is not part of this test'
-
-/** The never-called stubs the AuthContext contract requires. */
-const unused = async () => {
-  throw new Error(NOT_USED)
 }
 
 async function renderLogin(
@@ -146,34 +138,18 @@ async function renderLogin(
     history: createMemoryHistory({ initialEntries: ['/login'] })
   })
 
-  const screen = await render(
-    <QueryClientProvider client={queryClient}>
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: false,
-            isLoading: false,
-            login,
-            continueSignIn: unused,
-            completeSignIn,
-            verifyPasskeyLogin,
-            requestOneTimeAccess,
-            exchangeOneTimeToken,
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          <RouterProvider router={router} />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  const screen = await renderView(<RouterProvider router={router} />, {
+    queryClient,
+    transport,
+    auth: signedInAuth({
+      loggedIn: false,
+      login,
+      completeSignIn,
+      verifyPasskeyLogin,
+      requestOneTimeAccess,
+      exchangeOneTimeToken
+    })
+  })
   return { screen, login, transportCalls, requestOneTimeAccess, exchangeOneTimeToken }
 }
 

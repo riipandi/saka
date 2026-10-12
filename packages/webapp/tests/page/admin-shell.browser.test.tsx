@@ -5,11 +5,12 @@ import {
   RouterProvider
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
+import { type RenderResult } from 'vitest-browser-react'
+import { type AuthContextValue } from '#/hooks/use-auth'
 import { clearAuth, setAuthGrants, setAuthUser } from '#/libraries/guard/auth-store'
 import { AdminBanner } from '#/routes/(app)/-admin-banner'
 import { SideNavbar } from '#/routes/(app)/-sidebar'
+import { renderView, signedInAuth } from './view-harness'
 
 const USER = {
   id: 'usr_veteri',
@@ -28,25 +29,11 @@ function withRouter(children: React.ReactNode) {
   return <RouterProvider router={router} />
 }
 
-function authContext(stopImpersonation: () => Promise<void>) {
-  return {
-    user: USER,
-    loggedIn: true,
-    isLoading: false,
-    login: vi.fn(),
-    continueSignIn: vi.fn(),
-    completeSignIn: vi.fn(),
-    verifyPasskeyLogin: vi.fn(),
-    requestOneTimeAccess: vi.fn(),
-    exchangeOneTimeToken: vi.fn(),
-    stopImpersonation,
-    impersonateUser: vi.fn(async () => {}),
-    logout: vi.fn()
-  }
-}
-
-async function mount(children: React.ReactNode): Promise<RenderResult> {
-  return render(withRouter(children))
+async function mount(
+  children: React.ReactNode,
+  opts: { auth?: AuthContextValue } = {}
+): Promise<RenderResult> {
+  return renderView(withRouter(children), opts)
 }
 
 describe('the impersonation banner', () => {
@@ -100,11 +87,9 @@ describe('the impersonation banner', () => {
     })
     const stopImpersonation = vi.fn(async () => {})
 
-    const screen = await mount(
-      <AuthContext.Provider value={authContext(stopImpersonation)}>
-        <AdminBanner />
-      </AuthContext.Provider>
-    )
+    const screen = await mount(<AdminBanner />, {
+      auth: signedInAuth({ user: USER, stopImpersonation })
+    })
     const banner = screen.getByTestId('impersonation-banner')
 
     await banner.getByRole('button', { name: 'Stop impersonating' }).click()
@@ -112,7 +97,7 @@ describe('the impersonation banner', () => {
     clearAuth()
   })
 
-  it('surfaces the refusal when the stop is refused and keeps the way out disabled', async () => {
+  it('surfaces the refusal when the stop is refused and the way out stays retryable', async () => {
     setAuthUser(USER)
     setAuthGrants({
       roles: ['editor'],
@@ -124,16 +109,16 @@ describe('the impersonation banner', () => {
       throw new Error('the delegation already ended elsewhere')
     })
 
-    const screen = await mount(
-      <AuthContext.Provider value={authContext(stopImpersonation)}>
-        <AdminBanner />
-      </AuthContext.Provider>
-    )
+    const screen = await mount(<AdminBanner />, {
+      auth: signedInAuth({ user: USER, stopImpersonation })
+    })
     const banner = screen.getByTestId('impersonation-banner')
 
     await banner.getByRole('button', { name: 'Stop impersonating' }).click()
     await expect.element(banner.getByText('the delegation already ended elsewhere')).toBeVisible()
-    await expect.element(banner.getByRole('button', { name: 'Stop impersonating' })).toBeDisabled()
+    // A refused stop leaves the button alive — a transient failure is one
+    // the reader can retry, not one the banner locks them out of.
+    await expect.element(banner.getByRole('button', { name: 'Stop impersonating' })).toBeEnabled()
     clearAuth()
   })
 })

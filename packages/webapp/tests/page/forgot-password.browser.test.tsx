@@ -1,6 +1,4 @@
 import { Code, ConnectError, createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -8,52 +6,10 @@ import {
   createRouter
 } from '@tanstack/react-router'
 import { describe, expect, it } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
+import { type RenderResult } from 'vitest-browser-react'
 import { ForgotPasswordView } from '#/routes/(auth)/-forgot-password-view'
 import { PasswordRecoveryService } from '~/codegen/authn_pb'
-
-/** The stubs the context contract requires; the anonymous views never call
- * the session surfaces. */
-const notUsed = async () => {
-  throw new Error('session surfaces are not part of this page test')
-}
-
-import { AuthContext } from '#/hooks/use-auth'
-
-function wrapper(children: React.ReactNode, transport: ReturnType<typeof createRouterTransport>) {
-  return (
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } } })
-      }
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: false,
-            isLoading: false,
-            login: notUsed,
-            continueSignIn: notUsed,
-            completeSignIn: notUsed,
-            verifyPasskeyLogin: notUsed,
-            requestOneTimeAccess: notUsed,
-            exchangeOneTimeToken: notUsed,
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          {children}
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
-}
+import { renderView, signedInAuth } from './view-harness'
 
 async function renderForgot(
   forgotPassword?: () => { status: string; message: string; resetToken: string }
@@ -70,7 +26,10 @@ async function renderForgot(
     routeTree: RootRoute,
     history: createMemoryHistory({ initialEntries: ['/forgot-password'] })
   })
-  return render(wrapper(<RouterProvider router={router} />, transport))
+  return renderView(<RouterProvider router={router} />, {
+    transport,
+    auth: signedInAuth({ loggedIn: false })
+  })
 }
 
 describe('Forgot password (browser)', () => {

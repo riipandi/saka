@@ -1,7 +1,5 @@
 import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError, createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -9,8 +7,7 @@ import {
   createRouter
 } from '@tanstack/react-router'
 import { describe, expect, it } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
+import { type RenderResult } from 'vitest-browser-react'
 import { SignupView } from '#/routes/(auth)/-signup-view'
 import { SignupResponseSchema, SignupService, UserSchema } from '~/codegen/identity_pb'
 import {
@@ -18,12 +15,7 @@ import {
   PublicSettingSchema,
   SettingsService
 } from '~/codegen/settings_pb'
-
-/** The stubs the context contract requires; the anonymous views never call
- * the session surfaces. */
-const notUsed = async () => {
-  throw new Error('session surfaces are not part of this page test')
-}
+import { renderView, signedInAuth } from './view-harness'
 
 interface SignupCapture {
   firstName: string
@@ -65,41 +57,6 @@ function settingsTransport(
   })
 }
 
-function wrapper(children: React.ReactNode, transport: ReturnType<typeof createRouterTransport>) {
-  return (
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } } })
-      }
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: false,
-            isLoading: false,
-            login: notUsed,
-            continueSignIn: notUsed,
-            completeSignIn: notUsed,
-            verifyPasskeyLogin: notUsed,
-            requestOneTimeAccess: notUsed,
-            exchangeOneTimeToken: notUsed,
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          {children}
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
-}
-
 async function renderSignup(
   entries: Array<[string, string]>,
   signup?: (request: SignupCapture) => { status: string; message: string },
@@ -110,7 +67,10 @@ async function renderSignup(
     routeTree: RootRoute,
     history: createMemoryHistory({ initialEntries: ['/signup'] })
   })
-  return render(wrapper(<RouterProvider router={router} />, settingsTransport(entries, signup)))
+  return renderView(<RouterProvider router={router} />, {
+    transport: settingsTransport(entries, signup),
+    auth: signedInAuth({ loggedIn: false })
+  })
 }
 
 const OPEN: Array<[string, string]> = [

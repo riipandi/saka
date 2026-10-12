@@ -1,7 +1,5 @@
 import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -9,20 +7,14 @@ import {
   createRouter
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
+import { type RenderResult } from 'vitest-browser-react'
 import { ResetPasswordView } from '#/routes/(auth)/-reset-password-view'
 import {
   PasswordRecoveryService,
   type ResetPasswordResponse,
   ResetPasswordResponseSchema
 } from '~/codegen/authn_pb'
-
-/** The stubs the context contract requires; the anonymous views never call
- * the session surfaces. */
-const notUsed = async () => {
-  throw new Error('session surfaces are not part of this page test')
-}
+import { renderView, signedInAuth } from './view-harness'
 
 const OK: ResetPasswordResponse = create(ResetPasswordResponseSchema, {
   status: 'success',
@@ -55,40 +47,10 @@ async function renderReset(
     routeTree: RootRoute,
     history: createMemoryHistory({ initialEntries: ['/reset-password'] })
   })
-  const screen = await render(
-    <QueryClientProvider
-      client={
-        new QueryClient({
-          defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } }
-        })
-      }
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: false,
-            isLoading: false,
-            login: notUsed,
-            continueSignIn: notUsed,
-            completeSignIn: notUsed,
-            verifyPasskeyLogin: notUsed,
-            requestOneTimeAccess: notUsed,
-            exchangeOneTimeToken: notUsed,
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          <RouterProvider router={router} />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  const screen = await renderView(<RouterProvider router={router} />, {
+    transport,
+    auth: signedInAuth({ loggedIn: false })
+  })
   return { screen }
 }
 

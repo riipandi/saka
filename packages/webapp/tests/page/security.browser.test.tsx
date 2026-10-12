@@ -1,10 +1,7 @@
 import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
+import { type RenderResult } from 'vitest-browser-react'
 import { SecurityView } from '#/routes/(app)/account/-security-view'
 import {
   DeleteTotpEnrollmentResponseSchema,
@@ -33,6 +30,7 @@ import {
   DeleteCredentialResponseSchema,
   CredentialSchema
 } from '~/codegen/webauthn_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 const USER = create(UserSchema, {
   id: 'usr_langdon',
@@ -160,48 +158,10 @@ async function renderSecurity(
     })
   })
 
-  const screen = await render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: true,
-            isLoading: false,
-            login: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            continueSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            completeSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            verifyPasskeyLogin: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            requestOneTimeAccess: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            exchangeOneTimeToken: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          <SecurityView />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  const screen = await renderView(<SecurityView />, {
+    transport,
+    auth: signedInAuth()
+  })
   return { screen, captured }
 }
 

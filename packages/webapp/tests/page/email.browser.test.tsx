@@ -1,10 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
 import { EmailView } from '#/routes/(app)/account/-email-view'
 import {
   ConfirmEmailChangeResponseSchema,
@@ -16,6 +12,7 @@ import {
   VerifyEmailResponseSchema
 } from '~/codegen/identity_pb'
 import { ListPublicResponseSchema, SettingsService } from '~/codegen/settings_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 const PROFILE = {
   id: 'user_v1ag7h12abcd',
@@ -64,52 +61,17 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
     })
   })
 
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const screen = await render(
-    <QueryClientProvider client={queryClient}>
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: {
-              id: PROFILE.id,
-              username: PROFILE.username,
-              email: PROFILE.email,
-              displayName: PROFILE.displayName
-            },
-            loggedIn: true,
-            isLoading: false,
-            login: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            continueSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            completeSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            verifyPasskeyLogin: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            requestOneTimeAccess: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            exchangeOneTimeToken: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          <EmailView />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  const screen = await renderView(<EmailView />, {
+    transport,
+    auth: signedInAuth({
+      user: {
+        id: PROFILE.id,
+        username: PROFILE.username,
+        email: PROFILE.email,
+        displayName: PROFILE.displayName
+      }
+    })
+  })
   return { screen, sendEmail, requestEmailChange }
 }
 

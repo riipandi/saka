@@ -1,10 +1,6 @@
 import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
 import { ConnectionsView } from '#/routes/(app)/account/-connections-view'
 import type {
   GetLinkedAccountTokensRequest,
@@ -26,6 +22,7 @@ import {
   SendReauthenticationCodeResponseSchema,
   WebAuthnService
 } from '~/codegen/webauthn_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 function linkedAccount(id: string, provider: string, email: string) {
   return create(OAuthLinkedAccountSchema, {
@@ -90,48 +87,10 @@ async function renderConnections(handlers?: ConnectionHandlers) {
     })
   })
 
-  return render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider
-          value={{
-            user: null,
-            loggedIn: true,
-            isLoading: false,
-            login: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            continueSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            completeSignIn: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            verifyPasskeyLogin: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            requestOneTimeAccess: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            exchangeOneTimeToken: async () => {
-              throw new Error('sign in is not part of this page test')
-            },
-            stopImpersonation: async () => {
-              throw new Error('the impersonation banner is not part of this page test')
-            },
-            impersonateUser: async () => {
-              throw new Error('impersonation is not part of this page test')
-            },
-            logout: () => {}
-          }}
-        >
-          <ConnectionsView />
-        </AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
+  return renderView(<ConnectionsView />, {
+    transport,
+    auth: signedInAuth()
+  })
 }
 
 describe('Connections (browser)', () => {
