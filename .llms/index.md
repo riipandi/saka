@@ -32,7 +32,8 @@ the diff actually made stale.
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
 without the owner's explicit instruction. All listed plans are `done` or
-`shipped`, except `plan-20261008_1739.md` (`awaiting-approval`).
+`shipped`, except `plan-20261008_1739.md` and `plan-20261012_1935.md`
+(both `awaiting-approval`).
 
 | File | Subject |
 | --- | --- |
@@ -124,5 +125,8 @@ plans on 2026-10-12 — the files are the tracker, this is the index):
 
 - **A design decision** → the plan's Decisions section (dated, with rejected alternatives); the storage model's decisions live in `plan-20261003_2359.md`.
 - **An open item** → `.llms/issues/` (above).
+- **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
+- **What a past session did** → the handover of that date; memory recall supplements it.
+m** → `.llms/issues/` (above).
 - **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
 - **What a past session did** → the handover of that date; memory recall supplements it.
