@@ -32,7 +32,8 @@ the diff actually made stale.
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
 without the owner's explicit instruction. All listed plans are `done` or
-`shipped`, except `plan-20261008_1739.md` (`awaiting-approval`).
+`shipped`, except `plan-20261008_1739.md` and `plan-20261012_1935.md`
+(both `awaiting-approval`).
 
 | File | Subject |
 | --- | --- |
@@ -115,7 +116,7 @@ plans on 2026-10-12 — the files are the tracker, this is the index):
 | `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
 | `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim parked on the first split-assets deployment |
 | `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — the remedy shape (self-healing seeder vs startup check vs documented rule) awaits the owner's decision |
-| `issue-20261012_0445.md` | open | The OIDC consent interaction page does not exist in the SPA (backend complete; needs its own plan) — the timezone-picker half resolved |
+| `issue-20261012_0445.md` | open | The OIDC consent interaction page does not exist in the SPA (backend complete) — its plan is written (`plan-20261012_1935.md`, `awaiting-approval`); the timezone-picker half resolved |
 | `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — derive the totals from the seeder registry when CI goes red again |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; report upstream |
 
