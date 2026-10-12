@@ -2,7 +2,7 @@ import { createFileRoute, useSearch } from '@tanstack/react-router'
 import { z } from 'zod'
 import { LoginView } from './-login-view'
 
-export const Route = createFileRoute('/(auth)/login')({
+export const Route = createFileRoute('/(auth)/login/')({
   component: RouteComponent,
   validateSearch: z.object({
     loggedOut: z.coerce.boolean().optional(),

@@ -49,6 +49,9 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -98,26 +101,11 @@ export function BlocklistView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Signup blocklist
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The identifiers no open-mode sign-up may claim — one address, or one domain with the
-            leading @.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Signup blocklist'
+        description='The identifiers no open-mode sign-up may claim — one address, or one domain with the leading @.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -132,7 +120,12 @@ export function BlocklistView({
           </CardHeader>
           <CardContent>
             {entries.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
+            ) : entries.isError ? (
+              <ListError
+                message={getErrorMessage(entries.error)}
+                onRetry={() => void entries.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

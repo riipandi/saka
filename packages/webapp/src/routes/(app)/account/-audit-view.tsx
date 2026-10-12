@@ -19,7 +19,6 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import {
   Table,
   TableBody,
@@ -29,6 +28,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
 import { dataTableStyles } from '#/styles/element/data-table.stylex'
@@ -154,7 +154,7 @@ export function AuditView({
           </CardHeader>
           <CardContent>
             {logs.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

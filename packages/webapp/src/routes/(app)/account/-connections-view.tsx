@@ -32,8 +32,9 @@ import {
   ItemGroup,
   ItemTitle
 } from 'uilibs/components/extra/item'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
 import { StepUpCancelled } from '#/libraries/reauth/reauth'
@@ -114,11 +115,9 @@ export function ConnectionsView({ embedded = false }: { embedded?: boolean } = {
           </CardHeader>
           <CardContent>
             {linked.isPending ? (
-              <Spinner />
+              <TableSkeleton />
             ) : linked.isError ? (
-              <Text variant='body-2' color='critical'>
-                {linked.error.message}
-              </Text>
+              <ListError message={linked.error.message} onRetry={() => void linked.refetch()} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -209,11 +208,9 @@ function TokensDialog({
           </DialogDescription>
         </DialogHeader>
         {tokens.isPending ? (
-          <Spinner />
+          <TableSkeleton />
         ) : tokens.isError ? (
-          <Text variant='body-2' color='critical'>
-            {tokens.error.message}
-          </Text>
+          <ListError message={tokens.error.message} onRetry={() => void tokens.refetch()} />
         ) : (
           <div {...stylex.props(styles.tokens)}>
             <Text render={<p />} variant='caption-1' weight='semibold'>

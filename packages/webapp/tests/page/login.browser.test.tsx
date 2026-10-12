@@ -2,8 +2,10 @@ import { create } from '@bufbuild/protobuf'
 import { createRouterTransport } from '@connectrpc/connect'
 import { QueryClient } from '@tanstack/react-query'
 import {
+  Outlet,
   RouterProvider,
   createMemoryHistory,
+  createRoute,
   createRootRoute,
   createRouter
 } from '@tanstack/react-router'
@@ -12,7 +14,9 @@ import { type RenderResult } from 'vitest-browser-react'
 import { prefetchAppConfig } from '#/hooks/use-app-config'
 import type { AuthLoginContextOptions } from '#/hooks/use-auth'
 import type { CompleteSignInFactor, SignInOutcome } from '#/libraries/guard/auth-engine'
+import { pauseSignInChallenge } from '#/libraries/guard/sign-in-pause'
 import { LoginView } from '#/routes/(auth)/-login-view'
+import { MfaPauseView } from '#/routes/(auth)/-mfa-pause-view'
 import {
   BeginTotpEnrollmentResponseSchema,
   ConfirmTotpEnrollmentResponseSchema,
@@ -72,6 +76,7 @@ async function renderLogin(
 ): Promise<{
   screen: RenderResult
   login: Mock
+  router: { history: { location: { pathname: string; search: string } } }
   transportCalls: { beginLogin: number }
   requestOneTimeAccess: Mock<(email: string) => Promise<string>>
   exchangeOneTimeToken: Mock<
@@ -132,9 +137,21 @@ async function renderLogin(
   const requestOneTimeAccess = options.requestOneTimeAccess ?? vi.fn(async () => 'devtok_test')
   const exchangeOneTimeToken = options.exchangeOneTimeToken ?? vi.fn(async () => SIGNED_IN)
 
-  const RootRoute = createRootRoute({ component: () => <LoginView /> })
+  // The fork now hands the browser to the pause page, so the test router
+  // carries the pair of routes the real tree has.
+  const RootRoute = createRootRoute({ component: Outlet })
+  const LoginRoute = createRoute({
+    getParentRoute: () => RootRoute,
+    path: '/login',
+    component: () => <LoginView />
+  })
+  const MfaRoute = createRoute({
+    getParentRoute: () => RootRoute,
+    path: '/login/mfa',
+    component: () => <MfaPauseView search={{}} />
+  })
   const router = createRouter({
-    routeTree: RootRoute,
+    routeTree: RootRoute.addChildren([LoginRoute, MfaRoute]),
     history: createMemoryHistory({ initialEntries: ['/login'] })
   })
 
@@ -150,7 +167,7 @@ async function renderLogin(
       exchangeOneTimeToken
     })
   })
-  return { screen, login, transportCalls, requestOneTimeAccess, exchangeOneTimeToken }
+  return { screen, login, router, transportCalls, requestOneTimeAccess, exchangeOneTimeToken }
 }
 
 async function submitCredentials(screen: RenderResult) {
@@ -187,11 +204,15 @@ describe('Login (browser)', () => {
         options?: AuthLoginContextOptions
       ) => Promise<void>
     >(async () => {})
-    const { screen } = await renderLogin(challenge, completeSignIn)
+    const { screen, router } = await renderLogin(challenge, completeSignIn)
     await submitCredentials(screen)
 
-    const code = screen.getByLabelText('Verification code')
-    await expect.element(code).toBeVisible()
+    // The fork's own act: the browser lands on the pause page and the
+    // paused bridge renders there.
+    await expect.element(screen.getByRole('textbox').first()).toBeVisible()
+    expect(router.history.location.pathname).toBe('/login/mfa')
+
+    const code = screen.getByRole('textbox').first()
     await code.fill('039471')
     await screen.getByRole('button', { name: 'Verify' }).click()
     await vi.waitFor(() => {
@@ -216,12 +237,13 @@ describe('Login (browser)', () => {
         options?: AuthLoginContextOptions
       ) => Promise<void>
     >(async () => {})
-    const { screen } = await renderLogin(challenge, completeSignIn)
+    const { screen, router } = await renderLogin(challenge, completeSignIn)
     await submitCredentials(screen)
 
-    await expect.element(screen.getByText('The verification window closed')).toBeVisible()
-    await screen.getByRole('button', { name: 'Back to sign in' }).click()
+    // The expired bridge buys no page: the pause page walks the browser
+    // back to the credentials form, search intact.
     await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+    expect(router.history.location.pathname).toBe('/login')
     expect(completeSignIn).not.toHaveBeenCalled()
   })
 
@@ -246,7 +268,7 @@ describe('Login (browser)', () => {
 
     await expect.element(screen.getByText('JBSWY3DPEHPK3PXP')).toBeVisible()
 
-    await screen.getByLabelText('The code your authenticator renders').fill('039471')
+    await screen.getByRole('textbox').first().fill('039471')
     await screen.getByRole('button', { name: 'Confirm' }).click()
 
     await expect.element(screen.getByText('Your recovery codes — shown once')).toBeVisible()
@@ -390,7 +412,7 @@ describe('Login (browser)', () => {
     expect(requestOneTimeAccess).not.toHaveBeenCalled()
   })
 
-  it('hands a forked exchange to the challenge, carrying the same machine', async () => {
+  it('hands a forked exchange to the pause page, carrying the same bridge', async () => {
     const challenge: SignInOutcome = {
       kind: 'mfa-challenge',
       pendingToken: 'bridge_9',
@@ -414,10 +436,10 @@ describe('Login (browser)', () => {
     await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
     await screen.getByRole('button', { name: 'Sign in' }).click()
 
-    // The fork lands in the challenge the credentials form feeds — the
-    // exchange's second factor is the machine's, not a new flow.
-    await expect.element(screen.getByLabelText('Verification code')).toBeVisible()
-    await screen.getByLabelText('Verification code').fill('039471')
+    // The fork's second factor is spent on the pause page — the exchange's
+    // bridge, rendered from the slot.
+    await expect.element(screen.getByRole('textbox').first()).toBeVisible()
+    await screen.getByRole('textbox').first().fill('039471')
     await screen.getByRole('button', { name: 'Verify' }).click()
     await vi.waitFor(() => {
       expect(completeSignIn).toHaveBeenCalledWith(
@@ -426,5 +448,76 @@ describe('Login (browser)', () => {
         { redirectTo: undefined }
       )
     })
+  })
+
+  it('restores the paused bridge on a refresh of the pause page', async () => {
+    pauseSignInChallenge(
+      { kind: 'mfa-challenge', pendingToken: 'bridge_r', expiresAt: Date.now() + 300_000 },
+      '/account/security'
+    )
+    const completeSignIn = vi.fn<
+      (
+        pendingToken: string,
+        factor: CompleteSignInFactor,
+        options?: AuthLoginContextOptions
+      ) => Promise<void>
+    >(async () => {})
+
+    const transport = createRouterTransport(() => {})
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    // The second mount is the refresh: a fresh React tree over the same
+    // session storage — the pause answers again.
+    for (let mount = 0; mount < 2; mount += 1) {
+      const RootRoute = createRootRoute({ component: Outlet })
+      const MfaRoute = createRoute({
+        getParentRoute: () => RootRoute,
+        path: '/login/mfa',
+        component: () => <MfaPauseView search={{ return_to: '/account/security' }} />
+      })
+      const router = createRouter({
+        routeTree: RootRoute.addChildren([MfaRoute]),
+        history: createMemoryHistory({ initialEntries: ['/login/mfa'] })
+      })
+      const screen = await renderView(<RouterProvider router={router} />, {
+        queryClient,
+        transport,
+        auth: signedInAuth({ loggedIn: false, completeSignIn })
+      })
+      await expect.element(screen.getByRole('textbox').first()).toBeVisible()
+      void screen.unmount()
+    }
+  })
+
+  it('walks a pauseless visit back to the credentials form with the search intact', async () => {
+    // The previous test's pause lingers in the session storage the browser
+    // realm shares — this visit owns a clean slot.
+    sessionStorage.clear()
+    const RootRoute = createRootRoute({ component: Outlet })
+    const LoginRoute = createRoute({
+      getParentRoute: () => RootRoute,
+      path: '/login',
+      component: () => <LoginView />
+    })
+    const MfaRoute = createRoute({
+      getParentRoute: () => RootRoute,
+      path: '/login/mfa',
+      component: () => <MfaPauseView search={{ return_to: '/account/security' }} />
+    })
+    const router = createRouter({
+      routeTree: RootRoute.addChildren([LoginRoute, MfaRoute]),
+      history: createMemoryHistory({
+        initialEntries: ['/login/mfa?return_to=%2Faccount%2Fsecurity']
+      })
+    })
+    const screen = await renderView(<RouterProvider router={router} />, {
+      queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+      transport: createRouterTransport(() => {}),
+      auth: signedInAuth({ loggedIn: false })
+    })
+
+    await expect.element(screen.getByLabelText('Username or email')).toBeVisible()
+    expect(router.history.location.pathname).toBe('/login')
+    expect(router.history.location.search).toContain('return_to')
   })
 })

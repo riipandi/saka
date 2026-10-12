@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from 'uilibs/components/base/tabs'
-import { Text } from 'uilibs/components/extra/text'
+import { PageHeader } from '#/components/-page-header'
 import { pageStyles } from '#/styles/pages/page.stylex'
 
 const accountTabs = [
@@ -65,25 +65,11 @@ function SettingsShell() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Settings
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            {current?.description ?? 'Your account.'}
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Account'
+        title='Settings'
+        description={current?.description ?? 'Your account.'}
+      />
       <Tabs value={current?.id ?? 'profile'}>
         <TabsList>
           {accountTabs.map((tab) => (

@@ -14,7 +14,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Item,
   ItemActions,
@@ -24,11 +30,13 @@ import {
   ItemMedia,
   ItemTitle
 } from 'uilibs/components/extra/item'
-import { Spinner } from 'uilibs/components/extra/spinner'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
+import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -75,25 +83,11 @@ export function OidcClientsView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            OIDC clients
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The relying parties this deployment signs accounts into.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='OIDC clients'
+        description='The relying parties this deployment signs accounts into.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -125,7 +119,12 @@ export function OidcClientsView({
               />
             </div>
             {clients.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
+            ) : clients.isError ? (
+              <ListError
+                message={getErrorMessage(clients.error)}
+                onRetry={() => void clients.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -134,6 +133,13 @@ export function OidcClientsView({
                     Define the first relying party to point an application's sign-in here.
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Can permission='oidc_client:*:create'>
+                    <Button size='sm' render={<Link to='/admin/oidc-clients/new' />}>
+                      <Plus size={16} /> Define the first client
+                    </Button>
+                  </Can>
+                </EmptyContent>
               </Empty>
             ) : (
               <ItemGroup>

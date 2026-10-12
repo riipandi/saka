@@ -56,6 +56,9 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { LIST_MAX_LIMIT, listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -118,25 +121,11 @@ export function SignupTokensView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Signup tokens
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The invitations accounts are created under — the raw value is shown once, at issue.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Signup tokens'
+        description='The invitations accounts are created under — the raw value is shown once, at issue.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -151,7 +140,12 @@ export function SignupTokensView({
           </CardHeader>
           <CardContent>
             {tokens.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
+            ) : tokens.isError ? (
+              <ListError
+                message={getErrorMessage(tokens.error)}
+                onRetry={() => void tokens.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

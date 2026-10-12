@@ -10,7 +10,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { z } from 'zod'
 import { useAuthentication } from '#/hooks/use-auth'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { offerSignInChallenge } from '#/libraries/guard/sign-in-handoff'
+import { pauseSignInChallenge } from '#/libraries/guard/sign-in-pause'
 import { styles } from '#/styles/pages/login.stylex'
 
 export const Route = createFileRoute('/(auth)/auth/callback')({
@@ -54,12 +54,12 @@ function RouteComponent() {
     started.current = true
     continueSignIn(flowToken, { redirectTo: returnTo })
       .then((outcome) => {
-        // A multi-factor fork carries no tokens — its bridge is offered to
-        // the login flow's machine in memory and the browser goes there; the
-        // URL never carries the bridge.
+        // A multi-factor fork carries no tokens — its bridge pauses in
+        // storage and the browser goes to the pause page, whose refresh-
+        // surviving state owns the rest; the URL never carries the bridge.
         if (outcome.kind !== 'signed-in') {
-          offerSignInChallenge(outcome)
-          void navigate({ to: '/login', replace: true })
+          pauseSignInChallenge(outcome, returnTo)
+          void navigate({ to: '/login/mfa', search: { return_to: returnTo }, replace: true })
         }
       })
       .catch((cause: unknown) => setFailed(getErrorMessage(cause)))

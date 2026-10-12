@@ -23,8 +23,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { Spinner } from 'uilibs/components/extra/spinner'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Table,
   TableBody,
@@ -33,7 +38,8 @@ import {
   TableHeader,
   TableRow
 } from 'uilibs/components/extra/table'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { ListPagination } from '#/components/list-pagination'
 import { TimeValue } from '#/components/time-value'
@@ -42,7 +48,7 @@ import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
 import { AccountFrame } from './-account-frame'
-import { ApiKeyCreateDialog } from './-api-key-dialog'
+import { ApiKeyCreateSheet } from './-api-key-sheet'
 
 /** The RFC 3339 instants the key view carries, read as the viewer's own
  * wall clock — a key list is recognized by when it lives, not by the zone
@@ -105,11 +111,9 @@ export function ApiKeysView({
     <AccountFrame embedded={embedded}>
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={5} />
         ) : keys.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(keys.error)}
-          </Text>
+          <ListError message={getErrorMessage(keys.error)} onRetry={() => void keys.refetch()} />
         ) : (keys.data?.apiKeys ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -119,6 +123,11 @@ export function ApiKeysView({
                 needs it, and revoke it when the task is done.
               </EmptyDescription>
             </EmptyHeader>
+            <EmptyContent>
+              <Button size='sm' onClick={() => setCreateOpen(true)}>
+                <Plus size={16} /> Issue the first key
+              </Button>
+            </EmptyContent>
           </Empty>
         ) : (
           <>
@@ -235,7 +244,7 @@ export function ApiKeysView({
         )}
       </div>
 
-      <ApiKeyCreateDialog
+      <ApiKeyCreateSheet
         open={createOpen}
         onOpenChange={(next) => {
           setCreateOpen(next)

@@ -41,6 +41,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/compone
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { DateTimePicker } from '#/components/-date-time-picker'
+import { FormSkeleton } from '#/components/-skeleton-form'
 import { ListPagination } from '#/components/list-pagination'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
@@ -213,7 +214,20 @@ export function UserDetailView({ userId }: { userId: string }) {
     }
   })
 
-  if (read.isPending) return <Spinner />
+  if (read.isPending) {
+    return (
+      <div
+        {...stylex.props(
+          pageStyles.container,
+          pageStyles.containerPadMedium,
+          pageStyles.containerPadLarge,
+          pageStyles.containerPadXLarge
+        )}
+      >
+        <FormSkeleton fields={4} />
+      </div>
+    )
+  }
   if (read.isError) {
     return (
       <div {...stylex.props(pageStyles.container, pageStyles.containerPadMedium)}>
@@ -280,11 +294,28 @@ export function UserDetailView({ userId }: { userId: string }) {
         <DelegationCard onImpersonate={(reason) => impersonateUser(user.id, reason)} />
         <ActivityCard userId={user.id} />
         <GrantsCard user={user} />
-        <DangerCard
-          onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
-          pending={remove.isPending}
-          error={remove.error ? getErrorMessage(remove.error) : null}
-        />
+        {user.roles.includes('administrator') ? (
+          // The standing is the delete's own guard: the server refuses the
+          // last reachable administrator's departure, and an administrator
+          // row's delete affordance waits for the role to demote — the
+          // grants card above is the way out.
+          <Card>
+            <CardHeader>
+              <CardTitle>Deletion waits for the role</CardTitle>
+              <CardDescription>
+                This account holds the administrator role, and the deployment must always keep a
+                reachable administrator. Demote the role in the grants card above — the delete
+                control answers to it.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <DangerCard
+            onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
+            pending={remove.isPending}
+            error={remove.error ? getErrorMessage(remove.error) : null}
+          />
+        )}
       </div>
     </div>
   )

@@ -40,6 +40,8 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -192,11 +194,12 @@ export function WebhookDetailView({ webhookId }: { webhookId: string }) {
           </CardHeader>
           <CardContent>
             {deliveries.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={4} />
             ) : deliveries.isError ? (
-              <Text variant='body-2' color='critical'>
-                {getErrorMessage(deliveries.error)}
-              </Text>
+              <ListError
+                message={getErrorMessage(deliveries.error)}
+                onRetry={() => void deliveries.refetch()}
+              />
             ) : (deliveries.data?.deliveries ?? []).length === 0 ? (
               <Empty>
                 <EmptyHeader>

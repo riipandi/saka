@@ -2,7 +2,7 @@ import { create } from '@bufbuild/protobuf'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { createClient } from '@connectrpc/connect'
 import { createConnectQueryKey, useQuery, useTransport } from '@connectrpc/connect-query'
-import { KeyRound, Plus, Smartphone } from '@keyline-icons/react'
+import { KeyRound, Plus, Smartphone, Check, Copy } from '@keyline-icons/react'
 import { startRegistration } from '@simplewebauthn/browser'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,6 +20,8 @@ import {
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
+import { OTPField, OTPFieldSlot } from 'uilibs/components/base/otp-field'
+import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
   Card,
@@ -32,6 +34,9 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/compone
 import { InputPassword } from 'uilibs/components/extra/input-password'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { renderSVG } from 'uqr'
+import { FormSkeleton } from '#/components/-skeleton-form'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
 import { StepUpCancelled } from '#/libraries/reauth/reauth'
@@ -40,6 +45,8 @@ import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/security.stylex'
 import {
   DeleteTotpEnrollmentRequestSchema,
+  BeginTotpEnrollmentRequestSchema,
+  ConfirmTotpEnrollmentRequestSchema,
   DisableMfaRequestSchema,
   ListTotpEnrollmentsRequestSchema,
   MultifactorService,
@@ -151,7 +158,6 @@ function CodeRequestDialog({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             autoComplete='one-time-code'
-            autoFocus
           />
           {optional ? (
             <FieldDescription>Leave empty when no other confirmed factor is held.</FieldDescription>
@@ -218,6 +224,29 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
   >(null)
   const [passkeyName, setPasskeyName] = useState('')
   const [passkeyBusy, setPasskeyBusy] = useState(false)
+  // The authenticator enrollment is an inline multistep panel, not a
+  // dialog: the name step mints the unconfirmed row, the scan step proves
+  // it with a code, and the last step shows the recovery codes once.
+  const [enrollOpen, setEnrollOpen] = useState(false)
+  const [enrollStep, setEnrollStep] = useState<'name' | 'scan' | 'codes'>('name')
+  const [enrollName, setEnrollName] = useState('')
+  const [totpScan, setTotpScan] = useState<{
+    totpId: string
+    secret: string
+    otpauthUri: string
+  } | null>(null)
+  const [enrollCode, setEnrollCode] = useState('')
+  const [enrollCodes, setEnrollCodes] = useState<string[] | null>(null)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
+  const [enrollBusy, setEnrollBusy] = useState(false)
+  // The copy affordance's flash: the codes leave once, the button says so.
+  const [codesCopied, setCodesCopied] = useState(false)
+
+  const copyRecoveryCodes = async (codes: string[]) => {
+    await navigator.clipboard.writeText(codes.join('\n'))
+    setCodesCopied(true)
+    window.setTimeout(() => setCodesCopied(false), 2000)
+  }
 
   const userRpc = useMemo(() => createClient(UserService, transport), [transport])
   const mfaRpc = useMemo(() => createClient(MultifactorService, transport), [transport])
@@ -289,6 +318,75 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
       .finally(() => setWorking(false))
   }
 
+  const resetEnrollment = () => {
+    setEnrollOpen(false)
+    setEnrollStep('name')
+    setEnrollName('')
+    setTotpScan(null)
+    setEnrollCode('')
+    setEnrollCodes(null)
+    setEnrollError(null)
+    setEnrollBusy(false)
+    setCodesCopied(false)
+  }
+
+  const finishEnrollment = () => {
+    // The codes were shown once and acknowledged; the panel folds and the
+    // roll refetches to show the confirmed row.
+    resetEnrollment()
+    afterWrite()
+  }
+
+  const cancelEnrollment = () => {
+    // A begun-but-unconfirmed row is a mistyped start — the delete of one
+    // costs no code. The panel closes either way.
+    if (totpScan) {
+      mfaRpc
+        .deleteTotpEnrollment(
+          create(DeleteTotpEnrollmentRequestSchema, { totpId: totpScan.totpId, code: '' })
+        )
+        .then(afterWrite)
+        .catch(swallowCancelled)
+    }
+    resetEnrollment()
+  }
+
+  const beginTotpEnrollment = async () => {
+    setEnrollBusy(true)
+    setEnrollError(null)
+    try {
+      // The signed-in caller omits the pending token — the access token
+      // stands in for the bridge the sign-in mints.
+      const begin = await mfaRpc.beginTotpEnrollment(
+        create(BeginTotpEnrollmentRequestSchema, { name: enrollName.trim() })
+      )
+      setTotpScan({ totpId: begin.totpId, secret: begin.secret, otpauthUri: begin.otpauthUri })
+      setEnrollStep('scan')
+    } catch (error: unknown) {
+      setEnrollError(getErrorMessage(error))
+    } finally {
+      setEnrollBusy(false)
+    }
+  }
+
+  const confirmTotpEnrollment = async () => {
+    if (!totpScan) return
+    setEnrollBusy(true)
+    setEnrollError(null)
+    try {
+      const confirmed = await mfaRpc.confirmTotpEnrollment(
+        create(ConfirmTotpEnrollmentRequestSchema, { totpId: totpScan.totpId, code: enrollCode })
+      )
+      setEnrollCodes([...confirmed.recoveryCodes])
+      setEnrollStep('codes')
+      afterWrite()
+    } catch (error: unknown) {
+      setEnrollError(getErrorMessage(error))
+    } finally {
+      setEnrollBusy(false)
+    }
+  }
+
   const regenerateCodes = () => {
     setWorking(true)
     stepUp
@@ -324,7 +422,9 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
     setActionError(null)
     try {
       const ceremony = await webauthnRpc.beginRegistration(create(BeginRegistrationRequestSchema))
-      const credential = await startRegistration({ optionsJSON: JSON.parse(ceremony.options) })
+      const credential = await startRegistration({
+        optionsJSON: JSON.parse(ceremony.options).publicKey
+      })
       await webauthnRpc.verifyRegistration(
         create(VerifyRegistrationRequestSchema, {
           sessionId: ceremony.sessionId,
@@ -406,7 +506,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {account.isPending ? (
-              <Spinner />
+              <FormSkeleton fields={3} />
             ) : hasPassword ? (
               <div {...stylex.props(pageStyles.stack)}>
                 <Text variant='body-2' color='neutral-faded'>
@@ -467,7 +567,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {enrollments.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={3} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -478,7 +578,13 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
             ) : (
               <div {...stylex.props(styles.listStack)}>
                 {rows.map((row) => {
-                  const needsCode = Boolean(row.confirmedAt) && confirmedCount > 1
+                  // The code is the removal's proof only when the removal
+                  // would strip the LAST confirmed factor — the backend's
+                  // own rule (`remaining <= 1` demands the code, a factor
+                  // left standing deletes free). The old inverted predicate
+                  // asked when factors stood and sent a bare code at the
+                  // disarm — a 400.
+                  const needsCode = Boolean(row.confirmedAt) && confirmedCount === 1
                   return (
                     <div key={row.totpId} {...stylex.props(styles.factorRow)}>
                       <Smartphone {...stylex.props(styles.factorIcon)} />
@@ -510,6 +616,135 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                 })}
               </div>
             )}
+            <div {...stylex.props(styles.toolbarRow, styles.enrollRow)}>
+              <Button
+                variant='primary'
+                disabled={working || enrollOpen}
+                onClick={() => {
+                  setEnrollName('')
+                  setEnrollOpen(true)
+                }}
+              >
+                <Plus size={16} />
+                Add authenticator
+              </Button>
+            </div>
+            {enrollOpen ? (
+              // The enrollment is an inline multistep panel — the account
+              // stays on the page, each finished step folds away, and the
+              // cancel abandons the ceremony without touching a confirmed
+              // factor.
+              <div {...stylex.props(styles.enrollPanel)} data-testid='totp-enrollment-panel'>
+                <Text render={<h4 />} variant='body-2' weight='semibold'>
+                  {enrollStep === 'name'
+                    ? 'Step 1 of 3 — name the device'
+                    : enrollStep === 'scan'
+                      ? 'Step 2 of 3 — scan and confirm'
+                      : 'Step 3 of 3 — save the recovery codes'}
+                </Text>
+                {enrollStep === 'name' ? (
+                  <Field id='field-totp-enroll-name'>
+                    <FieldLabel htmlFor='totp-enroll-name'>Name this device</FieldLabel>
+                    <Input
+                      id='totp-enroll-name'
+                      value={enrollName}
+                      onChange={(e) => setEnrollName(e.target.value)}
+                      placeholder='Aegis on tablet'
+                    />
+                  </Field>
+                ) : null}
+                {enrollStep === 'scan' && totpScan ? (
+                  <>
+                    <div
+                      id='totp-enrollment-qr'
+                      {...stylex.props(styles.enrollQr)}
+                      dangerouslySetInnerHTML={{ __html: renderSVG(totpScan.otpauthUri) }}
+                    />
+                    <Text variant='body-2' color='neutral-faded'>
+                      Scan the QR code with your authenticator app, or enter the secret by hand:
+                    </Text>
+                    <Text variant='body-2' style={styles.enrollSecret}>
+                      {totpScan.secret}
+                    </Text>
+                    <Field id='field-totp-enroll-code'>
+                      <FieldLabel htmlFor='totp-enroll-code'>
+                        The code your authenticator renders
+                      </FieldLabel>
+                      <OTPField
+                        length={6}
+                        value={enrollCode}
+                        onValueChange={(next) => setEnrollCode(next.replace(/\D/g, '').slice(0, 6))}
+                      >
+                        {Array.from({ length: 6 }, (_, slot) => (
+                          <OTPFieldSlot key={slot} />
+                        ))}
+                      </OTPField>
+                    </Field>
+                  </>
+                ) : null}
+                {enrollStep === 'codes' && enrollCodes ? (
+                  <>
+                    <Text variant='body-2' color='neutral-faded'>
+                      Ten single-use codes, shown once — the backend keeps hashes only. Save them
+                      before leaving the panel.
+                    </Text>
+                    <div {...stylex.props(styles.codes)} id='totp-enrollment-codes'>
+                      {enrollCodes.map((code) => (
+                        <Text key={code} variant='body-2'>
+                          {code}
+                        </Text>
+                      ))}
+                    </div>
+                    <div {...stylex.props(styles.enrollFooter)}>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => void copyRecoveryCodes(enrollCodes)}
+                      >
+                        {codesCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {codesCopied ? 'Copied' : 'Copy codes'}
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
+                {enrollError ? (
+                  <Alert variant='destructive' id='totp-enrollment-error'>
+                    <AlertTitle>Enrollment failed</AlertTitle>
+                    <AlertDescription>{enrollError}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <div {...stylex.props(styles.enrollFooter)}>
+                  {enrollStep === 'name' ? (
+                    <Button
+                      variant='primary'
+                      disabled={enrollBusy || enrollName.trim().length === 0}
+                      onClick={() => void beginTotpEnrollment()}
+                    >
+                      {enrollBusy ? <Spinner /> : null}
+                      Continue
+                    </Button>
+                  ) : null}
+                  {enrollStep === 'scan' ? (
+                    <Button
+                      variant='primary'
+                      disabled={enrollBusy || !/^[0-9]{6}$/.test(enrollCode)}
+                      onClick={() => void confirmTotpEnrollment()}
+                    >
+                      {enrollBusy ? <Spinner /> : null}
+                      Confirm
+                    </Button>
+                  ) : null}
+                  {enrollStep === 'codes' ? (
+                    <Button variant='primary' onClick={finishEnrollment}>
+                      I saved my recovery codes
+                    </Button>
+                  ) : null}
+                  <Button variant='outline' disabled={enrollBusy} onClick={cancelEnrollment}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -523,7 +758,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {passkeys.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={3} />
             ) : passkeyRows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -636,7 +871,10 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
       <AlertDialog
         open={regeneratedCodes !== null}
         onOpenChange={(next) => {
-          if (!next) setRegeneratedCodes(null)
+          if (!next) {
+            setRegeneratedCodes(null)
+            setCodesCopied(false)
+          }
         }}
       >
         <AlertDialogContent>
@@ -653,6 +891,16 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                 {code}
               </Text>
             ))}
+          </div>
+          <div {...stylex.props(styles.toolbarRow, styles.enrollRow)}>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => void copyRecoveryCodes(regeneratedCodes ?? [])}
+            >
+              {codesCopied ? <Check size={16} /> : <Copy size={16} />}
+              {codesCopied ? 'Copied' : 'Copy codes'}
+            </Button>
           </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setRegeneratedCodes(null)}>
@@ -689,7 +937,6 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
               onChange={(e) => setPasskeyName(e.target.value)}
               placeholder='Aegis on tablet'
               maxLength={64}
-              autoFocus
             />
           </Field>
           <AlertDialogFooter>

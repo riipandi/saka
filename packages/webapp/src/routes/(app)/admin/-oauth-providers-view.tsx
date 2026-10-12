@@ -26,7 +26,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Item,
   ItemActions,
@@ -37,11 +43,14 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { DeleteOAuthConnectionRequestSchema, OAuthSSOService } from '~/codegen/authn_pb'
 import type { OAuthConnection } from '~/codegen/authn_pb'
-import { OAuthProviderDialog } from './-oauth-provider-dialog'
+import { OAuthProviderSheet } from './-oauth-provider-sheet'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -91,26 +100,11 @@ export function OAuthProvidersView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            OAuth providers
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The external providers an account may sign in with — one per provider slug, the secrets
-            sealed and never read back.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='OAuth providers'
+        description='The external providers an account may sign in with — one per provider slug, the secrets sealed and never read back.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -135,11 +129,12 @@ export function OAuthProvidersView() {
           </CardHeader>
           <CardContent>
             {connections.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={4} />
             ) : connections.isError ? (
-              <Text variant='body-2' color='critical'>
-                {connections.error.message}
-              </Text>
+              <ListError
+                message={connections.error.message}
+                onRetry={() => void connections.refetch()}
+              />
             ) : list.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -148,6 +143,19 @@ export function OAuthProvidersView() {
                     Add a provider and its button appears on the sign-in page once enabled.
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Can permission='oauth_connection:*:create'>
+                    <Button
+                      size='sm'
+                      onClick={() => {
+                        setEditing(null)
+                        setDialogOpen(true)
+                      }}
+                    >
+                      <Plus size={16} /> Add the first provider
+                    </Button>
+                  </Can>
+                </EmptyContent>
               </Empty>
             ) : (
               <ItemGroup>
@@ -207,10 +215,11 @@ export function OAuthProvidersView() {
         </Card>
       </div>
 
-      <OAuthProviderDialog
+      <OAuthProviderSheet
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         connection={editing}
+        takenProviders={list.map((one) => one.provider)}
         onDone={() =>
           void queryClient.invalidateQueries({
             queryKey: createConnectQueryKey({

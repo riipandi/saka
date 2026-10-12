@@ -162,8 +162,10 @@ func NewRouter(opts Options) chi.Router {
 	// surface — API, protocol, SPA, metrics — answers without them. The
 	// browser telemetry's collector, when the deployment named one, rides
 	// connect-src beside the origin — an exporter a policy cannot reach
-	// would drop every span without a word.
-	r.Use(fwmiddleware.SecurityHeadersWithConnect(collectorOrigin(opts.Config.OTEL.Browser.Endpoint)))
+	// would drop every span without a word. The runtime mode picks the
+	// script gate: the development shell's HMR preamble is an inline
+	// script, a document the compiler owns and no deployment ships.
+	r.Use(fwmiddleware.SecurityHeadersForMode(opts.Config.App.Mode, collectorOrigin(opts.Config.OTEL.Browser.Endpoint)))
 	// The client facts are captured here rather than per surface: both the
 	// REST routes and the procedures read them from the context, and the
 	// groups below inherit this chain, so there is one place a fact is

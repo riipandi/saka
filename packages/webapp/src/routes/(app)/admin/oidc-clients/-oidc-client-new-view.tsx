@@ -14,6 +14,7 @@ import {
 } from 'uilibs/components/extra/card'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { PageHeader } from '#/components/-page-header'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -95,25 +96,11 @@ export function OidcClientNewView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            New OIDC client
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The first secret answers this form — shown once, stored by you.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='New OIDC client'
+        description='The first secret answers this form — shown once, stored by you.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>

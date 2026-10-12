@@ -1,17 +1,10 @@
 import { timestampFromDate } from '@bufbuild/protobuf/wkt'
 import { useMutation } from '@connectrpc/connect-query'
 import { createConnectQueryKey } from '@connectrpc/connect-query'
+import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from 'uilibs/components/base/dialog'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
 import {
@@ -21,13 +14,22 @@ import {
   SelectTrigger,
   SelectValue
 } from 'uilibs/components/base/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle
+} from 'uilibs/components/extra/sheet'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { Textarea } from 'uilibs/components/extra/textarea'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { sheetFormStyles } from '#/styles/element/sheet-form.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
 
-/** The windows the create dialog offers. Renewal answers the same scale —
+/** The windows the create sheet offers. Renewal answers the same scale —
  * three months for a routine key, a year for the ones a pipeline owns. */
 const WINDOWS = [
   { value: '7d', label: '7 days', days: 7 },
@@ -39,11 +41,11 @@ const WINDOWS = [
 type WindowValue = (typeof WINDOWS)[number]['value']
 
 /**
- * The issue dialog (Wave 5 phase 5): a unique label, an optional note, and
- * the expiry window. The answer's raw key rides `onMinted` — the view owns
- * the show-once dialog, the dialog owns nothing after the close.
+ * The issue sheet: a unique label, an optional note, and the expiry window.
+ * The answer's raw key rides `onMinted` — the view owns the show-once
+ * dialog, the sheet owns nothing after the close.
  */
-export function ApiKeyCreateDialog({
+export function ApiKeyCreateSheet({
   open,
   onOpenChange,
   onMinted
@@ -93,83 +95,85 @@ export function ApiKeyCreateDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Issue an API key</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side='right'>
+        <SheetHeader>
+          <SheetTitle>Issue an API key</SheetTitle>
+          <SheetDescription>
             The key acts as this account until it expires. The raw key appears once, right after
             issuing.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <Field>
-          <FieldLabel htmlFor='api-key-name'>Name</FieldLabel>
-          <Input
-            id='api-key-name'
-            value={name}
-            maxLength={64}
-            placeholder='nightly-backup'
-            onChange={(event) => setName(event.target.value)}
-          />
-          <FieldDescription>
-            3–64 characters: letters, digits, underscores, dashes, spaces. Unique among your keys.
-          </FieldDescription>
-        </Field>
+        <div {...stylex.props(sheetFormStyles.body)}>
+          <Field>
+            <FieldLabel htmlFor='api-key-name'>Name</FieldLabel>
+            <Input
+              id='api-key-name'
+              value={name}
+              maxLength={64}
+              placeholder='nightly-backup'
+              onChange={(event) => setName(event.target.value)}
+            />
+            <FieldDescription>
+              3–64 characters: letters, digits, underscores, dashes, spaces. Unique among your keys.
+            </FieldDescription>
+          </Field>
 
-        <Field>
-          <FieldLabel htmlFor='api-key-description'>Description</FieldLabel>
-          <Textarea
-            id='api-key-description'
-            value={description}
-            maxLength={255}
-            rows={2}
-            placeholder='What this key is for, so the audit trail reads plainly.'
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </Field>
+          <Field>
+            <FieldLabel htmlFor='api-key-description'>Description</FieldLabel>
+            <Textarea
+              id='api-key-description'
+              value={description}
+              maxLength={255}
+              rows={2}
+              placeholder='What this key is for, so the audit trail reads plainly.'
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </Field>
 
-        <Field>
-          <FieldLabel>Expires in</FieldLabel>
-          <Select
-            value={windowValue}
-            onValueChange={(next) => {
-              if (typeof next === 'string' && WINDOWS.some((one) => one.value === next)) {
-                setWindowValue(next)
-              }
-            }}
-          >
-            <SelectTrigger aria-label='Expiry window'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WINDOWS.map((one) => (
-                <SelectItem key={one.value} value={one.value}>
-                  {one.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldDescription>
-            An expired key authenticates nothing; renewal replaces its secret and window.
-          </FieldDescription>
-        </Field>
+          <Field>
+            <FieldLabel>Expires in</FieldLabel>
+            <Select
+              value={windowValue}
+              onValueChange={(next) => {
+                if (typeof next === 'string' && WINDOWS.some((one) => one.value === next)) {
+                  setWindowValue(next)
+                }
+              }}
+            >
+              <SelectTrigger aria-label='Expiry window'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOWS.map((one) => (
+                  <SelectItem key={one.value} value={one.value}>
+                    {one.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldDescription>
+              An expired key authenticates nothing; renewal replaces its secret and window.
+            </FieldDescription>
+          </Field>
 
-        {failed !== null && (
-          <Text render={<p />} variant='body-2' color='critical'>
-            {failed}
-          </Text>
-        )}
+          {failed !== null && (
+            <Text render={<p />} variant='body-2' color='critical'>
+              {failed}
+            </Text>
+          )}
+        </div>
 
-        <DialogFooter>
+        <SheetFooter>
           <Button variant='ghost' onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button disabled={!canSubmit} onClick={submit}>
             {create.isPending ? <Spinner /> : 'Issue key'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

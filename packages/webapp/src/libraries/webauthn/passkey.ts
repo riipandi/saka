@@ -20,6 +20,8 @@ export interface PasskeyAssertion {
 export async function runPasskeyAssertion(transport: Transport): Promise<PasskeyAssertion> {
   const webauthn = createClient(WebAuthnService, transport)
   const ceremony = await webauthn.beginLogin(create(BeginLoginRequestSchema))
-  const assertion = await startAuthentication({ optionsJSON: JSON.parse(ceremony.options) })
+  const assertion = await startAuthentication({
+    optionsJSON: JSON.parse(ceremony.options).publicKey
+  })
   return { sessionId: ceremony.sessionId, credential: JSON.stringify(assertion) }
 }

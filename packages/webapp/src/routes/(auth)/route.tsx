@@ -1,6 +1,7 @@
 import atoms from '@stylexjs/atoms'
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { ToastProvider, Toaster } from 'uilibs/components/base/toast'
 import { ThemeSwitcher } from 'uilibs/theme'
 import { z } from 'zod'
 import { prefetchAppConfig } from '#/hooks/use-app-config'
@@ -28,23 +29,28 @@ export const Route = createFileRoute('/(auth)')({
 })
 
 function RouteComponent() {
+  // The auth surfaces speak in toasts too — the pause page's expiry notice
+  // rides the same provider the app shell mounts.
   return (
-    <main
-      id='auth-layout'
-      {...stylex.props(
-        atoms.minHeight['100vh'],
-        atoms.display.flex,
-        atoms.alignItems.center,
-        atoms.justifyContent.center,
-        atoms.padding['1rem']
-      )}
-    >
-      <header id='auth-header' {...stylex.props(styles.header)}>
-        <ThemeSwitcher />
-      </header>
-      <div id='auth-card-wrapper' {...stylex.props(styles.wrapper)}>
-        <Outlet />
-      </div>
-    </main>
+    <ToastProvider>
+      <main
+        id='auth-layout'
+        {...stylex.props(
+          atoms.minHeight['100vh'],
+          atoms.display.flex,
+          atoms.alignItems.center,
+          atoms.justifyContent.center,
+          atoms.padding['1rem']
+        )}
+      >
+        <header id='auth-header' {...stylex.props(styles.header)}>
+          <ThemeSwitcher />
+        </header>
+        <div id='auth-card-wrapper' {...stylex.props(styles.wrapper)}>
+          <Outlet />
+        </div>
+        <Toaster />
+      </main>
+    </ToastProvider>
   )
 }

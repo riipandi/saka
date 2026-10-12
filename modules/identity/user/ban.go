@@ -115,7 +115,7 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 	if s.notify != nil {
 		s.notify.UserBanned(ctx, existing.Email, banView, params.ExpiresAt)
 	}
-	filled, fillErr := s.withGroup(ctx, s.pool, banView)
+	filled, fillErr := s.enrichView(ctx, s.pool, banView)
 	if fillErr != nil {
 		return BanOutcome{}, fillErr
 	}
@@ -170,7 +170,7 @@ func (s *Service) UnbanUser(ctx context.Context, id string) (BanOutcome, error) 
 	if s.notify != nil {
 		s.notify.UserUnbanned(ctx, existing.Email, unbanView)
 	}
-	filled, fillErr := s.withGroup(ctx, s.pool, unbanView)
+	filled, fillErr := s.enrichView(ctx, s.pool, unbanView)
 	if fillErr != nil {
 		return BanOutcome{}, fillErr
 	}

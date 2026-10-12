@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
+import { OTPField, OTPFieldSlot } from 'uilibs/components/base/otp-field'
 import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
 import { Card, CardContent, CardDescription, CardHeader } from 'uilibs/components/extra/card'
 import { LoaderText } from 'uilibs/components/extra/loader-text'
@@ -216,29 +217,25 @@ export function MfaEnrollmentView({
                 name='code'
                 validators={{
                   onChange: ({ value }) =>
-                    /^[0-9]{6,8}$/.test(value)
-                      ? undefined
-                      : { message: 'Enter the 6 to 8 digit code' }
+                    /^[0-9]{6}$/.test(value) ? undefined : { message: 'Enter the 6 digit code' }
                 }}
                 children={(field) => {
                   const error = field.state.meta.errors?.[0]?.message
                   return (
                     <Field id='field-mfa-confirm-code' invalid={!!error}>
-                      <FieldLabel htmlFor='mfa-confirm-code'>
-                        The code your authenticator renders
-                      </FieldLabel>
-                      <input
-                        id='mfa-confirm-code'
-                        inputMode='numeric'
-                        autoComplete='one-time-code'
-                        {...stylex.props(styles.mfaCodeInput)}
+                      <FieldLabel>The code your authenticator renders</FieldLabel>
+                      <OTPField
+                        length={6}
                         value={field.state.value}
-                        onChange={(e) => {
+                        onValueChange={(next) => {
                           setFailed(null)
-                          field.handleChange(e.target.value.replace(/\D/g, '').slice(0, 8))
+                          field.handleChange(next.replace(/\D/g, '').slice(0, 6))
                         }}
-                        onBlur={field.handleBlur}
-                      />
+                      >
+                        {Array.from({ length: 6 }, (_, slot) => (
+                          <OTPFieldSlot key={slot} />
+                        ))}
+                      </OTPField>
                     </Field>
                   )
                 }}

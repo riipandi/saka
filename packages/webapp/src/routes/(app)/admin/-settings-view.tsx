@@ -38,6 +38,8 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { Textarea } from 'uilibs/components/extra/textarea'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { useAppConfig } from '#/hooks/use-app-config'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -74,33 +76,16 @@ export function AdminSettingsView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Platform settings
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The deployment's database-backed catalog — every change lands on the next read, no
-            restart required.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Platform settings'
+        description="The deployment's database-backed catalog — every change lands on the next read, no restart required."
+      />
 
       {settings.isPending ? (
         <Spinner />
       ) : settings.isError ? (
-        <Text variant='body-2' color='critical'>
-          {settings.error.message}
-        </Text>
+        <ListError message={settings.error.message} onRetry={() => void settings.refetch()} />
       ) : (
         <Tabs defaultValue={SETTING_GROUPS[0]?.id}>
           <TabsList>
@@ -387,9 +372,10 @@ function RuntimeCard() {
         {config.isPending ? (
           <Spinner />
         ) : config.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(config.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(config.error)}
+            onRetry={() => void config.refetch()}
+          />
         ) : (
           <>
             <pre {...stylex.props(styles.document)}>{JSON.stringify(config.data, null, 2)}</pre>

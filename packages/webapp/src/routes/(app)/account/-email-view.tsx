@@ -20,6 +20,7 @@ import {
 } from 'uilibs/components/extra/card'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { FormSkeleton } from '#/components/-skeleton-form'
 import { useAuthUser } from '#/hooks/use-auth'
 import { usePublicSettings } from '#/hooks/use-public-settings'
 import { setAuthUser } from '#/libraries/guard/auth-store'
@@ -194,7 +195,7 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
           </CardHeader>
           <CardContent>
             {account.isPending ? (
-              <Spinner />
+              <FormSkeleton fields={2} />
             ) : (
               <div {...stylex.props(styles.addressRow)}>
                 <Text render={<p />} variant='body-1' weight='medium'>

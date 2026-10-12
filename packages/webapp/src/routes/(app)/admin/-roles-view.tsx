@@ -48,7 +48,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Item,
   ItemActions,
@@ -60,6 +66,10 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { FormSkeleton } from '#/components/-skeleton-form'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
@@ -161,32 +171,16 @@ export function RolesView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Roles
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            A role is a named set of permissions accounts carry. A system role's set is the seed's;
-            a custom one is yours to shape.
-          </Text>
-        </div>
-        <CardAction>
+      <PageHeader
+        kicker='Administration'
+        title='Roles'
+        description="A role is a named set of permissions accounts carry. A system role's set is the seed's; a custom one is yours to shape."
+        actions={
           <Button variant='primary' onClick={() => setCreating(true)}>
-            <Plus size={16} />
-            Create role
+            <Plus size={16} /> Create role
           </Button>
-        </CardAction>
-      </div>
+        }
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -224,13 +218,23 @@ export function RolesView({
             </div>
 
             {roles.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
+            ) : roles.isError ? (
+              <ListError
+                message={getErrorMessage(roles.error)}
+                onRetry={() => void roles.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
                   <EmptyTitle>No roles found</EmptyTitle>
                   <EmptyDescription>No role matches the search on this page.</EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Button size='sm' onClick={() => setCreating(true)}>
+                    <Plus size={16} /> Create the first role
+                  </Button>
+                </EmptyContent>
               </Empty>
             ) : (
               <ItemGroup>
@@ -662,7 +666,7 @@ function PermissionsDialog({
           </Text>
         ) : null}
         {detail.isPending || catalog.isPending ? (
-          <Spinner />
+          <FormSkeleton fields={3} />
         ) : (
           <div {...stylex.props(localStyles.tree)}>
             {grouped.map(([resource, entries]) => (

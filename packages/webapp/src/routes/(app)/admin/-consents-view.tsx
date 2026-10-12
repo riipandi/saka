@@ -27,8 +27,9 @@ import {
   ItemGroup,
   ItemTitle
 } from 'uilibs/components/extra/item'
-import { Spinner } from 'uilibs/components/extra/spinner'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ScopeChip } from '#/components/scope-chip'
 import { LIST_MAX_LIMIT, listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -64,26 +65,11 @@ export function ConsentsView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Consents
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The consent ledger — which account let which relying party in, and what the consent
-            covers. The ledger is read here; withdrawal stays with the account.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Consents'
+        description='The consent ledger — which account let which relying party in, and what the consent covers. The ledger is read here; withdrawal stays with the account.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Tabs defaultValue='all'>
@@ -155,11 +141,12 @@ function AllConsentsCard({ page, onPage }: { page: number; onPage: (next: number
       </CardHeader>
       <CardContent>
         {consents.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} />
         ) : consents.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(consents.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(consents.error)}
+            onRetry={() => void consents.refetch()}
+          />
         ) : rows.length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -221,11 +208,12 @@ function UserConsentsCard({ userId }: { userId: string }) {
       </CardHeader>
       <CardContent>
         {consents.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} />
         ) : consents.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(consents.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(consents.error)}
+            onRetry={() => void consents.refetch()}
+          />
         ) : rows.length === 0 ? (
           <Empty>
             <EmptyHeader>
