@@ -96,7 +96,12 @@ RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     go tool buf generate && gofmt -w codegen/proto/go
 
 RUN --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    NODE_ENV=production pnpm exec vp run typecheck \
+    NODE_ENV=production pnpm exec tsc -p packages/webapp --noEmit \
+    && NODE_ENV=production pnpm exec tsc -p packages/uilibs --noEmit \
+    && NODE_ENV=production pnpm exec tsc -p packages/plugins --noEmit \
+    && NODE_ENV=production pnpm exec tsc -p packages/email --noEmit \
+    && NODE_ENV=production pnpm exec tsc -p packages/e2e-tests --noEmit \
+    && NODE_ENV=production pnpm exec tsc -p . --noEmit \
     && NODE_ENV=production pnpm exec vp run email#build \
     && NODE_ENV=production pnpm exec vp run webapp#build
 
