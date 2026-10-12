@@ -92,7 +92,8 @@ Upstream has no passwords, so the whole flow is saka's. The contract lives in
 
 Shared rules: the password-changed notice to the account's address rides the durable queue and is
 gated by `mailer.notifications.password_changed_notice_enabled`; a reset that ends sessions ends
-them in the same transaction. Impersonating administrators are refused.
+them in the same transaction. Impersonating administrators are refused. Collection folders: the
+two self-service rows ride `Authentication`; the admin trigger rides `User Management`.
 
 ## One-Time Access
 
@@ -189,22 +190,6 @@ mapped onto the dot-named catalog (`user.created`, `session.signed_in`, …); an
 lists no events, or lists the `*` wildcard, receives every one of them. All procedures carry the
 admin guard.
 
-SPA: `/admin/webhooks` (list + create + delete) and `/admin/webhooks/$id` (detail, enable
-toggle, test dispatch, rotation, delivery log) — `modules/webhook` served by the webapp's
-`WebhookService` clients, show-once secret dialogs on create and rotate. Live probe
-(2026-10-12, release binary): a test delivery answered HTTP 200 at the receiver with
-`X-Webhook-Event`, `X-Signature: t=…,v1=…`, and the canonical body.
-
----
-
-## API Keys
-
-The machine credentials an account issues for its own scripting and integrations. A key acts as
-its owner through the same guard table a session does — an administrator's key administers — but
-the surface that manages the keys refuses it, the way the upstream it ports disables API-key
-authentication on its own routes: a credential that cannot revoke itself must not be the one
-managing credentials.
-
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
 | POST | `/rpc/saka.webhook.v1.WebhookService/List` | List webhook endpoints | done — guard `Admin`; `enabled` and `event` filters; the `event` filter names a catalog event or the wildcard; secrets never present | `modules/webhook.TestEmissionMatchesSubscriptions`, `internal/guard` webhook rules |
@@ -217,6 +202,12 @@ managing credentials.
 | POST | `/rpc/saka.webhook.v1.WebhookService/ListDeliveries` | List deliveries of one endpoint | done — newest first, paginated; latest attempt rides along | `modules/webhook.TestRunDeliverySignsTheBodyAndRecordsTheAttempt` |
 | POST | `/rpc/saka.webhook.v1.WebhookService/ListAllDeliveries` | List all deliveries | done — `event` filter names a catalog event or the wildcard; redacted response metadata only | `modules/webhook.TestEmissionMatchesSubscriptions` |
 | POST | `/rpc/saka.webhook.v1.WebhookService/ListEventTypes` | List webhook event types | done — guard `Admin`; serves the whole catalog with descriptions, in declaration order | E2E probe (2026-09-30): 77 entries over a freshly built binary |
+
+SPA: `/admin/webhooks` (list + create + delete) and `/admin/webhooks/$id` (detail, enable
+toggle, test dispatch, rotation, delivery log) — `modules/webhook` served by the webapp's
+`WebhookService` clients, show-once secret dialogs on create and rotate. Live probe
+(2026-10-12, release binary): a test delivery answered HTTP 200 at the receiver with
+`X-Webhook-Event`, `X-Signature: t=…,v1=…`, and the canonical body.
 
 Delivery contract: HMAC-SHA256 over `t=<unix>,v1=<hex>` where the digest covers the signed
 timestamp concatenated with the exact canonical body bytes. Headers on every delivery:
@@ -257,13 +248,6 @@ the surface that manages the keys refuses it, the way the upstream it ports disa
 authentication on its own routes: a credential that cannot revoke itself must not be the one
 managing credentials.
 
-SPA: `/account/api-keys` (own list, issue with expiry window, show-once raw key, renewal of
-expired keys, revocation) and `/admin/api-keys` (read-only oversight with owner lookup) —
-`modules/apikey` served by the webapp's `ApiKeyService` clients. The machine-credential refusal
-on this surface is live-probed (2026-10-12): an `X-API-Key` call to `ListAPIKeys` answers
-`not_found` while the same key reads account surfaces normally, and renewal of an unexpired key
-answers `failed_precondition`.
-
 | Method | Procedure | Summary / Yaak Title | Status | Evidence |
 | ------ | --------- | -------------------- | ------ | -------- |
 | POST | `/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey` | Create API key | done — guard `Session`, the rule a machine credential is refused by; the raw key is `<prefix>.<secret>`, drawn from the full alphanumeric alphabet with the crypto source, and shown exactly once — the row stores the SHA-256 of the presented string, so a database leak cannot replay it; the name is unique per owner (the `(name, owner)` index), the window must lie in the future, and a duplicate answers `already_exists` | `modules/apikey.TestCreateShowsTheKeyOnceAndRefusesADuplicateName` |
@@ -271,6 +255,13 @@ answers `failed_precondition`.
 | POST | `/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey` | Renew API key | done — guard `Session`; an unexpired key is refused with `failed_precondition` (renewal is how a key lives past its expiry, not how it escapes one); an expired one earns a new secret and a new window, the reminder stamp dies with the old window, and the new raw key is shown once | `modules/apikey.TestRenewReplacesAnExpiredKeyAndRefusesALiveOne` |
 | POST | `/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey` | Revoke API key | done — guard `Session`; soft by the `revoked_at` stamp the schema reserved, idempotent (a second revocation is the same success and records nothing), and a key another account owns answers `not_found` | `modules/apikey.TestRevokeIsSoftAndIdempotent` |
 | POST | `/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys` | List all API keys | done — guard `Admin`; saka-only, the administrative view over every key the deployment holds (upstream has none); same sort whitelist as the owner's list; the answer names each key's owner | `modules/apikey.TestListOwnScopesToTheOwnerAndListAllSeesEverything`, `internal/transport/router.TestTheAPIKeyGuardIsDeclared` |
+
+SPA: `/account/api-keys` (own list, issue with expiry window, show-once raw key, renewal of
+expired keys, revocation) and `/admin/api-keys` (read-only oversight with owner lookup) —
+`modules/apikey` served by the webapp's `ApiKeyService` clients. The machine-credential refusal
+on this surface is live-probed (2026-10-12): an `X-API-Key` call to `ListAPIKeys` answers
+`not_found` while the same key reads account surfaces normally, and renewal of an unexpired key
+answers `failed_precondition`.
 
 Shared rules: the authwall is one read — the hash of the presented header is looked up against
 `revoked_at IS NULL AND expires_at > now AND NOT users.disabled`, so an unknown, expired, revoked,
@@ -449,6 +440,13 @@ the approval. Audit events: `device_login_approved`,
 | POST | `/api/device-login/requests/{id}/exchange` | Exchange device login request | done — REST, public; long-poll, the pairing cookie proves the creating browser; the approval answers the account view | `modules/devicelogin` (service tests) |
 | POST | `/rpc/saka.authn.v1.DeviceApprovalService/Inspect` | Inspect device login request | done — guard `Session`; the code as typed, with or without its hyphen, in any case | `modules/devicelogin` (service tests) |
 | POST | `/rpc/saka.authn.v1.DeviceApprovalService/Decide` | Decide device login request | done — guard `Session`; the impersonated caller refused; a repeat decision is the not-found | `modules/devicelogin` (service tests) |
+
+The approval screen the account holder uses lives at `/device`
+(`packages/webapp/src/routes/(app)/device.tsx` over `-device-view.tsx`):
+the code's OTP-style input accepts `XXXX-XXXX` or the bare eight
+characters, `?code=` deep-links the inspection, and the decide is
+approve-first with deny beside it. Reached from the header user menu
+("Approve a device").
 
 ## Health
 
@@ -646,7 +644,10 @@ the session RPCs (`ListSessions`, `RevokeSession`,
 `SignOutAllSessions`) do not already cover. A decision someone makes,
 not an accident; the discovery document does not advertise the field
 until it ships. `TODO(frontend)`: the consent screen's `login_hint`
-prefill.
+prefill and `offline_access` persistent-access line — the interaction
+page itself does not exist in the SPA yet (the ledger half ships:
+`/admin/consents`, `/account/authorized-apps`); the screen is its own
+surface, not a wording patch.
 
 **Token issuance.** Grants `authorization_code`, `refresh_token`, and
 `urn:ietf:params:oauth:grant-type:device_code`, plus `client_credentials`
@@ -682,9 +683,8 @@ the other grants ride `oidc.refresh_token_hours` (default 336 hours;
 zero on either is the never-expiring token the historical behavior
 kept), both settings read fresh at every issuance and rotation. The
 scope is consent-gated: the consent question names it like any other
-requested word, and the SPA's consent screen renders it distinctly.
-`TODO(frontend)`: the consent screen's offline_access line (persistent
-access wording). Claims: `sub` always; `profile` adds the
+requested word, and the SPA's consent screen renders it distinctly
+(see the interaction-page TODO above). Claims: `sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
 exists; `groups` adds group names. **Group restriction is enforced server-side**
@@ -866,6 +866,13 @@ customclaim feature owns them).
 | POST | `/rpc/saka.identity.v1.UserService/BanUser` | Ban a user | done — admin Bearer; the ban rides an `account_restrictions` row (kind `ban`), re-banning replaces the reason and expiry and keeps the start; audit `user_banned`; the ban ends the account's live sessions in the same transaction | `modules/identity/user` (service tests) |
 | POST | `/rpc/saka.identity.v1.UserService/UnbanUser` | Unban a user | done — admin Bearer; lifts the open ban rows; audit `user_unbanned` | `modules/identity/user` (service tests) |
 | POST | `/rpc/saka.identity.v1.UserService/UnlockUser` | Lift an account's lockout (admin) | done — guard `Admin`; lifts the open lockout rows and zeroes the failed-attempt streak; audit `user_unlocked`; the scaffolds' phases are done | `modules/identity/restrictions` (service tests) |
+
+The collection groups these rows into two folders — **User Account** (the
+self-service half: profile, own credentials, sessions, keys, the self-exits,
+email change, the unauthenticated one-time access pair) and **User Management**
+(the administrative half: CRUD, signup and tokens, blocklist, restrictions,
+impersonation, the admin credential and one-time access doors). The rows stay
+in their service sections here; the folders are Yaak's organization alone.
 | POST | `/rpc/saka.identity.v1.UserService/RemovePassword` | Remove the password credential | done — guard `Session` + step-up; refused `failed_precondition` when the account holds no password or keeps no other live credential (the chained check reads the passkey roll and the SSO bindings); the hash row is deleted and `password_removed` is recorded in its transaction; the removal notice rides the queue behind `mailer.notifications.password_removed_notice_enabled`; sessions stay valid — the removal does not end them | `modules/identity/password` (remove-password tests) |
 | PUT | `/api/users/{id}/profile-picture` | Update user profile picture | done — REST raw-body upload; self-service Bearer (guard `Self("id")` on the path param); magic-byte sniff (PNG/JPEG/WebP), max 2 MiB; stored at `pictures/<id>.<ext>` with the extension the sniffed bytes earn, so a kind change moves the key and deletes the replaced object first; the account's `picture_file_id` references the `storage_objects` row; staged then synced in-request | `modules/identity/user` (service + handler tests), `internal/guard` (rule) |
 | POST | `/rpc/saka.identity.v1.UserService/ResetProfilePicture` | Reset user profile picture | done — self-service Bearer (guard `Self("id")`); deletes the stored file and clears the row | `modules/identity/user` (service tests), `internal/guard` (rule), `internal/transport` (guard) |

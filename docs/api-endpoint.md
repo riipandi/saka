@@ -1,6 +1,7 @@
 # API Endpoints
 
-The surfaces the server answers, reconciled against the code on 2026-09-30. The agent-facing
+The surfaces the server answers, reconciled against the code on 2026-10-12. The grouping
+follows the Yaak collection (`wk_kBiMYTkhPP`) — sections mirror its folders; the agent-facing
 matrix with per-row status and test evidence is `.llms/endpoint-reference.md`; the code is the
 only record of what is served.
 
@@ -14,31 +15,23 @@ only. `SignIn` takes
 `{"identity": "<username or email>", "password": "<plaintext>", "remember": <bool>}` and answers
 the token pair plus the session view; `remember` selects the long or short session lifetime. A
 confirmed TOTP enrollment turns a successful sign-in into a pending bridge instead —
-`MultifactorService/CompleteSignIn` spends it (see MFA below).
+`MultifactorService/CompleteSignIn` spends it (see MFA below). The session rows
+the sign-in opened live under User Account below; `Sign out` rides the same
+folder as its siblings there — this section carries the credentials half only.
+The self-service recovery pair rides the same folder in the collection.
 
 | Method   | Procedure / Endpoint                                          | Protocol     | Summary                             |
 | -------- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
 | POST     | `/rpc/saka.authn.v1.AuthService/SignIn`                      | ConnectRPC   | Sign in with password               |
 | POST     | `/rpc/saka.authn.v1.SessionService/Refresh`                  | ConnectRPC   | Refresh the token pair (rotates the refresh token) |
-| POST     | `/rpc/saka.authn.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
-| POST     | `/rpc/saka.authn.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
-| POST     | `/rpc/saka.authn.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
 | POST     | `/rpc/saka.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
-| POST     | `/rpc/saka.authn.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
-| POST     | `/rpc/saka.authn.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
-| POST     | `/rpc/saka.authn.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
-| POST     | `/rpc/saka.authn.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
-
-## Password Recovery (saka-only)
-
-| Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
-| -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
 | POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
 | POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
-| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
 
-The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
-email and stored only as a hash.
+The password reset token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
+email and stored only as a hash. The administrative trigger is a User Management
+action in the collection (see the table there); the two self-service rows above
+ride Authentication.
 
 ## One-Time Access
 
@@ -46,35 +39,23 @@ A one-time access code signs an account in without its password. Codes are drawn
 alphabet without ambiguous characters — six characters for a code that lives fifteen minutes or
 less, twelve above — and stored as SHA-256 hashes. The email paths are gated by
 `auth.one_time_access_email_as_admin_enabled` and
-`auth.one_time_access_email_as_unauthenticated_enabled`, both off by default.
-
-| Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
-| -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/CreateToken`                      | ConnectRPC   | Create one-time access token for user (admin) |
-| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken`                    | ConnectRPC   | Exchange one-time access token               |
-| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
-| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
+`auth.one_time_access_email_as_unauthenticated_enabled`, both off by default. The
+holder's exchange and the unauthenticated email request live under User Account
+above; the administrative issue paths are here.
 
 ## Passkeys (WebAuthn)
 
 The passwordless surface: registration and ceremony sign-in ride the WebAuthn protocol; the
 administrative rows manage credentials over a named account. Step-up reauthentication mints a
-single-use token that lives `session.reverification_window` (default 30 minutes).
+single-use token that lives `session.reverification_window` (default 30 minutes). The
+holder's own rows live under User Account above.
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary                                     |
 | -------- | --------------------------------------------------------------------------- | ------------ | ------------------------------------------- |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/ListCredentials`                       | ConnectRPC   | List the account's passkeys                 |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/UpdateCredential`                      | ConnectRPC   | Rename a passkey                            |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginLogin`                            | ConnectRPC   | Open a ceremony sign-in challenge           |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyLogin`                           | ConnectRPC   | Verify the assertion and open the session   |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/Reauthenticate`                        | ConnectRPC   | Step-up proof (password, passkey, or email code) |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/SendReauthenticationCode`              | ConnectRPC   | Email the reverification code (self)         |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminUpdateCredential`                 | ConnectRPC   | Rename a user's passkey (admin)             |
-| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |
 
 ## MFA TOTP
 
@@ -93,6 +74,9 @@ completes — with a TOTP code or a recovery code.
 | POST     | `/rpc/saka.authn.v1.MultifactorService/DisableMfa`           | ConnectRPC   | Disable MFA (second-factor proof) |
 | POST     | `/rpc/saka.authn.v1.MultifactorService/VerifyRecoveryCode`   | ConnectRPC   | Spend one recovery code as a standalone proof |
 | POST     | `/rpc/saka.authn.v1.MultifactorService/AdminDisableMfa`      | ConnectRPC   | Disable a user's MFA (admin, no proof needed) |
+
+The caller's own `DisableMfa` rides the User Account folder in the Yaak
+collection; the enrollment, bridge, and recovery-code rows stay here.
 
 ## OAuth SSO
 
@@ -128,14 +112,11 @@ refresh grant refused with `invalid_grant`) with a permanent ban.
 
 A machine credential a holder issues for their own scripting and integrations. It acts as its
 owner; the one surface a key is refused on is the keys' own (`Session` guard rule). Shown once,
-stored as a SHA-256 hash of the presented `<prefix>.<secret>` string.
+stored as a SHA-256 hash of the presented `<prefix>.<secret>` string. The holder's
+own keys are under User Account above; the administrative roll is here.
 
 | Method   | Procedure / Endpoint                                                        | Protocol     | Summary          |
 | -------- | --------------------------------------------------------------------------- | ------------ | ---------------- |
-| POST     | `/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey`                            | ConnectRPC   | Create API key   |
-| POST     | `/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys`                             | ConnectRPC   | List API keys    |
-| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey`                             | ConnectRPC   | Renew API key    |
-| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey`                            | ConnectRPC   | Revoke API key   |
 | POST     | `/rpc/saka.apikey.v1.ApiKeyService/ListAllAPIKeys`                          | ConnectRPC   | List all API keys (saka-only, administrative) |
 
 ## Authorization
@@ -169,57 +150,76 @@ lives in `internal/audit/audit.go`; retention is a scheduled job, not an endpoin
 | POST     | `/rpc/saka.auditlog.v1.AuditLogService/ListForUser`            | ConnectRPC   | List one account's audit logs (admin) |
 | POST     | `/rpc/saka.auditlog.v1.AuditLogService/FilterOptions`          | ConnectRPC   | List filter facets (admin)           |
 
-## Users
+## User Account (self-service)
+
+The account holder's own surface: profile, credentials, sessions, keys, and the
+self-service exits. Every procedure acts on the caller's account; the administrative
+rows live under User Management below. This section groups rows their service
+sections also carry — the procedure is the same, only the folder differs.
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | POST     | `/rpc/saka.identity.v1.UserService/GetCurrentUser`                          | ConnectRPC   | The account the caller is                       |
 | POST     | `/rpc/saka.identity.v1.UserService/UpdateCurrentUser`                       | ConnectRPC   | Update the signed-in account's own profile (names, locale, timezone) |
+| PUT      | `/api/users/me/profile-picture`                                              | HTTP/REST    | Update own profile picture (raw-body upload)    |
+| DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
+| POST     | `/rpc/saka.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Saka-Reauthentication`; refused when a password already stands) |
+| POST     | `/rpc/saka.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
+| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/ListCredentials`                       | ConnectRPC   | List the account's passkeys                 |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/UpdateCredential`                      | ConnectRPC   | Rename a passkey                            |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/DeleteCredential`                      | ConnectRPC   | Remove a passkey (second-factor proof)      |
+| POST     | `/rpc/saka.authn.v1.SessionService/GetSession`               | ConnectRPC   | Inspect current session             |
+| POST     | `/rpc/saka.authn.v1.SessionService/ListSessions`             | ConnectRPC   | List own sessions                   |
+| POST     | `/rpc/saka.authn.v1.SessionService/RevokeSession`            | ConnectRPC   | Revoke one own session              |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOut`                  | ConnectRPC   | Sign out                            |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOutOtherSessions`     | ConnectRPC   | Sign out other sessions             |
+| POST     | `/rpc/saka.authn.v1.SessionService/SignOutAllSessions`       | ConnectRPC   | Sign out all sessions               |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/CreateAPIKey`                            | ConnectRPC   | Create API key   |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/ListAPIKeys`                             | ConnectRPC   | List API keys    |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RenewAPIKey`                             | ConnectRPC   | Renew API key    |
+| POST     | `/rpc/saka.apikey.v1.ApiKeyService/RevokeAPIKey`                            | ConnectRPC   | Revoke API key   |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/ExchangeToken`                    | ConnectRPC   | Exchange one-time access token               |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmail`                     | ConnectRPC   | Request one-time access email                |
+
+## User Management (admin)
+
+The administrative surface over accounts: CRUD, lifecycle, restrictions, and the
+administrative halves of the credential surfaces.
+
+| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
+| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | POST     | `/rpc/saka.identity.v1.UserService/ListUsers`                               | ConnectRPC   | List users (admin)                              |
 | POST     | `/rpc/saka.identity.v1.UserService/GetUser`                                 | ConnectRPC   | Get user by ID (admin)                          |
 | POST     | `/rpc/saka.identity.v1.UserService/CreateUser`                              | ConnectRPC   | Create user (admin; optional `user_group_ids` joins groups at creation) |
 | POST     | `/rpc/saka.identity.v1.UserService/UpdateUser`                              | ConnectRPC   | Update user (admin)                             |
 | POST     | `/rpc/saka.identity.v1.UserService/DeleteUser`                              | ConnectRPC   | Delete user (admin; refuses the signed-in account) |
+| POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword` | ConnectRPC | Trigger a reset for one account (admin) |
+| PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
+| GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture (public)               |
+| POST     | `/rpc/saka.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
 | POST     | `/rpc/saka.identity.v1.UserService/BanUser`                                 | ConnectRPC   | Ban a user (admin; the ban is a row in `account_restrictions`, ends the live sessions) |
 | POST     | `/rpc/saka.identity.v1.UserService/UnbanUser`                               | ConnectRPC   | Unban a user (admin)                            |
 | POST     | `/rpc/saka.identity.v1.UserService/UnlockUser`                              | ConnectRPC   | Lift an account's lockout (admin; zeroes the failed-attempt streak) |
-| POST     | `/rpc/saka.identity.v1.UserService/ResetProfilePicture`                     | ConnectRPC   | Reset user profile picture                      |
-| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (self-service; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
-| POST     | `/rpc/saka.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Saka-Reauthentication`; refused when a password already stands) |
-| POST     | `/rpc/saka.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
-| PUT      | `/api/users/me/profile-picture`                                              | HTTP/REST    | Update own profile picture (raw-body upload)    |
-| DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
-| PUT      | `/api/users/{id}/profile-picture`                                            | HTTP/REST    | Update a user's profile picture (self-service)  |
-| GET      | `/api/users/{id}/profile-picture.png`                                        | HTTP/REST    | Get user profile picture (public)               |
-
-## Blocklist (saka-only)
-
-Admin CRUD over the identifiers no open-mode sign-up may claim while
-`access.blocklist_enabled` is on. An entry is one email address or one
-`@domain` entry (the domain exact — a subdomain is a different domain); no
-wildcards. A blocked exact address carries over to its subaddressed variants.
-The refusal is the generic `not_found` "sign-up is not available"; the
-allowlist wins over the blocklist. `access.blocklist_applies_to_signins`
-extends the lists to sign-ins — the refusal is `permission_denied` "sign-in is
-not permitted", and a wrong password still answers `invalid credentials`.
-`access.block_email_subaddresses` blocks an address whose base (subaddress
-separators cut, Gmail dots folded) an existing account already holds, at
-sign-up and when an email change names the new address (`failed_precondition`).
-
-| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
-| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
-| POST     | `/rpc/saka.identity.v1.BlocklistService/ListBlocklistEntries`               | ConnectRPC   | List blocklist entries, newest first (admin)    |
-| POST     | `/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry`                  | ConnectRPC   | Add one entry (admin; idempotent — a repeat answers the stored row) |
-| POST     | `/rpc/saka.identity.v1.BlocklistService/RemoveBlocklistEntry`               | ConnectRPC   | Remove one entry by ID (admin)                  |
-
-## Sign-up and Signup Tokens
-
-| Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
-| -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
+| POST     | `/rpc/saka.authn.v1.SessionService/ImpersonateUser`          | ConnectRPC   | Impersonate a user (admin)          |
+| POST     | `/rpc/saka.authn.v1.SessionService/StopImpersonating`        | ConnectRPC   | Stop impersonating                  |
 | POST     | `/rpc/saka.identity.v1.SignupService/Signup`                                | ConnectRPC   | Sign up (requires a signup token)               |
 | POST     | `/rpc/saka.identity.v1.SignupService/ListSignupTokens`                      | ConnectRPC   | List signup tokens (admin)                      |
 | POST     | `/rpc/saka.identity.v1.SignupService/CreateSignupToken`                     | ConnectRPC   | Create signup token (admin; raw token shown once) |
 | POST     | `/rpc/saka.identity.v1.SignupService/DeleteSignupToken`                     | ConnectRPC   | Delete signup token (admin)                     |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/ListBlocklistEntries`               | ConnectRPC   | List blocklist entries, newest first (admin)    |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/AddBlocklistEntry`                  | ConnectRPC   | Add one entry (admin; idempotent — a repeat answers the stored row) |
+| POST     | `/rpc/saka.identity.v1.BlocklistService/RemoveBlocklistEntry`               | ConnectRPC   | Remove one entry by ID (admin)                  |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                          |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail`                | ConnectRPC   | Verify email (token is the credential)           |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/CreateToken`                      | ConnectRPC   | Create one-time access token for user (admin) |
+| POST     | `/rpc/saka.authn.v1.OneTimeAccessService/RequestEmailAsAdmin`              | ConnectRPC   | Request one-time access email (admin)        |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminListCredentials`                  | ConnectRPC   | List a user's passkeys (admin)              |
+| POST     | `/rpc/saka.authn.v1.WebAuthnService/AdminDeleteCredential`                 | ConnectRPC   | Remove a user's passkey (admin)             |
 
 ## User Groups
 
@@ -237,14 +237,15 @@ membership update is a replace: the request names the whole member set.
 | POST     | `/rpc/saka.identity.v1.UserGroupService/GetUserGroups`                           | ConnectRPC   | List one user's groups            |
 | POST     | `/rpc/saka.identity.v1.UserGroupService/UpdateUserGroups`                        | ConnectRPC   | Replace one user's groups (admin) |
 
-## Email Verification and Email Change
+## Email Verification
 
 | Method   | Procedure / Endpoint                                                         | Protocol     | Summary                                         |
 | -------- | ---------------------------------------------------------------------------- | ------------ | ----------------------------------------------- |
 | POST     | `/rpc/saka.identity.v1.EmailVerificationService/SendEmail`                  | ConnectRPC   | Send email verification                          |
 | POST     | `/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail`                | ConnectRPC   | Verify email (token is the credential)           |
-| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
-| POST     | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
+
+The email change pair is the account holder's — both rows live under User
+Account above.
 
 ## Notifications
 

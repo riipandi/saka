@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_TaKpCMqSrW
 createdAt: 2026-09-26T11:36:50.989070
-updatedAt: 2026-09-26T11:43:09.492813
+updatedAt: 2026-10-11T22:03:12.672962
 workspaceId: wk_kBiMYTkhPP
 folderId: fl_YFXTtzfvhT
 authentication:
@@ -26,7 +26,7 @@ headers:
   id: Kxbj9z3umC
 method: POST
 name: '[Saka] Sign out'
-sortPriority: 0.0
+sortPriority: 2000.0
 url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/SignOut
 urlParameters: []
 settingSendCookies:

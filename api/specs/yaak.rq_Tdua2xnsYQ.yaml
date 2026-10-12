@@ -2,9 +2,9 @@ type: http_request
 model: http_request
 id: rq_Tdua2xnsYQ
 createdAt: 2026-09-26T18:07:22.412572
-updatedAt: 2026-09-26T18:14:56.185355
+updatedAt: 2026-10-11T22:02:39.050029
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_YFXTtzfvhT
+folderId: fl_6Mz7cAXBrj
 authentication: {}
 authenticationType: null
 body:
@@ -27,7 +27,7 @@ headers:
   id: DCYwXPzwRH
 method: POST
 name: '[Saka] Stop impersonating'
-sortPriority: 0.0
+sortPriority: 25555.555555555555
 url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.SessionService/StopImpersonating
 urlParameters: []
 settingSendCookies:

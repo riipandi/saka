@@ -138,11 +138,23 @@ function baseRoleHandlers(router: ConnectRouter, overrides: Record<string, unkno
   })
 }
 
-async function clickInDialog(screen: RenderResult, name: string) {
-  await expect.element(screen.getByRole('alertdialog')).toBeVisible()
-  const button = screen.getByRole('alertdialog').getByRole('button', { name }).element()
+async function clickInDialog(
+  screen: RenderResult,
+  name: string,
+  role: 'dialog' | 'alertdialog' = 'dialog'
+) {
+  await expect.element(screen.getByRole(role)).toBeVisible()
+  const button = screen.getByRole(role).getByRole('button', { name }).element()
   if (!(button instanceof HTMLElement)) throw new Error(`the ${name} button is not an element`)
   button.click()
+}
+
+/** The row actions live behind the row's "Actions" dropdown trigger. */
+async function openRowActions(screen: RenderResult, position: 'first' | 'last') {
+  await screen.getByRole('button', { name: 'Actions' })[position]().click()
+  const menu = screen.getByRole('menu')
+  await expect.element(menu).toBeVisible()
+  return menu
 }
 
 afterEach(() => {
@@ -165,8 +177,10 @@ describe('the roles screen', () => {
     expect(screen.baseElement.textContent).toContain('editors')
     expect(screen.baseElement.textContent).toContain('2 permissions')
     // A custom role is the administrator's to shape and delete; a system
-    // role's row offers only its permission tree.
-    await expect.element(screen.getByRole('button', { name: 'Delete' })).toBeVisible()
+    // role's row offers only its permission tree (asserted in the
+    // read-only test, which opens the system row's menu).
+    const customMenu = await openRowActions(screen, 'last')
+    await expect.element(customMenu.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
   })
 
   it('creates a role with its name and immutable slug', async () => {
@@ -198,8 +212,8 @@ describe('the roles screen', () => {
     )
 
     await screen.getByRole('button', { name: 'Create role' }).click()
-    await screen.getByRole('alertdialog').getByLabelText('Name').fill('Reviewers')
-    await screen.getByRole('alertdialog').getByLabelText('Slug').fill('reviewers')
+    await screen.getByRole('dialog').getByLabelText('Name').fill('Reviewers')
+    await screen.getByRole('dialog').getByLabelText('Slug').fill('reviewers')
     await clickInDialog(screen, 'Create role')
 
     await expect.poll(() => created.length).toBe(1)
@@ -247,18 +261,19 @@ describe('the roles screen', () => {
     )
 
     // The custom role's row carries the tree; open it.
-    await screen.getByRole('button', { name: 'Permissions' }).last().click()
-    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
+    const customMenu = await openRowActions(screen, 'last')
+    await customMenu.getByRole('menuitem', { name: 'Permissions' }).click()
+    await expect.element(screen.getByRole('dialog')).toBeVisible()
     expect(screen.baseElement.textContent).toContain('next token')
 
     // The seed: the role's own set starts checked.
     const readToggle = screen
-      .getByRole('alertdialog')
+      .getByRole('dialog')
       .getByRole('checkbox', { name: /Permission: user:\*:read/ })
     await expect.element(readToggle).toHaveAttribute('aria-checked', 'true')
 
     const listBox = screen
-      .getByRole('alertdialog')
+      .getByRole('dialog')
       .getByRole('checkbox', { name: /Permission: user:\*:list/ })
       .element()
     if (!(listBox instanceof HTMLElement)) throw new Error('the toggle is not an element')
@@ -294,14 +309,14 @@ describe('the roles screen', () => {
       )
     )
 
-    // The system role's row offers only its tree — the first Permissions
-    // button in the list.
-    await screen.getByRole('button', { name: 'Permissions' }).first().click()
-    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
+    // The system role's row offers only its tree — the first row's menu.
+    const systemMenu = await openRowActions(screen, 'first')
+    expect(systemMenu.getByRole('menuitem', { name: 'Delete' }).elements().length).toBe(0)
+    await systemMenu.getByRole('menuitem', { name: 'Permissions' }).click()
+    await expect.element(screen.getByRole('dialog')).toBeVisible()
     expect(screen.baseElement.textContent).toContain('read-only')
     expect(
-      screen.getByRole('alertdialog').getByRole('button', { name: 'Save permissions' }).elements()
-        .length
+      screen.getByRole('dialog').getByRole('button', { name: 'Save permissions' }).elements().length
     ).toBe(0)
   })
 
@@ -324,8 +339,9 @@ describe('the roles screen', () => {
       )
     )
 
-    await screen.getByRole('button', { name: 'Delete' }).click()
-    await clickInDialog(screen, 'Delete role')
+    const customMenu = await openRowActions(screen, 'last')
+    await customMenu.getByRole('menuitem', { name: 'Delete' }).click()
+    await clickInDialog(screen, 'Delete role', 'alertdialog')
     await expect
       .element(screen.getByRole('alertdialog').getByText('the role is still carried by accounts'))
       .toBeVisible()

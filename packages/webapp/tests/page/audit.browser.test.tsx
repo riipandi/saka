@@ -83,8 +83,10 @@ describe('Audit trail (browser)', () => {
     await expect.element(screen.getByText('Signed in')).toBeVisible()
     await expect.element(screen.getByText('Account updated').first()).toBeVisible()
     expect(screen.baseElement.textContent).toContain('hermione')
-    expect(screen.baseElement.textContent).toContain('from 10.0.0.9')
-    expect(screen.baseElement.textContent).toContain('by albus (delegated)')
+    // The IP address is its own column; a delegated action names the
+    // administrator behind it without decoration.
+    expect(screen.baseElement.textContent).toContain('10.0.0.9')
+    expect(screen.baseElement.textContent).toContain('by albus')
     await expect.element(screen.getByText('Failed')).toBeVisible()
     expect(screen.baseElement.textContent).toContain('Success')
   })
@@ -97,9 +99,12 @@ describe('Audit trail (browser)', () => {
   it('turns the pages the summary offers', async () => {
     const onPageChange = vi.fn()
     const { screen } = await renderAudit({ page: 2, onPageChange })
-    await expect.element(screen.getByText('21–40 of 45')).toBeVisible()
+    // The pager is the numbered window around the current page.
+    await expect
+      .element(screen.getByRole('button', { name: '2' }))
+      .toHaveAttribute('aria-current', 'page')
 
-    await screen.getByRole('button', { name: 'Next' }).click()
+    await screen.getByRole('button', { name: 'Go to next page' }).click()
     expect(onPageChange).toHaveBeenCalledWith(3)
   })
 

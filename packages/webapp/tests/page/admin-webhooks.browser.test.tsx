@@ -204,7 +204,11 @@ describe('Admin webhooks (browser)', () => {
 
   it('deletes an endpoint after the confirmation', async () => {
     const screen = await renderWith(<WebhooksView />)
-    const trigger = screen.getByRole('button', { name: 'Delete billing-bridge' })
+    // The row actions live behind the row's "Actions" dropdown; the target
+    // endpoint is the first row.
+    await screen.getByRole('button', { name: 'Actions' }).first().click()
+    await expect.element(screen.getByRole('menu')).toBeVisible()
+    const trigger = screen.getByRole('menu').getByRole('button', { name: 'Delete billing-bridge' })
     await expect.element(trigger).toBeVisible()
     await trigger.click()
     const scope = screen.getByRole('alertdialog')
@@ -231,7 +235,8 @@ describe('Admin webhooks (browser)', () => {
     })
     await expect.element(screen.getByText('webhook.test')).toBeVisible()
     await expect.element(screen.getByText('succeeded').nth(0)).toBeVisible()
-    await expect.element(screen.getByText(/answered 200/).nth(0)).toBeVisible()
+    // The attempt's response status is its own column, the raw code.
+    await expect.element(screen.getByText('200')).toBeVisible()
   })
 
   it('presents the rotated secret once', async () => {

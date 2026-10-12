@@ -189,6 +189,20 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
         label: 'Notifications',
         href: '/admin/notifications',
         permission: 'notification:*:list'
+      },
+      {
+        icon: Layers,
+        activeIcon: LayersTwoTone,
+        label: 'Task queues',
+        href: '/admin/ops/queue',
+        adminOnly: true
+      },
+      {
+        icon: History,
+        activeIcon: HistoryTwoTone,
+        label: 'Scheduler',
+        href: '/admin/ops/scheduler',
+        adminOnly: true
       }
     ]
   }

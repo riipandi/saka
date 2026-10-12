@@ -19,6 +19,7 @@ import { LoaderText } from 'uilibs/components/extra/loader-text'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { ThemeSwitcher } from 'uilibs/theme'
+import { TimezonePicker } from '#/components/timezone-picker'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 import { usePublicSettings } from '#/hooks/use-public-settings'
@@ -344,13 +345,9 @@ export function SettingsView({ embedded = false }: { embedded?: boolean } = {}) 
               </Field>
               <Field style={styles.grow}>
                 <FieldLabel htmlFor='timezone'>Timezone</FieldLabel>
-                <Input
-                  id='timezone'
-                  placeholder='e.g. Asia/Jakarta'
+                <TimezonePicker
                   value={draft?.timezone ?? ''}
-                  onChange={(event) =>
-                    setDraft((d) => (d ? { ...d, timezone: event.target.value } : d))
-                  }
+                  onValueChange={(next) => setDraft((d) => (d ? { ...d, timezone: next } : d))}
                 />
                 <FieldDescription>An IANA zone; empty means UTC.</FieldDescription>
               </Field>

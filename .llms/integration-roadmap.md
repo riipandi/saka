@@ -542,11 +542,23 @@ goal, three deltas from its shape:
 
 ### Wave 6 — device, ops, storage
 
-- [ ] **Device login approval** — `Inspect`/`Decide` rendered for the
-  signed-in holder; the device side is REST and needs no SPA work beyond
-  documenting the flow.
-- [ ] **Ops console** — `QueueService`/`SchedulerService` screens and
-  health reads; the pagination and admin-shell patterns carry it.
+- [x] **Device login approval** — the approval screen ships at `/device`
+  (alphanumeric OTP input, `?code=` deep link, approve/deny) reached
+  from the user menu; the device side is REST and needed no SPA work
+  beyond it. The E2E client tool lives at `tools/e2e-device-login`.
+  The timezone picker (`countries-and-timezones`) lands with this
+  wave's parked-debt half; the OIDC consent interaction page is parked
+  as `issue-20261012_0445.md` — the backend is complete, the SPA
+  surface never existed to patch. (commits `231d0507`, `a2fe5432`,
+  `ab0af232`)
+- [x] **Ops console** — the queue half ships at `/admin/ops/queue`
+  (queues overview, pending table, dead archive, task drawer, cancel /
+  replay / flush with confirmation); the scheduler half ships at
+  `/admin/ops/scheduler` (registered jobs, next-due state badges, and
+  the run-now trigger that starts a tick early without moving the
+  schedule). Sidebar gates both by role (`adminOnly`) — the queue and
+  scheduler services are `Rule: Admin`, no catalog resource. (commits
+  `d19386ad`, `27dc78ad`)
 - [ ] **Storage** — blocked on the endpoint-reference gap (see
   `issue-20261009_2356.md`); plan it only after the shipped storage
   surface is inventoried and the tus/REST split is on the reference's

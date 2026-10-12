@@ -8,9 +8,9 @@
         "build": "tsx build.ts"
     },
     "dependencies": {
-        "@react-email/ui": "^6.11.0",
+        "@react-email/ui": "^6.11.1",
         "react": "^19.3.0",
-        "react-email": "^6.11.0"
+        "react-email": "^6.11.1"
     },
     "devDependencies": {
         "@types/react": "^19.3.0",

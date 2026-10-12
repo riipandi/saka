@@ -139,7 +139,7 @@ describe('the impersonation banner', () => {
 })
 
 describe('the sidebar administration section', () => {
-  it('shows the Administration section for the administrator snapshot', async () => {
+  it('shows the administration groups for the administrator snapshot', async () => {
     setAuthUser(USER)
     // The mint carries the role AND the catalog slugs the role grants —
     // the sidebar judges the slugs, the same facts the pages consume.
@@ -156,26 +156,27 @@ describe('the sidebar administration section', () => {
 
     const screen = await mount(<SideNavbar />)
 
-    await expect.element(screen.getByText('Administration')).toBeVisible()
+    await expect.element(screen.getByText('Identity & Access')).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Groups' })).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Roles' })).toBeVisible()
     clearAuth()
   })
 
-  it('hides the Administration section when the snapshot is not an administrator', async () => {
+  it('hides every administration group when the snapshot is not an administrator', async () => {
     setAuthUser(USER)
     setAuthGrants({ roles: ['editor'], permissions: ['user:*:read'] })
 
     const screen = await mount(<SideNavbar />)
 
-    expect(screen.baseElement.textContent).not.toContain('Administration')
+    expect(screen.baseElement.textContent).not.toContain('Identity & Access')
+    expect(screen.baseElement.textContent).not.toContain('Audit trail')
     clearAuth()
   })
 
   it('hides items whose slug the snapshot does not carry', async () => {
     setAuthUser(USER)
-    // An administrator-shaped role minus the audit slug: the section shows,
+    // An administrator-shaped role minus the audit slug: the group shows,
     // the audit trail item does not.
     setAuthGrants({
       roles: ['administrator'],
@@ -184,7 +185,7 @@ describe('the sidebar administration section', () => {
 
     const screen = await mount(<SideNavbar />)
 
-    await expect.element(screen.getByText('Administration')).toBeVisible()
+    await expect.element(screen.getByText('Identity & Access')).toBeVisible()
     expect(screen.baseElement.textContent).not.toContain('Audit trail')
     clearAuth()
   })

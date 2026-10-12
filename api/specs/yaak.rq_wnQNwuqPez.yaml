@@ -2,9 +2,9 @@ type: http_request
 model: http_request
 id: rq_wnQNwuqPez
 createdAt: 2026-09-26T21:00:44.046969
-updatedAt: 2026-09-26T21:25:32.706560
+updatedAt: 2026-10-11T22:15:45.019104
 workspaceId: wk_kBiMYTkhPP
-folderId: fl_ZsR2s3GrGS
+folderId: fl_6Mz7cAXBrj
 authentication:
   token: ${[ accessToken ]}
 authenticationType: bearer
@@ -26,7 +26,7 @@ headers:
   id: DzCM2paJmW
 method: POST
 name: '[Saka] Reset user password (admin)'
-sortPriority: 1000.0
+sortPriority: 25111.11111111111
 url: ${[ apiBaseURL ]}/rpc/saka.authn.v1.PasswordRecoveryService/AdminResetUserPassword
 urlParameters: []
 settingSendCookies:

@@ -181,7 +181,10 @@ describe('Admin notifications (browser)', () => {
     categoryTrigger.click()
     await screen.getByRole('option', { name: 'System notice' }).click()
     // A system notice preselects the accounts audience; name one account.
-    const hermione = dialog.getByLabelText('Hermione (hermione@example.com)')
+    // The Checkbox renders its own labelled element beside the native input.
+    const hermione = dialog.getByRole('checkbox', {
+      name: 'Hermione (hermione@example.com)'
+    })
     const box = hermione.element()
     if (!(box instanceof HTMLElement)) throw new Error('the account row is not an element')
     box.click()

@@ -34,7 +34,9 @@ Saka stands on ideas others built first. This page names them.
 - [Vite+](https://viteplus.dev) (Vite, Vitest, Oxlint, Oxfmt — the
   monorepo toolchain) · [React 19](https://react.dev) ·
   [TanStack](https://tanstack.com) ·
-  [React Email](https://react.email)
+  [React Email](https://react.email) ·
+  [countries-and-timezones](https://github.com/manuelmhtr/countries-and-timezones)
+  (the timezone picker's IANA data)
 - [Testcontainers](https://testcontainers.com) ·
   [Playwright](https://playwright.dev) ·
   [k6](https://k6.io) ·

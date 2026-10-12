@@ -113,10 +113,14 @@ function authContext(overrides: Record<string, unknown> = {}) {
 
 /** The dialog overlay intercepts pointer events, so a confirm click inside
  * an open dialog goes through the element itself — the pattern the security
- * tests keep. */
-async function confirmInDialog(view: RenderResult, name: string) {
-  await expect.element(view.getByRole('alertdialog')).toBeVisible()
-  const button = view.getByRole('alertdialog').getByRole('button', { name }).element()
+ * tests keep. Forms open as `dialog`; confirmations open as `alertdialog`. */
+async function confirmInDialog(
+  view: RenderResult,
+  name: string,
+  role: 'dialog' | 'alertdialog' = 'alertdialog'
+) {
+  await expect.element(view.getByRole(role)).toBeVisible()
+  const button = view.getByRole(role).getByRole('button', { name }).element()
   if (!(button instanceof HTMLElement)) throw new Error(`the ${name} button is not an element`)
   button.click()
 }
@@ -140,7 +144,9 @@ describe('the users list', () => {
     )
 
     await expect.element(screen.getByText('Robert Langdon')).toBeVisible()
-    expect(screen.baseElement.textContent).toContain('rlangdon · robert@langdon.dev')
+    // The table renders the username and the email as their own columns.
+    expect(screen.baseElement.textContent).toContain('rlangdon')
+    expect(screen.baseElement.textContent).toContain('robert@langdon.dev')
     await expect.element(screen.getByText('Banned')).toBeVisible()
   })
 
@@ -197,12 +203,12 @@ describe('the users list', () => {
     )
 
     await screen.getByRole('button', { name: 'Create user' }).click()
-    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
-    await screen.getByRole('alertdialog').getByLabelText('Username').fill('sneveu')
-    await screen.getByRole('alertdialog').getByLabelText('Email').fill('sophie@neveu.dev')
-    await screen.getByRole('alertdialog').getByLabelText('First name').fill('Sophie')
-    await screen.getByRole('alertdialog').getByLabelText('Last name').fill('Neveu')
-    await confirmInDialog(screen, 'Create user')
+    await expect.element(screen.getByRole('dialog')).toBeVisible()
+    await screen.getByRole('dialog').getByLabelText('Username').fill('sneveu')
+    await screen.getByRole('dialog').getByLabelText('Email').fill('sophie@neveu.dev')
+    await screen.getByRole('dialog').getByLabelText('First name').fill('Sophie')
+    await screen.getByRole('dialog').getByLabelText('Last name').fill('Neveu')
+    await confirmInDialog(screen, 'Create user', 'dialog')
 
     await expect.poll(() => created.length).toBe(1)
     expect(created[0]).toMatchObject({ username: 'sneveu', password: undefined })
