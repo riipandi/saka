@@ -656,6 +656,18 @@ request shape the Basic OP certification profile sends; `S256` is the only
 accepted challenge method — `plain` is refused at the authorize endpoint
 (RFC 9700 §4.1.3), and the discovery document names `["S256"]` alone.
 
+**The SPA completion dialect.** The continuation's success is the
+provider's own redirect to the RP's `redirect_uri`, and a browser tab the
+SPA drives can neither read a 302's `Location` (a fetch's manual redirect
+is opaque) nor navigate while carrying the bearer header. The SPA-facing
+callback paths — `/oidc/authorize/{id}`, `/oidc/device`,
+`/oidc/device/{id}` — therefore answer a request carrying
+`X-Saka-Interaction: spa` with the redirect wrapped into the interaction
+dialect: `200 {"redirect": "<location>"}`, the shape `writeInteraction`
+already speaks. The header is opt-in: the conformance suite's browser, the
+REST driver, and a plain browser keep the raw 302 the protocol writes
+(`modules/federation/oidc`, the `spaDialect` wrapper at the mount).
+
 **Third-party initiated login.** A relying party links the browser
 straight to `GET /oidc/authorize` with its own `client_id`, an optional
 `login_hint` (a username or email), and `state` — the standard

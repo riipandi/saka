@@ -312,8 +312,11 @@ func (p *Protocol) Mount(r chi.Router) {
 	// grant and saves it back apart, and the save must find the row
 	// holding the document the request read.
 	snapshots := grantSnapshotMiddleware
+	// The SPA's callback paths carry the completion dialect: the SPA
+	// cannot read the redirect the provider writes, so its opted-in calls
+	// get the target as JSON. Every other caller keeps the raw 302.
 	r.Handle(protocolPrefix+protocolAuthorizeEndpoint, handler)
-	r.Handle(protocolPrefix+protocolAuthorizeEndpoint+"/*", handler)
+	r.Handle(protocolPrefix+protocolAuthorizeEndpoint+"/*", spaDialect(handler))
 	r.Handle(protocolPrefix+protocolTokenEndpoint, snapshots(flatten(handler)))
 	r.Handle(protocolPrefix+protocolUserInfoEndpoint, handler)
 	r.Handle(protocolPrefix+protocolIntrospectEndpoint, snapshots(flatten(handler)))
@@ -333,10 +336,12 @@ func (p *Protocol) Mount(r chi.Router) {
 	// metadata staying honest about where a registration request lands.
 	r.Handle(protocolPrefix+protocolRegisterEndpoint, flatten(handler))
 	// The device verification endpoint serves the browser's entry and
-	// its callback continuation, so the subtree mounts with the handler.
+	// its callback continuation, so the subtree mounts with the handler —
+	// the SPA's dialect riding both, the entry's prompt redirect and the
+	// callback's completion redirect alike.
 	r.Handle(protocolPrefix+protocolDeviceAuthorizeEndpoint, flatten(handler))
-	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint, handler)
-	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint+"/*", handler)
+	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint, spaDialect(handler))
+	r.Handle(protocolPrefix+protocolDeviceVerificationEndpoint+"/*", spaDialect(handler))
 	r.Handle("/.well-known/openid-configuration", withLogoutDiscoveryMetadata(handler))
 	// The RFC 8414 alias is the OAuth face of the same document: the
 	// provider registers the discovery handler on the openid-configuration
