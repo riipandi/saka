@@ -56,11 +56,21 @@ func Mount(r chi.Router, injector do.Injector) {
 
 	// The passkey probe pages: the simulation of the SPA surfaces the
 	// frontend work will replace, one route per flow, carried by the web
-	// package's debug build.
+	// package's debug build. Their bodies load @simplewebauthn/browser's
+	// UMD bundle from unpkg and run inline — a script policy the route
+	// overrides per response, because the global CSP's script gate is the
+	// SPA's fence and the probe pages are the debug build's devtool, not
+	// the deployment's attack surface.
 	for path, body := range appweb.WebauthnProbePages {
 		page := body
 		r.Get(path, func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Content-Security-Policy",
+				"default-src 'self';"+
+					" script-src 'self' https://unpkg.com 'unsafe-inline';"+
+					" style-src 'self' 'unsafe-inline';"+
+					" img-src 'self' data:;"+
+					" connect-src 'self'")
 			_, _ = w.Write([]byte(page))
 		})
 	}

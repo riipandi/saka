@@ -15,7 +15,7 @@ import "net/http"
 // stand behind. JSON answers carry the headers too — a policy a browser
 // never acts on costs nothing.
 func SecurityHeaders(next http.Handler) http.Handler {
-	return withSecurityHeaders(next, "")
+	return withSecurityHeaders(next, "", false)
 }
 
 // SecurityHeadersWithConnect is the same header set, with the telemetry
@@ -24,15 +24,34 @@ func SecurityHeaders(next http.Handler) http.Handler {
 // that is not the deployment itself, and a policy the page's own tracer
 // cannot reach is a policy that silently drops every span.
 func SecurityHeadersWithConnect(extraConnect string) func(next http.Handler) http.Handler {
+	return SecurityHeadersForMode("", extraConnect)
+}
+
+// SecurityHeadersForMode picks the script gate the runtime mode serves. A
+// development build's shell injects the HMR preamble as an inline module
+// script — a document the compiler transforms, not one a deployment ships —
+// so its script gate adds the inline keyword; staging and production keep
+// the strict origin-only gate the token cookies stand behind.
+func SecurityHeadersForMode(mode, extraConnect string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return withSecurityHeaders(next, extraConnect)
+		return withSecurityHeaders(next, extraConnect, mode == "development")
 	}
 }
 
-func withSecurityHeaders(next http.Handler, extraConnect string) http.Handler {
+func withSecurityHeaders(next http.Handler, extraConnect string, dev bool) http.Handler {
 	connectSrc := "'self'"
 	if extraConnect != "" {
 		connectSrc += " " + extraConnect
+	}
+	scriptSrc := "'self'"
+	if dev {
+		scriptSrc += " 'unsafe-inline'"
+	}
+	fontSrc := "https://cdn.jsdelivr.net"
+	if dev {
+		// The dev server's own fonts (the devtools' bundle) ride the
+		// compiler's module graph — same origin, the /@fs/ pipeline.
+		fontSrc += " 'self'"
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
@@ -41,9 +60,9 @@ func withSecurityHeaders(next http.Handler, extraConnect string) http.Handler {
 		header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		header.Set("Content-Security-Policy",
 			"default-src 'self';"+
-				" script-src 'self';"+
+				" script-src "+scriptSrc+";"+
 				" style-src 'self' 'unsafe-inline';"+
-				" font-src https://cdn.jsdelivr.net;"+
+				" font-src "+fontSrc+";"+
 				" img-src 'self' data:;"+
 				" connect-src "+connectSrc+";"+
 				" worker-src 'self';"+

@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 import { type RenderResult } from 'vitest-browser-react'
 import { SecurityView } from '#/routes/(app)/account/-security-view'
 import {
+  BeginTotpEnrollmentResponseSchema,
+  ConfirmTotpEnrollmentResponseSchema,
   DeleteTotpEnrollmentResponseSchema,
   DisableMfaResponseSchema,
   ListTotpEnrollmentsResponseSchema,
@@ -67,6 +69,8 @@ interface Captured {
   credentialDeleted: { credentialId: string; proof: string | null } | null
   renamed: { credentialId: string; name: string } | null
   registrationStarted: number
+  begun: { name: string } | null
+  confirmed: { totpId: string; code: string } | null
 }
 
 interface SecurityOptions {
@@ -86,7 +90,9 @@ async function renderSecurity(
     added: null,
     credentialDeleted: null,
     renamed: null,
-    registrationStarted: 0
+    registrationStarted: 0,
+    begun: null,
+    confirmed: null
   }
   const credential = create(CredentialSchema, {
     id: 'psk_v1',
@@ -128,6 +134,22 @@ async function renderSecurity(
         captured.proof = context.requestHeader.get('x-saka-reauthentication')
         captured.disabled = { code: request.code }
         return create(DisableMfaResponseSchema, { message: 'disabled' })
+      },
+      beginTotpEnrollment: (request) => {
+        captured.begun = { name: request.name }
+        return create(BeginTotpEnrollmentResponseSchema, {
+          totpId: 'totp_repro',
+          name: request.name,
+          secret: 'MFRGGZDFMZTQ====',
+          otpauthUri: 'otpauth://totp/Saka:rlangdon?secret=MFRGGZDFMZTQ===='
+        })
+      },
+      confirmTotpEnrollment: (request) => {
+        captured.confirmed = { totpId: request.totpId, code: request.code }
+        return create(ConfirmTotpEnrollmentResponseSchema, {
+          totpId: request.totpId,
+          recoveryCodes: ['3f9a1c02', '8b2e47d1']
+        })
       }
     })
     service(WebAuthnService, {
@@ -218,6 +240,48 @@ describe('Security (browser)', () => {
     await vi.waitFor(() => {
       expect(captured.deleted).toEqual({ totpId: 'totp_pending', code: '' })
     })
+  })
+
+  it('enrolls an authenticator in the inline panel: name, scan, code, codes once', async () => {
+    const { screen, captured } = await renderSecurity()
+    await screen.getByRole('button', { name: 'Add authenticator' }).click()
+
+    const panel = screen.getByTestId('totp-enrollment-panel')
+    await expect.element(panel.getByText('Step 1 of 3 — name the device')).toBeVisible()
+    await panel.getByLabelText('Name this device').fill('Aegis on tablet')
+    await panel.getByRole('button', { name: 'Continue' }).click()
+    await vi.waitFor(() => {
+      expect(captured.begun).toEqual({ name: 'Aegis on tablet' })
+    })
+
+    await expect.element(panel.getByText('Step 2 of 3 — scan and confirm')).toBeVisible()
+    await expect.element(panel.getByText('MFRGGZDFMZTQ====')).toBeVisible()
+    await panel.getByLabelText('The code your authenticator renders').fill('039471')
+    await panel.getByRole('button', { name: 'Confirm' }).click()
+    await vi.waitFor(() => {
+      expect(captured.confirmed).toEqual({ totpId: 'totp_repro', code: '039471' })
+    })
+
+    await expect.element(panel.getByText('Step 3 of 3 — save the recovery codes')).toBeVisible()
+    await expect.element(panel.getByText('3f9a1c02')).toBeVisible()
+    await panel.getByRole('button', { name: 'I saved my recovery codes' }).click()
+    await expect.element(screen.getByTestId('totp-enrollment-panel')).not.toBeInTheDocument()
+  })
+
+  it('abandons a begun enrollment on cancel — the unconfirmed row is a mistyped start', async () => {
+    const { screen, captured } = await renderSecurity()
+    await screen.getByRole('button', { name: 'Add authenticator' }).click()
+
+    const panel = screen.getByTestId('totp-enrollment-panel')
+    await panel.getByLabelText('Name this device').fill('Aegis on tablet')
+    await panel.getByRole('button', { name: 'Continue' }).click()
+    await expect.element(panel.getByText('Step 2 of 3 — scan and confirm')).toBeVisible()
+
+    await panel.getByRole('button', { name: 'Cancel' }).click()
+    await vi.waitFor(() => {
+      expect(captured.deleted).toEqual({ totpId: 'totp_repro', code: '' })
+    })
+    await expect.element(screen.getByTestId('totp-enrollment-panel')).not.toBeInTheDocument()
   })
 
   it('asks for the factor code when a confirmed authenticator is removed beside others', async () => {
