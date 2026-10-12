@@ -3,6 +3,7 @@ package router
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do/v2"
@@ -140,14 +141,29 @@ var restGuardRules = guard.RestRules
 // The SPA is mounted last: its handler answers whatever the routes above it
 // did not claim, and its own not-found rule keeps API and protocol paths from
 // being answered with index.html.
+// collectorOrigin reduces the browser telemetry's endpoint to the origin
+// the CSP's connect-src names — scheme plus host, the whole reach a
+// browser exporter needs. An empty endpoint (the off switch) allows
+// nothing extra.
+func collectorOrigin(endpoint string) string {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
+}
+
 func NewRouter(opts Options) chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(fwmiddleware.RequestID)
 	// The security headers ride every response, refusals included: they are
 	// written before the handler runs, at the top of the chain, so no
-	// surface — API, protocol, SPA, metrics — answers without them.
-	r.Use(fwmiddleware.SecurityHeaders)
+	// surface — API, protocol, SPA, metrics — answers without them. The
+	// browser telemetry's collector, when the deployment named one, rides
+	// connect-src beside the origin — an exporter a policy cannot reach
+	// would drop every span without a word.
+	r.Use(fwmiddleware.SecurityHeadersWithConnect(collectorOrigin(opts.Config.OTEL.Browser.Endpoint)))
 	// The client facts are captured here rather than per surface: both the
 	// REST routes and the procedures read them from the context, and the
 	// groups below inherit this chain, so there is one place a fact is
