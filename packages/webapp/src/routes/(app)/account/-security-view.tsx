@@ -2,7 +2,7 @@ import { create } from '@bufbuild/protobuf'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { createClient } from '@connectrpc/connect'
 import { createConnectQueryKey, useQuery, useTransport } from '@connectrpc/connect-query'
-import { KeyRound, Plus, Smartphone } from '@keyline-icons/react'
+import { KeyRound, Plus, Smartphone, Check, Copy } from '@keyline-icons/react'
 import { startRegistration } from '@simplewebauthn/browser'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,6 +20,7 @@ import {
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
+import { OTPField, OTPFieldSlot } from 'uilibs/components/base/otp-field'
 import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
 import { Badge } from 'uilibs/components/extra/badge'
 import {
@@ -239,6 +240,14 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
   const [enrollCodes, setEnrollCodes] = useState<string[] | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [enrollBusy, setEnrollBusy] = useState(false)
+  // The copy affordance's flash: the codes leave once, the button says so.
+  const [codesCopied, setCodesCopied] = useState(false)
+
+  const copyRecoveryCodes = async (codes: string[]) => {
+    await navigator.clipboard.writeText(codes.join('\n'))
+    setCodesCopied(true)
+    window.setTimeout(() => setCodesCopied(false), 2000)
+  }
 
   const userRpc = useMemo(() => createClient(UserService, transport), [transport])
   const mfaRpc = useMemo(() => createClient(MultifactorService, transport), [transport])
@@ -319,6 +328,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
     setEnrollCodes(null)
     setEnrollError(null)
     setEnrollBusy(false)
+    setCodesCopied(false)
   }
 
   const finishEnrollment = () => {
@@ -569,7 +579,13 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
             ) : (
               <div {...stylex.props(styles.listStack)}>
                 {rows.map((row) => {
-                  const needsCode = Boolean(row.confirmedAt) && confirmedCount > 1
+                  // The code is the removal's proof only when the removal
+                  // would strip the LAST confirmed factor — the backend's
+                  // own rule (`remaining <= 1` demands the code, a factor
+                  // left standing deletes free). The old inverted predicate
+                  // asked when factors stood and sent a bare code at the
+                  // disarm — a 400.
+                  const needsCode = Boolean(row.confirmedAt) && confirmedCount === 1
                   return (
                     <div key={row.totpId} {...stylex.props(styles.factorRow)}>
                       <Smartphone {...stylex.props(styles.factorIcon)} />
@@ -655,15 +671,15 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                       <FieldLabel htmlFor='totp-enroll-code'>
                         The code your authenticator renders
                       </FieldLabel>
-                      <Input
-                        id='totp-enroll-code'
-                        inputMode='numeric'
-                        autoComplete='one-time-code'
+                      <OTPField
+                        length={8}
                         value={enrollCode}
-                        onChange={(e) =>
-                          setEnrollCode(e.target.value.replace(/\D/g, '').slice(0, 8))
-                        }
-                      />
+                        onValueChange={(next) => setEnrollCode(next.replace(/\D/g, '').slice(0, 8))}
+                      >
+                        {Array.from({ length: 8 }, (_, slot) => (
+                          <OTPFieldSlot key={slot} />
+                        ))}
+                      </OTPField>
                     </Field>
                   </>
                 ) : null}
@@ -679,6 +695,16 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                           {code}
                         </Text>
                       ))}
+                    </div>
+                    <div {...stylex.props(styles.enrollFooter)}>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => void copyRecoveryCodes(enrollCodes)}
+                      >
+                        {codesCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {codesCopied ? 'Copied' : 'Copy codes'}
+                      </Button>
                     </div>
                   </>
                 ) : null}
@@ -846,7 +872,10 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
       <AlertDialog
         open={regeneratedCodes !== null}
         onOpenChange={(next) => {
-          if (!next) setRegeneratedCodes(null)
+          if (!next) {
+            setRegeneratedCodes(null)
+            setCodesCopied(false)
+          }
         }}
       >
         <AlertDialogContent>
@@ -863,6 +892,16 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                 {code}
               </Text>
             ))}
+          </div>
+          <div {...stylex.props(styles.toolbarRow, styles.enrollRow)}>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => void copyRecoveryCodes(regeneratedCodes ?? [])}
+            >
+              {codesCopied ? <Check size={16} /> : <Copy size={16} />}
+              {codesCopied ? 'Copied' : 'Copy codes'}
+            </Button>
           </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setRegeneratedCodes(null)}>

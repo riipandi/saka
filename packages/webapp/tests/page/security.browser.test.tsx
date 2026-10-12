@@ -256,7 +256,9 @@ describe('Security (browser)', () => {
 
     await expect.element(panel.getByText('Step 2 of 3 — scan and confirm')).toBeVisible()
     await expect.element(panel.getByText('MFRGGZDFMZTQ====')).toBeVisible()
-    await panel.getByLabelText('The code your authenticator renders').fill('039471')
+    const slots = panel.getByRole('textbox')
+    await expect.element(slots.first()).toBeVisible()
+    await slots.first().fill('039471')
     await panel.getByRole('button', { name: 'Confirm' }).click()
     await vi.waitFor(() => {
       expect(captured.confirmed).toEqual({ totpId: 'totp_repro', code: '039471' })
@@ -284,7 +286,7 @@ describe('Security (browser)', () => {
     await expect.element(screen.getByTestId('totp-enrollment-panel')).not.toBeInTheDocument()
   })
 
-  it('asks for the factor code when a confirmed authenticator is removed beside others', async () => {
+  it('removes a confirmed authenticator while another stands — the proof is not asked', async () => {
     const { screen, captured } = await renderSecurity({
       enrollments: [
         enrollment('totp_a', 'Aegis on tablet', true),
@@ -295,6 +297,21 @@ describe('Security (browser)', () => {
     // Two rows carry the action; the second row's button is the one the
     // scenario aims at.
     await screen.getByRole('button', { name: 'Remove' }).nth(1).click()
+
+    // A confirmed factor stays behind, so the backend deletes free — the
+    // inverted predicate's old code demand here was the 400 the removal
+    // answered with.
+    await vi.waitFor(() => {
+      expect(captured.deleted).toEqual({ totpId: 'totp_b', code: '' })
+    })
+  })
+
+  it('demands the factor code when the removal strips the last confirmed factor', async () => {
+    const { screen, captured } = await renderSecurity({
+      enrollments: [enrollment('totp_a', 'Aegis on tablet', true)]
+    })
+    await expect.element(screen.getByText('Aegis on tablet')).toBeVisible()
+    await screen.getByRole('button', { name: 'Remove' }).click()
 
     await expect.element(screen.getByRole('alertdialog')).toBeVisible()
     await screen.getByLabelText('Authenticator or recovery code').fill('039471')
@@ -310,7 +327,7 @@ describe('Security (browser)', () => {
     continueButton.click()
 
     await vi.waitFor(() => {
-      expect(captured.deleted).toEqual({ totpId: 'totp_b', code: '039471' })
+      expect(captured.deleted).toEqual({ totpId: 'totp_a', code: '039471' })
     })
   })
 
