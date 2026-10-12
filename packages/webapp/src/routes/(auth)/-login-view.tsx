@@ -52,6 +52,7 @@ const PROVIDER_ICONS: Record<string, ComponentType<{ size: number }>> = {
  */
 function OneTimeCodeEntry({
   notice,
+  busy,
   failed,
   onFailed,
   onDismissFailed,
@@ -59,6 +60,7 @@ function OneTimeCodeEntry({
   onRestart
 }: {
   notice: string
+  busy?: boolean
   failed: string | null
   onFailed: (message: string | null) => void
   onDismissFailed: () => void
@@ -67,7 +69,6 @@ function OneTimeCodeEntry({
 }) {
   const [code, setCode] = useState('')
   const valid = ONE_TIME_CODE_PATTERN.test(code.trim())
-  const busy = false
 
   return (
     <Card size='md' id='login-one-time-card' style={styles.cardRoot}>
@@ -89,7 +90,7 @@ function OneTimeCodeEntry({
           onSubmit={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            if (valid) onSubmit(code.trim())
+            if (valid && !busy) onSubmit(code.trim())
           }}
         >
           {failed ? (
@@ -115,7 +116,7 @@ function OneTimeCodeEntry({
           </Field>
           <div {...stylex.props(styles.submitWrapper)}>
             <Button type='submit' variant='primary' disabled={!valid || busy} style={styles.submit}>
-              Sign in
+              {busy ? <Spinner /> : 'Sign in'}
             </Button>
           </div>
         </form>
@@ -165,6 +166,7 @@ export function LoginView({
   const [dismissed, setDismissed] = useState(false)
   const [phase, setPhase] = useState<LoginPhase>({ name: 'credentials' })
   const [passkeyBusy, setPasskeyBusy] = useState(false)
+  const [oneTimeBusy, setOneTimeBusy] = useState(false)
   const oneTimeEnabled = config?.auth.one_time_access_email_as_unauthenticated_enabled ?? false
   // The signup door the deployment opens: only the open mode advertises
   // itself on the sign-in card — invite-mode visitors carry their tokens.
@@ -262,6 +264,7 @@ export function LoginView({
 
   const signInWithOneTimeCode = async (code: string, deviceToken?: string) => {
     setFailed(null)
+    setOneTimeBusy(true)
     try {
       const outcome = await exchangeOneTimeToken(code, deviceToken)
       // A signed-in answer has already navigated. A fork moves this mount
@@ -273,6 +276,8 @@ export function LoginView({
       }
     } catch (error: unknown) {
       setFailed(getErrorMessage(error))
+    } finally {
+      setOneTimeBusy(false)
     }
   }
 
@@ -296,6 +301,7 @@ export function LoginView({
     return (
       <OneTimeCodeEntry
         notice={phase.notice}
+        busy={oneTimeBusy}
         failed={failed}
         onFailed={setFailed}
         onDismissFailed={clearAlerts}
@@ -373,7 +379,15 @@ export function LoginView({
                       type='button'
                       variant='outline'
                       style={socialStyles.socialButton}
-                      render={<a href={`/oauth/${conn.provider}/start`} />}
+                      render={
+                        <a
+                          href={
+                            returnTo
+                              ? `/oauth/${conn.provider}/start?return_to=${encodeURIComponent(returnTo)}`
+                              : `/oauth/${conn.provider}/start`
+                          }
+                        />
+                      }
                     >
                       {Icon && <Icon size={16} />}
                       {conn.displayName}

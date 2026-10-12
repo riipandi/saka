@@ -17,7 +17,10 @@ export const Route = createFileRoute('/(auth)/auth/callback')({
   component: RouteComponent,
   validateSearch: z.object({
     flow_token: z.string().optional(),
-    error: z.string().optional()
+    error: z.string().optional(),
+    // The return trip the start carried — the server stored it only when it
+    // passed the same-origin shape, and the navigation judges it again.
+    return_to: z.string().optional()
   }),
   staticData: {
     pageTitle: 'Completing sign in'
@@ -40,7 +43,7 @@ export const OAUTH_FLOW_ERROR_MESSAGES: Record<string, string> = {
  * effect starts it once per mount no matter how the render cycles run.
  */
 function RouteComponent() {
-  const { flow_token: flowToken, error } = useSearch({ from: Route.id })
+  const { flow_token: flowToken, error, return_to: returnTo } = useSearch({ from: Route.id })
   const { continueSignIn } = useAuthentication()
   const navigate = useNavigate()
   const [failed, setFailed] = useState<string | null>(null)
@@ -49,7 +52,7 @@ function RouteComponent() {
   useEffect(() => {
     if (!flowToken || started.current) return
     started.current = true
-    continueSignIn(flowToken)
+    continueSignIn(flowToken, { redirectTo: returnTo })
       .then((outcome) => {
         // A multi-factor fork carries no tokens — its bridge is offered to
         // the login flow's machine in memory and the browser goes there; the
@@ -60,7 +63,7 @@ function RouteComponent() {
         }
       })
       .catch((cause: unknown) => setFailed(getErrorMessage(cause)))
-  }, [flowToken, continueSignIn, navigate])
+  }, [flowToken, continueSignIn, navigate, returnTo])
 
   const message = error
     ? (OAUTH_FLOW_ERROR_MESSAGES[error] ?? 'The sign-in could not be completed.')

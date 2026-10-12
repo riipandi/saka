@@ -62,17 +62,22 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   )
 
   const handleContinueSignIn = useCallback(
-    async (flowToken: string): Promise<SignInOutcome> => {
+    async (flowToken: string, options?: AuthLoginContextOptions): Promise<SignInOutcome> => {
       const outcome = await authWorker().continueSignIn(flowToken)
       if (outcome.kind !== 'signed-in') return outcome
       setAuthUser(outcome.session.user)
       // The flow's redirect chain never carried the cache's account — clear it
       // the same way a password sign-in does.
       queryClient.clear()
-      void navigate({ to: '/overview' })
+      const target = safeReturnTo(options?.redirectTo)
+      if (target) {
+        router.history.push(target)
+      } else {
+        void navigate({ to: '/overview' })
+      }
       return outcome
     },
-    [navigate]
+    [navigate, router]
   )
 
   const handleCompleteSignIn = useCallback(

@@ -88,7 +88,7 @@ func callerID(ctx context.Context) (uuid.UUID, error) {
 // BeginSignIn opens the authorization-code flow: the pending row is
 // written, and the answer is the authorize URL the browser navigates to.
 func (h *rpcHandler) BeginSignIn(ctx context.Context, req *authnv1.BeginOAuthSignInRequest) (*authnv1.BeginOAuthSignInResponse, error) {
-	authorizeURL, err := h.service.Begin(ctx, req.Connection)
+	authorizeURL, err := h.service.Begin(ctx, req.Connection, "")
 	switch {
 	case errors.Is(err, ErrConnectionUnavailable):
 		return nil, connect.NewError(connect.CodeNotFound, "no enabled connection answers this provider")

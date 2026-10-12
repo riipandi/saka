@@ -384,9 +384,9 @@ func TestTheSecondSignInRefreshesTheBindingTokens(t *testing.T) {
 
 	// The first sign-in binds the tokens the provider minted, expiry
 	// included, onto the binding the seeded account already carries.
-	authorizeURL, err := service.Begin(t.Context(), created.Provider)
+	authorizeURL, err := service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	firstToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	firstToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	userID := seedAccount(t, pool, "padma@hogwarts.example", true)
 	mustExec(t, pool,
@@ -423,9 +423,9 @@ func TestTheSecondSignInRefreshesTheBindingTokens(t *testing.T) {
 		RefreshToken:         "second-refresh",
 		AccessTokenExpiresAt: second,
 	}
-	authorizeURL, err = service.Begin(t.Context(), created.Provider)
+	authorizeURL, err = service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	secondToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	secondToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	answer, err = service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: secondToken})
 	require.NoError(t, err)
