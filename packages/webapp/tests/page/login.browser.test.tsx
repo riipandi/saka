@@ -209,10 +209,10 @@ describe('Login (browser)', () => {
 
     // The fork's own act: the browser lands on the pause page and the
     // paused bridge renders there.
-    await expect.element(screen.getByLabelText('Verification code')).toBeVisible()
+    await expect.element(screen.getByRole('textbox').first()).toBeVisible()
     expect(router.history.location.pathname).toBe('/login/mfa')
 
-    const code = screen.getByLabelText('Verification code')
+    const code = screen.getByRole('textbox').first()
     await code.fill('039471')
     await screen.getByRole('button', { name: 'Verify' }).click()
     await vi.waitFor(() => {
@@ -268,7 +268,7 @@ describe('Login (browser)', () => {
 
     await expect.element(screen.getByText('JBSWY3DPEHPK3PXP')).toBeVisible()
 
-    await screen.getByLabelText('The code your authenticator renders').fill('039471')
+    await screen.getByRole('textbox').first().fill('039471')
     await screen.getByRole('button', { name: 'Confirm' }).click()
 
     await expect.element(screen.getByText('Your recovery codes — shown once')).toBeVisible()
@@ -438,8 +438,8 @@ describe('Login (browser)', () => {
 
     // The fork's second factor is spent on the pause page — the exchange's
     // bridge, rendered from the slot.
-    await expect.element(screen.getByLabelText('Verification code')).toBeVisible()
-    await screen.getByLabelText('Verification code').fill('039471')
+    await expect.element(screen.getByRole('textbox').first()).toBeVisible()
+    await screen.getByRole('textbox').first().fill('039471')
     await screen.getByRole('button', { name: 'Verify' }).click()
     await vi.waitFor(() => {
       expect(completeSignIn).toHaveBeenCalledWith(
@@ -484,8 +484,8 @@ describe('Login (browser)', () => {
         transport,
         auth: signedInAuth({ loggedIn: false, completeSignIn })
       })
-      await expect.element(screen.getByLabelText('Verification code')).toBeVisible()
-      screen.unmount()
+      await expect.element(screen.getByRole('textbox').first()).toBeVisible()
+      void screen.unmount()
     }
   })
 

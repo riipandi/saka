@@ -671,11 +671,11 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                         The code your authenticator renders
                       </FieldLabel>
                       <OTPField
-                        length={8}
+                        length={6}
                         value={enrollCode}
-                        onValueChange={(next) => setEnrollCode(next.replace(/\D/g, '').slice(0, 8))}
+                        onValueChange={(next) => setEnrollCode(next.replace(/\D/g, '').slice(0, 6))}
                       >
-                        {Array.from({ length: 8 }, (_, slot) => (
+                        {Array.from({ length: 6 }, (_, slot) => (
                           <OTPFieldSlot key={slot} />
                         ))}
                       </OTPField>
@@ -727,7 +727,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
                   {enrollStep === 'scan' ? (
                     <Button
                       variant='primary'
-                      disabled={enrollBusy || !/^[0-9]{6,8}$/.test(enrollCode)}
+                      disabled={enrollBusy || !/^[0-9]{6}$/.test(enrollCode)}
                       onClick={() => void confirmTotpEnrollment()}
                     >
                       {enrollBusy ? <Spinner /> : null}

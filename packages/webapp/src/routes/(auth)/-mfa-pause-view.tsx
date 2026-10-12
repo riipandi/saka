@@ -1,8 +1,10 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { toast } from 'uilibs/components/base/toast'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import {
   clearSignInPause,
+  consumeExpiredSignInPause,
   readSignInPause,
   type SignInPause as StoredPause
 } from '#/libraries/guard/sign-in-pause'
@@ -12,7 +14,10 @@ import { MfaEnrollmentView } from './-mfa-enrollment-view'
 /** The pause page's search: the login page's own schema, passthrough —
  * extra params ride along, and the typed members are what the restart
  * navigation needs. */
-interface PauseSearch { [key: string]: unknown; return_to?: string }
+interface PauseSearch {
+  [key: string]: unknown
+  return_to?: string
+}
 
 /**
  * The pause page: the sign-in's multi-factor fork rendered from the bridge
@@ -29,6 +34,13 @@ export function MfaPauseView({ search }: { search: PauseSearch }) {
   useEffect(() => {
     const read = readSignInPause()
     if (!read) {
+      // A pause that existed and died gets a word; a visit that never had
+      // one (a direct URL, a spent slot) is an ordinary walk-back.
+      if (consumeExpiredSignInPause()) {
+        toast('Your verification session ended', {
+          description: 'Sign in again to continue — the code window closed.'
+        })
+      }
       void navigate({ to: '/login', search, replace: true })
       return
     }

@@ -29,10 +29,35 @@ export function readSignInPause(): SignInPause | null {
   const raw = sessionStorage.getItem(PAUSE_KEY)
   if (!raw) return null
   try {
-    const pause = JSON.parse(raw) as SignInPause
-    if (!pause.challenge?.pendingToken) return null
-    if (pause.challenge.expiresAt <= Date.now()) return null
-    return pause
+    const pause: unknown = JSON.parse(raw)
+    if (typeof pause !== 'object' || pause === null) return null
+    const record: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(pause)) record[key] = value
+    const challengeRaw = record.challenge
+    if (typeof challengeRaw !== 'object' || challengeRaw === null) return null
+    const challenge: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(challengeRaw)) challenge[key] = value
+    if (typeof challenge.pendingToken !== 'string') return null
+    if (typeof challenge.expiresAt !== 'number' || challenge.expiresAt <= Date.now()) return null
+    const returnTo = typeof record.returnTo === 'string' ? record.returnTo : undefined
+    if (challenge.kind === 'enrollment-required') {
+      return {
+        challenge: {
+          kind: 'enrollment-required',
+          pendingToken: challenge.pendingToken,
+          expiresAt: challenge.expiresAt
+        },
+        returnTo
+      }
+    }
+    return {
+      challenge: {
+        kind: 'mfa-challenge',
+        pendingToken: challenge.pendingToken,
+        expiresAt: challenge.expiresAt
+      },
+      returnTo
+    }
   } catch {
     return null
   }
@@ -40,4 +65,29 @@ export function readSignInPause(): SignInPause | null {
 
 export function clearSignInPause(): void {
   sessionStorage.removeItem(PAUSE_KEY)
+}
+
+/** Whether a pause existed but its bridge died — the expiry notice's fact.
+ * A true answer consumes the raw entry, so the notice says it once. */
+export function consumeExpiredSignInPause(): boolean {
+  const raw = sessionStorage.getItem(PAUSE_KEY)
+  if (!raw) return false
+  sessionStorage.removeItem(PAUSE_KEY)
+  try {
+    const pause: unknown = JSON.parse(raw)
+    if (typeof pause !== 'object' || pause === null) return false
+    const record: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(pause)) record[key] = value
+    const challengeRaw = record.challenge
+    if (typeof challengeRaw !== 'object' || challengeRaw === null) return false
+    const challenge: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(challengeRaw)) challenge[key] = value
+    return (
+      typeof challenge.pendingToken === 'string' &&
+      typeof challenge.expiresAt === 'number' &&
+      challenge.expiresAt <= Date.now()
+    )
+  } catch {
+    return false
+  }
 }
