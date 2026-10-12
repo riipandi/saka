@@ -533,6 +533,7 @@ func TestMapErrorCarriesTheConnectCodes(t *testing.T) {
 		{ErrUserNotFound, connect.CodeNotFound},
 		{ErrAccountExists, connect.CodeAlreadyExists},
 		{ErrSelfDeletion, connect.CodeFailedPrecondition},
+		{ErrLastAdministrator, connect.CodeFailedPrecondition},
 	}
 	for _, tc := range cases {
 		assert.Equal(t, tc.code, connect.CodeOf(mapError(tc.err)), "%v", tc.err)
@@ -1191,4 +1192,140 @@ func TestDeleteMyAccountFollowsTheGateAndTheOverride(t *testing.T) {
 	_, err = pool.Exec(ctx, `UPDATE public.users SET self_delete_override = TRUE WHERE id = $1`, IDToUUID(mustID(t, overrideAllowed.ID)))
 	require.NoError(t, err)
 	assert.NoError(t, gated.DeleteMyAccount(ctx, overrideAllowed.ID))
+}
+
+// grantAdministratorRole arms an account with the administrator standing —
+// the seeded system role's slug, granted live. The test database runs the
+// migrations, not the seeders, so the role row is the test's to open.
+func grantAdministratorRole(t *testing.T, pool *datastore.Postgres, userID string) {
+	t.Helper()
+
+	_, err := pool.Exec(t.Context(), `
+		INSERT INTO public.roles (name, slug, type) VALUES ('Administrator', 'administrator', 'system')
+		ON CONFLICT (slug) DO NOTHING`)
+	require.NoError(t, err)
+	_, err = pool.Exec(t.Context(), `
+		INSERT INTO public.user_roles (user_id, role_id)
+		SELECT $1, r.id FROM public.roles r WHERE r.slug = 'administrator'`,
+		IDToUUID(mustID(t, userID)))
+	require.NoError(t, err)
+}
+
+func TestDeleteUserRefusesTheLastAdministrator(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	last, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, last.ID)
+
+	// The only reachable administrator does not leave by an administrator's
+	// hand — the guard refuses whatever account the delete names.
+	err = service.DeleteUser(t.Context(), last.ID, "vittoria")
+	assert.ErrorIs(t, err, ErrLastAdministrator)
+
+	// A second reachable administrator answers the standing, and the same
+	// delete now passes: the deployment keeps an administrator to reach.
+	peer, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "neveu", Email: "neveu@inferno.falls", FirstName: "Sophie", LastName: "Neveu",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, peer.ID)
+
+	require.NoError(t, service.DeleteUser(t.Context(), last.ID, "vittoria"))
+	_, err = service.GetUser(t.Context(), last.ID)
+	assert.ErrorIs(t, err, ErrUserNotFound)
+
+	// An account that holds no administrator standing never owed the guard
+	// a read of the deployment's administrators — the delete just runs.
+	plain, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "granger", Email: "granger@hogwarts.edu", FirstName: "Hermione", LastName: "Granger",
+	})
+	require.NoError(t, err)
+	require.NoError(t, service.DeleteUser(t.Context(), plain.ID, "neveu"))
+}
+
+func TestDeleteMyAccountRefusesTheLastAdministrator(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	ctx := t.Context()
+
+	last, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, last.ID)
+
+	selfDelete := testService(t, pool).WithSettings(stubUserSettings{
+		SettingSelfDeleteEnabled: true,
+	})
+	assert.ErrorIs(t, selfDelete.DeleteMyAccount(ctx, last.ID), ErrLastAdministrator)
+
+	peer, err := testService(t, pool).CreateUser(ctx, CreateParams{
+		Username: "neveu", Email: "neveu@inferno.falls", FirstName: "Sophie", LastName: "Neveu",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, peer.ID)
+
+	require.NoError(t, selfDelete.DeleteMyAccount(ctx, last.ID))
+}
+
+func TestDeleteUserRefusesABannedAdministrator(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	// The ban is the restrictions feature's write; the live predicate reads
+	// its table through the same shape the sign-in refusal does.
+	last, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, last.ID)
+	peer, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "neveu", Email: "neveu@inferno.falls", FirstName: "Sophie", LastName: "Neveu",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, peer.ID)
+
+	// A banned peer does not answer the "another administrator exists"
+	// reading — an account that cannot sign in cannot reach the console.
+	_, err = pool.Exec(t.Context(), `
+		INSERT INTO public.account_restrictions (user_id, kind, reason) VALUES ($1, 'ban', 'the test bans its peer')`,
+		IDToUUID(mustID(t, peer.ID)))
+	require.NoError(t, err)
+
+	err = service.DeleteUser(t.Context(), last.ID, "neveu")
+	assert.ErrorIs(t, err, ErrLastAdministrator)
+}
+
+func TestGetUserAnswersTheRoleSlugs(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+
+	created, err := service.CreateUser(t.Context(), CreateParams{
+		Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+	})
+	require.NoError(t, err)
+
+	view, err := service.GetUser(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Empty(t, view.Roles, "an account with no grants answers none")
+
+	grantAdministratorRole(t, pool, created.ID)
+	view, err = service.GetUser(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"administrator"}, view.Roles)
+
+	// The wire form carries the same slugs the claims pipeline uses — the
+	// vocabulary the client's gates read.
+	assert.Equal(t, []string{"administrator"}, WireView(view).GetRoles())
 }

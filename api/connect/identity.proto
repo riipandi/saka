@@ -445,6 +445,12 @@ message User {
   // add-password or the remove-password action from it, and the instant
   // answers the "changed on" line the card renders.
   optional string password_updated_at = 18;
+
+  // roles are the names of the live roles the account holds, ordered by
+  // name — the same live grants (`revoked_at IS NULL`) the authorization
+  // surface manages. A client gating an affordance on the account's
+  // standing reads it here; empty when the account holds none.
+  repeated string roles = 19;
 }
 
 // UserMetadata is the account's preference document, the typed view of the

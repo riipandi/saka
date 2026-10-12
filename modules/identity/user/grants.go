@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/riipandi/saka/framework/datastore"
+	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/database/entity"
 )
 
@@ -72,6 +74,115 @@ func loadRoleSlugs(ctx context.Context, db datastore.Querier, userID uuid.UUID) 
 		return nil, fmt.Errorf("user: load roles: %w", err)
 	}
 	return scanSlugs(rows, "user: load roles")
+}
+
+// loadRoleSlugsOfUsers answers one page's role slugs in a single read —
+// the batch the list procedure's views fill through, the same live grants
+// (`revoked_at IS NULL`) the mint walks through. An account with no grants
+// answers an empty slice, the state the wire's repeated field renders as
+// absent.
+func loadRoleSlugsOfUsers(ctx context.Context, db datastore.Querier, userIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	out := make(map[uuid.UUID][]string, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("ur.user_id", "r.slug")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.Join(entity.TableRoles + " r ON r.id = ur.role_id")
+	sb.Where(sb.IsNull("ur.revoked_at"), sb.In("ur.user_id", idsAsAny(userIDs)...))
+	sb.OrderBy("r.slug")
+
+	query, args := sb.Build()
+	rows, err := db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("user: load roles: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID uuid.UUID
+		var slug string
+		if err := rows.Scan(&userID, &slug); err != nil {
+			return nil, fmt.Errorf("user: load roles: %w", err)
+		}
+		out[userID] = append(out[userID], slug)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("user: load roles: %w", err)
+	}
+	return out, nil
+}
+
+// liveAdministratorPredicate is the standing an administrator deletion
+// turns on: the role's active grant, an account that can still sign in
+// (not disabled, no ban standing), and — for the "another one exists"
+// reading — anyone but the account the question is asked about. The check
+// rides the delete's own transaction, so the answer and the write see the
+// same grants.
+func liveAdministratorPredicate(sb *sqlbuilder.SelectBuilder, except *uuid.UUID) {
+	sb.Join(entity.TableUsers + " u ON u.id = ur.user_id")
+	sb.Where(sb.Equal("r.slug", appauthz.AdministratorRole), sb.IsNull("ur.revoked_at"), sb.Equal("u.disabled", false))
+	sb.Where(
+		"NOT EXISTS (SELECT 1 FROM " + entity.TableAccountRestrictions + " ar WHERE ar.user_id = u.id AND ar.kind = 'ban' AND ar.lifted_at IS NULL AND (ar.expires_at IS NULL OR ar.expires_at > now()))",
+	)
+	if except != nil {
+		sb.Where(sb.NotEqual("ur.user_id", except.String()))
+	}
+}
+
+// HoldsLiveAdministratorRole answers whether the account carries the
+// administrator standing — the fact the deletion guard refuses on.
+func HoldsLiveAdministratorRole(ctx context.Context, db datastore.Querier, userID uuid.UUID) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("1")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.Join(entity.TableRoles + " r ON r.id = ur.role_id")
+	liveAdministratorPredicate(sb, nil)
+	sb.Where(sb.Equal("ur.user_id", userID.String()))
+
+	query, args := sb.Build()
+	var one int
+	err := db.QueryRow(ctx, query, args...).Scan(&one)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("user: the administrator standing could not be read: %w", err)
+	}
+	return true, nil
+}
+
+// HoldsOtherLiveAdministratorRole answers whether the deployment holds an
+// administrator besides the account named — the fact the last
+// administrator's guard refuses on. A role grant whose account cannot sign
+// in (disabled, banned) is not an administrator anyone can reach, so it
+// does not count.
+func HoldsOtherLiveAdministratorRole(ctx context.Context, db datastore.Querier, exceptUserID uuid.UUID) (bool, error) {
+	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
+	sb.Select("1")
+	sb.From(entity.TableUserRoles + " ur")
+	sb.Join(entity.TableRoles + " r ON r.id = ur.role_id")
+	liveAdministratorPredicate(sb, &exceptUserID)
+
+	query, args := sb.Build()
+	var one int
+	err := db.QueryRow(ctx, query, args...).Scan(&one)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("user: the other administrator could not be read: %w", err)
+	}
+	return true, nil
+}
+
+func idsAsAny(ids []uuid.UUID) []any {
+	out := make([]any, len(ids))
+	for i, id := range ids {
+		out[i] = id
+	}
+	return out
 }
 
 // loadRolePermissions answers the permission slugs the account's active

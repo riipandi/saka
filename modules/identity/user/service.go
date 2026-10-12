@@ -38,6 +38,11 @@ var (
 	// cannot perform: their own signed-in account.
 	ErrSelfDeletion = errors.New("user: cannot delete the signed-in account")
 
+	// ErrLastAdministrator is the refusal of a deletion that would strip
+	// the deployment of its only reachable administrator — the standing a
+	// management surface cannot be recovered from without the database.
+	ErrLastAdministrator = errors.New("user: the deployment's last administrator cannot be deleted")
+
 	// ErrTimezoneInvalid is a timezone preference that names no zone the
 	// tz database carries. The proto constraint bounds its length; only
 	// this check can tell a well-formed name from a real zone.
@@ -156,33 +161,39 @@ func (s *Service) WithGroups(directory GroupDirectory) *Service {
 	return s
 }
 
-// withGroup fills one view's memberships through the group seam. db is the
-// query surface the caller already holds — inside a transaction the
-// memberships the write just opened are read back through it, so the answer
-// never names a join the commit has not made. A nil directory is the state
-// a consumer without the group feature is in: the view answers without the
-// field filled.
-func (s *Service) withGroup(ctx context.Context, db datastore.Querier, filled UserView) (UserView, error) {
-	if s.groups == nil {
-		return filled, nil
-	}
+// enrichView fills one view with the facts the account answers beside
+// itself: the memberships through the group seam and the active role
+// slugs. db is the query surface the caller already holds — inside a
+// transaction the facts the write just opened are read back through it, so
+// the answer never names a join the commit has not made. A nil group
+// directory is the state a consumer without the group feature is in: the
+// view answers without the memberships filled.
+func (s *Service) enrichView(ctx context.Context, db datastore.Querier, filled UserView) (UserView, error) {
 	id, err := parseWire(filled.ID)
 	if err != nil {
 		return UserView{}, ErrUserNotFound
 	}
-	groups, err := s.groups.GroupsOfUser(ctx, db, id)
+	if s.groups != nil {
+		groups, groupErr := s.groups.GroupsOfUser(ctx, db, id)
+		if groupErr != nil {
+			return UserView{}, groupErr
+		}
+		filled.Groups = groups
+	}
+	roles, err := loadRoleSlugs(ctx, db, id)
 	if err != nil {
 		return UserView{}, err
 	}
-	filled.Groups = groups
+	filled.Roles = roles
 	return filled, nil
 }
 
-// withGroups fills a page of views in one seam read, the batch the list
-// procedure's one answer needs — a per-row query would pay the group read
-// once per account on the page.
-func (s *Service) withGroups(ctx context.Context, views []UserView) ([]UserView, error) {
-	if s.groups == nil || len(views) == 0 {
+// enrichViews fills a page of views the way enrichView fills one — the
+// group memberships through the seam, the role slugs through the grants
+// read — in one read each, the batch the list procedure's one answer
+// needs.
+func (s *Service) enrichViews(ctx context.Context, views []UserView) ([]UserView, error) {
+	if len(views) == 0 {
 		return views, nil
 	}
 	ids := make([]uuid.UUID, 0, len(views))
@@ -193,13 +204,24 @@ func (s *Service) withGroups(ctx context.Context, views []UserView) ([]UserView,
 		}
 		ids = append(ids, id)
 	}
-	byUser, err := s.groups.GroupsOfUsers(ctx, s.pool, ids)
+	if s.groups != nil {
+		byUser, err := s.groups.GroupsOfUsers(ctx, s.pool, ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range views {
+			if id, err := parseWire(views[i].ID); err == nil {
+				views[i].Groups = byUser[id]
+			}
+		}
+	}
+	slugsByUser, err := loadRoleSlugsOfUsers(ctx, s.pool, ids)
 	if err != nil {
 		return nil, err
 	}
 	for i := range views {
 		if id, err := parseWire(views[i].ID); err == nil {
-			views[i].Groups = byUser[id]
+			views[i].Roles = slugsByUser[id]
 		}
 	}
 	return views, nil
@@ -382,7 +404,12 @@ type UserView struct {
 	// Groups are the memberships the account answers with, ordered by the
 	// group's display name. Empty when the group seam is not wired or the
 	// account belongs to none.
-	Groups        []GroupSummary
+	Groups []GroupSummary
+	// Roles are the slugs of the account's active role grants, ordered by
+	// slug — the same live grants the token's claims carry. Empty when the
+	// account holds none; the fill rides the same reads the views' groups
+	// take.
+	Roles         []string
 	Disabled      bool
 	EmailVerified bool
 	CreatedAt     time.Time
@@ -490,7 +517,7 @@ func (s *Service) CreateUser(ctx context.Context, params CreateParams) (UserView
 	if err != nil {
 		return UserView{}, err
 	}
-	return s.withGroup(ctx, s.pool, created)
+	return s.enrichView(ctx, s.pool, created)
 }
 
 // GetUser answers one account by its identifier.
@@ -506,7 +533,7 @@ func (s *Service) GetUser(ctx context.Context, id string) (UserView, error) {
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, s.view(row))
+	filled, err := s.enrichView(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -529,7 +556,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, subject string) (UserView,
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, s.view(row))
+	filled, err := s.enrichView(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -634,7 +661,7 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, s.view(row))
+	filled, err := s.enrichView(ctx, s.pool, s.view(row))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -684,6 +711,9 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 	}
 
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if guardErr := s.refuseTheLastAdministrator(ctx, tx, userID); guardErr != nil {
+			return guardErr
+		}
 		deleted, deleteErr := s.repo.DeleteUser(ctx, tx, userID)
 		if deleteErr != nil {
 			return deleteErr
@@ -704,6 +734,30 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 		})
 		return nil
 	})
+}
+
+// refuseTheLastAdministrator is the deletion guard both paths share: an
+// account that carries the administrator standing cannot leave if no
+// reachable administrator would remain. The caller runs it inside the
+// delete's transaction, so the grants the check reads are the grants the
+// delete acts on. A non-administrator target passes without a read of the
+// deployment's administrators.
+func (s *Service) refuseTheLastAdministrator(ctx context.Context, tx datastore.Querier, userID uuid.UUID) error {
+	admin, err := HoldsLiveAdministratorRole(ctx, tx, userID)
+	if err != nil {
+		return err
+	}
+	if !admin {
+		return nil
+	}
+	other, err := HoldsOtherLiveAdministratorRole(ctx, tx, userID)
+	if err != nil {
+		return err
+	}
+	if !other {
+		return ErrLastAdministrator
+	}
+	return nil
 }
 
 // ErrCredentialUnwired is the add-password procedure's state a bare wiring
@@ -754,7 +808,7 @@ func (s *Service) ListUsers(ctx context.Context, search, sortBy string, ascendin
 	for _, row := range rows {
 		views = append(views, s.view(row))
 	}
-	filled, err := s.withGroups(ctx, views)
+	filled, err := s.enrichViews(ctx, views)
 	if err != nil {
 		return nil, webutil.Pagination{}, err
 	}
@@ -849,7 +903,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 	if err != nil {
 		return UserView{}, err
 	}
-	filled, err := s.withGroup(ctx, s.pool, view(answer))
+	filled, err := s.enrichView(ctx, s.pool, view(answer))
 	if err != nil {
 		return UserView{}, err
 	}
@@ -902,6 +956,10 @@ func WireView(user UserView) *identityv1.User {
 			Locale:   user.Locale,
 			Timezone: user.Timezone,
 		},
+		// The live role slugs the account carries — the same words the
+		// token's roles claim uses, so a client gating an affordance on
+		// the account's standing reads one vocabulary.
+		Roles: user.Roles,
 	}
 	if user.BannedAt != nil {
 		view.BannedAt = new(user.BannedAt.Format(rfc3339))
@@ -953,14 +1011,14 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 		return ErrSelfDeletion
 	}
 
-	// The record of a deletion cannot name its account through the user
-	// column: the row is gone by the time the record is written, and the
-	// foreign key — `ON DELETE SET NULL`, so a record outlives its account —
-	// refuses an identifier that names nothing. The account is named the way
-	// any other acted-on resource is, in resource_type and resource_id, and
-	// the payload keeps the username so a reader can still tell whose
-	// deletion this was.
+	// The last administrator's guard rides the delete's own transaction —
+	// the standing the check reads and the row the delete takes must see
+	// the same grants, or two racing deletions can both pass the check and
+	// leave the deployment without an administrator to reach.
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if guardErr := s.refuseTheLastAdministrator(ctx, tx, userID); guardErr != nil {
+			return guardErr
+		}
 		deleted, deleteErr := s.repo.DeleteUser(ctx, tx, userID)
 		if deleteErr != nil {
 			return deleteErr
@@ -968,6 +1026,11 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 		if !deleted {
 			return ErrUserNotFound
 		}
+		// The record of a deletion cannot name its account through the
+		// user column: the row is gone by the time the record is written,
+		// so the account is named the way any other acted-on resource is —
+		// resource_type and resource_id — and the payload keeps the
+		// username.
 		s.audit.Record(ctx, tx, fwaudit.Entry{
 			Event:        audit.EventAccountDeleted,
 			Status:       fwaudit.StatusSuccess,
