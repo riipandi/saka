@@ -586,6 +586,10 @@ export function createAuthEngine(baseUrl: string = RPC_BASE_URL): AuthEngineApi 
     },
 
     async restore(next) {
+      // Adoption is a custody change: an in-flight refresh racing it (a
+      // sign-out adopted from another tab, a boot-time restore) must not
+      // land its now-stale answer on top of the adopted pair.
+      sessionEpoch++
       // Only a still-valid pair may be restored; a dead one is dropped so the
       // engine does not hold credentials the backend already expired — and so
       // the listener clears a cookie holding that dead pair.
