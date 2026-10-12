@@ -32,7 +32,7 @@ the diff actually made stale.
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
 without the owner's explicit instruction. All listed plans are `done` or
-`shipped`.
+`shipped`, except `plan-20261008_1739.md` (`awaiting-approval`).
 
 | File | Subject |
 | --- | --- |
@@ -46,21 +46,32 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261003_0258.md` | OAuth SSO sign-in (Google, GitHub, custom OIDC) |
 | `plan-20261003_0700.md` | Hardening: enumeration, lockout, security notifications |
 | `plan-20261003_2359.md` | Storage revamp: buckets, `/storage` mount, tus, signed links — the decisions list (esp. 17–21) is the binding record for the storage engine |
+| `plan-20261004_1030.md` | OAuth SSO refinement: full attribute mapping, custom attributes, sign-in profile refresh |
+| `plan-20261004_1510.md` | OAuth SSO token retrieval: the stored provider tokens, refresh/rotation, the local offboarding job |
+| `plan-20261004_1650.md` | OIDC IdP Standard Claims: `picture` and `updated_at` |
 | `plan-20261004_1800.md` | Framework extraction: the reusable engines into `framework/`, composable behind typed Options, `database/` into `internal/`, per-package migration sets — the decisions list (D1–D18) is the binding record for the framework boundary |
 | `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — the four profiles rehearse green; the hosted submission run is the owner's (runbook in the handover) |
+| `plan-20261008_1739.md` | Component library extraction to `packages/uilibs` — status `awaiting-approval` (P1–P2 done; resuming needs the owner's instruction) |
 | `plan-20261009_0025.md` | Frontend foundation: the cookies library, the backend-driven configuration layer, the shared auth-aware fetch, Connect-Query — the decisions list (D1–D10) is the binding record for the webapp's data layer |
 | `plan-20261009_0142.md` | OAuth SSO: one store for every provider, the enabled-provider listing, the SPA flow — the decisions list (D1–D9) is the binding record for the sign-in-with-a-provider surface |
+| `plan-20261009_1826.md` | The connect-go v1 → v2 migration — the mechanical import swap, the runtime seams, the follow-ups parked in `issue-20261009_1915.md` |
 | `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — shipped |
+| `plan-20261010_0610.md` | Wave 1.5: the authz foundation — the claims snapshot in the store, the `can()` engine (the `framework/authz` matcher ported), `usePermissions()`/`<Can>`, the refusal mapping (D1–D8) |
 | `plan-20261010_0925.md` | Wave 1.6: frontend observability — the browser tracer, seam/navigation/worker spans, redaction, the public collector field (D1–D8) — shipped |
 | `plan-20261010_1830.md` | Wave 2: sign-in completeness — the MFA challenge & enrollment fork, passkey sign-in/management, password recovery, one-time access, the shared step-up machinery (D1–D8; the one-time access delta is recorded in the phase-6 note) — shipped |
 | `plan-20261011_1545.md` | Wave 3: the admin console core — shell & guard, impersonation banner, user center, groups/blocklist/signup tokens, the public signup page, the audit console, the authorization screens (D1–D9) — shipped |
+| `plan-20261011_1805.md` | Wave 4: federation administration — OIDC clients (back-channel fields, grant-type editor, the show-once pattern), custom claims & SCIM, the OAuth SSO admin CRUD and the account-side connected-accounts page, the consent ledgers — complete |
+| `plan-20261011_2025.md` | Wave 5: platform administration — the settings CRUD screens + TestEmail probe, notifications with the `WatchNotifications` streaming consumer, webhooks, API keys — complete |
+| `plan-20261012_0145.md` | The webapp navigation/IA overhaul — sidebar regrouping, the topbar user menu and notification flyout — complete |
+| `plan-20261012_0155.md` | Wave 6 (partial): device login approval (`/device`), the ops console (queue + scheduler), the timezone picker; storage intentionally excluded pending the reference inventory (`issue-20261009_2356.md`, now resolved) — done |
 
 ## Handovers (`.llms/handover/`)
 
 Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
 few matter — each summarizes its session and what stayed open; anything still
 true is folded into the core documents above. Newest:
-`handover-20261011_1750.md`.
+`handover-20261012_2100.md` (65 files total; pruning awaits the owner's
+nod — `issue-20261006_0050.md` ISS-009).
 
 ## Audits (`.llms/audit/`)
 
@@ -89,7 +100,24 @@ The open and considering items, newest capture first:
 reopen triggers. The
 rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
 lands there the moment it is found — not in chat memory. Newest:
-`issue-20261010_0017.md`.
+`issue-20261012_1605.md`.
+
+Recap (status rollup per file, cross-checked against the tree and the
+plans on 2026-10-12 — the files are the tracker, this is the index):
+
+| File | Rollup | Subject |
+| --- | --- | --- |
+| `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]` (open, deferred), the handover archive — 65 files (considering), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
+| `issue-20261008_1705.md` | open | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the open item is the backend auth audit (owner's ask, separate pass) |
+| `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands |
+| `issue-20261009_0345.md` | open | A dead auth worker hangs every in-flight Comlink call (blank first paint, no console error) — re-verified 2026-10-12, the robust shape (current-engine indirection + bounded calls) has not landed |
+| `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-12), validate/otelconnect have no `/v2` yet, the two-suite E2E build split, and the v2 handler-error masking convention |
+| `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
+| `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim parked on the first split-assets deployment |
+| `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — the remedy shape (self-healing seeder vs startup check vs documented rule) awaits the owner's decision |
+| `issue-20261012_0445.md` | open | The OIDC consent interaction page does not exist in the SPA (backend complete; needs its own plan) — the timezone-picker half resolved |
+| `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — derive the totals from the seeder registry when CI goes red again |
+| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; report upstream |
 
 ## Finding history fast
 

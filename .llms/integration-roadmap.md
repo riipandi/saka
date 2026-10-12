@@ -173,9 +173,10 @@ upload/delete, `PreviewClient`, `UpdateAllowedUserGroups`, CIMD `RefreshClient`)
 views), `CustomClaimService` (user and group claims, reserved-key refusals),
 `ScimProviderService` (one provider per client, token show-once), the OAuth SSO admin CRUD
 and the account-side `ListLinkedConnections`/`UnlinkConnection`/`GetLinkedAccountTokens`.
-The client form owes four parked `TODO(frontend)` items recorded in the endpoint reference:
-back-channel logout fields, the `allowed_grant_types` editor, the consent screen's
-`offline_access` wording, and the `login_hint` prefill.
+Of the four parked `TODO(frontend)` items, the client form's two shipped with Wave 4
+(plan-20261011_1805: back-channel logout fields, the `allowed_grant_types` editor); the
+consent screen's two — the `offline_access` wording and the `login_hint` prefill — wait
+on the interaction page itself (`issue-20261012_0445.md`).
 
 **Platform administration** — `SettingsService` (`List`/`Update`/`Reset`, `ListPublic`
 anonymous), `AppConfigService/TestEmail`, the admin document of `GET /api/configuration`,
@@ -621,15 +622,15 @@ that outlives its turn lands in a new capture file per the standing
 Issues rule in `AGENTS.md`; the item resolved here gets its status
 updated in the file it lives in, never only in this snapshot.
 
-1. **Storage has no contract of record** — the collection carries ten
-   storage requests (five `BucketService` RPC procedures, five tus
-   REST routes) while the endpoint reference carries zero rows. Wave 6's
-   storage item stays blocked until the inventory lands (see
-   `issue-20261009_2356.md`).
+1. **Storage has no contract of record** — resolved 2026-10-12: the
+   endpoint reference now carries the Storage section (the five
+   `BucketService` procedures, the five tus REST routes, the `/storage`
+   serving mount; `issue-20261009_2356.md` closed). Wave 6's storage
+   item plans against the reference directly.
 2. **`ConfirmEmailChange` is absent from the endpoint reference** —
-   shipped (proto, guard `Public`, Yaak request present) but
-   undocumented; Wave 1's email item now names it and waits on
-   `issue-20261010_0017.md` ISS-001 for the reference row.
+   resolved: the reference row landed with Wave 1's email phase and was
+   re-verified in the tree 2026-10-12 (`issue-20261010_0017.md` ISS-001
+   closed).
 3. **The Yaak collection's password-recovery rows are stale** —
    "Enroll password recovery" and "Finalize password recovery" name no
    saka procedure, and the three real ones (`ForgotPassword`,
@@ -1130,4 +1131,6 @@ Recorded so a future agent does not reach for a package where the tree already a
 - **`check_session_iframe` / front-channel session management** — deferred on the backend
   by a recorded decision; no frontend work until that decision flips.
 - **`VersionService`, `ApiService`** — `planned` on the backend; nothing to wire.
+- **Storage wiring** — blocked on the reference gap recorded in `issue-20261009_2356.md`.
+vice`** — `planned` on the backend; nothing to wire.
 - **Storage wiring** — blocked on the reference gap recorded in `issue-20261009_2356.md`.

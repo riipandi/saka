@@ -489,6 +489,39 @@ account id is.
 | POST | `/rpc/saka.system.v1.SchedulerService/ListJobs` | List scheduled cron jobs (scheduler) | done — state rows: `scd_…` id, spec, next_due, last_fired; `page`/`limit`, `search` on name/spec, `sort_by` in name/next_due/updated_at; empty until a feature schedules a cron job (`jobs.Scheduled()` returns nil by design) | `internal/scheduler.TestJobsAnswersTheSeededStateRows` |
 | POST | `/rpc/saka.system.v1.SchedulerService/RunNow` | Run a scheduled job now (scheduler) | done — `scd_…` id parameter; enqueues without advancing next_due; unknown or malformed id `not_found` | `internal/scheduler.TestRunNowEnqueuesWithoutAdvancingTheSchedule`, `internal/scheduler.TestRunNowRefusesAnUnknownJob` |
 
+## Storage (saka-only)
+
+The file surface in three halves. Buckets are the administrative half:
+`saka.storage.v1.BucketService` (`api/connect/storage.proto`) over
+ConnectRPC through `modules/storage`, every procedure `Admin`. Uploads ride
+the tus 1.0.0 protocol on `/api/uploads` (`framework/storage/tus_handler.go`)
+— any authenticated account may upload into any bucket, the per-bucket
+authorization model being a follow-up. The stored bytes are served at
+`/storage/{bucket}/{key…}` (`internal/transport/handler/storage.go`, mounted
+in `internal/transport/router/http.go`): a stored file is read publicly and
+cached immutable, a private object is served only over a signed link —
+`?exp=<unix>&sig=<hex>`, HMAC-SHA256 over bucket, key, and expiry keyed by
+the deployment secret (`framework/storage/signed_url.go`), the TTL the
+`storage.signed_url_expires` setting; the mint has no endpoint of its own,
+features presign through the engine's `SignedURL`. A miss — unknown bucket,
+unknown key, a failed signature — answers 404, never a 403 that would
+confirm existence; the bucket names the engine reserves for its own
+subtrees (staging, logs, backup, config, files) are refused at create.
+
+| Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
+| ------ | -------------------- | -------------------- | ------ | -------- |
+| POST | `/rpc/saka.storage.v1.BucketService/CreateBucket` | Create Storage Bucket | done — admin Bearer; unique slug name (`[a-z0-9]([-_]?[a-z0-9])*`, ≤100), the engine's reserved names refused; optional positive size limit and MIME list | `modules/storage.TestCreateGetAndListBuckets`, `modules/storage.TestCreateRefusesADuplicateName` |
+| POST | `/rpc/saka.storage.v1.BucketService/UpdateBucket` | Update Storage Bucket | done — the name is the target and cannot change; absent fields keep their stored values | `modules/storage.TestUpdateChangesTheLimitsAndKeepsAbsentFields` |
+| POST | `/rpc/saka.storage.v1.BucketService/DeleteBucket` | Delete Storage Bucket | done — refuses a bucket that still holds objects and the bucket `storage.default_bucket` names | `modules/storage.TestDeleteRefusesANonEmptyBucket`, `modules/storage.TestDeleteRefusesTheBucketTheSettingNames` |
+| POST | `/rpc/saka.storage.v1.BucketService/ListBuckets` | List Storage Buckets | done — the set is small and admin-managed, no pagination; oldest first | `modules/storage.TestCreateGetAndListBuckets` |
+| POST | `/rpc/saka.storage.v1.BucketService/GetBucket` | Get Storage Bucket | done — by name; unknown name `not_found` | `modules/storage.TestGetRefusesAnUnknownName` |
+| OPTIONS | `/api/uploads` and `/api/uploads/{id…}` | Upload (tus) - Discover | done — REST tus preflight, public (the preflight carries no credential); names the extensions the handler serves | `framework/storage.TestTusOptionsNamesTheExtensions` |
+| POST | `/api/uploads` | Upload (tus) - Create session | done — REST tus creation, authenticated; `Upload-Metadata` names bucket and key, the first chunk may ride it; oversized and unknown-bucket creations refused | `framework/storage.TestTusCreationStagesAnEmptySession`, `framework/storage.TestTusCreationRefusesAnUnknownBucket`, `framework/storage.TestTusCreationRefusesAnOversizedUpload` |
+| HEAD | `/api/uploads/{id…}` | Upload (tus) - Read offset | done — REST tus offset probe, authenticated | `framework/storage.TestTusResumeContinuesFromTheServerOffset` |
+| PATCH | `/api/uploads/{id…}` | Upload (tus) - Append chunk | done — REST tus append, authenticated; a misplaced offset and a wrong media type refused; completion enqueues the processing task | `framework/storage.TestTusAppendRejectsAMisplacedOffset`, `framework/storage.TestTusAppendRejectsAWrongMediaType`, `framework/storage.TestTusCompletionEnqueuesTheUpload` |
+| DELETE | `/api/uploads/{id…}` | Upload (tus) - Terminate session | done — REST tus termination, authenticated | `framework/storage.TestTusTerminationRemovesTheSession` |
+| GET | `/storage/{bucket}/{key…}` | Serve a stored file | done — REST, public by default; a private object answers only a valid signed link and then `Cache-Control: private, no-store`; the mount has no fallback — a miss is a 404, never an HTML page | `framework/storage.TestTheSignerVerifiesItsOwnSignatureAndNothingElse`, `framework/storage.TestSignedURLComposesTheBucketAndKeyUnderThePrefix` |
+
 ## OIDC
 
 The provider surface is implemented across management, protocol, consent, and
@@ -768,9 +801,9 @@ is the client's safe refusal. The whole feature rides the
 logout like the consent switch. The client contract carries the fields:
 `backchannel_logout_uri` (optional absolute URL) and
 `backchannel_logout_session_required` on create, update, and the view.
-`TODO(frontend)`: the client form needs fields for both, and a
-grant-type editor for `allowed_grant_types` (checkbox list over the four
-served words).
+Both fields and the `allowed_grant_types` editor shipped with the Wave 4
+client form (`packages/webapp/src/routes/(app)/admin/oidc-clients/`,
+plan-20261011_1805).
 
 **Rate limits (guard's REST classification).** `/oidc/token`,
 `/oidc/device/authorize`, `/oidc/par` ride the credential bucket
