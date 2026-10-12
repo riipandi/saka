@@ -35,6 +35,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -121,7 +122,7 @@ export function NotificationsView() {
           </CardHeader>
           <CardContent>
             {list.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : list.isError ? (
               <Text variant='body-2' color='critical'>
                 {getErrorMessage(list.error)}

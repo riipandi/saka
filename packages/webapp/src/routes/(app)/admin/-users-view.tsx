@@ -51,6 +51,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import { TimeValue } from '#/components/time-value'
@@ -222,7 +223,7 @@ export function UsersView({
           </CardHeader>
           <CardContent>
             {users.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

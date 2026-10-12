@@ -49,6 +49,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -132,7 +133,7 @@ export function BlocklistView({
           </CardHeader>
           <CardContent>
             {entries.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

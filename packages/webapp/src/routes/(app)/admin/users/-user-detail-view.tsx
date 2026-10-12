@@ -41,6 +41,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/compone
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { DateTimePicker } from '#/components/-date-time-picker'
+import { FormSkeleton } from '#/components/-skeleton-form'
 import { ListPagination } from '#/components/list-pagination'
 import { UserAvatar } from '#/components/user-avatar'
 import { useAuthentication } from '#/hooks/use-auth'
@@ -213,7 +214,20 @@ export function UserDetailView({ userId }: { userId: string }) {
     }
   })
 
-  if (read.isPending) return <Spinner />
+  if (read.isPending) {
+    return (
+      <div
+        {...stylex.props(
+          pageStyles.container,
+          pageStyles.containerPadMedium,
+          pageStyles.containerPadLarge,
+          pageStyles.containerPadXLarge
+        )}
+      >
+        <FormSkeleton fields={4} />
+      </div>
+    )
+  }
   if (read.isError) {
     return (
       <div {...stylex.props(pageStyles.container, pageStyles.containerPadMedium)}>

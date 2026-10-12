@@ -32,8 +32,8 @@ import {
   ItemGroup,
   ItemTitle
 } from 'uilibs/components/extra/item'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
 import { StepUpCancelled } from '#/libraries/reauth/reauth'
@@ -114,7 +114,7 @@ export function ConnectionsView({ embedded = false }: { embedded?: boolean } = {
           </CardHeader>
           <CardContent>
             {linked.isPending ? (
-              <Spinner />
+              <TableSkeleton />
             ) : linked.isError ? (
               <Text variant='body-2' color='critical'>
                 {linked.error.message}
@@ -209,7 +209,7 @@ function TokensDialog({
           </DialogDescription>
         </DialogHeader>
         {tokens.isPending ? (
-          <Spinner />
+          <TableSkeleton />
         ) : tokens.isError ? (
           <Text variant='body-2' color='critical'>
             {tokens.error.message}

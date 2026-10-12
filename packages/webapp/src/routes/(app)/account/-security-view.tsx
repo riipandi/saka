@@ -32,6 +32,8 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/compone
 import { InputPassword } from 'uilibs/components/extra/input-password'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { FormSkeleton } from '#/components/-skeleton-form'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
 import { StepUpCancelled } from '#/libraries/reauth/reauth'
@@ -406,7 +408,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {account.isPending ? (
-              <Spinner />
+              <FormSkeleton fields={3} />
             ) : hasPassword ? (
               <div {...stylex.props(pageStyles.stack)}>
                 <Text variant='body-2' color='neutral-faded'>
@@ -467,7 +469,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {enrollments.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={3} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -523,7 +525,7 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
           </CardHeader>
           <CardContent>
             {passkeys.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={3} />
             ) : passkeyRows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

@@ -27,6 +27,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { useAuthentication } from '#/hooks/use-auth'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
@@ -179,7 +180,7 @@ export function SessionsView({
           </CardHeader>
           <CardContent>
             {sessions.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={4} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

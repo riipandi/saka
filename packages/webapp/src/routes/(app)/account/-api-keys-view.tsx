@@ -24,7 +24,6 @@ import {
   CardTitle
 } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import {
   Table,
   TableBody,
@@ -34,6 +33,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { ListPagination } from '#/components/list-pagination'
 import { TimeValue } from '#/components/time-value'
@@ -105,7 +105,7 @@ export function ApiKeysView({
     <AccountFrame embedded={embedded}>
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={5} />
         ) : keys.isError ? (
           <Text variant='body-2' color='critical'>
             {getErrorMessage(keys.error)}

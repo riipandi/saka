@@ -47,6 +47,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { fontFamily } from 'uilibs/styles/tokens.stylex'
+import { FormSkeleton } from '#/components/-skeleton-form'
 import { LIST_MAX_LIMIT, listPageInput } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
@@ -155,7 +156,7 @@ export function OidcClientDetailView({ clientId }: { clientId: string }) {
   if (client.isPending) {
     return (
       <div {...stylex.props(pageStyles.container, pageStyles.containerPadXLarge)}>
-        <Spinner />
+        <FormSkeleton fields={4} />
       </div>
     )
   }

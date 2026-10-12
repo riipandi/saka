@@ -37,6 +37,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { DeleteOAuthConnectionRequestSchema, OAuthSSOService } from '~/codegen/authn_pb'
@@ -135,7 +136,7 @@ export function OAuthProvidersView() {
           </CardHeader>
           <CardContent>
             {connections.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={4} />
             ) : connections.isError ? (
               <Text variant='body-2' color='critical'>
                 {connections.error.message}

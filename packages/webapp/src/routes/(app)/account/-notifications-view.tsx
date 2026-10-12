@@ -26,6 +26,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -174,7 +175,7 @@ function InboxCard({ category }: { category?: string }) {
         </div>
 
         {inbox.isPending ? (
-          <Spinner />
+          <TableSkeleton />
         ) : inbox.isError ? (
           <Text variant='body-2' color='critical'>
             {getErrorMessage(inbox.error)}

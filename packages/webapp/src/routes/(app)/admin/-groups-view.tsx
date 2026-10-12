@@ -61,6 +61,8 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { FormSkeleton } from '#/components/-skeleton-form'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import {
@@ -218,7 +220,7 @@ export function GroupsView({
           </CardHeader>
           <CardContent>
             {groups.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -541,7 +543,7 @@ function MembersDialog({ group }: { group: UserGroup }) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         {detail.isPending ? (
-          <Spinner />
+          <FormSkeleton fields={3} />
         ) : (
           <>
             <Field id='members-filter'>

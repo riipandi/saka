@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from 'uilibs/components/base/
 import { Badge } from 'uilibs/components/extra/badge'
 import { Card, CardContent, CardFooter } from 'uilibs/components/extra/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import {
   Table,
   TableBody,
@@ -16,6 +15,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -107,7 +107,7 @@ export function AllApiKeysView({
 
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} />
         ) : keys.isError ? (
           <Text variant='body-2' color='critical'>
             {getErrorMessage(keys.error)}

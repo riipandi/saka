@@ -27,8 +27,8 @@ import {
   ItemGroup,
   ItemTitle
 } from 'uilibs/components/extra/item'
-import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ScopeChip } from '#/components/scope-chip'
 import { LIST_MAX_LIMIT, listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -155,7 +155,7 @@ function AllConsentsCard({ page, onPage }: { page: number; onPage: (next: number
       </CardHeader>
       <CardContent>
         {consents.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} />
         ) : consents.isError ? (
           <Text variant='body-2' color='critical'>
             {getErrorMessage(consents.error)}
@@ -221,7 +221,7 @@ function UserConsentsCard({ userId }: { userId: string }) {
       </CardHeader>
       <CardContent>
         {consents.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} />
         ) : consents.isError ? (
           <Text variant='body-2' color='critical'>
             {getErrorMessage(consents.error)}

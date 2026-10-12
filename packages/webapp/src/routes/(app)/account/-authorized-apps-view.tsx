@@ -34,6 +34,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ScopeChip } from '#/components/scope-chip'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -93,7 +94,7 @@ export function AuthorizedAppsView({ embedded = false }: { embedded?: boolean } 
           </CardHeader>
           <CardContent>
             {consents.isPending ? (
-              <Spinner />
+              <TableSkeleton />
             ) : consents.isError ? (
               <Text variant='body-2' color='critical'>
                 {consents.error.message}

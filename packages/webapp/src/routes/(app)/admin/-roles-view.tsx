@@ -60,6 +60,8 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { FormSkeleton } from '#/components/-skeleton-form'
+import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
@@ -224,7 +226,7 @@ export function RolesView({
             </div>
 
             {roles.isPending ? (
-              <Spinner />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -662,7 +664,7 @@ function PermissionsDialog({
           </Text>
         ) : null}
         {detail.isPending || catalog.isPending ? (
-          <Spinner />
+          <FormSkeleton fields={3} />
         ) : (
           <div {...stylex.props(localStyles.tree)}>
             {grouped.map(([resource, entries]) => (
