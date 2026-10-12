@@ -24,7 +24,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Item,
   ItemActions,
@@ -34,7 +40,8 @@ import {
   ItemTitle
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -87,29 +94,12 @@ export function NotificationsView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Notifications
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            What the deployment announces to its accounts. A publish is live the moment the call
-            returns; an audience is resolved at read time, never fanned out at create.
-          </Text>
-        </div>
-        <div {...stylex.props(styles.headerActions)}>
-          <Button onClick={() => setComposeOpen(true)}>New broadcast</Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Notifications'
+        description='What the deployment announces to its accounts. A publish is live the moment the call returns; an audience is resolved at read time, never fanned out at create.'
+        actions={<Button onClick={() => setComposeOpen(true)}>New broadcast</Button>}
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -124,9 +114,10 @@ export function NotificationsView() {
             {list.isPending ? (
               <TableSkeleton rows={6} />
             ) : list.isError ? (
-              <Text variant='body-2' color='critical'>
-                {getErrorMessage(list.error)}
-              </Text>
+              <ListError
+                message={getErrorMessage(list.error)}
+                onRetry={() => void list.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -135,6 +126,11 @@ export function NotificationsView() {
                     The first announcement goes live the moment its creation returns.
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Button size='sm' onClick={() => setComposeOpen(true)}>
+                    Publish the first broadcast
+                  </Button>
+                </EmptyContent>
               </Empty>
             ) : (
               <>
@@ -228,18 +224,3 @@ function CancelConfirm({
     </AlertDialogContent>
   )
 }
-
-const styles = stylex.create({
-  pager: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 16
-  },
-  headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10
-  }
-})

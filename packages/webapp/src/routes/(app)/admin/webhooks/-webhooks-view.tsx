@@ -32,7 +32,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Item,
   ItemActions,
@@ -42,7 +48,8 @@ import {
   ItemTitle
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { ListPagination } from '#/components/list-pagination'
@@ -96,31 +103,16 @@ export function WebhooksView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Webhooks
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The destinations the deployment's events go to. Deliveries are signed; the signing
-            secret is shown exactly once, in the create and rotate answers.
-          </Text>
-        </div>
-        <div {...stylex.props(styles.headerActions)}>
+      <PageHeader
+        kicker='Administration'
+        title='Webhooks'
+        description="The destinations the deployment's events go to. Deliveries are signed; the signing secret is shown exactly once, in the create and rotate answers."
+        actions={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus size={16} /> New endpoint
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -135,9 +127,10 @@ export function WebhooksView() {
             {list.isPending ? (
               <TableSkeleton rows={6} />
             ) : list.isError ? (
-              <Text variant='body-2' color='critical'>
-                {getErrorMessage(list.error)}
-              </Text>
+              <ListError
+                message={getErrorMessage(list.error)}
+                onRetry={() => void list.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -146,6 +139,11 @@ export function WebhooksView() {
                     The first destination receives the events its subscription names.
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Button size='sm' onClick={() => setCreateOpen(true)}>
+                    <Plus size={16} /> Register the first endpoint
+                  </Button>
+                </EmptyContent>
               </Empty>
             ) : (
               <>
@@ -264,18 +262,3 @@ function DeleteButton({
     </AlertDialog>
   )
 }
-
-const styles = stylex.create({
-  headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10
-  },
-  pager: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 16
-  }
-})

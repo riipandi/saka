@@ -11,6 +11,7 @@ import { Item, ItemContent, ItemDescription } from 'uilibs/components/extra/item
 import { ItemGroup, ItemActions, ItemMedia, ItemTitle } from 'uilibs/components/extra/item'
 import { Text } from 'uilibs/components/extra/text'
 import { z } from 'zod'
+import { PageHeader } from '#/components/-page-header'
 import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 import { pageStyles } from '#/styles/pages/page.stylex'
 
@@ -64,26 +65,11 @@ function RouteComponent() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Dashboard
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            {greeting}
-            {displayName !== 'Guest' ? `, ${displayName}` : ''}!
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Welcome back to your workspace.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Dashboard'
+        title={`${greeting}${displayName !== 'Guest' ? `, ${displayName}` : ''}!`}
+        description='Welcome back to your workspace.'
+      />
 
       {arrivedAdminNotice && (
         <Alert style={pageStyles.quickCard}>

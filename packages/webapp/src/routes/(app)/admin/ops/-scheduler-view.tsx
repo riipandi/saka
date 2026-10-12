@@ -26,6 +26,8 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -113,20 +115,11 @@ export function SchedulerView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text render={<p />} variant='body-2' weight='medium' color='primary'>
-            Ops console
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Scheduler
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The registered jobs, the cron spec each fires on, and the claim cursor's answer for when
-            it is next due. Run now starts a job's task early — the schedule itself does not move.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Ops console'
+        title='Scheduler'
+        description="The registered jobs, the cron spec each fires on, and the claim cursor's answer for when it is next due. Run now starts a job's task early — the schedule itself does not move."
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         {actionError ? (
@@ -146,9 +139,10 @@ export function SchedulerView({
             {jobs.isPending ? (
               <Spinner />
             ) : jobs.isError ? (
-              <Text variant='body-2' color='critical'>
-                {getErrorMessage(jobs.error)}
-              </Text>
+              <ListError
+                message={getErrorMessage(jobs.error)}
+                onRetry={() => void jobs.refetch()}
+              />
             ) : (jobs.data?.jobs ?? []).length === 0 ? (
               <Empty>
                 <EmptyHeader>

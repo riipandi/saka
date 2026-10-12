@@ -46,6 +46,8 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
@@ -205,20 +207,11 @@ export function QueueView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text render={<p />} variant='body-2' weight='medium' color='primary'>
-            Ops console
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Task queues
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The queues the process registered, the tasks waiting on workers, and the failures the
-            archive keeps for replay.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Ops console'
+        title='Task queues'
+        description='The queues the process registered, the tasks waiting on workers, and the failures the archive keeps for replay.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         {actionError ? (
@@ -283,9 +276,10 @@ function QueuesCard({ queues }: { queues: QueueList<ListQueuesResponse> }) {
         {queues.isPending ? (
           <Spinner />
         ) : queues.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(queues.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(queues.error)}
+            onRetry={() => void queues.refetch()}
+          />
         ) : (queues.data?.queues ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -365,9 +359,10 @@ function PendingCard({
         {pending.isPending ? (
           <Spinner />
         ) : pending.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(pending.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(pending.error)}
+            onRetry={() => void pending.refetch()}
+          />
         ) : (pending.data?.tasks ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -482,9 +477,7 @@ function DeadCard({
         {dead.isPending ? (
           <Spinner />
         ) : dead.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(dead.error)}
-          </Text>
+          <ListError message={getErrorMessage(dead.error)} onRetry={() => void dead.refetch()} />
         ) : (dead.data?.tasks ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -670,9 +663,7 @@ function TaskDrawer({ taskId, onClose }: { taskId: string | null; onClose: () =>
           {task.isPending ? (
             <Spinner />
           ) : task.isError ? (
-            <Text variant='body-2' color='critical'>
-              {getErrorMessage(task.error)}
-            </Text>
+            <ListError message={getErrorMessage(task.error)} onRetry={() => void task.refetch()} />
           ) : task.data ? (
             <div {...stylex.props(pageStyles.stack)}>
               <div {...stylex.props(styles.factGrid)}>

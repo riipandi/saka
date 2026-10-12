@@ -30,6 +30,7 @@ import {
   TableRow
 } from 'uilibs/components/extra/table'
 import { Text } from 'uilibs/components/extra/text'
+import { PageHeader } from '#/components/-page-header'
 import { ListPagination } from '#/components/list-pagination'
 import { ListSearch } from '#/components/list-search'
 import { TimeValue } from '#/components/time-value'
@@ -139,26 +140,11 @@ export function AdminAuditView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Audit trail
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Every recorded action across the deployment, newest first. A delegated action names the
-            administrator behind it.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Audit trail'
+        description='Every recorded action across the deployment, newest first. A delegated action names the administrator behind it.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>

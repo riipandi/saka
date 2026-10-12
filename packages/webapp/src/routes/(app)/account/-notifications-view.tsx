@@ -25,7 +25,8 @@ import {
   ItemTitle
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
@@ -60,26 +61,11 @@ export function AccountNotificationsView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Notifications
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            What the deployment addressed to you. The read state is your own receipt — nothing is
-            marked read until you say so.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Account'
+        title='Notifications'
+        description='What the deployment addressed to you. The read state is your own receipt — nothing is marked read until you say so.'
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Tabs
@@ -177,9 +163,7 @@ function InboxCard({ category }: { category?: string }) {
         {inbox.isPending ? (
           <TableSkeleton />
         ) : inbox.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(inbox.error)}
-          </Text>
+          <ListError message={getErrorMessage(inbox.error)} onRetry={() => void inbox.refetch()} />
         ) : rows.length === 0 ? (
           <Empty>
             <EmptyHeader>

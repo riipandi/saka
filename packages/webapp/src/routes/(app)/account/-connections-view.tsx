@@ -33,6 +33,7 @@ import {
   ItemTitle
 } from 'uilibs/components/extra/item'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
@@ -116,9 +117,7 @@ export function ConnectionsView({ embedded = false }: { embedded?: boolean } = {
             {linked.isPending ? (
               <TableSkeleton />
             ) : linked.isError ? (
-              <Text variant='body-2' color='critical'>
-                {linked.error.message}
-              </Text>
+              <ListError message={linked.error.message} onRetry={() => void linked.refetch()} />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -211,9 +210,7 @@ function TokensDialog({
         {tokens.isPending ? (
           <TableSkeleton />
         ) : tokens.isError ? (
-          <Text variant='body-2' color='critical'>
-            {tokens.error.message}
-          </Text>
+          <ListError message={tokens.error.message} onRetry={() => void tokens.refetch()} />
         ) : (
           <div {...stylex.props(styles.tokens)}>
             <Text render={<p />} variant='caption-1' weight='semibold'>

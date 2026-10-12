@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { Text } from 'uilibs/components/extra/text'
 import { unit } from 'uilibs/styles/tokens.stylex'
+import { PageHeader } from '#/components/-page-header'
 import { pageStyles } from '#/styles/pages/page.stylex'
 
 const styles = stylex.create({
@@ -49,26 +49,12 @@ export function AccountFrame({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Account
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            {title}
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            {description}
-          </Text>
-        </div>
-        {actions}
-      </div>
+      <PageHeader
+        kicker='Account'
+        title={title ?? ''}
+        description={description ?? ''}
+        actions={actions}
+      />
       {children}
     </div>
   )

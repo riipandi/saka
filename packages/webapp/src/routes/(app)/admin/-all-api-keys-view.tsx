@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow
 } from 'uilibs/components/extra/table'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { usePaginatedList } from '#/hooks/use-pagination'
@@ -90,28 +91,17 @@ export function AllApiKeysView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text render={<p />} variant='body-2' weight='medium' color='primary'>
-            API keys
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Every machine credential
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            Every key the deployment holds, with whose account each acts as. Issuing, renewing, and
-            revoking stay with each key's owner.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='API keys'
+        title='Every machine credential'
+        description="Every key the deployment holds, with whose account each acts as. Issuing, renewing, and revoking stay with each key's owner."
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         {keys.isPending ? (
           <TableSkeleton rows={6} />
         ) : keys.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(keys.error)}
-          </Text>
+          <ListError message={getErrorMessage(keys.error)} onRetry={() => void keys.refetch()} />
         ) : (keys.data?.apiKeys ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>

@@ -61,6 +61,8 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
+import { PageHeader } from '#/components/-page-header'
 import { FormSkeleton } from '#/components/-skeleton-form'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
@@ -167,25 +169,11 @@ export function GroupsView({
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Groups
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The organizing units accounts belong to — membership is the group's to gather.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Groups'
+        description="The organizing units accounts belong to — membership is the group's to gather."
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Card>
@@ -221,6 +209,11 @@ export function GroupsView({
           <CardContent>
             {groups.isPending ? (
               <TableSkeleton rows={6} />
+            ) : groups.isError ? (
+              <ListError
+                message={getErrorMessage(groups.error)}
+                onRetry={() => void groups.refetch()}
+              />
             ) : rows.length === 0 ? (
               <Empty>
                 <EmptyHeader>

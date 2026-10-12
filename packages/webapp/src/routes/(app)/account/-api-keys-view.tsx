@@ -23,7 +23,13 @@ import {
   CardHeader,
   CardTitle
 } from 'uilibs/components/extra/card'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from 'uilibs/components/extra/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from 'uilibs/components/extra/empty'
 import {
   Table,
   TableBody,
@@ -32,7 +38,7 @@ import {
   TableHeader,
   TableRow
 } from 'uilibs/components/extra/table'
-import { Text } from 'uilibs/components/extra/text'
+import { ListError } from '#/components/-list-error'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ShowOnceSecretDialog } from '#/components/dialogs/-show-once-secret-dialog'
 import { ListPagination } from '#/components/list-pagination'
@@ -107,9 +113,7 @@ export function ApiKeysView({
         {keys.isPending ? (
           <TableSkeleton rows={5} />
         ) : keys.isError ? (
-          <Text variant='body-2' color='critical'>
-            {getErrorMessage(keys.error)}
-          </Text>
+          <ListError message={getErrorMessage(keys.error)} onRetry={() => void keys.refetch()} />
         ) : (keys.data?.apiKeys ?? []).length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -119,6 +123,11 @@ export function ApiKeysView({
                 needs it, and revoke it when the task is done.
               </EmptyDescription>
             </EmptyHeader>
+            <EmptyContent>
+              <Button size='sm' onClick={() => setCreateOpen(true)}>
+                <Plus size={16} /> Issue the first key
+              </Button>
+            </EmptyContent>
           </Empty>
         ) : (
           <>

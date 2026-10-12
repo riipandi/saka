@@ -25,6 +25,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { Textarea } from 'uilibs/components/extra/textarea'
+import { ListError } from '#/components/-list-error'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { sheetFormStyles } from '#/styles/element/sheet-form.stylex'
 import { WebhookService } from '~/codegen/webhook_pb'
@@ -204,9 +205,10 @@ export function WebhookCreateSheet({
             {catalog.isPending ? (
               <Spinner />
             ) : catalog.isError ? (
-              <Text variant='body-2' color='critical'>
-                {getErrorMessage(catalog.error)}
-              </Text>
+              <ListError
+                message={getErrorMessage(catalog.error)}
+                onRetry={() => void catalog.refetch()}
+              />
             ) : (
               <div
                 role='group'

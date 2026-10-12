@@ -21,6 +21,7 @@ import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { colors } from 'uilibs/styles/colors.stylex'
 import { fontFamily } from 'uilibs/styles/tokens.stylex'
+import { ListError } from '#/components/-list-error'
 import { LIST_MAX_LIMIT, listPageInput } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { OidcClientService, PreviewOidcClientRequestSchema } from '~/codegen/federation_pb'
@@ -110,9 +111,10 @@ export function PreviewClientDialog({
         ) : preview.isPending ? (
           <Spinner />
         ) : preview.isError ? (
-          <Text render={<p />} variant='body-2' color='critical'>
-            {getErrorMessage(preview.error)}
-          </Text>
+          <ListError
+            message={getErrorMessage(preview.error)}
+            onRetry={() => void preview.refetch()}
+          />
         ) : (
           <div {...stylex.props(previewStyles.stack)}>
             <PreviewBlock title='ID token' struct={preview.data?.preview?.idToken} />

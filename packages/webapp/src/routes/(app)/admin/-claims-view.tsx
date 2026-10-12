@@ -53,6 +53,7 @@ import {
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { Textarea } from 'uilibs/components/extra/textarea'
+import { PageHeader } from '#/components/-page-header'
 import { LIST_MAX_LIMIT, listPageInput } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { Can } from '#/libraries/guard/can'
@@ -96,26 +97,11 @@ export function ClaimsView() {
         pageStyles.containerPadXLarge
       )}
     >
-      <div {...stylex.props(pageStyles.header)}>
-        <div {...stylex.props(pageStyles.headerLeft)}>
-          <Text
-            render={<p />}
-            variant='caption-1'
-            weight='semibold'
-            color='primary'
-            style={pageStyles.kicker}
-          >
-            Administration
-          </Text>
-          <Text render={<h1 />} variant='featured-4' weight='bold'>
-            Custom claims
-          </Text>
-          <Text variant='body-2' color='neutral-faded'>
-            The claims beyond the protocol's own — hung on accounts and groups, carried by every
-            token the federation issues.
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        kicker='Administration'
+        title='Custom claims'
+        description="The claims beyond the protocol's own — hung on accounts and groups, carried by every token the federation issues."
+      />
 
       <div {...stylex.props(pageStyles.stack)}>
         <Tabs defaultValue='user'>
