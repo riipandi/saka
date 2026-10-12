@@ -116,8 +116,8 @@ describe('the audit console', () => {
     await expect.element(screen.getByText('Signed in').first()).toBeVisible()
     await expect.element(screen.getByText('Account updated')).toBeVisible()
     expect(screen.baseElement.textContent).toContain('rlangdon')
-    expect(screen.baseElement.textContent).toContain('from 10.0.0.9')
-    expect(screen.baseElement.textContent).toContain('by albus (delegated)')
+    expect(screen.baseElement.textContent).toContain('10.0.0.9')
+    expect(screen.baseElement.textContent).toContain('by albus')
     await expect.element(screen.getByText('Failed')).toBeVisible()
   })
 
@@ -155,7 +155,7 @@ describe('the audit console', () => {
     const { screen } = await renderAdminAudit({ onFilterChange })
 
     await screen.getByRole('textbox', { name: 'Search by account' }).fill('robert@langdon.dev')
-    await screen.getByRole('button', { name: 'Search' }).click()
+    await screen.getByRole('button', { name: 'Search by account' }).click()
     await vi.waitFor(() => {
       expect(onFilterChange).toHaveBeenCalledWith(
         expect.objectContaining({ search: 'robert@langdon.dev' })

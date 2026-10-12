@@ -112,10 +112,14 @@ function withRouter(children: React.ReactNode) {
 
 /** The dialog overlay intercepts pointer events, so a confirm click inside
  * an open dialog goes through the element itself — the pattern the security
- * tests keep. */
-async function confirmInDialog(view: RenderResult, name: string) {
-  await expect.element(view.getByRole('alertdialog')).toBeVisible()
-  const button = view.getByRole('alertdialog').getByRole('button', { name }).element()
+ * tests keep. Forms open as `dialog`; confirmations open as `alertdialog`. */
+async function confirmInDialog(
+  view: RenderResult,
+  name: string,
+  role: 'dialog' | 'alertdialog' = 'dialog'
+) {
+  await expect.element(view.getByRole(role)).toBeVisible()
+  const button = view.getByRole(role).getByRole('button', { name }).element()
   if (!(button instanceof HTMLElement)) throw new Error(`the ${name} button is not an element`)
   button.click()
 }
@@ -137,9 +141,9 @@ describe('the groups screen', () => {
     const view = await mountGroups(transport)
 
     await view.getByRole('button', { name: 'Create group' }).click()
-    await expect.element(view.getByRole('alertdialog')).toBeVisible()
-    await view.getByRole('alertdialog').getByLabelText('Name').fill('reviewers')
-    await view.getByRole('alertdialog').getByLabelText('Display name').fill('Reviewers')
+    await expect.element(view.getByRole('dialog')).toBeVisible()
+    await view.getByRole('dialog').getByLabelText('Name').fill('reviewers')
+    await view.getByRole('dialog').getByLabelText('Display name').fill('Reviewers')
     await confirmInDialog(view, 'Create group')
 
     await expect.poll(() => created.length).toBe(1)
@@ -160,11 +164,11 @@ describe('the groups screen', () => {
     const view = await mountGroups(transport)
 
     await view.getByRole('button', { name: 'Create group' }).click()
-    await view.getByRole('alertdialog').getByLabelText('Name').fill('editors')
-    await view.getByRole('alertdialog').getByLabelText('Display name').fill('Editors')
+    await view.getByRole('dialog').getByLabelText('Name').fill('editors')
+    await view.getByRole('dialog').getByLabelText('Display name').fill('Editors')
     await confirmInDialog(view, 'Create group')
     await expect
-      .element(view.getByRole('alertdialog').getByText('the group name is already taken'))
+      .element(view.getByRole('dialog').getByText('the group name is already taken'))
       .toBeVisible()
   })
 
@@ -192,7 +196,10 @@ describe('the groups screen', () => {
 
     const view = await mountGroups(transport)
 
-    await view.getByRole('button', { name: 'Members' }).click()
+    // The row actions live behind the row's "Actions" dropdown.
+    await view.getByRole('button', { name: 'Actions' }).click()
+    await expect.element(view.getByRole('menu')).toBeVisible()
+    await view.getByRole('menu').getByRole('button', { name: 'Members' }).click()
     await expect.element(view.getByRole('alertdialog')).toBeVisible()
     // The seed: the group's own member starts checked.
     const langdonToggle = view
@@ -206,7 +213,7 @@ describe('the groups screen', () => {
       .element()
     if (!(neveuBox instanceof HTMLElement)) throw new Error('the toggle is not an element')
     neveuBox.click()
-    await confirmInDialog(view, 'Save members')
+    await confirmInDialog(view, 'Save members', 'alertdialog')
 
     await expect.poll(() => members.length).toBe(1)
     expect(members[0]?.userIds.toSorted()).toEqual(['usr_langdon', 'usr_neveu'])
@@ -263,14 +270,14 @@ describe('the blocklist screen', () => {
     await expect.element(view.getByText('@spammers.example')).toBeVisible()
 
     await view.getByRole('button', { name: 'Add entry' }).click()
-    await view.getByRole('alertdialog').getByLabelText('Identifier').fill('John.Doe@Example.com')
+    await view.getByRole('dialog').getByLabelText('Identifier').fill('John.Doe@Example.com')
     await confirmInDialog(view, 'Add entry')
     await expect.poll(() => added.length).toBe(1)
     // The value travels as typed; the storage lowercases it.
     expect(added[0]).toBe('John.Doe@Example.com')
 
     await view.getByRole('button', { name: 'Remove' }).click()
-    await confirmInDialog(view, 'Remove')
+    await confirmInDialog(view, 'Remove', 'alertdialog')
     await expect.poll(() => removed.length).toBe(1)
     expect(removed[0]).toBe('bl_1')
   })
@@ -312,12 +319,12 @@ describe('the signup tokens screen', () => {
       )
     )
 
-    await expect.element(view.getByText(/2\/5/)).toBeVisible()
+    await expect.element(view.getByText(/2 of 5/)).toBeVisible()
 
     await view.getByRole('button', { name: 'Issue token' }).click()
-    await view.getByRole('alertdialog').getByLabelText('Usage limit').fill('10')
+    await view.getByRole('dialog').getByLabelText('Usage limit').fill('10')
     const editorsBox = view
-      .getByRole('alertdialog')
+      .getByRole('dialog')
       .getByRole('checkbox', { name: 'Group: Editors' })
       .element()
     if (!(editorsBox instanceof HTMLElement)) throw new Error('the toggle is not an element')
@@ -356,7 +363,7 @@ describe('the signup tokens screen', () => {
     )
 
     await view.getByRole('button', { name: 'Revoke' }).click()
-    await confirmInDialog(view, 'Revoke')
+    await confirmInDialog(view, 'Revoke', 'alertdialog')
     await expect.poll(() => revoked.length).toBe(1)
     expect(revoked[0]).toBe('stok_1')
   })

@@ -28,15 +28,10 @@ The self-service recovery pair rides the same folder in the collection.
 | POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ForgotPassword` | ConnectRPC   | Request a password reset (anti-enumeration) |
 | POST     | `/rpc/saka.authn.v1.PasswordRecoveryService/ResetPassword`  | ConnectRPC   | Reset with the emailed token        |
 
-## Password Recovery (saka-only)
-
-The token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
+The password reset token is 256 bits of lowercase hex — URL-safe with no special characters — delivered by
 email and stored only as a hash. The administrative trigger is a User Management
 action in the collection (see the table there); the two self-service rows above
 ride Authentication.
-
-| Method   | Procedure / Endpoint                                         | Protocol     | Summary                             |
-| -------- | ------------------------------------------------------------ | ------------ | ----------------------------------- |
 
 ## One-Time Access
 

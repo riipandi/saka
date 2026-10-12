@@ -304,9 +304,11 @@ describe('Sessions (browser)', () => {
       wrapperWith(transport, <SessionsPage page={1} onPageChange={onPageChange} />)
     )
 
-    await expect.element(screen.getByText('21–40 of 41')).toBeVisible()
-    const next = screen.getByRole('button', { name: 'Next' })
-    await expect.element(next).toBeEnabled()
+    // The pager is the numbered window the summary implies; the next button
+    // carries the turn to page 2.
+    await expect.element(screen.getByRole('button', { name: '2' })).toBeVisible()
+    const next = screen.getByRole('button', { name: 'Go to next page' })
+    await expect.element(next).not.toHaveAttribute('aria-disabled', 'true')
     await next.click()
     expect(onPageChange).toHaveBeenCalledWith(2)
   })

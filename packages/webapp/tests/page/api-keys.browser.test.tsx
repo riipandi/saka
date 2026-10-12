@@ -104,7 +104,11 @@ describe('Account API keys (browser)', () => {
   })
 
   it('issues a key and presents the raw key once', async () => {
-    const screen = await renderWith(<ApiKeysView page={1} onPageChange={() => {}} />)
+    // The list carries a row so the card — with its "New key" action —
+    // renders instead of the empty state.
+    const screen = await renderWith(<ApiKeysView page={1} onPageChange={() => {}} />, [
+      key('key_1', 'nightly-backup')
+    ])
     await screen.getByRole('button', { name: 'New key' }).click()
     const dialog = screen.getByRole('dialog')
     await expect.element(dialog.getByLabelText('Name')).toBeVisible()
@@ -126,9 +130,11 @@ describe('Account API keys (browser)', () => {
     const screen = await renderWith(<ApiKeysView page={1} onPageChange={() => {}} />, [
       key('key_2', 'stale-job', { expiresAt: timestampFromDate(past) })
     ])
-    const renewButton = screen.getByRole('button', { name: 'Renew' })
-    await expect.element(renewButton).toBeVisible()
-    const renewElement = renewButton.element()
+    // The row actions live behind the row's "Actions" dropdown.
+    await screen.getByRole('button', { name: 'Actions' }).click()
+    await expect.element(screen.getByRole('menu')).toBeVisible()
+    const renewItem = screen.getByRole('menu').getByRole('menuitem', { name: 'Renew' })
+    const renewElement = renewItem.element()
     if (!(renewElement instanceof HTMLElement))
       throw new Error('the renew button is not an element')
     renewElement.click()
@@ -145,9 +151,11 @@ describe('Account API keys (browser)', () => {
     const screen = await renderWith(<ApiKeysView page={1} onPageChange={() => {}} />, [
       key('key_1', 'nightly-backup')
     ])
-    const revokeButton = screen.getByRole('button', { name: 'Revoke' })
-    await expect.element(revokeButton).toBeVisible()
-    const revokeElement = revokeButton.element()
+    // The row actions live behind the row's "Actions" dropdown.
+    await screen.getByRole('button', { name: 'Actions' }).click()
+    await expect.element(screen.getByRole('menu')).toBeVisible()
+    const revokeItem = screen.getByRole('menu').getByRole('menuitem', { name: 'Revoke' })
+    const revokeElement = revokeItem.element()
     if (!(revokeElement instanceof HTMLElement))
       throw new Error('the revoke button is not an element')
     revokeElement.click()
@@ -163,7 +171,8 @@ describe('Admin API keys oversight (browser)', () => {
       key('key_1', 'nightly-backup', { ownerId: 'acc_9' })
     ])
     await expect.element(screen.getByText('nightly-backup')).toBeVisible()
-    await expect.element(screen.getByText(/owner acc_9/).nth(0)).toBeVisible()
+    // The owner cell falls back to the account id when the lookup fails.
+    await expect.element(screen.getByText('acc_9')).toBeVisible()
     expect(screen.container.textContent).not.toContain('Revoke')
     expect(screen.container.textContent).not.toContain('Renew')
   })
