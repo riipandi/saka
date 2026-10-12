@@ -18,8 +18,7 @@ import { useAuthentication, useAuthUser } from '#/hooks/use-auth'
 
 export const accountLinks: Array<{ label: string; to: LinkProps['to'] }> = [
   { label: 'Settings', to: '/account/profile' },
-  { label: 'Notifications', to: '/account/notifications' },
-  { label: 'Approve a device', to: '/device' }
+  { label: 'Notifications', to: '/account/notifications' }
 ]
 
 const styles = stylex.create({
@@ -35,13 +34,21 @@ const styles = stylex.create({
     backgroundColor: 'transparent',
     cursor: 'pointer'
   },
+  menu: {
+    // The library sizes a popup to its anchor's width — the 36px avatar
+    // would crush the menu onto its minimum. This menu is a small page of
+    // its own; it carries its own measure.
+    width: 248
+  },
   identity: {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    paddingTop: unit.x1,
-    paddingBottom: unit.x1,
-    maxWidth: '16rem'
+    paddingTop: unit.x2,
+    paddingBottom: unit.x2,
+    paddingLeft: unit.x2,
+    paddingRight: unit.x2,
+    maxWidth: '18rem'
   },
   name: {
     fontSize: fontSize.body2,
@@ -63,10 +70,10 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: unit.x3,
-    paddingTop: unit.x1,
-    paddingBottom: unit.x1,
+    paddingTop: unit.x2,
+    paddingBottom: unit.x2,
     paddingLeft: unit.x2,
-    paddingRight: unit.x1
+    paddingRight: unit.x2
   },
   themeLabel: {
     fontSize: fontSize.body2,
@@ -98,7 +105,7 @@ export function UserMenu() {
           <AvatarFallback>{initials(name)}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' sideOffset={8}>
+      <DropdownMenuContent align='end' sideOffset={8} style={styles.menu}>
         <DropdownMenuGroup>
           <div {...stylex.props(styles.identity)}>
             <DropdownMenuLabel style={styles.name}>{name}</DropdownMenuLabel>
