@@ -23,13 +23,10 @@ import { useAppConfig } from '#/hooks/use-app-config'
 import { useAuthentication } from '#/hooks/use-auth'
 import { useOAuthProviders } from '#/hooks/use-oauth-providers'
 import { usePublicSettings } from '#/hooks/use-public-settings'
-import type { SignInChallenge } from '#/libraries/guard/auth-engine'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
-import { takeSignInChallenge } from '#/libraries/guard/sign-in-handoff'
+import { pauseSignInChallenge, clearSignInPause } from '#/libraries/guard/sign-in-pause'
 import { runPasskeyAssertion } from '#/libraries/webauthn/passkey'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
-import { MfaChallengeView } from './-mfa-challenge-view'
-import { MfaEnrollmentView } from './-mfa-enrollment-view'
 
 /**
  * The code the one-time email carries — six or twelve characters per the
@@ -133,15 +130,14 @@ function OneTimeCodeEntry({
   )
 }
 /**
- * The login flow's phases. The credentials form, the multi-factor challenge,
- * and the forced enrollment are states of one machine in one mount — the
- * pending bridge travels between them in memory alone (plan D3), so a URL
- * never carries it and back navigation restarts the sign-in.
+ * The login flow's phases. The credentials form and the one-time code entry
+ * are states of one machine in one mount; the multi-factor fork is no
+ * longer a phase of it — the fork pauses the bridge in storage and hands
+ * the browser to `/login/mfa`, whose refresh-surviving state owns the rest
+ * of the flow (the pending bridge still never rides a URL).
  */
 type LoginPhase =
   | { name: 'credentials' }
-  | { name: 'challenge'; challenge: SignInChallenge }
-  | { name: 'enrollment'; challenge: SignInChallenge }
   | { name: 'one-time-code'; deviceToken?: string; notice: string }
 
 export function LoginView({
@@ -188,16 +184,11 @@ export function LoginView({
     void navigate({ to: '/login', search: { return_to: returnTo }, replace: true })
   }, [loggedOut, unauthenticated, reset, returnTo, navigate])
 
-  // A sign-in that forked on another route (the OAuth callback) handed its
-  // bridge over before landing here; taking it consumes the slot.
+  // A leftover pause (a fork that ended signed-in another way) is stale the
+  // moment the credentials form renders — the pause page is its only
+  // reader, and a fresh form means the flow restarted.
   useEffect(() => {
-    const handed = takeSignInChallenge()
-    if (!handed) return
-    if (handed.kind === 'mfa-challenge') {
-      setPhase({ name: 'challenge', challenge: handed })
-    } else {
-      setPhase({ name: 'enrollment', challenge: handed })
-    }
+    clearSignInPause()
   }, [])
 
   const clearAlerts = () => {
@@ -211,12 +202,14 @@ export function LoginView({
       setFailed(null)
       try {
         const outcome = await login(value, { rememberMe: remember, redirectTo: returnTo })
-        // A signed-in answer has already navigated. A fork moves this mount
-        // to its next phase — the bridge lives here now.
-        if (outcome.kind === 'mfa-challenge') {
-          setPhase({ name: 'challenge', challenge: outcome })
-        } else if (outcome.kind === 'enrollment-required') {
-          setPhase({ name: 'enrollment', challenge: outcome })
+        // A signed-in answer has already navigated. A fork pauses the
+        // bridge and hands the browser to the pause page — the URL there
+        // carries the search (return_to and the rest), the storage carries
+        // the bridge, and a refresh restores the state instead of the
+        // credentials form.
+        if (outcome.kind !== 'signed-in') {
+          pauseSignInChallenge(outcome, returnTo)
+          void navigate({ to: '/login/mfa', search: { return_to: returnTo }, replace: true })
         }
       } catch (error: unknown) {
         setFailed(getErrorMessage(error))
@@ -267,34 +260,18 @@ export function LoginView({
     setOneTimeBusy(true)
     try {
       const outcome = await exchangeOneTimeToken(code, deviceToken)
-      // A signed-in answer has already navigated. A fork moves this mount
-      // to its next phase — the same machine the credentials form feeds.
-      if (outcome.kind === 'mfa-challenge') {
-        setPhase({ name: 'challenge', challenge: outcome })
-      } else if (outcome.kind === 'enrollment-required') {
-        setPhase({ name: 'enrollment', challenge: outcome })
+      // A signed-in answer has already navigated. A fork pauses the bridge
+      // and hands the browser to the pause page — the same machine the
+      // credentials form feeds, now through the durable slot.
+      if (outcome.kind !== 'signed-in') {
+        pauseSignInChallenge(outcome, returnTo)
+        void navigate({ to: '/login/mfa', search: { return_to: returnTo }, replace: true })
       }
     } catch (error: unknown) {
       setFailed(getErrorMessage(error))
     } finally {
       setOneTimeBusy(false)
     }
-  }
-
-  if (phase.name === 'challenge') {
-    return (
-      <MfaChallengeView challenge={phase.challenge} returnTo={returnTo} onRestart={restartSignIn} />
-    )
-  }
-
-  if (phase.name === 'enrollment') {
-    return (
-      <MfaEnrollmentView
-        challenge={phase.challenge}
-        returnTo={returnTo}
-        onRestart={restartSignIn}
-      />
-    )
   }
 
   if (phase.name === 'one-time-code') {
