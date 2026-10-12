@@ -219,6 +219,7 @@ export function OAuthProvidersView() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         connection={editing}
+        takenProviders={list.map((one) => one.provider)}
         onDone={() =>
           void queryClient.invalidateQueries({
             queryKey: createConnectQueryKey({

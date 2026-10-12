@@ -51,12 +51,14 @@ export function OAuthProviderSheet({
   open,
   onOpenChange,
   connection,
-  onDone
+  onDone,
+  takenProviders = []
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   connection: OAuthConnection | null
   onDone: () => void
+  takenProviders?: string[]
 }) {
   const editing = connection !== null
 
@@ -277,8 +279,19 @@ export function OAuthProviderSheet({
                     <SelectValue placeholder='pick the provider' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='google'>Google</SelectItem>
-                    <SelectItem value='github'>GitHub</SelectItem>
+                    {Object.entries(BUILTIN_PRESETS).map(([slug, preset]) => {
+                      // The builtin slugs are singletons — the backend's
+                      // unique provider index binds one connection per
+                      // slug, so a taken one is named here rather than
+                      // discovered at submit.
+                      const taken = takenProviders.includes(slug)
+                      return (
+                        <SelectItem key={slug} value={slug} disabled={taken}>
+                          {preset.displayName}
+                          {taken ? ' — already added' : ''}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               )}

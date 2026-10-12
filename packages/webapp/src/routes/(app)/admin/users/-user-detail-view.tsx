@@ -294,11 +294,28 @@ export function UserDetailView({ userId }: { userId: string }) {
         <DelegationCard onImpersonate={(reason) => impersonateUser(user.id, reason)} />
         <ActivityCard userId={user.id} />
         <GrantsCard user={user} />
-        <DangerCard
-          onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
-          pending={remove.isPending}
-          error={remove.error ? getErrorMessage(remove.error) : null}
-        />
+        {user.roles.includes('administrator') ? (
+          // The standing is the delete's own guard: the server refuses the
+          // last reachable administrator's departure, and an administrator
+          // row's delete affordance waits for the role to demote — the
+          // grants card above is the way out.
+          <Card>
+            <CardHeader>
+              <CardTitle>Deletion waits for the role</CardTitle>
+              <CardDescription>
+                This account holds the administrator role, and the deployment must always keep a
+                reachable administrator. Demote the role in the grants card above — the delete
+                control answers to it.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <DangerCard
+            onDelete={() => remove.mutate(create(DeleteUserRequestSchema, { id: user.id }))}
+            pending={remove.isPending}
+            error={remove.error ? getErrorMessage(remove.error) : null}
+          />
+        )}
       </div>
     </div>
   )

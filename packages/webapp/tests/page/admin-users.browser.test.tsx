@@ -201,6 +201,8 @@ const transportFor = (options: { resetRefusal?: ConnectError; deleteRefusal?: Co
     })
   })
 
+const LANGDON_ADMIN = create(UserSchema, { ...LANGDON, roles: ['administrator'] })
+
 const detailHarness = (
   transport: ReturnType<typeof createRouterTransport>,
   contextOverrides: Partial<AuthContextValue> = {}
@@ -287,6 +289,37 @@ describe('the user detail page', () => {
           .getByText('You cannot delete the account you are signed in with.')
       )
       .toBeVisible()
+  })
+
+  it('hides the delete gate for an administrator row and names the demotion', async () => {
+    const transport = createRouterTransport(({ service }) => {
+      service(UserService, {
+        getUser: () => create(GetUserResponseSchema, { user: LANGDON_ADMIN, status: 'success' }),
+        deleteUser: () => {
+          throw new Error('the gate must keep the delete from firing')
+        }
+      })
+      service(WebAuthnService, {
+        adminListCredentials: () => create(ListCredentialsResponseSchema, { credentials: [] })
+      })
+      service(PasswordRecoveryService, {
+        adminResetUserPassword: () => {
+          throw new Error('not expected in this test')
+        }
+      })
+    })
+
+    const view = await renderView(withRouter(<UserDetailView userId='usr_langdon' />), {
+      transport,
+      auth: signedInAuth({ user: LANGDON_ADMIN })
+    })
+
+    await expect
+      .element(view.getByRole('heading', { name: 'Deletion waits for the role' }))
+      .toBeVisible()
+    await expect
+      .element(view.getByRole('button', { name: 'Delete account' }))
+      .not.toBeInTheDocument()
   })
 
   it('offers the unban to a banned account, not the ban', async () => {

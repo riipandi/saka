@@ -159,6 +159,18 @@ describe('OAuthProvidersView', () => {
     await expect.element(view.getByText('disabled', { exact: true })).toBeVisible()
   })
 
+  it('names the taken builtin slugs in the picker and refuses to offer them', async () => {
+    const view = await mount([GOOGLE])
+    await view.getByRole('button', { name: 'Add provider' }).click()
+    // The kind select is already on builtin; the provider combobox opens
+    // the two slugs, and the taken one is named and dead.
+    press(view.getByRole('dialog').getByRole('combobox').nth(1).element())
+    await expect
+      .element(view.getByRole('option', { name: 'Google — already added' }))
+      .toBeDisabled()
+    await expect.element(view.getByRole('option', { name: 'GitHub', exact: true })).toBeEnabled()
+  })
+
   it('adds a builtin provider with the preset defaults', async () => {
     const view = await mount([])
     await view.getByRole('button', { name: 'Add provider' }).click()
