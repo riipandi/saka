@@ -220,9 +220,11 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			Manager: deviceStore{protocolStore: stores},
 			// The prompt renders nothing a browser needs — every
 			// verification visit redirects into the SPA, which carries
-			// the user code in its route.
+			// the user code in its route. The callback names the
+			// verification endpoint with its prefix, the shape the SPA
+			// validates and later submits the code to.
 			PromptFunc: func(w http.ResponseWriter, r *http.Request) error {
-				http.Redirect(w, r, interactionPath+"?callback="+url.QueryEscape(protocolDeviceVerificationEndpoint), http.StatusFound)
+				http.Redirect(w, r, interactionPath+"?callback="+url.QueryEscape(protocolPrefix+protocolDeviceVerificationEndpoint), http.StatusFound)
 				return nil
 			},
 			// The approval ends at the SPA's device confirmation state;

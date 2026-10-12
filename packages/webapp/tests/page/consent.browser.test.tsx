@@ -1,7 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { render, type RenderResult } from 'vitest-browser-react'
-import { ConsentView, parseInteractionCallback, type ResumeAnswer } from '#/routes/-consent-view'
+import {
+  ConsentView,
+  normalizeUserCode,
+  parseInteractionCallback,
+  type ResumeAnswer
+} from '#/routes/-consent-view'
 
 const CONSENT: ResumeAnswer = {
   kind: 'consent',
@@ -22,10 +27,16 @@ describe('parseInteractionCallback', () => {
     )
   })
 
+  it('accepts the device shapes — the bare entry and the session resume', () => {
+    expect(parseInteractionCallback('/oidc/device')).toBe('/oidc/device')
+    expect(parseInteractionCallback('/oidc/device/sess_9')).toBe('/oidc/device/sess_9')
+  })
+
   it('refuses a foreign url, a protocol-relative one, and garbage', () => {
     expect(parseInteractionCallback('https://evil.example/cb')).toBeNull()
     expect(parseInteractionCallback('//evil.example')).toBeNull()
     expect(parseInteractionCallback('/account/settings')).toBeNull()
+    expect(parseInteractionCallback('/oidc/device/')).toBeNull()
     expect(parseInteractionCallback(undefined)).toBeNull()
   })
 })
@@ -103,5 +114,93 @@ describe('ConsentView', () => {
     await vi.waitFor(() => {
       expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?return_to='))
     })
+  })
+})
+
+async function renderDevice(props: Partial<Parameters<typeof ConsentView>[0]> = {}) {
+  const onVerify = vi.fn()
+  const onNavigate = vi.fn()
+  const screen = await render(
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } }
+        })
+      }
+    >
+      <ConsentView callback='/oidc/device' onVerify={onVerify} onNavigate={onNavigate} {...props} />
+    </QueryClientProvider>
+  )
+  return { screen, onVerify, onNavigate }
+}
+
+async function typeCode(screen: RenderResult, code: string) {
+  const slots = screen.getByRole('textbox').all()
+  for (const [index, slot] of slots.entries()) {
+    await slot.fill(code[index] ?? '')
+  }
+}
+
+describe('the device entry', () => {
+  it('strips the dashes a reader copies, uppercases, and caps at eight letters', () => {
+    expect(normalizeUserCode('abcd-efgh')).toBe('ABCDEFGH')
+    expect(normalizeUserCode('bcdf ghjk')).toBe('BCDFGHJK')
+    expect(normalizeUserCode('bcdfghjk123')).toBe('BCDFGHJK')
+  })
+
+  it('asks for the code and refuses to continue before eight letters stand', async () => {
+    const { screen, onVerify } = await renderDevice()
+    await expect.element(screen.getByText('Device sign-in')).toBeInTheDocument()
+    await typeCode(screen, 'BCDFG')
+    await expect.element(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(onVerify).not.toHaveBeenCalled()
+  })
+
+  it('sends the normalized code and lands on the approved state', async () => {
+    const onVerify = vi.fn().mockResolvedValue({ kind: 'approved' })
+    const { screen } = await renderDevice({ onVerify })
+    await typeCode(screen, 'BCDFGHJK')
+    await screen.getByRole('button', { name: 'Continue' }).click()
+    await vi.waitFor(() => {
+      expect(onVerify).toHaveBeenCalledWith('BCDFGHJK')
+    })
+    await expect.element(screen.getByText('Device authorized')).toBeInTheDocument()
+  })
+
+  it('re-prompts when the code comes back unrecognized', async () => {
+    const { screen } = await renderDevice({
+      onVerify: vi
+        .fn()
+        .mockResolvedValue({ kind: 'redirect', target: '/interaction?callback=%2Foidc%2Fdevice' })
+    })
+    await typeCode(screen, 'BCDFGHJK')
+    await screen.getByRole('button', { name: 'Continue' }).click()
+    await expect.element(screen.getByText(/not recognized/i)).toBeInTheDocument()
+    await expect.element(screen.getByText('Device sign-in')).toBeInTheDocument()
+  })
+
+  it('resumes the session in place, asks the question, and approves on the bare 200', async () => {
+    const onVerify = vi.fn().mockResolvedValue({
+      kind: 'redirect',
+      target: '/interaction?callback=%2Foidc%2Fdevice%2Fsess_9'
+    })
+    const onApprove = vi.fn().mockResolvedValue({ kind: 'approved' })
+    const { screen } = await renderDevice({
+      onVerify,
+      onApprove,
+      onResume: vi.fn().mockResolvedValue(CONSENT)
+    })
+    await typeCode(screen, 'BCDFGHJK')
+    await screen.getByRole('button', { name: 'Continue' }).click()
+    await expect.element(screen.getByText('La Forgia')).toBeInTheDocument()
+    await screen.getByRole('button', { name: 'Allow' }).click()
+    await vi.waitFor(() => {
+      expect(onApprove).toHaveBeenCalledWith('/oidc/device/sess_9', [
+        'openid',
+        'profile',
+        'offline_access'
+      ])
+    })
+    await expect.element(screen.getByText('Device authorized')).toBeInTheDocument()
   })
 })
