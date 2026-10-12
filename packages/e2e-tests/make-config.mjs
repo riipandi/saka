@@ -28,6 +28,14 @@ source.auth = {
   one_time_access_email_as_unauthenticated_enabled: true
 }
 
+// The interaction suite walks the provider's protocol surface — the
+// authorize redirects, the device verification, the SPA's consent page —
+// so the federation switch rides on for the run.
+source.oidc = {
+  ...source.oidc,
+  enabled: true
+}
+
 const target = resolve(root, 'build', buildTag, 'app.config.e2e.json')
 mkdirSync(dirname(target), { recursive: true })
 writeFileSync(target, JSON.stringify(source, null, 2))

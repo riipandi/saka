@@ -175,8 +175,8 @@ views), `CustomClaimService` (user and group claims, reserved-key refusals),
 and the account-side `ListLinkedConnections`/`UnlinkConnection`/`GetLinkedAccountTokens`.
 Of the four parked `TODO(frontend)` items, the client form's two shipped with Wave 4
 (plan-20261011_1805: back-channel logout fields, the `allowed_grant_types` editor); the
-consent screen's two — the `offline_access` wording and the `login_hint` prefill — wait
-on the interaction page itself (`issue-20261012_0445.md`).
+consent screen's two shipped with the interaction page (plan-20261012_1935: the
+`offline_access` disclosure and the `login_hint` display note).
 
 **Platform administration** — `SettingsService` (`List`/`Update`/`Reset`, `ListPublic`
 anonymous), `AppConfigService/TestEmail`, the admin document of `GET /api/configuration`,
@@ -548,10 +548,12 @@ goal, three deltas from its shape:
   from the user menu; the device side is REST and needed no SPA work
   beyond it. The E2E client tool lives at `tools/e2e-device-login`.
   The timezone picker (`countries-and-timezones`) lands with this
-  wave's parked-debt half; the OIDC consent interaction page is parked
-  as `issue-20261012_0445.md` — the backend is complete, the SPA
-  surface never existed to patch. (commits `231d0507`, `a2fe5432`,
-  `ab0af232`)
+  wave's parked-debt half. The OIDC consent interaction page — the wave's
+  other parked debt (`issue-20261012_0445.md`) — shipped after it:
+  plan-20261012_1935 landed the SPA interaction area (the consent page,
+  the device grant's verification, the completion dialect) in three
+  phases (commits `50e07974`, `4834d4f9`, `85ee60f8`). (commits `231d0507`,
+  `a2fe5432`, `ab0af232`)
 - [x] **Ops console** — the queue half ships at `/admin/ops/queue`
   (queues overview, pending table, dead archive, task drawer, cancel /
   replay / flush with confirmation); the scheduler half ships at
@@ -797,10 +799,10 @@ routes/
       queue.tsx                  # ops console (Wave 6)
       scheduler.tsx              # ops console (Wave 6)
 
-  (interaction)/route.tsx       # neither anonymous-only nor the app shell:
-    consent.tsx                 #   the OIDC consent interaction — the visitor may be
-                                #   signed in or not; posts the decision to
-                                #   /oidc/authorize/{id} (Wave 4)
+  interaction.tsx                # neither anonymous-only nor the app shell:
+    -consent-view.tsx            #   the OIDC consent interaction — the visitor may be
+                                 #   signed in or not; posts the decision to the
+                                 #   ?callback= the provider redirected with (Wave 6)
 ```
 
 Notes the tree does not say:
@@ -810,11 +812,13 @@ Notes the tree does not say:
   content in place, so the `return_to` context and the pending state never leave the
   route. A standalone `/mfa` route would have to pass the bridge token through search
   params a refresh would drop.
-- `(interaction)` exists because the OIDC authorize redirect lands there with whatever
-  authentication state the browser carries — neither group's guard applies. Its
-  `route.tsx` only ensures the session is loaded, then `consent.tsx` decides: signed in →
-  render the consent question; anonymous → hand off to `/login` with `return_to` pointed
-  back at the interaction URL.
+- `interaction.tsx` sits at the root for the same reason `verify-email.tsx` does: the
+  provider's redirect lands there with whatever authentication state the browser
+  carries — neither group's guard applies. Its `beforeLoad` only ensures the session
+  is loaded, validates the `?callback=` shape (a foreign one is a not-found, never a
+  redirect target), then decides: signed in → render the consent question (the device
+  grant's code entry and resume fork off the same screen); anonymous → hand off to
+  `/login` with `return_to` pointed back at the interaction URL.
 - `verify-email.tsx` sits at the root for the same reason: the emailed link may reach a
   signed-in user changing their address or an anonymous one confirming a signup.
 - Admin navigation appears in the sidebar only when the caller qualifies (administrator

@@ -32,8 +32,7 @@ the diff actually made stale.
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
 without the owner's explicit instruction. All listed plans are `done` or
-`shipped`, except `plan-20261008_1739.md` and `plan-20261012_1935.md`
-(both `awaiting-approval`).
+`shipped`, except `plan-20261008_1739.md` (`awaiting-approval`).
 
 | File | Subject |
 | --- | --- |
@@ -65,13 +64,14 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261011_2025.md` | Wave 5: platform administration — the settings CRUD screens + TestEmail probe, notifications with the `WatchNotifications` streaming consumer, webhooks, API keys — complete |
 | `plan-20261012_0145.md` | The webapp navigation/IA overhaul — sidebar regrouping, the topbar user menu and notification flyout — complete |
 | `plan-20261012_0155.md` | Wave 6 (partial): device login approval (`/device`), the ops console (queue + scheduler), the timezone picker; storage intentionally excluded pending the reference inventory (`issue-20261009_2356.md`, now resolved) — done |
+| `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
 
 ## Handovers (`.llms/handover/`)
 
 Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
 few matter — each summarizes its session and what stayed open; anything still
 true is folded into the core documents above. Newest:
-`handover-20261012_2100.md` (65 files total; pruning awaits the owner's
+`handover-20261012_2150.md` (66 files total; pruning awaits the owner's
 nod — `issue-20261006_0050.md` ISS-009).
 
 ## Audits (`.llms/audit/`)
@@ -116,7 +116,7 @@ plans on 2026-10-12 — the files are the tracker, this is the index):
 | `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
 | `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim parked on the first split-assets deployment |
 | `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — the remedy shape (self-healing seeder vs startup check vs documented rule) awaits the owner's decision |
-| `issue-20261012_0445.md` | open | The OIDC consent interaction page does not exist in the SPA (backend complete) — its plan is written (`plan-20261012_1935.md`, `awaiting-approval`); the timezone-picker half resolved |
+| `issue-20261012_0445.md` | resolved | The OIDC consent interaction page shipped (plan-20261012_1935: the SPA interaction area — consent page, device verification, the completion dialect) |
 | `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — derive the totals from the seeder registry when CI goes red again |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; report upstream |
 
