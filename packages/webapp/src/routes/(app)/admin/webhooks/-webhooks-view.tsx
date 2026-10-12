@@ -50,7 +50,7 @@ import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { WebhookService } from '~/codegen/webhook_pb'
-import { WebhookCreateDialog } from './-webhook-dialog'
+import { WebhookCreateSheet } from './-webhook-sheet'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -211,7 +211,7 @@ export function WebhooksView() {
         </Card>
       </div>
 
-      <WebhookCreateDialog
+      <WebhookCreateSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
         onMinted={(secret) => setMintedSecret(secret)}

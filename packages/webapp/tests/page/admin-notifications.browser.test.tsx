@@ -151,7 +151,7 @@ describe('Admin notifications (browser)', () => {
     await expect.element(screen.getByText(/emailed/).nth(0)).toBeVisible()
   })
 
-  it('publishes a global announcement through the dialog', async () => {
+  it('publishes a global announcement through the sheet', async () => {
     const screen = await renderView()
     await screen.getByRole('button', { name: 'New broadcast' }).click()
     const dialog = screen.getByRole('dialog')

@@ -42,7 +42,7 @@ import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { ApiKeyService } from '~/codegen/api_key_pb'
 import { AccountFrame } from './-account-frame'
-import { ApiKeyCreateDialog } from './-api-key-dialog'
+import { ApiKeyCreateSheet } from './-api-key-sheet'
 
 /** The RFC 3339 instants the key view carries, read as the viewer's own
  * wall clock — a key list is recognized by when it lives, not by the zone
@@ -235,7 +235,7 @@ export function ApiKeysView({
         )}
       </div>
 
-      <ApiKeyCreateDialog
+      <ApiKeyCreateSheet
         open={createOpen}
         onOpenChange={(next) => {
           setCreateOpen(next)

@@ -41,7 +41,7 @@ import { listPageInput, decodeListMetadata } from '#/hooks/use-pagination'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { NotificationService } from '~/codegen/notification_pb'
-import { NotificationBroadcastDialog } from './-notification-dialog'
+import { NotificationBroadcastSheet } from './-notification-sheet'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -54,7 +54,7 @@ function formatInstant(value?: Timestamp | null): string {
 /**
  * The broadcast console (Wave 5 phase 2): every notification the
  * deployment holds — live and cancelled — paged newest first, with the
- * publish dialog and the withdrawal the ledger keeps.
+ * publish sheet and the withdrawal the ledger keeps.
  */
 export function NotificationsView() {
   const [page, setPage] = useState(1)
@@ -196,7 +196,7 @@ export function NotificationsView() {
         </Card>
       </div>
 
-      <NotificationBroadcastDialog open={composeOpen} onOpenChange={setComposeOpen} />
+      <NotificationBroadcastSheet open={composeOpen} onOpenChange={setComposeOpen} />
     </div>
   )
 }

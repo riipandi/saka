@@ -42,7 +42,7 @@ import { Can } from '#/libraries/guard/can'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { DeleteOAuthConnectionRequestSchema, OAuthSSOService } from '~/codegen/authn_pb'
 import type { OAuthConnection } from '~/codegen/authn_pb'
-import { OAuthProviderDialog } from './-oauth-provider-dialog'
+import { OAuthProviderSheet } from './-oauth-provider-sheet'
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -208,7 +208,7 @@ export function OAuthProvidersView() {
         </Card>
       </div>
 
-      <OAuthProviderDialog
+      <OAuthProviderSheet
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         connection={editing}
