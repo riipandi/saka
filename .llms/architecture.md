@@ -1087,6 +1087,14 @@ The OIDC surface, when built, is specification-driven and becomes the third nami
 
 **D9 — no compatibility layer.** Where an existing page's shape would tempt an abstraction (the audit table, the recovery dialog), the admin screens fork the composition; a migration this wave would need is an in-place edit with a dev-DB reset.
 
+## The webapp's UI conventions (settled 2026-10-12, plan-20261012_2331 D1–D5)
+
+**The loading answer is a skeleton shaped like the content it stands in for.** Three composites under `packages/webapp/src/components/` (`-skeleton-rows`, `-skeleton-cards`, `-skeleton-form`, laid out by `styles/element/skeletons.stylex.ts`) replace the bare `<Spinner />` a list or detail pane used to center — a spinner lets the data's arrival shove the page, the composites hold the space. Every list-level `isPending` branch renders the shape-matched composite (tables get row blocks, card grids get bordered cards, forms and detail panes get label-input pairs); the Spinner keeps only button and inline-action duty. The composites are webapp page conventions, not library design — uilibs' `Skeleton` is the pulse primitive, unmodified.
+
+**Long forms ride the right-side Sheet; Dialog keeps confirmations and secrets.** The four create/edit forms that outgrew the modal (API key, OAuth provider, notification broadcast, webhook) are `SheetContent side='right'` surfaces (`*-sheet.tsx` beside their views), their fields scrolling under a fixed header and a pinned footer (`sheet-form.stylex.ts`'s body block). The Sheet is built on the same Base Dialog root, so the reader's keyboard and focus behavior is the modal's they already knew. The bottom-slide `Drawer` stays the read-only inspector surface (claim preview, webhook delivery).
+
+**One opening block, one failed-list answer, one empty state that asks.** `PageHeader` (`-page-header.tsx`) renders the kicker/title/description arrangement the views rolled by hand — a header cannot drift between pages. `ListError` (`-list-error.tsx`) pairs the refusal's words with the retry the query already owns (`refetch`), so an errored list is never a bare red line nor a lie of an empty state. List empty states whose create flow lives in the view's scope carry an `EmptyContent` CTA mirroring the card's primary action — the first record is reachable from the state that asks for it.
+
 ## Planned layout
 
 Design records for packages that were planned before they landed — `internal/config` and `framework/fetcher` are implemented as described below; read them as the rationale, the code as truth. The still-unbuilt scaffolds are named where they are.

@@ -66,15 +66,15 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261012_0145.md` | The webapp navigation/IA overhaul — sidebar regrouping, the topbar user menu and notification flyout — complete |
 | `plan-20261012_0155.md` | Wave 6 (partial): device login approval (`/device`), the ops console (queue + scheduler), the timezone picker; storage intentionally excluded pending the reference inventory (`issue-20261009_2356.md`, now resolved) — done |
 | `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
-| `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — awaiting approval |
+| `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — done |
 
 ## Handovers (`.llms/handover/`)
 
 Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
 few matter — each summarizes its session and what stayed open; anything still
 true is folded into the core documents above. Newest:
-`handover-20261012_2150.md` (66 files total; pruning awaits the owner's
-nod — `issue-20261006_0050.md` ISS-009).
+`handover-20261013_0023.md` (the webapp UI revamp; 68 files total; pruning
+awaits the owner's nod — `issue-20261006_0050.md` ISS-009).
 
 ## Audits (`.llms/audit/`)
 
