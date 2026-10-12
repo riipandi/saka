@@ -1,7 +1,5 @@
 import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError, createRouterTransport, type ConnectRouter } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -9,9 +7,8 @@ import {
   createRouter
 } from '@tanstack/react-router'
 import { afterEach, describe, expect, it } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
-import { clearAuth, setAuthGrants, type UserProfile } from '#/libraries/guard/auth-store'
+import { type RenderResult } from 'vitest-browser-react'
+import { clearAuth, setAuthGrants } from '#/libraries/guard/auth-store'
 import { RolesView } from '#/routes/(app)/admin/-roles-view'
 import { UserDetailView } from '#/routes/(app)/admin/users/-user-detail-view'
 import { AuditLogService, ListForUserResponseSchema } from '~/codegen/auditlog_pb'
@@ -33,6 +30,7 @@ import {
 } from '~/codegen/authz_pb'
 import type { ListMetadata } from '~/codegen/common_pb'
 import { GetUserResponseSchema, UserSchema, UserService } from '~/codegen/identity_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 const EDITORS = create(RoleSchema, {
   id: 'role_editors',
@@ -75,31 +73,6 @@ function rolesPage(rows: Role[], metadata?: Partial<ListMetadata>) {
   })
 }
 
-const notUsed = async () => {
-  throw new Error('session surfaces are not part of this page test')
-}
-
-function authContext() {
-  return {
-    user: null,
-    loggedIn: true,
-    isLoading: false,
-    login: notUsed,
-    continueSignIn: notUsed,
-    completeSignIn: notUsed,
-    verifyPasskeyLogin: notUsed,
-    requestOneTimeAccess: notUsed,
-    exchangeOneTimeToken: notUsed,
-    stopImpersonation: async () => {
-      throw new Error('the impersonation banner is not part of this page test')
-    },
-    impersonateUser: async () => {
-      throw new Error('impersonation is not part of this page test')
-    },
-    logout: () => {}
-  }
-}
-
 function withRouter(children: React.ReactNode, initial = '/') {
   const RootRoute = createRootRoute({ component: () => <>{children}</> })
   const router = createRouter({
@@ -107,22 +80,6 @@ function withRouter(children: React.ReactNode, initial = '/') {
     history: createMemoryHistory({ initialEntries: [initial] })
   })
   return <RouterProvider router={router} />
-}
-
-function providers(
-  children: React.ReactNode,
-  transport: ReturnType<typeof createRouterTransport>,
-  user: UserProfile | null = null
-) {
-  return (
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <TransportProvider transport={transport}>
-        <AuthContext.Provider value={{ ...authContext(), user }}>{children}</AuthContext.Provider>
-      </TransportProvider>
-    </QueryClientProvider>
-  )
 }
 
 function baseRoleHandlers(router: ConnectRouter, overrides: Record<string, unknown> = {}) {
@@ -163,14 +120,10 @@ afterEach(() => {
 
 describe('the roles screen', () => {
   it('renders the roles with their type and set size', async () => {
-    const screen = await render(
-      withRouter(
-        providers(
-          <RolesView />,
-          createRouterTransport((service) => baseRoleHandlers(service))
-        )
-      )
-    )
+    const screen = await renderView(withRouter(<RolesView />), {
+      transport: createRouterTransport((service) => baseRoleHandlers(service)),
+      auth: signedInAuth()
+    })
 
     await expect.element(screen.getByText(/Administrator/).first()).toBeVisible()
     await expect.element(screen.getByText(/System/).first()).toBeVisible()
@@ -185,31 +138,27 @@ describe('the roles screen', () => {
 
   it('creates a role with its name and immutable slug', async () => {
     const created: Array<{ name: string; slug: string }> = []
-    const screen = await render(
-      withRouter(
-        providers(
-          <RolesView />,
-          createRouterTransport((service) =>
-            baseRoleHandlers(service, {
-              createRole: (request: { name: string; slug: string }) => {
-                created.push({ name: request.name, slug: request.slug })
-                return create(CreateRoleResponseSchema, {
-                  role: create(RoleDetailSchema, {
-                    id: 'role_new',
-                    name: request.name,
-                    slug: request.slug,
-                    type: RoleType.CUSTOM,
-                    permissions: []
-                  }),
-                  status: 'success',
-                  message: 'ok'
-                })
-              }
+    const screen = await renderView(withRouter(<RolesView />), {
+      transport: createRouterTransport((service) =>
+        baseRoleHandlers(service, {
+          createRole: (request: { name: string; slug: string }) => {
+            created.push({ name: request.name, slug: request.slug })
+            return create(CreateRoleResponseSchema, {
+              role: create(RoleDetailSchema, {
+                id: 'role_new',
+                name: request.name,
+                slug: request.slug,
+                type: RoleType.CUSTOM,
+                permissions: []
+              }),
+              status: 'success',
+              message: 'ok'
             })
-          )
-        )
-      )
-    )
+          }
+        })
+      ),
+      auth: signedInAuth()
+    })
 
     await screen.getByRole('button', { name: 'Create role' }).click()
     await screen.getByRole('dialog').getByLabelText('Name').fill('Reviewers')
@@ -222,43 +171,39 @@ describe('the roles screen', () => {
 
   it('replaces a role’s permission set as a whole and carries the custody copy', async () => {
     const saved: Array<{ id: string; slugs: string[] }> = []
-    const screen = await render(
-      withRouter(
-        providers(
-          <RolesView />,
-          createRouterTransport((service) =>
-            baseRoleHandlers(service, {
-              getRole: () =>
-                create(GetRoleResponseSchema, {
-                  role: create(RoleDetailSchema, {
-                    id: 'role_editors',
-                    name: 'Editors',
-                    slug: 'editors',
-                    type: RoleType.CUSTOM,
-                    permissions: ['user:*:read']
-                  }),
-                  status: 'success',
-                  message: 'ok'
-                }),
-              setRolePermissions: (request: { id: string; permissionSlugs: string[] }) => {
-                saved.push({ id: request.id, slugs: [...request.permissionSlugs] })
-                return create(SetRolePermissionsResponseSchema, {
-                  role: create(RoleDetailSchema, {
-                    id: request.id,
-                    name: 'Editors',
-                    slug: 'editors',
-                    type: RoleType.CUSTOM,
-                    permissions: [...request.permissionSlugs]
-                  }),
-                  status: 'success',
-                  message: 'ok'
-                })
-              }
+    const screen = await renderView(withRouter(<RolesView />), {
+      transport: createRouterTransport((service) =>
+        baseRoleHandlers(service, {
+          getRole: () =>
+            create(GetRoleResponseSchema, {
+              role: create(RoleDetailSchema, {
+                id: 'role_editors',
+                name: 'Editors',
+                slug: 'editors',
+                type: RoleType.CUSTOM,
+                permissions: ['user:*:read']
+              }),
+              status: 'success',
+              message: 'ok'
+            }),
+          setRolePermissions: (request: { id: string; permissionSlugs: string[] }) => {
+            saved.push({ id: request.id, slugs: [...request.permissionSlugs] })
+            return create(SetRolePermissionsResponseSchema, {
+              role: create(RoleDetailSchema, {
+                id: request.id,
+                name: 'Editors',
+                slug: 'editors',
+                type: RoleType.CUSTOM,
+                permissions: [...request.permissionSlugs]
+              }),
+              status: 'success',
+              message: 'ok'
             })
-          )
-        )
-      )
-    )
+          }
+        })
+      ),
+      auth: signedInAuth()
+    })
 
     // The custom role's row carries the tree; open it.
     const customMenu = await openRowActions(screen, 'last')
@@ -285,29 +230,25 @@ describe('the roles screen', () => {
   })
 
   it('opens a system role’s set read-only', async () => {
-    const screen = await render(
-      withRouter(
-        providers(
-          <RolesView />,
-          createRouterTransport((service) =>
-            baseRoleHandlers(service, {
-              getRole: () =>
-                create(GetRoleResponseSchema, {
-                  role: create(RoleDetailSchema, {
-                    id: 'role_admin',
-                    name: 'Administrator',
-                    slug: 'administrator',
-                    type: RoleType.SYSTEM,
-                    permissions: ['user:*:read', 'user:*:list', 'user_group:*:list']
-                  }),
-                  status: 'success',
-                  message: 'ok'
-                })
+    const screen = await renderView(withRouter(<RolesView />), {
+      transport: createRouterTransport((service) =>
+        baseRoleHandlers(service, {
+          getRole: () =>
+            create(GetRoleResponseSchema, {
+              role: create(RoleDetailSchema, {
+                id: 'role_admin',
+                name: 'Administrator',
+                slug: 'administrator',
+                type: RoleType.SYSTEM,
+                permissions: ['user:*:read', 'user:*:list', 'user_group:*:list']
+              }),
+              status: 'success',
+              message: 'ok'
             })
-          )
-        )
-      )
-    )
+        })
+      ),
+      auth: signedInAuth()
+    })
 
     // The system role's row offers only its tree — the first row's menu.
     const systemMenu = await openRowActions(screen, 'first')
@@ -321,23 +262,16 @@ describe('the roles screen', () => {
   })
 
   it('surfaces the held-by-accounts refusal verbatim', async () => {
-    const screen = await render(
-      withRouter(
-        providers(
-          <RolesView />,
-          createRouterTransport((service) =>
-            baseRoleHandlers(service, {
-              deleteRole: () => {
-                throw new ConnectError(
-                  'the role is still carried by accounts',
-                  Code.FailedPrecondition
-                )
-              }
-            })
-          )
-        )
-      )
-    )
+    const screen = await renderView(withRouter(<RolesView />), {
+      transport: createRouterTransport((service) =>
+        baseRoleHandlers(service, {
+          deleteRole: () => {
+            throw new ConnectError('the role is still carried by accounts', Code.FailedPrecondition)
+          }
+        })
+      ),
+      auth: signedInAuth()
+    })
 
     const customMenu = await openRowActions(screen, 'last')
     await customMenu.getByRole('menuitem', { name: 'Delete' }).click()
@@ -415,11 +349,12 @@ describe('the grants card', () => {
       permissions: ['user:*:read', 'user:*:assign_role', 'user:*:grant_permission']
     })
 
-    const screen = await render(
-      withRouter(
-        providers(<UserDetailView userId='usr_langdon' />, grantsTransport(), LANGDON),
-        '/admin/users/usr_langdon'
-      )
+    const screen = await renderView(
+      withRouter(<UserDetailView userId='usr_langdon' />, '/admin/users/usr_langdon'),
+      {
+        transport: grantsTransport(),
+        auth: signedInAuth({ user: LANGDON })
+      }
     )
     expect(screen.baseElement.textContent).toContain('next token')
     await expect.element(screen.getByRole('button', { name: 'Save roles' })).toBeVisible()
@@ -429,11 +364,12 @@ describe('the grants card', () => {
   it('reads the card only without the assignment grants', async () => {
     setAuthGrants({ roles: ['administrator'], permissions: ['user:*:read'] })
 
-    const screen = await render(
-      withRouter(
-        providers(<UserDetailView userId='usr_langdon' />, grantsTransport(), LANGDON),
-        '/admin/users/usr_langdon'
-      )
+    const screen = await renderView(
+      withRouter(<UserDetailView userId='usr_langdon' />, '/admin/users/usr_langdon'),
+      {
+        transport: grantsTransport(),
+        auth: signedInAuth({ user: LANGDON })
+      }
     )
     expect(screen.baseElement.textContent).toContain('next token')
     expect(screen.getByRole('button', { name: 'Save roles' }).elements().length).toBe(0)

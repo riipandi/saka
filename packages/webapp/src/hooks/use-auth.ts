@@ -48,7 +48,7 @@ export interface AuthContextValue {
     options?: AuthLoginContextOptions
   ) => Promise<SignInOutcome>
   /** Complete an OAuth SSO flow the callback route redirected with. Same outcome shape. */
-  continueSignIn: (flowToken: string) => Promise<SignInOutcome>
+  continueSignIn: (flowToken: string, options?: AuthLoginContextOptions) => Promise<SignInOutcome>
   /**
    * Spend the pending bridge the sign-in forked with. Resolves after the
    * session was established and the navigation already happened — the view's

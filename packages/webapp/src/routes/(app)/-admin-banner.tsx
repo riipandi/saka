@@ -43,13 +43,7 @@ export function AdminBanner() {
         </Text>
       </span>
       <span {...stylex.props(styles.grow)} />
-      <Button
-        type='button'
-        variant='secondary'
-        size='sm'
-        onClick={() => void stop()}
-        disabled={failed != null}
-      >
+      <Button type='button' variant='secondary' size='sm' onClick={() => void stop()}>
         Stop impersonating
       </Button>
       {failed && (

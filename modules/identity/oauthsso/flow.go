@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/riipandi/saka/framework/datastore"
@@ -59,12 +60,30 @@ func (s *Service) WithOAuthEnabled(enabled bool) *Service {
 	return s
 }
 
+// safeReturnTo judges the return trip the start carried: only a
+// same-origin relative path — a single leading slash, never a
+// protocol-relative or backslash spelling — may ride the flow. The value
+// is stored in the row and handed back to the same origin it came from;
+// anything else travels as empty (the flow still works, the return trip
+// just lands at the default).
+func safeReturnTo(value string) string {
+	if value == "" || len(value) > 512 {
+		return ""
+	}
+	if !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") || strings.HasPrefix(value, "/\\") {
+		return ""
+	}
+	return value
+}
+
 // Begin opens one authorization-code ceremony: it draws the secrets,
 // renders the provider's authorize URL, and stores the pending row the
 // callback will consume. The raw state and verifier never rest anywhere —
 // the row carries their hash and their sealed form, and the browser
-// carries the raw state to the provider and back.
-func (s *Service) Begin(ctx context.Context, provider string) (string, error) {
+// carries the raw state to the provider and back. The return trip the
+// start carried (the SPA path to land the signed-in browser on) rides
+// the row the same way: validated same-origin or not at all.
+func (s *Service) Begin(ctx context.Context, provider, redirectTo string) (string, error) {
 	if !s.ssoEnabled {
 		return "", ErrConnectionUnavailable
 	}
@@ -119,7 +138,7 @@ func (s *Service) Begin(ctx context.Context, provider string) (string, error) {
 		return "", err
 	}
 	if _, err := s.repo.CreateFlow(ctx, s.pool, conn.ID,
-		hashSecret(state), nonce, sealedVerifier, s.now().Add(flowLifetime)); err != nil {
+		hashSecret(state), nonce, sealedVerifier, safeReturnTo(redirectTo), s.now().Add(flowLifetime)); err != nil {
 		return "", err
 	}
 	return authorizeURL, nil
@@ -128,40 +147,41 @@ func (s *Service) Begin(ctx context.Context, provider string) (string, error) {
 // Callback consumes the ceremony the provider returned the browser with:
 // the pending row is spent by a guarded update that writes the resolved
 // identity and the fresh flow token's hash, and the raw flow token is
-// what the SPA redirect carries. A resolution the provider refused leaves
-// the row pending — it expires on its own, and the code the provider
-// minted is single-use anyway.
-func (s *Service) Callback(ctx context.Context, provider, code, state string) (string, error) {
+// what the SPA redirect carries — with the return trip the begin stored,
+// the answer the signed-in browser lands from. A resolution the provider
+// refused leaves the row pending — it expires on its own, and the code
+// the provider minted is single-use anyway.
+func (s *Service) Callback(ctx context.Context, provider, code, state string) (string, string, error) {
 	conn, err := s.repo.ByProvider(ctx, s.pool, provider)
 	if errors.Is(err, ErrConnectionNotFound) {
-		return "", ErrConnectionUnavailable
+		return "", "", ErrConnectionUnavailable
 	}
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !conn.Enabled {
-		return "", ErrConnectionUnavailable
+		return "", "", ErrConnectionUnavailable
 	}
 	adapter, err := s.providerFor(conn)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	secret, err := s.unseal(conn.ClientSecret)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	conn.ClientSecret = secret
 
 	flow, err := s.repo.PendingByState(ctx, hashSecret(state))
 	if errors.Is(err, datastore.ErrNoRows) {
-		return "", ErrFlowUnknown
+		return "", "", ErrFlowUnknown
 	}
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	verifier, err := s.unseal(flow.CodeVerifier)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	identity, err := adapter.Resolve(ctx, conn, FlowSecrets{
@@ -171,23 +191,23 @@ func (s *Service) Callback(ctx context.Context, provider, code, state string) (s
 		RedirectURI: s.redirectURI(conn.Provider),
 	}, code)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if identity.Email == "" || identity.ProviderAccountID == "" {
-		return "", ErrIdentityInvalid
+		return "", "", ErrIdentityInvalid
 	}
 
 	sealedAccess, err := s.seal(identity.AccessToken)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	sealedRefresh, err := s.seal(identity.RefreshToken)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	flowToken, err := newSecret()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	consumed, err := s.repo.ConsumePending(ctx, s.pool, flow.ID, FlowResolution{
 		FlowTokenHash:      hashSecret(flowToken),
@@ -204,14 +224,14 @@ func (s *Service) Callback(ctx context.Context, provider, code, state string) (s
 		AccessExpiresAt:    expiresAtOf(identity),
 	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !consumed {
 		// A concurrent callback spent the state first: the ceremony is
 		// gone, and the answer says nothing about who won.
-		return "", ErrFlowUnknown
+		return "", "", ErrFlowUnknown
 	}
-	return flowToken, nil
+	return flowToken, flow.RedirectTo, nil
 }
 
 // FlowByToken reads the live ceremony the SPA's handle names, restricted
@@ -235,9 +255,14 @@ func (s *Service) redirectURI(provider string) string {
 }
 
 // FlowRedirect builds the SPA redirect a resolved ceremony answers with:
-// the flow token rides the query, and the SPA drives the rest.
-func (s *Service) FlowRedirect(flowToken string) string {
-	return s.baseURL + spaCallbackPath + "?flow_token=" + url.QueryEscape(flowToken)
+// the flow token rides the query, and the return trip the start carried
+// rides beside it when there was one — the SPA drives the rest.
+func (s *Service) FlowRedirect(flowToken, redirectTo string) string {
+	redirect := s.baseURL + spaCallbackPath + "?flow_token=" + url.QueryEscape(flowToken)
+	if redirectTo != "" {
+		redirect += "&return_to=" + url.QueryEscape(redirectTo)
+	}
+	return redirect
 }
 
 // ErrorRedirect builds the SPA redirect a refused ceremony answers with.

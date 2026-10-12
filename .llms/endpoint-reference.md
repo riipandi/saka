@@ -656,6 +656,18 @@ request shape the Basic OP certification profile sends; `S256` is the only
 accepted challenge method — `plain` is refused at the authorize endpoint
 (RFC 9700 §4.1.3), and the discovery document names `["S256"]` alone.
 
+**The SPA completion dialect.** The continuation's success is the
+provider's own redirect to the RP's `redirect_uri`, and a browser tab the
+SPA drives can neither read a 302's `Location` (a fetch's manual redirect
+is opaque) nor navigate while carrying the bearer header. The SPA-facing
+callback paths — `/oidc/authorize/{id}`, `/oidc/device`,
+`/oidc/device/{id}` — therefore answer a request carrying
+`X-Saka-Interaction: spa` with the redirect wrapped into the interaction
+dialect: `200 {"redirect": "<location>"}`, the shape `writeInteraction`
+already speaks. The header is opt-in: the conformance suite's browser, the
+REST driver, and a plain browser keep the raw 302 the protocol writes
+(`modules/federation/oidc`, the `spaDialect` wrapper at the mount).
+
 **Third-party initiated login.** A relying party links the browser
 straight to `GET /oidc/authorize` with its own `client_id`, an optional
 `login_hint` (a username or email), and `state` — the standard
@@ -676,11 +688,9 @@ today, and a backend route without a frontend consumer answers nothing
 the session RPCs (`ListSessions`, `RevokeSession`,
 `SignOutAllSessions`) do not already cover. A decision someone makes,
 not an accident; the discovery document does not advertise the field
-until it ships. `TODO(frontend)`: the consent screen's `login_hint`
-prefill and `offline_access` persistent-access line — the interaction
-page itself does not exist in the SPA yet (the ledger half ships:
-`/admin/consents`, `/account/authorized-apps`); the screen is its own
-surface, not a wording patch.
+until it ships. The SPA's consent screen ships: the interaction page
+(`/interaction`) renders the `login_hint` as a display note and the
+`offline_access` request as a persistent-access disclosure.
 
 **Token issuance.** Grants `authorization_code`, `refresh_token`, and
 `urn:ietf:params:oauth:grant-type:device_code`, plus `client_credentials`
@@ -717,7 +727,8 @@ zero on either is the never-expiring token the historical behavior
 kept), both settings read fresh at every issuance and rotation. The
 scope is consent-gated: the consent question names it like any other
 requested word, and the SPA's consent screen renders it distinctly
-(see the interaction-page TODO above). Claims: `sub` always; `profile` adds the
+(the persistent-access disclosure on the interaction page). Claims:
+`sub` always; `profile` adds the
 custom claims plus `given_name`, `family_name`, `name`, `display_name`, and
 `preferred_username`; `email` adds `email` and `email_verified` if an address
 exists; `groups` adds group names. **Group restriction is enforced server-side**

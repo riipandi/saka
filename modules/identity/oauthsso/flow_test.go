@@ -65,7 +65,7 @@ func TestBeginWritesAPendingFlowAndNeverStoresTheRawState(t *testing.T) {
 	service := flowService(t, provider)
 	enabledCustom(t, service)
 
-	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso")
+	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.NoError(t, err)
 	assert.Contains(t, authorizeURL, "state=")
 	assert.Equal(t, "https://app.hogwarts.example/oauth/hogwarts-sso/callback", provider.last.RedirectURI)
@@ -90,13 +90,13 @@ func TestBeginWritesAPendingFlowAndNeverStoresTheRawState(t *testing.T) {
 func TestBeginRefusesADisabledOrUnknownConnection(t *testing.T) {
 	service := flowService(t, &fakeProvider{})
 
-	_, err := service.Begin(t.Context(), "hogwarts-sso")
+	_, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.ErrorIs(t, err, ErrConnectionUnavailable)
 
 	params := customParams()
 	_, err = service.Create(t.Context(), params)
 	require.NoError(t, err)
-	_, err = service.Begin(t.Context(), "hogwarts-sso")
+	_, err = service.Begin(t.Context(), "hogwarts-sso", "")
 	require.ErrorIs(t, err, ErrConnectionUnavailable, "a disabled connection answers the same refusal")
 }
 
@@ -107,7 +107,7 @@ func TestTheMasterSwitchRefusesTheBegin(t *testing.T) {
 
 	// The configuration's switch is the surface's word: off, the begin
 	// refuses whatever the rows hold.
-	_, err := service.WithOAuthEnabled(false).Begin(t.Context(), "hogwarts-sso")
+	_, err := service.WithOAuthEnabled(false).Begin(t.Context(), "hogwarts-sso", "")
 	require.ErrorIs(t, err, ErrConnectionUnavailable)
 }
 
@@ -124,10 +124,10 @@ func TestCallbackConsumesTheFlowAndSealsTheTokens(t *testing.T) {
 	service := flowService(t, provider)
 	enabledCustom(t, service)
 
-	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso")
+	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.NoError(t, err)
 
-	flowToken, err := service.Callback(t.Context(), "hogwarts-sso", "code-from-provider", stateOf(t, authorizeURL))
+	flowToken, _, err := service.Callback(t.Context(), "hogwarts-sso", "code-from-provider", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	require.NotEmpty(t, flowToken)
 
@@ -156,21 +156,48 @@ func TestCallbackReplayIsRefused(t *testing.T) {
 	service := flowService(t, provider)
 	enabledCustom(t, service)
 
-	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso")
+	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.NoError(t, err)
 	state := stateOf(t, authorizeURL)
 
-	_, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
+	_, _, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
 	require.NoError(t, err)
-	_, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
+	_, _, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
 	require.ErrorIs(t, err, ErrFlowUnknown)
+}
+
+func TestTheReturnTripRidesTheFlow(t *testing.T) {
+	provider := &fakeProvider{identity: ExternalIdentity{
+		ProviderAccountID: "gryffindor-1",
+		Email:             "hermione@hogwarts.example",
+		AccessToken:       "access-plain",
+	}}
+	service := flowService(t, provider)
+	enabledCustom(t, service)
+
+	// A same-origin return trip is stored and handed back with the flow
+	// token; anything else travels as empty — the flow still works, the
+	// browser just lands at the default.
+	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso", "/account/security")
+	require.NoError(t, err)
+	flowToken, redirectTo, err := service.Callback(t.Context(), "hogwarts-sso", "code", stateOf(t, authorizeURL))
+	require.NoError(t, err)
+	assert.Equal(t, "/account/security", redirectTo)
+	assert.Contains(t, service.FlowRedirect(flowToken, redirectTo), "return_to=%2Faccount%2Fsecurity")
+
+	authorizeURL, err = service.Begin(t.Context(), "hogwarts-sso", "https://evil.example/cb")
+	require.NoError(t, err)
+	_, redirectTo, err = service.Callback(t.Context(), "hogwarts-sso", "code", stateOf(t, authorizeURL))
+	require.NoError(t, err)
+	assert.Empty(t, redirectTo)
+	assert.NotContains(t, service.FlowRedirect(flowToken, redirectTo), "return_to")
 }
 
 func TestCallbackWithAnUnknownStateIsRefused(t *testing.T) {
 	service := flowService(t, &fakeProvider{})
 	enabledCustom(t, service)
 
-	_, err := service.Callback(t.Context(), "hogwarts-sso", "code", "not-a-state")
+	_, _, err := service.Callback(t.Context(), "hogwarts-sso", "code", "not-a-state")
 	require.ErrorIs(t, err, ErrFlowUnknown)
 }
 
@@ -179,11 +206,11 @@ func TestCallbackLeavesTheFlowPendingWhenTheProviderRefuses(t *testing.T) {
 	service := flowService(t, provider)
 	enabledCustom(t, service)
 
-	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso")
+	authorizeURL, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.NoError(t, err)
 	state := stateOf(t, authorizeURL)
 
-	_, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
+	_, _, err = service.Callback(t.Context(), "hogwarts-sso", "code", state)
 	require.ErrorIs(t, err, ErrResolutionFailed)
 
 	var stage string
@@ -196,7 +223,7 @@ func TestTheSweepDeletesOnlyExpiredFlows(t *testing.T) {
 	service := flowService(t, &fakeProvider{})
 	enabledCustom(t, service)
 
-	_, err := service.Begin(t.Context(), "hogwarts-sso")
+	_, err := service.Begin(t.Context(), "hogwarts-sso", "")
 	require.NoError(t, err)
 
 	deleted, err := service.repo.DeleteExpiredFlows(t.Context(), time.Now())

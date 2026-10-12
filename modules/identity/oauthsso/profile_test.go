@@ -119,9 +119,9 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 
 	// The first sign-in binds the provider identity to the seeded
 	// account.
-	authorizeURL, err := service.Begin(t.Context(), created.Provider)
+	authorizeURL, err := service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	firstToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	firstToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	userID := seedAccount(t, pool, "hermione@hogwarts.example", true)
 	mustExec(t, pool,
@@ -145,9 +145,9 @@ func TestTheSecondSignInRefreshesTheProfileAndTheAttributes(t *testing.T) {
 		Picture:           "https://cdn.hogwarts.example/minerva.png",
 		Profile:           []byte(`{"hogwarts_house":"gryffindor"}`),
 	}
-	authorizeURL, err = service.Begin(t.Context(), created.Provider)
+	authorizeURL, err = service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	secondToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	secondToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	answer, err = service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: secondToken})
 	require.NoError(t, err)
@@ -198,9 +198,9 @@ func TestTheMappedUsernameIsTheJITCandidateAndATakenOneSuffixes(t *testing.T) {
 
 	// The mapped claim is the candidate, cleaned to the column's shape.
 	provider.identity.Username = "Loony-Lovegood!"
-	authorizeURL, err := service.Begin(t.Context(), created.Provider)
+	authorizeURL, err := service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	firstToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	firstToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: firstToken})
 	require.NoError(t, err)
@@ -216,9 +216,9 @@ func TestTheMappedUsernameIsTheJITCandidateAndATakenOneSuffixes(t *testing.T) {
 		FamilyName:        "Lovegood",
 		Username:          "loonylovegood",
 	}
-	authorizeURL, err = service.Begin(t.Context(), created.Provider)
+	authorizeURL, err = service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	secondToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	secondToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 	answer, err = service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: secondToken})
 	require.NoError(t, err)

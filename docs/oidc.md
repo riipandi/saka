@@ -31,7 +31,9 @@ fresh one when the old authentication is too stale.
 **Ask for the user's consent once.** The first sign-in shows a consent
 page; after that, the application's access is remembered and later sign-ins
 are silent. Users can withdraw that consent, and the next sign-in asks
-again.
+again. The consent page asks plainly: the application's name, the accesses
+it asks for, and — when it asks to keep its access after the user leaves —
+a note saying so.
 
 **Read the user's profile.** The userinfo endpoint answers with the claims
 the user's scopes allow — name, email, and the standard profile fields.
@@ -45,7 +47,10 @@ authenticate with their own credentials and receive tokens directly, with
 no user in the loop.
 
 **Sign in on a second device.** The device flow shows a code on the device
-asking to sign in; the user confirms on a device that has a browser.
+asking to sign in; the user opens the verification address on a device
+that has a browser, types the code, and answers the same consent question.
+Once approved, the device continues on its own — the browser window can be
+closed.
 
 **Revoke access.** A client can revoke its own tokens; administrators can
 inspect and revoke clients' access from the management API.

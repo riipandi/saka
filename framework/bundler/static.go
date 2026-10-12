@@ -182,5 +182,9 @@ func renderShell(w http.ResponseWriter, r *http.Request, page Page, tags templat
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The shell is a bootstrap document, not a resource — no intermediary
+	// and no browser should serve a stale one; the hashed assets beside it
+	// keep their own caching.
+	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write([]byte(html))
 }

@@ -1,7 +1,5 @@
 import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError, createRouterTransport } from '@connectrpc/connect'
-import { TransportProvider } from '@connectrpc/connect-query'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
@@ -9,8 +7,8 @@ import {
   RouterProvider
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { render, type RenderResult } from 'vitest-browser-react'
-import { AuthContext } from '#/hooks/use-auth'
+import { type RenderResult } from 'vitest-browser-react'
+import { type AuthContextValue } from '#/hooks/use-auth'
 import { setAuthGrants } from '#/libraries/guard/auth-store'
 import { UsersView } from '#/routes/(app)/admin/-users-view'
 import { UserDetailView } from '#/routes/(app)/admin/users/-user-detail-view'
@@ -45,6 +43,7 @@ import {
   type User
 } from '~/codegen/identity_pb'
 import { ListCredentialsResponseSchema, WebAuthnService } from '~/codegen/webauthn_pb'
+import { renderView, signedInAuth } from './view-harness'
 
 const LANGDON = create(UserSchema, {
   id: 'usr_langdon',
@@ -93,24 +92,6 @@ function withRouter(children: React.ReactNode, initial = '/') {
   return <RouterProvider router={router} />
 }
 
-function authContext(overrides: Record<string, unknown> = {}) {
-  return {
-    user: LANGDON,
-    loggedIn: true,
-    isLoading: false,
-    login: vi.fn(),
-    continueSignIn: vi.fn(),
-    completeSignIn: vi.fn(),
-    verifyPasskeyLogin: vi.fn(),
-    requestOneTimeAccess: vi.fn(),
-    exchangeOneTimeToken: vi.fn(),
-    stopImpersonation: vi.fn(async () => {}),
-    impersonateUser: vi.fn(async () => {}),
-    logout: vi.fn(),
-    ...overrides
-  }
-}
-
 /** The dialog overlay intercepts pointer events, so a confirm click inside
  * an open dialog goes through the element itself — the pattern the security
  * tests keep. Forms open as `dialog`; confirmations open as `alertdialog`. */
@@ -133,15 +114,7 @@ describe('the users list', () => {
       })
     })
 
-    const screen = await render(
-      withRouter(
-        <TransportProvider transport={transport}>
-          <QueryClientProvider client={new QueryClient()}>
-            <UsersView />
-          </QueryClientProvider>
-        </TransportProvider>
-      )
-    )
+    const screen = await renderView(withRouter(<UsersView />), { transport })
 
     await expect.element(screen.getByText('Robert Langdon')).toBeVisible()
     // The table renders the username and the email as their own columns.
@@ -161,15 +134,9 @@ describe('the users list', () => {
       })
     })
 
-    const screen = await render(
-      withRouter(
-        <TransportProvider transport={transport}>
-          <QueryClientProvider client={new QueryClient()}>
-            <UsersView page={2} search='langdon' />
-          </QueryClientProvider>
-        </TransportProvider>
-      )
-    )
+    const screen = await renderView(withRouter(<UsersView page={2} search='langdon' />), {
+      transport
+    })
 
     await expect.element(screen.getByText('No accounts match')).toBeVisible()
     expect(seen[0]).toMatchObject({ search: 'langdon', page: 2 })
@@ -192,15 +159,9 @@ describe('the users list', () => {
     })
     const onCreated = vi.fn()
 
-    const screen = await render(
-      withRouter(
-        <TransportProvider transport={transport}>
-          <QueryClientProvider client={new QueryClient()}>
-            <UsersView onCreated={onCreated} />
-          </QueryClientProvider>
-        </TransportProvider>
-      )
-    )
+    const screen = await renderView(withRouter(<UsersView onCreated={onCreated} />), {
+      transport
+    })
 
     await screen.getByRole('button', { name: 'Create user' }).click()
     await expect.element(screen.getByRole('dialog')).toBeVisible()
@@ -242,19 +203,12 @@ const transportFor = (options: { resetRefusal?: ConnectError; deleteRefusal?: Co
 
 const detailHarness = (
   transport: ReturnType<typeof createRouterTransport>,
-  contextOverrides: Record<string, unknown> = {}
+  contextOverrides: Partial<AuthContextValue> = {}
 ): Promise<RenderResult> =>
-  render(
-    withRouter(
-      <TransportProvider transport={transport}>
-        <QueryClientProvider client={new QueryClient()}>
-          <AuthContext.Provider value={authContext(contextOverrides)}>
-            <UserDetailView userId='usr_langdon' />
-          </AuthContext.Provider>
-        </QueryClientProvider>
-      </TransportProvider>
-    )
-  )
+  renderView(withRouter(<UserDetailView userId='usr_langdon' />), {
+    transport,
+    auth: signedInAuth({ user: LANGDON, ...contextOverrides })
+  })
 
 describe('the user detail page', () => {
   it('renders the cards and hands the impersonation to the context with its reason', async () => {

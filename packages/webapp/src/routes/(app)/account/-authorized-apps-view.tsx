@@ -16,7 +16,6 @@ import {
   AlertDialogTitle
 } from 'uilibs/components/base/alert-dialog'
 import { Button } from 'uilibs/components/base/button'
-import { Badge } from 'uilibs/components/extra/badge'
 import {
   Card,
   CardContent,
@@ -35,6 +34,7 @@ import {
 } from 'uilibs/components/extra/item'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
+import { ScopeChip } from '#/components/scope-chip'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { OidcConsentService, RevokeMyAuthorizedClientRequestSchema } from '~/codegen/federation_pb'
@@ -182,19 +182,6 @@ export function AuthorizedAppsView({ embedded = false }: { embedded?: boolean } 
       </AlertDialog>
     </AccountFrame>
   )
-}
-
-/** The scope words a consent carries, worded for the reader: the offline
- * scope is a persistent access the app keeps renewing, and the login hint
- * scope only ever prefills a form. */
-export function ScopeChip({ scope }: { scope: string }) {
-  if (scope === 'offline_access') {
-    return <Badge variant='primary'>offline_access — persistent access</Badge>
-  }
-  if (scope === 'login_hint') {
-    return <Badge variant='secondary'>login_hint — prefills the sign-in form</Badge>
-  }
-  return <Badge variant='outline'>{scope}</Badge>
 }
 
 const styles = stylex.create({

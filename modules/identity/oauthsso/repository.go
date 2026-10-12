@@ -196,12 +196,13 @@ const maxWrongCodes = 3
 
 // CreateFlow writes one pending ceremony row. The state hash is the only
 // handle that exists yet — the flow token is minted at the callback, the
-// moment the SPA first carries it.
-func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connID uuid.UUID, stateHash, nonce, sealedVerifier string, expiresAt time.Time) (uuid.UUID, error) {
+// moment the SPA first carries it. The return trip the start carried
+// rides the row (validated where it was read); empty is the default.
+func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connID uuid.UUID, stateHash, nonce, sealedVerifier, redirectTo string, expiresAt time.Time) (uuid.UUID, error) {
 	sb := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	sb.InsertInto(entity.TableOAuthFlows)
-	sb.Cols("connection_id", "state_hash", "nonce", "code_verifier", "stage", "expires_at")
-	sb.Values(connID, stateHash, nonce, sealedVerifier, string(StagePending), expiresAt)
+	sb.Cols("connection_id", "state_hash", "nonce", "code_verifier", "redirect_to", "stage", "expires_at")
+	sb.Values(connID, stateHash, nonce, sealedVerifier, redirectTo, string(StagePending), expiresAt)
 	sb.SQL("RETURNING id")
 	query, args := sb.Build()
 

@@ -140,9 +140,9 @@ func resolvedFlow(t *testing.T, service *Service, identity ExternalIdentity) (Fl
 	created, err := service.Create(t.Context(), params)
 	require.NoError(t, err)
 
-	authorizeURL, err := service.Begin(t.Context(), created.Provider)
+	authorizeURL, err := service.Begin(t.Context(), created.Provider, "")
 	require.NoError(t, err)
-	flowToken, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
+	flowToken, _, err := service.Callback(t.Context(), created.Provider, "the-code", stateOf(t, authorizeURL))
 	require.NoError(t, err)
 
 	flow, err := service.FlowByToken(t.Context(), flowToken, StageResolved, StageRequireNames)

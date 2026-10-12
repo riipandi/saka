@@ -69,7 +69,9 @@ test.describe.serial('the federation flows', () => {
     const body = (await listed.json()) as unknown
     expect(isRecord(body)).toBeTruthy()
     if (!isRecord(body)) throw new Error('the listing is not an object')
-    const connections = body.connections
+    // The wire omits an empty list (protojson's unpopulated rule) — the
+    // absent key is the empty answer, not a malformed one.
+    const connections = body.connections ?? []
     expect(Array.isArray(connections)).toBeTruthy()
     if (!Array.isArray(connections)) throw new Error('the listing carries no connections')
     for (const connection of connections) {
@@ -107,7 +109,7 @@ test.describe.serial('the federation flows', () => {
       password: process.env.E2E_PASSWORD || '@dmin123'
     })
     await page.goto('/admin/consents')
-    await expect(page.getByText('Consents', { exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Consents' })).toBeVisible({ timeout: 15_000 })
     await page.close()
   })
 })

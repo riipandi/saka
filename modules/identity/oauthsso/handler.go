@@ -43,10 +43,11 @@ func (h *handler) Mount(r chi.Router) {
 }
 
 // start hands the browser to the provider. The flow row is written before
-// the redirect leaves; a refused begin is a redirect to the SPA's error
+// the redirect leaves — carrying the return trip the SPA named, validated
+// same-origin or dropped; a refused begin is a redirect to the SPA's error
 // surface, the answer the browser can act on.
 func (h *handler) start(w http.ResponseWriter, r *http.Request) {
-	authorizeURL, err := h.service.Begin(r.Context(), chi.URLParam(r, "provider"))
+	authorizeURL, err := h.service.Begin(r.Context(), chi.URLParam(r, "provider"), r.URL.Query().Get("return_to"))
 	if err != nil {
 		http.Redirect(w, r, h.errorRedirect(err), http.StatusFound)
 		return
@@ -66,7 +67,7 @@ func (h *handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flowToken, err := h.service.Callback(r.Context(),
+	flowToken, redirectTo, err := h.service.Callback(r.Context(),
 		chi.URLParam(r, "provider"), query.Get("code"), query.Get("state"))
 	if err != nil {
 		// The browser's answer is the redirect below; the operator's is
@@ -78,7 +79,7 @@ func (h *handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, h.service.FlowRedirect(flowToken), http.StatusFound)
+	http.Redirect(w, r, h.service.FlowRedirect(flowToken, redirectTo), http.StatusFound)
 }
 
 // errorRedirect maps the service's failures onto the SPA surface's error
