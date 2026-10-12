@@ -158,7 +158,6 @@ function CodeRequestDialog({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             autoComplete='one-time-code'
-            autoFocus
           />
           {optional ? (
             <FieldDescription>Leave empty when no other confirmed factor is held.</FieldDescription>
@@ -938,7 +937,6 @@ export function SecurityView({ embedded = false }: { embedded?: boolean } = {}) 
               onChange={(e) => setPasskeyName(e.target.value)}
               placeholder='Aegis on tablet'
               maxLength={64}
-              autoFocus
             />
           </Field>
           <AlertDialogFooter>
