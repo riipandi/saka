@@ -90,7 +90,8 @@ test.describe.serial('the account audit flow', () => {
     }
 
     await page.goto('/account/audit')
-    await expect(page.getByText(/of \d+/)).toBeVisible({ timeout: 15_000 })
+    // The pager renders numbered buttons once the trail spans two pages.
+    await expect(page.getByRole('button', { name: '2' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page).toHaveURL(/page=2/)
     const first = await page.locator('body').textContent()
