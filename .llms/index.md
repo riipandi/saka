@@ -123,7 +123,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261011_2205.md` | resolved | Catalog drift leaves existing deployments with stale administrator grants — resolved 2026-10-14 (plan-20261014_0047 phase 2): the serve startup check logs the lagging slugs and the repair command, never writes |
 | `issue-20261012_0445.md` | resolved | The OIDC consent interaction page shipped (plan-20261012_1935: the SPA interaction area — consent page, device verification, the completion dialect) |
 | `issue-20261012_1538.md` | resolved | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drifted on every new seed item — resolved 2026-10-14 (plan-20261014_0047 phase 4): the tests read the run's own status line and assert the registry's invariants, no counter to maintain |
-| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; report upstream |
+| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
 
 ## Finding history fast
 
