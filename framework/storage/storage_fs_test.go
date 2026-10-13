@@ -129,6 +129,68 @@ func TestFSStoreDeleteKeepsTheBucketDirectory(t *testing.T) {
 	assert.DirExists(t, filepath.Join(store.root, uploadsDir, fsTestBucket))
 }
 
+func TestFSStoreRoundTripsANestedKey(t *testing.T) {
+	store, _, data := newFSStore(t)
+	ctx := t.Context()
+	key := "sub/nested/usr_2.png"
+
+	require.NoError(t, store.Put(ctx, fsTestBucket, key, bytes.NewReader(data), int64(len(data)), "image/png"))
+
+	reader, err := store.Get(ctx, fsTestBucket, key)
+	require.NoError(t, err)
+	got, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.NoError(t, reader.Close())
+	assert.Equal(t, data, got)
+
+	// The listing names the nested key relative to the bucket, the shape
+	// the rest of the contract speaks.
+	keys, err := listedKeys(ctx, store, fsTestBucket)
+	require.NoError(t, err)
+	assert.Equal(t, []string{key}, keys)
+
+	// The delete empties the nested subtree's skeleton up to the bucket
+	// root, which stays — an empty bucket is still a bucket.
+	require.NoError(t, store.Delete(ctx, fsTestBucket, key))
+	assert.NoDirExists(t, filepath.Join(store.root, uploadsDir, fsTestBucket, "sub"))
+	assert.DirExists(t, filepath.Join(store.root, uploadsDir, fsTestBucket))
+}
+
+// TestFSStoreTheTraversalKeyCannotEscape pins the rooted fence: a key that
+// spells a path out of the bucket is refused by the FS operations themselves
+// — the fence below the manager's validation contract — and nothing lands
+// outside the bucket whatever the caller handed over.
+func TestFSStoreTheTraversalKeyCannotEscape(t *testing.T) {
+	store, _, data := newFSStore(t)
+	ctx := t.Context()
+
+	// One round trip first, so the bucket directory exists and the delete
+	// exercises the rooted Remove rather than the absent-bucket answer,
+	// plus a real nested file: the traversal refusal is what a name whose
+	// prefix components exist earns — a first component that is absent
+	// answers not-found before the walk ever reaches the escape, which is
+	// the delete's own quiet state and still touches nothing outside.
+	require.NoError(t, store.Put(ctx, fsTestBucket, "usr_1.png", bytes.NewReader(data), int64(len(data)), "image/png"))
+	require.NoError(t, store.Put(ctx, fsTestBucket, "sub/keep.png", bytes.NewReader(data), int64(len(data)), "image/png"))
+
+	for _, key := range []string{"../escape.png", "sub/../../escape.png", ".."} {
+		_, err := store.Get(ctx, fsTestBucket, key)
+		assert.Error(t, err, "Get "+key)
+		assert.Error(t, store.Put(ctx, fsTestBucket, key, bytes.NewReader(data), int64(len(data)), "image/png"), "Put "+key)
+		assert.Error(t, store.Delete(ctx, fsTestBucket, key), "Delete "+key)
+	}
+
+	// The escape targets — the uploads container itself and the data
+	// directory above it — hold nothing the traversal wrote, and the
+	// bucket's own content is untouched.
+	assert.NoFileExists(t, filepath.Join(store.root, uploadsDir, "escape.png"))
+	assert.NoFileExists(t, filepath.Join(store.root, "escape.png"))
+
+	keys, err := listedKeys(ctx, store, fsTestBucket)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"sub/keep.png", "usr_1.png"}, keys)
+}
+
 func TestFSStorePutStopsWhenTheContextEnds(t *testing.T) {
 	store, key, data := newFSStore(t)
 
