@@ -89,7 +89,7 @@ func mayWriteEnvFile(cmd *cli.Command, path string) (bool, error) {
 	case errors.Is(err, fs.ErrNotExist):
 		return true, nil
 	case err != nil:
-		return false, fmt.Errorf("inspect %s: %w", path, err)
+		return false, fmt.Errorf("key:generate: inspect %s: %w", path, err)
 	case cmd.Bool("overwrite"):
 		return true, nil
 	default:

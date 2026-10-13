@@ -75,7 +75,7 @@ func (p *scimSyncProcessor) Process(ctx context.Context, task ScimSyncTask) erro
 		IntervalMillis: task.IntervalMillis,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("scim_sync: enqueue: %w", err)
 	}
 
 	if p.syncer == nil {

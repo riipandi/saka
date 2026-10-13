@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -98,8 +99,10 @@ func webhookPruneProcessor(ctx context.Context, task WebhookPruneTask, runner We
 
 	// The next run is queued before this one succeeds, so the schedule never
 	// depends on the process that ran the last one.
-	_, err = client.Add(WebhookPruneTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
-	return err
+	if _, err := client.Add(WebhookPruneTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save(); err != nil {
+		return fmt.Errorf("webhook_prune: enqueue: %w", err)
+	}
+	return nil
 }
 
 // webhookPruneSeed is the payload the first run of the retention is seeded

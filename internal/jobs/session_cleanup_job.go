@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -86,7 +87,7 @@ func sessionCleanupProcessor(ctx context.Context, task SessionCleanupTask, pool 
 		RetentionDays:  task.RetentionDays,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("session_cleanup: enqueue: %w", err)
 	}
 	return nil
 }

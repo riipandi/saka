@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -75,7 +76,7 @@ func oauthCleanupProcessor(ctx context.Context, task OAuthCleanupTask, pool *dat
 		IntervalMillis: task.IntervalMillis,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("oauth_cleanup: enqueue: %w", err)
 	}
 	return nil
 }
@@ -85,7 +86,11 @@ func oauthCleanupProcessor(ctx context.Context, task OAuthCleanupTask, pool *dat
 // maintenance jobs, because it removes rows nothing reads back.
 func deleteExpiredOAuthFlows(ctx context.Context, pool *datastore.Postgres, now time.Time) (int64, error) {
 	repo := oauthsso.NewRepository(pool)
-	return repo.DeleteExpiredFlows(ctx, now)
+	deleted, err := repo.DeleteExpiredFlows(ctx, now)
+	if err != nil {
+		return 0, fmt.Errorf("oauth_cleanup: delete: %w", err)
+	}
+	return deleted, nil
 }
 
 // oauthCleanupSeed is the payload the first run of the sweep is seeded

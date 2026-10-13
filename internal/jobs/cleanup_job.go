@@ -15,6 +15,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -79,7 +80,7 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 
 	deleted, err := client.DeleteExpiredCompleted(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("cleanup: delete expired completed: %w", err)
 	}
 	if deleted > 0 {
 		slog.InfoContext(ctx, "queue: deleted expired completed tasks",
@@ -132,7 +133,7 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 	// depends on the process that ran the last one.
 	_, err = client.Add(CleanupTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("cleanup: enqueue: %w", err)
 	}
 
 	slog.DebugContext(ctx, "queue: cleanup rescheduled",

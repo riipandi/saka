@@ -89,7 +89,7 @@ func auditCleanupProcessor(ctx context.Context, task AuditCleanupTask, pool *dat
 		RetentionDays:  task.RetentionDays,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("audit_cleanup: enqueue: %w", err)
 	}
 	return nil
 }

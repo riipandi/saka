@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -289,13 +290,13 @@ func (s *Seeder) Seed(ctx context.Context) error {
 func (s *Seeder) seedOnce(ctx context.Context, name string, task queue.Task, interval time.Duration) error {
 	pending, err := s.client.Pending(ctx, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: pending: %w", name, err)
 	}
 	if pending > 0 {
 		return nil
 	}
 	if _, err := s.client.Add(task).Ctx(ctx).Wait(interval).Save(); err != nil {
-		return err
+		return fmt.Errorf("%s: enqueue: %w", name, err)
 	}
 
 	s.log.InfoContext(ctx, "queue: recurring job seeded",

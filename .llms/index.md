@@ -96,7 +96,7 @@ lands there the moment it is found — not in chat memory. An issue file
 whose every item reaches a terminal status (`resolved`) leaves the
 directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
 name — the live directory lists only what is open or considering.
-Newest: `issue-20261012_1605.md`.
+Newest: `issue-20261014_0730.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -109,6 +109,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
+| `issue-20261014_0730.md` | open | `lazyPublisher.CreateSystemNotice` returns nil (the notice vanishes, the caller reports success) when the notification service is absent from the container — the two sibling lazy seams document their skip, this one carries no such comment; decide skip-documented or fail-loud at the next registry-seam touch (found by the error-context sweep's tier A) |
 
 ## Finding history fast
 
