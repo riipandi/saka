@@ -150,6 +150,21 @@ func TestTheFullScopeLeavesAnUnsetSecretOmitted(t *testing.T) {
 // TestTheFullScopeCarriesTheRealNonSecretValues keeps the redaction from
 // swallowing the document: the administrative values an operator reads are
 // the resolved ones.
+// TestTheSessionRetentionIsAdministrative pins the retention window beside
+// the audit window: the deployment document's full scope carries the policy
+// the session_cleanup job applies, and the anonymous subset carries neither.
+func TestTheSessionRetentionIsAdministrative(t *testing.T) {
+	cfg := plantedConfig()
+
+	full, err := json.Marshal(cfg.Published(true))
+	require.NoError(t, err)
+	assert.Contains(t, string(full), "session_retention_days")
+
+	public, err := json.Marshal(cfg.Published(false))
+	require.NoError(t, err)
+	assert.NotContains(t, string(public), "session_retention_days")
+}
+
 func TestTheFullScopeCarriesTheRealNonSecretValues(t *testing.T) {
 	cfg := plantedConfig()
 	cfg.App.Mode = ModeStaging
