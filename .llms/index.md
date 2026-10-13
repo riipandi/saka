@@ -32,7 +32,7 @@ the diff actually made stale.
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
 without the owner's explicit instruction. All listed plans are `done` or
-`shipped`, except `plan-20261008_1739.md` and `plan-20261012_1935.md`
+`shipped`, except `plan-20261008_1739.md` and `plan-20261014_0047.md`
 (both `awaiting-approval`).
 
 | File | Subject |
@@ -68,6 +68,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
 | `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — done |
 | `plan-20261013_0048.md` | The last administrator's deletion guard (backend refusal + the roles-on-the-wire frontend gate) and the singleton builtin provider picker — done |
+| `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — awaiting-approval |
 
 ## Handovers (`.llms/handover/`)
 
