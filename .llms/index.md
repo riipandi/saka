@@ -62,13 +62,19 @@ folded into the core documents above. Newest:
 ## Audits (`.llms/audit/`)
 
 Point-in-time reviews against the tree; conclusions age, the tree wins.
+Every audit carries the frontmatter convention (`status` / `updated` /
+`reference`): `status` is `resolved` when every finding the audit demanded
+is closed in the tree (an owner-accepted risk recorded in the decision
+records does not hold the audit open) or `open` while a finding waits on
+its issue or plan; `reference` names the plan and issue that carry the
+outcome, omitted when direct commits closed the findings.
 
-- `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects).
-- `audit-20260929_1613.md` — federation, device flow, SCIM.
-- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
-- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s.
-- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness.
-- `audit-20261014_0329.md` — the backend auth audit (sessions, refresh rotation, revocation): the inactivity gate's rolled-back revocation fixed, the gate's mis-aimed test re-pointed, the EXPLAIN probes at 200k rows, the replay pattern judged sound, the missing session sweep opened as `issue-20261014_0330.md`.
+- `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects). resolved.
+- `audit-20260929_1613.md` — federation, device flow, SCIM. resolved (plan-20260929_1722).
+- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability. resolved.
+- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s. resolved.
+- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness. resolved (plan-20261005_1845; the hosted submission run stays open in issue-20261006_0050).
+- `audit-20261014_0329.md` — the backend auth audit (sessions, refresh rotation, revocation): the inactivity gate's rolled-back revocation fixed, the gate's mis-aimed test re-pointed, the EXPLAIN probes at 200k rows, the replay pattern judged sound, the missing session sweep opened as `issue-20261014_0330.md`. open — the sweep rides `issue-20261014_0330.md` and `plan-20261014_0504.md` (awaiting approval).
 
 ## Product docs (`docs/`)
 
