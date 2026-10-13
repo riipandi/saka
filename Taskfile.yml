@@ -31,6 +31,9 @@ includes:
   cleanup:
     taskfile: ./scripts/task-cleanup.yml
     flatten: true
+  analysis:
+    taskfile: ./scripts/task-analysis.yml
+    flatten: true
   docker:
     taskfile: ./scripts/task-container.yml
     flatten: true
