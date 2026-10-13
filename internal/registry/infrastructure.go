@@ -337,7 +337,7 @@ func infrastructure(ctx context.Context) func(do.Injector) {
 			client := do.MustInvoke[*queue.Client](i)
 			uploader := do.MustInvoke[*storage.Manager](i)
 			log := do.MustInvoke[*slog.Logger](i)
-			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.Auth.ExpiryEmailEnabled, true, log), nil
+			return jobs.NewSeeder(client, c.Queue.CleanupInterval, uploader, c.App.AuditRetentionDays, c.App.SessionRetentionDays, c.Auth.ExpiryEmailEnabled, true, log), nil
 		}),
 
 		do.Lazy(func(i do.Injector) (*scheduler.Scheduler, error) {

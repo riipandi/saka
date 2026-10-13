@@ -156,7 +156,7 @@ func TestTheSeederSeedsTheRetentionWithTheConfiguredWindow(t *testing.T) {
 
 	// Only the retention is seeded here: the other recurring jobs would need
 	// the uploader, which this test does not build.
-	seeder := NewSeeder(client, time.Hour, nil, 30, false, false, slog.New(slog.DiscardHandler))
+	seeder := NewSeeder(client, time.Hour, nil, 30, 30, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, seeder.Seed(t.Context()))
 
 	pending, err := client.Pending(t.Context(), AuditCleanupName)
@@ -176,10 +176,10 @@ func TestTheSeederSeedsTheRetentionWithTheConfiguredWindow(t *testing.T) {
 func TestTheRetentionSeedDoesNotMultiply(t *testing.T) {
 	_, client := auditPool(t)
 
-	first := NewSeeder(client, time.Hour, nil, 90, false, false, slog.New(slog.DiscardHandler))
+	first := NewSeeder(client, time.Hour, nil, 90, 30, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, first.Seed(t.Context()))
 
-	second := NewSeeder(client, time.Hour, nil, 90, false, false, slog.New(slog.DiscardHandler))
+	second := NewSeeder(client, time.Hour, nil, 90, 30, false, false, slog.New(slog.DiscardHandler))
 	require.NoError(t, second.Seed(t.Context()))
 
 	pending, err := client.Pending(t.Context(), AuditCleanupName)

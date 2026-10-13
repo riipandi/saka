@@ -40,6 +40,12 @@ func Register(client *queue.Client, cleanupInterval time.Duration, uploader *sto
 	client.Register(queue.NewQueue[AuditCleanupTask](func(ctx context.Context, task AuditCleanupTask) error {
 		return auditCleanupProcessor(ctx, task, pool)
 	}))
+	// The session rows' retention runs the same way: a row past its window
+	// belongs to no live holder, and the sweep is the deletion nothing else
+	// performs.
+	client.Register(queue.NewQueue[SessionCleanupTask](func(ctx context.Context, task SessionCleanupTask) error {
+		return sessionCleanupProcessor(ctx, task, pool)
+	}))
 	// The protocol state's retention runs the same way: the expired
 	// oauth_sessions rows belong to no feature, and the sweeps the queue
 	// carries are the one deletion path they have.
@@ -186,23 +192,26 @@ type Seeder struct {
 	cleanupInterval time.Duration
 	uploader        *storage.Manager
 	retentionDays   int
+	sessionDays     int
 	expiryEmail     bool
 	scimSync        bool
 	log             *slog.Logger
 }
 
 // NewSeeder builds the seeder over the client whose processors Register
-// wired. retentionDays is the audit window the retention job is seeded with;
-// a run that changes the configuration carries the new window into the
-// seeded task, which is what makes the change take effect at the next run.
+// wired. retentionDays is the audit window the retention job is seeded with,
+// sessionDays the session window the session sweep is seeded with; a run that
+// changes the configuration carries the new windows into the seeded tasks,
+// which is what makes the change take effect at the next run.
 // scimSync arms the hourly provisioning pass; a run without a provider row
 // still seeds it, and the pass answers nothing to push.
-func NewSeeder(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, retentionDays int, expiryEmail bool, scimSync bool, log *slog.Logger) *Seeder {
+func NewSeeder(client *queue.Client, cleanupInterval time.Duration, uploader *storage.Manager, retentionDays int, sessionDays int, expiryEmail bool, scimSync bool, log *slog.Logger) *Seeder {
 	return &Seeder{
 		client:          client,
 		cleanupInterval: cleanupInterval,
 		uploader:        uploader,
 		retentionDays:   retentionDays,
+		sessionDays:     sessionDays,
 		expiryEmail:     expiryEmail,
 		scimSync:        scimSync,
 		log:             log,
@@ -217,6 +226,11 @@ func (s *Seeder) Seed(ctx context.Context) error {
 	if err := s.seedOnce(ctx, AuditCleanupName,
 		auditCleanupSeed(DefaultAuditCleanupInterval, s.retentionDays),
 		DefaultAuditCleanupInterval); err != nil {
+		return err
+	}
+	if err := s.seedOnce(ctx, SessionCleanupName,
+		sessionCleanupSeed(DefaultSessionCleanupInterval, s.sessionDays),
+		DefaultSessionCleanupInterval); err != nil {
 		return err
 	}
 	if err := s.seedOnce(ctx, ProtocolCleanupName,
