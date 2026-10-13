@@ -385,6 +385,18 @@ token without one is not a session — whatever signed it. The audit events name
 `sign_out` ends the current session, `session_revoked` ends one the holder named, and the record
 names the session it ended so an operator can pair it with the sign-in line.
 
+**Retention is a daily sweep, not a lifecycle write.** `session_cleanup` (the `audit_cleanup`
+shape: dedicated queue, 24h cadence, the window carried in the task payload so a config change
+takes effect at the next run) deletes the rows whose end — `revoked_at` where stamped,
+`expires_at` where a row was never revoked — is older than `app.session_retention_days` (default
+30). The delete lives in the session repository because the table is its vocabulary; the job is
+the schedule. The delete is not user-scoped and spares no account: a retention that spared some
+accounts would be a record an administrator could curate. `known_devices` is deliberately outside
+the sweep — its rows exist to outlive sessions for the new-device notice. The table's
+`expires_at > CURRENT_TIMESTAMP` check means an expired-never-stamped row can only be created by
+aging, which is why the sweep judges by the row's stored end instead of restamping (the same trap
+the bulk sign-out sweep already learned).
+
 ### modules/identity/signup
 
 The sign-up feature: `saka.identity.v1.SignupService/Signup`, the contract in `api/connect/identity.proto` (the identity package, unlike sign-in's `saka.authn.v1` — authentication is its own package, account creation is identity's). RPC only: there is no REST route and none is planned for it. The account carries its primary credential from the first call — the password is required and hashed with the shared `crypto.PasswordHasher` — so the account can sign in immediately; it is created unverified, and email verification is a later procedure (`public.auth_tokens` with purpose `email_verification` already exists for it).

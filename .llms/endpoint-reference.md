@@ -78,6 +78,14 @@ randomness (`pkg/crypto.NewRefreshTokenPair`, the one draw both the opening and 
 The account-state checks are the issuer's, so every way of opening or continuing a session refuses
 the same. Audit events cover sign-in, sign-out, and named revocations; a renewal records nothing.
 
+**Retention.** `app.session_retention_days` (default 30) applied by the `session_cleanup`
+recurring job (daily, the `audit_cleanup` pattern): a row goes once its end — the revocation
+stamp, or the expiry a never-revoked row aged into — is older than the window, served by
+`idx_sessions_expires_at` and the partial `idx_sessions_revoked_at`. The listing's shape is
+untouched: `ListSessions` keeps an ended row until the window deletes it, so an account's session
+center is a bounded recent history rather than a lifetime ledger. There is no endpoint to write,
+edit, or read the deleted rows — retention is policy, not a surface.
+
 ## Password Recovery (saka-only)
 
 Upstream has no passwords, so the whole flow is saka's. The contract lives in

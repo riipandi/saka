@@ -33,7 +33,7 @@ flowchart LR
 
 | Group | What it decides | Examples |
 | --- | --- | --- |
-| `app` | The deployment's identity and URLs | base URL, name, short name |
+| `app` | The deployment's identity and URLs | base URL, name, short name, retention windows (`audit_retention_days`, `session_retention_days`) |
 | `server` | HTTP surface | addresses, timeouts |
 | `database` | The PostgreSQL connection | DSN (secret), pool sizes |
 | `cache` / `kvstore` | Optional Valkey | endpoints (off = in-process) |
