@@ -17,16 +17,27 @@ import { resolve } from 'node:path'
 // The build tag is release: the session flows test the surface a real
 // deployment serves. The passkey ladder is the exception — its devtool
 // pages (/debug/passkey/*) exist only in the debug build, so run it with
-// E2E_BUILD_TAG=debug.
-const serverBaseURL = 'http://localhost:3000'
+// E2E_BUILD_TAG=debug; its webServer is boot-debug.mjs, which boots the
+// Vite compiler the debug build proxies before the binary comes up.
+//
+// The port is dedicated (:4473, E2E_PORT to override): nothing else in the
+// tree claims it — :3000 is the app server, :5173 the compiler, :3030 the
+// email UI, :4173 vite preview — so a lingering `saka serve` on :3000 can
+// never be mistaken for the suite's server, and the two build tags cannot
+// share one.
+const e2ePort = Number(process.env.E2E_PORT) || 4473
+const serverBaseURL = `http://localhost:${e2ePort}`
 const buildTag = process.env.E2E_BUILD_TAG || 'release'
-const serverCommand = [
-  'pnpm exec vp run webapp#prebuild',
-  'pnpm exec vp run webapp#build',
-  `go build -tags ${buildTag} -o build/${buildTag}/saka ./cmd`,
-  'node packages/e2e-tests/make-config.mjs',
-  `./build/${buildTag}/saka --config-file=build/${buildTag}/app.config.e2e.json --env-file=.env.local serve --base-url=${serverBaseURL}`
-].join(' && ')
+const serverCommand =
+  buildTag === 'debug'
+    ? 'node packages/e2e-tests/boot-debug.mjs'
+    : [
+        'pnpm exec vp run webapp#prebuild',
+        'pnpm exec vp run webapp#build',
+        `go build -tags ${buildTag} -o build/${buildTag}/saka ./cmd`,
+        'node packages/e2e-tests/make-config.mjs',
+        `./build/${buildTag}/saka --config-file=build/${buildTag}/app.config.e2e.json --env-file=.env.local serve --base-url=${serverBaseURL} --port=${e2ePort}`
+      ].join(' && ')
 
 // The projects the e2e-* scripts select. Plain `pnpm e2e` runs the one
 // browser the e2e-install installed; the others need their browsers
@@ -67,7 +78,11 @@ export default defineConfig({
     command: serverCommand,
     url: `${serverBaseURL}/api/healthz`,
     cwd: resolve('..', '..'),
-    reuseExistingServer: !process.env.CI,
+    // No reuse, ever: a server left over from a previous run may be the
+    // other build tag, and this run must answer for its own build — the
+    // default (!CI) once let a lingering `saka serve` on :3000 serve the
+    // suite with the wrong one.
+    reuseExistingServer: false,
     timeout: 120_000
   }
 })
