@@ -52,7 +52,7 @@ without the owner's explicit instruction. All listed plans are `done` or
 | `plan-20261004_1650.md` | OIDC IdP Standard Claims: `picture` and `updated_at` |
 | `plan-20261004_1800.md` | Framework extraction: the reusable engines into `framework/`, composable behind typed Options, `database/` into `internal/`, per-package migration sets — the decisions list (D1–D18) is the binding record for the framework boundary |
 | `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — the four profiles rehearse green; the hosted submission run is the owner's (runbook in the handover) |
-| `plan-20261008_1739.md` | Component library extraction to `packages/uilibs` — status `awaiting-approval` (P1–P3b done — the package, the theme unification, and the shared StyleX plugin are in the tree; P4, the docs sync + final validation, is the only pending phase: `rules.md` 75–77, the `architecture.md` package section, and `AGENTS.md`'s shape paragraph still omit `uilibs`) |
+| `plan-20261008_1739.md` | Component library extraction to `packages/uilibs` — done (P1–P3b landed; P4 closed 2026-10-14 with its docs-sync residue riding `plan-20261014_0047.md` D10) |
 | `plan-20261009_0025.md` | Frontend foundation: the cookies library, the backend-driven configuration layer, the shared auth-aware fetch, Connect-Query — the decisions list (D1–D10) is the binding record for the webapp's data layer |
 | `plan-20261009_0142.md` | OAuth SSO: one store for every provider, the enabled-provider listing, the SPA flow — the decisions list (D1–D9) is the binding record for the sign-in-with-a-provider surface |
 | `plan-20261009_1826.md` | The connect-go v1 → v2 migration — the mechanical import swap, the runtime seams, the follow-ups parked in `issue-20261009_1915.md` |
@@ -133,4 +133,6 @@ previous cross-check ran 2026-10-12):
 - **What a past session did** → the handover of that date; memory recall supplements it.
 m** → `.llms/issues/` (above).
 - **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
+- **What a past session did** → the handover of that date; memory recall supplements it.
+neline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
 - **What a past session did** → the handover of that date; memory recall supplements it.
