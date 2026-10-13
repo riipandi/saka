@@ -56,6 +56,20 @@ func TestThePublicScopeCarriesTheOauthSwitch(t *testing.T) {
 	assert.Contains(t, string(document), `"oauth":{"enabled":true}`)
 }
 
+// TestTheAssetsURLIsPublic pins the split-assets door in the anonymous
+// body: a CDN-fronted deployment names the origin its SPA loads from, and
+// the fact is public in both scopes.
+func TestTheAssetsURLIsPublic(t *testing.T) {
+	cfg := plantedConfig()
+	cfg.App.AssetsURL = "https://cdn.example.com/saka"
+
+	for _, full := range []bool{false, true} {
+		document, err := json.Marshal(cfg.Published(full))
+		require.NoError(t, err)
+		assert.Contains(t, string(document), `"assets_url":"https://cdn.example.com/saka"`)
+	}
+}
+
 // TestTheBrowserTelemetryFactIsPublic pins the SPA's tracing door in the
 // anonymous body: the browser dials the collector the deployment names, so
 // the fact is public in both scopes — and the ratio rides with it.

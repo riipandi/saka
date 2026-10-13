@@ -323,9 +323,10 @@ func publishedSecretRender(secret string) string {
 func (c Config) Published(full bool) Published {
 	public := Published{
 		App: PublishedApp{
-			Mode:     c.App.Mode,
-			BaseURL:  c.App.BaseURL,
-			Timezone: c.App.Timezone,
+			Mode:      c.App.Mode,
+			BaseURL:   c.App.BaseURL,
+			Timezone:  c.App.Timezone,
+			AssetsURL: c.App.AssetsURL,
 		},
 		Auth: PublishedAuth{
 			OneTimeAccessEmailAsAdminEnabled:           c.Auth.OneTimeAccessEmailAsAdminEnabled,
@@ -360,7 +361,6 @@ func (c Config) Published(full bool) Published {
 	// secret cannot reach the wire by being populated.
 	sealed := c.withSecrets(publishedSecretRender)
 
-	public.App.AssetsURL = c.App.AssetsURL
 	public.App.ExposeResetToken = c.App.ExposeResetToken
 	public.App.ExposeTotpSecret = c.App.ExposeTotpSecret
 	public.App.AuditRetentionDays = c.App.AuditRetentionDays
