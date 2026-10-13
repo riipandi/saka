@@ -48,8 +48,12 @@ retained plans are `done`, except `plan-20261014_0047.md`
 
 ## Handovers (`.llms/handover/`)
 
-Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. The directory
-keeps the five newest; the older history (62 files) lives flat in
+Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Every handover —
+live and archived alike — carries the frontmatter convention
+(`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
+the filename stamp, the other keys from the body, and a key the body cannot
+name is omitted rather than guessed). The directory keeps the five newest; the
+older history (62 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
@@ -86,7 +90,7 @@ lands there the moment it is found — not in chat memory. An issue file
 whose every item reaches a terminal status (`resolved`) leaves the
 directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
 name — the live directory lists only what is open or considering.
-Newest: `issue-20261014_0450.md`.
+Newest: `issue-20261014_0330.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -98,7 +102,6 @@ previous cross-check ran 2026-10-12):
 | `issue-20261008_1705.md` | considering | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport stays `considering`; the backend auth audit resolved 2026-10-14 (audit-20261014_0329, plan-20261014_0047 phase 7 — the gate's rolled-back revocation fixed, indexes proven, the sweep gap opened as issue-20261014_0330) — no open item remains |
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
 | `issue-20261014_0330.md` | open | Session rows are never swept — the cleanup job covers queue, MFA, webauthn, signup, and device-login rows but not `public.sessions`; a retention sweep (ended past N days) wants a retention key and a named surface. Found by the backend auth audit (audit-20261014_0329) |
-| `issue-20261014_0450.md` | considering | 55 archived handovers predate the frontmatter convention — retrofit (`captured` from the filename, `plan`/`wave`/`status` from the body) only when a task needs to join the archive on that metadata |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
 
