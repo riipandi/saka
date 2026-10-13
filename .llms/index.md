@@ -8,7 +8,7 @@ reference, history, or contract — navigate from here.
 
 | Path | Read it for |
 | --- | --- |
-| `/AGENTS.md` | The general instructions: read order, ambiguous-decision protocol, workflow, git. |
+| `/AGENTS.md` | The general instructions: read order, ambiguous-decision protocol, the per-area skill map, workflow, git. |
 | `.llms/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
 | `.llms/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
 | `.llms/auth-design.md` | The authentication design the auth surface follows. |
@@ -44,7 +44,7 @@ retained plans are `done`, except `plan-20261014_0047.md`
 | `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
 | `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — done |
 | `plan-20261013_0048.md` | The last administrator's deletion guard (backend refusal + the roles-on-the-wire frontend gate) and the singleton builtin provider picker — done |
-| `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — closing (phases 1–8 committed; the closing state reported, the owner's commit completes it) |
+| `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — done (phases 1–8 committed per phase; the owner's closing commit `a70880e1` completes phase 9) |
 
 ## Handovers (`.llms/handover/`)
 
