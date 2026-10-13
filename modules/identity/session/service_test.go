@@ -569,16 +569,18 @@ func TestAnIdleSessionIsRefusedAndRotatedOut(t *testing.T) {
 	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 	service.WithSettings(stubBound{seconds: int64(time.Hour.Seconds())})
 
-	// Inside the window the renewal answers.
+	// Inside the window the renewal answers; its replacement is the token
+	// the next attempt presents — re-presenting the spent one would be the
+	// replay path, not the gate.
 	jump(t, now, 30*time.Minute)
-	_, err := service.Refresh(t.Context(), token)
+	renewed, err := service.Refresh(t.Context(), token)
 	require.NoError(t, err)
 
 	// Past the window — the last renewal is the jump above, so the clock
-	// moves two hours past it — the same token is refused, and the row is
+	// moves two hours past it — the live token is refused, and the row is
 	// revoked rather than left resting.
 	jump(t, now, 2*time.Hour)
-	_, err = service.Refresh(t.Context(), token)
+	_, err = service.Refresh(t.Context(), renewed.RefreshToken)
 	assert.ErrorIs(t, err, ErrSessionEnded)
 	row, err := service.repo.GetSession(t.Context(), pool, sid)
 	require.NoError(t, err)

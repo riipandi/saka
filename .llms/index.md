@@ -87,6 +87,7 @@ Point-in-time reviews against the tree; conclusions age, the tree wins.
 - `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
 - `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s.
 - `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness.
+- `audit-20261014_0329.md` — the backend auth audit (sessions, refresh rotation, revocation): the inactivity gate's rolled-back revocation fixed, the gate's mis-aimed test re-pointed, the EXPLAIN probes at 200k rows, the replay pattern judged sound, the missing session sweep opened as `issue-20261014_0330.md`.
 
 ## Product docs (`docs/`)
 
@@ -105,7 +106,7 @@ The open and considering items, newest capture first:
 reopen triggers. The
 rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
 lands there the moment it is found — not in chat memory. Newest:
-`issue-20261012_1605.md`.
+`issue-20261014_0330.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -114,8 +115,9 @@ previous cross-check ran 2026-10-12):
 | File | Rollup | Subject |
 | --- | --- | --- |
 | `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]`, closed wontfix 2026-10-14 (owner keeps the split), the handover archive — 67 files, remedy decided (archive to `.llms/archived`, keep the five newest; plan-20261014_0047), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
-| `issue-20261008_1705.md` | open | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the open item is the backend auth audit — accepted into plan-20261014_0047 as its own phase |
+| `issue-20261008_1705.md` | resolved | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the backend auth audit resolved 2026-10-14 (audit-20261014_0329, plan-20261014_0047 phase 7 — the gate's rolled-back revocation fixed, indexes proven, the sweep gap opened as issue-20261014_0330) |
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
+| `issue-20261014_0330.md` | open | Session rows are never swept — the cleanup job covers queue, MFA, webauthn, signup, and device-login rows but not `public.sessions`; a retention sweep (ended past N days) wants a retention key and a named surface. Found by the backend auth audit (audit-20261014_0329) |
 | `issue-20261009_0345.md` | resolved | A dead auth worker hung every in-flight Comlink call (blank first paint, no console error) — resolved 2026-10-14 (plan-20261014_0047 phase 1): current-engine cell with bounded calls, the error listener revives a wired main-thread engine and interrupted calls re-run against it |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14), validate/otelconnect have no `/v2` yet, and the v2 handler-error masking convention (rules.md record rides the plan's closing phase). The two-suite E2E build split resolved 2026-10-14 (plan-20261014_0047 phase 5: the ladder boots its own compiler, the suite's server lives on :4473, no reuse) |
 | `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
