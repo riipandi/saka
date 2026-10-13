@@ -82,8 +82,11 @@ The open and considering items, newest capture first:
 `updated`) and per-item status lines carrying their plan references and
 reopen triggers. The
 rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
-lands there the moment it is found — not in chat memory. Newest:
-`issue-20261014_0450.md`.
+lands there the moment it is found — not in chat memory. An issue file
+whose every item reaches a terminal status (`resolved`) leaves the
+directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
+name — the live directory lists only what is open or considering.
+Newest: `issue-20261014_0450.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -96,13 +99,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
 | `issue-20261014_0330.md` | open | Session rows are never swept — the cleanup job covers queue, MFA, webauthn, signup, and device-login rows but not `public.sessions`; a retention sweep (ended past N days) wants a retention key and a named surface. Found by the backend auth audit (audit-20261014_0329) |
 | `issue-20261014_0450.md` | considering | 55 archived handovers predate the frontmatter convention — retrofit (`captured` from the filename, `plan`/`wave`/`status` from the body) only when a task needs to join the archive on that metadata |
-| `issue-20261009_0345.md` | resolved | A dead auth worker hung every in-flight Comlink call (blank first paint, no console error) — resolved 2026-10-14 (plan-20261014_0047 phase 1): current-engine cell with bounded calls, the error listener revives a wired main-thread engine and interrupted calls re-run against it |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
-| `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
-| `issue-20261010_0017.md` | resolved | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim — resolved 2026-10-14 (plan-20261014_0047 phase 3): the field joins the public body, the publisher test pins it |
-| `issue-20261011_2205.md` | resolved | Catalog drift leaves existing deployments with stale administrator grants — resolved 2026-10-14 (plan-20261014_0047 phase 2): the serve startup check logs the lagging slugs and the repair command, never writes |
-| `issue-20261012_0445.md` | resolved | The OIDC consent interaction page shipped (plan-20261012_1935: the SPA interaction area — consent page, device verification, the completion dialect) |
-| `issue-20261012_1538.md` | resolved | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drifted on every new seed item — resolved 2026-10-14 (plan-20261014_0047 phase 4): the tests read the run's own status line and assert the registry's invariants, no counter to maintain |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
 
 ## Finding history fast
