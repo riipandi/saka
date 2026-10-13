@@ -35,16 +35,16 @@ without the owner's explicit instruction. The directory keeps the five
 newest plans; the older history (27 files) lives flat in
 `.llms/archive/plan-<stamp>.md`, moved under their existing names — the
 archive files carry their own subject lines and decision records. All
-retained plans are `done`, except `plan-20261014_0047.md`
-(`awaiting-approval`: phases 1–8 landed, the closing phase is next).
+retained plans are `done`, except `plan-20261014_0504.md`
+(`awaiting-approval`, written 2026-10-14).
 
 | File | Subject |
 | --- | --- |
-| `plan-20261012_0155.md` | Wave 6 (partial): device login approval (`/device`), the ops console (queue + scheduler), the timezone picker; storage intentionally excluded pending the reference inventory (`issue-20261009_2356.md`, now resolved) — done |
 | `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
 | `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — done |
 | `plan-20261013_0048.md` | The last administrator's deletion guard (backend refusal + the roles-on-the-wire frontend gate) and the singleton builtin provider picker — done |
 | `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — done (phases 1–8 committed per phase; the owner's closing commit `a70880e1` completes phase 9) |
+| `plan-20261014_0504.md` | The session retention sweep: `app.session_retention_days` (30), the two retention indexes, the dedicated `session_cleanup` job over the repository's `DeleteRetentionExpired`, docs sync + handover + final validation — closes `issue-20261014_0330.md` — awaiting approval |
 
 ## Handovers (`.llms/handover/`)
 
@@ -101,7 +101,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]`, closed wontfix 2026-10-14 (owner keeps the split), the handover archive — resolved 2026-10-14 (plan-20261014_0047 phase 8: 62 handovers + 27 plans moved flat to `.llms/archive/`, the five newest of each retained), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
 | `issue-20261008_1705.md` | considering | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport stays `considering`; the backend auth audit resolved 2026-10-14 (audit-20261014_0329, plan-20261014_0047 phase 7 — the gate's rolled-back revocation fixed, indexes proven, the sweep gap opened as issue-20261014_0330) — no open item remains |
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
-| `issue-20261014_0330.md` | open | Session rows are never swept — the cleanup job covers queue, MFA, webauthn, signup, and device-login rows but not `public.sessions`; a retention sweep (ended past N days) wants a retention key and a named surface. Found by the backend auth audit (audit-20261014_0329) |
+| `issue-20261014_0330.md` | open | Session rows are never swept — the cleanup job covers queue, MFA, webauthn, signup, and device-login rows but not `public.sessions`; a retention sweep (ended past N days) wants a retention key and a named surface. Found by the backend auth audit (audit-20261014_0329); the plan `plan-20261014_0504.md` is written and awaits approval |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
 
