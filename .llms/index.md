@@ -107,21 +107,22 @@ lands there the moment it is found — not in chat memory. Newest:
 `issue-20261012_1605.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
-plans on 2026-10-12 — the files are the tracker, this is the index):
+plans on 2026-10-14 — the files are the tracker, this is the index; the
+previous cross-check ran 2026-10-12):
 
 | File | Rollup | Subject |
 | --- | --- | --- |
-| `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]` (open, deferred), the handover archive — 65 files (considering), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
-| `issue-20261008_1705.md` | open | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the open item is the backend auth audit (owner's ask, separate pass) |
-| `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands |
-| `issue-20261009_0345.md` | open | A dead auth worker hangs every in-flight Comlink call (blank first paint, no console error) — re-verified 2026-10-12, the robust shape (current-engine indirection + bounded calls) has not landed |
-| `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-12), validate/otelconnect have no `/v2` yet, the two-suite E2E build split, and the v2 handler-error masking convention |
+| `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]`, closed wontfix 2026-10-14 (owner keeps the split), the handover archive — 67 files, remedy decided (archive to `.llms/archived`, keep the five newest; plan-20261014_0047), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
+| `issue-20261008_1705.md` | open | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the open item is the backend auth audit — accepted into plan-20261014_0047 as its own phase |
+| `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
+| `issue-20261009_0345.md` | open | A dead auth worker hangs every in-flight Comlink call (blank first paint, no console error) — re-verified 2026-10-14, the robust shape (current-engine indirection + bounded calls) is planned in plan-20261014_0047 |
+| `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14), validate/otelconnect have no `/v2` yet, the two-suite E2E build split (planned in plan-20261014_0047), and the v2 handler-error masking convention (rules.md record rides the plan's closing phase) |
 | `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
-| `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim parked on the first split-assets deployment |
-| `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — the remedy shape (self-healing seeder vs startup check vs documented rule) awaits the owner's decision |
+| `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim — owner decided 2026-10-14 the field joins the public scope (plan-20261014_0047) |
+| `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — remedy decided 2026-10-14: the serve startup check with the loud warning and repair command (plan-20261014_0047) |
 | `issue-20261012_0445.md` | resolved | The OIDC consent interaction page shipped (plan-20261012_1935: the SPA interaction area — consent page, device verification, the completion dialect) |
-| `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — derive the totals from the seeder registry when CI goes red again |
-| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; report upstream |
+| `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — three assertions (recounted 2026-10-14, not four); the registry-derived fix is planned in plan-20261014_0047 |
+| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; report upstream |
 
 ## Finding history fast
 
