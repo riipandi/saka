@@ -35,8 +35,9 @@ without the owner's explicit instruction. The directory keeps the five
 newest plans; the older history (27 files) lives flat in
 `.llms/archive/plan-<stamp>.md`, moved under their existing names — the
 archive files carry their own subject lines and decision records. All
-retained plans are all `done` — `plan-20261014_0604.md` closed 2026-10-14
-with the final matrix green.
+retained plans are all `done`, except `plan-20261014_0915.md`
+(`awaiting-approval`, written 2026-10-14 — `plan-20261014_0604.md` closed
+2026-10-14 with the final matrix green).
 
 | File | Subject |
 | --- | --- |
@@ -45,6 +46,7 @@ with the final matrix green.
 | `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — done (phases 1–8 committed per phase; the owner's closing commit `a70880e1` completes phase 9) |
 | `plan-20261014_0504.md` | The session retention sweep: `app.session_retention_days` (30), the two retention indexes, the dedicated `session_cleanup` job over the repository's `DeleteRetentionExpired`, docs sync + handover + final validation — closes `issue-20261014_0330.md` — done (phases 1–5 committed per phase, the final matrix green) |
 | `plan-20261014_0604.md` | The 2026-practices adoption from the two read articles: the error-context contract and the four-tier sweep over the 723 context-free returns, the account search's missing email trigram index, `os.Root` defense-in-depth on the storage paths, the stdlib sweep, `pg_stat_statements` in the dev/test posture — done (phases 1–9 committed per phase; the final matrix green, with the test-container boot fix `e8d45823` and the lint clear `d26ee304` riding phase 11) |
+| `plan-20261014_0915.md` | The lazy publisher's absent-area contract: `lazyPublisher.CreateSystemNotice` learns the skip its consumer's contract already documents — the do not-found sentinels skip the advisory notice, a real construction failure still travels, the garbled type comment rewritten, the resolution paths pinned in `internal/registry` — closes `issue-20261014_0730.md` — awaiting approval |
 
 ## Handovers (`.llms/handover/`)
 
