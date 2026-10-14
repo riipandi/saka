@@ -1,3 +1,9 @@
+---
+status: living
+updated: 2026-10-14T10:20:00+07:00
+references: plan-20261009_0025 (D1–D10), plan-20261009_0142 (D1–D9), .llms/endpoint-reference.md, the Yaak workspace `Saka` (wk_kBiMYTkhPP)
+---
+
 # Frontend integration roadmap
 
 Captured 2026-10-09, after the frontend-foundation plan (`plan-20261009_0025.md`) and the
