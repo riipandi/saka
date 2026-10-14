@@ -30,11 +30,11 @@ type ViteChunk struct {
 func ParseViteManifest(r io.Reader) (*ViteManifest, error) {
 	raw, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bundler: read the vite manifest: %w", err)
 	}
 	var m ViteManifest
 	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bundler: the vite manifest does not parse: %w", err)
 	}
 	return &m, nil
 }

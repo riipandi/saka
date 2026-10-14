@@ -11,6 +11,7 @@ package bundler
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 )
 
@@ -43,14 +44,14 @@ func RenderPage(page Page, tags template.HTML) (template.HTML, error) {
 	var buf bytes.Buffer
 	tmpl, err := template.New("shell").Parse(shellTmpl)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("bundler: the shell template does not parse: %w", err)
 	}
 	err = tmpl.Execute(&buf, struct {
 		Page
 		ViteTags template.HTML
 	}{page, tags})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("bundler: the shell template does not render: %w", err)
 	}
 	return trustedHead(buf.Bytes()), nil
 }

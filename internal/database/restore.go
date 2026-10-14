@@ -53,7 +53,7 @@ func (r *Restorer) Restore(
 
 	conn, err := r.connector.Acquire(ctx)
 	if err != nil {
-		return stats, err
+		return stats, fmt.Errorf("database: acquire the restore connection: %w", err)
 	}
 	defer conn.Release()
 
@@ -146,7 +146,7 @@ func readBlocks(rd io.Reader) ([]pendingBlock, error) {
 			return blocks, nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("database: read the dump header: %w", err)
 		}
 
 		table, columns, err := parseCopyHeader(header)
@@ -334,7 +334,7 @@ func orderByForeignKeys(ctx context.Context, tx pgx.Tx, blocks []pendingBlock) (
 // name. A self-reference is left out: a table cannot be loaded after itself.
 func foreignKeyParents(ctx context.Context, tx pgx.Tx) (map[string][]string, error) {
 	parents := make(map[string][]string)
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, "read the foreign keys", `
 		SELECT nc.nspname || '.' || c.relname, np.nspname || '.' || p.relname
 		FROM pg_constraint con
 		JOIN pg_class c ON c.oid = con.conrelid

@@ -80,7 +80,7 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 
 	deleted, err := client.DeleteExpiredCompleted(ctx)
 	if err != nil {
-		return fmt.Errorf("cleanup: delete expired completed: %w", err)
+		return err
 	}
 	if deleted > 0 {
 		slog.InfoContext(ctx, "queue: deleted expired completed tasks",

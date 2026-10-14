@@ -158,24 +158,27 @@ func (m *Mailer) send(ctx context.Context, msg Message, body bodySource) error {
 // a string.
 func (m *Mailer) submit(client *smtp.Client, env *envelope) error {
 	if err := client.Mail(env.from, nil); err != nil {
-		return err
+		return fmt.Errorf("mailer: declare the sender %s: %w", env.from, err)
 	}
 	for _, addr := range env.rcpt {
 		if err := client.Rcpt(addr, nil); err != nil {
-			return err
+			return fmt.Errorf("mailer: declare the recipient %s: %w", addr, err)
 		}
 	}
 	data, err := client.Data()
 	if err != nil {
-		return err
+		return fmt.Errorf("mailer: open the data connection: %w", err)
 	}
 	if err := env.writeTo(data); err != nil {
 		// The DATA command is aborted rather than closed: the server must not
 		// accept a half-written message as a complete one.
 		_ = client.Reset()
-		return err
+		return fmt.Errorf("mailer: write the message: %w", err)
 	}
-	return data.Close()
+	if err := data.Close(); err != nil {
+		return fmt.Errorf("mailer: submit the message: %w", err)
+	}
+	return nil
 }
 
 // connect opens a session and completes the greeting.
