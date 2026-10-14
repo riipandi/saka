@@ -28,6 +28,25 @@ rules, the reference carries the shape. `AGENTS.md` and `.llms/rules.md`
   orientation on the reader. Run the `clarity` skill before writing or
   rewriting any tree document.
 
+## Status vocabulary and required metadata
+
+The ledger has four document kinds; each carries its frontmatter keys and
+its own status options — never a status from another kind's vocabulary.
+
+| Document | Frontmatter keys (required) | Document `status` options | Item/phase `status` options |
+| --- | --- | --- | --- |
+| Plan — `.llms/plans/plan-<stamp>.md` | `status`, `updated`, `phases:` (each: `id`, `title`, `status`, `note`) | `awaiting-approval` (drafted, unstarted) · `in-progress` (phases running) · `done` (every phase landed, matrix green) · `cancelled` (owner closed it; the note names why) | `pending` (not started) · `in_progress` (active this turn) · `committed` (landed, commit hash in the note) · `partially-done` (the note names what moved and what parked) · `done` |
+| Issue — `.llms/issues/issue-<stamp>.md` | `status` (the rollup), `captured`, `updated`, `summary`, `count` (items actually listed) | the rollup mirrors its items: `open` · `considering` · `resolved` · `wontfix` | `open` (work to do, nobody working it) · `considering` (a decision parked with a named trigger — act only when it fires) · `resolved` (landed, the resolution names the evidence) · `wontfix` (the owner declined; the trigger records when to reopen) |
+| Roadmap — `.llms/roadmap/<name>.md` | `status`, `updated`, `references` (source issues/plans) | `living` (updated in place, stamped) | per entry: `parked (unlock: …)` · `taken (plan-<stamp>)` · `opened (issue-<stamp>)` · `landed (commit/plan)` |
+| Handover — `.llms/handover/handover-<stamp>.md` | `status`, `captured` (from the filename stamp), `plan`, `wave` — a key the body cannot name is omitted, not guessed | `done` (the session closed its work) · `partial` (compacted mid-work; the open threads named) | — |
+
+Shared conventions: `updated` is the last time the file's claims were
+true (a status flip without a fresh `updated` is a stale file); `count`
+on an issue matches the items actually listed; an archived file keeps
+its last status — the archive note carries where live content went.
+Audits use the same vocabulary as issues at document level (`resolved` /
+`open`) with `updated` and `reference`.
+
 ## Plans (`.llms/plans/plan-YYYYMMDD_HHMM.md`)
 
 A plan is a contract, written only on the owner's request. Shape:
