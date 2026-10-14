@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
@@ -83,7 +84,7 @@ func (s *Service) authorizedClientsFor(ctx context.Context, db datastore.Querier
 
 	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: list the authorized clients: %w", err)
 	}
 	defer rows.Close()
 
@@ -91,7 +92,7 @@ func (s *Service) authorizedClientsFor(ctx context.Context, db datastore.Querier
 	for rows.Next() {
 		row, scopes, lastUsed, scanErr := scanLedgerRow(rows.Scan)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, fmt.Errorf("oidc: list the authorized clients: %w", scanErr)
 		}
 		views = append(views, AuthorizedClientView{
 			Client:     row.view(s.now()),
@@ -99,7 +100,10 @@ func (s *Service) authorizedClientsFor(ctx context.Context, db datastore.Querier
 			LastUsedAt: lastUsed,
 		})
 	}
-	return views, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oidc: list the authorized clients: %w", err)
+	}
+	return views, nil
 }
 
 // MyAuthorizedClients answers the calling account's ledger.
@@ -128,7 +132,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context, page, limit int) ([]
 	countQuery, countArgs := cb.Build()
 	var total int
 	if err := s.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("oidc: count the authorized clients: %w", err)
 	}
 
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -142,7 +146,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context, page, limit int) ([]
 
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("oidc: list the authorized clients: %w", err)
 	}
 	defer rows.Close()
 
@@ -153,7 +157,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context, page, limit int) ([]
 			return rows.Scan(append(dest, &accountID)...)
 		})
 		if scanErr != nil {
-			return nil, webutil.Pagination{}, scanErr
+			return nil, webutil.Pagination{}, fmt.Errorf("oidc: list the authorized clients: %w", scanErr)
 		}
 		entry := LedgerEntry{
 			Client:     row.view(s.now()),
@@ -168,7 +172,7 @@ func (s *Service) AllAuthorizedClients(ctx context.Context, page, limit int) ([]
 		entries = append(entries, entry)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("oidc: list the authorized clients: %w", err)
 	}
 	return entries, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, total), nil
 }
@@ -199,7 +203,7 @@ func (s *Service) MyClients(ctx context.Context, userID string) ([]ClientView, e
 
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: list the clients: %w", err)
 	}
 	defer rows.Close()
 
@@ -207,11 +211,14 @@ func (s *Service) MyClients(ctx context.Context, userID string) ([]ClientView, e
 	for rows.Next() {
 		row, scanErr := scanClient(rows.Scan)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, fmt.Errorf("oidc: list the clients: %w", scanErr)
 		}
 		views = append(views, row.view(s.now()))
 	}
-	return views, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oidc: list the clients: %w", err)
+	}
+	return views, nil
 }
 
 // RevokeMyAuthorizedClient withdraws one account's consent for a client
@@ -312,7 +319,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 		)
 		query, args := sb.Build()
 		if _, err := tx.Exec(ctx, query, args...); err != nil {
-			return err
+			return fmt.Errorf("oidc: revoke the client's tokens: %w", err)
 		}
 	}
 	sb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
@@ -324,7 +331,7 @@ func (s *Service) revokeGrants(ctx context.Context, tx datastore.Querier, userID
 	)
 	query, args := sb.Build()
 	if _, err := tx.Exec(ctx, query, args...); err != nil {
-		return err
+		return fmt.Errorf("oidc: revoke the grants: %w", err)
 	}
 	return nil
 }
@@ -339,7 +346,7 @@ func (s *Service) removeAuthorization(ctx context.Context, db datastore.Querier,
 	query, args := sb.Build()
 	tag, err := db.Exec(ctx, query, args...)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oidc: remove the authorization: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -357,7 +364,7 @@ func (s *Service) grantKeysFor(ctx context.Context, db datastore.Querier, userID
 	query, args := sb.Build()
 	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: read the grant keys: %w", err)
 	}
 	defer rows.Close()
 
@@ -368,11 +375,14 @@ func (s *Service) grantKeysFor(ctx context.Context, db datastore.Querier, userID
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("oidc: read the grant keys: %w", err)
 		}
 		keys = append(keys, key)
 	}
-	return keys, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oidc: read the grant keys: %w", err)
+	}
+	return keys, nil
 }
 
 // qualifiedClientColumns renders the client column list under one alias.

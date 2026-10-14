@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/url"
@@ -44,7 +45,7 @@ func ValidateCallbackURLPattern(pattern string) error {
 	pattern, _, _ = strings.Cut(pattern, "#")
 	parsed, err := url.Parse(callbackURLPatternForURLParse(pattern))
 	if err != nil {
-		return err
+		return fmt.Errorf("the callback URL pattern does not parse: %w", err)
 	}
 	if parsed.Scheme == "" {
 		return errors.New("callback URL pattern must include a scheme")
@@ -54,8 +55,10 @@ func ValidateCallbackURLPattern(pattern string) error {
 		return errors.New("callback URL pattern scheme is not allowed")
 	}
 
-	_, err = urlpattern.New(normalizeToURLPatternStandard(pattern), "", nil)
-	return err
+	if _, err := urlpattern.New(normalizeToURLPatternStandard(pattern), "", nil); err != nil {
+		return fmt.Errorf("the callback URL pattern does not compile: %w", err)
+	}
+	return nil
 }
 
 // MatchCallbackURLFromList answers the first registered URL that matches
@@ -274,7 +277,7 @@ func extractQueryParams(rawurl string) (string, url.Values, error) {
 	if i := strings.IndexByte(rawurl, '?'); i >= 0 {
 		query, err := url.ParseQuery(rawurl[i+1:])
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("the URL's query does not parse: %w", err)
 		}
 		return rawurl[:i], query, nil
 	}

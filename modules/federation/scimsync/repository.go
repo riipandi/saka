@@ -202,7 +202,7 @@ func scanProvider(row scanner) (Provider, error) {
 		return Provider{}, err
 	}
 	if err != nil {
-		return Provider{}, err
+		return Provider{}, fmt.Errorf("scimsync: scan the provider: %w", err)
 	}
 	return p, nil
 }
