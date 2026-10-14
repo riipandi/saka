@@ -171,13 +171,6 @@ func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 	return meta
 }
 
-// ptr hands the setters an addressable value.
-//
-//go:fix inline
-func ptr[T any](value T) *T {
-	return new(value)
-}
-
 // mapError translates the service's failures into the codes the Connect
 // protocol carries. The internal ones are collapsed to one answer whose text
 // names nothing a caller could aim at. A malformed field never reaches the

@@ -131,11 +131,11 @@ func writePostgresBootFiles() (postgresBootFiles, error) {
 		return postgresBootFiles{}, fmt.Errorf("create boot dir: %w", err)
 	}
 	confPath := filepath.Join(dir, "postgres.conf")
-	if err := os.WriteFile(confPath, []byte(postgresConf), 0o644); err != nil {
+	if err := os.WriteFile(confPath, []byte(postgresConf), 0o600); err != nil {
 		return postgresBootFiles{}, fmt.Errorf("write postgres.conf: %w", err)
 	}
 	initPath := filepath.Join(dir, "001-pg-stat-statements.sql")
-	if err := os.WriteFile(initPath, []byte(postgresInit), 0o644); err != nil {
+	if err := os.WriteFile(initPath, []byte(postgresInit), 0o600); err != nil {
 		return postgresBootFiles{}, fmt.Errorf("write the init script: %w", err)
 	}
 	return postgresBootFiles{conf: confPath, init: initPath}, nil

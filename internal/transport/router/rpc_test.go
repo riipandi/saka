@@ -404,7 +404,7 @@ func TestAnAuthoredErrorRidesTheWireAndSkipsTheLedger(t *testing.T) {
 
 // stubPanickingAuthService panics inside the procedure — the failure the
 // boundary catches, records, and refuses.
-type stubPanickingAuthService struct{ stubAuthService }
+type stubPanickingAuthService struct{}
 
 func (stubPanickingAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
 	panic("it exploded")
@@ -422,7 +422,7 @@ func (rpcPanickingFeature) MountRPC(server *connect.Server) {
 
 // stubAuthoredErrorAuthService answers a coded error the handler authored —
 // the shape the wire publishes and the ledger skips.
-type stubAuthoredErrorAuthService struct{ stubAuthService }
+type stubAuthoredErrorAuthService struct{}
 
 func (stubAuthoredErrorAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
 	return nil, connect.NewError(connect.CodeInvalidArgument, "authored refusal")

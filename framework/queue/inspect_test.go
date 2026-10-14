@@ -152,9 +152,3 @@ func TestInspectReportsAnUnknownTaskAsAbsent(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
-
-//go:fix inline
-func strPtr(s string) *string { return new(s) }
-
-//go:fix inline
-func timePtr(t time.Time) *time.Time { return new(t) }

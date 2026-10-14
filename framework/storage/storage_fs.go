@@ -103,8 +103,8 @@ func (s *FS) Put(ctx context.Context, bucket, key string, r io.Reader, _ int64, 
 	defer func() { _ = root.Close() }()
 
 	if dir := path.Dir(key); dir != "." {
-		if err := root.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("storage: file directory: %w", err)
+		if mkdirErr := root.MkdirAll(dir, 0o755); mkdirErr != nil {
+			return fmt.Errorf("storage: file directory: %w", mkdirErr)
 		}
 	}
 	tmp, tmpName, err := createTempInRoot(root, key)

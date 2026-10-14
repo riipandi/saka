@@ -78,6 +78,3 @@ func TestActiveSigningKeysNeverReadsThePrivateColumn(t *testing.T) {
 	assert.Equal(t, "with-private", keys[0].KeyID)
 	assert.Equal(t, []byte(`{"kty":"EC"}`), keys[0].PublicKey)
 }
-
-//go:fix inline
-func ptr[T any](v T) *T { return new(v) }
