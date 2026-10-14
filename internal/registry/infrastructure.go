@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -48,8 +49,10 @@ import (
 // not when the queue is built: that service's own provider resolves this
 // queue for its email pass, so building one against the other would order
 // the two around each other. A container without the notification area —
-// a consumer served without it — answers the failure the skip falls back
-// to, the notice being advisory.
+// a consumer served without it — answers nil here: the notice is skipped
+// rather than failed, the advisory bell nobody wired. A container whose
+// area is present but under construction answers that construction error,
+// which is the outage the queue's retry budget exists for.
 type lazyPublisher struct {
 	injector do.Injector
 }
@@ -58,8 +61,14 @@ type lazyPublisher struct {
 // area's own create.
 func (p lazyPublisher) CreateSystemNotice(ctx context.Context, userID uuid.UUID, title, body string) error {
 	service, err := do.Invoke[*notification.Service](p.injector)
-	if err != nil || service == nil {
+	if err != nil {
+		if errors.Is(err, do.ErrServiceNotFound) || errors.Is(err, do.ErrServiceNotMatch) {
+			return nil
+		}
 		return err
+	}
+	if service == nil {
+		return nil
 	}
 	return service.CreateSystemNotice(ctx, userID, title, body)
 }
