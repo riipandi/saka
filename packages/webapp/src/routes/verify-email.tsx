@@ -28,7 +28,7 @@ export const Route = createFileRoute('/verify-email')({
 
 const CODE_LENGTH = 12
 
-export function RouteComponent() {
+function RouteComponent() {
   const { code: initialCode } = Route.useSearch()
 
   const queryClient = useQueryClient()
@@ -40,8 +40,6 @@ export function RouteComponent() {
     onSuccess: () => {
       setError(null)
       setResult('verified')
-      // A signed-in reader of the same browser gets the fresh badge without
-      // a reload; a signed-out one carries no query to invalidate.
       queryClient.invalidateQueries({
         queryKey: createConnectQueryKey({
           schema: UserService.method.getCurrentUser,
