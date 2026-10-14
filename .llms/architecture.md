@@ -1109,6 +1109,38 @@ The OIDC surface, when built, is specification-driven and becomes the third nami
 
 **One opening block, one failed-list answer, one empty state that asks.** `PageHeader` (`-page-header.tsx`) renders the kicker/title/description arrangement the views rolled by hand — a header cannot drift between pages. `ListError` (`-list-error.tsx`) pairs the refusal's words with the retry the query already owns (`refetch`), so an errored list is never a bare red line nor a lie of an empty state. List empty states whose create flow lives in the view's scope carry an `EmptyContent` CTA mirroring the card's primary action — the first record is reachable from the state that asks for it.
 
+## The two sealing ciphers and `key:rotate` (settled 2026-10-14, plan-20261014_0955 D1–D4)
+
+The secrets seal through **two ciphers**, both AES-256-GCM over the `enc:`
+wire format, both built in `internal/registry`'s wiring: the **application
+cipher** (`NewCipherFromHex(APP_SECRET_KEY)`) seals the webhook signing
+secrets, the OAuth connection client secrets, the SCIM provider tokens,
+the sealed settings values, and the queue payloads (when `queue.encrypt`
+is on); the **auth cipher** (`NewAuthCipher(AUTH_SECRET_KEY)` — the AES
+key derived over the HMAC secret's bytes) seals the TOTP enrollment
+secrets and the JWKS private documents. The sealed format carries no key
+id — a row decrypts or it does not — so rotation is decrypt-with-old,
+encrypt-with-new, all at once.
+
+**`key:rotate`** (`cmd/keyrotate.go`) walks both halves in one pass:
+loads both secrets from the deployment's env file (the root `--env-file`
+flag — the command declares none of its own, because a subcommand's flag
+shadows the root's and the root's is what loads the configuration),
+generates the replacement pair (`--new-key`/`--new-auth-key` for scripted
+runs), re-seals every surface inside **one transaction** — `jwks`'s
+`seal_fp` re-stamped, the queue's pending and archived payloads re-sealed
+only when `queue.encrypt` is on, the walk saying so when it is not — and
+aborts on the first row the old ciphers cannot open, the row named, zero
+writes committed (D4). A `--dry-run` counts the rows and verifies the
+secrets open them before anything writes; the new keys land back in the
+env file through `key:generate`'s confirm/`--overwrite` dance. The walk
+trusts the `enc:` prefix, not the settings catalog: every
+CHECK-constrained surface admits no other form, and `app_settings`'
+plaintext rows are its normal state. The rule a sealed surface must join
+this walk is `rules.md`'s; the manual-path gap an env-file edit leaves
+(the TOTP rows have no `seal_fp` to self-heal with, unlike the jwks
+pairs) is `issue-20261014_1245`'s to settle.
+
 ## Planned layout
 
 Design records for packages that were planned before they landed — `internal/config` and `framework/fetcher` are implemented as described below; read them as the rationale, the code as truth. The still-unbuilt scaffolds are named where they are.

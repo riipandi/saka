@@ -44,7 +44,7 @@ the older history (35 files) lives there too.
 | File | Subject |
 | --- | --- |
 | `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — `in-progress`: phases 1–2 landed (`b42f8765`), phase 3 (final validation) waits for the owner's word |
-| `plan-20261014_0955.md` | `key:rotate`: one command re-seals the six sealed surfaces under a new `APP_SECRET_KEY` (D1 scope, D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new key written to the env file `key:generate`-style — takes issue-20261014_0949's open residue — awaiting approval |
+| `plan-20261014_0955.md` | `key:rotate`: one command re-seals every surface the two secrets encrypt (D1 amended to both secrets — the owner picked the six-surface scope after the wiring showed the TOTP and JWKS rows seal under the auth cipher; D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new keys written to the env file `key:generate`-style — took issue-20261014_0949's open residue — `done` 2026-10-14 (`4f2925ed`, `162dca78`), the matrix green; the manual-path gap lives in `issue-20261014_1245.md` |
 
 ## Handovers (`.llms/handover/`)
 
@@ -53,13 +53,13 @@ live and archived alike — carries the frontmatter convention
 (`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
 the filename stamp, the other keys from the body, and a key the body cannot
 name is omitted rather than guessed). The directory keeps the five newest; the
-older history (68 files) lives flat in
+older history (69 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
-`handover-20261014_1120.md` (plan-20261014_0930's phases 1–2: the
-capability-toggles and transports records landed in rules/architecture/
-docs, the handover and index synced; phase 3 — final validation — waits).
+`handover-20261014_1330.md` (plan-20261014_0955's four phases: `key:rotate`
+landed — both secrets, nine surfaces, one transaction; the docs records,
+issue-0949 closed and archived; the matrix green).
 
 ## Audits (`.llms/audit/`)
 
@@ -141,7 +141,6 @@ previous cross-check ran 2026-10-12):
 | File | Rollup | Subject |
 | --- | --- | --- |
 | `issue-20261014_0935.md` | open (1) + considering (1) | The live residues of the 2026-10-06 certification rollup after two carves: the owner's hosted certification run (open, owner's action) and the commented compose blocks (owner's call). The six parked protocol/direction decisions (ISS-002–007) moved to the roadmap 2026-10-14 as RI-1–RI-6; the terminal items stay with the archive |
-| `issue-20261014_0949.md` | open (1) + one resolved | The reconciliation of the fifteen `status: partial` archived handovers + plan-20261012_0155's partially-done phase (2026-10-14): nearly everything landed — the open residue is the `key:rotate` stub (`cmd/appkey.go:177`, plan-20261014_0955 takes it); the `release_after` invariant resolved on re-verification (enforced at the queue client's `Register` seam, the config layer cannot see task timeouts); the two parked decisions moved to the roadmap as RI-7/RI-8 |
 | `issue-20261014_1245.md` | considering (1) | Found while landing `key:rotate`: the wiring seals two surfaces (TOTP secrets, JWKS private documents) with the **auth cipher** — a manual `AUTH_SECRET_KEY` edit skips the re-seal and kills every TOTP enrollment with no `seal_fp`-style recovery, unlike jwks' self-heal; the command's own pass re-seals both halves, so the gap is the manual path only. Decide the story when a rotation outside `key:rotate` becomes a need |
 
 ## Finding history fast
