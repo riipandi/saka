@@ -80,11 +80,17 @@ message; self-serve commits allowed during the plan's working session;
 after the last phase, stop and recommend the closing commit message —
 never commit it unasked. The final-validation phase and the test matrix
 are mandatory; E2E is written only when relevant and recorded n/a
-otherwise. Any standing project rules the owner keeps (for example:
-early stage, so no backward compatibility or legacy code; backend
-migrations edited in place rather than altered, dev-database resets
-allowed) are restated in the plan's execution-rules block so the plan is
-self-contained.
+otherwise.
+
+Project policies are the owner's, not this skill's: anything that
+shapes the code — backward compatibility, migration policy (in-place
+edits vs additive alters), database resets, deprecation windows — is
+restated in the plan's execution-rules block only as the owner's
+standing rules grant it. The safe defaults when nothing was said:
+migrations are additive and forward-only, no destructive operation
+(reset, drop, key rotation) runs without explicit consent in the turn,
+and compatibility is kept until the owner waives it. A plan that
+silently assumes "early stage" or grants itself a reset is wrong.
 
 Ledger hygiene: a completed plan archives flat to
 `.llms/archive/plan-<stamp>.md` under its existing name; the live

@@ -20,8 +20,8 @@ when the prose does not make it obvious.
 ## The Given-When-Then shape for behavioral criteria
 
 ```markdown
-- **AC-1**: Given a seeded database with a sealed webhook secret,
-  when `key:rotate` runs with the correct current key,
+- **AC-1**: Given a seeded database with a sealed credential,
+  when the rotation command runs with the correct current key,
   then every sealed row decrypts under the new key and the old key
   opens nothing; the command prints the per-surface counts.
 - **AC-2**: Given a wrong key, when the rotation's dry run executes,
