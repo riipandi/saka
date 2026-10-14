@@ -183,12 +183,21 @@ explicitly recorded n/a — silence is not a verdict.
 
 ## Reference exemplars
 
-| File | The shape it shows |
-| --- | --- |
-| `references/plan-example.md` | A full plan: frontmatter phases, verified current state, decisions with rejected alternatives, the execution-rules block, per-phase commits, matrix, out-of-scope |
-| `references/issue-example.md` | An issue rollup: frontmatter rollup, per-item statuses with triggers, the settled-records section |
-| `references/roadmap-example.md` | A roadmap document: frontmatter, per-entry `parked (unlock)` lines, evidence, first moves, source stamps |
-| `references/handover-example.md` | A handover: frontmatter convention, what the session did, the commits, what stayed open |
+Two kinds live here: the **snapshots** — real ledger documents whose
+shape is the lesson — and the **cards** — distilled techniques from the
+owner's skill library, one page each.
+
+| File | Kind | The shape it shows |
+| --- | --- | --- |
+| `references/plan-example.md` | snapshot | A full plan: frontmatter phases, verified current state, decisions with rejected alternatives, the execution-rules block, per-phase commits, matrix, out-of-scope |
+| `references/issue-example.md` | snapshot | An issue rollup: frontmatter rollup, per-item statuses with triggers, the settled-records section |
+| `references/roadmap-example.md` | snapshot | A roadmap document: frontmatter, per-entry `parked (unlock)` lines, evidence, first moves, source stamps |
+| `references/handover-example.md` | snapshot | A handover: frontmatter convention, what the session did, the commits, what stayed open |
+| `references/adr-example.md` | card | The decision record: context, decision, consequences both sides, alternatives with evidence-backed rejections; scale — full ADR vs compact record |
+| `references/verification-example.md` | card | The adversarial claim check: extract, tree-check, break — the verdicts (verified / stale / unfounded / contradicted) and what each writes |
+| `references/refactor-sequence-example.md` | card | The safe sequence (contracts → implementations → callers → tests → cleanup), the affected-files table, the named undo |
+| `references/acceptance-criteria-example.md` | card | Requirements vs constraints vs guidelines; Given-When-Then criteria; the measurable bar; non-goals as a first-class section |
+| `references/docs-tone-example.md` | card | The human-docs tone: lead with the why, one idea per paragraph, GFM and admonitions earned, examples over descriptions, no internals |
 
 ## Provenance — what this skill borrows
 
