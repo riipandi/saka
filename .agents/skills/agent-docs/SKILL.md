@@ -213,22 +213,3 @@ owner's skill library, one page each.
 | `references/refactor-sequence-example.md` | card | The safe sequence (contracts → implementations → callers → tests → cleanup), the affected-files table, the named undo |
 | `references/acceptance-criteria-example.md` | card | Requirements vs constraints vs guidelines; Given-When-Then criteria; the measurable bar; non-goals as a first-class section |
 | `references/docs-tone-example.md` | card | The human-docs tone: lead with the why, one idea per paragraph, GFM and admonitions earned, examples over descriptions, no internals |
-
-## Provenance — what this skill borrows
-
-The shapes are the host repository's (its AGENTS.md and core documents);
-these techniques come from the owner's skill library at
-`~/.agents/skills/` and are applied here in their ledger form:
-
-| Source skill | What carried over |
-| --- | --- |
-| `create-implementation-plan` | Per-phase measurable validation; a plan ready for approval carries no placeholder |
-| `create-architectural-decision-record` | A decision records its consequences — the cost of the pick, both sides |
-| `doublecheck` | The adversarial pass before repeating a claim; extract → check → ask what makes it wrong |
-| `refactor-plan` | The safe sequence (contracts → implementations → callers → tests → cleanup) and the named undo for risky phases |
-| `create-readme` | The `docs/` tone: concise GFM, one idea per paragraph, admonitions earned |
-| `prd` | Non-goals as a first-class section (the plans' out-of-scope list) |
-| `create-llms` / `update-llms` | Not adopted — `.llms/index.md` is the map here; revisit only if an `llms.txt` root file is ever wanted |
-| `create-specification` / `update-specification` | Requirements vs constraints vs recommendations kept distinct in plan prose |
-| `update-markdown-file-index` | Index rows move in the same commit as the tree they describe |
-| `update-implementation-plan` / `update-specification` | Status updates re-stamp `updated` and re-verify the claims they touch |
