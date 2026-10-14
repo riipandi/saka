@@ -373,8 +373,8 @@ func TestRedactedCoversExactlyTheSecretKeys(t *testing.T) {
 // does not know about is filled like any other, and the rendering that hides it
 // is then visible as a changed value.
 func fillStrings(value reflect.Value, probe string) {
-	for i := range value.NumField() {
-		field := value.Field(i)
+	for _, field := range value.Fields() {
+		field := field
 		if !field.CanSet() {
 			continue
 		}

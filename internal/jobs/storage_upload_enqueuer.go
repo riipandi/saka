@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/riipandi/saka/framework/queue"
@@ -30,7 +31,7 @@ func NewUploadEnqueuer(client *queue.Client, log *slog.Logger) *UploadEnqueuer {
 func (e *UploadEnqueuer) EnqueueUpload(ctx context.Context, ref string) error {
 	if _, err := e.client.Add(StorageUploadTask{Key: ref}).Ctx(ctx).Save(); err != nil {
 		e.log.ErrorContext(ctx, "jobs: enqueue upload", "ref", ref, "err", err)
-		return err
+		return fmt.Errorf("storage_upload: enqueue: %w", err)
 	}
 	return nil
 }
@@ -47,7 +48,7 @@ func SweepUploads(ctx context.Context, manager *storage.Manager, client *queue.C
 	}
 	for _, ref := range refs {
 		if _, err := client.Add(StorageUploadTask{Key: ref}).Ctx(ctx).Save(); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("storage_upload: enqueue: %w", err)
 		}
 	}
 	if len(refs) > 0 {

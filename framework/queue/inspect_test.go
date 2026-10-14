@@ -113,8 +113,8 @@ func TestInspectAnswersAnArchivedTask(t *testing.T) {
 		Attempts:       3,
 		LastDuration:   time.Second,
 		Succeeded:      false,
-		Error:          strPtr("Expecto failed"),
-		ExpiresAt:      timePtr(time.Now().Add(time.Hour)),
+		Error:          new("Expecto failed"),
+		ExpiresAt:      new(time.Now().Add(time.Hour)),
 		CreatedAt:      time.Now().Add(-time.Minute),
 		LastExecutedAt: time.Now(),
 	}
@@ -152,7 +152,3 @@ func TestInspectReportsAnUnknownTaskAsAbsent(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
-
-func strPtr(s string) *string { return &s }
-
-func timePtr(t time.Time) *time.Time { return &t }

@@ -45,13 +45,11 @@ func TestJTIConcurrentClaimsElectOneWinner(t *testing.T) {
 	wins := make(chan struct{}, racers)
 	var wg sync.WaitGroup
 	for range racers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if store.consumeJTI(t.Context(), "gryffindor") == nil {
 				wins <- struct{}{}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(wins)

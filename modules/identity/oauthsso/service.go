@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"time"
 
@@ -530,9 +531,7 @@ func mergeMapping(current, update AttributeMapping) AttributeMapping {
 // impersonation actor from the context; the service carries none of them.
 func (s *Service) record(ctx context.Context, tx datastore.Querier, event string, conn Connection, payload map[string]string) {
 	out := make(map[string]string, len(payload)+1)
-	for key, value := range payload {
-		out[key] = value
-	}
+	maps.Copy(out, payload)
 	out["connection_id"] = FormatID(conn.ID)
 	s.audit.Record(ctx, tx, fwaudit.Entry{
 		Event:        event,

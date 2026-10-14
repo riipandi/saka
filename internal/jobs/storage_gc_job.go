@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -66,7 +67,7 @@ func gcProcessor(ctx context.Context, task StorageGCTask, manager *storage.Manag
 	// never depends on the process that ran the last one.
 	_, err = client.Add(StorageGCTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("storage_gc: enqueue: %w", err)
 	}
 	return nil
 }

@@ -322,7 +322,7 @@ func administratorRoleID(ctx context.Context, db datastore.Querier) (string, err
 		if errors.Is(err, datastore.ErrNoRows) {
 			return "", errors.New("the administrator role does not exist; the system seed did not run")
 		}
-		return "", err
+		return "", fmt.Errorf("initialize: read the administrator role: %w", err)
 	}
 	return id, nil
 }

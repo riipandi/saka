@@ -28,6 +28,15 @@ source.auth = {
   one_time_access_email_as_unauthenticated_enabled: true
 }
 
+// The stored-file origin rides the deployment's `PUBLIC_ASSETS_URL`, which
+// pins :3000 — the picture URLs the suite's accounts answer would point at
+// an origin nothing serves on the dedicated port. The harness re-pins it to
+// its own server so the avatar's img resolves.
+source.app = {
+  ...source.app,
+  assets_url: `http://localhost:${process.env.E2E_PORT || 4473}/storage`
+}
+
 // The interaction suite walks the provider's protocol surface — the
 // authorize redirects, the device verification, the SPA's consent page —
 // so the federation switch rides on for the run.

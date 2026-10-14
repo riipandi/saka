@@ -91,7 +91,9 @@ test.describe.serial('the federation flows', () => {
     const body = (await ledger.json()) as unknown
     expect(isRecord(body)).toBeTruthy()
     if (!isRecord(body)) throw new Error('the ledger is not an object')
-    expect(Array.isArray(body.entries)).toBeTruthy()
+    // An empty ledger answers without the entries key — protobuf JSON omits
+    // an empty repeated field — so the absence is the empty answer itself.
+    expect(Array.isArray(body.entries ?? [])).toBeTruthy()
   })
 
   test('the account screens refuse a signed-out browser with the sign-in handoff', async ({

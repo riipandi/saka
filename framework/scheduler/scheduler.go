@@ -208,8 +208,10 @@ func (s *Scheduler) seed(ctx context.Context, job *registeredJob) error {
 	ib.SQL("ON CONFLICT (name) DO NOTHING")
 
 	query, args := ib.Build()
-	_, err := s.store.Exec(ctx, query, args...)
-	return err
+	if _, err := s.store.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("scheduler: seed the state row for %s: %w", job.Name, err)
+	}
+	return nil
 }
 
 // fire runs one cron firing: the tick is claimed and the task enqueued in
@@ -267,7 +269,7 @@ func (s *Scheduler) claim(ctx context.Context, tx datastore.Querier, job *regist
 		return tickReseeded, s.reseed(ctx, tx, job)
 	}
 	if err != nil {
-		return tickError, err
+		return tickError, fmt.Errorf("scheduler: read the state row for %s: %w", job.Name, err)
 	}
 	if due.After(dbNow) {
 		// Another replica's fire already claimed this tick.
@@ -290,11 +292,11 @@ func (s *Scheduler) claim(ctx context.Context, tx datastore.Querier, job *regist
 
 	query, args = ub.Build()
 	if _, err := tx.Exec(ctx, query, args...); err != nil {
-		return tickError, err
+		return tickError, fmt.Errorf("scheduler: advance the state row for %s: %w", job.Name, err)
 	}
 
 	if _, err := s.client.Add(job.Task).Ctx(ctx).Priority(job.Priority).Executor(tx).Save(); err != nil {
-		return tickError, fmt.Errorf("enqueue task: %w", err)
+		return tickError, fmt.Errorf("scheduler: enqueue the task for %s: %w", job.Name, err)
 	}
 
 	s.log.InfoContext(ctx, "scheduler: tick claimed",
@@ -316,8 +318,9 @@ func (s *Scheduler) reseed(ctx context.Context, tx datastore.Querier, job *regis
 
 	query, args := ib.Build()
 	_, err := tx.Exec(ctx, query, args...)
-	if err == nil {
-		s.metrics.recordReseed(ctx, job.Name)
+	if err != nil {
+		return fmt.Errorf("scheduler: reseed the state row for %s: %w", job.Name, err)
 	}
-	return err
+	s.metrics.recordReseed(ctx, job.Name)
+	return nil
 }

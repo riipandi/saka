@@ -33,7 +33,7 @@ flowchart LR
 
 | Group | What it decides | Examples |
 | --- | --- | --- |
-| `app` | The deployment's identity and URLs | base URL, name, short name |
+| `app` | The deployment's identity and URLs | base URL, name, short name, retention windows (`audit_retention_days`, `session_retention_days`) |
 | `server` | HTTP surface | addresses, timeouts |
 | `database` | The PostgreSQL connection | DSN (secret), pool sizes |
 | `cache` / `kvstore` | Optional Valkey | endpoints (off = in-process) |
@@ -65,6 +65,27 @@ configuration document) reads that list and redacts it. The rules:
   database are encrypted with the application's own cipher, whose key is
   itself a config secret.
 
+## Rotating the secret keys
+
+Two secret keys seal data at rest: `APP_SECRET_KEY` (the webhook
+signing secrets, the OAuth connection client secrets, the SCIM provider
+tokens, the sealed settings values, and — when `queue.encrypt` is on —
+the queued task payloads) and `AUTH_SECRET_KEY` (the TOTP enrollment
+secrets and the JWKS private documents). Rotate either — or both — with
+one command:
+
+```sh
+saka key:rotate --dry-run --env-file=.env.local   # counts the sealed rows, verifies the keys open them, writes nothing
+saka key:rotate --env-file=.env.local             # one transaction, then the new keys land in the env file
+```
+
+The rotation aborts on the first row the old keys cannot open — the row
+is named, nothing is written — so a half-rotated database cannot happen.
+After the run, restart the serving processes: a process still holding
+the old secrets reads nothing. Editing `AUTH_SECRET_KEY` in the file
+without the command invalidates every enrolled authenticator — the
+command is the supported rotation.
+
 ## Configuration vs settings — two different things
 
 | | Configuration | Settings |
@@ -73,6 +94,8 @@ configuration document) reads that list and redacts it. The rules:
 | Changes | Restart to apply | Live, through the admin API |
 | Carries | Infrastructure and topology | Product behavior: sign-up modes, password rules, session windows, lockout, MFA limits, passkey limits, token lifetimes, linking toggles |
 | Sealed values | Referenced, never inline | A sealed setting's value is encrypted at rest |
+
+The login-screen capability toggles — OIDC sign-in (`oidc.enabled`), OAuth sign-in (`oauth.enabled`), and the one-time-access email switches (`auth` section) — are configuration, not settings: they are published to the application through the configuration document (`/api/configuration`) and are deliberately absent from the settings catalog, so no administrator can enable a sign-in method the deployment's own file has switched off.
 
 The full settings catalog is forty-plus keys, every one with a declared
 default, a description, and a public-or-not flag; an anonymous reader

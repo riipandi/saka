@@ -15,6 +15,7 @@
 package webhook
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/samber/do/v2"
@@ -52,7 +53,7 @@ var Package = do.Package(
 		if c.App.SecretKey != "" {
 			built, err := crypto.NewCipherFromHex(c.App.SecretKey)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("webhook: read the cipher key: %w", err)
 			}
 			cipher = built
 		}

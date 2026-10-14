@@ -21,7 +21,7 @@ func authStub(refuse bool) Authenticator {
 		if refuse {
 			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
-		return &jwtutils.Caller{UserID: "01a0", AccessClaims: jwtutils.AccessClaims{Username: "hermione"}}, nil
+		return &jwtutils.Caller{UserID: "01a0", Username: "hermione"}, nil
 	}
 }
 

@@ -267,7 +267,10 @@ func (r *Repository) MatchEndpointIDs(ctx context.Context, db datastore.Querier,
 		}
 		ids = append(ids, id)
 	}
-	return ids, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("webhook: match endpoints: %w", err)
+	}
+	return ids, nil
 }
 
 // endpointSubscription is the subscription test one event runs against every
@@ -481,7 +484,10 @@ func (r *Repository) LatestAttempts(ctx context.Context, db datastore.Querier, d
 		}
 		latest[row.DeliveryID] = row
 	}
-	return latest, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("webhook: list attempts: %w", err)
+	}
+	return latest, nil
 }
 
 // toAny lifts a typed slice into the variadic values the IN clause takes.

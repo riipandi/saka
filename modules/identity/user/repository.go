@@ -147,7 +147,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 	if search != "" {
 		pattern := "%" + search + "%"
 		sb.Where(sb.Or(
-			sb.ILike("u.username", pattern),
+			sb.ILike("u.username::text", pattern),
 			sb.ILike("u.email", pattern),
 			sb.ILike("u.display_name", pattern),
 		))
@@ -180,7 +180,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 	if search != "" {
 		pattern := "%" + search + "%"
 		cb.Where(cb.Or(
-			cb.ILike("username", pattern),
+			cb.ILike("username::text", pattern),
 			cb.ILike("email", pattern),
 			cb.ILike("display_name", pattern),
 		))
@@ -211,7 +211,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("user: create the account: %w", err)
 	}
 	return row.ID, nil
 }

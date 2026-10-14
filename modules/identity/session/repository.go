@@ -276,6 +276,29 @@ func (r *Repository) RevokeLiveForUser(ctx context.Context, db datastore.Querier
 	return targets, nil
 }
 
+// DeleteRetentionExpired removes the session rows whose end is older than the
+// cutoff: a row the revocation stamped ages from its stamp, an
+// expired-never-revoked row from its expiry, and a NULL `revoked_at` fails the
+// first arm in SQL. The retention sweep is the only caller — the listing keeps
+// a row until the window deletes it — and the delete is not user-scoped: a
+// retention that spared some accounts would be a record an administrator could
+// curate.
+func (r *Repository) DeleteRetentionExpired(ctx context.Context, db datastore.Querier, cutoff time.Time) (int64, error) {
+	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbl.DeleteFrom(entity.TableSessions)
+	dbl.Where(dbl.Or(
+		dbl.LessThan("revoked_at", cutoff),
+		dbl.LessThan("expires_at", cutoff),
+	))
+
+	query, args := dbl.Build()
+	res, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("session: delete retention-expired: %w", err)
+	}
+	return res.RowsAffected(), nil
+}
+
 // ListOwn answers one page of the account's sessions, newest first, ended
 // ones included. An ended session stays listed: the stamp is the fact a
 // holder reads, not something to hide.

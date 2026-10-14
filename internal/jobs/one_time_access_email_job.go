@@ -94,10 +94,7 @@ func expirationString(ttl time.Duration) string {
 		hours := int(ttl.Hours())
 		return fmt.Sprintf("%d %s", hours, printext.Plural(hours, "hour"))
 	default:
-		minutes := int(ttl.Minutes())
-		if minutes < 1 {
-			minutes = 1
-		}
+		minutes := max(int(ttl.Minutes()), 1)
 		return fmt.Sprintf("%d %s", minutes, printext.Plural(minutes, "minute"))
 	}
 }

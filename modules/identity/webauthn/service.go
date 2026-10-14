@@ -392,7 +392,7 @@ func (u *credentialUser) WebAuthnCredentials() []gowebauthn.Credential { return 
 func toEngineCredential(row CredentialSchema) (gowebauthn.Credential, error) {
 	transport, err := decodeTransports(row.Transport)
 	if err != nil {
-		return gowebauthn.Credential{}, fmt.Errorf("webauthn: transports: %w", err)
+		return gowebauthn.Credential{}, err
 	}
 	aaguid := [16]byte{}
 	if row.AAGUID != nil && *row.AAGUID != "" {
@@ -444,7 +444,7 @@ func decodeTransports(raw []byte) ([]protocol.AuthenticatorTransport, error) {
 	}
 	var names []string
 	if err := json.Unmarshal(raw, &names); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("webauthn: transports: %w", err)
 	}
 	out := make([]protocol.AuthenticatorTransport, 0, len(names))
 	for _, name := range names {

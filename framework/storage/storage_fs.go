@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -32,6 +34,21 @@ func NewFS(root string) *FS {
 	return &FS{root: root}
 }
 
+// bucketRoot opens the bucket's subtree as the rooted fence every file
+// operation goes through: each name the backend resolves is held inside the
+// bucket, so a key that spells a traversal — whatever a caller above
+// validated — lands on os.Root's refusal instead of the machine's wider
+// filesystem. The key validation contract (ErrInvalidKey at the manager)
+// stays the primary fence; this is the second one, and it is the same
+// fence the listing has always walked.
+//
+// A bucket nothing wrote yet has no directory to root; the readers answer
+// their not-found shapes and the delete answers the state it asked for,
+// while the write creates the bucket directory before opening the root.
+func (s *FS) bucketRoot(bucket string) (*os.Root, error) {
+	return os.OpenRoot(filepath.Join(s.root, uploadsDir, bucket))
+}
+
 // EnsureBucket makes the bucket's container exist. The local driver creates
 // directories on the write, so there is nothing to do ahead of it — the
 // call only validates the name, which the manager has already done.
@@ -42,7 +59,16 @@ func (s *FS) EnsureBucket(_ context.Context, _ string) error {
 // Get opens the key's file. The caller closes the handle; no buffer holds
 // the file on the read path.
 func (s *FS) Get(_ context.Context, bucket, key string) (io.ReadCloser, error) {
-	f, err := os.Open(s.path(bucket, key))
+	root, err := s.bucketRoot(bucket)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("storage: file %s: %w", key, ErrNotFound)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("storage: open file %s: %w", key, err)
+	}
+	defer func() { _ = root.Close() }()
+
+	f, err := root.Open(key)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("storage: file %s: %w", key, ErrNotFound)
 	}
@@ -63,38 +89,97 @@ func (s *FS) Get(_ context.Context, bucket, key string) (io.ReadCloser, error) {
 // makes the caller's deadline real here. A cancelled copy removes its temp
 // file and leaves the key's previous bytes untouched.
 func (s *FS) Put(ctx context.Context, bucket, key string, r io.Reader, _ int64, _ string) error {
-	path := s.path(bucket, key)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	// The bucket's own directory is the write's first act — a plain Mkdir,
+	// at a path the manager's bucket-name validation already fenced. The
+	// rooted operations refuse to touch anything outside it from here on.
+	bucketDir := filepath.Join(s.root, uploadsDir, bucket)
+	if err := os.MkdirAll(bucketDir, 0o755); err != nil {
 		return fmt.Errorf("storage: file directory: %w", err)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(key)+".*")
+	root, err := os.OpenRoot(bucketDir)
+	if err != nil {
+		return fmt.Errorf("storage: file directory: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
+	if dir := path.Dir(key); dir != "." {
+		if mkdirErr := root.MkdirAll(dir, 0o755); mkdirErr != nil {
+			return fmt.Errorf("storage: file directory: %w", mkdirErr)
+		}
+	}
+	tmp, tmpName, err := createTempInRoot(root, key)
 	if err != nil {
 		return fmt.Errorf("storage: write file %s: %w", key, err)
 	}
 	if _, err = io.Copy(tmp, ctxReader{ctx: ctx, r: r}); err != nil {
 		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
+		_ = root.Remove(tmpName)
 		return fmt.Errorf("storage: write file %s: %w", key, err)
 	}
 	if err = tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
+		_ = root.Remove(tmpName)
 		return fmt.Errorf("storage: write file %s: %w", key, err)
 	}
-	if err = os.Rename(tmp.Name(), path); err != nil {
-		_ = os.Remove(tmp.Name())
+	if err = root.Rename(tmpName, key); err != nil {
+		_ = root.Remove(tmpName)
 		return fmt.Errorf("storage: write file %s: %w", key, err)
 	}
 	return nil
 }
 
+// createTempInRoot opens a unique dot-prefixed temp file inside the bucket
+// root — the shape the listing's scan skips, so a crash's leftover never
+// names itself a file. os.Root has no CreateTemp, so the O_EXCL retry is
+// the writer's own: the random suffix makes a collision a curiosity, not
+// an expected round.
+func createTempInRoot(root *os.Root, key string) (*os.File, string, error) {
+	base := path.Base(key)
+	for range 8 {
+		name := "." + base + "." + rand.Text() + ".tmp"
+		f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return nil, "", err
+		}
+		return f, name, nil
+	}
+	return nil, "", fmt.Errorf("storage: temp file name retries exhausted for %s", key)
+}
+
 // Delete removes the key's file and the directories an empty subtree leaves
 // behind. A missing file is the state the caller asked for, not an error.
 func (s *FS) Delete(_ context.Context, bucket, key string) error {
-	if err := os.Remove(s.path(bucket, key)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	root, err := s.bucketRoot(bucket)
+	if errors.Is(err, fs.ErrNotExist) {
+		// A bucket nothing stored in has nothing to delete.
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("storage: delete file %s: %w", key, err)
 	}
-	s.pruneDirs(bucket, key)
+	defer func() { _ = root.Close() }()
+
+	if err := root.Remove(key); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("storage: delete file %s: %w", key, err)
+	}
+	s.pruneDirs(root, key)
 	return nil
+}
+
+// pruneDirs removes the directories a deleted file's subtree emptied, so a
+// churn of keys does not leave an empty skeleton behind. The bucket root
+// itself is kept — an empty bucket is still a bucket. Errors are the
+// caller's to never see: an unremovable directory only costs a listing.
+func (s *FS) pruneDirs(root *os.Root, key string) {
+	for dir := path.Dir(key); dir != "."; dir = path.Dir(dir) {
+		if err := root.Remove(dir); err != nil {
+			// A directory that still holds something — or cannot go —
+			// stops the walk; the empty skeleton above it stays.
+			return
+		}
+	}
 }
 
 // List calls fn for every key one bucket's subtree holds, relative to the
@@ -113,11 +198,11 @@ func (s *FS) List(_ context.Context, bucket string, fn func(key string) error) e
 	}
 	defer func() { _ = bucketRoot.Close() }()
 
-	return fs.WalkDir(bucketRoot.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
+	return fs.WalkDir(bucketRoot.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == "." {
+		if name == "." {
 			return nil
 		}
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
@@ -125,31 +210,6 @@ func (s *FS) List(_ context.Context, bucket string, fn func(key string) error) e
 		}
 		// A walk over an fs.FS yields the paths relative to its root —
 		// exactly the keys the backend stores for this bucket.
-		return fn(filepath.ToSlash(path))
+		return fn(filepath.ToSlash(name))
 	})
-}
-
-// pruneDirs removes the directories a deleted file's subtree emptied, so a
-// churn of keys does not leave an empty skeleton behind. The bucket
-// directory itself is kept — an empty bucket is still a bucket. Errors are
-// the caller's to never see: an unremovable directory only costs a listing.
-func (s *FS) pruneDirs(bucket, key string) {
-	dir := filepath.Dir(s.path(bucket, key))
-	bucketDir := filepath.Join(s.root, uploadsDir, bucket)
-	for {
-		if dir == bucketDir {
-			return
-		}
-		if err := os.Remove(dir); err != nil {
-			return
-		}
-		dir = filepath.Dir(dir)
-	}
-}
-
-// path is where one bucket/key's file lives: uploads/{bucket}/{key} under
-// the data directory — the public /storage path, with the container subtree
-// the engine's own subtrees sit beside.
-func (s *FS) path(bucket, key string) string {
-	return filepath.Join(s.root, uploadsDir, bucket, filepath.FromSlash(key))
 }

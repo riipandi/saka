@@ -40,7 +40,7 @@ func clientCredentialsProvider(t *testing.T, pool *revokePool) http.Handler {
 	require.NoError(t, symmetric.Set(jwk.AlgorithmKey, "HS256"))
 	require.NoError(t, keys.AddKey(symmetric))
 
-	grants := grantStore{protocolStore: protocolStore{pool: pool.Postgres}}
+	grants := grantStore{pool: pool.Postgres}
 	clients := clientStore{
 		pool:    pool.Postgres,
 		repo:    NewRepository(),

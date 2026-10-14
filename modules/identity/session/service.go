@@ -478,6 +478,7 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		actorID       string
 		actorUsername string
 		reused        bool
+		idledOut      bool
 	)
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		// The row lock is taken before anything is read from it: a concurrent
@@ -524,11 +525,15 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 		// The revocation commits, so a stolen refresh token cannot wait out
 		// the gate and replay later; the access tokens die on their own
 		// short TTL, which is the blast radius the timeout does not bound.
+		// The stamp survives the refusal the same way the replay's does: the
+		// sentinel rides a flag, because an error would roll the revocation
+		// back with it and leave the idle row resting unended.
 		if last := locked.lastActivity(); now.Sub(last) > s.inactivityTimeout(ctx) {
 			if _, revokeErr := s.repo.Revoke(ctx, tx, locked.ID, nil, now); revokeErr != nil {
 				return revokeErr
 			}
-			return ErrSessionEnded
+			idledOut = true
+			return nil
 		}
 
 		// A delegated row must name the administrator behind it, and the
@@ -587,7 +592,7 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Refreshed, err
 	if err != nil {
 		return Refreshed{}, err
 	}
-	if reused {
+	if reused || idledOut {
 		return Refreshed{}, ErrSessionEnded
 	}
 

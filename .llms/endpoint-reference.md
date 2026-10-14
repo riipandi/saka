@@ -78,6 +78,14 @@ randomness (`pkg/crypto.NewRefreshTokenPair`, the one draw both the opening and 
 The account-state checks are the issuer's, so every way of opening or continuing a session refuses
 the same. Audit events cover sign-in, sign-out, and named revocations; a renewal records nothing.
 
+**Retention.** `app.session_retention_days` (default 30) applied by the `session_cleanup`
+recurring job (daily, the `audit_cleanup` pattern): a row goes once its end — the revocation
+stamp, or the expiry a never-revoked row aged into — is older than the window, served by
+`idx_sessions_expires_at` and the partial `idx_sessions_revoked_at`. The listing's shape is
+untouched: `ListSessions` keeps an ended row until the window deletes it, so an account's session
+center is a bounded recent history rather than a lifetime ledger. There is no endpoint to write,
+edit, or read the deleted rows — retention is policy, not a surface.
+
 ## Password Recovery (saka-only)
 
 Upstream has no passwords, so the whole flow is saka's. The contract lives in
@@ -300,7 +308,7 @@ Saka's machine credentials live in `ApiKeyService` (`modules/apikey`) above — 
 
 | Method | Procedure / Endpoint | Summary / Yaak Title | Status | Evidence |
 | ------ | -------------------- | -------------------- | ------ | -------- |
-| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, sign-in and announcement toggles, `otel.browser` — the SPA's tracing door), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
+| GET | `/api/configuration` | Get application configuration | implemented — public route; anonymous and non-admin callers read the public subset (mode, base URL, `assets_url` — the origin the SPA loads its assets from, the split-assets deployment door, sign-in and announcement toggles, `otel.browser` — the SPA's tracing door), an administrator's token widens the answer to every non-secret setting; a set secret is `[redacted]`, an unset one omitted, the datastore URLs reduced to `host:port/database` | `modules/appconfig/handler.go`, `internal/config/publish.go`, `internal/guard/rules.go` |
 | POST | `/rpc/saka.system.v1.AppConfigService/TestEmail` | Send test email | implemented — admin; synchronous send to the caller's address on record, `to` redirects it | `modules/appconfig`, `internal/guard/rules.go` |
 | PUT | `/api/application-configuration` | Update application configurations | excluded — the system configuration's source is the JSON file, resolved once at startup; there is no write surface | — |
 | POST | `/api/application-configuration/sync-ldap` | excluded | — | — |

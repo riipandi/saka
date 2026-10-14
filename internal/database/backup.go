@@ -29,7 +29,7 @@ func (e *Exporter) Dump(ctx context.Context, w io.Writer, progress func(TablePro
 
 	conn, err := e.connector.Acquire(ctx)
 	if err != nil {
-		return stats, err
+		return stats, fmt.Errorf("database: acquire the dump connection: %w", err)
 	}
 	defer conn.Release()
 
@@ -78,7 +78,10 @@ func writeDumpHeader(ctx context.Context, w io.Writer, tx pgx.Tx) error {
 
 	_, err = fmt.Fprintf(w, "-- saka database dump\n-- server: %s\n-- database: %s\n-- generated: %s\n",
 		server, database, time.Now().UTC().Format(time.RFC3339))
-	return err
+	if err != nil {
+		return fmt.Errorf("database: write the dump header: %w", err)
+	}
+	return nil
 }
 
 // dumpDDL writes the schema. The order is the order a restore needs: schemas
@@ -185,7 +188,7 @@ func dumpData(
 		return 0, 0, nil
 	}
 	if _, err := io.WriteString(w, "\n-- data\n"); err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("database: write the data section: %w", err)
 	}
 
 	var total int64
@@ -278,7 +281,7 @@ func copyTable(ctx context.Context, w io.Writer, tx pgx.Tx, table Table, plan *t
 // listTables returns every table in the dumped schemas.
 func listTables(ctx context.Context, tx pgx.Tx) ([]Table, error) {
 	var tables []Table
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, "list the tables", `
 		SELECT n.nspname, c.relname
 		FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -302,7 +305,7 @@ func listTables(ctx context.Context, tx pgx.Tx) ([]Table, error) {
 // left out: it is computed on the target, and COPY refuses to write it.
 func tableColumnNames(ctx context.Context, tx pgx.Tx, table Table) ([]string, error) {
 	var columns []string
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, fmt.Sprintf("list the columns of %s", table.Qualified()), `
 		SELECT attname FROM pg_attribute
 		WHERE attrelid = $1::regclass
 		  AND attnum > 0
@@ -326,7 +329,7 @@ func tableColumnNames(ctx context.Context, tx pgx.Tx, table Table) ([]string, er
 // has no defined order, which is the best a dump can promise.
 func primaryKeyColumns(ctx context.Context, tx pgx.Tx, table Table) ([]string, error) {
 	var columns []string
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, fmt.Sprintf("read the primary key of %s", table.Qualified()), `
 		SELECT a.attname
 		FROM pg_constraint c
 		JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true

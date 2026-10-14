@@ -48,8 +48,10 @@ test.describe.serial('the account profile flow', () => {
   test('saves the profile and reads it back after a reload', async ({ browser }) => {
     const account = requireUser()
     const page = await signIn(browser, requireUser())
-    await page.goto('/settings')
-    await expect(page).toHaveURL(/\/settings$/)
+    // The old `/settings` path redirects under the account shell — navigate
+    // to the profile tab it lands on instead of racing the redirect.
+    await page.goto('/account/profile')
+    await expect(page).toHaveURL(/\/account\/profile$/)
 
     const display = page.locator('#display-name')
     await expect(display).toHaveValue(/Throwaway/)
