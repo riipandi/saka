@@ -36,13 +36,14 @@ without the owner's explicit instruction. The directory keeps only the
 plans that still hold open work — a completed plan archives flat to
 `.llms/archive/plan-<stamp>.md` under its existing name (2026-10-14: the
 seven completed plans, `plan-20261008_1739.md` through
-`plan-20261014_0915.md`, moved; `plan-20261014_0930.md` alone remains).
+`plan-20261014_0915.md`, moved; `plan-20261014_0930.md` and
+`plan-20261014_0955.md` remain).
 The archive carries the plans' own subject lines and decision records;
 the older history (35 files) lives there too.
 
 | File | Subject |
 | --- | --- |
-| `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — awaiting approval, the phases wait for the owner's word |
+| `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — `in-progress`: phases 1–2 landed (`b42f8765`), phase 3 (final validation) waits for the owner's word |
 | `plan-20261014_0955.md` | `key:rotate`: one command re-seals the six sealed surfaces under a new `APP_SECRET_KEY` (D1 scope, D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new key written to the env file `key:generate`-style — takes issue-20261014_0949's open residue — awaiting approval |
 
 ## Handovers (`.llms/handover/`)
@@ -52,13 +53,13 @@ live and archived alike — carries the frontmatter convention
 (`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
 the filename stamp, the other keys from the body, and a key the body cannot
 name is omitted rather than guessed). The directory keeps the five newest; the
-older history (67 files) lives flat in
+older history (68 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
-`handover-20261014_0945.md` (the issues ledger reshuffle; the live items
-re-homed, the five rollups archived, plan-20261014_0930's phase 2
-slimmed to handover + index sync).
+`handover-20261014_1120.md` (plan-20261014_0930's phases 1–2: the
+capability-toggles and transports records landed in rules/architecture/
+docs, the handover and index synced; phase 3 — final validation — waits).
 
 ## Audits (`.llms/audit/`)
 
