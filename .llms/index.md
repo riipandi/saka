@@ -56,11 +56,13 @@ live and archived alike — carries the frontmatter convention
 (`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
 the filename stamp, the other keys from the body, and a key the body cannot
 name is omitted rather than guessed). The directory keeps the five newest; the
-older history (64 files) lives flat in
+older history (67 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
-`handover-20261014_0935.md` (the lazy-publisher contract plan).
+`handover-20261014_0945.md` (the issues ledger reshuffle; the live items
+re-homed, the five rollups archived, plan-20261014_0930's phase 2
+slimmed to handover + index sync).
 
 ## Audits (`.llms/audit/`)
 
@@ -98,8 +100,12 @@ rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
 lands there the moment it is found — not in chat memory. An issue file
 whose every item reaches a terminal status (`resolved`) leaves the
 directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
-name — the live directory lists only what is open or considering.
-Newest: `issue-20261012_1605.md`.
+name — the live directory lists only what is open or considering. A
+rollup that still carries live items may also archive, its open and
+considering items re-homed first into a fresh issue file that names the
+source (2026-10-14: the five 2026-10-06 → 2026-10-12 rollups archived;
+their live items carved into the three files below).
+Newest: `issue-20261014_0937.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -107,11 +113,9 @@ previous cross-check ran 2026-10-12):
 
 | File | Rollup | Subject |
 | --- | --- | --- |
-| `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]`, closed wontfix 2026-10-14 (owner keeps the split), the handover archive — resolved 2026-10-14 (plan-20261014_0047 phase 8: 62 handovers + 27 plans moved flat to `.llms/archive/`, the five newest of each retained), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
-| `issue-20261008_1705.md` | considering | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport stays `considering`; the backend auth audit resolved 2026-10-14 (audit-20261014_0329, plan-20261014_0047 phase 7 — the gate's rolled-back revocation fixed, indexes proven, the sweep gap opened as issue-20261014_0330) — no open item remains |
-| `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
-| `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
-| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
+| `issue-20261014_0935.md` | open (8) | The OIDC conformance and platform-direction residues carved out of the archived 2026-10-06 rollup: the owner's hosted certification run (open), the six parked decisions — RFC 8707 resource indicators (re-verified 2026-10-14), internal MCP servers, DCR, Form Post OP, the RP conformance rehearsal, RP-side logout — and the commented compose blocks (owner's call) |
+| `issue-20261014_0936.md` | open (2) | The connect-go v2 upstream-gated residues carved out of the archived 2026-10-09 rollup: `connectrpc.com/connect` v1 still in `go.mod` as buf's indirect, and validate/otelconnect with no `/v2` modules yet — both re-verified 2026-10-14, both acting on their named upstream trigger |
+| `issue-20261014_0937.md` | open (1) | `vp run` crashes child processes with a native stack overflow in Linux containers (re-homed unchanged from the archived 2026-10-12 issue) — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`) fails the commit that drifts either side; report upstream |
 
 ## Finding history fast
 
