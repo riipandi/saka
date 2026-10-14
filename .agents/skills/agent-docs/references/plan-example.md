@@ -27,28 +27,21 @@ phases:
 
 ## Objective
 
-<What this plan settles or ships, in three sentences: the finding or
-request that caused it, what the tree will look like after, and the one
-boundary the plan does not cross.>
+<What this plan settles or ships, in three sentences: the finding or request that caused it, what the tree will look like after, and the one boundary the plan does not cross.>
 
 ## Current state (verified in the tree, YYYY-MM-DD)
 
-- **<Claim 1>** — `<path/file.go:LINE>` names the code as it stands
-  today, quoted or paraphrased precisely.
-- **<Claim 2>** — the absence or behavior the plan responds to, with
-  the search that proved it (absence claims name their search).
-- **<Claim 3>** — the decision or record this plan extends or closes,
-  with its reference.
+- **<Claim 1>** — `<path/file.go:LINE>` names the code as it stands today, quoted or paraphrased precisely.
+- **<Claim 2>** — the absence or behavior the plan responds to, with the search that proved it (absence claims name their search).
+- **<Claim 3>** — the decision or record this plan extends or closes, with its reference.
 
 ## Decisions
 
-- **D1 (date): <the pick, stated as fact>.** <The reason that survived
-  the alternatives — specific to this tree.> The cost the pick carries:
+- **D1 (date): <the pick, stated as fact>.** <The reason that survived the alternatives — specific to this tree.> The cost the pick carries:
   <the trade-off, named>.
   Rejected: <alternative> — <the evidence-backed reason it lost>.
   Rejected: <alternative> — <the reason>.
-- **D2 (date): <the second fork, resolved>.** <Reason.> Rejected: <the
-  alternative and its reason>.
+- **D2 (date): <the second fork, resolved>.** <Reason.> Rejected: <the alternative and its reason>.
 
 ## Shape and enforcement points
 
@@ -61,39 +54,19 @@ boundary the plan does not cross.>
 
 ## Execution rules
 
-- **Atomic commit per phase** is authorized; each phase's heading names
-  its suggested commit message; self-serve commits are allowed during
-  this plan's working session.
-- **Execution waits for the owner's explicit "continue with phase N".**
-  When the phases have all landed, the agent stops and recommends the
-  closing commit message with its paths — it does not commit the
-  closing state on its own.
-- <Project policies restated as the owner grants them — migration
-  policy, reset consent, compatibility windows. Absent a grant: additive
-  migrations, no destructive operation, compatibility kept.>
-- **The owner's parallel work is untouchable:** <the files and
-  directories the owner named for this working session>.
+- **Atomic commit per phase** is authorized; each phase's heading names its suggested commit message; self-serve commits are allowed during this plan's working session.
+- **Execution waits for the owner's explicit "continue with phase N".** When the phases have all landed, the agent stops and recommends the closing commit message with its paths — it does not commit the closing state on its own.
+- <Project policies restated as the owner grants them — migration policy, reset consent, compatibility windows. Absent a grant: additive migrations, no destructive operation, compatibility kept.>
+- **The owner's parallel work is untouchable:** <the files and directories the owner named for this working session>.
 - **Per-phase validation runs before each phase's commit.**
-- **E2E only when relevant** — recorded n/a otherwise, never skipped
-  silently.
+- **E2E only when relevant** — recorded n/a otherwise, never skipped silently.
 
 ## Phases
 
-1. **<The contract or schema change>** — <what lands>. Validation:
-   <the exact command or probe that proves it>.
-   *Commit: `<type>(<scope>): <the message>`.*
-2. **<The implementation>** — <what lands>. Validation: <the command>;
-   the edge cases from the matrix rows it touches.
-   *Commit: `<type>(<scope>): <the message>`.*
-3. **Docs sync, ledger close, handover** — the records land (rules /
-   architecture / docs/), the issue flips and archives, the index rows
-   move, the handover carries the decisions.
-   Validation: the docs' claims diff-checked against the landed code;
-   the index agrees with the tree.
-   *Commit: `docs: <the message>`.*
-4. **Final validation** — the matrix below, run over the tree as it
-   stands. Validation: the matrix green end to end.
-   *Commit: none if green; the ledger note rides the docs phase.*
+1. **<The contract or schema change>** — <what lands>. Validation: <the exact command or probe that proves it>. *Commit: `<type>(<scope>): <the message>`.*
+2. **<The implementation>** — <what lands>. Validation: <the command>; the edge cases from the matrix rows it touches. *Commit: `<type>(<scope>): <the message>`.*
+3. **Docs sync, ledger close, handover** — the records land (rules / architecture / docs/), the issue flips and archives, the index rows move, the handover carries the decisions. Validation: the docs' claims diff-checked against the landed code; the index agrees with the tree. *Commit: `docs: <the message>`.*
+4. **Final validation** — the matrix below, run over the tree as it stands. Validation: the matrix green end to end. *Commit: none if green; the ledger note rides the docs phase.*
 
 ## Test matrix
 

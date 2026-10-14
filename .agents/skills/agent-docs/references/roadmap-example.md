@@ -19,9 +19,7 @@ references: <the issue and plan stamps the entries came from>
 
 - status: parked (unlock: <the named event>) · updated YYYY-MM-DD
 
-<What and why: the capability gap, the constraint that makes it
-non-urgent, and the evidence the tree can carry it — file:line for the
-seam it would use, re-verified on the date stamped.>
+<What and why: the capability gap, the constraint that makes it non-urgent, and the evidence the tree can carry it — file:line for the seam it would use, re-verified on the date stamped.>
 
 **Unlock:** <the event. The unlock is a fact about the world, not a
 wish — name who or what fires it.>
@@ -33,8 +31,7 @@ wish — name who or what fires it.>
 - status: parked (owner-deferred YYYY-MM-DD; unlock: <the named event>)
   · updated YYYY-MM-DD
 
-<What and why. A deferral is a decision, so it carries the date and the
-owner's word — an entry parked by decision reopens by decision.>
+<What and why. A deferral is a decision, so it carries the date and the owner's word — an entry parked by decision reopens by decision.>
 
 **Unlock:** <the event>. **First move:** <the first line of work>.
 
@@ -46,10 +43,7 @@ owner's word — an entry parked by decision reopens by decision.>
 - status: parked (unlock: <the upstream release or tag>) · updated
   YYYY-MM-DD
 
-<What is pinned and why it must wait: the indirect dependency, the
-missing module, the upstream bug — each with the file:line of today's
-state and the workaround that holds until then.>
+<What is pinned and why it must wait: the indirect dependency, the missing module, the upstream bug — each with the file:line of today's state and the workaround that holds until then.>
 
 **Unlock:** <the release, the tag, the fix — checkable by command>.
-**First move:** <the mechanical step, when it is one — the tidying, the
-import-path change, the workaround to delete with its guard>.
+**First move:** <the mechanical step, when it is one — the tidying, the import-path change, the workaround to delete with its guard>.
