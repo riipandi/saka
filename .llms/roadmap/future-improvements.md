@@ -93,6 +93,8 @@ plans — a separate harness where the suite acts as the OP.
 ### RI-6 — RP-initiated and back-channel logout on the RP side
 *(from issue-20261014_0935 ISS-007)*
 
+- status: parked (unlock: a product decision to propagate sign-out upstream) · updated 2026-10-14
+
 Saka never ends the upstream session on sign-out, and no receiver accepts
 providers' logout tokens — usually not what users expect, revisited only
 on demand. The offboarding seam (`modules/identity/oauthsso/offboarding.go`)
