@@ -199,8 +199,7 @@ explicitly recorded n/a — silence is not a verdict.
 ## Reference exemplars
 
 Two kinds live here: the **snapshots** — real ledger documents whose
-shape is the lesson — and the **cards** — distilled techniques from the
-owner's skill library, one page each.
+shape is the lesson — and the **cards** — one-page technique guides.
 
 | File | Kind | The shape it shows |
 | --- | --- | --- |
