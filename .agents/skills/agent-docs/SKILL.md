@@ -1,7 +1,7 @@
 ---
 name: agent-docs
 description: >
-    The Saka documentation-ledger workflow: drafting plan documents
+    The documentation-ledger workflow: drafting plan documents
     (.llms/plans), filing and reconciling issues (.llms/issues), curating
     the roadmap (.llms/roadmap), writing handovers and audits, keeping
     .llms/index.md and the .llms core documents in sync, and maintaining
@@ -12,12 +12,14 @@ metadata:
     short-description: "The .llms ledger and docs/ workflow"
 ---
 
-# Agent docs — the Saka ledger workflow
+# Agent docs — the documentation ledger workflow
 
 The shapes in force are the exemplars in `references/` beside this file.
 Read the matching one before writing its kind; this file carries the
-rules, the reference carries the shape. `AGENTS.md` and `.llms/rules.md`
-("Plan documents") win over anything here.
+rules, the reference carries the shape. The repository's own instruction
+files (AGENTS.md and the core documents it names) win over anything
+here. The exemplars are snapshots of one repository's ledger — their
+shape is the lesson; their content is not prescriptive.
 
 ## The two audiences
 
@@ -72,14 +74,17 @@ tests, then cleanup — and the riskiest phase names its undo (the
 revert or the in-place edit that backs it out).
 
 Execution rules (the owner's standing template — mirror it in every
-plan): execution waits for the owner's explicit "Lanjut fase N"; atomic
-commit per phase with the plan-named message; self-serve commits allowed
-during the plan's working session; after the last phase, stop and
-recommend the closing commit message — never commit it unasked. The
-final-validation phase and the test matrix are mandatory; E2E is written
-only when relevant and recorded n/a otherwise. Early stage: no backward
-compatibility, no legacy code; backend: no `ALTER` — edit migrations in
-place, dev-DB resets allowed when the plan says so.
+plan): execution waits for the owner's explicit go-ahead per phase
+("continue with phase N"); atomic commit per phase with the plan-named
+message; self-serve commits allowed during the plan's working session;
+after the last phase, stop and recommend the closing commit message —
+never commit it unasked. The final-validation phase and the test matrix
+are mandatory; E2E is written only when relevant and recorded n/a
+otherwise. Any standing project rules the owner keeps (for example:
+early stage, so no backward compatibility or legacy code; backend
+migrations edited in place rather than altered, dev-database resets
+allowed) are restated in the plan's execution-rules block so the plan is
+self-contained.
 
 Ledger hygiene: a completed plan archives flat to
 `.llms/archive/plan-<stamp>.md` under its existing name; the live
@@ -98,11 +103,10 @@ named trigger), `resolved`, `wontfix` — plus `area`, `plan` references
 Verify before writing, then verify adversarially: extract every claim
 the item makes, check each against the tree, and before repeating a
 claim — yours or an archived handover's — ask what would make it wrong
-and go look. A stale finding is worse than a missing one: the
-`release_after` lesson is a claim repeated from an archived handover
-whose contradicting guard (`framework/queue/client.go:137`) sat one
-search away. An audit record in `.llms/audit/` is the format when the
-finding set is large.
+and go look. A stale finding is worse than a missing one: the costliest
+reconciliation errors are claims repeated from an archived handover
+whose contradicting guard sat one search away. An audit record in
+`.llms/audit/` is the format when the finding set is large.
 
 Hygiene: a file whose every item is terminal archives flat under its
 existing name; a rollup with live items may also archive after its open
@@ -133,13 +137,14 @@ convention; conclusions age, the tree wins.
 ## The docs-sync rule and the closing sweep
 
 A change that lands a behavior lands its documentation in the same turn
-and the same commit. Dispatch: a contract or invariant → `.llms/rules.md`;
-a reasoning/decision/library record → `.llms/architecture.md`; a shipped
-endpoint, job, email, audit event, guard rule, or settings key → the
-endpoint reference, the Yaak collection, and `docs/`. The index's rows
-move in the same commit — plans gained or archived, issues opened or
-closed, pointers (`Newest:`) updated. Outdated prose is a defect of the
-change, not a follow-up.
+and the same commit. Dispatch: a contract or invariant → the rules
+document; a reasoning/decision/library record → the architecture
+document; a shipped surface (endpoint, job, background delivery, guard
+rule, settings key) → the endpoint reference, the API client collection
+the repository keeps, and `docs/`. The index's rows move in the same
+commit — plans gained or archived, issues opened or closed, pointers
+(`Newest:`) updated. Outdated prose is a defect of the change, not a
+follow-up.
 
 **The closing sweep is mandatory** — every time a task or a plan phase
 completes (and again at a plan's final-validation phase), walk this
@@ -154,12 +159,11 @@ checklist and sync each line the work touched, in the same commit:
    its `status`/`updated` line moved (taken / opened as an issue); the
    document's frontmatter `updated` stamps with it.
 4. **`docs/`** — sweep every human-facing document whose subject the
-   diff touched (endpoints → `api-endpoint.md` + the endpoint reference
-   + Yaak, behavior → `product-guide.md`/`auth.md`/`oauth-sso.md`/
-   `oidc.md`/`oidc-profiles.md`, operations → `deployment.md`/
-   `observability.md`, response shapes → `api-response.md`, users →
-   `users.md`); a `docs/` claim the diff made stale is the diff's
-   defect. When nothing applies, the n/a is recorded, not assumed.
+   diff touched: the endpoint/API references, the behavior and feature
+   guides, the operations and deployment runbooks, the response-shape
+   docs, the user-facing guides. A `docs/` claim the diff made stale is
+   the diff's defect. When nothing applies, the n/a is recorded, not
+   assumed.
 5. **The core documents** — a contract → `rules.md`, a decision or
    library record → `architecture.md`, the map rows → `index.md`.
 6. **The handover** — written at the plan's close (mandatory), not left
@@ -188,9 +192,9 @@ explicitly recorded n/a — silence is not a verdict.
 
 ## Provenance — what this skill borrows
 
-The shapes are Saka's (AGENTS.md, `.llms/rules.md`); these techniques
-come from the owner's skill library at `~/.agents/skills/` and are
-applied here in their ledger form:
+The shapes are the host repository's (its AGENTS.md and core documents);
+these techniques come from the owner's skill library at
+`~/.agents/skills/` and are applied here in their ledger form:
 
 | Source skill | What carried over |
 | --- | --- |
