@@ -42,6 +42,7 @@ the older history (35 files) lives there too.
 | File | Subject |
 | --- | --- |
 | `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — awaiting approval, the phases wait for the owner's word |
+| `plan-20261014_0955.md` | `key:rotate`: one command re-seals the six sealed surfaces under a new `APP_SECRET_KEY` (D1 scope, D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new key written to the env file `key:generate`-style — takes issue-20261014_0949's open residue — awaiting approval |
 
 ## Handovers (`.llms/handover/`)
 
@@ -110,7 +111,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261014_0935.md` | open (8) | The OIDC conformance and platform-direction residues carved out of the archived 2026-10-06 rollup: the owner's hosted certification run (open), the six parked decisions — RFC 8707 resource indicators (re-verified 2026-10-14), internal MCP servers, DCR, Form Post OP, the RP conformance rehearsal, RP-side logout — and the commented compose blocks (owner's call) |
 | `issue-20261014_0936.md` | open (2) | The connect-go v2 upstream-gated residues carved out of the archived 2026-10-09 rollup: `connectrpc.com/connect` v1 still in `go.mod` as buf's indirect, and validate/otelconnect with no `/v2` modules yet — both re-verified 2026-10-14, both acting on their named upstream trigger |
 | `issue-20261014_0937.md` | open (1) | `vp run` crashes child processes with a native stack overflow in Linux containers (re-homed unchanged from the archived 2026-10-12 issue) — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`) fails the commit that drifts either side; report upstream |
-| `issue-20261014_0949.md` | open (4) | The reconciliation of the fifteen `status: partial` archived handovers + plan-20261012_0155's partially-done phase (2026-10-14): nearly everything landed — the residues are the `key:rotate` stub (`cmd/appkey.go:177`), the `queue.release_after` invariant `Validate` never cross-checks, and two parked decisions (`storage:migrate`, the deferred `rs/cors` replacement) |
+| `issue-20261014_0949.md` | open (1) + considering (2), one resolved on re-verification | The reconciliation of the fifteen `status: partial` archived handovers + plan-20261012_0155's partially-done phase (2026-10-14): nearly everything landed — the open residue is the `key:rotate` stub (`cmd/appkey.go:177`, plan-20261014_0955 takes it); the `release_after` invariant resolved on re-verification (enforced at the queue client's `Register` seam, the config layer cannot see task timeouts); two parked (`storage:migrate`, the deferred `rs/cors` replacement) |
 
 ## Finding history fast
 
