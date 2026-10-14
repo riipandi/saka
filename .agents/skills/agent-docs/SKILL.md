@@ -94,7 +94,7 @@ The directory keeps the five newest; older history archives flat. Audits
 (`.llms/audit/`) are point-in-time reviews with the same frontmatter
 convention; conclusions age, the tree wins.
 
-## The docs-sync rule
+## The docs-sync rule and the closing sweep
 
 A change that lands a behavior lands its documentation in the same turn
 and the same commit. Dispatch: a contract or invariant → `.llms/rules.md`;
@@ -104,6 +104,33 @@ endpoint reference, the Yaak collection, and `docs/`. The index's rows
 move in the same commit — plans gained or archived, issues opened or
 closed, pointers (`Newest:`) updated. Outdated prose is a defect of the
 change, not a follow-up.
+
+**The closing sweep is mandatory** — every time a task or a plan phase
+completes (and again at a plan's final-validation phase), walk this
+checklist and sync each line the work touched, in the same commit:
+
+1. **The plan itself** — frontmatter `status` and the phases' `status` /
+   `note` lines; a completed plan archives and its index rows move.
+2. **Issues** — every item the work touched flips its status line with
+   the date and the evidence; a rollup whose items are all terminal
+   archives (re-homing live items first).
+3. **Roadmap** — an entry a plan took, or whose unlock just fired, gets
+   its `status`/`updated` line moved (taken / opened as an issue); the
+   document's frontmatter `updated` stamps with it.
+4. **`docs/`** — sweep every human-facing document whose subject the
+   diff touched (endpoints → `api-endpoint.md` + the endpoint reference
+   + Yaak, behavior → `product-guide.md`/`auth.md`/`oauth-sso.md`/
+   `oidc.md`/`oidc-profiles.md`, operations → `deployment.md`/
+   `observability.md`, response shapes → `api-response.md`, users →
+   `users.md`); a `docs/` claim the diff made stale is the diff's
+   defect. When nothing applies, the n/a is recorded, not assumed.
+5. **The core documents** — a contract → `rules.md`, a decision or
+   library record → `architecture.md`, the map rows → `index.md`.
+6. **The handover** — written at the plan's close (mandatory), not left
+   to the next session.
+
+The sweep is a checklist, not a vibe: each line is either synced or
+explicitly recorded n/a — silence is not a verdict.
 
 ## Mechanical traps
 
