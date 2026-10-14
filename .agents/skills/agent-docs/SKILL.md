@@ -178,6 +178,15 @@ checklist and sync each line the work touched, in the same commit:
 The sweep is a checklist, not a vibe: each line is either synced or
 explicitly recorded n/a — silence is not a verdict.
 
+## Markdown mechanics
+
+- **No word-wrapping.** Write each paragraph, list item, and table row
+  as a single line — the soft wrap is the editor's job, not the file's.
+  Never reflow or hard-wrap a document whose lines already run long, and
+  never let a formatter introduce mid-sentence breaks: a wrapped line
+  makes every diff a noisier one and every `grep` a two-line problem.
+  One sentence of diff shows as one changed line.
+
 ## Mechanical traps
 
 - Never batch multiple `edit_file` calls to the same file in one
