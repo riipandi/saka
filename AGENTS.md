@@ -41,7 +41,7 @@ The frontend toolchain is Vite+ (`vp`): one CLI over Vite/Rolldown, Vitest, Oxli
 
 The agent environment carries a skill library. These are the ones this repository reaches for, by area. A skill advises; the rules in this file and `.llms/` still win.
 
-- **The documentation ledger** — `agent-docs` for every piece of ledger work: a plan document, an issue, a roadmap entry, a handover, an audit, an index update, or a `docs/` change. Its `reference/` folder carries the exemplar shapes (plan, issue, roadmap, handover) — read the matching one before writing that kind of document.
+- **The documentation ledger** — `agent-docs` for every piece of ledger work: a plan document, an issue, a roadmap entry, a handover, an audit, an index update, or a `docs/` change. Its `references/` folder carries the exemplar shapes (plan, issue, roadmap, handover) — read the matching one before writing that kind of document.
 - **Frontend UI** — `emil-design-eng` and `apple-design` when composing or implementing UI (see Frontend UI above); `impeccable` for a design review, polish pass, or an interface that needs shaping or critique.
 - **Go services** — `golang-samber-do` for DI shapes; `go-http-safeguards` when writing or hardening `net/http` handlers and middleware (timeouts, graceful shutdown, body limits, panic recovery); `go-api-perf` when a latency or throughput complaint lands — profile first, never tune blind.
 - **Postgres** — `postgresql-optimization` for query and index work (the `EXPLAIN (ANALYZE, BUFFERS)` on seeded rows habit the audits use); `postgresql-code-review` when reviewing a migration or a query change.

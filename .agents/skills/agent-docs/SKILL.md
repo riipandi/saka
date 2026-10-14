@@ -14,7 +14,7 @@ metadata:
 
 # Agent docs — the Saka ledger workflow
 
-The shapes in force are the exemplars in `reference/` beside this file.
+The shapes in force are the exemplars in `references/` beside this file.
 Read the matching one before writing its kind; this file carries the
 rules, the reference carries the shape. `AGENTS.md` and `.llms/rules.md`
 ("Plan documents") win over anything here.
@@ -118,7 +118,7 @@ change, not a follow-up.
 
 | File | The shape it shows |
 | --- | --- |
-| `reference/plan-example.md` | A full plan: frontmatter phases, verified current state, decisions with rejected alternatives, the execution-rules block, per-phase commits, matrix, out-of-scope |
-| `reference/issue-example.md` | An issue rollup: frontmatter rollup, per-item statuses with triggers, the settled-records section |
-| `reference/roadmap-example.md` | A roadmap document: frontmatter, per-entry `parked (unlock)` lines, evidence, first moves, source stamps |
-| `reference/handover-example.md` | A handover: frontmatter convention, what the session did, the commits, what stayed open |
+| `references/plan-example.md` | A full plan: frontmatter phases, verified current state, decisions with rejected alternatives, the execution-rules block, per-phase commits, matrix, out-of-scope |
+| `references/issue-example.md` | An issue rollup: frontmatter rollup, per-item statuses with triggers, the settled-records section |
+| `references/roadmap-example.md` | A roadmap document: frontmatter, per-entry `parked (unlock)` lines, evidence, first moves, source stamps |
+| `references/handover-example.md` | A handover: frontmatter convention, what the session did, the commits, what stayed open |
