@@ -195,7 +195,7 @@ func (c *claimSet) UnmarshalJSON(data []byte) error {
 	}
 	var fields named
 	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
+		return fmt.Errorf("oauthsso: decode the provider claims: %w", err)
 	}
 	c.Subject = fields.Subject
 	c.Email = fields.Email
@@ -206,7 +206,7 @@ func (c *claimSet) UnmarshalJSON(data []byte) error {
 		c.raw = map[string]any{}
 	}
 	if err := json.Unmarshal(data, &c.raw); err != nil {
-		return err
+		return fmt.Errorf("oauthsso: decode the provider claims: %w", err)
 	}
 	return nil
 }

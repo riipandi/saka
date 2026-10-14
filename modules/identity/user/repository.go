@@ -211,7 +211,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("user: create the account: %w", err)
 	}
 	return row.ID, nil
 }

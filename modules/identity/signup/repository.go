@@ -184,7 +184,7 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row u
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("signup: create the account: %w", err)
 	}
 	return row.ID, nil
 }
@@ -218,7 +218,7 @@ func (r *Repository) FindUserEmailAccount(ctx context.Context, db datastore.Quer
 	row := db.QueryRow(ctx, query, args...)
 	var account userEmailAccount
 	if err := row.Scan(&account.Email, &account.DisplayName); err != nil {
-		return userEmailAccount{}, err
+		return userEmailAccount{}, fmt.Errorf("signup: find the address account: %w", err)
 	}
 	return account, nil
 }

@@ -166,7 +166,10 @@ func (r *Repository) audienceIDs(ctx context.Context, db datastore.Querier, tabl
 		}
 		ids = append(ids, target)
 	}
-	return ids, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("notification: audience: %w", err)
+	}
+	return ids, nil
 }
 
 // ListAll answers one page of every notification, ordered as the caller
@@ -442,7 +445,10 @@ func (r *Repository) Recipients(ctx context.Context, db datastore.Querier, id, a
 		}
 		recipients = append(recipients, row)
 	}
-	return recipients, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("notification: recipients: %w", err)
+	}
+	return recipients, nil
 }
 
 // visibleWhereFor is the visibility predicate for the recipient query,
@@ -505,7 +511,10 @@ func (r *Repository) GroupMemberUserIDs(ctx context.Context, db datastore.Querie
 		}
 		ids = append(ids, id)
 	}
-	return ids, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("notification: group members: %w", err)
+	}
+	return ids, nil
 }
 
 // notificationRows runs a built page query over the notification table and

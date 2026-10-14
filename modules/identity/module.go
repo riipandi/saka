@@ -505,7 +505,7 @@ var Package = do.Package(
 		}
 		service, err := webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, reader, recorder, log)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("identity: webauthn service: %w", err)
 		}
 		// The email-code proof's send pair rides the post-construction
 		// seam, the way the password recovery service takes its notifier:

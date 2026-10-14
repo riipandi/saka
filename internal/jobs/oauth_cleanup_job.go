@@ -86,9 +86,12 @@ func oauthCleanupProcessor(ctx context.Context, task OAuthCleanupTask, pool *dat
 // maintenance jobs, because it removes rows nothing reads back.
 func deleteExpiredOAuthFlows(ctx context.Context, pool *datastore.Postgres, now time.Time) (int64, error) {
 	repo := oauthsso.NewRepository(pool)
+	// The repository names its own failure (`oauthsso: delete expired
+	// flows: ...`); pass it through unchanged so the log line does not
+	// double the prefix.
 	deleted, err := repo.DeleteExpiredFlows(ctx, now)
 	if err != nil {
-		return 0, fmt.Errorf("oauth_cleanup: delete: %w", err)
+		return 0, err
 	}
 	return deleted, nil
 }
