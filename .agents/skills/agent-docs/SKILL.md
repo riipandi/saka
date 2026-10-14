@@ -25,8 +25,11 @@ rules, the reference carries the shape. `AGENTS.md` and `.llms/rules.md`
   no prose padding. `index.md` is the map; `rules.md` holds contracts,
   `architecture.md` holds reasoning and decision records.
 - **`docs/` is for humans** — no internals, no paths, no agent context;
-  orientation on the reader. Run the `clarity` skill before writing or
-  rewriting any tree document.
+  orientation on the reader. The `clarity` skill is **mandatory** before
+  writing or rewriting any document in `.llms/` or `docs/` — a rewrite
+  without it is a defect of the change, not a style preference. `docs/`
+  prose is concise GFM, one idea per paragraph, emoji only where an
+  admonition earns it.
 
 ## Status vocabulary and required metadata
 
@@ -58,6 +61,16 @@ a shape/enforcement table, Execution rules, Phases (each with its own
 validation line and suggested commit message), Test matrix, Explicitly
 out of scope.
 
+Plan quality rules: a plan claiming `awaiting-approval` carries no
+placeholder — every decision is either made and dated or explicitly
+asked, never a `TBD`; each phase's validation is objectively checkable
+(a command, a probe, a count — not "works correctly"); a decision
+records its consequence, the cost the pick carries, not only why the
+alternatives lost. For code plans, sequence phases the safe order —
+contracts and types first, then implementations, then callers, then
+tests, then cleanup — and the riskiest phase names its undo (the
+revert or the in-place edit that backs it out).
+
 Execution rules (the owner's standing template — mirror it in every
 plan): execution waits for the owner's explicit "Lanjut fase N"; atomic
 commit per phase with the plan-named message; self-serve commits allowed
@@ -82,10 +95,14 @@ its own status line — `open`, `considering` (a decision parked with a
 named trigger), `resolved`, `wontfix` — plus `area`, `plan` references
 (source or record-to-honor), `summary`, `trigger`.
 
-Verify before writing: every file:line claim is checked against the tree
-in the same turn, and re-checked when the item is touched — a stale
-finding is worse than a missing one (the `release_after` lesson:
-re-verification flipped an open item to resolved).
+Verify before writing, then verify adversarially: extract every claim
+the item makes, check each against the tree, and before repeating a
+claim — yours or an archived handover's — ask what would make it wrong
+and go look. A stale finding is worse than a missing one: the
+`release_after` lesson is a claim repeated from an archived handover
+whose contradicting guard (`framework/queue/client.go:137`) sat one
+search away. An audit record in `.llms/audit/` is the format when the
+finding set is large.
 
 Hygiene: a file whose every item is terminal archives flat under its
 existing name; a rollup with live items may also archive after its open
@@ -168,3 +185,22 @@ explicitly recorded n/a — silence is not a verdict.
 | `references/issue-example.md` | An issue rollup: frontmatter rollup, per-item statuses with triggers, the settled-records section |
 | `references/roadmap-example.md` | A roadmap document: frontmatter, per-entry `parked (unlock)` lines, evidence, first moves, source stamps |
 | `references/handover-example.md` | A handover: frontmatter convention, what the session did, the commits, what stayed open |
+
+## Provenance — what this skill borrows
+
+The shapes are Saka's (AGENTS.md, `.llms/rules.md`); these techniques
+come from the owner's skill library at `~/.agents/skills/` and are
+applied here in their ledger form:
+
+| Source skill | What carried over |
+| --- | --- |
+| `create-implementation-plan` | Per-phase measurable validation; a plan ready for approval carries no placeholder |
+| `create-architectural-decision-record` | A decision records its consequences — the cost of the pick, both sides |
+| `doublecheck` | The adversarial pass before repeating a claim; extract → check → ask what makes it wrong |
+| `refactor-plan` | The safe sequence (contracts → implementations → callers → tests → cleanup) and the named undo for risky phases |
+| `create-readme` | The `docs/` tone: concise GFM, one idea per paragraph, admonitions earned |
+| `prd` | Non-goals as a first-class section (the plans' out-of-scope list) |
+| `create-llms` / `update-llms` | Not adopted — `.llms/index.md` is the map here; revisit only if an `llms.txt` root file is ever wanted |
+| `create-specification` / `update-specification` | Requirements vs constraints vs recommendations kept distinct in plan prose |
+| `update-markdown-file-index` | Index rows move in the same commit as the tree they describe |
+| `update-implementation-plan` / `update-specification` | Status updates re-stamp `updated` and re-verify the claims they touch |
