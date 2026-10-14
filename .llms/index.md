@@ -99,7 +99,7 @@ rollup that still carries live items may also archive, its open and
 considering items re-homed first into a fresh issue file that names the
 source (2026-10-14: the five 2026-10-06 → 2026-10-12 rollups archived;
 their live items carved into the three files below).
-Newest: `issue-20261014_0937.md`.
+Newest: `issue-20261014_0949.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -110,6 +110,7 @@ previous cross-check ran 2026-10-12):
 | `issue-20261014_0935.md` | open (8) | The OIDC conformance and platform-direction residues carved out of the archived 2026-10-06 rollup: the owner's hosted certification run (open), the six parked decisions — RFC 8707 resource indicators (re-verified 2026-10-14), internal MCP servers, DCR, Form Post OP, the RP conformance rehearsal, RP-side logout — and the commented compose blocks (owner's call) |
 | `issue-20261014_0936.md` | open (2) | The connect-go v2 upstream-gated residues carved out of the archived 2026-10-09 rollup: `connectrpc.com/connect` v1 still in `go.mod` as buf's indirect, and validate/otelconnect with no `/v2` modules yet — both re-verified 2026-10-14, both acting on their named upstream trigger |
 | `issue-20261014_0937.md` | open (1) | `vp run` crashes child processes with a native stack overflow in Linux containers (re-homed unchanged from the archived 2026-10-12 issue) — the Dockerfile workaround (direct `tsc` chain) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`) fails the commit that drifts either side; report upstream |
+| `issue-20261014_0949.md` | open (4) | The reconciliation of the fifteen `status: partial` archived handovers + plan-20261012_0155's partially-done phase (2026-10-14): nearly everything landed — the residues are the `key:rotate` stub (`cmd/appkey.go:177`), the `queue.release_after` invariant `Validate` never cross-checks, and two parked decisions (`storage:migrate`, the deferred `rs/cors` replacement) |
 
 ## Finding history fast
 
