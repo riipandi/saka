@@ -1,75 +1,90 @@
 # Agents Instructions
 
-One binary: HTTP/ConnectRPC API, embedded SPA, CLI. This file holds the general
-instructions; the detail lives in `.llms/`. Read in this order:
+This file holds the workflow rules, always in force; the detail — the
+repository's shape, stack, per-package contracts, and reasoning — lives
+in `.llms/`. Read in this order:
 
-1. This file — behavioral rules, always in force.
+1. This file — behavioral rules and workflow.
 2. `.llms/index.md` — the documentation map.
-3. `.llms/rules.md` — the detailed rules: tasks, per-package contracts, how-to-change recipes, traps. Read the section a change touches before touching it.
-4. `.llms/architecture.md` — per-package reasoning and library decision records. Read that package's section before changing it.
+3. `.llms/shape.md` — the repository's shape: the layout, the toolchain, the frontend conventions, the porting contract. Read once, return when a path or a command is needed.
+4. `.llms/rules.md` — the detailed rules: tasks, per-package contracts, how-to-change recipes, traps. Read the section a change touches before touching it.
+5. `.llms/architecture.md` — per-package reasoning and library decision records. Read that package's section before changing it.
 
-## Shape
+## Working rules
 
-- `cmd/` uses `urfave/cli/v3`; `task --list` mirrors the CLI. The frontend is a pnpm + Vite+ monorepo of independent packages under `packages/`: `webapp` (the React 19 + TanStack SPA source, plus `public/` — its `vite.config.ts` owns the SPA pipeline and the Go binary targets), `uilibs` (the presentational component library — components, styles, theme, hooks; no data fetching, no build target of its own, compiled by the consumer; Storybook stories beside the components), `email` (React Email templates — its own `build.ts` script compiles them into the Go embed, content-hash cached), `plugins` (the shared Vite plugin: golang), `e2e-tests` (Playwright). The root `vite.config.ts` is monorepo setup only (staged/fmt/lint/typecheck), with no app pipeline; the Taskfile sequences the passes (`task build` = email then webapp, `task dev` = webapp dev loop). The Go shell (`web/shell.go`) owns the HTML document, so there is no `index.html`. The dev server proxies `/api`, `/rpc`, `/.well-known`, `/storage` to Go on `:3000`.
-- Implemented surfaces are listed in `.llms/index.md` and `.llms/architecture.md`; the rest of `internal/**` and `modules/**` is a scaffold. Do not document, test, or treat a stub as working.
-- Pocket ID is passkey-only. Surfaces it never had are `[Saka]` in Yaak. Auth flows beyond ported endpoints follow Better Auth.
-- Do not add, remove, or rename a top-level directory unless asked. Extend an existing package.
-- Porting a plan into code means implementing it. A doc may describe a larger surface than the code has.
-- No self-evident comments: a comment must carry what the code cannot (a why, a contract, a trap), never restate what the next line already says.
-
-## Frontend UI
-
-- Compose screens from `packages/uilibs/src/components/` — the library is comprehensive; pick the component that fits the item (Item for list rows, Table for grids, AlertDialog for confirmations, …) and never reshape an existing uilibs design to fit a feature. Check the component's Storybook story beside it before building on it.
-- Apply the skills `emil-design-eng` and `apple-design` when composing or implementing UI.
-- Keep route files small with TanStack Router code splitting: a route file declares `createFileRoute` with `component: RouteComponent` — a thin wrapper defined in the same file that wires `useSearch`/`useNavigate` to the view — while the implementation lives beside it in a dash-prefixed file (`-settings-view.tsx`, `-sessions-view.tsx`) — dash-prefixed files are excluded from the route tree and never render as URLs. Never mount a dash-file view as the route's component directly. See <https://tanstack.com/router/latest/docs/routing/file-based-routing>.
-- Import colocated files (the dash files beside a route) with relative paths (`./-settings-dialog`), not the `#/` alias — the alias is for cross-directory reaches.
-
-## Stack (summary)
-
-Go 1.27.2, Node ≥ 24.21, pnpm, Docker (testcontainers), `task`. chi, pgx, optional Valkey, `samber/do` DI, goose as a library, koanf, LogLayer behind `log/slog`, OpenTelemetry, local and S3 storage. DI rules (`do.Package`, no singletons, no package `init`) and the registry seams are in `.llms/rules.md` and the skill `golang-samber-do`.
-
-## Vite+ toolchain
-
-The frontend toolchain is Vite+ (`vp`): one CLI over Vite/Rolldown, Vitest, Oxlint, Oxfmt, and its task runner. Docs: `node_modules/vite-plus/docs` or <https://viteplus.dev/guide/>.
-
-- `vp <name>` runs a built-in; `vp run <name>` runs a `package.json` script or a `vite.config.ts` task — they may differ. Check both before assuming what a name runs.
-- `vp check` = format + lint + type check (`--fix` to write); `vp fmt` / `vp lint` are the pieces. The lint/fmt settings live in the root `vite.config.ts` (migrated from the former `.oxlintrc.json` / `.oxfmtrc.json`).
-- `vp toolchain [tool]` shows versions; `vp why <package>` the dependency graph. Run `vp install` after pulling remote changes.
-- **Commit hooks.** The dispatcher is `core.hooksPath → .vite-hooks/_` (generated; `prepare: vp config` reinstalls it). The project-owned `.vite-hooks/pre-commit` runs `vp staged` — the `staged` block in the root `vite.config.ts` maps `*.{ts,tsx,js,jsx,css,json}` to `vp check --fix` and `*.go` to `gofmt -w`, re-staging fixed files — then guards the Yaak export with `scripts/check-yaak-secrets.sh` and the typecheck chain with `scripts/check-typecheck-parity.sh`. `VP_GIT_HOOKS=0` skips hooks per process.
+- Do not document, test, or treat a stub as working — implemented
+  surfaces are listed in `.llms/index.md` and `.llms/architecture.md`;
+  the rest is a scaffold.
+- Do not add, remove, or rename a top-level directory unless asked;
+  extend an existing package.
+- Porting a plan into code means implementing it. A doc may describe a
+  larger surface than the code has.
+- No self-evident comments: a comment must carry what the code cannot
+  (a why, a contract, a trap), never restate what the next line already
+  says.
 
 ## Skills
 
-The agent environment carries a skill library. These are the ones this repository reaches for, by area. A skill advises; the rules in this file and `.llms/` still win.
+The agent environment carries a skill library. These are the ones this
+repository reaches for, by area. A skill advises; the rules in this
+file and `.llms/` still win.
 
-- **The documentation ledger** — `agent-docs` for every piece of ledger work: a plan document, an issue, a roadmap entry, a handover, an audit, an index update, or a `docs/` change. Its `references/` folder carries the exemplar shapes (plan, issue, roadmap, handover) — read the matching one before writing that kind of document.
-- **Frontend UI** — `emil-design-eng` and `apple-design` when composing or implementing UI (see Frontend UI above); `impeccable` for a design review, polish pass, or an interface that needs shaping or critique.
-- **Go services** — `golang-samber-do` for DI shapes; `go-http-safeguards` when writing or hardening `net/http` handlers and middleware (timeouts, graceful shutdown, body limits, panic recovery); `go-api-perf` when a latency or throughput complaint lands — profile first, never tune blind.
-- **Postgres** — `postgresql-optimization` for query and index work (the `EXPLAIN (ANALYZE, BUFFERS)` on seeded rows habit the audits use); `postgresql-code-review` when reviewing a migration or a query change.
-- **E2E** — `webapp-testing` for driving the browser against a running app; `playwright-generate-test` for a new scenario in `packages/e2e-tests`.
-- **Security** — `security-review` before an auth, federation, or storage change claims done; the audit records in `.llms/audit/` are the format.
-- **Prose and plans** — `clarity` before writing or rewriting any tree document, `handoff` for handovers (see Prose below); `create-specification` and `create-implementation-plan` can seed a document, but the shapes in `.llms/rules.md` ("Plan documents") are the contract — a skill's template never overrides them.
+- **The documentation ledger** — `agent-docs` for every piece of ledger
+  work: a plan document, an issue, a roadmap entry, a handover, an
+  audit, an index update, or a `docs/` change. Its `references/` folder
+  carries the exemplar shapes — read the matching one before writing
+  that kind of document.
+- **Frontend UI** — `emil-design-eng` and `apple-design` when composing
+  or implementing UI; `impeccable` for a design review, polish pass, or
+  an interface that needs shaping or critique.
+- **Backend services** — the per-stack DI/design skills the
+  architecture document names; hardening skills when writing or
+  reviewing `net/http` handlers and middleware; the profiling skill
+  when a latency or throughput complaint lands — profile first, never
+  tune blind.
+- **Databases** — the query/index optimization skill for query work;
+  the code-review skill when reviewing a migration or a query change.
+- **E2E** — the browser-driving skill for a running app; the
+  test-generation skill for a new scenario in the E2E package.
+- **Security** — `security-review` before an auth, federation, or
+  storage change claims done; the audit records in `.llms/audit/` are
+  the format.
+- **Prose** — `clarity` before writing or rewriting any tree document;
+  `handoff` for handovers (see Prose below).
 
 ## Ambiguous decisions
 
-Stop and confirm before writing code, migrations, protos, or config when scope, system design, or an architecture choice is unclear. Do not pick a design silently and ship it.
+Stop and confirm before writing code, migrations, protos, or config
+when scope, system design, or an architecture choice is unclear. Do not
+pick a design silently and ship it.
 
 Ask when any of these is true:
 
 - The request fits more than one package, area, table, or transport.
-- A new surface, job, queue, config key, grant, or migration is implied but not named.
-- `.llms/architecture.md` and this file leave more than one valid shape.
-- The change would be hard to undo (schema, public contract, seed, authz rule, secret, storage key).
-- You would have to invent a product rule (who can call it, what is stored, what is async).
+- A new surface, job, queue, config key, grant, or migration is implied
+  but not named.
+- `.llms/architecture.md` and this file leave more than one valid
+  shape.
+- The change would be hard to undo (schema, public contract, seed,
+  authz rule, secret, storage key).
+- You would have to invent a product rule (who can call it, what is
+  stored, what is async).
 
-Do not ask about rules the docs already settle: stack, DI, SQL style, guard refusal codes, log frontend, goose layout, JSON v2, file size habits.
+Do not ask about rules the docs already settle — check
+`.llms/rules.md`'s contracts first; a settled rule is not a question.
 
 How to ask:
 
 1. One line: what is unclear and what breaks if the wrong option ships.
-2. A numbered list of concrete options (usually 2–4). Each option is a design, not a vibe.
-3. Mark exactly one option `recommended` and give one sentence of why (constraint in this repo, blast radius, or fit with an existing package).
-4. Always add a final free-input option so the human can name a different path in their own words.
-5. Wait. Do not implement, generate, or migrate until they pick a number or write their own.
+2. A numbered list of concrete options (usually 2–4). Each option is a
+   design, not a vibe.
+3. Mark exactly one option `recommended` and give one sentence of why
+   (a constraint in this repo, blast radius, or fit with an existing
+   package).
+4. Always add a final free-input option so the human can name a
+   different path in their own words.
+5. Wait. Do not implement, generate, or migrate until they pick a
+   number or write their own.
 
 ```text
 Unclear: <decision> — wrong pick means <cost>.
@@ -80,27 +95,87 @@ Unclear: <decision> — wrong pick means <cost>.
 4. Other — reply with the design you want
 ```
 
-If they already chose in the same thread, do not re-ask. If new facts change the choice, confirm the delta only.
+If they already chose in the same thread, do not re-ask. If new facts
+change the choice, confirm the delta only.
 
 ## Workflow
 
-- **Cross-check the contract.** Frontend implementation and integration work must be cross-checked against the actual backend state before it is written: the proto specs (`api/connect/*.proto`) name the procedures and wire types, and the serving module (`internal/`, `modules/`) names what really answers — which surface owns which key, and which transport serves it. A plan's or doc's claim is a hypothesis until this check confirms it; a toggle, endpoint, or envelope shape that exists on neither side is not to be invented.
-- **Issues.** A finding that outlives the turn — a defect discovered mid-work, a gap a plan's closure exposed, a parked decision with a named trigger — goes to `.llms/issues/issue-YYYYMMDD_hhmm.md` when found, not to chat memory. The file's frontmatter carries the rollup `status` and `captured`/`updated` timestamps; each item inside carries its own `status` line, the plan documents it came from or touches, and the trigger that reopens it. Statuses: `open`, `considering`, `resolved`, `wontfix`. When an item resolves, mark it in the file it lives in — the file is the tracker, not a diary. A file whose every item reaches a terminal status leaves the live directory for `.llms/archive/issue-<stamp>.md` — flat, under its existing name, and the index's recap row drops with it; the live directory lists only open and considering files.
-- **Docs sync.** A change that lands a behavior must land its documentation in the same turn: contract or invariant → `.llms/rules.md`; reasoning, decision, or library record → `.llms/architecture.md`; a shipped endpoint, job, email, audit event, guard rule, or settings key → the endpoint reference, the Yaak collection, and `docs/` where they live. Decide once per turn, before the commit: if the diff changes what a doc claims, the doc rides the same commit. Outdated prose is a defect of the change, not a follow-up. Every completed task or plan phase runs the closing sweep the `agent-docs` skill carries: the plan's own status, the issue and roadmap statuses it touches, the `docs/` tree it made stale, the index rows, and the handover — each line synced or recorded n/a.
-- **Validation.** `go test ./...`, `task lint`, and a probe against a freshly built `build/release/saka serve --env-file=.env.local` before claiming a change works — a green unit suite does not exercise the composition root. Load tests run only when the user asks for them; never start one unprompted.
-- **Static analysis.** `task analysis:deadcode` runs `go tool deadcode ./...` — the unreachable-function report over the non-test build. The tool rides go.mod's `tool` directive; `go get -tool golang.org/x/tools/cmd/deadcode@latest` adds or updates it (the pin is committed, so the report is reproducible across machines). A finding is a lead, not a deletion order: deadcode cannot see through the reachability it does not model — a method satisfied through an interface it did not trace, a handler registered by reflection or `init` — so verify each report against the tree before removing anything, and a finding that outlives the turn goes to `.llms/issues/` like any other.
-- **Plans.** A plan (`.llms/plans/`) is a contract with a fixed shape and hard rules; it executes only on the owner's explicit instruction. The full spec is in `.llms/rules.md` ("Plan documents").
-- **Prose.** Tree documents are English. Technical documentation for agents lives in `.llms/`; product documentation for humans lives in `docs/` — keep `docs/` free of technical references (paths, internals, agent context); its orientation is the human reader. Chat may follow the user's language. Files do not. Use skill `clarity` before writing or rewriting any of them; `handoff` for handovers.
-- **Library docs.** Use the MCP Context7 and DeepWiki tools for external libraries; the module cache is the pinned truth — code wins over docs.
-- **Secrets.** A secret is listed in `internal/config` `secretKeys` and nowhere else. Never print one; never rewrite a dotenv file without consent.
+- **Cross-check the contract.** Integration work is cross-checked
+  against the actual backend state before it is written: the wire
+  contracts (the API specs and proto files) name the procedures and
+  wire types, and the serving module names what really answers — which
+  surface owns which key, and which transport serves it. A plan's or
+  doc's claim is a hypothesis until this check confirms it; a toggle,
+  endpoint, or envelope shape that exists on neither side is not to be
+  invented.
+- **Issues.** A finding that outlives the turn — a defect discovered
+  mid-work, a gap a plan's closure exposed, a parked decision with a
+  named trigger — goes to `.llms/issues/issue-YYYYMMDD_hhmm.md` when
+  found, not to chat memory. The file's frontmatter carries the rollup
+  `status` and `captured`/`updated` timestamps; each item carries its
+  own `status` line, the plan documents it came from or touches, and
+  the trigger that reopens it. Statuses: `open`, `considering`,
+  `resolved`, `wontfix`. A file whose every item reaches a terminal
+  status leaves the live directory for `.llms/archive/issue-<stamp>.md`
+  — flat, under its existing name, and the index's recap row drops with
+  it; the live directory lists only open and considering files. The
+  `agent-docs` skill carries the full shape.
+- **Docs sync.** A change that lands a behavior must land its
+  documentation in the same turn: contract or invariant →
+  `.llms/rules.md`; reasoning, decision, or library record →
+  `.llms/architecture.md`; a shipped surface (endpoint, job, background
+  delivery, guard rule, settings key) → the endpoint reference, the API
+  client collection the repository keeps, and `docs/` where they live.
+  Decide once per turn, before the commit: if the diff changes what a
+  doc claims, the doc rides the same commit. Outdated prose is a defect
+  of the change, not a follow-up. Every completed task or plan phase
+  runs the closing sweep the `agent-docs` skill carries: the plan's own
+  status, the issue and roadmap statuses it touches, the `docs/` tree
+  it made stale, the index rows, and the handover — each line synced or
+  recorded n/a.
+- **Validation.** The full test suite, the lint task, and a probe
+  against a freshly built release binary before claiming a change works
+  — a green unit suite does not exercise the composition root. Load
+  tests run only when the user asks for them; never start one
+  unprompted.
+- **Static analysis.** Findings from the static-analysis tooling
+  (`.llms/shape.md` carries the commands) are leads, not deletion
+  orders: no tool sees through the reachability it does not model — a
+  method satisfied through an interface it did not trace, a handler
+  registered by reflection or `init` — so verify each report against
+  the tree before removing anything, and a finding that outlives the
+  turn goes to `.llms/issues/` like any other.
+- **Plans.** A plan (`.llms/plans/`) is a contract with a fixed shape
+  and hard rules; it executes only on the owner's explicit instruction.
+  The full spec is in `.llms/rules.md` ("Plan documents") and the
+  `agent-docs` skill.
+- **Prose.** Tree documents are English. Technical documentation for
+  agents lives in `.llms/`; product documentation for humans lives in
+  `docs/` — keep `docs/` free of technical references (paths,
+  internals, agent context); its orientation is the human reader. Chat
+  may follow the user's language. Files do not. The `clarity` skill is
+  mandatory before writing or rewriting any of them; `handoff` for
+  handovers.
+- **Library docs.** Use the MCP Context7 and DeepWiki tools for
+  external libraries; the module cache is the pinned truth — code wins
+  over docs.
+- **Secrets.** A secret is listed once in the configuration system's
+  secret list and nowhere else. Never print one; never rewrite a dotenv
+  file without consent.
 
 ## Git
 
-- Stage explicit paths. Check `git status`. Never `git add -A` or `git add .`.
-- Message: `{feat,fix,docs,refactor,chore}[(scope)]: <concise message>`. Do not push.
-- Do not commit unless this turn asked for it. When the work is finished, recommend the one-line message and list the paths.
-- Never run `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git commit --no-verify`, or `git push --force`.
+- Stage explicit paths. Check `git status`. Never `git add -A` or
+  `git add .`.
+- Message: `{feat,fix,docs,refactor,chore}[(scope)]: <concise message>`.
+  Do not push.
+- Do not commit unless this turn asked for it. When the work is
+  finished, recommend the one-line message and list the paths.
+- Never run `git reset --hard`, `git checkout .`, `git clean -fd`,
+  `git stash`, `git commit --no-verify`, or `git push --force`.
 
-## Related Docs
+## Related docs
 
-- `.llms/stylex-authoring.md` — read before writing styles. `.llms/stylex-installation.md` — StyleX setup.
+The full map is `.llms/index.md`; the entries this file names — shape,
+rules, architecture, issues, plans, roadmap, audits, handovers — live
+under `.llms/`.

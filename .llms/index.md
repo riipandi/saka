@@ -8,7 +8,9 @@ reference, history, or contract — navigate from here.
 
 | Path | Read it for |
 | --- | --- |
-| `/AGENTS.md` | The general instructions: read order, ambiguous-decision protocol, the per-area skill map, workflow, git. |
+| `/AGENTS.md` | The workflow rules: read order, ambiguous-decision protocol, the per-area skill map, workflow, git. |
+| `.llms/index.md` | The documentation map — this file. |
+| `.llms/shape.md` | The repository's shape: the monorepo layout, the stack, the Vite+ toolchain and its commit hooks, the frontend conventions, the static-analysis tooling, the porting contract. |
 | `.llms/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
 | `.llms/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
 | `.llms/auth-design.md` | The authentication design the auth surface follows. |
