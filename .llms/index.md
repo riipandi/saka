@@ -35,9 +35,8 @@ without the owner's explicit instruction. The directory keeps the five
 newest plans; the older history (27 files) lives flat in
 `.llms/archive/plan-<stamp>.md`, moved under their existing names — the
 archive files carry their own subject lines and decision records. All
-retained plans are all `done`, except `plan-20261014_0915.md`
-(`awaiting-approval`, written 2026-10-14 — `plan-20261014_0604.md` closed
-2026-10-14 with the final matrix green).
+retained plans are all `done` — `plan-20261014_0915.md` closed 2026-10-14
+with its matrix green.
 
 | File | Subject |
 | --- | --- |
@@ -46,7 +45,7 @@ retained plans are all `done`, except `plan-20261014_0915.md`
 | `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — done (phases 1–8 committed per phase; the owner's closing commit `a70880e1` completes phase 9) |
 | `plan-20261014_0504.md` | The session retention sweep: `app.session_retention_days` (30), the two retention indexes, the dedicated `session_cleanup` job over the repository's `DeleteRetentionExpired`, docs sync + handover + final validation — closes `issue-20261014_0330.md` — done (phases 1–5 committed per phase, the final matrix green) |
 | `plan-20261014_0604.md` | The 2026-practices adoption from the two read articles: the error-context contract and the four-tier sweep over the 723 context-free returns, the account search's missing email trigram index, `os.Root` defense-in-depth on the storage paths, the stdlib sweep, `pg_stat_statements` in the dev/test posture — done (phases 1–9 committed per phase; the final matrix green, with the test-container boot fix `e8d45823` and the lint clear `d26ee304` riding phase 11) |
-| `plan-20261014_0915.md` | The lazy publisher's absent-area contract: `lazyPublisher.CreateSystemNotice` learns the skip its consumer's contract already documents — the do not-found sentinels skip the advisory notice, a real construction failure still travels, the garbled type comment rewritten, the resolution paths pinned in `internal/registry` — closes `issue-20261014_0730.md` — awaiting approval |
+| `plan-20261014_0915.md` | The lazy publisher's absent-area contract: `lazyPublisher.CreateSystemNotice` learns the skip its consumer's contract already documents — the do not-found sentinels skip the advisory notice, a real construction failure still travels, the garbled type comment rewritten, the resolution paths pinned in `internal/registry` — closes `issue-20261014_0730.md` — done (phase 1 committed, the matrix green) |
 
 ## Handovers (`.llms/handover/`)
 
@@ -59,7 +58,7 @@ older history (64 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
-`handover-20261014_0819.md` (the 2026-practices adoption).
+`handover-20261014_0935.md` (the lazy-publisher contract plan).
 
 ## Audits (`.llms/audit/`)
 
@@ -98,7 +97,7 @@ lands there the moment it is found — not in chat memory. An issue file
 whose every item reaches a terminal status (`resolved`) leaves the
 directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
 name — the live directory lists only what is open or considering.
-Newest: `issue-20261014_0730.md`.
+Newest: `issue-20261012_1605.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -111,7 +110,6 @@ previous cross-check ran 2026-10-12):
 | `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
 | `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14) and validate/otelconnect have no `/v2` yet — both upstream-gated. The E2E build split resolved 2026-10-14 (phase 5: the ladder boots its own compiler, :4473, no reuse); the handler-error masking convention resolved 2026-10-14 (the rules.md record landed with the closing commit) |
 | `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; the parity guard (`scripts/check-typecheck-parity.sh`, run by the pre-commit hook, landed 2026-10-14 via plan-20261014_0047 phase 6) fails the commit that drifts either side; report upstream |
-| `issue-20261014_0730.md` | open | `lazyPublisher.CreateSystemNotice` returns nil (the notice vanishes, the caller reports success) when the notification service is absent from the container — the two sibling lazy seams document their skip, this one carries no such comment; decide skip-documented or fail-loud at the next registry-seam touch (found by the error-context sweep's tier A) |
 
 ## Finding history fast
 
