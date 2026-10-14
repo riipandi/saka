@@ -89,6 +89,8 @@ services:
     hostname: clickstack-db
     expose: ['27017']
     volumes: ['../.storage/clickstack_db_data:/data/db:rw']
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
 
   clickstack-ch:
     <<: *common
@@ -102,6 +104,8 @@ services:
       - ../.storage/clickstack_ch_logs:/var/log/clickhouse-server:rw
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "127.0.0.1", "9000"]
 
   clickstack-app:
     <<: *common
