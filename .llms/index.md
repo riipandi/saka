@@ -142,6 +142,7 @@ previous cross-check ran 2026-10-12):
 | --- | --- | --- |
 | `issue-20261014_0935.md` | open (1) + considering (1) | The live residues of the 2026-10-06 certification rollup after two carves: the owner's hosted certification run (open, owner's action) and the commented compose blocks (owner's call). The six parked protocol/direction decisions (ISS-002–007) moved to the roadmap 2026-10-14 as RI-1–RI-6; the terminal items stay with the archive |
 | `issue-20261014_0949.md` | open (1) + one resolved | The reconciliation of the fifteen `status: partial` archived handovers + plan-20261012_0155's partially-done phase (2026-10-14): nearly everything landed — the open residue is the `key:rotate` stub (`cmd/appkey.go:177`, plan-20261014_0955 takes it); the `release_after` invariant resolved on re-verification (enforced at the queue client's `Register` seam, the config layer cannot see task timeouts); the two parked decisions moved to the roadmap as RI-7/RI-8 |
+| `issue-20261014_1245.md` | considering (1) | Found while landing `key:rotate`: the wiring seals two surfaces (TOTP secrets, JWKS private documents) with the **auth cipher** — a manual `AUTH_SECRET_KEY` edit skips the re-seal and kills every TOTP enrollment with no `seal_fp`-style recovery, unlike jwks' self-heal; the command's own pass re-seals both halves, so the gap is the manual path only. Decide the story when a rotation outside `key:rotate` becomes a need |
 
 ## Finding history fast
 
