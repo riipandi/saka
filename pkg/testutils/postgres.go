@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/exec"
 	tcpg "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -30,6 +32,7 @@ const postgresImage = "docker.io/postgres:18-alpine"
 // seed database the shared DSN names. Deployment images do not carry the
 // preload, so this is a test-only capability — never a migration.
 const postgresConf = `
+listen_addresses = '*'
 shared_preload_libraries = 'pg_stat_statements'
 pg_stat_statements.track = all
 `
@@ -82,7 +85,34 @@ func startPostgres(ctx context.Context) (*Postgres, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve postgres endpoint: %w", err)
 	}
+	if err := pingPostgres(ctx, dsn); err != nil {
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
 	return &Postgres{DSN: dsn, container: container}, nil
+}
+
+// pingPostgres connects until the server answers or the budget runs out. The
+// wait strategies watch the image's own logs, but the init scripts extend the
+// first boot: a caller that connects the moment the port listens can race the
+// restart the image does between the init phase and the real server, and the
+// connection dies with a reset. The ping is the readiness that matters.
+func pingPostgres(ctx context.Context, dsn string) error {
+	const attempts = 60
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		conn, err := pgx.Connect(ctx, dsn)
+		if err == nil {
+			_ = conn.Close(ctx)
+			return nil
+		}
+		lastErr = err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	return fmt.Errorf("the server never answered a connection after %d attempts: %w", attempts, lastErr)
 }
 
 // postgresBootFiles names the conf and the init script the container mounts.
