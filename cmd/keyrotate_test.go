@@ -8,11 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/riipandi/saka/framework/datastore"
+	"github.com/riipandi/saka/framework/queue"
 	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/testutils"
 )
@@ -162,6 +166,8 @@ func TestKeyRotateReSealsEverySurface(t *testing.T) {
 	out, err := runRotateCmd(t, "", "--env-file="+envFile, "--dry-run")
 	require.NoError(t, err)
 	assert.Contains(t, out, "no writes were made")
+	assert.Contains(t, out, "queue.encrypt is off",
+		"the report says the queue stayed out of the pass when the deployment does not encrypt it")
 
 	newAppKey, err := crypto.GenerateKeyHex()
 	require.NoError(t, err)
@@ -221,6 +227,129 @@ func TestKeyRotateReSealsEverySurface(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(file), "APP_SECRET_KEY="+newAppKey)
 	assert.Contains(t, string(file), "AUTH_SECRET_KEY="+newAuthKey)
+}
+
+// rotationQueueConfig is the rotation config with queue.encrypt on — the
+// deployment whose queued payloads join the pass.
+func rotationQueueConfig(t *testing.T) {
+	t.Helper()
+
+	useConfig(t, `{
+		"database": {"url": "env:DATABASE_URL"},
+		"app": {"secret_key": "env:APP_SECRET_KEY"},
+		"auth": {"secret_key": "env:AUTH_SECRET_KEY", "issuer": "http://localhost:3000"},
+		"queue": {"encrypt": true}
+	}`)
+}
+
+func TestKeyRotateReSealsTheQueuedPayloads(t *testing.T) {
+	container := testutils.StartPostgres(t.Context(), t)
+	dsn := container.NewDatabase(t)
+	envFile := writeEnvFile(t, dsn)
+	_, err := runMigrateUpCmd(t, "", "--env-file="+envFile, "--force")
+	require.NoError(t, err)
+	// The migrate pass runs under its own database-only config; the queue
+	// surfaces join under the encrypting one.
+	rotationQueueConfig(t)
+
+	pool, err := datastore.NewPostgres(t.Context(), datastore.PostgresOptions{DSN: dsn})
+	require.NoError(t, err)
+	t.Cleanup(func() { pool.Shutdown(context.Background()) })
+
+	oldApp, err := crypto.NewCipherFromHex(testSecret)
+	require.NoError(t, err)
+
+	payload := []byte(`{"job":"probe","n":1}`)
+	sealed, err := oldApp.Encrypt(string(payload))
+	require.NoError(t, err)
+
+	// One pending task and one archived failure, both sealed under the
+	// old application cipher — the two forms the queue keeps.
+	require.NoError(t, pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
+		for _, stmt := range []string{
+			`INSERT INTO public.queue_tasks (queue, task) VALUES ('probe', '` + sealed + `')`,
+			`INSERT INTO public.queue_tasks_completed (queue, task, last_duration_micro, succeeded, error, last_executed_at, created_at)
+			 VALUES ('probe', '` + sealed + `', 1000, false, 'exhausted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		} {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+
+	newAppKey, err := crypto.GenerateKeyHex()
+	require.NoError(t, err)
+	newAuthKey, err := crypto.GenerateKeyHex()
+	require.NoError(t, err)
+
+	out, err := runRotateCmd(t, "", "--env-file="+envFile, "--overwrite",
+		"--new-key="+newAppKey, "--new-auth-key="+newAuthKey)
+	require.NoError(t, err)
+	assert.Contains(t, out, "queued task payloads")
+	assert.Contains(t, out, "archived task payloads")
+
+	newApp, err := crypto.NewCipherFromHex(newAppKey)
+	require.NoError(t, err)
+
+	// The stored forms open under the new cipher and under no other —
+	// both tables kept the sealed form, so a replayed task rides the
+	// same path it always did.
+	var pending, archived []byte
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT task FROM public.queue_tasks WHERE queue='probe'").Scan(&pending))
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT task FROM public.queue_tasks_completed WHERE queue='probe'").Scan(&archived))
+	for _, stored := range [][]byte{pending, archived} {
+		opened, openErr := newApp.Decrypt(string(stored))
+		require.NoError(t, openErr)
+		assert.Equal(t, string(payload), opened)
+		_, openErr = oldApp.Decrypt(string(stored))
+		assert.Error(t, openErr, "the old cipher opens nothing after the pass")
+	}
+
+	// The replay proofs, through the client's own read paths: Detail
+	// opens the stored form, ReplayDead moves the archived task back
+	// into the queue without touching its sealed bytes — the replayed
+	// row re-enters with a fresh id, so the read finds it by queue.
+	oldClient, err := queue.NewClient(queue.ClientConfig{
+		Store: pool, Encryptor: oldApp, NumWorkers: 1, ReleaseAfter: time.Minute,
+	})
+	require.NoError(t, err)
+	var taskIDText string
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT id::text FROM public.queue_tasks WHERE queue='probe' LIMIT 1").Scan(&taskIDText))
+	taskID, err := uuid.Parse(taskIDText)
+	require.NoError(t, err)
+	_, exists, err := oldClient.Detail(t.Context(), taskID)
+	// The old cipher cannot open the rotated payload: the client's read
+	// fails closed instead of answering ciphertext.
+	assert.False(t, exists, "a client on the old secret reads nothing")
+
+	newClient, err := queue.NewClient(queue.ClientConfig{
+		Store: pool, Encryptor: newApp, NumWorkers: 1, ReleaseAfter: time.Minute,
+	})
+	require.NoError(t, err)
+	detail, exists, err := newClient.Detail(t.Context(), taskID)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.Equal(t, payload, detail.Payload)
+
+	// The archived row replays into the queue under the new cipher and
+	// the Detail read opens it from the pending table.
+	replayed, err := newClient.ReplayDead(t.Context(), "probe")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, replayed)
+
+	var replayedIDText string
+	require.NoError(t, pool.QueryRow(t.Context(),
+		"SELECT id::text FROM public.queue_tasks WHERE queue='probe' AND id::text <> $1", taskID.String()).Scan(&replayedIDText))
+	replayedID, err := uuid.Parse(replayedIDText)
+	require.NoError(t, err)
+	detail, exists, err = newClient.Detail(t.Context(), replayedID)
+	require.NoError(t, err)
+	assert.True(t, exists, "the replayed task now rests in the pending table")
+	assert.Equal(t, payload, detail.Payload)
 }
 
 func TestKeyRotateAbortsOnAWrongOldKeyLeavingZeroWrites(t *testing.T) {

@@ -39,6 +39,22 @@ var rotationSurfaces = []sealedSurface{
 	{label: "sealed setting values", table: "public.app_settings", column: "value", keyID: "key"},
 }
 
+// queuePayloadSurfaces are the queued tasks' sealed payloads, pending and
+// archived alike — they join the pass only when the deployment encrypts
+// its queue (D3): with the flag off the payloads are plaintext, the
+// prefix filter would select nothing, and walking them would lie about
+// what the pass covered.
+func rotationSurfacesFor(queueEncrypted bool) []sealedSurface {
+	surfaces := rotationSurfaces
+	if queueEncrypted {
+		surfaces = append(append([]sealedSurface{}, rotationSurfaces...),
+			sealedSurface{label: "queued task payloads", table: "public.queue_tasks", column: "task", keyID: "id"},
+			sealedSurface{label: "archived task payloads", table: "public.queue_tasks_completed", column: "task", keyID: "id"},
+		)
+	}
+	return surfaces
+}
+
 var keyRotateCmd = &cli.Command{
 	Name:  "key:rotate",
 	Usage: "Rotate APP_SECRET_KEY and AUTH_SECRET_KEY, re-sealing every encrypted row",
@@ -58,6 +74,7 @@ the rotation with the row named, leaving zero writes.
 from it — the old secrets come from there), and the same file receives
 the new keys: the confirm/--overwrite dance as key:generate applies. A
 run without --env-file only prints the new keys.`,
+	Hidden: true,
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "overwrite",
@@ -122,11 +139,16 @@ func runKeyRotate(ctx context.Context, cmd *cli.Command) error {
 	}
 	defer store.Shutdown(context.Background())
 
-	if cmd.Bool("dry-run") {
-		return dryRunRotation(out, store, oldApp, oldAuth)
+	surfaces := rotationSurfacesFor(cfg.Queue.Encrypt)
+	if !cfg.Queue.Encrypt {
+		fmt.Fprintf(out, "queue.encrypt is off — the queued payloads rest plaintext and stay out of the pass\n")
 	}
 
-	summary, err := rotateRows(ctx, store, oldApp, oldAuth, newApp, newAuth)
+	if cmd.Bool("dry-run") {
+		return dryRunRotation(out, store, oldApp, oldAuth, surfaces)
+	}
+
+	summary, err := rotateRows(ctx, store, surfaces, oldApp, oldAuth, newApp, newAuth)
 	if err != nil {
 		return err
 	}
@@ -140,7 +162,7 @@ func runKeyRotate(ctx context.Context, cmd *cli.Command) error {
 		return printRotatedKeys(out, newAppKey, newAuthKey)
 	}
 
-	return printRotationSummary(out, summary, newAppKey, newAuthKey)
+	return printRotationSummary(out, surfaces, summary, newAppKey, newAuthKey)
 }
 
 // replacementKeys resolves the two new secrets: an explicit flag wins,
@@ -166,14 +188,14 @@ func replacementKeys(cmd *cli.Command) (appKey, authKey string, err error) {
 // dryRunRotation counts each surface's sealed rows and verifies the old
 // ciphers open them, writing nothing. Its report is the operator's go
 // signal: the counts and the key check precede any write.
-func dryRunRotation(out io.Writer, store *fdatastore.Postgres, oldApp, oldAuth *crypto.Cipher) error {
-	counts, err := walkSurfaces(context.Background(), store, oldApp, oldAuth, func(ctx context.Context, tx fdatastore.Querier, surface sealedSurface) (int, error) {
+func dryRunRotation(out io.Writer, store *fdatastore.Postgres, oldApp, oldAuth *crypto.Cipher, surfaces []sealedSurface) error {
+	counts, err := walkSurfaces(context.Background(), store, surfaces, oldApp, oldAuth, func(ctx context.Context, tx fdatastore.Querier, surface sealedSurface) (int, error) {
 		return verifySurface(ctx, tx, surface, oldApp, oldAuth)
 	})
 	if err != nil {
 		return err
 	}
-	printSurfaceCounts(out, "would re-seal", counts)
+	printSurfaceCounts(out, "would re-seal", surfaces, counts)
 	fmt.Fprintf(out, "\nthe loaded secrets open every sealed row — no writes were made\n")
 	return nil
 }
@@ -181,8 +203,8 @@ func dryRunRotation(out io.Writer, store *fdatastore.Postgres, oldApp, oldAuth *
 // rotateRows re-seals every surface inside one transaction and aborts on
 // the first row the old ciphers cannot open — a wrong key or an already
 // rotated row is the operator's information, not a partial state.
-func rotateRows(ctx context.Context, store *fdatastore.Postgres, oldApp, oldAuth, newApp, newAuth *crypto.Cipher) (map[string]int, error) {
-	return walkSurfaces(ctx, store, oldApp, oldAuth, func(ctx context.Context, tx fdatastore.Querier, surface sealedSurface) (int, error) {
+func rotateRows(ctx context.Context, store *fdatastore.Postgres, surfaces []sealedSurface, oldApp, oldAuth, newApp, newAuth *crypto.Cipher) (map[string]int, error) {
+	return walkSurfaces(ctx, store, surfaces, oldApp, oldAuth, func(ctx context.Context, tx fdatastore.Querier, surface sealedSurface) (int, error) {
 		return resealSurface(ctx, tx, surface, oldApp, oldAuth, newApp, newAuth)
 	})
 }
@@ -194,12 +216,13 @@ func rotateRows(ctx context.Context, store *fdatastore.Postgres, oldApp, oldAuth
 func walkSurfaces(
 	ctx context.Context,
 	store *fdatastore.Postgres,
+	surfaces []sealedSurface,
 	oldApp, oldAuth *crypto.Cipher,
 	pass func(ctx context.Context, tx fdatastore.Querier, surface sealedSurface) (int, error),
 ) (map[string]int, error) {
-	summary := make(map[string]int, len(rotationSurfaces))
+	summary := make(map[string]int, len(surfaces))
 	err := store.WithTx(ctx, func(ctx context.Context, tx fdatastore.Querier) error {
-		for _, surface := range rotationSurfaces {
+		for _, surface := range surfaces {
 			count, err := pass(ctx, tx, surface)
 			if err != nil {
 				return err
@@ -358,16 +381,16 @@ func printRotatedKeys(out io.Writer, newAppKey, newAuthKey string) error {
 
 // printSurfaceCounts lines the surfaces up in a column and reports how
 // many rows each would give a pass.
-func printSurfaceCounts(out io.Writer, verb string, counts map[string]int) {
-	for _, surface := range rotationSurfaces {
+func printSurfaceCounts(out io.Writer, verb string, surfaces []sealedSurface, counts map[string]int) {
+	for _, surface := range surfaces {
 		fmt.Fprintf(out, "%-36s %s %d %s\n", surface.label, verb, counts[surface.label], printext.Plural(counts[surface.label], "row"))
 	}
 }
 
 // printRotationSummary reports what moved and what the deployment must
 // do next (restart the processes that hold the old secrets).
-func printRotationSummary(out io.Writer, summary map[string]int, newAppKey, newAuthKey string) error {
-	printSurfaceCounts(out, "re-sealed", summary)
+func printRotationSummary(out io.Writer, surfaces []sealedSurface, summary map[string]int, newAppKey, newAuthKey string) error {
+	printSurfaceCounts(out, "re-sealed", surfaces, summary)
 	if err := printRotatedKeys(out, newAppKey, newAuthKey); err != nil {
 		return err
 	}
