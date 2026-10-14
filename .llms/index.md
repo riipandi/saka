@@ -119,9 +119,3 @@ previous cross-check ran 2026-10-12):
 - **An open item** → `.llms/issues/` (above).
 - **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
 - **What a past session did** → the handover of that date; memory recall supplements it.
-m** → `.llms/issues/` (above).
-- **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
-- **What a past session did** → the handover of that date; memory recall supplements it.
-neline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
-- **What a past session did** → the handover of that date; memory recall supplements it.
-of that date; memory recall supplements it.
