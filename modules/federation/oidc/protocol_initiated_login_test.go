@@ -69,13 +69,11 @@ func TestTheAuthorizationResponseCarriesTheIssParameter(t *testing.T) {
 func TestTheInteractionDocumentCarriesTheLoginHint(t *testing.T) {
 	hint := "sophie.neveu@saka.example"
 	session := &goidc.AuthnSession{
-		ID:       "sess_1",
-		ClientID: "client_1",
-		Status:   goidc.StatusPending,
-		AuthorizationParameters: goidc.AuthorizationParameters{
-			Scopes:    "openid profile",
-			LoginHint: hint,
-		},
+		ID:        "sess_1",
+		ClientID:  "client_1",
+		Status:    goidc.StatusPending,
+		Scopes:    "openid profile",
+		LoginHint: hint,
 	}
 
 	rec := httptest.NewRecorder()

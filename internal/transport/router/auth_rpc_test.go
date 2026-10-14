@@ -30,8 +30,8 @@ func stubAuthenticator() router.Authenticator {
 			return nil, connect.NewError(connect.CodeUnauthenticated, "authentication required")
 		}
 		return &jwtutils.Caller{
-			UserID:       stubCallerWireID(),
-			AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
+			UserID:   stubCallerWireID(),
+			Username: "admin", Roles: []string{"administrator"},
 		}, nil
 	}
 }

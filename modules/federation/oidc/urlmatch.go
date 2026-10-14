@@ -274,12 +274,12 @@ func extractPath(rawurl string) (base, urlPath string) {
 
 // extractQueryParams splits the query from the rest of the URL.
 func extractQueryParams(rawurl string) (string, url.Values, error) {
-	if i := strings.IndexByte(rawurl, '?'); i >= 0 {
-		query, err := url.ParseQuery(rawurl[i+1:])
+	if before, after, ok := strings.Cut(rawurl, "?"); ok {
+		query, err := url.ParseQuery(after)
 		if err != nil {
 			return "", nil, fmt.Errorf("the URL's query does not parse: %w", err)
 		}
-		return rawurl[:i], query, nil
+		return before, query, nil
 	}
 	return rawurl, nil, nil
 }

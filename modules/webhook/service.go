@@ -617,8 +617,7 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 	target := deref(endpoint.Endpoint)
 	if !s.allowPrivateNetwork {
 		if refuseErr := s.checkDestination(ctx, target); refuseErr != nil {
-			var refusal destinationRefusal
-			if errors.As(refuseErr, &refusal) {
+			if refusal, ok := errors.AsType[destinationRefusal](refuseErr); ok {
 				return s.failQuietly(ctx, delivery, refusal.Error())
 			}
 			return fmt.Errorf("webhook: destination: %w", refuseErr)

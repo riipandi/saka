@@ -40,7 +40,9 @@ func bucketService(t *testing.T, settings settingsReader) (*Service, *datastore.
 }
 
 // ptrInt64 wraps a size limit for the params that carry one.
-func ptrInt64(v int64) *int64 { return &v }
+//
+//go:fix inline
+func ptrInt64(v int64) *int64 { return new(v) }
 
 // TestTheWireIdCarriesTheBucketPrefix pins the identifier's wire form: a
 // bucket's id leaves the server carrying the bkt TypeID's prefix, and the

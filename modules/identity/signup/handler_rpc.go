@@ -160,7 +160,7 @@ func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 		if value > math.MaxInt32 || value < math.MinInt32 {
 			value = math.MaxInt32
 		}
-		*dst = ptr(int32(value))
+		*dst = new(int32(value))
 	}
 	set(&meta.Page, p.Page)
 	set(&meta.Limit, p.Limit)
@@ -172,8 +172,10 @@ func listMetadata(p webutil.Pagination) *commonv1.ListMetadata {
 }
 
 // ptr hands the setters an addressable value.
+//
+//go:fix inline
 func ptr[T any](value T) *T {
-	return &value
+	return new(value)
 }
 
 // mapError translates the service's failures into the codes the Connect

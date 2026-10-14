@@ -18,7 +18,7 @@ func TestTheGrantStoreRoundTripsAndResolvesTheTokens(t *testing.T) {
 	issued, err := service.Create(t.Context(), seedAccount(t, pool, "hermione"), createParams("Gryffindor"))
 	require.NoError(t, err)
 
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	grant := &goidc.Grant{
 		ID:                    "grant-1",
 		CreatedAt:             int(time.Now().Unix()),
@@ -64,15 +64,13 @@ func TestTheAuthnStoreResolvesTheSessionAndThePARHandle(t *testing.T) {
 	issued, err := service.Create(t.Context(), seedAccount(t, pool, "sophie"), createParams("Sophie"))
 	require.NoError(t, err)
 
-	store := authnStore{protocolStore: protocolStore{pool: pool}}
+	store := authnStore{pool: pool}
 	session := &goidc.AuthnSession{
-		ID:       "session-1",
-		Status:   goidc.StatusPending,
-		Subject:  "user_sophie",
-		ClientID: issued.Client.ID,
-		AuthorizationParameters: goidc.AuthorizationParameters{
-			Scopes: "openid",
-		},
+		ID:              "session-1",
+		Status:          goidc.StatusPending,
+		Subject:         "user_sophie",
+		ClientID:        issued.Client.ID,
+		Scopes:          "openid",
 		ExpiresAt:       int(time.Now().Add(time.Minute).Unix()),
 		PushedAuthReqID: "par-1",
 	}
@@ -96,15 +94,13 @@ func TestTheDeviceStoreResolvesTheCodesAndMovesTheUserCode(t *testing.T) {
 	issued, err := service.Create(t.Context(), seedAccount(t, pool, "vittoria"), createParams("Vittoria"))
 	require.NoError(t, err)
 
-	store := deviceStore{protocolStore: protocolStore{pool: pool}}
+	store := deviceStore{pool: pool}
 	session := &goidc.AuthnSession{
-		ID:       "device-1",
-		Status:   goidc.StatusPending,
-		Subject:  "user_vittoria",
-		ClientID: issued.Client.ID,
-		AuthorizationParameters: goidc.AuthorizationParameters{
-			Scopes: "openid",
-		},
+		ID:         "device-1",
+		Status:     goidc.StatusPending,
+		Subject:    "user_vittoria",
+		ClientID:   issued.Client.ID,
+		Scopes:     "openid",
 		ExpiresAt:  int(time.Now().Add(time.Minute).Unix()),
 		DeviceCode: "device-code-plain",
 		UserCode:   "user-code-plain",
@@ -145,7 +141,7 @@ func TestTheDeviceStoreResolvesTheCodesAndMovesTheUserCode(t *testing.T) {
 func TestTheLogoutStoreRoundTripsAClientlessSession(t *testing.T) {
 	pool := migratedPool(t)
 
-	store := logoutStore{protocolStore: protocolStore{pool: pool}}
+	store := logoutStore{pool: pool}
 	session := &goidc.LogoutSession{
 		ID:        "logout-1",
 		Status:    goidc.StatusPending,

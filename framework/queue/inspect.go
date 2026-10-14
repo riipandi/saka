@@ -170,14 +170,8 @@ func sortQueueViews(views []QueueView, sortBy string, ascending bool) {
 // end answers an empty window rather than an error — the pagination block
 // already tells the caller the total.
 func pageBounds(page, limit, total int) (int, int) {
-	start := (page - 1) * limit
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	start := min((page-1)*limit, total)
+	end := min(start+limit, total)
 	return start, end
 }
 

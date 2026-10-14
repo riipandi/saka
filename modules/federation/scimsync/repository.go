@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"uuid"
 
@@ -208,12 +209,12 @@ func scanProvider(row scanner) (Provider, error) {
 }
 
 func joinCols(cols []string) string {
-	out := ""
+	var out strings.Builder
 	for i, c := range cols {
 		if i > 0 {
-			out += ", "
+			out.WriteString(", ")
 		}
-		out += c
+		out.WriteString(c)
 	}
-	return out
+	return out.String()
 }

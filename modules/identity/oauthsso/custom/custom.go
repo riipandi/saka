@@ -17,6 +17,7 @@ import (
 	"encoding/base64"
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -237,9 +238,7 @@ func (c claimSet) merged(other claimSet) claimSet {
 		c.raw = other.raw
 		return c
 	}
-	for key, value := range other.raw {
-		c.raw[key] = value
-	}
+	maps.Copy(c.raw, other.raw)
 	return c
 }
 
