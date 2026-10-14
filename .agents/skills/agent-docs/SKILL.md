@@ -33,6 +33,44 @@ shape is the lesson; their content is not prescriptive.
   prose is concise GFM, one idea per paragraph, emoji only where an
   admonition earns it.
 
+## First run — scaffolding the ledger
+
+When the ledger does not exist yet, build it before using it — and
+build it on facts, not invention:
+
+1. **Verify before creating.** Read the actual tree first: the top-level
+   layout, where the entry points and packages live, the build/test/lint
+   commands the task runner or package scripts actually define, the test
+   framework in use, any existing `docs/` or README content worth
+   keeping. Every claim a scaffold makes about the codebase must have
+   been seen in a file — a command not verified in a script, a package
+   not verified on disk, is not written down as fact.
+2. **Scaffold the minimum that the workflow needs**, no more:
+
+   ```text
+   .llms/
+     index.md          — the map: what each document is, the recap table (empty to start)
+     rules.md          — Contracts / How to change it / Traps (only verified contracts; name the gaps)
+     architecture.md   — per-area reasoning and decision records (one stub entry per area, unverified areas marked so)
+     plans/  issues/  roadmap/  handover/  audit/  archive/   — empty directories
+   docs/               — an index page naming the human-facing surface (create only if the project has a human-facing surface)
+   ```
+
+3. **Stubs stay honest.** A scaffold document that has not earned its
+   content yet says so in one line at the top ("scaffold — no verified
+   content yet"); it never invents contracts, commands, or decisions to
+   look complete. The working rule — do not document a stub as working —
+   applies to the ledger itself.
+4. **Fill from evidence.** After scaffolding, the first real pass is
+   reading the codebase and replacing the stubs' disclaimers with
+   verified facts (file:line for contracts, commit or plan references
+   for decisions). A scaffold that never graduated past its disclaimer
+   is a finding for `.llms/issues/`.
+5. The owner's instruction files (AGENTS.md and its kin) are read first
+   in this flow too: if they exist, the scaffold must not contradict
+   them, and their read-order references must resolve once the
+   scaffolding lands.
+
 ## Status vocabulary and required metadata
 
 The ledger has four document kinds; each carries its frontmatter keys and
