@@ -24,6 +24,18 @@ type Postgres struct {
 // postgresImage is the Postgres image used by integration tests.
 const postgresImage = "docker.io/postgres:18-alpine"
 
+// postgresConf and postgresInit are the container boot files for the dev and
+// test posture (plan-20261014_0604/D7): the statements module is preloaded so
+// every query the container runs is tracked, and the extension exists in the
+// seed database the shared DSN names. Deployment images do not carry the
+// preload, so this is a test-only capability — never a migration.
+const postgresConf = `
+shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.track = all
+`
+
+const postgresInit = `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`
+
 var (
 	postgresOnce   sync.Once
 	sharedPostgres *Postgres
@@ -49,10 +61,17 @@ func StartPostgres(ctx context.Context, t testing.TB) *Postgres {
 // init) and then for the port to be served — required for reliable startup
 // on Docker Desktop proxies (macOS/Windows).
 func startPostgres(ctx context.Context) (*Postgres, error) {
+	boot, err := writePostgresBootFiles()
+	if err != nil {
+		return nil, fmt.Errorf("write postgres boot files: %w", err)
+	}
+
 	container, err := tcpg.Run(ctx, postgresImage,
 		tcpg.WithDatabase("saka_test"),
 		tcpg.WithUsername("postgres"),
 		tcpg.WithPassword("postgres"),
+		tcpg.WithConfigFile(boot.conf),
+		tcpg.WithInitScripts(boot.init),
 		tcpg.BasicWaitStrategies(),
 	)
 	if err != nil {
@@ -64,6 +83,32 @@ func startPostgres(ctx context.Context) (*Postgres, error) {
 		return nil, fmt.Errorf("resolve postgres endpoint: %w", err)
 	}
 	return &Postgres{DSN: dsn, container: container}, nil
+}
+
+// postgresBootFiles names the conf and the init script the container mounts.
+type postgresBootFiles struct {
+	conf string
+	init string
+}
+
+// writePostgresBootFiles stages the statement-tracking conf and the extension
+// init script in a temp directory the container mounts at boot. The files
+// outlive the tests that run them; a stale directory is harmless — each
+// container boot mounts its own.
+func writePostgresBootFiles() (postgresBootFiles, error) {
+	dir, err := os.MkdirTemp("", "saka-pg-boot-")
+	if err != nil {
+		return postgresBootFiles{}, fmt.Errorf("create boot dir: %w", err)
+	}
+	confPath := filepath.Join(dir, "postgres.conf")
+	if err := os.WriteFile(confPath, []byte(postgresConf), 0o644); err != nil {
+		return postgresBootFiles{}, fmt.Errorf("write postgres.conf: %w", err)
+	}
+	initPath := filepath.Join(dir, "001-pg-stat-statements.sql")
+	if err := os.WriteFile(initPath, []byte(postgresInit), 0o644); err != nil {
+		return postgresBootFiles{}, fmt.Errorf("write the init script: %w", err)
+	}
+	return postgresBootFiles{conf: confPath, init: initPath}, nil
 }
 
 // Exec runs a command inside the Postgres container and returns the exit code
