@@ -74,6 +74,8 @@ configuration document) reads that list and redacts it. The rules:
 | Carries | Infrastructure and topology | Product behavior: sign-up modes, password rules, session windows, lockout, MFA limits, passkey limits, token lifetimes, linking toggles |
 | Sealed values | Referenced, never inline | A sealed setting's value is encrypted at rest |
 
+The login-screen capability toggles — OIDC sign-in (`oidc.enabled`), OAuth sign-in (`oauth.enabled`), and the one-time-access email switches (`auth` section) — are configuration, not settings: they are published to the application through the configuration document (`/api/configuration`) and are deliberately absent from the settings catalog, so no administrator can enable a sign-in method the deployment's own file has switched off.
+
 The full settings catalog is forty-plus keys, every one with a declared
 default, a description, and a public-or-not flag; an anonymous reader
 sees only the public subset (via `/api/configuration`), an administrator
