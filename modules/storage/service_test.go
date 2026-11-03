@@ -39,9 +39,6 @@ func bucketService(t *testing.T, settings settingsReader) (*Service, *datastore.
 	return service, pool
 }
 
-// ptrInt64 wraps a size limit for the params that carry one.
-func ptrInt64(v int64) *int64 { return &v }
-
 // TestTheWireIdCarriesTheBucketPrefix pins the identifier's wire form: a
 // bucket's id leaves the server carrying the bkt TypeID's prefix, and the
 // wire form parses back to the UUID the column stores.
@@ -69,7 +66,7 @@ func TestCreateGetAndListBuckets(t *testing.T) {
 
 	created, err := service.Create(ctx, "admin", CreateParams{
 		Name:          "gryffindor",
-		FileSizeLimit: ptrInt64(1024),
+		FileSizeLimit: new(int64(1024)),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "gryffindor", created.Name)
@@ -147,13 +144,13 @@ func TestUpdateChangesTheLimitsAndKeepsAbsentFields(t *testing.T) {
 
 	_, err := service.Create(ctx, "admin", CreateParams{
 		Name:             "gryffindor",
-		FileSizeLimit:    ptrInt64(1024),
+		FileSizeLimit:    new(int64(1024)),
 		AllowedMimeTypes: []string{"image/png"},
 	})
 	require.NoError(t, err)
 
 	updated, err := service.Update(ctx, "admin", "gryffindor", UpdateParams{
-		FileSizeLimit: ptrInt64(2048),
+		FileSizeLimit: new(int64(2048)),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, updated.FileSizeLimit)

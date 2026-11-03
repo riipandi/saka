@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -77,7 +78,7 @@ func webauthnCleanupProcessor(ctx context.Context, task WebauthnCleanupTask, poo
 		IntervalMillis: task.IntervalMillis,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("webauthn_cleanup: enqueue: %w", err)
 	}
 	return nil
 }
@@ -92,7 +93,7 @@ func deleteExpiredWebauthnSessions(ctx context.Context, pool *datastore.Postgres
 	query, args := dbt.Build()
 	tag, err := pool.Exec(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("webauthn_cleanup: delete: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

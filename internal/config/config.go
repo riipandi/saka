@@ -55,6 +55,7 @@ package config
 
 import (
 	"fmt"
+	"maps"
 
 	fconfig "github.com/riipandi/saka/framework/config"
 )
@@ -133,9 +134,7 @@ func Load(opts Options) (Config, error) {
 // variable while a command that does not is unaffected.
 func (c Config) Unresolved() map[string]string {
 	out := make(map[string]string, len(c.unresolved))
-	for key, name := range c.unresolved {
-		out[key] = name
-	}
+	maps.Copy(out, c.unresolved)
 	return out
 }
 
@@ -151,8 +150,6 @@ func (c Config) Origin(key string) string {
 // Origins returns a copy of the source of every resolved key.
 func (c Config) Origins() map[string]string {
 	out := make(map[string]string, len(c.origin))
-	for key, layer := range c.origin {
-		out[key] = layer
-	}
+	maps.Copy(out, c.origin)
 	return out
 }

@@ -302,7 +302,10 @@ func (r *Repository) ListExpiring(ctx context.Context, db datastore.Querier, now
 		}
 		keys = append(keys, row)
 	}
-	return keys, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("apikey: list expiring: %w", err)
+	}
+	return keys, nil
 }
 
 // MarkEmailSent records that the reminder went out, so the next run of the

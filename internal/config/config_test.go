@@ -116,6 +116,7 @@ func TestDefaultsAreValid(t *testing.T) {
 	require.Equal(t, defaults.Server.Port, cfg.Server.Port)
 	require.Equal(t, defaults.Storage.LocalPath, cfg.Storage.LocalPath)
 	require.Equal(t, defaults.Log.Level, cfg.Log.Level)
+	require.Equal(t, 30, defaults.App.SessionRetentionDays)
 	require.Equal(t, fconfig.LayerDefault, cfg.Origin("server.port"))
 }
 

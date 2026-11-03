@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -50,7 +51,7 @@ type protocolStore struct {
 func (st protocolStore) save(ctx context.Context, kind, key, clientID string, expiresAt int, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return err
+		return fmt.Errorf("oidc: save %s: %w", kind, err)
 	}
 	var expires any
 	if expiresAt != 0 {
@@ -60,14 +61,16 @@ func (st protocolStore) save(ctx context.Context, kind, key, clientID string, ex
 	if clientID != "" {
 		client = clientID
 	}
-	_, err = st.pool.Exec(ctx,
+	if _, err := st.pool.Exec(ctx,
 		`INSERT INTO public.oauth_sessions (kind, key, request_id, client_id, request_data, expires_at)
 		 VALUES ($1, $2, $1, $3, $4, $5)
 		 ON CONFLICT (kind, key) DO UPDATE
 		 SET request_data = EXCLUDED.request_data, client_id = EXCLUDED.client_id,
 		     expires_at = EXCLUDED.expires_at, active = TRUE`,
-		kind, key, client, data, expires)
-	return err
+		kind, key, client, data, expires); err != nil {
+		return fmt.Errorf("oidc: save %s: %w", kind, err)
+	}
+	return nil
 }
 
 // savePointer writes one pointer row, the hash the key.
@@ -110,7 +113,7 @@ func (st protocolStore) loadDocument(ctx context.Context, kind, key string) ([]b
 		if errors.Is(err, datastore.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			return nil, goidc.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("oidc: read %s: %w", kind, err)
 	}
 	return data, nil
 }
@@ -133,7 +136,7 @@ func (st protocolStore) saveCAS(ctx context.Context, kind, key, clientID string,
 		 WHERE kind = $4 AND key = $5 AND request_data = $6`,
 		data, client, expires, kind, key, expected)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oidc: rewrite %s: %w", kind, err)
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -146,8 +149,10 @@ func (st protocolStore) loadPointer(ctx context.Context, kind, hash string) (tok
 }
 
 func (st protocolStore) delete(ctx context.Context, kind, key string) error {
-	_, err := st.pool.Exec(ctx, `DELETE FROM public.oauth_sessions WHERE kind = $1 AND key = $2`, kind, key)
-	return err
+	if _, err := st.pool.Exec(ctx, `DELETE FROM public.oauth_sessions WHERE kind = $1 AND key = $2`, kind, key); err != nil {
+		return fmt.Errorf("oidc: delete %s: %w", kind, err)
+	}
+	return nil
 }
 
 // hashToken is the SHA-256 digest a pointer row is keyed by.
@@ -177,7 +182,7 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 	stored.AuthCode = ""
 	data, marshalErr := json.Marshal(&stored)
 	if marshalErr != nil {
-		return marshalErr
+		return fmt.Errorf("oidc: marshal the grant: %w", marshalErr)
 	}
 
 	// A rotation retires the pointer the request loaded: the presented

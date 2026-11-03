@@ -88,8 +88,8 @@ func TestAConsumerServesItsOwnArea(t *testing.T) {
 	do.Override[middleware.Authenticator](injector, func(do.Injector) (middleware.Authenticator, error) {
 		return func(context.Context, *http.Request) (any, error) {
 			return &jwtutils.Caller{
-				UserID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
-				AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
+				UserID:   "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
+				Username: "admin", Roles: []string{"administrator"},
 			}, nil
 		}, nil
 	})

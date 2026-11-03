@@ -525,7 +525,7 @@ func (s *Service) createJITAccount(ctx context.Context, tx datastore.Querier, fl
 	name := displayName(flow.GivenName, flow.FamilyName)
 	verifiedAt := s.now()
 	attempt := usernameCandidate(flow.Username, flow.Email, 0)
-	for tries := 0; tries < 3; tries++ {
+	for tries := range 3 {
 		// The taken name's retry runs inside the caller's transaction,
 		// where one failed statement would poison every later one — the
 		// savepoint rolls back exactly the refused insert.

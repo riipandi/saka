@@ -15,3 +15,8 @@ yaak_files=$(git diff --cached --name-only --diff-filter=ACM -- 'api/specs/*.yam
 if [ -n "$yaak_files" ]; then
     ./scripts/check-yaak-secrets.sh $yaak_files
 fi
+
+# The Dockerfile repeats the vite typecheck task's tsc commands by hand
+# (vp run crashes in Linux containers — issue-20261012_1605); either side
+# drifting out of sync must fail the commit that drifted it.
+./scripts/check-typecheck-parity.sh

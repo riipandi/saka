@@ -277,7 +277,7 @@ func (r *Repository) CreateRole(ctx context.Context, db datastore.Querier, row R
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return RoleID{}, err
+		return RoleID{}, fmt.Errorf("authorization: create the role: %w", err)
 	}
 	return row.ID, nil
 }

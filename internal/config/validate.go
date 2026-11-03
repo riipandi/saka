@@ -270,6 +270,7 @@ func (c Config) Validate() error {
 		"queue.encrypt: requires app.secret_key, the secret it seals payloads with")
 
 	check(c.App.AuditRetentionDays > 0, "app.audit_retention_days: must be greater than 0")
+	check(c.App.SessionRetentionDays > 0, "app.session_retention_days: must be greater than 0")
 	if _, err := time.LoadLocation(c.App.Timezone); err != nil {
 		check(false, "app.timezone: %q is not a time zone: %v", c.App.Timezone, err)
 	}

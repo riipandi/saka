@@ -100,12 +100,14 @@ services:
     volumes:
       - "../storage/config/localhost_crt.pem:/etc/ssl/certs/nginx-selfsigned.crt:ro"
       - "../storage/config/localhost_key.pem:/etc/ssl/private/nginx-selfsigned.key:ro"
+    mem_limit: 128m
+    healthcheck:
+     test: ['CMD-SHELL', 'curl -sf http://localhost:80/ || exit 1']
     networks:
       intranet:
         aliases: ["localhost.emobix.co.uk"]
     depends_on:
       server: { condition: service_started }
-    mem_limit: 128m
 
 volumes:
   conformance_mongo_data:

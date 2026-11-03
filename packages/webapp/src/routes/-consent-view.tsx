@@ -2,20 +2,11 @@ import * as stylex from '@stylexjs/stylex'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
-import {
-  OTPField,
-  OTPFieldGroup,
-  OTPFieldSeparator,
-  OTPFieldSlot
-} from 'uilibs/components/base/otp-field'
+import { OTPField, OTPFieldGroup } from 'uilibs/components/base/otp-field'
+import { OTPFieldSeparator, OTPFieldSlot } from 'uilibs/components/base/otp-field'
 import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/alert'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from 'uilibs/components/extra/card'
+import { Card, CardContent, CardDescription } from 'uilibs/components/extra/card'
+import { CardHeader, CardTitle } from 'uilibs/components/extra/card'
 import { Spinner } from 'uilibs/components/extra/spinner'
 import { Text } from 'uilibs/components/extra/text'
 import { z } from 'zod'

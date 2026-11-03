@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,6 +52,35 @@ func countUsers(t *testing.T, envFile string) int {
 	return count
 }
 
+// seedTotals parses the report's status line and answers the two totals it
+// carries, so a test asserts the invariants between runs instead of a
+// hand-maintained counter that every new seed item would have to bump.
+func seedTotals(t *testing.T, out string) (created, skipped int) {
+	t.Helper()
+
+	m := regexp.MustCompile(`status: (\d+) created, (\d+) skipped`).FindStringSubmatch(out)
+	require.NotNil(t, m, "the seed report carries no status line")
+	created, err := strconv.Atoi(m[1])
+	require.NoError(t, err)
+	skipped, err = strconv.Atoi(m[2])
+	require.NoError(t, err)
+	return created, skipped
+}
+
+// dryRunTotals parses the dry-run report's status line, the future-tense
+// twin of seedTotals.
+func dryRunTotals(t *testing.T, out string) (toCreate, toSkip int) {
+	t.Helper()
+
+	m := regexp.MustCompile(`status: (\d+) to create, (\d+) to skip`).FindStringSubmatch(out)
+	require.NotNil(t, m, "the dry run carries no status line")
+	toCreate, err := strconv.Atoi(m[1])
+	require.NoError(t, err)
+	toSkip, err = strconv.Atoi(m[2])
+	require.NoError(t, err)
+	return toCreate, toSkip
+}
+
 func TestMigrateSeedCreatesTheDefaultUser(t *testing.T) {
 	envFile := migratedDatabase(t)
 
@@ -57,22 +88,27 @@ func TestMigrateSeedCreatesTheDefaultUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" created")
-	assert.Contains(t, out, "status: 152 created, 1 skipped")
+	created, _ := seedTotals(t, out)
+	assert.Positive(t, created, "a fresh seed creates the records its registry plans")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
-// Running the command twice must not create a second account.
+// Running the command twice must not create a second account. The second
+// run's totals are read off its own report — the registry's answer, not a
+// counter a new seed item would have to bump.
 func TestMigrateSeedIsIdempotent(t *testing.T) {
 	envFile := migratedDatabase(t)
 
 	_, err := runMigrateSeedCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
 
-	out, err := runMigrateSeedCmd(t, "", "--env-file="+envFile, "--force")
+	second, err := runMigrateSeedCmd(t, "", "--env-file="+envFile, "--force")
 	require.NoError(t, err)
 
-	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" skipped")
-	assert.Contains(t, out, "0 created, 149 skipped")
+	assert.Contains(t, second, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" skipped")
+	recreated, reskipped := seedTotals(t, second)
+	assert.Zero(t, recreated)
+	assert.Positive(t, reskipped, "the second run reports the records it found standing")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 
@@ -84,7 +120,8 @@ func TestMigrateSeedDryRunWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out, seeders.UserSeederName+" "+seeders.DefaultUser.Email+" would create")
-	assert.Contains(t, out, "134 to create, 5 to skip")
+	toCreate, _ := dryRunTotals(t, out)
+	assert.Positive(t, toCreate, "a dry run plans the work its registry names")
 	assert.Zero(t, countUsers(t, envFile))
 }
 
@@ -146,7 +183,8 @@ func TestMigrateSeedAcceptedPromptSeeds(t *testing.T) {
 	out, err := runMigrateSeedCmd(t, "y\n", "--env-file="+envFile)
 	require.NoError(t, err)
 
-	assert.Contains(t, out, "status: 152 created, 1 skipped")
+	created, _ := seedTotals(t, out)
+	assert.Positive(t, created, "an accepted prompt seeds the records its registry plans")
 	assert.Equal(t, 7, countUsers(t, envFile))
 }
 

@@ -1,6 +1,9 @@
 package authz
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Match reports whether a held permission satisfies a requirement.
 //
@@ -16,10 +19,8 @@ func Match(requirement, grant string) bool {
 	if len(required) != 3 || len(held) != 3 {
 		return false
 	}
-	for _, part := range append(required, held...) {
-		if part == "" {
-			return false
-		}
+	if slices.Contains(append(required, held...), "") {
+		return false
 	}
 	if required[0] != held[0] || required[2] != held[2] {
 		return false

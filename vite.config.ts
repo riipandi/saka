@@ -117,6 +117,12 @@ export default defineConfig({
         }
       },
       {
+        files: ['**/*.tsx', '**/*.test.ts', '**/*.spec.ts'],
+        rules: {
+          'typescript/no-floating-promises': 'off'
+        }
+      },
+      {
         files: ['./packages/**/components/**/*.tsx'],
         rules: {
           'jsx-a11y/anchor-has-content': 'off',

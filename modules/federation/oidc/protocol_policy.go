@@ -105,7 +105,7 @@ func resumeBrowserSession(service *Service, w http.ResponseWriter, r *http.Reque
 	if err != nil || cookie.Value == "" {
 		return false
 	}
-	prior, err := authnStore{protocolStore: protocolStore{pool: service.pool}}.Session(r.Context(), cookie.Value)
+	prior, err := authnStore{pool: service.pool}.Session(r.Context(), cookie.Value)
 	if err != nil || prior.Subject == "" {
 		return false
 	}
@@ -148,7 +148,7 @@ func promptNoneAuthentication(service *Service, w http.ResponseWriter, r *http.R
 			"no provider session: the browser has not authenticated here")
 	}
 
-	prior, err := authnStore{protocolStore: protocolStore{pool: service.pool}}.Session(r.Context(), cookie.Value)
+	prior, err := authnStore{pool: service.pool}.Session(r.Context(), cookie.Value)
 	if err != nil || prior.Subject == "" {
 		return goidc.StatusFailure, goidc.NewError(goidc.ErrorCodeLoginRequired,
 			"the provider session the browser named is gone")
@@ -419,7 +419,7 @@ func writeInteraction(w http.ResponseWriter, status int, body map[string]any) {
 // surface stores, anything else a PHC string the password hasher reads —
 // the shape a carried-over credential may hold.
 func clientSecretVerifier(ctx context.Context, stored, presented string) error {
-	for _, hash := range strings.Split(stored, "\n") {
+	for hash := range strings.SplitSeq(stored, "\n") {
 		if hash == "" {
 			continue
 		}

@@ -58,7 +58,7 @@ func (s *Service) authorizedScopes(ctx context.Context, userID, clientID string)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("oidc: read the authorized scopes: %w", err)
 	}
 	return decodeScopeJSON(raw), nil
 }
@@ -82,8 +82,10 @@ func (s *Service) recordAuthorization(ctx context.Context, userID, clientID stri
 	sb.Values(userID, clientID, encodeScopeJSON(known), now)
 	query, args := sb.Build()
 	query += " ON CONFLICT (user_id, client_id) DO UPDATE SET scope = EXCLUDED.scope, last_used_at = EXCLUDED.last_used_at"
-	_, err = s.pool.Exec(ctx, query, args...)
-	return err
+	if _, err := s.pool.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("oidc: record the authorization: %w", err)
+	}
+	return nil
 }
 
 // encodeScopeJSON renders the scope list as the JSONB column stores it.

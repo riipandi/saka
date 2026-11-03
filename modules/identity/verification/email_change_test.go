@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -268,10 +269,8 @@ func (f *fakeSubaddresses) CollisionTaken(_ context.Context, address string) (bo
 		return false, errors.New("the collision scan failed")
 	}
 	base := blocklist.CollisionBase(address)
-	for _, held := range f.bases {
-		if held == base {
-			return true, nil
-		}
+	if slices.Contains(f.bases, base) {
+		return true, nil
 	}
 	return false, nil
 }

@@ -200,7 +200,7 @@ func TestEnvelopeEncodesTheBodyAsQuotedPrintable(t *testing.T) {
 	assert.Equal(t, "quoted-printable", msg.header.Get("Content-Transfer-Encoding"))
 	// Every line of an SMTP body is CRLF terminated; the transport rewraps
 	// anything longer.
-	for _, line := range strings.Split(strings.TrimSuffix(msg.body, "\r\n"), "\r\n") {
+	for line := range strings.SplitSeq(strings.TrimSuffix(msg.body, "\r\n"), "\r\n") {
 		assert.LessOrEqual(t, len(line), 76, "quoted-printable lines stay under 76 characters")
 	}
 }

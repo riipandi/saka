@@ -538,7 +538,7 @@ func (s *Service) replaceUserRoles(ctx context.Context, tx datastore.Querier, us
 	for _, raw := range wanted {
 		parsed, err := uuid.Parse(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("authorization: parse the granted role id %q: %w", raw, err)
 		}
 		if !slices.Contains(active, parsed) {
 			grant = append(grant, parsed)

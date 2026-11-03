@@ -118,7 +118,7 @@ func clearBrowserSessionCookie(w http.ResponseWriter) {
 func joseTypeMember(token string) (string, error) {
 	message, err := jws.Parse([]byte(token))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("the logout token does not parse: %w", err)
 	}
 	if len(message.Signatures()) == 0 {
 		return "", fmt.Errorf("the token carries no signature header")

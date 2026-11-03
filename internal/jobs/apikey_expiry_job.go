@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -113,8 +114,10 @@ func apiKeyExpiryScanProcessor(ctx context.Context, task APIKeyExpiryScanTask, p
 		}
 	}
 
-	_, err := client.Add(task).Wait(DefaultAPIKeyExpiryInterval).Ctx(ctx).Save()
-	return err
+	if _, err := client.Add(task).Wait(DefaultAPIKeyExpiryInterval).Ctx(ctx).Save(); err != nil {
+		return fmt.Errorf("api_key_expiry_scan: enqueue: %w", err)
+	}
+	return nil
 }
 
 // apiKeyExpiryScan is the pass itself: list the window, enqueue one reminder

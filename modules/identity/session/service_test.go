@@ -569,16 +569,18 @@ func TestAnIdleSessionIsRefusedAndRotatedOut(t *testing.T) {
 	sid, token := seedSession(t, pool, userID, "one", "credential", false)
 	service.WithSettings(stubBound{seconds: int64(time.Hour.Seconds())})
 
-	// Inside the window the renewal answers.
+	// Inside the window the renewal answers; its replacement is the token
+	// the next attempt presents — re-presenting the spent one would be the
+	// replay path, not the gate.
 	jump(t, now, 30*time.Minute)
-	_, err := service.Refresh(t.Context(), token)
+	renewed, err := service.Refresh(t.Context(), token)
 	require.NoError(t, err)
 
 	// Past the window — the last renewal is the jump above, so the clock
-	// moves two hours past it — the same token is refused, and the row is
+	// moves two hours past it — the live token is refused, and the row is
 	// revoked rather than left resting.
 	jump(t, now, 2*time.Hour)
-	_, err = service.Refresh(t.Context(), token)
+	_, err = service.Refresh(t.Context(), renewed.RefreshToken)
 	assert.ErrorIs(t, err, ErrSessionEnded)
 	row, err := service.repo.GetSession(t.Context(), pool, sid)
 	require.NoError(t, err)
@@ -689,12 +691,10 @@ func TestConcurrentRefreshOfOneTokenSerializesAndRevokesTheReuse(t *testing.T) {
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 	for i := range callers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			results[i], errs[i] = service.Refresh(context.Background(), token)
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -831,13 +831,11 @@ func TestStopImpersonatingEndsTheDelegationAndReissuesTheActor(t *testing.T) {
 	require.NoError(t, err)
 
 	caller := &jwtutils.Caller{
-		UserID: wireOf(t, target),
-		AccessClaims: jwtutils.AccessClaims{
-			Username:      "sophie_neveu",
-			SessionID:     out.SessionID,
-			ActorID:       wireOf(t, admin),
-			ActorUsername: "robert_langdon",
-		},
+		UserID:        wireOf(t, target),
+		Username:      "sophie_neveu",
+		SessionID:     out.SessionID,
+		ActorID:       wireOf(t, admin),
+		ActorUsername: "robert_langdon",
 	}
 
 	stopped, err := service.StopImpersonating(t.Context(), out.SessionID, caller)
@@ -869,12 +867,10 @@ func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
 	// A live session that is nobody's delegation refuses the stop even when
 	// its caller carries actor claims — the row is the proof, not the token.
 	forged := &jwtutils.Caller{
-		UserID: wireOf(t, target),
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: sid.String(),
-			ActorID:   wireOf(t, admin),
-		},
+		UserID:    wireOf(t, target),
+		Username:  "sophie_neveu",
+		SessionID: sid.String(),
+		ActorID:   wireOf(t, admin),
 	}
 	_, err := service.StopImpersonating(t.Context(), sid.String(), forged)
 	assert.ErrorIs(t, err, ErrNotImpersonating)
@@ -883,11 +879,9 @@ func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
 	// delegation that is not theirs.
 	adminSid, _ := seedSession(t, pool, admin, "own", "credential", false)
 	selfCaller := &jwtutils.Caller{
-		UserID: wireOf(t, admin),
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "robert_langdon",
-			SessionID: adminSid.String(),
-		},
+		UserID:    wireOf(t, admin),
+		Username:  "robert_langdon",
+		SessionID: adminSid.String(),
 	}
 	_, err = service.StopImpersonating(t.Context(), adminSid.String(), selfCaller)
 	assert.ErrorIs(t, err, ErrNotImpersonating)
@@ -900,12 +894,10 @@ func TestStopImpersonatingRefusesTheNonDelegatedAndTheForeign(t *testing.T) {
 	require.NoError(t, err)
 
 	stranger := &jwtutils.Caller{
-		UserID: wireOf(t, target),
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: out.SessionID,
-			ActorID:   wireOf(t, bystander),
-		},
+		UserID:    wireOf(t, target),
+		Username:  "sophie_neveu",
+		SessionID: out.SessionID,
+		ActorID:   wireOf(t, bystander),
 	}
 	_, err = service.StopImpersonating(t.Context(), out.SessionID, stranger)
 	assert.ErrorIs(t, err, ErrNotImpersonating)

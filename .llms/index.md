@@ -8,11 +8,12 @@ reference, history, or contract — navigate from here.
 
 | Path | Read it for |
 | --- | --- |
-| `/AGENTS.md` | The general instructions: read order, ambiguous-decision protocol, workflow, git. |
+| `/AGENTS.md` | The workflow rules: read order, ambiguous-decision protocol, the per-area skill map, workflow, git. |
+| `.llms/index.md` | The documentation map — this file. |
+| `.llms/shape.md` | The repository's shape: the monorepo layout, the stack, the Vite+ toolchain and its commit hooks, the frontend conventions, the static-analysis tooling, the porting contract. |
 | `.llms/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
 | `.llms/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
 | `.llms/auth-design.md` | The authentication design the auth surface follows. |
-| `.llms/integration-roadmap.md` | The recommended order for wiring the served backend surface into the webapp, as a delivery checklist (`- [ ]`): what is wired, what each wave lands, the reference map (which acknowledged inspiration each flow consults), the recommended route file layout, the E2E happy/unhappy scenario matrix per flow, the supporting-library research, the shared machinery each piece needs. Analysis and recommendation — each wave becomes a plan on the owner's instruction. |
 | `.llms/upstream-deviations.md` | Every intentional departure from Pocket ID upstream, with reasons. |
 | `.llms/endpoint-reference.md` | Shipped endpoints vs the ported upstream reference, at a glance. |
 | `.llms/references/pocket-id-api-reference.md` | The upstream API surface the port maps onto. |
@@ -31,62 +32,78 @@ the diff actually made stale.
 
 A plan is a contract: frontmatter `status`, decisions with rejected
 alternatives, phases with commits. Never start, resume, or continue one
-without the owner's explicit instruction. All listed plans are `done` or
-`shipped`, except `plan-20261008_1739.md` and `plan-20261014_0047.md`
-(both `awaiting-approval`).
+without the owner's explicit instruction. The directory keeps only the
+plans that still hold open work — a completed plan archives flat to
+`.llms/archive/plan-<stamp>.md` under its existing name (2026-10-14: the
+seven completed plans, `plan-20261008_1739.md` through
+`plan-20261014_0915.md`, moved; `plan-20261014_0930.md` and
+`plan-20261014_0955.md` remain).
+The archive carries the plans' own subject lines and decision records;
+the older history (35 files) lives there too.
 
 | File | Subject |
 | --- | --- |
-| `plan-20260929_1722.md` | Federation, OIDC, SCIM, device-flow remediation |
-| `plan-20260929_1930.md` | OIDC industrialization (Tier 1–2, CIBA, inbound SCIM) |
-| `plan-20260930_1728.md` | Passkey authentication, backend first |
-| `plan-20261001_1551.md` | Auth alignment: auth-design vs shipped surface |
-| `plan-20261001_2312.md` | Migration reorder, table renames, residue cleanup |
-| `plan-20261002_1812.md` | Password auth via email-code reverification |
-| `plan-20261002_1958.md` | Access restrictions: blocklist + block email subaddresses |
-| `plan-20261003_0258.md` | OAuth SSO sign-in (Google, GitHub, custom OIDC) |
-| `plan-20261003_0700.md` | Hardening: enumeration, lockout, security notifications |
-| `plan-20261003_2359.md` | Storage revamp: buckets, `/storage` mount, tus, signed links — the decisions list (esp. 17–21) is the binding record for the storage engine |
-| `plan-20261004_1030.md` | OAuth SSO refinement: full attribute mapping, custom attributes, sign-in profile refresh |
-| `plan-20261004_1510.md` | OAuth SSO token retrieval: the stored provider tokens, refresh/rotation, the local offboarding job |
-| `plan-20261004_1650.md` | OIDC IdP Standard Claims: `picture` and `updated_at` |
-| `plan-20261004_1800.md` | Framework extraction: the reusable engines into `framework/`, composable behind typed Options, `database/` into `internal/`, per-package migration sets — the decisions list (D1–D18) is the binding record for the framework boundary |
-| `plan-20261005_1845.md` | OIDC certification readiness: Basic/Config/RP-Initiated-Logout/Back-Channel-Logout OP profiles, the local conformance-suite harness, the audit's recommended fixes — the four profiles rehearse green; the hosted submission run is the owner's (runbook in the handover) |
-| `plan-20261008_1739.md` | Component library extraction to `packages/uilibs` — done (P1–P3b landed; P4 closed 2026-10-14 with its docs-sync residue riding `plan-20261014_0047.md` D10) |
-| `plan-20261009_0025.md` | Frontend foundation: the cookies library, the backend-driven configuration layer, the shared auth-aware fetch, Connect-Query — the decisions list (D1–D10) is the binding record for the webapp's data layer |
-| `plan-20261009_0142.md` | OAuth SSO: one store for every provider, the enabled-provider listing, the SPA flow — the decisions list (D1–D9) is the binding record for the sign-in-with-a-provider surface |
-| `plan-20261009_1826.md` | The connect-go v1 → v2 migration — the mechanical import swap, the runtime seams, the follow-ups parked in `issue-20261009_1915.md` |
-| `plan-20261010_0054.md` | Wave 1: the account works on real data — profile, picture, danger zone, the session center, email verification & change, the own audit trail, the pagination/error/public-settings machinery — shipped |
-| `plan-20261010_0610.md` | Wave 1.5: the authz foundation — the claims snapshot in the store, the `can()` engine (the `framework/authz` matcher ported), `usePermissions()`/`<Can>`, the refusal mapping (D1–D8) |
-| `plan-20261010_0925.md` | Wave 1.6: frontend observability — the browser tracer, seam/navigation/worker spans, redaction, the public collector field (D1–D8) — shipped |
-| `plan-20261010_1830.md` | Wave 2: sign-in completeness — the MFA challenge & enrollment fork, passkey sign-in/management, password recovery, one-time access, the shared step-up machinery (D1–D8; the one-time access delta is recorded in the phase-6 note) — shipped |
-| `plan-20261011_1545.md` | Wave 3: the admin console core — shell & guard, impersonation banner, user center, groups/blocklist/signup tokens, the public signup page, the audit console, the authorization screens (D1–D9) — shipped |
-| `plan-20261011_1805.md` | Wave 4: federation administration — OIDC clients (back-channel fields, grant-type editor, the show-once pattern), custom claims & SCIM, the OAuth SSO admin CRUD and the account-side connected-accounts page, the consent ledgers — complete |
-| `plan-20261011_2025.md` | Wave 5: platform administration — the settings CRUD screens + TestEmail probe, notifications with the `WatchNotifications` streaming consumer, webhooks, API keys — complete |
-| `plan-20261012_0145.md` | The webapp navigation/IA overhaul — sidebar regrouping, the topbar user menu and notification flyout — complete |
-| `plan-20261012_0155.md` | Wave 6 (partial): device login approval (`/device`), the ops console (queue + scheduler), the timezone picker; storage intentionally excluded pending the reference inventory (`issue-20261009_2356.md`, now resolved) — done |
-| `plan-20261012_1935.md` | The OIDC consent interaction page in the SPA: the completion dialect (header-keyed redirect capture), the consent page, the device grant's verification, the E2E workflow spec (D1–D8) — closes `issue-20261012_0445.md` — done |
-| `plan-20261012_2331.md` | The webapp UI revamp: the skeleton loading layer, the long forms riding the side sheet, the structural polish (empty CTAs, list errors with retry, page headers) — done |
-| `plan-20261013_0048.md` | The last administrator's deletion guard (backend refusal + the roles-on-the-wire frontend gate) and the singleton builtin provider picker — done |
-| `plan-20261014_0047.md` | The open-issues close-out: the dead auth worker's bounded calls, the serve startup check on the administrator grant, AssetsURL's public scope, the registry-derived seed-test totals, the debug E2E compiler boot, the Dockerfile parity guard, the backend auth audit, the handover archive — awaiting-approval |
+| `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — `in-progress`: phases 1–2 landed (`b42f8765`), phase 3 (final validation) waits for the owner's word |
+| `plan-20261014_0955.md` | `key:rotate`: one command re-seals every surface the two secrets encrypt (D1 amended to both secrets — the owner picked the six-surface scope after the wiring showed the TOTP and JWKS rows seal under the auth cipher; D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new keys written to the env file `key:generate`-style — took issue-20261014_0949's open residue — `done` 2026-10-14 (`4f2925ed`, `162dca78`), the matrix green; the manual-path gap lives in `issue-20261014_1245.md` |
 
 ## Handovers (`.llms/handover/`)
 
-Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Only the latest
-few matter — each summarizes its session and what stayed open; anything still
-true is folded into the core documents above. Newest:
-`handover-20261013_0023.md` (the webapp UI revamp; 68 files total; pruning
-awaits the owner's nod — `issue-20261006_0050.md` ISS-009).
+Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Every handover —
+live and archived alike — carries the frontmatter convention
+(`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
+the filename stamp, the other keys from the body, and a key the body cannot
+name is omitted rather than guessed). The directory keeps the five newest; the
+older history (69 files) lives flat in
+`.llms/archive/handover-<stamp>.md`, moved under their existing names —
+each summarizes its session and what stayed open; anything still true is
+folded into the core documents above. Newest:
+`handover-20261014_1330.md` (plan-20261014_0955's four phases: `key:rotate`
+landed — both secrets, nine surfaces, one transaction; the docs records,
+issue-0949 closed and archived; the matrix green).
 
 ## Audits (`.llms/audit/`)
 
 Point-in-time reviews against the tree; conclusions age, the tree wins.
+Every audit carries the frontmatter convention (`status` / `updated` /
+`reference`): `status` is `resolved` when every finding the audit demanded
+is closed in the tree (an owner-accepted risk recorded in the decision
+records does not hold the audit open) or `open` while a finding waits on
+its issue or plan; `reference` names the plan and issue that carry the
+outcome, omitted when direct commits closed the findings.
 
-- `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects).
-- `audit-20260929_1613.md` — federation, device flow, SCIM.
-- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability.
-- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s.
-- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness.
+- `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects). resolved.
+- `audit-20260929_1613.md` — federation, device flow, SCIM. resolved (plan-20260929_1722).
+- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability. resolved.
+- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s. resolved.
+- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness. resolved (plan-20261005_1845; the hosted submission run stays open in issue-20261006_0050).
+- `audit-20261014_0329.md` — the backend auth audit (sessions, refresh rotation, revocation): the inactivity gate's rolled-back revocation fixed, the gate's mis-aimed test re-pointed, the EXPLAIN probes at 200k rows, the replay pattern judged sound, the missing session sweep opened as `issue-20261014_0330.md`. resolved — the sweep closed with `plan-20261014_0504.md`.
+
+## Roadmap (`.llms/roadmap/`)
+
+Parked future improvements and the delivery analyses — not plans, not
+issues: an entry here carries its own `status` / `updated` frontmatter
+(line), the unlock that makes it worth planning, and the source issue it
+came from; when an unlock fires the entry re-enters `.llms/issues/` or
+goes straight to a plan. The directory's documents are `living` (updated
+in place, stamped) rather than point-in-time records.
+
+- `future-improvements.md` — the parked decisions the issue ledger
+  stopped carrying (2026-10-14): the six OIDC/federation entries
+  (RFC 8707 resource indicators, internal MCP servers, DCR, Form Post
+  OP, the RP conformance rehearsal, RP-side logout), the two CLI/tooling
+  entries (`storage:migrate`, the deferred `rs/cors` replacement), and
+  the three upstream-gated dependency/toolchain entries (connect v1 out
+  of `go.mod`, validate/otelconnect `/v2`, the Dockerfile's `vp run`
+  restoration). Sources: issue-20261014_0935, issue-20261014_0949, and
+  the archived 0936/0937.
+- `frontend-integration.md` — the recommended order for wiring the
+  served backend surface into the webapp, as a delivery checklist
+  (`- [ ]`): what is wired, what each wave lands, the reference map
+  (which acknowledged inspiration each flow consults), the recommended
+  route file layout, the E2E happy/unhappy scenario matrix per flow, the
+  supporting-library research, the shared machinery each piece needs.
+  Analysis and recommendation — each wave becomes a plan on the owner's
+  instruction.
 
 ## Product docs (`docs/`)
 
@@ -104,8 +121,18 @@ The open and considering items, newest capture first:
 `updated`) and per-item status lines carrying their plan references and
 reopen triggers. The
 rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
-lands there the moment it is found — not in chat memory. Newest:
-`issue-20261012_1605.md`.
+lands there the moment it is found — not in chat memory. An issue file
+whose every item reaches a terminal status (`resolved`) leaves the
+directory for `.llms/archive/issue-<stamp>.md`, flat, under its existing
+name — the live directory lists only what is open or considering. A
+rollup that still carries live items may also archive, its open and
+considering items re-homed first into a fresh issue file that names the
+source (2026-10-14: the five 2026-10-06 → 2026-10-12 rollups archived,
+their live items carved into the files below; later the same day the
+aspirational items moved on to the roadmap — 0936 and 0937 archived
+whole, 0935 and 0949 shrunk — so a parked improvement lives in
+`.llms/roadmap/`, not as a floating issue).
+Newest: `issue-20261014_0949.md`.
 
 Recap (status rollup per file, cross-checked against the tree and the
 plans on 2026-10-14 — the files are the tracker, this is the index; the
@@ -113,26 +140,12 @@ previous cross-check ran 2026-10-12):
 
 | File | Rollup | Subject |
 | --- | --- | --- |
-| `issue-20261006_0050.md` | open (12) | The post-certification residues: the owner's hosted cert run (open), the MCP-facing OAuth work + DCR + Form Post + RP-side items (considering ×6), the Yaak prefix split — 84 `[Pocket ID]` vs 138 `[Saka]`, closed wontfix 2026-10-14 (owner keeps the split), the handover archive — 67 files, remedy decided (archive to `.llms/archived`, keep the five newest; plan-20261014_0047), the compose comments (considering); ISS-010 (unused webapp deps) and ISS-012 (the SPA `TODO(frontend)` markers) resolved 2026-10-12 |
-| `issue-20261008_1705.md` | open | Auth-wiring accepted risks: the cookie custody model and the tampered profile cookie are `wontfix`, the dual transport is `considering`; the open item is the backend auth audit — accepted into plan-20261014_0047 as its own phase |
-| `issue-20261009_0127.md` | considering | The login-screen toggles (`oidc.enabled`, the two one-time-access switches) live only in the deployment document, not the settings catalog — owner decision 2026-10-09 parked the backend move; the REST read stands (re-verified 2026-10-14) |
-| `issue-20261009_0345.md` | open | A dead auth worker hangs every in-flight Comlink call (blank first paint, no console error) — re-verified 2026-10-14, the robust shape (current-engine indirection + bounded calls) is planned in plan-20261014_0047 |
-| `issue-20261009_1915.md` | open | Connect-go v2 follow-ups: the v1 module still in `go.mod` as buf's indirect (re-verified 2026-10-14), validate/otelconnect have no `/v2` yet, the two-suite E2E build split (planned in plan-20261014_0047), and the v2 handler-error masking convention (rules.md record rides the plan's closing phase) |
-| `issue-20261009_2356.md` | resolved | The endpoint reference's missing Storage section — landed 2026-10-12 (five bucket procedures, five tus routes, the `/storage` mount); the Wave 6 storage item is unblocked |
-| `issue-20261010_0017.md` | considering | The Yaak reconciliation: three items resolved (the `ConfirmEmailChange` row, the stale password-recovery rows, the `GetLinkedAccountTokens` request), `AssetsURL`'s public-scope claim — owner decided 2026-10-14 the field joins the public scope (plan-20261014_0047) |
-| `issue-20261011_2205.md` | open | Catalog drift leaves existing deployments with stale administrator grants — remedy decided 2026-10-14: the serve startup check with the loud warning and repair command (plan-20261014_0047) |
-| `issue-20261012_0445.md` | resolved | The OIDC consent interaction page shipped (plan-20261012_1935: the SPA interaction area — consent page, device verification, the completion dialect) |
-| `issue-20261012_1538.md` | open | Hardcoded seeder counts in `cmd/migrate_seed_test.go` drift on every new seed item — three assertions (recounted 2026-10-14, not four); the registry-derived fix is planned in plan-20261014_0047 |
-| `issue-20261012_1605.md` | open | `vp run` crashes children with a native stack overflow in Linux containers — the Dockerfile workaround (direct `tsc` chain, re-verified 2026-10-14) stands until a fixed vp ships; report upstream |
+| `issue-20261014_0935.md` | open (1) + considering (1) | The live residues of the 2026-10-06 certification rollup after two carves: the owner's hosted certification run (open, owner's action) and the commented compose blocks (owner's call). The six parked protocol/direction decisions (ISS-002–007) moved to the roadmap 2026-10-14 as RI-1–RI-6; the terminal items stay with the archive |
+| `issue-20261014_1245.md` | considering (1) | Found while landing `key:rotate`: the wiring seals two surfaces (TOTP secrets, JWKS private documents) with the **auth cipher** — a manual `AUTH_SECRET_KEY` edit skips the re-seal and kills every TOTP enrollment with no `seal_fp`-style recovery, unlike jwks' self-heal; the command's own pass re-seals both halves, so the gap is the manual path only. Decide the story when a rotation outside `key:rotate` becomes a need |
 
 ## Finding history fast
 
 - **A design decision** → the plan's Decisions section (dated, with rejected alternatives); the storage model's decisions live in `plan-20261003_2359.md`.
 - **An open item** → `.llms/issues/` (above).
 - **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
-- **What a past session did** → the handover of that date; memory recall supplements it.
-m** → `.llms/issues/` (above).
-- **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
-- **What a past session did** → the handover of that date; memory recall supplements it.
-neline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
 - **What a past session did** → the handover of that date; memory recall supplements it.

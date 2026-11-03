@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+tasks:
+  analysis:deadcode:
+    desc: Static analysis — report the functions no call path reaches (go tool deadcode)
+    cmds:
+      - go tool deadcode ./...

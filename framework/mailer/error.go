@@ -127,8 +127,7 @@ func classify(op Op, target string, err error) error {
 		failure.Kind = ErrAuth
 		failure.cause = ErrInsecureAuth
 	default:
-		var smtpErr *smtp.SMTPError
-		if errors.As(err, &smtpErr) {
+		if smtpErr, ok := errors.AsType[*smtp.SMTPError](err); ok {
 			failure.Code = smtpErr.Code
 			failure.detail = smtpErr.Message
 			failure.Kind = smtpClass(op, smtpErr)

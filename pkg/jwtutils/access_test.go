@@ -144,8 +144,8 @@ func TestNewCallerRefusesATokenWithoutASubject(t *testing.T) {
 // carries the registered claim the private claims do not.
 func TestNewCallerKeepsTheSubjectAndTheClaims(t *testing.T) {
 	caller, err := NewCaller(Verified[AccessClaims]{
-		Standard: Standard{Subject: "0197abc"},
-		Private:  AccessClaims{Username: "hermione", Roles: []string{"administrator"}, Permissions: []string{"user:*:read", "user:*:ban"}},
+		Subject: "0197abc",
+		Private: AccessClaims{Username: "hermione", Roles: []string{"administrator"}, Permissions: []string{"user:*:read", "user:*:ban"}},
 	})
 	require.NoError(t, err)
 

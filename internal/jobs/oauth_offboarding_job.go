@@ -82,7 +82,7 @@ func (p *oauthOffboardingProcessor) Process(ctx context.Context, task OAuthOffbo
 		IntervalMillis: task.IntervalMillis,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("oauth_offboarding: enqueue: %w", err)
 	}
 
 	if p.offboarder == nil {

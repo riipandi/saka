@@ -26,10 +26,10 @@ func TestExpiredProtocolRowsFailClosedAtTheLookup(t *testing.T) {
 	expired := int(time.Now().Add(-time.Hour).Unix())
 	live := int(time.Now().Add(time.Hour).Unix())
 
-	grants := grantStore{protocolStore: protocolStore{pool: pool}}
-	authn := authnStore{protocolStore: protocolStore{pool: pool}}
-	devices := deviceStore{protocolStore: protocolStore{pool: pool}}
-	logouts := logoutStore{protocolStore: protocolStore{pool: pool}}
+	grants := grantStore{pool: pool}
+	authn := authnStore{pool: pool}
+	devices := deviceStore{pool: pool}
+	logouts := logoutStore{pool: pool}
 
 	// The grant kind carries the refresh window as its column expiry; a
 	// grant without one expires NULL and stays loadable.
@@ -192,7 +192,7 @@ func TestAnExpiryWithinTheSkewAllowanceStillAnswers(t *testing.T) {
 	// now, not past now plus the allowance — still answers: a lookup
 	// must not refuse what a skewed clock still considers live.
 	justPast := int(time.Now().Add(-30 * time.Second).Unix())
-	grants := grantStore{protocolStore: protocolStore{pool: pool}}
+	grants := grantStore{pool: pool}
 	require.NoError(t, grants.SaveGrant(t.Context(), &goidc.Grant{
 		ID: "g-skew", ClientID: issued.Client.ID, Subject: "s", Username: "langdon",
 		Scopes: "openid", CreatedAt: justPast,

@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -68,7 +69,10 @@ func storageUploadExpiryProcessor(ctx context.Context, task StorageUploadExpiryT
 	// The next run is queued before this one succeeds, so the schedule
 	// never depends on the process that ran the last one.
 	_, err = client.Add(StorageUploadExpiryTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
-	return err
+	if err != nil {
+		return fmt.Errorf("storage_upload_expiry: enqueue: %w", err)
+	}
+	return nil
 }
 
 // storageUploadExpirySeed is the payload the first run is seeded with.

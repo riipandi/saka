@@ -124,3 +124,19 @@ func (c *Cipher) Decrypt(encoded string) (string, error) {
 	}
 	return string(plaintext), nil
 }
+
+// ReSeal opens a value the old cipher sealed and seals it again under
+// the new one, returning the canonical "enc:<ciphertext>" form. The two
+// ciphers may derive from different secrets of any length — the pair is
+// the caller's correctness, because the format carries no key id that
+// could catch a mismatch. A value the old cipher cannot open returns
+// the decrypt's own error; a rotation walking many rows decides for
+// itself whether one failure aborts the batch (it must — a half
+// re-sealed tree is readable by neither key).
+func ReSeal(oldCipher, newCipher *Cipher, sealed string) (string, error) {
+	plaintext, err := oldCipher.Decrypt(sealed)
+	if err != nil {
+		return "", err
+	}
+	return newCipher.Encrypt(plaintext)
+}

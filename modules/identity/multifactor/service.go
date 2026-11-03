@@ -5,10 +5,13 @@ package multifactor
 // bridge a password success writes between the first factor and the full
 // session.
 //
-// The secret's sealing uses the same AES-256-GCM cipher the configuration's
-// secret key backs — the one cipher the codebase has, per the crypto
-// package's contract. A secret leaves the server exactly once, in the
-// enrollment's answer; every later read answers metadata only.
+// The secret's sealing uses the auth cipher — the AES-256-GCM key derived
+// from AUTH_SECRET_KEY, not the application secret — so a manual edit of
+// that variable invalidates every enrollment; the supported rotation is
+// `key:rotate`, whose pass re-seals these rows (and the JWKS documents,
+// sealed under the same cipher) under the new secret. A secret leaves the
+// server exactly once, in the enrollment's answer; every later read
+// answers metadata only.
 
 import (
 	"context"

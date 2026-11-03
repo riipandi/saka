@@ -242,7 +242,12 @@ func Default() Config {
 			// happened last quarter", short enough that the table stays a
 			// table rather than an archive.
 			AuditRetentionDays: 90,
-			Timezone:           DefaultTimezone,
+			// Thirty days keeps an account's recent sign-in history
+			// readable in the session center while the lifetime ledger
+			// stops growing: sessions are a personal list, not the
+			// compliance trail the audit window serves.
+			SessionRetentionDays: 30,
+			Timezone:             DefaultTimezone,
 		},
 		Auth: Auth{
 			// The issuer is empty by default: the loader fills it from

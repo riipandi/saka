@@ -40,8 +40,8 @@ func TestProtovalidateRefusesTheContractViolations(t *testing.T) {
 		// an unauthenticated request would be refused before validation ran.
 		Authenticator: func(context.Context, *http.Request) (any, error) {
 			return &jwtutils.Caller{
-				UserID:       stubCallerWireID(),
-				AccessClaims: jwtutils.AccessClaims{Username: "admin", Roles: []string{"administrator"}},
+				UserID:   stubCallerWireID(),
+				Username: "admin", Roles: []string{"administrator"},
 			}, nil
 		},
 		Modules: []kernel.Module{

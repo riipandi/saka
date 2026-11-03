@@ -96,24 +96,33 @@ test.describe.serial('the sign-in completeness flows', () => {
     expect(confirm.status()).toBe(200)
     expect((await confirm.json()).recovery_codes.length).toBeGreaterThan(0)
 
-    // The form now forks: the challenge is the next state of the same
-    // mount, not a new route.
+    // The challenge is the next state of the same mount, not a new route —
+    // the login form's own textboxes outlive the fork for a beat, so the
+    // slots must be scoped to the challenge form or the first wait picks
+    // the identity box the fork is about to replace.
     const context = await browser.newContext()
     const page = await context.newPage()
     await page.goto('/login')
     await page.fill('#identity', mfaUser.username)
     await page.fill('#password', mfaUser.password)
     await page.click('button[type=submit]')
-    const code = page.getByLabel('Verification code')
-    await expect(code).toBeVisible({ timeout: 15_000 })
+    const code = page.locator('#mfa-challenge-form').getByRole('textbox')
+    await expect(code).toHaveCount(6, { timeout: 15_000 })
 
     // A wrong factor reads as a refusal on the same screen.
-    await code.fill('000000')
+    await code.first().pressSequentially('000000')
     await page.getByRole('button', { name: 'Verify' }).click()
     await expect(page.getByText('Verification failed')).toBeVisible({ timeout: 15_000 })
 
-    // The authenticator's current code completes the sign-in.
-    await code.fill(totpCode(enrollment.secret))
+    // The authenticator's current code completes the sign-in. The first
+    // wrong attempt leaves the slots full and the focus on the last box,
+    // so the retype goes through a fresh visit to the fork.
+    await page.goto('/login')
+    await page.fill('#identity', mfaUser.username)
+    await page.fill('#password', mfaUser.password)
+    await page.click('button[type=submit]')
+    await expect(code).toHaveCount(6, { timeout: 15_000 })
+    await code.first().pressSequentially(totpCode(enrollment.secret))
     await page.getByRole('button', { name: 'Verify' }).click()
     await expect(page).toHaveURL(/\/overview$/, { timeout: 15_000 })
     await closeSignInContexts()

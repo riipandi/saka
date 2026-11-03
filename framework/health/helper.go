@@ -103,7 +103,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		TookMS:  milliseconds(r.Duration),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("health: encode the result: %w", err)
 	}
 
 	// The head ends with the closing brace; the info entries are spliced in
@@ -114,11 +114,11 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		out.WriteByte(',')
 		encodedKey, err := json.Marshal(key)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("health: encode the info key %s: %w", key, err)
 		}
 		encodedValue, err := json.Marshal(r.Info[key])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("health: encode the info field %s: %w", key, err)
 		}
 		out.Write(encodedKey)
 		out.WriteByte(':')
