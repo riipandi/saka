@@ -41,6 +41,11 @@ type Policy struct {
 type RateClass struct {
 	Name   string
 	Policy Policy
+	// Global, when its Limit is positive, is a second budget the whole
+	// deployment shares for this request, whoever sends it. The per-address
+	// Policy cannot stop a caller spread across addresses; Global bounds the
+	// total.
+	Global Policy
 }
 
 // Classifier answers the bucket a request path is counted under, or false
@@ -145,6 +150,13 @@ func RateLimit(opts RateLimitOptions) func(http.Handler) http.Handler {
 			}
 
 			result, err := opts.Limiter.Allow(r.Context(), rateLimitKey(class.Name, r), class.Policy)
+			if err == nil && !result.Limited && class.Global.Limit > 0 {
+				// A global check that cannot answer degrades like the
+				// per-address one: the request passes, never the service down.
+				if global, globalErr := opts.Limiter.Allow(r.Context(), sanitizeKey(class.Name)+":global", class.Global); globalErr == nil && global.Limited {
+					result = global
+				}
+			}
 			if err != nil {
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
 					attribute.String("surface", opts.Surface),

@@ -3,6 +3,7 @@ package multifactor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -47,7 +48,7 @@ func (s *Service) beginBridge(ctx context.Context, userID uuid.UUID, remember bo
 
 	token, err := crypto.RandomHexToken(32)
 	if err != nil {
-		return SignInOutcome{}, err
+		return SignInOutcome{}, fmt.Errorf("multifactor: mint bridge token: %w", err)
 	}
 	hash := crypto.HashHexToken(token)
 

@@ -261,6 +261,7 @@ func (c Config) Validate() error {
 		"rate_limit.driver: %q is not one of %s", c.RateLimit.Driver, joinValues(RateLimitDB, RateLimitKV))
 	check(c.RateLimit.Limit > 0, "rate_limit.limit: must be positive")
 	check(c.RateLimit.AuthLimit > 0, "rate_limit.auth_limit: must be positive")
+	check(c.RateLimit.CodeGlobalLimit > 0, "rate_limit.code_global_limit: must be positive")
 	check(c.RateLimit.Window > 0, "rate_limit.window: must be positive")
 
 	check(c.Queue.NumWorkers >= 1, "queue.num_workers: %d must be at least 1", c.Queue.NumWorkers)
@@ -270,6 +271,7 @@ func (c Config) Validate() error {
 		"queue.encrypt: requires app.secret_key, the secret it seals payloads with")
 
 	check(c.App.AuditRetentionDays > 0, "app.audit_retention_days: must be greater than 0")
+	check(c.App.SessionRetentionDays > 0, "app.session_retention_days: must be greater than 0")
 	if _, err := time.LoadLocation(c.App.Timezone); err != nil {
 		check(false, "app.timezone: %q is not a time zone: %v", c.App.Timezone, err)
 	}

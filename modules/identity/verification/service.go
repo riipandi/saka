@@ -65,19 +65,12 @@ var (
 
 // tokenTTL is how long a verification code works. The template copy states
 // it, so changing one means changing the other.
-const tokenTTL = time.Hour
-
-// verificationCodeLength is the code's length: the unambiguous alphabet at
-// twelve characters — long enough that a typed guess is hopeless, short
-// enough that a human types it. The short/long window rule the one-time
-// access code keeps does not apply: these codes are the long form wherever
-// they are issued.
-const verificationCodeLength = 12
+const tokenTTL = 15 * time.Minute
 
 // newVerificationCode draws the single-use code the message carries and the
 // hash answers.
 func newVerificationCode() (string, error) {
-	return crypto.RandomString(verificationCodeLength, crypto.AlphabetUnambiguous)
+	return crypto.RandomLetterDigitCode()
 }
 
 // resendCooldown is how long the last send keeps a new one out. The window
@@ -165,7 +158,7 @@ func (s *Service) SendEmail(ctx context.Context, userID uuid.UUID) error {
 	}
 	now := s.now()
 
-	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(rawToken), now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertToken(ctx, s.pool, account.ID, crypto.HashHexToken(crypto.NormalizeCode(rawToken)), now.Add(tokenTTL), now); err != nil {
 		return err
 	}
 	if _, err := s.queue.Add(jobs.EmailVerificationTask{
@@ -204,7 +197,7 @@ func (s *Service) IssueForSignup(ctx context.Context, tx datastore.Querier, user
 		return "", fmt.Errorf("verification: token: %w", err)
 	}
 	now := s.now()
-	if err := s.repo.UpsertToken(ctx, tx, userID, crypto.HashHexToken(rawToken), now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertToken(ctx, tx, userID, crypto.HashHexToken(crypto.NormalizeCode(rawToken)), now.Add(tokenTTL), now); err != nil {
 		return "", fmt.Errorf("verification: issue for signup: %w", err)
 	}
 	return rawToken, nil
@@ -244,7 +237,7 @@ func (s *Service) DeliverForSignup(ctx context.Context, userID uuid.UUID, email,
 // between the two makes the consume fail rather than stamping a token that is
 // no longer the one presented.
 func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
-	hash := crypto.HashHexToken(rawToken)
+	hash := crypto.HashHexToken(crypto.NormalizeCode(rawToken))
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		token, findErr := s.repo.FindTokenByHash(ctx, tx, hash)
 		if errors.Is(findErr, datastore.ErrNoRows) {
@@ -468,7 +461,7 @@ func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newE
 	}
 	now := s.now()
 
-	if err := s.repo.UpsertEmailChangeToken(ctx, s.pool, account.ID, crypto.HashHexToken(rawToken), newEmail, now.Add(tokenTTL), now); err != nil {
+	if err := s.repo.UpsertEmailChangeToken(ctx, s.pool, account.ID, crypto.HashHexToken(crypto.NormalizeCode(rawToken)), newEmail, now.Add(tokenTTL), now); err != nil {
 		return err
 	}
 	if _, err := s.queue.Add(jobs.EmailChangeRequestEmailTask{
@@ -525,7 +518,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error
 	if !s.emailChangeOpen(ctx) {
 		return ErrEmailChangeDisabled
 	}
-	hash := crypto.HashHexToken(rawToken)
+	hash := crypto.HashHexToken(crypto.NormalizeCode(rawToken))
 	var confirmed EmailChangeNotice
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		token, findErr := s.repo.FindEmailChangeTokenByHash(ctx, tx, hash)

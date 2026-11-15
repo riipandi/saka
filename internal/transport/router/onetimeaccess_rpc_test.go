@@ -193,7 +193,7 @@ func TestTheOneTimeAccessLoopEndsInASession(t *testing.T) {
 		Token string `json:"token"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
-	require.Len(t, created.Token, 6, "the default window's code is the short form")
+	require.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, created.Token)
 
 	// The holder's exchange is an anonymous call: no credential, only the
 	// code.

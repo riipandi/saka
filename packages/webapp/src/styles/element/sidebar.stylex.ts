@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { colors } from 'uilibs/styles/colors.stylex'
-import { fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
+import { duration, easing, fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
 import { radius, unit } from 'uilibs/styles/tokens.stylex'
 
 // Mirrors `breakpoints.small` from `components/styles/core/tokens.stylex` (659px cap).
@@ -27,7 +27,7 @@ export const sidebarStyles = stylex.create({
     flexShrink: 0
   },
   containerExpanded: {
-    width: '15rem',
+    width: '16rem',
     alignItems: 'stretch',
     [breakpoints.small]: {
       width: '18rem'
@@ -131,8 +131,8 @@ export const sidebarStyles = stylex.create({
     flex: 1,
     paddingTop: unit.x2,
     paddingBottom: unit.x2,
-    paddingLeft: unit.x3,
-    paddingRight: unit.x3,
+    paddingLeft: unit.x2,
+    paddingRight: unit.x2,
     display: 'flex',
     flexDirection: 'column',
     gap: unit.x1,
@@ -146,16 +146,93 @@ export const sidebarStyles = stylex.create({
     gap: unit.x1,
     flex: '0 0 auto'
   },
-  sectionLabel: {
+  // The group header folds its items. It keeps the section label's type and
+  // adds the button reset and the chevron's row.
+  group: {
+    flexShrink: 0
+  },
+  groupTrigger: {
+    display: 'flex',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingLeft: unit.x2,
-    paddingTop: unit.x4,
-    paddingBottom: unit.x1,
+    paddingRight: unit.x2,
+    paddingTop: unit.x3,
+    paddingBottom: unit.x2,
+    borderWidth: 0,
+    borderRadius: radius.medium,
+    backgroundColor: 'transparent',
+    color: {
+      default: colors.foregroundNeutralFaded,
+      ':hover': colors.foregroundNeutral
+    },
+    cursor: 'pointer',
     fontSize: fontSize.caption1,
     fontWeight: fontWeight.semibold,
-    color: colors.foregroundNeutralFaded,
     letterSpacing: '0.07em',
+    textAlign: 'left',
     textTransform: 'uppercase',
-    userSelect: 'none'
+    transitionProperty: 'color',
+    transitionDuration: '150ms',
+    userSelect: 'none',
+    outline: 'none',
+    ':focus-visible': {
+      outlineWidth: 2,
+      outlineStyle: 'solid',
+      outlineColor: colors.foregroundPrimary,
+      outlineOffset: -2
+    }
+  },
+  // A label is one line: a name too long for the rail truncates instead of
+  // wrapping and pushing the rows below it.
+  groupLabel: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  groupChevron: {
+    height: '0.875rem',
+    width: '0.875rem',
+    flexShrink: 0,
+    stroke: 'currentColor',
+    transitionProperty: 'transform',
+    transitionDuration: duration.medium,
+    transitionTimingFunction: easing.standard
+  },
+  groupChevronClosed: {
+    transform: 'rotate(-90deg)'
+  },
+  // The panel is a one-row grid whose row runs between 1fr and 0fr, so the
+  // height animates over the content's real size; the inner box clips it. A
+  // closed panel is also visibility:hidden (after the fold) so its links leave
+  // the tab order and the accessibility tree.
+  groupPanel: {
+    display: 'grid',
+    transitionProperty: 'grid-template-rows, visibility',
+    transitionDuration: {
+      default: duration.slow,
+      '@media (prefers-reduced-motion: reduce)': '0s'
+    },
+    transitionTimingFunction: easing.standard
+  },
+  groupPanelOpen: {
+    gridTemplateRows: '1fr',
+    visibility: 'visible',
+    transitionDelay: '0s'
+  },
+  groupPanelClosed: {
+    gridTemplateRows: '0fr',
+    visibility: 'hidden',
+    transitionDelay: `0s, ${duration.slow}`
+  },
+  groupPanelInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: unit.x1,
+    minHeight: 0,
+    overflow: 'hidden'
   },
   divider: {
     width: '1.75rem',
@@ -169,13 +246,15 @@ export const sidebarStyles = stylex.create({
   // Nav item
   navItem: {
     display: 'flex',
-    height: '2.25rem',
+    // The nav scrolls: a row keeps its height instead of squeezing to fit.
+    flexShrink: 0,
+    height: '2rem',
     width: '100%',
     alignItems: 'center',
     gap: unit.x2,
     borderRadius: radius.large,
-    paddingLeft: unit.x3,
-    paddingRight: unit.x3,
+    paddingLeft: unit.x2,
+    paddingRight: unit.x2,
     textDecoration: 'none',
     color: {
       default: colors.foregroundNeutralFaded,
@@ -196,11 +275,26 @@ export const sidebarStyles = stylex.create({
       outlineStyle: 'solid',
       outlineColor: colors.foregroundPrimary,
       outlineOffset: 2
+    },
+    // The selected marker: a short pill on the item's leading edge, so the
+    // rounded background is not cut by a straight inset bar.
+    '::before': {
+      content: '""',
+      position: 'absolute',
+      left: 0,
+      top: '50%',
+      width: 3,
+      height: '1rem',
+      borderRadius: 999,
+      backgroundColor: colors.backgroundPrimary,
+      transform: 'translateY(-50%) scaleY(0)',
+      transitionProperty: 'transform',
+      transitionDuration: '150ms'
     }
   },
   navItemCollapsed: {
-    height: '2.25rem',
-    width: '2.25rem',
+    height: '2rem',
+    width: '2rem',
     justifyContent: 'center',
     paddingLeft: 0,
     paddingRight: 0
@@ -210,12 +304,12 @@ export const sidebarStyles = stylex.create({
       default: colors.backgroundPrimaryFaded,
       ':hover': colors.backgroundPrimaryFaded
     },
-    boxShadow: {
-      default: `inset 3px 0 0 ${colors.backgroundPrimary}`
-    },
     color: {
       default: colors.foregroundPrimary,
       ':hover': colors.foregroundPrimary
+    },
+    '::before': {
+      transform: 'translateY(-50%) scaleY(1)'
     }
   },
   navIcon: {
@@ -226,6 +320,9 @@ export const sidebarStyles = stylex.create({
   },
   navLabel: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
     fontSize: fontSize.body2,
     fontWeight: fontWeight.medium,
     whiteSpace: 'nowrap'

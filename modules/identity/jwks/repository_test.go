@@ -35,10 +35,10 @@ func TestActiveSigningKeysFiltersTheRows(t *testing.T) {
 		expires *time.Time
 	}{
 		{"live", true, UseSignature, nil},
-		{"expires-later", true, UseSignature, ptr(now.Add(time.Hour))},
+		{"expires-later", true, UseSignature, new(now.Add(time.Hour))},
 		{"inactive", false, UseSignature, nil},
 		{"encryption", true, "enc", nil},
-		{"expired", true, UseSignature, ptr(now.Add(-time.Hour))},
+		{"expired", true, UseSignature, new(now.Add(-time.Hour))},
 	}
 	for _, row := range rows {
 		_, err := pool.Exec(ctx, `
@@ -78,5 +78,3 @@ func TestActiveSigningKeysNeverReadsThePrivateColumn(t *testing.T) {
 	assert.Equal(t, "with-private", keys[0].KeyID)
 	assert.Equal(t, []byte(`{"kty":"EC"}`), keys[0].PublicKey)
 }
-
-func ptr[T any](v T) *T { return &v }

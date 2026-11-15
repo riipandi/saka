@@ -69,3 +69,16 @@ func TestTimeoutReleasesTheTimerWhenTheHandlerIsFast(t *testing.T) {
 		require.Fail(t, "the request context was never cancelled")
 	}
 }
+
+func TestTimeoutSkipsUpgrade(t *testing.T) {
+	var hasDeadline bool
+	h := Timeout(time.Second)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		_, hasDeadline = r.Context().Deadline()
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Upgrade", "websocket")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if hasDeadline {
+		t.Fatal("an Upgrade request must not carry the timeout deadline")
+	}
+}

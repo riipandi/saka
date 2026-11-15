@@ -95,6 +95,11 @@ role grants, sign-up modes, and the blocklist — has its own page:
 
 ## Managing your own account
 
+The **Overview** page is where you land. It shows your own sessions, the
+ways you can sign in, unread notifications, your API keys, and the latest
+activity on your account; an administrator also sees the state of the
+deployment above it — people, groups, queues, webhooks, and clients.
+
 Once signed in, each person manages their own account from the Account
 section in the sidebar — no administrator needed:
 

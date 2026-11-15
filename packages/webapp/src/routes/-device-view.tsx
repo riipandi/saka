@@ -39,8 +39,8 @@ const CODE_LENGTH = 8
 
 /** The field's alphabet is the server's user-code charset — letters and
  * digits, no punctuation. The OTP field's numeric default would reject
- * every code at the keystroke. The display hyphen is the wire's job
- * (`user_code` answers `XXXX-XXXX`); the field's own state stays bare. */
+ * every code at the keystroke. The wire answers the bare code; a hyphen a person
+ * types is dropped, and the field's own state stays bare. */
 function bareCode(raw: string): string {
   return raw.replaceAll('-', '').toUpperCase().slice(0, CODE_LENGTH)
 }
@@ -81,7 +81,7 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
 
-  // A deep link with ?code=XXXX-XXXX inspects on arrival; a hand-typed code
+  // A deep link with ?code=ABC12345 inspects on arrival; a hand-typed code
   // waits for the button. The link's code may already be decided — the
   // not-found surface covers that too.
   useEffect(() => {
@@ -185,7 +185,9 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
           <Card>
             <CardHeader>
               <CardTitle>Enter the code</CardTitle>
-              <CardDescription>The code the requesting device displays, XXXX-XXXX.</CardDescription>
+              <CardDescription>
+                The code the requesting device displays, such as ABC12345.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div {...stylex.props(styles.inputStack)}>
@@ -205,10 +207,10 @@ export function DeviceApprovalView({ initialCode }: { initialCode?: string }) {
                     <OTPFieldSlot />
                     <OTPFieldSlot />
                     <OTPFieldSlot />
-                    <OTPFieldSlot />
                   </OTPFieldGroup>
                   <OTPFieldSeparator />
                   <OTPFieldGroup>
+                    <OTPFieldSlot />
                     <OTPFieldSlot />
                     <OTPFieldSlot />
                     <OTPFieldSlot />

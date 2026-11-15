@@ -58,11 +58,12 @@ type PublishedApp struct {
 	// rest of the section is administrative.
 	AssetsURL string `json:"assets_url,omitzero"`
 
-	ExposeResetToken   bool   `json:"expose_reset_token,omitzero"`
-	ExposeTotpSecret   bool   `json:"expose_totp_secret,omitzero"`
-	AuditRetentionDays int    `json:"audit_retention_days,omitzero"`
-	Timezone           string `json:"timezone,omitzero"`
-	SecretKey          string `json:"secret_key,omitzero"`
+	ExposeResetToken     bool   `json:"expose_reset_token,omitzero"`
+	ExposeTotpSecret     bool   `json:"expose_totp_secret,omitzero"`
+	AuditRetentionDays   int    `json:"audit_retention_days,omitzero"`
+	SessionRetentionDays int    `json:"session_retention_days,omitzero"`
+	Timezone             string `json:"timezone,omitzero"`
+	SecretKey            string `json:"secret_key,omitzero"`
 }
 
 // PublishedAuth is the auth section. The HMAC secret is published only as its
@@ -323,9 +324,10 @@ func publishedSecretRender(secret string) string {
 func (c Config) Published(full bool) Published {
 	public := Published{
 		App: PublishedApp{
-			Mode:     c.App.Mode,
-			BaseURL:  c.App.BaseURL,
-			Timezone: c.App.Timezone,
+			Mode:      c.App.Mode,
+			BaseURL:   c.App.BaseURL,
+			Timezone:  c.App.Timezone,
+			AssetsURL: c.App.AssetsURL,
 		},
 		Auth: PublishedAuth{
 			OneTimeAccessEmailAsAdminEnabled:           c.Auth.OneTimeAccessEmailAsAdminEnabled,
@@ -360,10 +362,10 @@ func (c Config) Published(full bool) Published {
 	// secret cannot reach the wire by being populated.
 	sealed := c.withSecrets(publishedSecretRender)
 
-	public.App.AssetsURL = c.App.AssetsURL
 	public.App.ExposeResetToken = c.App.ExposeResetToken
 	public.App.ExposeTotpSecret = c.App.ExposeTotpSecret
 	public.App.AuditRetentionDays = c.App.AuditRetentionDays
+	public.App.SessionRetentionDays = c.App.SessionRetentionDays
 	public.App.SecretKey = sealed.App.SecretKey
 	public.Auth.JWTAlgorithm = c.Auth.JWTAlgorithm
 	public.Auth.Issuer = c.Auth.Issuer

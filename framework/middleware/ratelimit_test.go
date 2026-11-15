@@ -238,3 +238,43 @@ func TestKVStoreLimiterExpiresTheWindow(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, renewed.Limited, "a spent window starts again once it expires")
 }
+
+// keyLimiter limits only the keys it names, so a test can spend one budget
+// and leave the other open.
+type keyLimiter struct {
+	limited string
+	keys    []string
+}
+
+func (k *keyLimiter) Allow(_ context.Context, key string, policy Policy) (Result, error) {
+	k.keys = append(k.keys, key)
+	return Result{Limit: policy.Limit, Limited: strings.Contains(key, k.limited), RetryAfter: time.Second}, nil
+}
+
+func TestRateLimitRefusesWhenTheGlobalBudgetIsSpentFromAnyAddress(t *testing.T) {
+	classify := func(string) (RateClass, bool) {
+		return RateClass{Name: "auth", Policy: testPolicy, Global: Policy{Limit: 300, Window: time.Minute}}, true
+	}
+	limiter := &keyLimiter{limited: ":global"}
+	reached := false
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classify})(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) { reached = true }))
+
+	for _, addr := range []string{"192.0.2.1:1234", "198.51.100.7:1234"} {
+		req := httptest.NewRequest(http.MethodPost, "/rpc/x", nil)
+		req.RemoteAddr = addr
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusTooManyRequests, rec.Code, addr)
+	}
+	assert.False(t, reached, "a spent global budget stops the call whichever address sends it")
+	assert.Contains(t, limiter.keys, "auth:global")
+}
+
+func TestRateLimitWithoutAGlobalBudgetChecksOnlyTheAddress(t *testing.T) {
+	limiter := &keyLimiter{limited: "never"}
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) {}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/x", nil))
+	assert.Len(t, limiter.keys, 1)
+}

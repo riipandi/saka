@@ -35,7 +35,7 @@ export const PasswordReset = ({ logoURL, appName, data }: PasswordResetProps) =>
       </Text>
 
       <Alert variant='warning' style={{ marginTop: '20px' }}>
-        <strong>Important:</strong> This code will expire in 1 hour. If you did not request this
+        <strong>Important:</strong> This code will expire in 15 minutes. If you did not request this
         change, please ignore this email.
       </Alert>
 
@@ -61,7 +61,7 @@ PasswordReset.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     email: 'user@example.com',
-    resetCode: 'EXPECTO-PATRONUM'
+    resetCode: 'HRM20483'
   }
 }
 

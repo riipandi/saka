@@ -16,8 +16,8 @@ import (
 // with or without the delegation an impersonated session carries.
 func caller(userID string, admin bool) *jwtutils.Caller {
 	return &jwtutils.Caller{
-		UserID:       userID,
-		AccessClaims: jwtutils.AccessClaims{Username: "hermione", Roles: adminRoles(admin)},
+		UserID:   userID,
+		Username: "hermione", Roles: adminRoles(admin),
 	}
 }
 
@@ -34,13 +34,11 @@ func adminRoles(admin bool) []string {
 // the subject while naming the administrator behind it.
 func impersonator(subject string) *jwtutils.Caller {
 	return &jwtutils.Caller{
-		UserID: subject,
-		AccessClaims: jwtutils.AccessClaims{
-			Username:      "hermione",
-			Roles:         adminRoles(true),
-			ActorID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
-			ActorUsername: "admin",
-		},
+		UserID:        subject,
+		Username:      "hermione",
+		Roles:         adminRoles(true),
+		ActorID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
+		ActorUsername: "admin",
 	}
 }
 
@@ -262,31 +260,25 @@ func TestEveryDeclaredProcedureExistsInTheContract(t *testing.T) {
 // caller without a session is refused as unauthenticated.
 func TestStopImpersonatingRuleRequiresTheDelegation(t *testing.T) {
 	delegated := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-			ActorID:   "user_01a0da1ccb4177900000000001",
-		},
+		UserID:    "user_01a0da1ccb4177900000000000",
+		Username:  "sophie_neveu",
+		SessionID: "sess_01a0da1ccb4177900000000000",
+		ActorID:   "user_01a0da1ccb4177900000000001",
 	}
 	assert.NoError(t, guard.StopImpersonating(delegated, guard.Target{}))
 
 	plain := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-		},
+		UserID:    "user_01a0da1ccb4177900000000000",
+		Username:  "sophie_neveu",
+		SessionID: "sess_01a0da1ccb4177900000000000",
 	}
 	assert.ErrorIs(t, guard.StopImpersonating(plain, guard.Target{}), guard.ErrImpersonated)
 
 	machine := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-			ActorID:   "user_01a0da1ccb4177900000000001",
-		},
+		UserID:     "user_01a0da1ccb4177900000000000",
+		Username:   "sophie_neveu",
+		SessionID:  "sess_01a0da1ccb4177900000000000",
+		ActorID:    "user_01a0da1ccb4177900000000001",
 		Credential: jwtutils.CredentialAPIKey,
 	}
 	assert.ErrorIs(t, guard.StopImpersonating(machine, guard.Target{}), guard.ErrMachineCredential)

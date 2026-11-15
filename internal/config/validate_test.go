@@ -68,6 +68,15 @@ func TestValidationRejectsMinAboveMax(t *testing.T) {
 	assert.Contains(t, err.Error(), "database.min_conns")
 }
 
+func TestValidationRejectsAZeroSessionRetention(t *testing.T) {
+	// Zero reads as "keep every sign-in forever": the sweep the key feeds
+	// would delete nothing, so an explicit zero is a refused run, not a
+	// disabled retention.
+	err := resolveFile(t, `"app": {"session_retention_days": 0}`)
+	require.ErrorIs(t, err, config.ErrInvalid)
+	assert.Contains(t, err.Error(), "app.session_retention_days")
+}
+
 func TestValidationRestrictsTheExposureAidsToDevelopment(t *testing.T) {
 	// The raw reset token and the decrypted authenticator secret hand an
 	// account's credential to anyone who can reach the response, so the

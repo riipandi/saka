@@ -56,18 +56,13 @@ type CodeEmail struct {
 
 const (
 	// reauthCodeTTL is the email code's window: long enough to reach an
-	// inbox and type a twelve-character code, short enough to be a
+	// inbox and type an eight-character code, short enough to be a
 	// credential that dies.
 	reauthCodeTTL = 15 * time.Minute
 
 	// resendCooldown is how long the live code keeps a fresh email send,
 	// the same window the one-time access send observes.
 	resendCooldown = time.Minute
-
-	// reauthCodeLength is the code's length: twelve characters of the
-	// unambiguous alphabet — a credential typed from an email, not a
-	// six-digit guess a drive can carry off.
-	reauthCodeLength = 12
 )
 
 // SendReauthenticationCode delivers the email-code reverification factor to
@@ -91,7 +86,7 @@ func (s *Service) SendReauthenticationCode(ctx context.Context, userID uuid.UUID
 		return err
 	}
 
-	code, err := crypto.RandomString(reauthCodeLength, crypto.AlphabetUnambiguous)
+	code, err := crypto.RandomLetterDigitCode()
 	if err != nil {
 		return fmt.Errorf("webauthn: reauthentication code: %w", err)
 	}
@@ -160,7 +155,7 @@ func (s *Service) Reauthenticate(ctx context.Context, userID uuid.UUID, password
 		}
 		resolved, proof = userID, "passkey"
 	case emailCode != "":
-		spent, err := s.repo.ConsumeReauthenticationCode(ctx, s.pool, userID, crypto.HashHexToken(emailCode), s.now())
+		spent, err := s.repo.ConsumeReauthenticationCode(ctx, s.pool, userID, crypto.HashHexToken(crypto.NormalizeCode(emailCode)), s.now())
 		if err != nil {
 			return "", time.Time{}, err
 		}

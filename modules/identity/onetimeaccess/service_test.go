@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -231,24 +232,22 @@ func TestCreateTokenIssuesACodeTheExchangeAccepts(t *testing.T) {
 
 	code, expiresAt, err := service.CreateToken(t.Context(), wireOf(t, userID), 0)
 	require.NoError(t, err)
-	assert.Len(t, code, shortCodeLength, "a code without a window defaults to fifteen minutes, and that window's form is the short one")
+	assert.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, code)
 	assert.True(t, expiresAt.After(time.Now()), "the expiry is in the future")
 
 	// The exchange answers the token pair and names the session it opened.
-	result, err := service.Exchange(t.Context(), code, "", fwaudit.ClientInfo{})
+	result, err := service.Exchange(t.Context(), " "+strings.ToLower(code)+" ", "", fwaudit.ClientInfo{})
 	require.NoError(t, err)
 	assert.Equal(t, "hermione", result.User.Username)
 	assert.NotEmpty(t, result.AccessToken)
 	assert.NotEmpty(t, result.RefreshToken)
 	assert.NotEmpty(t, result.SessionID)
 
-	// A longer window buys the longer form, on an account of its own: two
-	// codes for one account cannot coexist, and the exchange below needs the
-	// short one still standing.
+	// The window does not change the form.
 	other := seedUser(t, pool, "langdon", "langdon@example.com")
 	long, _, err := service.CreateToken(t.Context(), wireOf(t, other), 3600)
 	require.NoError(t, err)
-	assert.Len(t, long, longCodeLength)
+	assert.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, long)
 
 	// The code is spent: a second exchange with the same value answers the
 	// same refusal an unknown one does, and never a second session.

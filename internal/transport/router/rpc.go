@@ -2,9 +2,12 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
@@ -141,36 +144,58 @@ func otelInterceptor() connect.ServerInterceptor {
 	return interceptor
 }
 
-// recoveryInterceptor is the panic boundary every procedure is served behind.
-// The recovery middleware above this surface answers a panic with the REST
-// envelope, which a Connect client cannot parse. A panic inside a procedure
-// is reported in the protocol the caller used, and the panic value is not
-// published: it is an internal detail, and the middleware logs it with the
-// stack and the request id. The net/http abort sentinel passes through —
-// the server owns that panic and aborting the response is its answer.
-func recoveryInterceptor(next connect.ServerFunc) connect.ServerFunc {
-	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
-		defer func() {
-			if recovered := recover(); recovered != nil {
-				if recovered == http.ErrAbortHandler {
-					panic(recovered)
+// errorBoundary is the ledger of everything a procedure answers that the
+// wire does not carry. A panic is refused in the protocol the caller used,
+// and the value is logged here with its stack — the recovery middleware
+// above this surface never sees one, because this boundary is the outermost
+// interceptor. A plain (non-connect) error rides to the wire as the
+// protocol's masked `unknown` — the SQL fragments and constraint names it
+// may carry are not a caller's to read — so this is where its cause earns
+// the only record it gets: the log names the procedure and the message the
+// wire refused. Authored *connect.Error values keep their text on the wire
+// and are not logged twice.
+//
+// A nil logger keeps the refusal behavior and drops the record, the state a
+// test that reads only responses runs in.
+func errorBoundary(log *slog.Logger) connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					if recovered == http.ErrAbortHandler {
+						panic(recovered)
+					}
+					if log != nil {
+						log.ErrorContext(context.WithoutCancel(ctx), "rpc procedure panicked",
+							"procedure", spec.Procedure,
+							"panic", fmt.Sprint(recovered),
+							"stack", string(debug.Stack()))
+					}
+					err = connect.NewError(connect.CodeInternal, "internal error")
 				}
-				err = connect.NewError(connect.CodeInternal, "internal error")
+			}()
+			err = next(ctx, spec, stream)
+			if err != nil && log != nil {
+				if _, isAuthored := errors.AsType[*connect.Error](err); !isAuthored {
+					log.ErrorContext(context.WithoutCancel(ctx), "rpc procedure failed",
+						"procedure", spec.Procedure, "error", err)
+				}
 			}
-		}()
-		return next(ctx, spec, stream)
+			return err
+		}
 	}
 }
 
 // rpcInterceptors are the interceptors every procedure on this surface is
-// served behind, in wrap order: the panic boundary outermost, then the guard
-// — authorization runs before the contract is enforced, so a caller who may
-// not run a procedure is refused without the request body being judged — then
-// the declarative constraints, whose refusals carry typed protovalidate
-// details, and the OpenTelemetry interceptor innermost.
-func rpcInterceptors(reauth guard.ReauthConsumer) []connect.ServerInterceptor {
+// served behind, in wrap order: the error boundary outermost — panics and
+// the masked plain errors are recorded where the wire refuses them — then
+// the guard — authorization runs before the contract is enforced, so a
+// caller who may not run a procedure is refused without the request body
+// being judged — then the declarative constraints, whose refusals carry
+// typed protovalidate details, and the OpenTelemetry interceptor innermost.
+func rpcInterceptors(reauth guard.ReauthConsumer, log *slog.Logger) []connect.ServerInterceptor {
 	return []connect.ServerInterceptor{
-		recoveryInterceptor,
+		errorBoundary(log),
 		middleware.Guard(reauth),
 		validate.NewServerInterceptor(),
 		otelInterceptor(),
@@ -228,7 +253,7 @@ func rpcRouter(opts Options) http.Handler {
 	// renamed procedure breaks the build rather than losing its exemption.
 	r.Use(fwmiddleware.UnboundedFor(rpcStreamingProcedures...))
 
-	server := connect.NewServer(rpcInterceptors(reauth)...)
+	server := connect.NewServer(rpcInterceptors(reauth, opts.Logger)...)
 	systemv1connect.RegisterHealthServiceHandler(server, handler.NewRPCHealthService(checker))
 
 	// The engines' own administrative surface: the queue's tables and the

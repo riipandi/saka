@@ -87,12 +87,12 @@ export function ResetPasswordView({ prefill }: { prefill?: string }) {
               id='reset-code'
               name='token'
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
               autoComplete='off'
               required
               autoFocus={!prefill}
             />
-            <FieldDescription>The 64-character code the email carried.</FieldDescription>
+            <FieldDescription>The eight-character code the email carried.</FieldDescription>
           </Field>
           <Field id='field-reset-password'>
             <FieldLabel htmlFor='reset-password'>New password</FieldLabel>

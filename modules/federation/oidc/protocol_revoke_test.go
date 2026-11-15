@@ -50,7 +50,7 @@ func readAll(t *testing.T, response *http.Response) string {
 func revokeProvider(t *testing.T, pool *revokePool) http.Handler {
 	t.Helper()
 
-	grants := grantStore{protocolStore: protocolStore{pool: pool.Postgres}}
+	grants := grantStore{pool: pool.Postgres}
 	clients := clientStore{
 		pool:    pool.Postgres,
 		repo:    NewRepository(),
@@ -84,7 +84,7 @@ func revokeProvider(t *testing.T, pool *revokePool) http.Handler {
 func seedRevokableGrant(t *testing.T, pool *revokePool, clientID, refreshToken string) {
 	t.Helper()
 
-	grants := grantStore{protocolStore: protocolStore{pool: pool.Postgres}}
+	grants := grantStore{pool: pool.Postgres}
 	require.NoError(t, grants.SaveGrant(t.Context(), &goidc.Grant{
 		ID:                    "g-" + refreshToken,
 		ClientID:              clientID,
@@ -119,7 +119,7 @@ func TestTheRevocationEndpointKillsTheGrant(t *testing.T) {
 
 	// The grant is marked revoked, and the refresh token's next
 	// redemption meets the library's invalid-grant refusal.
-	grants := grantStore{protocolStore: protocolStore{pool: pool.Postgres}}
+	grants := grantStore{pool: pool.Postgres}
 	grant, err := grants.GrantByRefreshToken(t.Context(), "rt-cluedo")
 	require.NoError(t, err)
 	assert.NotZero(t, grant.RevokedAt, "the grant carries the revocation mark")
@@ -164,7 +164,7 @@ func TestTheRevocationEndpointRefusesAStrangersToken(t *testing.T) {
 	assert.True(t, strings.Contains(body, "access_denied"),
 		"the refusal names the access-denied error, got %q", body)
 
-	grants := grantStore{protocolStore: protocolStore{pool: pool.Postgres}}
+	grants := grantStore{pool: pool.Postgres}
 	grant, err := grants.GrantByRefreshToken(t.Context(), "rt-abarthel")
 	require.NoError(t, err)
 	assert.Zero(t, grant.RevokedAt, "the stranger's refusal revokes nothing")

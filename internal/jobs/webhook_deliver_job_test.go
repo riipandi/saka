@@ -80,7 +80,7 @@ func TestWebhookPruneDeletesAgedOutAttemptsAndReschedules(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, deliveries, 1)
 	deliveryID := deliveries[0].Delivery.ID.String()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		require.Error(t, service.RunDelivery(t.Context(), deliveryID))
 	}
 

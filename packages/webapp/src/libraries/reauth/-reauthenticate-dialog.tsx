@@ -170,7 +170,7 @@ export function ReauthenticateDialog({
                 <Input
                   id='reauth-code'
                   value={code}
-                  onChange={(event) => setCode(event.target.value)}
+                  onChange={(event) => setCode(event.target.value.toUpperCase())}
                   autoComplete='one-time-code'
                 />
               </Field>

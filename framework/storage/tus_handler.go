@@ -368,7 +368,7 @@ func parseUploadMetadata(raw string) (map[string]string, error) {
 	if len(raw) > TusMaxMetadataBytes {
 		return nil, errors.New("the Upload-Metadata header is too long")
 	}
-	for _, pair := range strings.Split(raw, ",") {
+	for pair := range strings.SplitSeq(raw, ",") {
 		parts := strings.SplitN(strings.TrimSpace(pair), " ", 2)
 		name := parts[0]
 		if name == "" {

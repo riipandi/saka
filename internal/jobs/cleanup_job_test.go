@@ -31,6 +31,10 @@ func expiredRecord(ctx context.Context, t *testing.T, pool *datastore.Postgres) 
 // configuration default.
 const defaultRetentionDays = 90
 
+// defaultSessionDays is the session window the tests seed with, matching the
+// configuration default the sweep applies.
+const defaultSessionDays = 30
+
 // seeded wires the processors onto the client and seeds the recurring jobs —
 // the two steps a serve run takes between building the queue and starting it.
 func seeded(ctx context.Context, client *queue.Client, pool *datastore.Postgres, cleanupInterval time.Duration, uploader *storage.Manager) error {
@@ -38,7 +42,7 @@ func seeded(ctx context.Context, client *queue.Client, pool *datastore.Postgres,
 	// tasks sees every one a serve run seeds. It runs on the pool the
 	// migrated client was built over.
 	Register(client, cleanupInterval, uploader, nil, pool, "", false, false, nil, nil, nil, nil, nil, nil, nil)
-	return NewSeeder(client, cleanupInterval, uploader, defaultRetentionDays, false, false, slog.New(slog.DiscardHandler)).Seed(ctx)
+	return NewSeeder(client, cleanupInterval, uploader, defaultRetentionDays, defaultSessionDays, false, false, slog.New(slog.DiscardHandler)).Seed(ctx)
 }
 
 func TestRegisterSeedsOneMaintenanceTask(t *testing.T) {

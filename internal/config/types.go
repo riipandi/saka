@@ -67,6 +67,13 @@ type App struct {
 	// is a decision a deployment should make on purpose, not a default it
 	// never noticed.
 	AuditRetentionDays int `koanf:"audit_retention_days" json:"audit_retention_days"`
+	// SessionRetentionDays is how long a session row outlives its end: the
+	// session_cleanup job deletes the rows whose revocation or expiry is
+	// older than the window. Zero would mean "keep every sign-in forever",
+	// which is why Validate refuses it: the account's session center lists
+	// what the retention keeps, and an unbounded list is a decision a
+	// deployment should make on purpose.
+	SessionRetentionDays int `koanf:"session_retention_days" json:"session_retention_days"`
 	// Timezone is the one zone the deployment runs in: every pooled
 	// database session is pinned to it and a cron spec that names no zone
 	// of its own is resolved against it, so "0 3 * * *" is three in the
@@ -572,6 +579,11 @@ type RateLimit struct {
 	// AuthLimit is the credential bucket's number of requests per Window.
 	// The procedures it throttles are named in internal/guard.
 	AuthLimit int `koanf:"auth_limit" json:"auth_limit"`
+	// CodeGlobalLimit is the number of code-spending requests per Window the
+	// whole deployment accepts, whoever sends them. The per-address budget
+	// cannot stop a guesser spread across addresses; this one bounds the
+	// total, and a legitimate deployment spends a small fraction of it.
+	CodeGlobalLimit int `koanf:"code_global_limit" json:"code_global_limit"`
 	// Window is the period the budgets apply to.
 	Window time.Duration `koanf:"window" json:"window"`
 }

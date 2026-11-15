@@ -65,7 +65,7 @@ ReauthenticationCodeEmail.TemplateProps = {
 ReauthenticationCodeEmail.PreviewProps = {
   ...sharedPreviewProps,
   data: {
-    code: 'EXPECTOPATRONUM',
+    code: 'HRM20483',
     expirationString: '15 minutes'
   }
 }

@@ -271,7 +271,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithTokenRevocationEndpoint(protocolRevokeEndpoint)),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: build the provider: %w", err)
 	}
 	return &Protocol{provider: p, baseURL: baseURL}, nil
 }

@@ -1,9 +1,11 @@
 package router_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -327,6 +329,113 @@ func TestAPlainErrorIsMasked(t *testing.T) {
 	assert.Equal(t, "unknown", body.Code)
 	assert.Empty(t, body.Message, "a plain error's text must not reach the wire")
 	assert.NotContains(t, rec.Body.String(), "constraint")
+}
+
+// TestTheMaskedErrorIsRecorded pins the error boundary's ledger: the plain
+// error the wire masks is logged with the procedure's name and the message
+// the caller never sees — the cause's only record, since the mapper and the
+// masking both drop it.
+func TestTheMaskedErrorIsRecorded(t *testing.T) {
+	var logBuf bytes.Buffer
+	router := rt.NewRouter(rt.Options{
+		Config:  config.Default(),
+		Checker: health.NewChecker(),
+		Logger:  slog.New(slog.NewTextHandler(&logBuf, nil)),
+		Modules: []kernel.Module{rpcFailingFeature{}},
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	entry := logBuf.String()
+	assert.Contains(t, entry, "rpc procedure failed")
+	assert.Contains(t, entry, "AuthService/SignIn")
+	assert.Contains(t, entry, "duplicate key value violates unique constraint")
+
+	// The record is the log's alone: the wire carries nothing of the cause.
+	assert.NotContains(t, rec.Body.String(), "duplicate key")
+}
+
+// TestAProcedurePanicIsRecordedAndRefused pins the boundary's panic side: the
+// panic value never reaches the wire, and the log carries it with the stack —
+// the record the recovery middleware cannot make, because this boundary is
+// the outermost interceptor and the panic never reaches it.
+func TestAProcedurePanicIsRecordedAndRefused(t *testing.T) {
+	var logBuf bytes.Buffer
+	router := rt.NewRouter(rt.Options{
+		Config:  config.Default(),
+		Checker: health.NewChecker(),
+		Logger:  slog.New(slog.NewTextHandler(&logBuf, nil)),
+		Modules: []kernel.Module{rpcPanickingFeature{}},
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "explode", "a panic value is not a caller's to read")
+
+	entry := logBuf.String()
+	assert.Contains(t, entry, "rpc procedure panicked")
+	assert.Contains(t, entry, "it exploded")
+	assert.Contains(t, entry, "goroutine", "the stack is the record's payload")
+}
+
+// TestAnAuthoredErrorRidesTheWireAndSkipsTheLedger pins the boundary's
+// restraint: an authored *connect.Error is the caller's to read, and logging
+// it would say twice what the response already says.
+func TestAnAuthoredErrorRidesTheWireAndSkipsTheLedger(t *testing.T) {
+	var logBuf bytes.Buffer
+	router := rt.NewRouter(rt.Options{
+		Config:  config.Default(),
+		Checker: health.NewChecker(),
+		Logger:  slog.New(slog.NewTextHandler(&logBuf, nil)),
+		Modules: []kernel.Module{rpcAuthoredErrorFeature{}},
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, rpcRequest(t, authnv1connect.AuthServiceSignInProcedure, "{}"))
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "authored refusal")
+	assert.NotContains(t, logBuf.String(), "rpc procedure failed")
+}
+
+// stubPanickingAuthService panics inside the procedure — the failure the
+// boundary catches, records, and refuses.
+type stubPanickingAuthService struct{}
+
+func (stubPanickingAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	panic("it exploded")
+}
+
+type rpcPanickingFeature struct{}
+
+func (rpcPanickingFeature) Name() string { return "rpc-panicking-feature" }
+
+func (rpcPanickingFeature) Mount(chi.Router) {}
+
+func (rpcPanickingFeature) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterAuthServiceHandler(server, stubPanickingAuthService{})
+}
+
+// stubAuthoredErrorAuthService answers a coded error the handler authored —
+// the shape the wire publishes and the ledger skips.
+type stubAuthoredErrorAuthService struct{}
+
+func (stubAuthoredErrorAuthService) SignIn(context.Context, *authnv1.SignInRequest) (*authnv1.SignInResponse, error) {
+	return nil, connect.NewError(connect.CodeInvalidArgument, "authored refusal")
+}
+
+type rpcAuthoredErrorFeature struct{}
+
+func (rpcAuthoredErrorFeature) Name() string { return "rpc-authored-error-feature" }
+
+func (rpcAuthoredErrorFeature) Mount(chi.Router) {}
+
+func (rpcAuthoredErrorFeature) MountRPC(server *connect.Server) {
+	authnv1connect.RegisterAuthServiceHandler(server, stubAuthoredErrorAuthService{})
 }
 
 // stubAuthService answers the smallest SignIn response that carries the field.

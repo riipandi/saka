@@ -3,7 +3,7 @@ import { unit } from 'uilibs/styles/tokens.stylex'
 
 /**
  * The standalone verify-email screen's shell: one centered card on a bare
- * page, sized to the twelve-slot code entry.
+ * page, sized to the eight-slot code entry.
  */
 export const styles = stylex.create({
   page: {

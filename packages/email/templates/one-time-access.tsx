@@ -58,7 +58,7 @@ OneTimeAccessEmail.TemplateProps = {
 OneTimeAccessEmail.PreviewProps = {
   ...sharedPreviewProps,
   data: {
-    code: 'GRYFFINDOR',
+    code: 'HRM20483',
     expirationString: '15 minutes'
   }
 }

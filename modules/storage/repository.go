@@ -96,7 +96,10 @@ func (r *Repository) List(ctx context.Context, db datastore.Querier) ([]BucketSc
 		}
 		buckets = append(buckets, row)
 	}
-	return buckets, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage: list buckets: %w", err)
+	}
+	return buckets, nil
 }
 
 // Update rewrites one bucket's limits, leaving a NULL argument's column at

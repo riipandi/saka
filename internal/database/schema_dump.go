@@ -19,7 +19,7 @@ import (
 
 func dumpSchemasSection(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	var names []string
-	err := eachRow(ctx, tx,
+	err := eachRow(ctx, tx, "dump the schemas",
 		`SELECT nspname FROM pg_namespace WHERE nspname = ANY($1) ORDER BY nspname`,
 		[]any{dumpSchemas}, func(rows pgx.Rows) error {
 			var name string
@@ -47,7 +47,7 @@ func dumpSchemasSection(ctx context.Context, w *statementWriter, tx pgx.Tx) erro
 func dumpExtensions(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	var names []string
 	// plpgsql is installed by initdb and cannot be dropped, so it is noise.
-	err := eachRow(ctx, tx,
+	err := eachRow(ctx, tx, "dump the extensions",
 		`SELECT extname FROM pg_extension WHERE extname <> 'plpgsql' ORDER BY extname`,
 		nil, func(rows pgx.Rows) error {
 			var name string
@@ -80,7 +80,7 @@ func dumpExtensions(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // would otherwise fail on the first type it meets.
 func dumpEnums(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the enums", `
 		SELECT n.nspname, t.typname,
 		       string_agg(quote_literal(e.enumlabel), ', ' ORDER BY e.enumsortorder)
 		FROM pg_type t
@@ -111,7 +111,7 @@ func dumpEnums(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // it is skipped: writing it again would leave two objects claiming one name.
 func dumpSequences(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the sequences", `
 		SELECT n.nspname, c.relname
 		FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -151,7 +151,7 @@ func dumpTables(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 		name   string
 	}
 	var refs []tableRef
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, "dump the tables", `
 		SELECT c.oid, n.nspname, c.relname
 		FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -176,7 +176,7 @@ func dumpTables(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	}
 
 	for _, ref := range refs {
-		columns, err := tableColumns(ctx, tx, ref.oid)
+		columns, err := tableColumns(ctx, tx, ref.oid, Table{Schema: ref.schema, Name: ref.name})
 		if err != nil {
 			return err
 		}
@@ -192,9 +192,9 @@ func dumpTables(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // tableColumns renders one column definition per line, using format_type so a
 // type keeps its modifier and its schema (character varying(100),
 // public.jwt_algorithm, text[]).
-func tableColumns(ctx context.Context, tx pgx.Tx, oid uint32) ([]string, error) {
+func tableColumns(ctx context.Context, tx pgx.Tx, oid uint32, table Table) ([]string, error) {
 	var columns []string
-	err := eachRow(ctx, tx, `
+	err := eachRow(ctx, tx, fmt.Sprintf("read the columns of %s", table.Qualified()), `
 		SELECT a.attname,
 		       format_type(a.atttypid, a.atttypmod),
 		       a.attnotnull,
@@ -237,7 +237,7 @@ func tableColumns(ctx context.Context, tx pgx.Tx, oid uint32) ([]string, error) 
 // schema would otherwise fail on the first constraint it meets.
 func dumpConstraints(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the constraints", `
 		SELECT n.nspname, c.relname, con.conname, pg_get_constraintdef(con.oid)
 		FROM pg_constraint con
 		JOIN pg_class c ON c.oid = con.conrelid
@@ -276,7 +276,7 @@ func dumpConstraints(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // on a duplicate name.
 func dumpIndexes(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the indexes", `
 		SELECT schemaname, tablename, indexdef FROM pg_indexes
 		WHERE schemaname = ANY($1)
 		  AND indexname NOT IN (
@@ -306,7 +306,7 @@ func dumpIndexes(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // arrive with CREATE EXTENSION.
 func dumpFunctions(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the functions", `
 		SELECT pg_get_functiondef(p.oid)
 		FROM pg_proc p
 		JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -340,7 +340,7 @@ func dumpFunctions(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // used as it comes.
 func dumpTriggers(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the triggers", `
 		SELECT n.nspname, c.relname, pg_get_triggerdef(t.oid)
 		FROM pg_trigger t
 		JOIN pg_class c ON c.oid = t.tgrelid
@@ -369,7 +369,7 @@ func dumpTriggers(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 // the server, so a comment holding an apostrophe cannot break the statement.
 func dumpComments(ctx context.Context, w *statementWriter, tx pgx.Tx) error {
 	written := false
-	return eachRow(ctx, tx, `
+	return eachRow(ctx, tx, "dump the comments", `
 		SELECT n.nspname, c.relname, a.attname, quote_literal(d.description)
 		FROM pg_description d
 		JOIN pg_class c ON c.oid = d.objoid
