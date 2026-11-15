@@ -59,7 +59,7 @@ var (
 
 // tokenTTL is how long a reset code works. The template copy states it, so
 // changing one means changing the other.
-const tokenTTL = time.Hour
+const tokenTTL = 15 * time.Minute
 
 // resendCooldown is how long the last send keeps a new one out. The window
 // is what stops a caller from turning the trigger into a mailbomb; the token

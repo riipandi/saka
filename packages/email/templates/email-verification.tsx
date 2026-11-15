@@ -31,7 +31,7 @@ export const EmailVerification = ({ logoURL, appName, data }: EmailVerificationP
       </Text>
 
       <Text style={{ marginTop: '24px' }}>
-        <strong>Important:</strong> This code will expire in 1 hour.
+        <strong>Important:</strong> This code will expire in 15 minutes.
       </Text>
 
       <Text>If you did not create account, please ignore this email.</Text>

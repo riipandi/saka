@@ -65,7 +65,7 @@ var (
 
 // tokenTTL is how long a verification code works. The template copy states
 // it, so changing one means changing the other.
-const tokenTTL = time.Hour
+const tokenTTL = 15 * time.Minute
 
 // newVerificationCode draws the single-use code the message carries and the
 // hash answers.
