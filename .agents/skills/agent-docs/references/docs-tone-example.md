@@ -10,7 +10,7 @@ The `docs/` tree is written for a reader who wants to use the product, not revie
 - **GFM, used honestly.** Tables for enumerations, code blocks for anything a reader would copy, admonitions (`> [!NOTE]`, `> [!WARNING]`) for the things a skimming reader must not miss — earned by content, not sprinkled.
 - **Emoji are punctuation of last resort.** If an admonition or a bold label does the job, no icon is needed.
 - **Examples over descriptions.** One real command beats a paragraph describing the command; one request/response pair beats a paragraph on the shape.
-- **No internals.** A human doc names behavior and interfaces, never file paths, package names, or the agent's own context — that material belongs in the `.llms/` tree. When the reader needs the internals, the doc points at the front door, it does not open it.
+- **No internals.** A human doc names behavior and interfaces, never file paths, package names, or the agent's own context — that material belongs in the `.agents/docs/` tree. When the reader needs the internals, the doc points at the front door, it does not open it.
 - **No meta-docs.** License, contributing, changelog live in their own files; a human doc links out rather than duplicating.
 
 ## The test

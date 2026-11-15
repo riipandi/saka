@@ -2,14 +2,14 @@
 name: agent-docs
 description: >
     The documentation-ledger workflow: drafting plan documents
-    (.llms/plans), filing and reconciling issues (.llms/issues), curating
-    the roadmap (.llms/roadmap), writing handovers and audits, keeping
-    .llms/index.md and the .llms core documents in sync, and maintaining
+    (.agents/docs/plans), filing and reconciling issues (.agents/docs/issues), curating
+    the roadmap (.agents/docs/roadmap), writing handovers and audits, keeping
+    .agents/docs/index.md and the .agents/docs core documents in sync, and maintaining
     the human-facing docs/ tree. Use when the user asks for a plan, an
     issue, a roadmap entry, a handover, an index update, or any docs/
     change — and when the user runs /agent-docs.
 metadata:
-    short-description: "The .llms ledger and docs/ workflow"
+    short-description: "The .agents/docs ledger and docs/ workflow"
 ---
 
 # Agent docs — the documentation ledger workflow
@@ -23,12 +23,12 @@ shape is the lesson; their content is not prescriptive.
 
 ## The two audiences
 
-- **`.llms/` is for agents** — English, technical, file:line evidence,
+- **`.agents/docs/` is for agents** — English, technical, file:line evidence,
   no prose padding. `index.md` is the map; `rules.md` holds contracts,
   `architecture.md` holds reasoning and decision records.
 - **`docs/` is for humans** — no internals, no paths, no agent context;
   orientation on the reader. The `clarity` skill is **mandatory** before
-  writing or rewriting any document in `.llms/` or `docs/` — a rewrite
+  writing or rewriting any document in `.agents/docs/` or `docs/` — a rewrite
   without it is a defect of the change, not a style preference. `docs/`
   prose is concise GFM, one idea per paragraph, emoji only where an
   admonition earns it.
@@ -48,7 +48,7 @@ build it on facts, not invention:
 2. **Scaffold the minimum that the workflow needs**, no more:
 
    ```text
-   .llms/
+   .agents/docs/
      index.md          — the map: what each document is, the recap table (empty to start)
      rules.md          — Contracts / How to change it / Traps (only verified contracts; name the gaps)
      architecture.md   — per-area reasoning and decision records (one stub entry per area, unverified areas marked so)
@@ -65,7 +65,7 @@ build it on facts, not invention:
    reading the codebase and replacing the stubs' disclaimers with
    verified facts (file:line for contracts, commit or plan references
    for decisions). A scaffold that never graduated past its disclaimer
-   is a finding for `.llms/issues/`.
+   is a finding for `.agents/docs/issues/`.
 5. The owner's instruction files (AGENTS.md and its kin) are read first
    in this flow too: if they exist, the scaffold must not contradict
    them, and their read-order references must resolve once the
@@ -78,10 +78,10 @@ its own status options — never a status from another kind's vocabulary.
 
 | Document | Frontmatter keys (required) | Document `status` options | Item/phase `status` options |
 | --- | --- | --- | --- |
-| Plan — `.llms/plans/plan-<stamp>.md` | `status`, `updated`, `phases:` (each: `id`, `title`, `status`, `note`) | `awaiting-approval` (drafted, unstarted) · `in-progress` (phases running) · `done` (every phase landed, matrix green) · `cancelled` (owner closed it; the note names why) | `pending` (not started) · `in_progress` (active this turn) · `committed` (landed, commit hash in the note) · `partially-done` (the note names what moved and what parked) · `done` |
-| Issue — `.llms/issues/issue-<stamp>.md` | `status` (the rollup), `captured`, `updated`, `summary`, `count` (items actually listed) | the rollup mirrors its items: `open` · `considering` · `resolved` · `wontfix` | `open` (work to do, nobody working it) · `considering` (a decision parked with a named trigger — act only when it fires) · `resolved` (landed, the resolution names the evidence) · `wontfix` (the owner declined; the trigger records when to reopen) |
-| Roadmap — `.llms/roadmap/<name>.md` | `status`, `updated`, `references` (source issues/plans) | `living` (updated in place, stamped) | per entry: `parked (unlock: …)` · `taken (plan-<stamp>)` · `opened (issue-<stamp>)` · `landed (commit/plan)` |
-| Handover — `.llms/handover/handover-<stamp>.md` | `status`, `captured` (from the filename stamp), `plan`, `wave` — a key the body cannot name is omitted, not guessed | `done` (the session closed its work) · `partial` (compacted mid-work; the open threads named) | — |
+| Plan — `.agents/docs/plans/plan-<stamp>.md` | `status`, `updated`, `phases:` (each: `id`, `title`, `status`, `note`) | `awaiting-approval` (drafted, unstarted) · `in-progress` (phases running) · `done` (every phase landed, matrix green) · `cancelled` (owner closed it; the note names why) | `pending` (not started) · `in_progress` (active this turn) · `committed` (landed, commit hash in the note) · `partially-done` (the note names what moved and what parked) · `done` |
+| Issue — `.agents/docs/issues/issue-<stamp>.md` | `status` (the rollup), `captured`, `updated`, `summary`, `count` (items actually listed) | the rollup mirrors its items: `open` · `considering` · `resolved` · `wontfix` | `open` (work to do, nobody working it) · `considering` (a decision parked with a named trigger — act only when it fires) · `resolved` (landed, the resolution names the evidence) · `wontfix` (the owner declined; the trigger records when to reopen) |
+| Roadmap — `.agents/docs/roadmap/<name>.md` | `status`, `updated`, `references` (source issues/plans) | `living` (updated in place, stamped) | per entry: `parked (unlock: …)` · `taken (plan-<stamp>)` · `opened (issue-<stamp>)` · `landed (commit/plan)` |
+| Handover — `.agents/docs/handover/handover-<stamp>.md` | `status`, `captured` (from the filename stamp), `plan`, `wave` — a key the body cannot name is omitted, not guessed | `done` (the session closed its work) · `partial` (compacted mid-work; the open threads named) | — |
 
 Shared conventions: `updated` is the last time the file's claims were
 true (a status flip without a fresh `updated` is a stale file); `count`
@@ -90,7 +90,7 @@ its last status — the archive note carries where live content went.
 Audits use the same vocabulary as issues at document level (`resolved` /
 `open`) with `updated` and `reference`.
 
-## Plans (`.llms/plans/plan-YYYYMMDD_HHMM.md`)
+## Plans (`.agents/docs/plans/plan-YYYYMMDD_HHMM.md`)
 
 A plan is a contract, written only on the owner's request. Shape:
 frontmatter (`status: awaiting-approval` → in progress → `done`,
@@ -131,11 +131,11 @@ and compatibility is kept until the owner waives it. A plan that
 silently assumes "early stage" or grants itself a reset is wrong.
 
 Ledger hygiene: a completed plan archives flat to
-`.llms/archive/plan-<stamp>.md` under its existing name; the live
+`.agents/docs/archive/plan-<stamp>.md` under its existing name; the live
 directory keeps only plans with open work. The index's plans preamble
 and rows move with it.
 
-## Issues (`.llms/issues/issue-YYYYMMDD_HHMM.md`)
+## Issues (`.agents/docs/issues/issue-YYYYMMDD_HHMM.md`)
 
 A finding that outlives the turn lands here the moment it is found, not
 in chat memory. Frontmatter: `status` (the rollup), `captured`,
@@ -150,32 +150,32 @@ claim — yours or an archived handover's — ask what would make it wrong
 and go look. A stale finding is worse than a missing one: the costliest
 reconciliation errors are claims repeated from an archived handover
 whose contradicting guard sat one search away. An audit record in
-`.llms/audit/` is the format when the finding set is large.
+`.agents/docs/audit/` is the format when the finding set is large.
 
 Hygiene: a file whose every item is terminal archives flat under its
 existing name; a rollup with live items may also archive after its open
 items are re-homed into a fresh issue file that names the source — or
 moved to the roadmap when they are parked improvements, not work items
-(`.llms/roadmap/`). Annotate the archived copy with where its live
+(`.agents/docs/roadmap/`). Annotate the archived copy with where its live
 content went. After any move, grep the live tree for dangling references
 to the old path.
 
-## Roadmap (`.llms/roadmap/`)
+## Roadmap (`.agents/docs/roadmap/`)
 
 Parked future improvements and delivery analyses — not plans, not
 issues. Frontmatter per document: `status: living`, `updated`,
 `references` (source issues/plans). Each entry carries its own
 `- status: parked (unlock: …) · updated <date>` line, the verified
 evidence (file:line), the unlock that fires it, and a first move. When
-an unlock fires, the entry re-enters `.llms/issues/` or goes straight to
+an unlock fires, the entry re-enters `.agents/docs/issues/` or goes straight to
 a plan — the roadmap is not a graveyard, it is a staging area.
 
-## Handovers (`.llms/handover/handover-YYYYMMDD_HHMM.md`) and audits
+## Handovers (`.agents/docs/handover/handover-YYYYMMDD_HHMM.md`) and audits
 
 Handovers are session compactions: frontmatter `status` / `captured` /
 `plan` / `wave` — a key the body cannot name is omitted, not guessed.
 The directory keeps the five newest; older history archives flat. Audits
-(`.llms/audit/`) are point-in-time reviews with the same frontmatter
+(`.agents/docs/audit/`) are point-in-time reviews with the same frontmatter
 convention; conclusions age, the tree wins.
 
 ## The docs-sync rule and the closing sweep

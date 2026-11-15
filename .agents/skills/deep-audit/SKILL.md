@@ -26,7 +26,7 @@ This skill is stack-agnostic. Detect the language, framework, and database from 
 
 ## Language rules
 
-- **Skill-internal content, and the report file saved under `.llms/audit/`**: English (including frontmatter keys and values).
+- **Skill-internal content, and the report file saved under `.agents/docs/audit/`**: English (including frontmatter keys and values).
 - **Everything said in chat** (summaries, findings overview, questions, progress notes): the language the user is currently writing in. If the user switches language, follow.
 - Technical identifiers, code, file paths, and tool output stay as-is regardless of language.
 
@@ -99,10 +99,10 @@ Write the report using `references/report-template.md`. It starts with YAML fron
 
 **Output location and naming**
 
-- Save the report to `.llms/audit/audit-YYYYMMDD_hhmm.md` relative to the repository root (create the directories if missing). The timestamp is the local time the audit was captured (24-hour clock); get it from the system clock (e.g. `date +%Y%m%d_%H%M`), never guess it.
+- Save the report to `.agents/docs/audit/audit-YYYYMMDD_hhmm.md` relative to the repository root (create the directories if missing). The timestamp is the local time the audit was captured (24-hour clock); get it from the system clock (e.g. `date +%Y%m%d_%H%M`), never guess it.
 - Create the file early (end of Phase 1) with `status: draft` and fill it in as phases complete, so progress survives an interrupted session.
 - If a report for the same scope already exists and the user is continuing it, update that file (keep `captured_at`, refresh `updated_at`) instead of creating a new one. If unsure whether to continue or start fresh, ask. Never overwrite another report.
-- Do not edit `.gitignore` or commit the report unless asked. If `.llms/` is not ignored by git, mention it in one line and let the user decide.
+- Do not edit `.gitignore` or commit the report unless asked. If `.agents/docs/` is not ignored by git, mention it in one line and let the user decide.
 - Keep frontmatter and body consistent: counts, `status`, and `updated_at` must be updated on every edit.
 
 **Language**

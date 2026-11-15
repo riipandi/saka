@@ -2,7 +2,7 @@
 
 The surfaces the server answers, reconciled against the code on 2026-10-12. The grouping
 follows the Yaak collection (`wk_kBiMYTkhPP`) — sections mirror its folders; the agent-facing
-matrix with per-row status and test evidence is `.llms/endpoint-reference.md`; the code is the
+matrix with per-row status and test evidence is `.agents/docs/endpoint-reference.md`; the code is the
 only record of what is served.
 
 Every ConnectRPC procedure is called with `POST` under `/rpc`; the wire is snake_case JSON. REST
@@ -467,7 +467,7 @@ a release build.
 ## Planned (not implemented)
 
 The scaffolds below exist as empty packages waiting for their phase; **no proto, no routes** —
-every row is uncallable. The designed surfaces live in `.llms/endpoint-reference.md`.
+every row is uncallable. The designed surfaces live in `.agents/docs/endpoint-reference.md`.
 
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |

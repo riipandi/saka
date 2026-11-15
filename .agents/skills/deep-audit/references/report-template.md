@@ -1,6 +1,6 @@
 # Audit Report Template
 
-Save the report to `.llms/audit/audit-YYYYMMDD_hhmm.md` (repository root; local time of capture, 24-hour clock; read the clock with a command, never guess).
+Save the report to `.agents/docs/audit/audit-YYYYMMDD_hhmm.md` (repository root; local time of capture, 24-hour clock; read the clock with a command, never guess).
 
 **Language:** the report file is always in English, including frontmatter. A summary shown in chat follows the user's current language (translate prose; keep identifiers, paths, and code unchanged).
 

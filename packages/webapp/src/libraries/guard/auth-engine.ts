@@ -267,7 +267,7 @@ function readProfile(response: GetSessionResponse): UserProfile | null {
 }
 
 /** The pending bridge's mint-time lifetime when the wire omits its expiry —
- * the backend keeps it five minutes (see `.llms/rules.md`, Multifactor). */
+ * the backend keeps it five minutes (see `.agents/docs/rules.md`, Multifactor). */
 const MFA_BRIDGE_FALLBACK_MS = 5 * 60_000
 
 /** The fork the sign-in paused at, read off the wire's fork fields. The

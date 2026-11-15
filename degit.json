@@ -1,6 +1,6 @@
 [
     {
         "action": "remove",
-        "files": [".llms", "pnpm-lock.yaml", "LICENSE", "NOTICE.md", "README.md"]
+        "files": [".agents/docs", "pnpm-lock.yaml", "LICENSE", "NOTICE.md", "README.md"]
     }
 ]
