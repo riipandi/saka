@@ -56,7 +56,7 @@ type CodeEmail struct {
 
 const (
 	// reauthCodeTTL is the email code's window: long enough to reach an
-	// inbox and type a twelve-character code, short enough to be a
+	// inbox and type an eight-character code, short enough to be a
 	// credential that dies.
 	reauthCodeTTL = 15 * time.Minute
 

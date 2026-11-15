@@ -956,8 +956,8 @@ service DeviceApprovalService {
 // rendered — with or without its reading hyphen, in any case the
 // normalization folds.
 message InspectDeviceLoginRequest {
-  // code is the user code as typed: `XXXX-XXXX` or the bare eight
-  // characters.
+  // code is the user code as typed: the eight characters, with or without
+  // one hyphen.
   string code = 1 [
     (buf.validate.field).string.min_len = 8,
     (buf.validate.field).string.max_len = 9
@@ -967,7 +967,7 @@ message InspectDeviceLoginRequest {
 // InspectDeviceLoginResponse is the request's own facts, the view the
 // approving device renders before the human answers.
 message InspectDeviceLoginResponse {
-  // user_code is the code in its display form, `XXXX-XXXX`.
+  // user_code is the eight-character code, three letters then five digits.
   string user_code = 1;
 
   // ip_address is the requesting browser's address as the create saw it.

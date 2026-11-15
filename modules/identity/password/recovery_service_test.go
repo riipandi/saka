@@ -3,6 +3,7 @@ package password
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -161,10 +162,8 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 	require.Equal(t, 1, enqueuer.calls)
 	assert.NotEmpty(t, enqueuer.last.Token)
 
-	// The token is URL-safe hex: 64 lowercase hexadecimal characters, no
-	// dashes, no symbols.
-	// The reset credential is the single-use code the message carries: the
-	// unambiguous alphabet at twelve characters — typed, never linked.
+	// The reset credential is the single-use code the message carries:
+	// three letters and five digits — typed, never linked.
 	assert.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, raw)
 
 	// The row carries the hash, not the value the email took away.
@@ -207,7 +206,7 @@ func TestResetPasswordSwapsTheCredentialAndEndsTheSessions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, enqueuer.calls)
 
-	require.NoError(t, service.ResetPassword(t.Context(), enqueuer.last.Token, "Expecto!Patronum9", true))
+	require.NoError(t, service.ResetPassword(t.Context(), " "+strings.ToLower(enqueuer.last.Token), "Expecto!Patronum9", true))
 
 	// The new hash verifies, the token row is spent, and the session
 	// coupling ran.
