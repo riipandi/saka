@@ -44,6 +44,7 @@ the older history (35 files) lives there too.
 | File | Subject |
 | --- | --- |
 | `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — `in-progress`: phases 1–2 landed (`b42f8765`), phase 3 (final validation) waits for the owner's word |
+| `plan-20261115_1800.md` | The overview says something true — the lists' totals as tiles, an account view for every caller and the console's state above it for the administrator (D1–D7, owner picks 2026-11-15), and the sidebar's administration groups gated on the administrator role — `done` 2026-11-15 (`1f7dd971` through the closing docs commit), the matrix green |
 | `plan-20261115_1600.md` | The sidebar spends less height — dense rows from the existing scale, groups that fold over a grid row with the preference kept in `app.store`, one-word group names, a `16rem` rail; items and order kept (owner picks 2026-11-15) — `done` 2026-11-15 (`dbc97786` through the closing docs commit), the matrix green |
 | `plan-20261115_1505.md` | Emailed codes take one shape — three letters then five digits, uppercase, `RandomLetterDigitCode` and `NormalizeCode` in `pkg/crypto`, six consumers (the five identity codes and the device user code), the input folded before hashing, device `Inspect`/`Decide` joined the credential bucket (D4), no schema or wire-shape change — `done` 2026-11-15 (`3bd92a1a` through the closing docs commit), the matrix green |
 | `plan-20261014_0955.md` | `key:rotate`: one command re-seals every surface the two secrets encrypt (D1 amended to both secrets — the owner picked the six-surface scope after the wiring showed the TOTP and JWKS rows seal under the auth cipher; D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new keys written to the env file `key:generate`-style — took issue-20261014_0949's open residue — `done` 2026-10-14 (`4f2925ed`, `162dca78`), the matrix green; the manual-path gap lives in `issue-20261014_1245.md` |
@@ -55,13 +56,13 @@ live and archived alike — carries the frontmatter convention
 (`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
 the filename stamp, the other keys from the body, and a key the body cannot
 name is omitted rather than guessed). The directory keeps the five newest; the
-older history (71 files) lives flat in
+older history (72 files) lives flat in
 `.llms/archive/handover-<stamp>.md`, moved under their existing names —
 each summarizes its session and what stayed open; anything still true is
 folded into the core documents above. Newest:
-`handover-20261115_1730.md` (plan-20261115_1600: the sidebar's dense rows,
-folding groups, and the grid-row fold that replaced the measured-height
-one; the matrix green).
+`handover-20261115_1900.md` (plan-20261115_1800: the overview's account and
+administrator views from the existing lists, the sidebar's role gate; the
+matrix green).
 
 ## Audits (`.llms/audit/`)
 

@@ -18,7 +18,7 @@ import { formatEvent } from '#/libraries/audit-event'
 import type { AuditLog } from '~/codegen/auditlog_pb'
 
 const styles = stylex.create({
-  link: { color: 'inherit', display: 'block', textDecoration: 'none' },
+  link: { color: 'inherit', display: 'block', textDecorationLine: 'none' },
   value: { alignItems: 'center', display: 'flex', gap: unit.x2, marginBottom: unit.x2 },
   skeleton: { height: '2rem', marginBottom: unit.x2, width: '4rem' },
   title: { marginBottom: unit.x2 }
