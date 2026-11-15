@@ -35,9 +35,9 @@ ride Authentication.
 
 ## One-Time Access
 
-A one-time access code signs an account in without its password. Codes are drawn from an
-alphabet without ambiguous characters — six characters for a code that lives fifteen minutes or
-less, twelve above — and stored as SHA-256 hashes. The email paths are gated by
+A one-time access code signs an account in without its password. A code is three letters then
+five digits, such as `KQM48215`, drawn without the characters that are easy to confuse, and stored as
+SHA-256 hashes. Case and spaces do not matter when it is typed. The email paths are gated by
 `auth.one_time_access_email_as_admin_enabled` and
 `auth.one_time_access_email_as_unauthenticated_enabled`, both off by default. The
 holder's exchange and the unauthenticated email request live under User Account
@@ -394,7 +394,7 @@ exactly once.
 
 The passkey-less pairing sign-in: a browser that cannot sign itself in creates a request, another
 browser approves it, and the creating browser's long poll answers. The user code is
-`XXXX-XXXX` over an alphabet without ambiguous characters; the code and the pairing secret live
+three letters then five digits (`KQM48215`), without the characters that are easy to confuse; the code and the pairing secret live
 only as SHA-256 hashes; decisions are single-use.
 
 | Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
