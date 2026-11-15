@@ -40,6 +40,7 @@ func TestTheRateTablesNameRealProcedures(t *testing.T) {
 	for table, entries := range map[string]map[string]struct{}{
 		"RateAuthProcedures":    guard.RateAuthProcedures,
 		"RateDefaultProcedures": guard.RateDefaultProcedures,
+		"RateCodeProcedures":    guard.RateCodeProcedures,
 		"RateExemptProcedures":  guard.RateExemptProcedures,
 	} {
 		for procedure := range entries {
@@ -69,5 +70,17 @@ func TestTheCredentialBucketCarriesTheAttemptSurface(t *testing.T) {
 		require.True(t, counted, "%s must be counted", procedure)
 		assert.Equal(t, guard.RateAuth, bucket,
 			"%s must count against the credential bucket", procedure)
+	}
+}
+
+// TestEveryGloballyBudgetedProcedureIsCounted keeps the deployment-wide code
+// budget behind the per-address one: a procedure that spends the global
+// budget but is not counted per address would be throttled by neither's
+// classifier.
+func TestEveryGloballyBudgetedProcedureIsCounted(t *testing.T) {
+	for procedure := range guard.RateCodeProcedures {
+		_, counted := guard.RateBucketFor(procedure)
+		assert.True(t, counted, "%s spends the global code budget but is not counted per address", procedure)
+		assert.True(t, guard.RateGlobalFor(procedure))
 	}
 }

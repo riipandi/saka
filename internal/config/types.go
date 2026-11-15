@@ -579,6 +579,11 @@ type RateLimit struct {
 	// AuthLimit is the credential bucket's number of requests per Window.
 	// The procedures it throttles are named in internal/guard.
 	AuthLimit int `koanf:"auth_limit" json:"auth_limit"`
+	// CodeGlobalLimit is the number of code-spending requests per Window the
+	// whole deployment accepts, whoever sends them. The per-address budget
+	// cannot stop a guesser spread across addresses; this one bounds the
+	// total, and a legitimate deployment spends a small fraction of it.
+	CodeGlobalLimit int `koanf:"code_global_limit" json:"code_global_limit"`
 	// Window is the period the budgets apply to.
 	Window time.Duration `koanf:"window" json:"window"`
 }

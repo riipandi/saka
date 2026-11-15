@@ -179,6 +179,11 @@ const DefaultTimezone = "UTC"
 // a script wants; the deployment can loosen it through the configuration.
 const DefaultRateLimitAuthLimit = 10
 
+// DefaultRateLimitCodeGlobalLimit is the deployment-wide budget per window for
+// the procedures that spend a typed code. The code is about 29 bits, so the
+// total guess rate, not one address's, is what bounds an attacker.
+const DefaultRateLimitCodeGlobalLimit = 300
+
 // DefaultMaxRequestBytes is the body size one RPC request may carry. A
 // contract's largest legitimate message — a profile picture upload rides the
 // REST surface with its own bound — stays far below it, and a caller with
@@ -374,10 +379,11 @@ func Default() Config {
 			},
 		},
 		RateLimit: RateLimit{
-			Driver:    RateLimitDB,
-			Limit:     60,
-			AuthLimit: DefaultRateLimitAuthLimit,
-			Window:    time.Minute,
+			Driver:          RateLimitDB,
+			Limit:           60,
+			AuthLimit:       DefaultRateLimitAuthLimit,
+			CodeGlobalLimit: DefaultRateLimitCodeGlobalLimit,
+			Window:          time.Minute,
 		},
 		OAuth: OAuth{
 			// On by default: the connections decide which providers

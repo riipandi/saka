@@ -121,6 +121,9 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 			return fwmiddleware.RateClass{}, false
 		}
 		class, ok := classes[bucket]
+		if ok && guard.RateGlobalFor(path) {
+			class.Global = fwmiddleware.Policy{Limit: c.RateLimit.CodeGlobalLimit, Window: c.RateLimit.Window}
+		}
 		return class, ok
 	}
 
