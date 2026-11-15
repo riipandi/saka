@@ -38,3 +38,21 @@ func TestRandomStringDrawsOnlyFromTheAlphabet(t *testing.T) {
 		assert.Contains(t, AlphabetUnambiguous, string(char))
 	}
 }
+
+func TestLetterDigitCodeIsThreeLettersThenFiveDigits(t *testing.T) {
+	shape := regexp.MustCompile(`^[A-HJ-NP-Z]{3}[2-9]{5}$`)
+	seen := map[string]bool{}
+	for range 1000 {
+		code, err := RandomLetterDigitCode()
+		require.NoError(t, err)
+		assert.Regexp(t, shape, code)
+		seen[code] = true
+	}
+	assert.Greater(t, len(seen), 990, "the draw is random, not a constant")
+}
+
+func TestNormalizeCodeFoldsHowAPersonTypesIt(t *testing.T) {
+	for _, typed := range []string{"hrm20483", " HRM20483\n", "hrm-20483", "Hrm 204 83"} {
+		assert.Equal(t, "HRM20483", NormalizeCode(typed), typed)
+	}
+}
