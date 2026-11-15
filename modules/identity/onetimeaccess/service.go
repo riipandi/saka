@@ -75,16 +75,6 @@ const (
 	// minutes, the same window the public email path fixes.
 	defaultTTL = 15 * time.Minute
 
-	// shortCodeWindow is the boundary between the two code forms. A code that
-	// lives fifteen minutes or less is six characters — short enough to type
-	// from a phone reading the message — and anything longer is twelve,
-	// because a longer-lived credential buys its entropy back.
-	shortCodeWindow = 15 * time.Minute
-
-	// shortCodeLength and longCodeLength are the two code forms.
-	shortCodeLength = 6
-	longCodeLength  = 12
-
 	// deviceTokenLength is the entropy of the device token the public email
 	// request answers with. It is never typed by a human — the frontend holds
 	// it — and it is worthless without the code, which travels by email
@@ -149,7 +139,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 	}
 	ttl := ttlOr(ttlSeconds)
 
-	code, err := generateCode(ttl)
+	code, err := generateCode()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("onetimeaccess: code: %w", err)
 	}
@@ -179,7 +169,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 // mismatch leaves the code spendable, because the caller's mistake is not the
 // code's spend.
 func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client fwaudit.ClientInfo) (signin.Result, error) {
-	hash := crypto.HashHexToken(rawCode)
+	hash := crypto.HashHexToken(crypto.NormalizeCode(rawCode))
 	var result signin.Result
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		row, err := s.repo.FindTokenByHash(ctx, tx, hash)
@@ -367,7 +357,7 @@ func (s *Service) issueEmailCode(ctx context.Context, account Account, ttl time.
 		return ErrQueueUnavailable
 	}
 
-	code, err := generateCode(ttl)
+	code, err := generateCode()
 	if err != nil {
 		return fmt.Errorf("onetimeaccess: code: %w", err)
 	}
@@ -428,14 +418,9 @@ func ttlOr(ttlSeconds int32) time.Duration {
 	return time.Duration(ttlSeconds) * time.Second
 }
 
-// generateCode draws a code from the unambiguous alphabet, six characters for
-// a code that lives fifteen minutes or less and twelve for anything longer.
-func generateCode(ttl time.Duration) (string, error) {
-	length := longCodeLength
-	if ttl <= shortCodeWindow {
-		length = shortCodeLength
-	}
-	return crypto.RandomString(length, crypto.AlphabetUnambiguous)
+// generateCode draws the single-use code the message carries.
+func generateCode() (string, error) {
+	return crypto.RandomLetterDigitCode()
 }
 
 // generateDeviceToken draws the device token the public email request answers

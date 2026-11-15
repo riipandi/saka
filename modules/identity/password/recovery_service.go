@@ -61,11 +61,6 @@ var (
 // changing one means changing the other.
 const tokenTTL = time.Hour
 
-// resetCodeLength is the reset code's length: the unambiguous alphabet at
-// twelve characters — the form the verification code keeps, long enough
-// that a typed guess is hopeless, short enough that a human types it.
-const resetCodeLength = 12
-
 // resendCooldown is how long the last send keeps a new one out. The window
 // is what stops a caller from turning the trigger into a mailbomb; the token
 // row's send time is the clock it reads.
@@ -315,7 +310,7 @@ func (s *Service) issue(ctx context.Context, account Account) (string, error) {
 	// The reset credential is a single-use code — typed on the reset
 	// screen, never linked. The unambiguous alphabet at twelve characters
 	// is the same form the verification code keeps.
-	raw, err := crypto.RandomString(resetCodeLength, crypto.AlphabetUnambiguous)
+	raw, err := crypto.RandomLetterDigitCode()
 	if err != nil {
 		return "", fmt.Errorf("password: mint token: %w", err)
 	}
@@ -354,7 +349,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 
 	// The token is looked up before the password is hashed: a public
 	// endpoint answers a junk token with a cheap refusal, not a KDF run.
-	token, err := s.repo.FindTokenByHash(ctx, s.pool, crypto.HashHexToken(rawToken))
+	token, err := s.repo.FindTokenByHash(ctx, s.pool, crypto.HashHexToken(crypto.NormalizeCode(rawToken)))
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrInvalidToken
 	}
@@ -412,7 +407,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword strin
 		if setErr := s.repo.SetPasswordHash(ctx, tx, token.UserID, hash); setErr != nil {
 			return setErr
 		}
-		consumed, delErr := s.repo.DeleteToken(ctx, tx, token.ID, crypto.HashHexToken(rawToken))
+		consumed, delErr := s.repo.DeleteToken(ctx, tx, token.ID, crypto.HashHexToken(crypto.NormalizeCode(rawToken)))
 		if delErr != nil {
 			return delErr
 		}

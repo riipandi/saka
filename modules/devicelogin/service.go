@@ -8,21 +8,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
-	"strings"
 	"time"
 
 	fwaudit "github.com/riipandi/saka/framework/audit"
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/audit"
 	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
-
-// userCodeCharset excludes the glyphs a printed code confuses — 0/O and
-// 1/I/L — and the code renders as XXXX-XXXX, the hyphen a reading aid
-// the comparisons strip.
-const userCodeCharset = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 // ErrCodeUnknown is the one refusal every pairing surface answers: an
 // unknown, expired, or already decided request never says which.
@@ -68,7 +62,7 @@ type CreatedView struct {
 // ride the row — the approving device renders them back before the
 // decision, so the human sees what they are approving.
 func (s *Service) Create(ctx context.Context, deviceToken, ipAddress, userAgent string) (CreatedView, error) {
-	code, err := newUserCode()
+	code, err := crypto.RandomLetterDigitCode()
 	if err != nil {
 		return CreatedView{}, fmt.Errorf("devicelogin: generate user code: %w", err)
 	}
@@ -81,7 +75,7 @@ func (s *Service) Create(ctx context.Context, deviceToken, ipAddress, userAgent 
 	complete := s.baseURL + "/device?user_code=" + code
 	return CreatedView{
 		ID:                      req.ID.String(),
-		UserCode:                FormatUserCode(code),
+		UserCode:                code,
 		VerificationURI:         s.baseURL + "/device",
 		VerificationURIComplete: complete,
 		ExpiresAt:               req.ExpiresAt,
@@ -102,12 +96,12 @@ type Inspection struct {
 // request holds is the unknown refusal — the answer never says which
 // half failed.
 func (s *Service) Inspect(ctx context.Context, code string) (Inspection, error) {
-	req, err := s.repo.ByUserCode(ctx, HashUserCode(NormalizeUserCode(code)))
+	req, err := s.repo.ByUserCode(ctx, HashUserCode(crypto.NormalizeCode(code)))
 	if err != nil {
 		return Inspection{}, ErrCodeUnknown
 	}
 	return Inspection{
-		UserCode:  FormatUserCode(NormalizeUserCode(code)),
+		UserCode:  crypto.NormalizeCode(code),
 		IPAddress: req.IPAddress,
 		UserAgent: req.UserAgent,
 		ExpiresAt: req.ExpiresAt,
@@ -119,7 +113,7 @@ func (s *Service) Inspect(ctx context.Context, code string) (Inspection, error) 
 // request decided once is decided forever. The caller names the account
 // deciding: its wire-form id rides the audit record.
 func (s *Service) Decide(ctx context.Context, code string, decision Decision, caller *jwtutils.Caller) error {
-	normalized := NormalizeUserCode(code)
+	normalized := crypto.NormalizeCode(code)
 	req, err := s.repo.ByUserCode(ctx, HashUserCode(normalized))
 	if err != nil {
 		return ErrCodeUnknown
@@ -238,34 +232,6 @@ func (s *Service) LoadAccount(ctx context.Context, rawID string) (Account, error
 	return Account{ID: view.ID, Username: view.Username}, nil
 }
 
-// newUserCode draws eight unambiguous characters from the crypto source.
-func newUserCode() (string, error) {
-	out := make([]byte, 8)
-	max := big.NewInt(int64(len(userCodeCharset)))
-	for i := range out {
-		n, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return "", err
-		}
-		out[i] = userCodeCharset[n.Int64()]
-	}
-	return string(out), nil
-}
-
-// FormatUserCode renders the code with its reading hyphen.
-func FormatUserCode(code string) string {
-	if len(code) != 8 {
-		return code
-	}
-	return code[:4] + "-" + code[4:]
-}
-
-// NormalizeUserCode strips the reading hyphen and folds the case, so a
-// code typed in any rhythm resolves.
-func NormalizeUserCode(code string) string {
-	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
-}
-
 // NewDeviceToken draws the pairing secret the creating browser holds.
 func NewDeviceToken() (string, error) {
 	buf := make([]byte, 32)
@@ -277,7 +243,7 @@ func NewDeviceToken() (string, error) {
 
 // HashUserCode is the SHA-256 digest the rows key the presented code by.
 func HashUserCode(code string) string {
-	return HashDeviceToken(NormalizeUserCode(code))
+	return HashDeviceToken(crypto.NormalizeCode(code))
 }
 
 // HashDeviceToken is the SHA-256 digest the rows key the presented

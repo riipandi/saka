@@ -116,7 +116,7 @@ func TestConfirmEmailChangeMovesTheAccountOnce(t *testing.T) {
 	service := emailChangeService(t, pool, true)
 	userID := seedUser(t, pool, "vvetra", "vetra@example.com", false)
 
-	raw := "vetra-change-token-value"
+	raw := "VTR20483"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, crypto.HashHexToken(raw), "vetra@new.example.com",
@@ -147,7 +147,7 @@ func TestConfirmEmailChangeRefusesAnAddressClaimedInTheMeantime(t *testing.T) {
 	service := emailChangeService(t, pool, true)
 	userID := seedUser(t, pool, "rkohl", "kohl@example.com", false)
 
-	raw := "kohl-change-token-value"
+	raw := "KHL30584"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed, crypto.HashHexToken(raw), "granger@example.com",
@@ -182,7 +182,7 @@ func TestConfirmEmailChangeRefusesASupersededToken(t *testing.T) {
 	service := emailChangeService(t, pool, true)
 	userID := seedUser(t, pool, "hermione", "hermione@example.com", false)
 
-	stale := "hermione-stale-change-token"
+	stale := "HRM40685"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
@@ -190,7 +190,7 @@ func TestConfirmEmailChangeRefusesASupersededToken(t *testing.T) {
 
 	// A second request replaces the row in place: the id survives, the hash
 	// and the payload move to the newest address.
-	fresh := "hermione-fresh-change-token"
+	fresh := "HRM50786"
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
 		crypto.HashHexToken(fresh), "hermione@second.example.com", time.Now().Add(time.Hour), time.Now()))
 
@@ -217,7 +217,7 @@ func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
 	service := emailChangeService(t, pool, true)
 	userID := seedUser(t, pool, "gsilas", "silas@example.com", false)
 
-	stale := "silas-stale-token"
+	stale := "SLS60887"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
@@ -225,7 +225,7 @@ func TestDeleteTokenRefusesAStaleHash(t *testing.T) {
 
 	token := pendingChangeToken(t, pool, userID)
 	require.NoError(t, service.repo.UpsertEmailChangeToken(t.Context(), pool, parsed,
-		crypto.HashHexToken("silas-live-token"), "silas@second.example.com", time.Now().Add(time.Hour), time.Now()))
+		crypto.HashHexToken("SLS70988"), "silas@second.example.com", time.Now().Add(time.Hour), time.Now()))
 
 	consumed, err := service.repo.DeleteToken(t.Context(), pool, token.ID, crypto.HashHexToken(stale), PurposeEmailChange)
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestConfirmEmailChangeRefusesAnExpiredToken(t *testing.T) {
 	service := emailChangeService(t, pool, true)
 	userID := seedUser(t, pool, "gsilas", "silas@example.com", false)
 
-	raw := "silas-expired-token-value"
+	raw := "SLS80289"
 	parsed, parseErr := uuid.Parse(userID)
 	require.NoError(t, parseErr)
 	// The table refuses a backdated row, so the test moves the service's

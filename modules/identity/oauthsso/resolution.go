@@ -34,15 +34,9 @@ const (
 	SettingAccountLinkingEnabled = "oauth.account_linking_enabled"
 )
 
-// The email code's shape: the twelve-character unambiguous alphabet the
-// verification codes keep, and a window as long as the flow's own — a
-// code that outlives its ceremony is a hash on a dead row. The drawn
-// form always fits the users column's username check, so the pattern
-// lives in the candidate derivation below.
-const (
-	signInCodeLength   = 12
-	signInCodeLifetime = flowLifetime
-)
+// signInCodeLifetime is as long as the flow's own — a code that outlives its
+// ceremony is a hash on a dead row.
+const signInCodeLifetime = flowLifetime
 
 // usernameCandidate derives the JIT username: the mapped username claim
 // when the provider answered one — cleaned to the users column's shape —
@@ -303,7 +297,7 @@ func (s *Service) VerifySignInEmail(ctx context.Context, flowToken, code string)
 	if err != nil {
 		return "", err
 	}
-	codeHash := hashSecret(strings.TrimSpace(code))
+	codeHash := hashSecret(crypto.NormalizeCode(code))
 	next := StageResolved
 	if strings.TrimSpace(flow.GivenName) == "" || strings.TrimSpace(flow.FamilyName) == "" {
 		next = StageRequireNames
@@ -336,7 +330,7 @@ func (s *Service) pauseForEmailCode(ctx context.Context, flow Flow, conn Connect
 	if s.codes == nil {
 		return ContinueResult{}, fmt.Errorf("oauthsso: no code notifier is wired")
 	}
-	code, err := crypto.RandomString(signInCodeLength, crypto.AlphabetUnambiguous)
+	code, err := crypto.RandomLetterDigitCode()
 	if err != nil {
 		return ContinueResult{}, fmt.Errorf("oauthsso: draw code: %w", err)
 	}

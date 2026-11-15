@@ -11,6 +11,7 @@ import (
 	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/testutils"
 	"github.com/riipandi/saka/modules/identity/user"
+	"github.com/riipandi/saka/pkg/crypto"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
@@ -67,8 +68,7 @@ func TestCreateOpensOnePairingRequestTheExchangeAccepts(t *testing.T) {
 
 	created, err := service.Create(t.Context(), "token-plain", "192.0.2.10", "Probe/1.0")
 	require.NoError(t, err)
-	require.Len(t, created.UserCode, 9) // XXXX-XXXX
-	require.Contains(t, created.UserCode, "-")
+	require.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, created.UserCode)
 	require.Equal(t, pollInterval, created.Interval)
 	require.Equal(t, "http://localhost:3000/device", created.VerificationURI)
 
@@ -85,7 +85,7 @@ func TestTheUserCodeSurvivesItsReadingForms(t *testing.T) {
 	created, err := service.Create(t.Context(), "token-plain", "192.0.2.10", "Probe/1.0")
 	require.NoError(t, err)
 
-	// The hyphen and the case the entry may carry fold away.
+	// The case and the hyphen the entry may carry fold away.
 	inspection, err := service.Inspect(t.Context(), created.UserCode)
 	require.NoError(t, err)
 	require.Equal(t, created.UserCode, inspection.UserCode)
@@ -93,7 +93,9 @@ func TestTheUserCodeSurvivesItsReadingForms(t *testing.T) {
 	require.Equal(t, "Probe/1.0", inspection.UserAgent)
 
 	// The entry may arrive in any case: the fold takes it.
-	_, err = service.Inspect(t.Context(), strings.ToLower(strings.ReplaceAll(created.UserCode, "-", "")))
+	_, err = service.Inspect(t.Context(), strings.ToLower(created.UserCode))
+	require.NoError(t, err)
+	_, err = service.Inspect(t.Context(), created.UserCode[:3]+"-"+created.UserCode[3:])
 	require.NoError(t, err)
 }
 
@@ -194,13 +196,10 @@ func TestAnExpiredRequestIsTheUnknown(t *testing.T) {
 	require.ErrorIs(t, err, ErrCodeUnknown)
 }
 
-func TestTheUserCodeAlphabetExcludesTheAmbiguous(t *testing.T) {
+func TestTheUserCodeIsThreeLettersAndFiveDigits(t *testing.T) {
 	for range 200 {
-		code, err := newUserCode()
+		code, err := crypto.RandomLetterDigitCode()
 		require.NoError(t, err)
-		require.Len(t, code, 8)
-		for _, r := range code {
-			require.NotContains(t, "0O1IL", string(r))
-		}
+		require.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, code)
 	}
 }

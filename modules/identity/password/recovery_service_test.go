@@ -165,7 +165,7 @@ func TestForgotPasswordIssuesOneTokenPerAccount(t *testing.T) {
 	// dashes, no symbols.
 	// The reset credential is the single-use code the message carries: the
 	// unambiguous alphabet at twelve characters — typed, never linked.
-	assert.Regexp(t, `^[a-km-zA-KM-NP-Z2-9]{12}$`, raw)
+	assert.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, raw)
 
 	// The row carries the hash, not the value the email took away.
 	var stored string
@@ -248,7 +248,7 @@ func TestResetPasswordRefusesAnUnknownAnExpiredAndAWeakCredential(t *testing.T) 
 	// moved past it — the table's check refuses an already-expired row, and
 	// the (user_id, purpose) unique index allows one row per account, so
 	// the expired case reuses the same row.
-	raw := "expiring-token-value"
+	raw := "EXP23456"
 	seedResetToken(t, pool, userID, raw, time.Now().Add(tokenTTL))
 	service.now = func() time.Time { return time.Now().Add(2 * tokenTTL) }
 	err = service.ResetPassword(t.Context(), raw, "Expecto!Patronum9", true)
