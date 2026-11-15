@@ -209,7 +209,12 @@ describe('the sidebar groups fold', () => {
     const screen = await mount(<SideNavbar />)
     await screen.getByRole('button', { name: 'Identity' }).click()
 
-    await expect.element(screen.getByRole('link', { name: 'Users' })).not.toBeInTheDocument()
+    // The test build carries no stylesheet, so the fold shows as state: the
+    // button reports it and the panel's links are inert.
+    const header = screen.getByRole('button', { name: 'Identity' })
+    await expect.element(header).toHaveAttribute('aria-expanded', 'false')
+    const users = screen.getByRole('link', { name: 'Users', includeHidden: true })
+    expect(users.element().closest('[inert]')).not.toBeNull()
     await expect.element(screen.getByRole('link', { name: 'Audit trail' })).toBeVisible()
     expect(appStore.state.sidebarClosedGroups).toEqual(['Identity'])
     reset()

@@ -148,6 +148,9 @@ export const sidebarStyles = stylex.create({
   },
   // The group header folds its items. It keeps the section label's type and
   // adds the button reset and the chevron's row.
+  group: {
+    flexShrink: 0
+  },
   groupTrigger: {
     display: 'flex',
     width: '100%',
@@ -201,18 +204,35 @@ export const sidebarStyles = stylex.create({
   groupChevronClosed: {
     transform: 'rotate(-90deg)'
   },
-  // The library's height transition, slowed so the rows below glide instead
-  // of jumping when a group closes.
+  // The panel is a one-row grid whose row runs between 1fr and 0fr, so the
+  // height animates over the content's real size; the inner box clips it. A
+  // closed panel is also visibility:hidden (after the fold) so its links leave
+  // the tab order and the accessibility tree.
   groupPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: unit.x1,
-    transitionProperty: 'height',
+    display: 'grid',
+    transitionProperty: 'grid-template-rows, visibility',
     transitionDuration: {
       default: duration.slow,
       '@media (prefers-reduced-motion: reduce)': '0s'
     },
     transitionTimingFunction: easing.standard
+  },
+  groupPanelOpen: {
+    gridTemplateRows: '1fr',
+    visibility: 'visible',
+    transitionDelay: '0s'
+  },
+  groupPanelClosed: {
+    gridTemplateRows: '0fr',
+    visibility: 'hidden',
+    transitionDelay: `0s, ${duration.slow}`
+  },
+  groupPanelInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: unit.x1,
+    minHeight: 0,
+    overflow: 'hidden'
   },
   divider: {
     width: '1.75rem',
@@ -226,6 +246,8 @@ export const sidebarStyles = stylex.create({
   // Nav item
   navItem: {
     display: 'flex',
+    // The nav scrolls: a row keeps its height instead of squeezing to fit.
+    flexShrink: 0,
     height: '2rem',
     width: '100%',
     alignItems: 'center',

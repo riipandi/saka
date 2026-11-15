@@ -40,11 +40,6 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { Fragment, useState } from 'react'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from 'uilibs/components/base/collapsible'
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -378,13 +373,16 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
             // group holding the active route stays open over a stored close.
             const open =
               !closedGroups.includes(group.label) || items.some((item) => isActive(item.href))
+            const panelId = `sidebar-group-${group.label.toLowerCase().replace(/\W+/g, '-')}`
             return (
-              <Collapsible
-                key={group.label}
-                open={open}
-                onOpenChange={(next) => setSidebarGroupOpen(group.label, next)}
-              >
-                <CollapsibleTrigger {...stylex.props(sidebarStyles.groupTrigger)}>
+              <div key={group.label} {...stylex.props(sidebarStyles.group)}>
+                <button
+                  type='button'
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => setSidebarGroupOpen(group.label, !open)}
+                  {...stylex.props(sidebarStyles.groupTrigger)}
+                >
                   <span {...stylex.props(sidebarStyles.groupLabel)}>{group.label}</span>
                   <ChevronDown
                     {...stylex.props(
@@ -392,11 +390,22 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
                       !open && sidebarStyles.groupChevronClosed
                     )}
                   />
-                </CollapsibleTrigger>
-                <CollapsibleContent style={sidebarStyles.groupPanel}>
-                  {renderNavItems(items)}
-                </CollapsibleContent>
-              </Collapsible>
+                </button>
+                {/* A grid row that goes between 1fr and 0fr: the browser animates the real
+                    content height, with no measured value to fall out of step at the end. */}
+                <div
+                  id={panelId}
+                  inert={!open}
+                  {...stylex.props(
+                    sidebarStyles.groupPanel,
+                    open ? sidebarStyles.groupPanelOpen : sidebarStyles.groupPanelClosed
+                  )}
+                >
+                  <div {...stylex.props(sidebarStyles.groupPanelInner)}>
+                    {renderNavItems(items)}
+                  </div>
+                </div>
+              </div>
             )
           })}
         </div>
