@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { colors } from 'uilibs/styles/colors.stylex'
-import { fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
+import { duration, easing, fontSize, fontWeight } from 'uilibs/styles/tokens.stylex'
 import { radius, unit } from 'uilibs/styles/tokens.stylex'
 
 // Mirrors `breakpoints.small` from `components/styles/core/tokens.stylex` (659px cap).
@@ -156,7 +156,7 @@ export const sidebarStyles = stylex.create({
     paddingLeft: unit.x2,
     paddingRight: unit.x2,
     paddingTop: unit.x3,
-    paddingBottom: unit.x0_5,
+    paddingBottom: unit.x2,
     borderWidth: 0,
     borderRadius: radius.medium,
     backgroundColor: 'transparent',
@@ -195,15 +195,24 @@ export const sidebarStyles = stylex.create({
     flexShrink: 0,
     stroke: 'currentColor',
     transitionProperty: 'transform',
-    transitionDuration: '150ms'
+    transitionDuration: duration.medium,
+    transitionTimingFunction: easing.standard
   },
   groupChevronClosed: {
     transform: 'rotate(-90deg)'
   },
+  // The library's height transition, slowed so the rows below glide instead
+  // of jumping when a group closes.
   groupPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: unit.x1
+    gap: unit.x1,
+    transitionProperty: 'height',
+    transitionDuration: {
+      default: duration.slow,
+      '@media (prefers-reduced-motion: reduce)': '0s'
+    },
+    transitionTimingFunction: easing.standard
   },
   divider: {
     width: '1.75rem',
