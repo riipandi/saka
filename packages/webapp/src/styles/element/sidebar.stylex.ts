@@ -131,11 +131,11 @@ export const sidebarStyles = stylex.create({
     flex: 1,
     paddingTop: unit.x2,
     paddingBottom: unit.x2,
-    paddingLeft: unit.x3,
-    paddingRight: unit.x3,
+    paddingLeft: unit.x2,
+    paddingRight: unit.x2,
     display: 'flex',
     flexDirection: 'column',
-    gap: unit.x1,
+    gap: unit.x0_5,
     overflowY: 'auto',
     width: '100%'
   },
@@ -143,13 +143,13 @@ export const sidebarStyles = stylex.create({
     paddingTop: unit.x2,
     paddingBottom: unit.x2,
     alignItems: 'center',
-    gap: unit.x1,
+    gap: unit.x0_5,
     flex: '0 0 auto'
   },
   sectionLabel: {
     paddingLeft: unit.x2,
-    paddingTop: unit.x4,
-    paddingBottom: unit.x1,
+    paddingTop: unit.x3,
+    paddingBottom: unit.x0_5,
     fontSize: fontSize.caption1,
     fontWeight: fontWeight.semibold,
     color: colors.foregroundNeutralFaded,
@@ -169,13 +169,13 @@ export const sidebarStyles = stylex.create({
   // Nav item
   navItem: {
     display: 'flex',
-    height: '2.5rem',
+    height: '2rem',
     width: '100%',
     alignItems: 'center',
-    gap: unit.x3,
+    gap: unit.x2,
     borderRadius: radius.large,
-    paddingLeft: unit.x3,
-    paddingRight: unit.x3,
+    paddingLeft: unit.x2,
+    paddingRight: unit.x2,
     textDecoration: 'none',
     color: {
       default: colors.foregroundNeutralFaded,
@@ -205,7 +205,7 @@ export const sidebarStyles = stylex.create({
       left: 0,
       top: '50%',
       width: 3,
-      height: '1.25rem',
+      height: '1rem',
       borderRadius: 999,
       backgroundColor: colors.backgroundPrimary,
       transform: 'translateY(-50%) scaleY(0)',
@@ -214,8 +214,8 @@ export const sidebarStyles = stylex.create({
     }
   },
   navItemCollapsed: {
-    height: '2.5rem',
-    width: '2.5rem',
+    height: '2rem',
+    width: '2rem',
     justifyContent: 'center',
     paddingLeft: 0,
     paddingRight: 0
@@ -234,8 +234,8 @@ export const sidebarStyles = stylex.create({
     }
   },
   navIcon: {
-    height: '1.125rem',
-    width: '1.125rem',
+    height: '1rem',
+    width: '1rem',
     stroke: 'currentColor',
     flexShrink: 0
   },
