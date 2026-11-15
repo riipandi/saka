@@ -61,7 +61,7 @@ PasswordReset.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     email: 'user@example.com',
-    resetCode: 'EXPECTO-PATRONUM'
+    resetCode: 'HRM20483'
   }
 }
 

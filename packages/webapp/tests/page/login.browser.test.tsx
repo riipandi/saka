@@ -361,10 +361,10 @@ describe('Login (browser)', () => {
     await expect.element(screen.getByLabelText('One-time code')).toBeVisible()
     await expect.element(screen.getByText('Check your inbox')).toBeVisible()
 
-    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await screen.getByLabelText('One-time code').fill('HRM20483')
     await screen.getByRole('button', { name: 'Sign in' }).click()
     await vi.waitFor(() => {
-      expect(exchangeOneTimeToken).toHaveBeenCalledWith('GRYFFINDOR', 'devtok_test')
+      expect(exchangeOneTimeToken).toHaveBeenCalledWith('HRM20483', 'devtok_test')
     })
   })
 
@@ -386,7 +386,7 @@ describe('Login (browser)', () => {
     await expect.element(submit).toBeDisabled()
     await screen.getByLabelText('One-time code').fill('AB12')
     await expect.element(submit).toBeDisabled()
-    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await screen.getByLabelText('One-time code').fill('HRM20483')
     await expect.element(submit).toBeEnabled()
   })
 
@@ -433,7 +433,7 @@ describe('Login (browser)', () => {
 
     await screen.getByLabelText('Username or email').fill('robert@langdon.dev')
     await screen.getByRole('button', { name: 'Email me a one-time sign-in code' }).click()
-    await screen.getByLabelText('One-time code').fill('GRYFFINDOR')
+    await screen.getByLabelText('One-time code').fill('HRM20483')
     await screen.getByRole('button', { name: 'Sign in' }).click()
 
     // The fork's second factor is spent on the pause page — the exchange's

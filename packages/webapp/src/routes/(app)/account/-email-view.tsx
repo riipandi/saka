@@ -41,10 +41,10 @@ import { AccountFrame } from './-account-frame'
 const KEY_CHANGE_EMAIL = 'users.change_email_enabled'
 
 /** The length the backend's code generator draws (an unambiguous alphabet). */
-const CODE_LENGTH = 12
+const CODE_LENGTH = 8
 
 /**
- * The code screen's single entry: twelve unambiguous characters, typed or
+ * The code screen's single entry: eight characters, three letters then five digits,, typed or
  * pasted whole. The slots exist so one character is one keypress — the
  * paste path fills them in one gesture.
  */
@@ -67,10 +67,6 @@ function CodeEntry({
       validationType='alphanumeric'
       disabled={disabled}
     >
-      <OTPFieldSlot />
-      <OTPFieldSlot />
-      <OTPFieldSlot />
-      <OTPFieldSlot />
       <OTPFieldSlot />
       <OTPFieldSlot />
       <OTPFieldSlot />

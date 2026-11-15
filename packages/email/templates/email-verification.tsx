@@ -58,7 +58,7 @@ EmailVerification.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     userFullName: 'John Doe',
-    verificationCode: 'GRYFFINDOR-EXPECTO'
+    verificationCode: 'HRM20483'
   }
 }
 

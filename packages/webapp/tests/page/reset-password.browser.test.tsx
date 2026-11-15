@@ -60,14 +60,14 @@ describe('Reset password (browser)', () => {
       (request: { token: string; newPassword: string }) => ResetPasswordResponse
     >(() => OK)
     const { screen } = await renderReset({ resetPassword })
-    await screen.getByLabelText('Reset code').fill('a'.repeat(64))
+    await screen.getByLabelText('Reset code').fill('HRM20483')
     await screen.getByLabelText('New password').fill('griffin-guard-9')
     await screen.getByLabelText('Confirm it').fill('griffin-guard-9')
     await screen.getByRole('button', { name: 'Reset password' }).click()
     await vi.waitFor(() => {
       expect(resetPassword).toHaveBeenCalledWith(
         expect.objectContaining({
-          token: 'a'.repeat(64),
+          token: 'HRM20483',
           newPassword: 'griffin-guard-9'
         })
       )
@@ -78,7 +78,7 @@ describe('Reset password (browser)', () => {
     const { screen } = await renderReset()
     const button = screen.getByRole('button', { name: 'Reset password' })
     await expect.element(button).toBeDisabled()
-    await screen.getByLabelText('Reset code').fill('a'.repeat(64))
+    await screen.getByLabelText('Reset code').fill('HRM20483')
     await screen.getByLabelText('New password').fill('griffin-guard-9')
     await expect.element(button).toBeDisabled()
     await screen.getByLabelText('Confirm it').fill('different')

@@ -26,13 +26,13 @@ export const Route = createFileRoute('/verify-email')({
   }
 })
 
-const CODE_LENGTH = 12
+const CODE_LENGTH = 8
 
 function RouteComponent() {
   const { code: initialCode } = Route.useSearch()
 
   const queryClient = useQueryClient()
-  const [code, setCode] = useState(initialCode?.slice(0, CODE_LENGTH) ?? '')
+  const [code, setCode] = useState(initialCode?.slice(0, CODE_LENGTH).toUpperCase() ?? '')
   const [result, setResult] = useState<'idle' | 'verified' | 'failed'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -87,13 +87,9 @@ function RouteComponent() {
           <OTPField
             length={CODE_LENGTH}
             value={code}
-            onValueChange={setCode}
+            onValueChange={(value) => setCode(value.toUpperCase())}
             validationType='alphanumeric'
           >
-            <OTPFieldSlot />
-            <OTPFieldSlot />
-            <OTPFieldSlot />
-            <OTPFieldSlot />
             <OTPFieldSlot />
             <OTPFieldSlot />
             <OTPFieldSlot />

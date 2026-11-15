@@ -65,7 +65,7 @@ OAuthSignInCodeEmail.PreviewProps = {
   ...sharedPreviewProps,
   data: {
     providerName: 'Hogwarts',
-    code: 'EXPECTOPATRONUM',
+    code: 'HRM20483',
     expirationString: '15 minutes'
   }
 }

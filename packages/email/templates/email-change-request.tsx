@@ -93,7 +93,7 @@ EmailChangeRequest.PreviewProps = {
     name: 'John Doe',
     oldEmail: 'current@example.com',
     newEmail: 'new@example.com',
-    confirmCode: 'CHAMBER-SECRETS'
+    confirmCode: 'HRM20483'
   }
 }
 

@@ -29,10 +29,10 @@ import { runPasskeyAssertion } from '#/libraries/webauthn/passkey'
 import { socialStyles, styles } from '#/styles/pages/login.stylex'
 
 /**
- * The code the one-time email carries — six or twelve characters per the
- * wire's validation, and uppercase: the emails render it that way.
+ * The code the one-time email carries: three letters then five digits. The
+ * server folds case, so a lowercase entry is accepted.
  */
-const ONE_TIME_CODE_PATTERN = /^[A-Za-z0-9]{6,12}$/
+const ONE_TIME_CODE_PATTERN = /^[A-Za-z]{3}[0-9]{5}$/
 
 /** The icon the two builtin providers render; a custom connection carries none. */
 const PROVIDER_ICONS: Record<string, ComponentType<{ size: number }>> = {
@@ -101,13 +101,13 @@ function OneTimeCodeEntry({
             <Input
               id='one-time-code'
               name='one-time-code'
-              placeholder='GRYFFINDOR'
+              placeholder='HRM20483'
               autoComplete='one-time-code'
               value={code}
               onChange={(e) => {
                 onFailed(null)
                 onDismissFailed()
-                setCode(e.target.value)
+                setCode(e.target.value.toUpperCase())
               }}
             />
           </Field>

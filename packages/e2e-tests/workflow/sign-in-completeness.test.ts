@@ -34,19 +34,6 @@ function totpCode(secretBase32: string): string {
   return totp.generate()
 }
 
-/**
- * The six-character one-time code the email carries: the standalone short
- * alphanumeric line. `codeFromMail` anchors twelve-character codes; the
- * one-time email path mints six, so this reads the shorter line.
- */
-function oneTimeCodeFromMail(text: string): string | null {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => /^[A-Za-z0-9]{6}$/.test(line))
-  return lines[lines.length - 1] ?? null
-}
-
 let admin: string
 let mfaUser: SeedUser
 let resetUser: SeedUser
@@ -179,7 +166,7 @@ test.describe.serial('the sign-in completeness flows', () => {
 
     const mail = await latestMail(/Your login code/i, oneTimeUser.email)
     expect(mail).not.toBeNull()
-    const code = oneTimeCodeFromMail(mail!.text)
+    const code = codeFromMail(mail!.text)
     expect(code).not.toBeNull()
 
     await codeField.fill(code!)
