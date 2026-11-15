@@ -15,6 +15,9 @@ import (
 // closed by the server's own write timeout, which bounds the same window at
 // the transport level.
 //
+// An Upgrade request (a websocket, the Vite HMR socket in development) is
+// exempt: it is a long-lived stream, and a deadline would cut it at d.
+//
 // A duration of zero or less leaves the request unbounded, which is what a
 // configuration that named no timeout means.
 func Timeout(d time.Duration) func(http.Handler) http.Handler {
@@ -23,6 +26,10 @@ func Timeout(d time.Duration) func(http.Handler) http.Handler {
 			return next
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Upgrade") != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 			ctx, cancel := context.WithTimeout(r.Context(), d)
 			defer cancel()
 			next.ServeHTTP(w, r.WithContext(ctx))
