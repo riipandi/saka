@@ -62,6 +62,8 @@ func TestTheCredentialBucketCarriesTheAttemptSurface(t *testing.T) {
 		authnv1connect.WebAuthnServiceReauthenticateProcedure,
 		authnv1connect.PasswordRecoveryServiceForgotPasswordProcedure,
 		identityv1connect.EmailVerificationServiceSendEmailProcedure,
+		authnv1connect.DeviceApprovalServiceInspectProcedure,
+		authnv1connect.DeviceApprovalServiceDecideProcedure,
 	} {
 		bucket, counted := guard.RateBucketFor(procedure)
 		require.True(t, counted, "%s must be counted", procedure)

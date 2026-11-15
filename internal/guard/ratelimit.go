@@ -32,8 +32,8 @@ const (
 )
 
 // RateAuthProcedures names the procedures counted under the credential
-// bucket. They are the surface a script drives: guessing a password, a
-// six-character code, or a TOTP, and provoking the mailer into a bomb. The
+// bucket. They are the surface a script drives: guessing a password, an
+// emailed or device code, or a TOTP, and provoking the mailer into a bomb. The
 // budget they share is rate_limit.auth_limit; the feature-level cooldowns and
 // single-use spend limits stand beside it, not instead of it.
 var RateAuthProcedures = map[string]struct{}{
@@ -79,6 +79,12 @@ var RateAuthProcedures = map[string]struct{}{
 	identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure: {},
 	authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure:       {},
 	authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {},
+	// The device approval pair is session-guarded, but the user code it
+	// takes is about 29 bits: Inspect is the guess and Decide the spend, so
+	// a signed-in caller's drive against the code space is throttled like
+	// any other credential attempt.
+	authnv1connect.DeviceApprovalServiceInspectProcedure: {},
+	authnv1connect.DeviceApprovalServiceDecideProcedure:  {},
 }
 
 // RateDefaultProcedures names the procedures counted under the default
