@@ -31,6 +31,7 @@ import { Text } from 'uilibs/components/extra/text'
 import { TableSkeleton } from '#/components/-skeleton-rows'
 import { ListPagination } from '#/components/list-pagination'
 import { listPageInput, usePaginatedList, type SortOrder } from '#/hooks/use-pagination'
+import { formatEvent } from '#/libraries/audit-event'
 import { dataTableStyles } from '#/styles/element/data-table.stylex'
 import { styles } from '#/styles/pages/audit.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
@@ -45,21 +46,6 @@ const SORT_CHOICES = [
   { value: 'username:asc', label: 'Account, A–Z', sortBy: 'username', sortOrder: 'asc' },
   { value: 'ip_address:asc', label: 'IP address, A–Z', sortBy: 'ip_address', sortOrder: 'asc' }
 ] as const
-
-/** The event vocabulary the wire carries, read as sentences; unknown events stay legible. */
-function formatEvent(event: string): string {
-  const KNOWN: Record<string, string> = {
-    sign_in: 'Signed in',
-    account_created: 'Account created',
-    account_updated: 'Account updated',
-    account_deleted: 'Account deleted',
-    email_verification_sent: 'Verification email sent',
-    email_verified: 'Email verified',
-    profile_picture_updated: 'Profile picture updated',
-    profile_picture_reset: 'Profile picture reset'
-  }
-  return KNOWN[event] ?? event.replaceAll('_', ' ')
-}
 
 const instantFormat = new Intl.DateTimeFormat('en-GB', {
   dateStyle: 'medium',
