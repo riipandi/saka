@@ -87,7 +87,7 @@ interface AdminNavItem extends NavItem {
  */
 export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
   {
-    label: 'Identity & Access',
+    label: 'Identity',
     items: [
       {
         icon: Users,
@@ -120,7 +120,7 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
     ]
   },
   {
-    label: 'Security & Governance',
+    label: 'Security',
     items: [
       {
         icon: History,
@@ -146,7 +146,7 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
     ]
   },
   {
-    label: 'Developer & Integrations',
+    label: 'Developer',
     items: [
       {
         icon: Blocks,
@@ -385,7 +385,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
                 onOpenChange={(next) => setSidebarGroupOpen(group.label, next)}
               >
                 <CollapsibleTrigger {...stylex.props(sidebarStyles.groupTrigger)}>
-                  <span>{group.label}</span>
+                  <span {...stylex.props(sidebarStyles.groupLabel)}>{group.label}</span>
                   <ChevronDown
                     {...stylex.props(
                       sidebarStyles.groupChevron,

@@ -142,7 +142,7 @@ describe('the sidebar administration section', () => {
 
     const screen = await mount(<SideNavbar />)
 
-    await expect.element(screen.getByText('Identity & Access')).toBeVisible()
+    await expect.element(screen.getByText('Identity')).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Groups' })).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Roles' })).toBeVisible()
@@ -155,7 +155,7 @@ describe('the sidebar administration section', () => {
 
     const screen = await mount(<SideNavbar />)
 
-    expect(screen.baseElement.textContent).not.toContain('Identity & Access')
+    expect(screen.baseElement.textContent).not.toContain('Identity')
     expect(screen.baseElement.textContent).not.toContain('Audit trail')
     clearAuth()
   })
@@ -171,7 +171,7 @@ describe('the sidebar administration section', () => {
 
     const screen = await mount(<SideNavbar />)
 
-    await expect.element(screen.getByText('Identity & Access')).toBeVisible()
+    await expect.element(screen.getByText('Identity')).toBeVisible()
     expect(screen.baseElement.textContent).not.toContain('Audit trail')
     clearAuth()
   })
@@ -207,11 +207,11 @@ describe('the sidebar groups fold', () => {
     setAuthGrants(grants)
 
     const screen = await mount(<SideNavbar />)
-    await screen.getByRole('button', { name: 'Identity & Access' }).click()
+    await screen.getByRole('button', { name: 'Identity' }).click()
 
     await expect.element(screen.getByRole('link', { name: 'Users' })).not.toBeInTheDocument()
     await expect.element(screen.getByRole('link', { name: 'Audit trail' })).toBeVisible()
-    expect(appStore.state.sidebarClosedGroups).toEqual(['Identity & Access'])
+    expect(appStore.state.sidebarClosedGroups).toEqual(['Identity'])
     reset()
   })
 
@@ -219,7 +219,7 @@ describe('the sidebar groups fold', () => {
     reset()
     setAuthUser(USER)
     setAuthGrants(grants)
-    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity & Access'] }))
+    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity'] }))
 
     const screen = await mount(<SideNavbar />, { path: '/admin/users' })
 
@@ -231,12 +231,12 @@ describe('the sidebar groups fold', () => {
     reset()
     setAuthUser(USER)
     setAuthGrants(grants)
-    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity & Access'] }))
+    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity'] }))
 
     const screen = await mount(<SideNavbar collapsed />)
 
     await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
-    expect(screen.baseElement.textContent).not.toContain('Identity & Access')
+    expect(screen.baseElement.textContent).not.toContain('Identity')
     reset()
   })
 })

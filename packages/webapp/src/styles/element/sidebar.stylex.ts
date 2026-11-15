@@ -27,7 +27,7 @@ export const sidebarStyles = stylex.create({
     flexShrink: 0
   },
   containerExpanded: {
-    width: '15rem',
+    width: '16rem',
     alignItems: 'stretch',
     [breakpoints.small]: {
       width: '18rem'
@@ -181,6 +181,14 @@ export const sidebarStyles = stylex.create({
       outlineOffset: -2
     }
   },
+  // A label is one line: a name too long for the rail truncates instead of
+  // wrapping and pushing the rows below it.
+  groupLabel: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
   groupChevron: {
     height: '0.875rem',
     width: '0.875rem',
@@ -281,6 +289,9 @@ export const sidebarStyles = stylex.create({
   },
   navLabel: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
     fontSize: fontSize.body2,
     fontWeight: fontWeight.medium,
     whiteSpace: 'nowrap'
