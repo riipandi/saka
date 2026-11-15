@@ -1,0 +1,6 @@
+*
+!.gitignore
+!skills/
+!skills/**
+!docs/
+!docs/**
