@@ -135,7 +135,7 @@ export const sidebarStyles = stylex.create({
     paddingRight: unit.x2,
     display: 'flex',
     flexDirection: 'column',
-    gap: unit.x0_5,
+    gap: unit.x1,
     overflowY: 'auto',
     width: '100%'
   },
@@ -143,7 +143,7 @@ export const sidebarStyles = stylex.create({
     paddingTop: unit.x2,
     paddingBottom: unit.x2,
     alignItems: 'center',
-    gap: unit.x0_5,
+    gap: unit.x1,
     flex: '0 0 auto'
   },
   sectionLabel: {
