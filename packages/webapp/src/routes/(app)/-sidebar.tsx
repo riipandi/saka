@@ -239,10 +239,11 @@ export function admitsAdminNav(
   can: (permission: string) => boolean,
   isAdministrator: boolean
 ) {
-  return (
-    (item.adminOnly === true && isAdministrator) ||
-    (item.permission !== undefined && can(item.permission))
-  )
+  // The server judges every administration procedure by the administrator role
+  // (`Rule: Admin`), and the admin routes redirect anyone else: a catalog slug
+  // alone never opens a screen, so a non-administrator sees none of them.
+  if (!isAdministrator) return false
+  return item.adminOnly === true || (item.permission !== undefined && can(item.permission))
 }
 
 export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarProps) {

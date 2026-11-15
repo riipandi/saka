@@ -160,6 +160,23 @@ describe('the sidebar administration section', () => {
     clearAuth()
   })
 
+  it('hides every group from a role that holds the list slugs without the administrator role', async () => {
+    setAuthUser(USER)
+    // The slugs the Identity and Platform groups gate on; the server refuses
+    // these screens to anyone below the administrator role, so the rail offers none.
+    setAuthGrants({
+      roles: ['editor'],
+      permissions: ['user:*:list', 'role:*:list', 'setting:*:read', 'notification:*:list']
+    })
+
+    const screen = await mount(<SideNavbar />)
+
+    expect(screen.baseElement.textContent).not.toContain('Identity')
+    expect(screen.baseElement.textContent).not.toContain('Platform')
+    expect(screen.baseElement.textContent).not.toContain('Users')
+    clearAuth()
+  })
+
   it('hides items whose slug the snapshot does not carry', async () => {
     setAuthUser(USER)
     // An administrator-shaped role minus the audit slug: the group shows,
