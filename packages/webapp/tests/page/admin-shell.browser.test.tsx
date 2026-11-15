@@ -7,6 +7,7 @@ import {
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { type RenderResult } from 'vitest-browser-react'
 import { type AuthContextValue } from '#/hooks/use-auth'
+import { appStore } from '#/libraries/app.store'
 import { clearAuth, setAuthGrants, setAuthUser } from '#/libraries/guard/auth-store'
 import { AdminBanner } from '#/routes/(app)/-admin-banner'
 import { SideNavbar } from '#/routes/(app)/-sidebar'
@@ -20,20 +21,20 @@ const USER = {
 }
 
 /** Wrap a sidebar or banner mount in the router context its links need. */
-function withRouter(children: React.ReactNode) {
+function withRouter(children: React.ReactNode, path = '/') {
   const RootRoute = createRootRoute({ component: () => <>{children}</> })
   const router = createRouter({
     routeTree: RootRoute,
-    history: createMemoryHistory({ initialEntries: ['/'] })
+    history: createMemoryHistory({ initialEntries: [path] })
   })
   return <RouterProvider router={router} />
 }
 
 async function mount(
   children: React.ReactNode,
-  opts: { auth?: AuthContextValue } = {}
+  opts: { auth?: AuthContextValue; path?: string } = {}
 ): Promise<RenderResult> {
-  return renderView(withRouter(children), opts)
+  return renderView(withRouter(children, opts.path), opts)
 }
 
 describe('the impersonation banner', () => {
@@ -173,5 +174,69 @@ describe('the sidebar administration section', () => {
     await expect.element(screen.getByText('Identity & Access')).toBeVisible()
     expect(screen.baseElement.textContent).not.toContain('Audit trail')
     clearAuth()
+  })
+})
+
+const reset = () => {
+  window.localStorage.clear()
+  appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: [] }))
+  clearAuth()
+}
+
+describe('the sidebar groups fold', () => {
+  const grants = {
+    roles: ['administrator'],
+    permissions: ['user:*:list', 'user_group:*:list', 'audit_log:*:list']
+  }
+
+  it('opens every group by default', async () => {
+    reset()
+    setAuthUser(USER)
+    setAuthGrants(grants)
+
+    const screen = await mount(<SideNavbar />)
+
+    await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
+    await expect.element(screen.getByRole('link', { name: 'Audit trail' })).toBeVisible()
+    reset()
+  })
+
+  it('hides the links of a folded group and keeps the others', async () => {
+    reset()
+    setAuthUser(USER)
+    setAuthGrants(grants)
+
+    const screen = await mount(<SideNavbar />)
+    await screen.getByRole('button', { name: 'Identity & Access' }).click()
+
+    await expect.element(screen.getByRole('link', { name: 'Users' })).not.toBeInTheDocument()
+    await expect.element(screen.getByRole('link', { name: 'Audit trail' })).toBeVisible()
+    expect(appStore.state.sidebarClosedGroups).toEqual(['Identity & Access'])
+    reset()
+  })
+
+  it('keeps the group of the current page open over a stored close', async () => {
+    reset()
+    setAuthUser(USER)
+    setAuthGrants(grants)
+    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity & Access'] }))
+
+    const screen = await mount(<SideNavbar />, { path: '/admin/users' })
+
+    await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
+    reset()
+  })
+
+  it('shows every item and no group button in the icon-only rail', async () => {
+    reset()
+    setAuthUser(USER)
+    setAuthGrants(grants)
+    appStore.setState((prev) => ({ ...prev, sidebarClosedGroups: ['Identity & Access'] }))
+
+    const screen = await mount(<SideNavbar collapsed />)
+
+    await expect.element(screen.getByRole('link', { name: 'Users' })).toBeVisible()
+    expect(screen.baseElement.textContent).not.toContain('Identity & Access')
+    reset()
   })
 })

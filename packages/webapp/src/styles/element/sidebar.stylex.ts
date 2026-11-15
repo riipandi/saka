@@ -146,16 +146,56 @@ export const sidebarStyles = stylex.create({
     gap: unit.x1,
     flex: '0 0 auto'
   },
-  sectionLabel: {
+  // The group header folds its items. It keeps the section label's type and
+  // adds the button reset and the chevron's row.
+  groupTrigger: {
+    display: 'flex',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingLeft: unit.x2,
+    paddingRight: unit.x2,
     paddingTop: unit.x3,
     paddingBottom: unit.x0_5,
+    borderWidth: 0,
+    borderRadius: radius.medium,
+    backgroundColor: 'transparent',
+    color: {
+      default: colors.foregroundNeutralFaded,
+      ':hover': colors.foregroundNeutral
+    },
+    cursor: 'pointer',
     fontSize: fontSize.caption1,
     fontWeight: fontWeight.semibold,
-    color: colors.foregroundNeutralFaded,
     letterSpacing: '0.07em',
+    textAlign: 'left',
     textTransform: 'uppercase',
-    userSelect: 'none'
+    transitionProperty: 'color',
+    transitionDuration: '150ms',
+    userSelect: 'none',
+    outline: 'none',
+    ':focus-visible': {
+      outlineWidth: 2,
+      outlineStyle: 'solid',
+      outlineColor: colors.foregroundPrimary,
+      outlineOffset: -2
+    }
+  },
+  groupChevron: {
+    height: '0.875rem',
+    width: '0.875rem',
+    flexShrink: 0,
+    stroke: 'currentColor',
+    transitionProperty: 'transform',
+    transitionDuration: '150ms'
+  },
+  groupChevronClosed: {
+    transform: 'rotate(-90deg)'
+  },
+  groupPanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: unit.x1
   },
   divider: {
     width: '1.75rem',
