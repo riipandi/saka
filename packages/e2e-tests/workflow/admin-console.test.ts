@@ -54,6 +54,26 @@ test.describe.serial('the admin console flow', () => {
     await expect(page.getByText('Administration is for administrators')).toBeVisible({
       timeout: 15_000
     })
+    // The overview carries the account's own facts and none of the console's,
+    // and the rail offers no administration group.
+    await expect(page.getByText('Active sessions')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Administration', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Identity' })).toHaveCount(0)
+  })
+
+  test('the overview shows the administrator the console beside the account', async ({
+    browser
+  }) => {
+    const page = await signIn(browser, {
+      username: ADMIN_IDENTITY,
+      password: process.env.E2E_PASSWORD || '@dmin123'
+    })
+
+    await expect(page.getByRole('heading', { name: 'Administration', exact: true })).toBeVisible({
+      timeout: 15_000
+    })
+    await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible()
+    await expect(page.getByText('Dead tasks')).toBeVisible({ timeout: 15_000 })
   })
 
   test('the impersonation round trip names the borrowed account', async ({ browser }) => {

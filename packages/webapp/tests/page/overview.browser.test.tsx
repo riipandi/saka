@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router'
 import { describe, expect, it } from 'vite-plus/test'
 import { type RenderResult } from 'vitest-browser-react'
-import { AccountOverview } from '#/routes/(app)/-overview-account'
+import { OverviewSections } from '#/routes/(app)/-overview-sections'
 import {
   ApiKeyService,
   ListAPIKeysResponseSchema,
@@ -17,6 +17,7 @@ import {
 import {
   AuditLogSchema,
   AuditLogService,
+  ListAllResponseSchema,
   ListResponseSchema,
   type ListResponse
 } from '~/codegen/auditlog_pb'
@@ -29,17 +30,33 @@ import {
   SessionSchema,
   SessionService
 } from '~/codegen/authn_pb'
+import { ListOAuthConnectionsResponseSchema, OAuthSSOService } from '~/codegen/authn_pb'
+import { ListOidcClientsResponseSchema, OidcClientService } from '~/codegen/federation_pb'
+import {
+  ListUserGroupsResponseSchema,
+  ListUsersResponseSchema,
+  UserGroupService,
+  UserService
+} from '~/codegen/identity_pb'
 import {
   ListNotificationsResponseSchema,
   type ListNotificationsResponse,
   NotificationService
 } from '~/codegen/notification_pb'
 import {
+  ListQueuesResponseSchema,
+  ListSchedulerJobsResponseSchema,
+  QueueService,
+  QueueSummarySchema,
+  SchedulerService
+} from '~/codegen/system_pb'
+import {
   CredentialSchema,
   ListCredentialsResponseSchema,
   type ListCredentialsResponse,
   WebAuthnService
 } from '~/codegen/webauthn_pb'
+import { ListWebhooksResponseSchema, WebhookService } from '~/codegen/webhook_pb'
 import { renderView } from './view-harness'
 
 function withRouter(children: React.ReactNode) {
@@ -62,6 +79,12 @@ const live = (id: string) =>
 
 type Answer<T> = () => T | Promise<T>
 
+interface AdminAnswers {
+  dead?: number
+  /** Runs once per administration procedure the page calls. */
+  onCall?: () => void
+}
+
 interface Answers {
   sessions?: Answer<ListSessionsResponse>
   credentials?: Answer<ListCredentialsResponse>
@@ -71,7 +94,10 @@ interface Answers {
   activity?: Answer<ListResponse>
 }
 
-async function mount(answers: Answers = {}): Promise<RenderResult> {
+async function mount(
+  answers: Answers = {},
+  opts: { administrator?: boolean; admin?: AdminAnswers } = {}
+): Promise<RenderResult> {
   const transport = createRouterTransport(({ service }) => {
     service(SessionService, {
       listSessions:
@@ -117,7 +143,65 @@ async function mount(answers: Answers = {}): Promise<RenderResult> {
         (() =>
           create(ListAPIKeysResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 2 } }))
     })
+    const hit =
+      <T,>(response: T) =>
+      () => {
+        opts.admin?.onCall?.()
+        return response
+      }
+    service(UserService, {
+      listUsers: hit(
+        create(ListUsersResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 41 } })
+      )
+    })
+    service(UserGroupService, {
+      listUserGroups: hit(
+        create(ListUserGroupsResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 5 } })
+      )
+    })
+    service(QueueService, {
+      listQueues: hit(
+        create(ListQueuesResponseSchema, {
+          queues: [
+            create(QueueSummarySchema, {
+              name: 'mail',
+              pending: 4n,
+              dead: BigInt(opts.admin?.dead ?? 0)
+            })
+          ]
+        })
+      )
+    })
+    service(SchedulerService, {
+      listJobs: hit(
+        create(ListSchedulerJobsResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 6 } })
+      )
+    })
+    service(WebhookService, {
+      list: hit(
+        create(ListWebhooksResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 2 } })
+      )
+    })
+    service(OidcClientService, {
+      listClients: hit(
+        create(ListOidcClientsResponseSchema, { metadata: { page: 1, limit: 1, totalItems: 7 } })
+      )
+    })
+    service(OAuthSSOService, {
+      listConnections: hit(create(ListOAuthConnectionsResponseSchema, { connections: [] }))
+    })
     service(AuditLogService, {
+      listAll: hit(
+        create(ListAllResponseSchema, {
+          logs: [
+            create(AuditLogSchema, {
+              id: 'log_admin',
+              event: 'account_created',
+              username: 'langdon'
+            })
+          ]
+        })
+      ),
       list:
         answers.activity ??
         (() =>
@@ -133,7 +217,9 @@ async function mount(answers: Answers = {}): Promise<RenderResult> {
           }))
     })
   })
-  return renderView(withRouter(<AccountOverview />), { transport })
+  return renderView(withRouter(<OverviewSections administrator={opts.administrator ?? false} />), {
+    transport
+  })
 }
 
 describe('the account overview', () => {
@@ -171,5 +257,38 @@ describe('the account overview', () => {
 
     await expect.element(screen.getByTestId('tile-skeleton').first()).toBeInTheDocument()
     expect(screen.baseElement.textContent).not.toContain('Unread notifications0')
+  })
+})
+
+describe('the administrator overview', () => {
+  it('reads the console counts above the account facts', async () => {
+    const screen = await mount({}, { administrator: true })
+
+    await expect.element(screen.getByText('Administration')).toBeVisible()
+    await expect.element(screen.getByText('Your account')).toBeVisible()
+    await expect.element(screen.getByText('41', { exact: true })).toBeVisible()
+    await expect.element(screen.getByText('Account created')).toBeVisible()
+  })
+
+  it('marks a queue that holds dead tasks', async () => {
+    const screen = await mount({}, { administrator: true, admin: { dead: 3 } })
+
+    await expect.element(screen.getByText('Needs attention')).toBeVisible()
+  })
+
+  it('leaves the warning out when no task is dead', async () => {
+    const screen = await mount({}, { administrator: true })
+
+    await expect.element(screen.getByText('Dead tasks')).toBeVisible()
+    expect(screen.baseElement.textContent).not.toContain('Needs attention')
+  })
+
+  it('never asks a non-administrator for an administration list', async () => {
+    let calls = 0
+    const screen = await mount({}, { administrator: false, admin: { onCall: () => (calls += 1) } })
+
+    await expect.element(screen.getByText('Active sessions')).toBeVisible()
+    expect(screen.baseElement.textContent).not.toContain('Administration')
+    expect(calls).toBe(0)
   })
 })

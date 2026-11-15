@@ -5,8 +5,9 @@ import { Alert, AlertDescription, AlertTitle } from 'uilibs/components/extra/ale
 import { z } from 'zod'
 import { PageHeader } from '#/components/-page-header'
 import { useAuthUser } from '#/hooks/use-auth'
+import { usePermissions } from '#/libraries/guard/use-permissions'
 import { pageStyles } from '#/styles/pages/page.stylex'
-import { AccountOverview } from './-overview-account'
+import { OverviewSections } from './-overview-sections'
 
 // The one-shot notice the admin guard's redirect carries. Anything else on
 // the URL is not this page's business.
@@ -28,6 +29,7 @@ const greeting =
 
 function RouteComponent() {
   const user = useAuthUser()
+  const { isAdministrator } = usePermissions()
   const navigate = useNavigate()
   const { notice } = Route.useSearch()
 
@@ -67,7 +69,7 @@ function RouteComponent() {
         </Alert>
       )}
 
-      <AccountOverview />
+      <OverviewSections administrator={isAdministrator} />
     </div>
   )
 }
