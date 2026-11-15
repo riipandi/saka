@@ -169,10 +169,10 @@ export const sidebarStyles = stylex.create({
   // Nav item
   navItem: {
     display: 'flex',
-    height: '2.25rem',
+    height: '2.5rem',
     width: '100%',
     alignItems: 'center',
-    gap: unit.x2,
+    gap: unit.x3,
     borderRadius: radius.large,
     paddingLeft: unit.x3,
     paddingRight: unit.x3,
@@ -196,11 +196,26 @@ export const sidebarStyles = stylex.create({
       outlineStyle: 'solid',
       outlineColor: colors.foregroundPrimary,
       outlineOffset: 2
+    },
+    // The selected marker: a short pill on the item's leading edge, so the
+    // rounded background is not cut by a straight inset bar.
+    '::before': {
+      content: '""',
+      position: 'absolute',
+      left: 0,
+      top: '50%',
+      width: 3,
+      height: '1.25rem',
+      borderRadius: 999,
+      backgroundColor: colors.backgroundPrimary,
+      transform: 'translateY(-50%) scaleY(0)',
+      transitionProperty: 'transform',
+      transitionDuration: '150ms'
     }
   },
   navItemCollapsed: {
-    height: '2.25rem',
-    width: '2.25rem',
+    height: '2.5rem',
+    width: '2.5rem',
     justifyContent: 'center',
     paddingLeft: 0,
     paddingRight: 0
@@ -210,17 +225,17 @@ export const sidebarStyles = stylex.create({
       default: colors.backgroundPrimaryFaded,
       ':hover': colors.backgroundPrimaryFaded
     },
-    boxShadow: {
-      default: `inset 3px 0 0 ${colors.backgroundPrimary}`
-    },
     color: {
       default: colors.foregroundPrimary,
       ':hover': colors.foregroundPrimary
+    },
+    '::before': {
+      transform: 'translateY(-50%) scaleY(1)'
     }
   },
   navIcon: {
-    height: '1rem',
-    width: '1rem',
+    height: '1.125rem',
+    width: '1.125rem',
     stroke: 'currentColor',
     flexShrink: 0
   },

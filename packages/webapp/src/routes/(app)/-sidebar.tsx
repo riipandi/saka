@@ -39,6 +39,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { Fragment, useState } from 'react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from 'uilibs/components/base/tooltip'
 import { usePermissions } from '#/libraries/guard/use-permissions'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
@@ -250,7 +251,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
     items.map((item) => {
       const itemActive = isActive(item.href)
       const Icon = itemActive && item.activeIcon ? item.activeIcon : item.icon
-      return (
+      const link = (
         <Link
           key={item.label}
           to={item.href}
@@ -265,9 +266,21 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
           {!collapsed && <span {...stylex.props(sidebarStyles.navLabel)}>{item.label}</span>}
         </Link>
       )
+      // A collapsed item shows only its icon, so the label moves to a tooltip
+      // on the side the content lies on; an expanded one already reads it.
+      if (!collapsed) return link
+      return (
+        <Tooltip key={item.label}>
+          <TooltipTrigger render={link} />
+          <TooltipContent side='right' sideOffset={10}>
+            {item.label}
+          </TooltipContent>
+        </Tooltip>
+      )
     })
 
   return (
+    <TooltipProvider>
     <nav
       aria-label='Sidebar'
       {...stylex.props(
@@ -344,5 +357,6 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
         })}
       </div>
     </nav>
+    </TooltipProvider>
   )
 }
