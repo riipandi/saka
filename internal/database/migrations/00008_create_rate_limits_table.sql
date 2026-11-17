@@ -30,6 +30,10 @@ CREATE TRIGGER trg_rate_limits_updated_at BEFORE UPDATE ON public.rate_limits FO
 
 -- Indexes for `public.rate_limits`
 -- (the key needs no index: the primary key carries every lookup)
+-- The window start orders the sweep: a row is never deleted by the check
+-- itself, so the cleanup job walks the oldest windows first and removes the
+-- ones that lapsed more than a window ago.
+CREATE INDEX IF NOT EXISTS idx_rate_limits_window_start ON public.rate_limits (window_start);
 
 -- --------------------------------------------------------
 -- Rate limit check function, returns JSON with rate limit information

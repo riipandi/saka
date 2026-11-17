@@ -129,6 +129,17 @@ func cleanupProcessor(ctx context.Context, task CleanupTask, pool *datastore.Pos
 		slog.InfoContext(ctx, "queue: purged expired device-login requests", "requests", deviceSwept)
 	}
 
+	// The database limiter writes one row per bucket-and-address key and the
+	// check only resets it in place, so without this sweep every address that
+	// ever touched a counted route leaves a permanent row.
+	limitsSwept, err := deleteLapsedRateLimits(ctx, pool, time.Now())
+	if err != nil {
+		return err
+	}
+	if limitsSwept > 0 {
+		slog.InfoContext(ctx, "queue: purged lapsed rate-limit windows", "rows", limitsSwept)
+	}
+
 	// The next run is queued before this one succeeds, so the schedule never
 	// depends on the process that ran the last one.
 	_, err = client.Add(CleanupTask{IntervalMillis: task.IntervalMillis}).Ctx(ctx).Wait(interval).Save()
@@ -162,4 +173,39 @@ func purgeExpiredAuthRows(ctx context.Context, pool *datastore.Postgres, cutoff 
 // with.
 func cleanupSeed(interval time.Duration) CleanupTask {
 	return CleanupTask{IntervalMillis: interval.Milliseconds()}
+}
+
+// rateLimitSweepBatch and rateLimitSweepBound size the rate-limit sweep: a
+// bounded delete per statement, so a backlog from a stopped deployment is not
+// one long-running statement, and a bound per run so the sweep never starves
+// the rest of the cleanup.
+const (
+	rateLimitSweepBatch = 5000
+	rateLimitSweepBound = 100_000
+)
+
+// deleteLapsedRateLimits removes the windows that ended more than one full
+// window ago. A row whose window just lapsed is kept: the next request for
+// that key resets it in place, and deleting it only to re-insert it would be
+// churn. The oldest windows go first, riding the window_start index.
+func deleteLapsedRateLimits(ctx context.Context, pool *datastore.Postgres, now time.Time) (int, error) {
+	total := 0
+	for {
+		tag, err := pool.Exec(ctx,
+			`DELETE FROM public.rate_limits
+			 WHERE key IN (
+				 SELECT key FROM public.rate_limits
+				 WHERE window_start < $1::timestamptz - make_interval(secs => window_seconds * 2)
+				 ORDER BY window_start
+				 LIMIT $2
+			 )`, now, rateLimitSweepBatch)
+		if err != nil {
+			return total, fmt.Errorf("cleanup: sweep rate limits: %w", err)
+		}
+		removed := int(tag.RowsAffected())
+		total += removed
+		if removed < rateLimitSweepBatch || total >= rateLimitSweepBound {
+			return total, nil
+		}
+	}
 }

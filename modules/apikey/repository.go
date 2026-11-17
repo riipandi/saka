@@ -258,7 +258,9 @@ func (r *Repository) TouchLastUsed(ctx context.Context, db datastore.Querier, id
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(entity.TableAPIKeys)
 	ub.Set(ub.Assign("last_used_at", at))
-	ub.Where(ub.Equal("id", id))
+	// The guard rides the statement as well as the caller: two requests that
+	// both read a stale instant write once between them.
+	ub.Where(ub.Equal("id", id), ub.Or(ub.IsNull("last_used_at"), ub.LT("last_used_at", at.Add(-lastUsedGranularity))))
 
 	query, args := ub.Build()
 	// The touch is best-effort by construction: a failure to record when a

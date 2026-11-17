@@ -305,6 +305,16 @@ func rpcRefuseWith(maxRequestBytes int) func(http.ResponseWriter, *http.Request)
 	}
 }
 
+// rpcUnavailableWith answers a request the limiter could not judge, for a
+// class that fails closed: `unavailable`, the code the Connect specification
+// maps to 503, serialized like any other refusal.
+func rpcUnavailableWith(maxRequestBytes int) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writer := connecthttp.NewErrorWriter(rpcMountOptions(maxRequestBytes)...)
+		writeRPCError(writer, w, r, connect.CodeUnavailable, "the request limiter is unavailable; retry shortly")
+	}
+}
+
 // writeRPCError answers a request that reached no procedure, in the protocol the caller used.
 func writeRPCError(writer *connecthttp.ErrorWriter, w http.ResponseWriter, r *http.Request, code connect.Code, message string) {
 	_ = writer.Write(w, r, connect.NewError(code, message))

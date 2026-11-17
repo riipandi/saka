@@ -20,6 +20,9 @@ const (
 	outcomeLimited  = "limited"
 	outcomeExcluded = "excluded"
 	outcomeDegraded = "degraded"
+	// outcomeUnavailable is a request a fail-closed class refused because the
+	// limiter could not judge it.
+	outcomeUnavailable = "unavailable"
 )
 
 // rateLimitMetrics holds the limiter's one counter. The middleware builds one

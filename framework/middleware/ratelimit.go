@@ -46,6 +46,13 @@ type RateClass struct {
 	// Policy cannot stop a caller spread across addresses; Global bounds the
 	// total.
 	Global Policy
+	// FailClosed makes a limiter that cannot answer refuse the request
+	// instead of passing it. The credential and code buckets set it: they
+	// are the brute-force surface, and a database fault is exactly when a
+	// run against them is also loading the backend, so passing the request
+	// would drop the protection when it is needed most. The default bucket
+	// stays open — throttling a browse is not worth taking the API down.
+	FailClosed bool
 }
 
 // Classifier answers the bucket a request path is counted under, or false
@@ -69,6 +76,11 @@ type Result struct {
 // the connect error its client parses. The X-RateLimit-* headers and
 // Retry-After are already on the response when Refuse runs.
 type Refuse func(w http.ResponseWriter, r *http.Request)
+
+// RetryUnavailableSeconds is the Retry-After a fail-closed refusal carries:
+// the limiter's backend is down, so the honest hint is "soon", not the
+// window of a budget nobody could read.
+const RetryUnavailableSeconds = 5
 
 // RateLimit throttles the requests a client may make, keyed by its address
 // within the bucket the classifier names the path with.
@@ -94,11 +106,14 @@ type Refuse func(w http.ResponseWriter, r *http.Request)
 // "/api/healthz" also spares "/api/healthz/deep".
 //
 // A limiter that cannot answer — a database that is down — lets the request
-// through. The limiter is a protection of the service, and taking the API
-// down to enforce it inverts the relationship: a degraded backend costs some
-// throttling, never the service itself. The driver logs its own failures, and
-// the pass-through is counted, so a silent degradation still shows up as a
-// rising "error" outcome on the rejection counter.
+// through, except for a class marked FailClosed. The limiter is a protection
+// of the service, and taking the API down to enforce it inverts the
+// relationship: a degraded backend costs some throttling, never the service
+// itself. The credential and code buckets are the exception: they are the
+// brute-force surface, so an unjudged request there is refused with a 503
+// and a Retry-After. Either way the driver logs its own failures and the
+// outcome is counted ("degraded" for a pass-through, "unavailable" for a
+// refusal), so a silent degradation still shows up on the counter.
 //
 // The key is the bucket and the connection's host without its port. Behind a
 // proxy every address is the proxy's, which makes a bucket's limit global
@@ -109,9 +124,13 @@ type Refuse func(w http.ResponseWriter, r *http.Request)
 // telemetry namespace is the caller's series identity (decision 8) — empty
 // leaves the instruments under their bare domain name.
 type RateLimitOptions struct {
-	Surface            string
-	Limiter            Limiter
-	Refuse             Refuse
+	Surface string
+	Limiter Limiter
+	Refuse  Refuse
+	// Unavailable answers a request the limiter could not judge, for a
+	// class that fails closed: a 503 in the protocol of the surface. Nil
+	// answers a plain 503.
+	Unavailable        Refuse
 	Classify           Classifier
 	Excluded           []string
 	TelemetryNamespace string
@@ -152,12 +171,31 @@ func RateLimit(opts RateLimitOptions) func(http.Handler) http.Handler {
 			result, err := opts.Limiter.Allow(r.Context(), rateLimitKey(class.Name, r), class.Policy)
 			if err == nil && !result.Limited && class.Global.Limit > 0 {
 				// A global check that cannot answer degrades like the
-				// per-address one: the request passes, never the service down.
-				if global, globalErr := opts.Limiter.Allow(r.Context(), sanitizeKey(class.Name)+":global", class.Global); globalErr == nil && global.Limited {
+				// per-address one: the request passes for an open class, and
+				// is refused for a class that fails closed.
+				global, globalErr := opts.Limiter.Allow(r.Context(), sanitizeKey(class.Name)+":global", class.Global)
+				switch {
+				case globalErr != nil && class.FailClosed:
+					err = globalErr
+				case global.Limited:
 					result = global
 				}
 			}
 			if err != nil {
+				if class.FailClosed {
+					metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
+						attribute.String("surface", opts.Surface),
+						attribute.String("outcome", outcomeUnavailable),
+						attribute.String("bucket", class.Name),
+					))
+					w.Header().Set(RateLimitRetryHeader, strconv.Itoa(RetryUnavailableSeconds))
+					if opts.Unavailable != nil {
+						opts.Unavailable(w, r)
+					} else {
+						http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+					}
+					return
+				}
 				metrics.requests.Add(r.Context(), 1, metric.WithAttributes(
 					attribute.String("surface", opts.Surface),
 					attribute.String("outcome", outcomeDegraded),

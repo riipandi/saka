@@ -11,9 +11,21 @@ tasks:
       - task: test:ui
 
   # Pass packages or flags after `--`.
+  # -p bounds how many test binaries run at once: each integration package
+  # starts a Postgres container, and an unbounded run trips the container
+  # reaper's name conflict and the pool's ping timeout — flakes of the
+  # harness, not of the code. Raise it only on a host with room for the
+  # containers.
   test:go:
     desc: Run Go unit tests
-    cmd: gotestsum --format testname -- {{.CLI_ARGS | default "$(go list ./... | egrep -v '(/test|/codegen)$$')"}}
+    cmd: gotestsum --format testname -- -p 2 {{.CLI_ARGS | default "$(go list ./... | egrep -v '(/test|/codegen)$$')"}}
+
+  # The race detector needs cgo; the repository builds with CGO_ENABLED=0.
+  test:race:
+    desc: Run the Go tests under the race detector
+    env:
+      CGO_ENABLED: "1"
+    cmd: gotestsum --format testname -- -race -p 2 {{.CLI_ARGS | default "./framework/... ./internal/... ./modules/... ./pkg/..."}}
 
   # Chromium by default; needs the pgsql container up.
   test:e2e:

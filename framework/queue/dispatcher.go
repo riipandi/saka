@@ -81,6 +81,7 @@ type dispatcher struct {
 	// scheduled; defaultFallbackPoll unless a test shortened it.
 	fallbackPoll time.Duration
 	running      atomic.Bool
+	startMu      sync.Mutex
 	// workers tracks the worker goroutines, so a stop waits for them to exit
 	// rather than inferring it from the free-worker tokens: a worker that
 	// leaves because the start context ended never returns its token, and
@@ -116,12 +117,27 @@ func (d *dispatcher) init(client *Client, numWorkers int, releaseAfter time.Dura
 // start starts the dispatcher. To hard-stop it, cancel the provided context;
 // to stop it gracefully, call stop.
 func (d *dispatcher) start(ctx context.Context) {
-	// start is guarded by a CAS rather than a load: two concurrent starts
-	// must not both spawn a goroutine set, the second overwriting the first's
-	// channels while its fetcher still selects on them.
-	if !d.running.CompareAndSwap(false, true) {
+	// Two concurrent starts must not both spawn a goroutine set, the second
+	// overwriting the first's channels while its fetcher still selects on
+	// them, so the whole of start runs under one lock.
+	d.startMu.Lock()
+	defer d.startMu.Unlock()
+
+	// A live generation answers a second start with nothing. One whose
+	// context was cancelled or whose shutdown was asked for is ending, and
+	// the start that follows replaces it: the fetcher clears running as it
+	// leaves, which can be before the triggerer and the workers of its
+	// generation have exited — a context cancelled without a stop leaves
+	// exactly that window — and they still read the fields rebuilt below.
+	// The restart therefore joins the previous generation first. The first
+	// start has nothing to wait for, and a restart after a stop finds the
+	// generation already gone.
+	if d.running.Load() && !d.generationEnding() {
 		return
 	}
+	d.workers.Wait()
+	d.engines.Wait()
+	d.running.Store(true)
 
 	d.ctx = ctx
 	d.shutdownCtx, d.shutdown = context.WithCancel(context.Background())
@@ -169,6 +185,13 @@ drain:
 	go d.fetcher()
 	d.signalReady()
 	d.client.log.InfoContext(ctx, "task dispatcher started", "workers", d.numWorkers)
+}
+
+// generationEnding answers whether the running generation has been told to
+// stop, by its start context or by a shutdown. Only start reads it, under
+// startMu, where the contexts it names are not being replaced.
+func (d *dispatcher) generationEnding() bool {
+	return d.ctx != nil && d.ctx.Err() != nil || d.shutdownCtx != nil && d.shutdownCtx.Err() != nil
 }
 
 // stop attempts to gracefully shut down the dispatcher by blocking until
