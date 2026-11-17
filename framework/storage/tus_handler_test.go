@@ -17,6 +17,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testOwner reads the account a test request acts for from a header the
+// transport's real owner function replaces with the caller's subject.
+func testOwner(r *http.Request) string { return r.Header.Get("X-Test-Owner") }
+
+// asOwner sends one request as the named account.
+func asOwner(t *testing.T, server *httptest.Server, owner, method, path string, headers map[string]string, body string) *http.Response {
+	t.Helper()
+
+	request, err := http.NewRequest(method, server.URL+path, strings.NewReader(body))
+	require.NoError(t, err)
+	request.Header.Set("X-Test-Owner", owner)
+	for name, value := range headers {
+		request.Header.Set(name, value)
+	}
+	response, err := server.Client().Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = response.Body.Close() })
+	return response
+}
+
+func ownerCreation(t *testing.T, server *httptest.Server, owner, key string, length int64, body string) *http.Response {
+	t.Helper()
+
+	return asOwner(t, server, owner, http.MethodPost, "/api/uploads", map[string]string{
+		"Upload-Length": formatInt(length),
+		"Upload-Metadata": metadataHeader(
+			[2]string{"bucket", testBucket},
+			[2]string{"key", key},
+			[2]string{"filetype", "text/plain"},
+		),
+	}, body)
+}
+
 // recordingEnqueuer answers the engine's completion seam with a slice a
 // test reads.
 type recordingEnqueuer struct {
@@ -37,7 +70,7 @@ func newTusHarness(t *testing.T) (*httptest.Server, *Manager, *recordingEnqueuer
 	manager, _, _ := newManager(t)
 	enqueuer := &recordingEnqueuer{}
 	manager.WithUploadEnqueuer(enqueuer)
-	server := httptest.NewServer(NewTusHandler(manager, manager.log))
+	server := httptest.NewServer(NewTusHandler(manager, manager.log, testOwner))
 	t.Cleanup(server.Close)
 	return server, manager, enqueuer
 }
@@ -167,7 +200,7 @@ func TestTusCreationRefusesAnOversizedUpload(t *testing.T) {
 	manager := NewManager(store, pool, t.TempDir(), slog.New(slog.DiscardHandler))
 	enqueuer := &recordingEnqueuer{}
 	manager.WithUploadEnqueuer(enqueuer)
-	server := httptest.NewServer(NewTusHandler(manager, manager.log))
+	server := httptest.NewServer(NewTusHandler(manager, manager.log, testOwner))
 	t.Cleanup(server.Close)
 
 	// The bucket's size limit is the ceiling the creation's declared
@@ -277,9 +310,10 @@ func TestTusCompletionEnqueuesTheUpload(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, appended.StatusCode)
 	assert.Equal(t, []string{testBucket + "/probe/complete.txt"}, enqueuer.refs)
 
-	// A chunk past the declared length is a mismatch, not a silence.
+	// A completed upload is a stored file, not a session: a chunk after the
+	// end gets the answer a missing session gets.
 	past := tusPatch(t, server, testBucket, "probe/complete.txt", 10, "x")
-	assert.Equal(t, http.StatusConflict, past.StatusCode)
+	assert.Equal(t, http.StatusNotFound, past.StatusCode)
 }
 
 // TestTheStartupSweepRequeuesStagePathFilesOnly pins the sweep's predicate:
@@ -317,4 +351,57 @@ func TestTusOptionsNamesTheExtensions(t *testing.T) {
 	assert.Contains(t, response.Header.Get("Tus-Extension"), "creation-with-upload")
 	assert.Contains(t, response.Header.Get("Tus-Extension"), "termination")
 	assert.Contains(t, response.Header.Get("Tus-Extension"), "expiration")
+}
+
+func TestTusSessionsBelongToTheirOwner(t *testing.T) {
+	server, manager, _ := newTusHarness(t)
+	path := "/api/uploads/" + testBucket + "/probe/owned.txt"
+
+	require.Equal(t, http.StatusCreated, ownerCreation(t, server, "alice", "probe/owned.txt", 10, "01234").StatusCode)
+
+	// Another account can neither begin over the key nor probe, append to or
+	// terminate the session: every answer is the one a missing upload gets.
+	assert.Equal(t, http.StatusConflict, ownerCreation(t, server, "bob", "probe/owned.txt", 10, "").StatusCode)
+	assert.Equal(t, http.StatusNotFound, asOwner(t, server, "bob", http.MethodHead, path, nil, "").StatusCode)
+	assert.Equal(t, http.StatusNotFound, asOwner(t, server, "bob", http.MethodPatch, path,
+		map[string]string{"Content-Type": TusMedia, "Upload-Offset": "5"}, "56789").StatusCode)
+	assert.Equal(t, http.StatusNotFound, asOwner(t, server, "bob", http.MethodDelete, path, nil, "").StatusCode)
+
+	// The session is untouched: the owner still sees its offset and resumes.
+	head := asOwner(t, server, "alice", http.MethodHead, path, nil, "")
+	assert.Equal(t, http.StatusOK, head.StatusCode)
+	assert.Equal(t, "5", head.Header.Get("Upload-Offset"))
+	size, err := manager.stagingSize(testBucket, "probe/owned.txt")
+	require.NoError(t, err)
+	assert.EqualValues(t, 5, size)
+
+	// The owner may restart its own session and terminate it.
+	assert.Equal(t, http.StatusCreated, ownerCreation(t, server, "alice", "probe/owned.txt", 10, "").StatusCode)
+	assert.Equal(t, http.StatusNoContent, asOwner(t, server, "alice", http.MethodDelete, path, nil, "").StatusCode)
+}
+
+func TestTusNeverReplacesOrDeletesAStoredFile(t *testing.T) {
+	server, manager, _ := newTusHarness(t)
+	ctx := t.Context()
+	path := "/api/uploads/" + testBucket + "/probe/final.txt"
+
+	// A completed tus upload and a Stage-path file are both stored files.
+	require.Equal(t, http.StatusCreated, ownerCreation(t, server, "alice", "probe/final.txt", 5, "01234").StatusCode)
+	require.NoError(t, manager.Stage(ctx, testBucket, "docs/staged.txt", strings.NewReader("staged"), nil))
+
+	for _, key := range []string{"probe/final.txt", "docs/staged.txt"} {
+		before, err := manager.Manifest(ctx, testBucket, key)
+		require.NoError(t, err)
+
+		// Not even the account that uploaded it can begin over it again.
+		assert.Equal(t, http.StatusConflict, ownerCreation(t, server, "alice", key, 5, "").StatusCode, key)
+		assert.Equal(t, http.StatusNotFound,
+			asOwner(t, server, "alice", http.MethodDelete, "/api/uploads/"+testBucket+"/"+key, nil, "").StatusCode, key)
+
+		after, err := manager.Manifest(ctx, testBucket, key)
+		require.NoError(t, err, "the row survived: %s", key)
+		assert.Equal(t, before.Metadata, after.Metadata, key)
+		assert.Equal(t, before.Size, after.Size, key)
+	}
+	assert.Equal(t, http.StatusNotFound, asOwner(t, server, "alice", http.MethodHead, path, nil, "").StatusCode)
 }

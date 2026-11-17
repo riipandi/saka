@@ -29,6 +29,11 @@ import (
 // ErrNotFound is what a read of an unknown key answers with.
 var ErrNotFound = errors.New("storage: not found")
 
+// ErrExists is what a begin over a key that already holds a stored file, or
+// another account's upload, answers with: an upload never replaces what it
+// does not own.
+var ErrExists = errors.New("storage: already exists")
+
 // ErrInvalidKey is what a key that names nothing inside the storage tree
 // answers with: an empty key, an absolute path, a ".." segment, or a name no
 // sane file system stores.

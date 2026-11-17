@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,6 +34,27 @@ import (
 // app.assets_url defaults to, so a value written there and a file stored in
 // a bucket meet at the same URL.
 const Path = "/storage"
+
+// servedPolicy is the Content-Security-Policy every served object carries.
+// The style allowance is what a browser's own image viewer page needs; the
+// frame ban repeats the application policy this one replaces.
+const servedPolicy = "default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'"
+
+// inlineTypes are the media types shown in the browser instead of
+// downloaded. SVG is absent on purpose: it is a document that can carry
+// script.
+var inlineTypes = map[string]struct{}{
+	"image/png": {}, "image/jpeg": {}, "image/gif": {}, "image/webp": {}, "image/avif": {},
+}
+
+func inlineType(contentType string) bool {
+	base, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	_, ok := inlineTypes[base]
+	return ok
+}
 
 // ManagerSource is what the mount reads through: the storage engine's
 // bucket-aware read surface.
@@ -106,6 +128,17 @@ func handler(source ManagerSource, signer *engine.Signer) http.Handler {
 			contentType = "application/octet-stream"
 		}
 		w.Header().Set("Content-Type", contentType)
+
+		// The declared type is the uploader's word, and this mount shares the
+		// application's origin: a served page could act as the signed-in
+		// user. The sandbox policy replaces the application's own, so no
+		// script runs and no origin is granted whatever the bytes are, and
+		// only the raster images a page embeds are shown inline; everything
+		// else, SVG and HTML included, downloads.
+		w.Header().Set("Content-Security-Policy", servedPolicy)
+		if !inlineType(contentType) {
+			w.Header().Set("Content-Disposition", "attachment")
+		}
 		if manifest.Size > 0 {
 			w.Header().Set("Content-Length", strconv.FormatInt(manifest.Size, 10))
 		}

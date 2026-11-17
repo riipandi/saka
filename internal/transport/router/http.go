@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/saka/internal/transport/devtools"
 	"github.com/riipandi/saka/internal/transport/handler"
 	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/pkg/jwtutils"
 	appweb "github.com/riipandi/saka/web"
 )
 
@@ -239,7 +240,14 @@ func NewRouter(opts Options) chi.Router {
 					// One handler serves both routes: the per-upload locks
 					// the creation-with-upload append and the PATCHes race
 					// over live on the instance, not on the route.
-					tus := storage.NewTusHandler(manager, log)
+					// The bearer middleware has already put the caller in the
+					// context; an API key acts as the account that owns it.
+					tus := storage.NewTusHandler(manager, log, func(r *http.Request) string {
+						if caller, ok := jwtutils.CallerFrom(r.Context()); ok {
+							return caller.UserID
+						}
+						return ""
+					})
 					mod.Handle("/api/uploads", tus)
 					mod.Handle("/api/uploads/*", tus)
 				}

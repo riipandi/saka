@@ -210,10 +210,33 @@ func (Manifests) Save(ctx context.Context, q datastore.Querier, file File) error
 // hashing and upload the new bytes under the old digest. Clearing it means a
 // re-stage always pays for one hash, and a retry of an unchanged file still
 // takes the reuse path off the checkpoint the sync itself committed.
-func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any, isPrivate bool) error {
+func (m Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any, isPrivate bool) error {
+	_, err := m.stage(ctx, q, bucketID, key, size, mtime, metadata, isPrivate, "")
+	return err
+}
+
+// StageSession is Stage for a tus session's row, with the overwrite made
+// conditional in the statement itself: an existing row is replaced only when
+// it is a session of the same owner, so a final object, a Stage-path upload
+// and another account's session all survive. A row the conflict refused
+// answers ErrExists; the check and the write are one statement, so two
+// begins racing for one key cannot both win.
+func (m Manifests) StageSession(ctx context.Context, q datastore.Querier, bucketID, key string, mtime time.Time, metadata map[string]any) error {
+	written, err := m.stage(ctx, q, bucketID, key, 0, mtime, metadata, false,
+		" WHERE "+objectsTable+".metadata ? '"+TusLengthKey+"' AND "+objectsTable+".metadata ->> '"+TusOwnerKey+"' = EXCLUDED.metadata ->> '"+TusOwnerKey+"'")
+	if err != nil {
+		return err
+	}
+	if !written {
+		return ErrExists
+	}
+	return nil
+}
+
+func (Manifests) stage(ctx context.Context, q datastore.Querier, bucketID, key string, size int64, mtime time.Time, metadata map[string]any, isPrivate bool, onConflictWhere string) (bool, error) {
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
-		return fmt.Errorf("storage: encode metadata of %q: %w", key, err)
+		return false, fmt.Errorf("storage: encode metadata of %q: %w", key, err)
 	}
 
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
@@ -226,13 +249,14 @@ func (Manifests) Stage(ctx context.Context, q datastore.Querier, bucketID, key s
 		"metadata = EXCLUDED.metadata, " +
 		"staging_size = EXCLUDED.staging_size, " +
 		"staging_mtime = EXCLUDED.staging_mtime, " +
-		"status = EXCLUDED.status")
+		"status = EXCLUDED.status" + onConflictWhere)
 
 	query, args := ib.Build()
-	if _, err := q.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("storage: stage file %q: %w", key, err)
+	tag, err := q.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("storage: stage file %q: %w", key, err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // UpdateMetadata replaces the metadata a bucket/key carries, keeping
@@ -271,6 +295,26 @@ func (Manifests) Delete(ctx context.Context, q datastore.Querier, bucketID, key 
 	tag, err := q.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("storage: delete file %q: %w", key, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteSession removes a bucket/key's row only while it is still a tus
+// session. The marker test rides the DELETE, so a session that completed
+// between the caller's check and this call leaves its now-final row alone;
+// ErrNotFound names a pair that is not an open session.
+func (Manifests) DeleteSession(ctx context.Context, q datastore.Querier, bucketID, key string) error {
+	db := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	db.DeleteFrom(objectsTable)
+	db.Where(db.Equal("bucket_id", bucketID), db.Equal("key", key), "metadata ? "+db.Var(TusLengthKey))
+
+	query, args := db.Build()
+	tag, err := q.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("storage: delete session %q: %w", key, err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
