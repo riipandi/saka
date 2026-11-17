@@ -867,8 +867,28 @@ expiring, the historical behavior), a grant carrying `offline_access`
 rides the `oidc.offline_refresh_token_hours` long one, and both are
 read at every issuance and rotation through the grant handler — an
 operator's change lands on the next issuance, never waiting for a
-restart, and an unreadable setting fails open to the never-expiring
-token.
+restart, and an unreadable setting fails the grant: zero hours is an
+operator's choice of the never-expiring token, and a failed read must not
+make it for them.
+
+**Tokens follow the account, at refresh time.** The grant handler the
+library runs on every rotation first asks `accountQualifies`
+(`protocol_account.go`): the account exists, is enabled, sits outside any
+ban window and, for a group-restricted client, still belongs to an allowed
+group. A grant whose account no longer qualifies is deleted with its
+pointers and the refresh answers `invalid_grant`; a failed read is a server
+error and ends nothing, so an outage never deletes anyone's grant. The
+userinfo claims answer the subject alone for such an account. The access
+tokens already issued live to their own expiry (60 minutes by default) —
+the bounded window the pull model accepts in return for needing no push
+seam from identity into federation. **A retired refresh token is a
+tombstone**: a rotation rewrites the replaced token's pointer row, after the
+grant's own compare-and-swap save has landed, to a `retired` marker capped at
+thirty days of life; presenting it again is a replay — the legitimate client
+holds the replacement — so the lookup deletes the grant and every pointer
+riding it and answers not-found. `oauth_sessions` carries no `request_id` or
+`active` column: the table's keys are `(kind, key)`, the grant pointer index
+and the grant subject index (`00016`).
 
 **The device grant (RFC 8628) and the prefix.** The provider registers
 its routes under `WithPathPrefix("/oidc")` — the v0.25.0 API exposes no

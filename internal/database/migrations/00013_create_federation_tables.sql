@@ -123,8 +123,6 @@ CREATE TABLE IF NOT EXISTS public.oauth_sessions (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     kind TEXT NOT NULL,
     key TEXT NOT NULL,
-    request_id TEXT NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
     request_data JSONB NOT NULL,
     -- A logout session may name no client: an RP-initiated logout
     -- without a client_id or an id_token_hint is still a flow the
@@ -137,10 +135,7 @@ CREATE TABLE IF NOT EXISTS public.oauth_sessions (
 ) USING heap;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_sessions_kind_key ON public.oauth_sessions (kind, key);
-CREATE INDEX IF NOT EXISTS idx_oauth_sessions_kind_request ON public.oauth_sessions (kind, request_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_sessions_expires_at ON public.oauth_sessions (expires_at);
-CREATE INDEX IF NOT EXISTS idx_oauth_sessions_client_subject
-    ON public.oauth_sessions (client_id, (request_data #>> '{session,subject}'), kind, active);
 
 -- --------------------------------------------------------
 -- Table: public.oauth_jtis (replay-protected JWT IDs)

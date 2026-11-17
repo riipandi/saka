@@ -33,11 +33,22 @@ const (
 
 // tokenPointer is the request_data of a pointer row: the row it resolves
 // to, plus the client the FK and the check constraint name.
+//
+// Retired marks a refresh pointer whose token a rotation has replaced. The
+// row stays as a tombstone: a retired token presented again is a replay —
+// the legitimate client holds the newer one — and the lookup that meets it
+// ends the whole grant.
 type tokenPointer struct {
 	GrantID   string `json:"grant_id"`
 	SessionID string `json:"session_id,omitempty"`
 	ClientID  string `json:"client_id,omitempty"`
+	Retired   bool   `json:"retired,omitempty"`
 }
+
+// retiredPointerRetention bounds how long a tombstone outlives its rotation.
+// A refresh window of zero is the never-expiring token, so without a bound
+// every rotation would leave a row that lives as long as the grant.
+const retiredPointerRetention = 30 * 24 * time.Hour
 
 // protocolStore is the pgx surface every protocol manager shares. The
 // query runs on the pool — protocol state is not part of any business
@@ -62,11 +73,11 @@ func (st protocolStore) save(ctx context.Context, kind, key, clientID string, ex
 		client = clientID
 	}
 	if _, err := st.pool.Exec(ctx,
-		`INSERT INTO public.oauth_sessions (kind, key, request_id, client_id, request_data, expires_at)
-		 VALUES ($1, $2, $1, $3, $4, $5)
+		`INSERT INTO public.oauth_sessions (kind, key, client_id, request_data, expires_at)
+		 VALUES ($1, $2, $3, $4, $5)
 		 ON CONFLICT (kind, key) DO UPDATE
 		 SET request_data = EXCLUDED.request_data, client_id = EXCLUDED.client_id,
-		     expires_at = EXCLUDED.expires_at, active = TRUE`,
+		     expires_at = EXCLUDED.expires_at`,
 		kind, key, client, data, expires); err != nil {
 		return fmt.Errorf("oidc: save %s: %w", kind, err)
 	}
@@ -106,7 +117,7 @@ func (st protocolStore) loadDocument(ctx context.Context, kind, key string) ([]b
 	var data []byte
 	err := st.pool.QueryRow(ctx,
 		`SELECT request_data FROM public.oauth_sessions
-		 WHERE kind = $1 AND key = $2 AND active
+		 WHERE kind = $1 AND key = $2
 		   AND (expires_at IS NULL OR expires_at > now() - make_interval(secs => $3))`,
 		kind, key, protocolSkewAllowanceSeconds).Scan(&data)
 	if err != nil {
@@ -185,19 +196,6 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 		return fmt.Errorf("oidc: marshal the grant: %w", marshalErr)
 	}
 
-	// A rotation retires the pointer the request loaded: the presented
-	// token's row goes away as the replacement lands, so the retired
-	// token redeems nothing and a replay finds not-found.
-	if rotations := refreshRotationsFrom(ctx); rotations != nil && grant.RefreshToken != "" {
-		for _, retired := range rotations.retired() {
-			if retired != hashToken(grant.RefreshToken) {
-				if err := s.delete(ctx, sessionKindRefresh, retired); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
 	// A request that armed the compare-and-swap and has already read
 	// this grant saves against the document it read: the write lands
 	// only while the row still holds it, which is what makes a one-time
@@ -225,6 +223,19 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 		}
 	} else if err := s.save(ctx, sessionKindGrant, grant.ID, grant.ClientID, grant.RefreshTokenExpiresAt, &stored); err != nil {
 		return err
+	}
+	// A rotation retires the pointer the request loaded, after the grant's
+	// own write has landed: a request that lost the compare-and-swap above
+	// has retired nothing. The retired token's row stays as a tombstone, so
+	// a replay of it is recognised rather than merely unknown.
+	if rotations := refreshRotationsFrom(ctx); rotations != nil && grant.RefreshToken != "" {
+		for _, retired := range rotations.retired() {
+			if retired != hashToken(grant.RefreshToken) {
+				if err := s.retireRefresh(ctx, retired, grant.ID, grant.ClientID); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	// The pointers track the tokens as they are issued; a consumed code
 	// loses its pointer, so a replay is a not-found rather than a row.
@@ -262,6 +273,43 @@ func (s grantStore) SaveGrant(ctx context.Context, grant *goidc.Grant) error {
 	return nil
 }
 
+// retireRefresh rewrites a refresh pointer into its tombstone and caps its
+// life at the retention bound.
+func (s grantStore) retireRefresh(ctx context.Context, hash, grantID, clientID string) error {
+	marker, err := json.Marshal(tokenPointer{GrantID: grantID, ClientID: clientID, Retired: true})
+	if err != nil {
+		return fmt.Errorf("oidc: retire the refresh token: %w", err)
+	}
+	if _, err := s.pool.Exec(ctx,
+		`UPDATE public.oauth_sessions
+		 SET request_data = $1,
+		     expires_at = LEAST(COALESCE(expires_at, now() + make_interval(secs => $3)), now() + make_interval(secs => $3))
+		 WHERE kind = $2 AND key = $4`,
+		marker, sessionKindRefresh, retiredPointerRetention.Seconds(), hash); err != nil {
+		return fmt.Errorf("oidc: retire the refresh token: %w", err)
+	}
+	return nil
+}
+
+// revokeChain ends one grant outright: the grant row and every code and
+// refresh pointer riding it, tombstones included.
+func (s grantStore) revokeChain(ctx context.Context, grantID string) error {
+	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM public.oauth_sessions
+			 WHERE kind IN ($1, $2) AND request_data ->> 'grant_id' = $3`,
+			sessionKindAuthCode, sessionKindRefresh, grantID); err != nil {
+			return fmt.Errorf("oidc: revoke the grant's tokens: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM public.oauth_sessions WHERE kind = $1 AND key = $2`,
+			sessionKindGrant, grantID); err != nil {
+			return fmt.Errorf("oidc: revoke the grant: %w", err)
+		}
+		return nil
+	})
+}
+
 func (s grantStore) Grant(ctx context.Context, id string) (*goidc.Grant, error) {
 	data, err := s.loadDocument(ctx, sessionKindGrant, id)
 	if err != nil {
@@ -283,6 +331,16 @@ func (s grantStore) grantByPointer(ctx context.Context, kind, presented string) 
 	pointer, err := s.loadPointer(ctx, kind, hashToken(presented))
 	if err != nil {
 		return nil, err
+	}
+	// A retired refresh token is a replay: the legitimate client already
+	// holds its replacement, so whoever presents this one holds a copy. The
+	// grant dies with it — the chain the copy could extend ends here — and
+	// the answer is the not-found every other dead token gets.
+	if pointer.Retired {
+		if revokeErr := s.revokeChain(ctx, pointer.GrantID); revokeErr != nil {
+			return nil, revokeErr
+		}
+		return nil, goidc.ErrNotFound
 	}
 	grant, err := s.Grant(ctx, pointer.GrantID)
 	if err != nil {

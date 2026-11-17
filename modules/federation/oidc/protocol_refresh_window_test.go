@@ -2,7 +2,6 @@ package oidc
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -58,16 +57,6 @@ func TestAZeroWindowIsTheNeverExpiringToken(t *testing.T) {
 	require.NoError(t, stampRefreshWindow(t.Context(), service, goidc.GrantAuthorizationCode, &grant))
 	assert.Zero(t, grant.RefreshTokenExpiresAt,
 		"zero hours is the historical never-expiring token, not an instant expiry")
-}
-
-func TestAnUnreadableWindowFailsOpenToNeverExpiring(t *testing.T) {
-	service := testService(t, migratedPool(t)).WithRefreshWindowSource(
-		staticWindows{err: errors.New("settings: unreadable")})
-	grant := goidc.Grant{ID: "g", Scopes: "openid", ClientID: "c", Subject: "s", CreatedAt: 1000}
-
-	require.NoError(t, stampRefreshWindow(t.Context(), service, goidc.GrantAuthorizationCode, &grant))
-	assert.Zero(t, grant.RefreshTokenExpiresAt,
-		"an unreadable setting is the never-expiring token, not a broken issuance")
 }
 
 func TestAnUnwiredWindowSourceKeepsTheHistoricalBehavior(t *testing.T) {
