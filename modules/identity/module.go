@@ -663,6 +663,12 @@ var Package = do.Package(
 		if profiles := do.MustInvoke[*user.Service](i); profiles != nil {
 			service = service.WithProfiles(profiles)
 		}
+		service = service.WithAccountAdopter(accountAdoption{
+			verification: do.MustInvoke[*verification.Service](i),
+			passwords:    do.MustInvoke[*password.Service](i),
+			factors:      do.MustInvoke[*multifactor.Service](i),
+			sessions:     do.MustInvoke[*session.Service](i),
+		})
 		if tokenPosts != nil {
 			service = service.WithTokenPoster(tokenPosts)
 		}

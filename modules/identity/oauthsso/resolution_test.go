@@ -515,3 +515,106 @@ func TestASeededBindingRidesPastTheEmailGates(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, answer.Session)
 }
+
+// stubAdopter records the adoption calls the resolution makes and lets a
+// test decide what the real seam would have answered.
+type stubAdopter struct {
+	pool    *datastore.Postgres
+	calls   int
+	adopted bool
+}
+
+func (a *stubAdopter) AdoptUnverified(ctx context.Context, tx datastore.Querier, userID uuid.UUID) (bool, error) {
+	a.calls++
+	if a.adopted {
+		if _, err := tx.Exec(ctx, `DELETE FROM public.user_passwords WHERE user_id = $1`, userID); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE public.users SET email_verified_at = now() WHERE id = $1`, userID); err != nil {
+			return false, err
+		}
+	}
+	return a.adopted, nil
+}
+
+func bindingCount(t *testing.T, pool *datastore.Postgres, userID uuid.UUID, providerAccount string) int {
+	t.Helper()
+	var count int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.oauth_accounts WHERE user_id = $1 AND provider_account_id = $2`,
+		userID, providerAccount).Scan(&count))
+	return count
+}
+
+func TestAnUnverifiedAccountIsAdoptedBeforeTheIdentityBinds(t *testing.T) {
+	pool := migratedPool(t)
+	adopter := &stubAdopter{pool: pool, adopted: true}
+	service := resolutionService(t, pool, func(s *Service) { s.WithAccountAdopter(adopter) })
+	_, flowToken := resolvedFlow(t, service, ExternalIdentity{
+		ProviderAccountID: "prov-adopt", Email: "victim@hogwarts.example", EmailVerified: true,
+	})
+
+	// The squatter registered the address and set a password; the code was
+	// never entered.
+	userID := seedAccount(t, pool, "victim@hogwarts.example", true)
+	mustExec(t, pool, `UPDATE public.users SET email_verified_at = NULL WHERE id = $1`, userID)
+
+	answer, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
+	require.NoError(t, err)
+	require.NotNil(t, answer.Session)
+
+	assert.Equal(t, 1, adopter.calls)
+	assert.Equal(t, 1, bindingCount(t, pool, userID, "prov-adopt"))
+	var passwords, adoptedRecords int
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.user_passwords WHERE user_id = $1`, userID).Scan(&passwords))
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.audit_logs WHERE event = 'oauthsso_account_adopted'`).Scan(&adoptedRecords))
+	assert.Zero(t, passwords, "the planted password is gone")
+	assert.Equal(t, 1, adoptedRecords, "the takeover is on the record")
+}
+
+func TestAVerifiedAccountIsLinkedWithoutAdoption(t *testing.T) {
+	pool := migratedPool(t)
+	adopter := &stubAdopter{pool: pool, adopted: true}
+	service := resolutionService(t, pool, func(s *Service) { s.WithAccountAdopter(adopter) })
+	_, flowToken := resolvedFlow(t, service, ExternalIdentity{
+		ProviderAccountID: "prov-plain", Email: "owner@hogwarts.example", EmailVerified: true,
+	})
+	userID := seedAccount(t, pool, "owner@hogwarts.example", true)
+
+	_, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
+	require.NoError(t, err)
+	assert.Zero(t, adopter.calls)
+	assert.Equal(t, 1, bindingCount(t, pool, userID, "prov-plain"))
+}
+
+func TestAnUnverifiedAccountIsNeverLinkedWithoutTheAdopter(t *testing.T) {
+	pool := migratedPool(t)
+	service := resolutionService(t, pool)
+	_, flowToken := resolvedFlow(t, service, ExternalIdentity{
+		ProviderAccountID: "prov-bare", Email: "squatted@hogwarts.example", EmailVerified: true,
+	})
+	userID := seedAccount(t, pool, "squatted@hogwarts.example", true)
+	mustExec(t, pool, `UPDATE public.users SET email_verified_at = NULL WHERE id = $1`, userID)
+
+	_, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
+	require.Error(t, err)
+	assert.Zero(t, bindingCount(t, pool, userID, "prov-bare"), "linking without the wipe is the vector")
+}
+
+func TestTheProvidersAddressLinksWhateverItsCase(t *testing.T) {
+	pool := migratedPool(t)
+	service := resolutionService(t, pool)
+	_, flowToken := resolvedFlow(t, service, ExternalIdentity{
+		ProviderAccountID: "prov-case", Email: "Minerva@Hogwarts.example", EmailVerified: true,
+	})
+	userID := seedAccount(t, pool, "minerva@hogwarts.example", true)
+
+	_, err := service.ContinueSignIn(t.Context(), ContinueParams{FlowToken: flowToken})
+	require.NoError(t, err)
+	assert.Equal(t, 1, bindingCount(t, pool, userID, "prov-case"), "one account, not a JIT twin")
+	var accounts int
+	require.NoError(t, pool.QueryRow(t.Context(), `SELECT count(*) FROM public.users`).Scan(&accounts))
+	assert.Equal(t, 1, accounts)
+}

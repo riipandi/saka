@@ -8,7 +8,11 @@
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     username CITEXT UNIQUE,
-    email TEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+    -- CITEXT makes the address's identity case-insensitive in the database
+    -- itself: the unique index, every lookup and every join agree that
+    -- Alice@x.com and alice@x.com are one account, whatever a caller forgot
+    -- to fold. The stored text keeps the case the holder typed.
+    email CITEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),

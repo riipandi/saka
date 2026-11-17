@@ -589,3 +589,15 @@ func (s *Service) revokeInTx(ctx context.Context, tx datastore.Querier, userID u
 	}
 	return s.sessions.RevokeAllForUser(ctx, tx, userID)
 }
+
+// DiscardCredentials removes the password and the pending resets an account
+// holds, inside the caller's transaction. It is the credential half of an
+// account's adoption by a verified identity: whoever set the password did not
+// prove the address, so neither the hash nor a reset in flight may outlive
+// the change of hands.
+func (s *Service) DiscardCredentials(ctx context.Context, tx datastore.Querier, userID uuid.UUID) error {
+	if err := s.repo.DeletePasswordHash(ctx, tx, userID); err != nil {
+		return err
+	}
+	return s.repo.DeleteResetTokensForUser(ctx, tx, userID)
+}

@@ -364,3 +364,12 @@ func TestMapRecoveryErrorCarriesTheConnectCodes(t *testing.T) {
 		assert.NotEqual(t, connect.CodeInternal, connect.CodeOf(mapped), "unexpected internal for %v", err)
 	}
 }
+
+func TestTheResetLookupFoldsTheAddressCase(t *testing.T) {
+	pool := migratedPool(t)
+	id := seedUser(t, pool, "minerva", "Minerva.McGonagall@Hogwarts.example")
+
+	account, err := NewRepository().FindUserByEmail(t.Context(), pool, "minerva.mcgonagall@hogwarts.example")
+	require.NoError(t, err)
+	require.Equal(t, id, account.ID.String())
+}

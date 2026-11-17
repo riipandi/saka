@@ -101,6 +101,7 @@ type Service struct {
 	// like the adapters do; a nil issuer refuses every continue.
 	issuer    signInIssuer
 	mfa       mfaGate
+	adopter   accountAdopter
 	settings  settingsReader
 	blocklist blocklistChecker
 	codes     CodeNotifier

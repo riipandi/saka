@@ -674,3 +674,12 @@ func TestTheLockoutAnswersTheCredentialError(t *testing.T) {
 	require.NotNil(t, row)
 	assert.Equal(t, restrictions.KindLockout, row.Kind)
 }
+
+func TestTheSignInIdentityFoldsTheAddressCase(t *testing.T) {
+	pool := migratedPool(t)
+	id := createAccount(t, pool, "minerva", "Minerva.McGonagall@Hogwarts.example", "Expecto-Patronum-9", nil)
+
+	account, err := NewRepository(pool).FindAccountByIdentity(t.Context(), "MINERVA.MCGONAGALL@HOGWARTS.EXAMPLE")
+	require.NoError(t, err)
+	require.Equal(t, id, account.ID)
+}

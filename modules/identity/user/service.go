@@ -574,55 +574,55 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	if err != nil {
 		return UserView{}, ErrUserNotFound
 	}
-	existing, err := s.repo.GetUser(ctx, s.pool, userID)
-	if errors.Is(err, datastore.ErrNoRows) {
-		return UserView{}, ErrUserNotFound
-	}
-	if err != nil {
-		return UserView{}, err
-	}
-
-	// The username is the gated field: absent keeps the current one, and a
-	// present value goes through the toggle, the pattern, and the column's
-	// unique index — in that order, so a refused change is a cheap refusal.
-	username := existing.Username
-	usernameChanged := false
-	if params.Username != "" && !strings.EqualFold(params.Username, existing.Username) {
-		if !s.gateOpen(ctx, SettingChangeUsernameEnabled, nil) {
-			return UserView{}, ErrUserNotFound
-		}
-		if !usernamePattern.MatchString(params.Username) {
-			return UserView{}, ErrUsernameInvalid
-		}
-		username = params.Username
-		usernameChanged = true
-	}
 
 	timezone, tzErr := normalizeTimezone(params.Timezone)
 	if tzErr != nil {
 		return UserView{}, tzErr
 	}
 
-	row := UserSchema{
-		ID:          userID,
-		Username:    username,
-		Email:       existing.Email,
-		FirstName:   params.FirstName,
-		LastName:    params.LastName,
-		DisplayName: params.DisplayName,
-		Metadata:    UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw(),
-		Disabled:    existing.Disabled,
-		// The immutable columns and the ban state ride through untouched:
-		// this update owns the profile, nothing else.
-		CreatedAt:       existing.CreatedAt,
-		BannedAt:        existing.BannedAt,
-		BanExpires:      existing.BanExpires,
-		BanReason:       existing.BanReason,
-		EmailVerifiedAt: existing.EmailVerifiedAt,
-	}
-
+	// The row is locked before it is read, and the write covers the profile
+	// columns only: an administrator's disable or the email-change
+	// confirmation that lands between the read and the write is a change
+	// this update must neither undo nor overwrite.
+	var row UserSchema
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
+		if lockErr := s.repo.LockUser(ctx, tx, userID); errors.Is(lockErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		} else if lockErr != nil {
+			return lockErr
+		}
+		existing, readErr := s.repo.GetUser(ctx, tx, userID)
+		if errors.Is(readErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		if readErr != nil {
+			return readErr
+		}
+
+		// The username is the gated field: absent keeps the current one, and a
+		// present value goes through the toggle, the pattern, and the column's
+		// unique index — in that order, so a refused change is a cheap refusal.
+		username := existing.Username
+		usernameChanged := false
+		if params.Username != "" && !strings.EqualFold(params.Username, existing.Username) {
+			if !s.gateOpen(ctx, SettingChangeUsernameEnabled, nil) {
+				return ErrUserNotFound
+			}
+			if !usernamePattern.MatchString(params.Username) {
+				return ErrUsernameInvalid
+			}
+			username = params.Username
+			usernameChanged = true
+		}
+
+		row = existing
+		row.Username = username
+		row.FirstName = params.FirstName
+		row.LastName = params.LastName
+		row.DisplayName = params.DisplayName
+		row.Metadata = UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw()
+
+		updated, updateErr := s.repo.UpdateProfile(ctx, tx, row)
 		if errUniqueViolation(updateErr) {
 			return ErrAccountExists
 		}
@@ -856,6 +856,14 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 	// when", so a re-ban does not move it — and an absent expiry lifts the
 	// ban as a unit, reason included.
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// The row lock serializes this replace with a profile edit or an
+		// email-change confirmation in flight: whichever commits second
+		// reads the other's result instead of overwriting it.
+		if lockErr := s.repo.LockUser(ctx, tx, userID); errors.Is(lockErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		} else if lockErr != nil {
+			return lockErr
+		}
 		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
 		if errUniqueViolation(updateErr) {
 			return ErrAccountExists

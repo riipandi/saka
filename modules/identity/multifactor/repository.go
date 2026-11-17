@@ -384,6 +384,19 @@ func (r *Repository) RegisterWrongAttempt(ctx context.Context, db datastore.Quer
 	return attempts >= max, nil
 }
 
+// DeletePendingForUser drops every sign-in bridge the account holds.
+func (r *Repository) DeletePendingForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbb.DeleteFrom(entity.TableMFAPending)
+	dbb.Where(dbb.Equal("user_id", userID))
+
+	query, args := dbb.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("multifactor: delete pending for user: %w", err)
+	}
+	return nil
+}
+
 // DeleteExpiredPending purges bridges past their life — the sweeper's delete.
 func (r *Repository) DeleteExpiredPending(ctx context.Context, db datastore.Querier, now time.Time) (int, error) {
 	dbb := sqlbuilder.PostgreSQL.NewDeleteBuilder()

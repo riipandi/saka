@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"uuid"
 
@@ -250,7 +251,7 @@ func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 			return ErrInvalidToken
 		}
 
-		if markErr := s.repo.MarkVerified(ctx, tx, token.UserID, s.now()); markErr != nil {
+		if _, markErr := s.repo.MarkVerified(ctx, tx, token.UserID, s.now()); markErr != nil {
 			return markErr
 		}
 		consumed, deleteErr := s.repo.DeleteToken(ctx, tx, token.ID, hash, PurposeEmailVerification)
@@ -411,7 +412,7 @@ func (s *Service) RequestEmailChange(ctx context.Context, userID uuid.UUID, newE
 	if !s.mail.Configured() {
 		return ErrMailUnavailable
 	}
-	if newEmail == account.Email {
+	if strings.EqualFold(newEmail, account.Email) {
 		return ErrSameEmail
 	}
 	taken := false
@@ -589,4 +590,14 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, rawToken string) error
 		s.changes.EnqueueSuccessNotice(ctx, confirmed)
 	}
 	return nil
+}
+
+// StampVerifiedByProvider marks an unverified address verified on the
+// strength of an identity provider's verified claim, inside the caller's
+// transaction, and answers whether this call is the one that moved it. The
+// conditional update is the answer's authority: an address that was already
+// verified — a code spent a moment ago — answers false, so the caller strips
+// nothing from an account whose holder has just proven it.
+func (s *Service) StampVerifiedByProvider(ctx context.Context, tx datastore.Querier, userID uuid.UUID) (bool, error) {
+	return s.repo.MarkVerified(ctx, tx, userID, s.now())
 }
