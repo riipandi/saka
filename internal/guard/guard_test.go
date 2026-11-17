@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
 	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -284,4 +285,30 @@ func TestStopImpersonatingRuleRequiresTheDelegation(t *testing.T) {
 	assert.ErrorIs(t, guard.StopImpersonating(machine, guard.Target{}), guard.ErrMachineCredential)
 
 	assert.ErrorIs(t, guard.StopImpersonating(nil, guard.Target{}), guard.ErrUnauthenticated)
+}
+
+// TestTheAccountTakeoverProceduresTakeASessionAndAProof pins the two
+// procedures an API key or a stolen access token could use to take an account
+// for good — moving its address (the confirmed address then owns the public
+// password reset) and deleting it: both need a session credential and the
+// holder's step-up proof.
+func TestTheAccountTakeoverProceduresTakeASessionAndAProof(t *testing.T) {
+	for _, procedure := range []string{
+		identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure,
+		identityv1connect.UserServiceDeleteMyAccountProcedure,
+	} {
+		rule := guard.RuleFor(procedure)
+		require.NotNil(t, rule, procedure)
+
+		session := caller("01a0", false)
+		session.Credential = jwtutils.CredentialSession
+		session.SessionID = "sess_01a0da1ccb4177900000000000"
+		assert.NoError(t, rule(session, guard.Target{}), procedure)
+
+		key := caller("01a0", false)
+		key.Credential = jwtutils.CredentialAPIKey
+		assert.Error(t, rule(key, guard.Target{}), "%s refuses a machine credential", procedure)
+
+		assert.True(t, guard.RequiresReauthentication(procedure), "%s needs the holder's proof", procedure)
+	}
 }

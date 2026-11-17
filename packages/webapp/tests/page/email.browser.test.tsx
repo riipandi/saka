@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf'
-import { createRouterTransport } from '@connectrpc/connect'
+import { createRouterTransport, type HandlerContext } from '@connectrpc/connect'
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { EmailView } from '#/routes/(app)/account/-email-view'
 import {
@@ -12,6 +12,7 @@ import {
   VerifyEmailResponseSchema
 } from '~/codegen/identity_pb'
 import { ListPublicResponseSchema, SettingsService } from '~/codegen/settings_pb'
+import { ReauthenticateResponseSchema, WebAuthnService } from '~/codegen/webauthn_pb'
 import { renderView, signedInAuth } from './view-harness'
 
 const PROFILE = {
@@ -40,9 +41,11 @@ function settingsWith(changeEmailEnabled: boolean) {
 
 async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled: boolean }) {
   const sendEmail = vi.fn(() => create(SendVerificationEmailResponseSchema, { status: 'success' }))
-  const requestEmailChange = vi.fn(() =>
-    create(RequestEmailChangeResponseSchema, { status: 'success', message: 'sent' })
-  )
+  const requestEmailChange = vi.fn((_request: unknown, context: HandlerContext) => {
+    proofs.push(context.requestHeader.get('x-saka-reauthentication'))
+    return create(RequestEmailChangeResponseSchema, { status: 'success', message: 'sent' })
+  })
+  const proofs: Array<string | null> = []
   const transport = createRouterTransport(({ service }) => {
     service(UserService, {
       getCurrentUser: () =>
@@ -55,6 +58,9 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
       verifyEmail: () => create(VerifyEmailResponseSchema, { status: 'success' }),
       requestEmailChange,
       confirmEmailChange: () => create(ConfirmEmailChangeResponseSchema, { status: 'success' })
+    })
+    service(WebAuthnService, {
+      reauthenticate: () => create(ReauthenticateResponseSchema, { token: 'proof_9' })
     })
     service(SettingsService, {
       listPublic: () => create(ListPublicResponseSchema, settingsWith(options.changeEmailEnabled))
@@ -72,7 +78,7 @@ async function renderEmail(options: { emailVerified: boolean; changeEmailEnabled
       }
     })
   })
-  return { screen, sendEmail, requestEmailChange }
+  return { screen, sendEmail, requestEmailChange, proofs }
 }
 
 describe('Email page (browser)', () => {
@@ -101,7 +107,7 @@ describe('Email page (browser)', () => {
   })
 
   it("gates the change flow by the deployment's toggle", async () => {
-    const { screen, requestEmailChange } = await renderEmail({
+    const { screen, requestEmailChange, proofs } = await renderEmail({
       emailVerified: true,
       changeEmailEnabled: true
     })
@@ -110,8 +116,21 @@ describe('Email page (browser)', () => {
 
     await input.fill('luna@hogwarts.edu')
     await screen.getByRole('button', { name: 'Request change' }).click()
+
+    // The request is step-up guarded: nothing is sent until the holder proves
+    // again, and the proof rides the one call.
+    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
+    expect(requestEmailChange).not.toHaveBeenCalled()
+    await screen.getByLabelText('Account password').fill('correct-horse-battery')
+    const confirm = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Confirm' })
+      .element()
+    if (!(confirm instanceof HTMLElement)) throw new Error('the confirm button is not an element')
+    confirm.click()
     await vi.waitFor(() => {
       expect(requestEmailChange).toHaveBeenCalled()
+      expect(proofs).toEqual(['proof_9'])
       expect(screen.baseElement.textContent).toContain('The confirm code was sent to')
     })
   })

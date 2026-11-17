@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf'
-import { createRouterTransport } from '@connectrpc/connect'
+import { createRouterTransport, type HandlerContext } from '@connectrpc/connect'
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { authStore, type AuthState } from '#/libraries/guard/auth-store'
 import { SettingsView as RouteComponent } from '#/routes/(app)/-settings-view'
@@ -9,6 +9,7 @@ import {
   UserService
 } from '~/codegen/identity_pb'
 import { ListPublicResponseSchema, SettingsService } from '~/codegen/settings_pb'
+import { ReauthenticateResponseSchema, WebAuthnService } from '~/codegen/webauthn_pb'
 import { renderView, signedInAuth, testQueryClient } from './view-harness'
 
 const PROFILE = {
@@ -39,11 +40,18 @@ async function renderSettings() {
     status: 'success',
     message: 'the account was updated'
   }))
+  const deleteProofs: Array<string | null> = []
   const transport = createRouterTransport(({ service }) => {
     service(UserService, {
       getCurrentUser: () => create(GetCurrentUserResponseSchema, { user: PROFILE }),
       updateCurrentUser,
-      deleteMyAccount: () => create(DeleteMyAccountResponseSchema, { status: 'success' })
+      deleteMyAccount: (_request: unknown, context: HandlerContext) => {
+        deleteProofs.push(context.requestHeader.get('x-saka-reauthentication'))
+        return create(DeleteMyAccountResponseSchema, { status: 'success' })
+      }
+    })
+    service(WebAuthnService, {
+      reauthenticate: () => create(ReauthenticateResponseSchema, { token: 'proof_9' })
     })
     service(SettingsService, {
       listPublic: () => create(ListPublicResponseSchema, SETTINGS)
@@ -68,7 +76,7 @@ async function renderSettings() {
     transport,
     auth: signedInAuth({ ...auth, loggedIn: true, logout })
   })
-  return { screen, updateCurrentUser, logout }
+  return { screen, updateCurrentUser, logout, deleteProofs }
 }
 
 describe('Settings (browser)', () => {
@@ -97,5 +105,32 @@ describe('Settings (browser)', () => {
   it("gates the danger zone by the deployment's public settings", async () => {
     const { screen } = await renderSettings()
     await expect.element(screen.getByRole('button', { name: 'Delete account' })).toBeVisible()
+  })
+
+  it('deletes the account only behind the reauthentication proof', async () => {
+    const { screen, logout, deleteProofs } = await renderSettings()
+    await screen.getByRole('button', { name: 'Delete account' }).click()
+    await screen.getByPlaceholder('hermione').fill('hermione')
+    const remove = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete account' })
+      .element()
+    if (!(remove instanceof HTMLElement)) throw new Error('the delete button is not an element')
+    remove.click()
+
+    await expect.element(screen.getByLabelText('Account password')).toBeVisible()
+    expect(deleteProofs).toEqual([])
+    await screen.getByLabelText('Account password').fill('correct-horse-battery')
+    const confirm = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Confirm' })
+      .element()
+    if (!(confirm instanceof HTMLElement)) throw new Error('the confirm button is not an element')
+    confirm.click()
+
+    await vi.waitFor(() => {
+      expect(deleteProofs).toEqual(['proof_9'])
+      expect(logout).toHaveBeenCalled()
+    })
   })
 })

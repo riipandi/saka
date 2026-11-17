@@ -1,9 +1,15 @@
 import { create } from '@bufbuild/protobuf'
-import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
+import { createClient } from '@connectrpc/connect'
+import {
+  createConnectQueryKey,
+  useMutation,
+  useQuery,
+  useTransport
+} from '@connectrpc/connect-query'
 import { ImagePlus, Power, RotateCcw } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
@@ -26,6 +32,9 @@ import { usePublicSettings } from '#/hooks/use-public-settings'
 import { fetcher } from '#/libraries/api-client'
 import { setAuthUser } from '#/libraries/guard/auth-store'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
+import { StepUpCancelled } from '#/libraries/reauth/reauth'
+import { useStepUp } from '#/libraries/reauth/use-step-up'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import { styles } from '#/styles/pages/settings.stylex'
 import {
@@ -121,14 +130,29 @@ export function SettingsView({ embedded = false }: { embedded?: boolean } = {}) 
     }
   })
 
-  const removeAccount = useMutation(UserService.method.deleteMyAccount, {
-    onSuccess: () => {
-      // The account is gone server-side; the pair is dropped client-side
-      // (a failing SignOut is tolerated by the engine) and the shell's
-      // eviction effect carries the browser to the sign-in page.
-      logout()
-    }
-  })
+  // The deletion is guarded by a step-up proof: the dialog opens first and
+  // the proof is spent on this one call.
+  const transport = useTransport()
+  const userRpc = useMemo(() => createClient(UserService, transport), [transport])
+  const stepUp = useStepUp()
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
+  const removeAccount = () => {
+    setRemoving(true)
+    setRemoveError(null)
+    stepUp
+      .run((options) => userRpc.deleteMyAccount(create(DeleteMyAccountRequestSchema), options))
+      // The account is gone server-side; the pair is dropped client-side (a
+      // failing SignOut is tolerated by the engine) and the shell's eviction
+      // effect carries the browser to the sign-in page.
+      .then(() => logout())
+      .catch((error) => {
+        if (error instanceof StepUpCancelled) return
+        setRemoveError(getErrorMessage(error))
+      })
+      .finally(() => setRemoving(false))
+  }
 
   const usernameEditable = settings.isOn(KEY_CHANGE_USERNAME)
   const selfDeleteEnabled = settings.isOn(KEY_SELF_DELETE)
@@ -413,15 +437,25 @@ export function SettingsView({ embedded = false }: { embedded?: boolean } = {}) 
                 </div>
                 <DeleteAccountDialog
                   username={user?.username ?? ''}
-                  onDelete={() => removeAccount.mutate(create(DeleteMyAccountRequestSchema))}
-                  pending={removeAccount.isPending}
-                  error={removeAccount.error ? getErrorMessage(removeAccount.error) : null}
+                  onDelete={removeAccount}
+                  pending={removing}
+                  error={removeError}
                 />
               </div>
+            ) : null}
+            {removeError ? (
+              <Text render={<p />} variant='body-2' color='critical'>
+                {removeError}
+              </Text>
             ) : null}
           </CardContent>
         </Card>
       </div>
+      <ReauthenticateDialog
+        open={stepUp.dialogOpen}
+        onProven={stepUp.onProven}
+        onDismissed={stepUp.onDismissed}
+      />
     </AccountFrame>
   )
 }

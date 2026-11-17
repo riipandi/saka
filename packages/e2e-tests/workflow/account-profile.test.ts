@@ -122,6 +122,11 @@ test.describe.serial('the account profile flow', () => {
       await expect(confirm).toBeEnabled()
       await confirm.click()
 
+      // The deletion is step-up guarded: the password proves the holder
+      // before the call is made.
+      await page.fill('#reauth-password', account.password)
+      await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+
       // The account is gone server-side; the browser is carried to login.
       await expect(page).toHaveURL(/\/login/, { timeout: 15_000 })
 

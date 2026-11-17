@@ -1,10 +1,15 @@
 import { create } from '@bufbuild/protobuf'
-import { Code, ConnectError } from '@connectrpc/connect'
-import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query'
+import { Code, ConnectError, createClient } from '@connectrpc/connect'
+import {
+  createConnectQueryKey,
+  useMutation,
+  useQuery,
+  useTransport
+} from '@connectrpc/connect-query'
 import { Mail, MailCheck } from '@keyline-icons/react'
 import * as stylex from '@stylexjs/stylex'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from 'uilibs/components/base/button'
 import { Field, FieldDescription, FieldLabel } from 'uilibs/components/base/field'
 import { Input } from 'uilibs/components/base/input'
@@ -25,6 +30,9 @@ import { useAuthUser } from '#/hooks/use-auth'
 import { usePublicSettings } from '#/hooks/use-public-settings'
 import { setAuthUser } from '#/libraries/guard/auth-store'
 import { getErrorMessage } from '#/libraries/guard/auth-utils'
+import { ReauthenticateDialog } from '#/libraries/reauth/-reauthenticate-dialog'
+import { StepUpCancelled } from '#/libraries/reauth/reauth'
+import { useStepUp } from '#/libraries/reauth/use-step-up'
 import { styles } from '#/styles/pages/email.stylex'
 import { pageStyles } from '#/styles/pages/page.stylex'
 import {
@@ -139,14 +147,31 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
     onError: (error) => setVerifyError(getErrorMessage(error))
   })
 
-  const requestChange = useMutation(EmailVerificationService.method.requestEmailChange, {
-    onSuccess: (_response, input) => {
-      setChangeError(null)
-      setPendingEmail(input.newEmail ?? '')
-      setConfirmCode('')
-    },
-    onError: (error) => setChangeError(getErrorMessage(error))
-  })
+  // The change request is guarded by a step-up proof: the dialog opens
+  // first and the proof is spent on this one call, so a stolen session or an
+  // API key cannot move the address the public reset answers to.
+  const transport = useTransport()
+  const emailRpc = useMemo(() => createClient(EmailVerificationService, transport), [transport])
+  const stepUp = useStepUp()
+  const [requesting, setRequesting] = useState(false)
+
+  const requestChange = (newEmail: string) => {
+    setRequesting(true)
+    stepUp
+      .run((options) =>
+        emailRpc.requestEmailChange(create(RequestEmailChangeRequestSchema, { newEmail }), options)
+      )
+      .then(() => {
+        setChangeError(null)
+        setPendingEmail(newEmail)
+        setConfirmCode('')
+      })
+      .catch((error) => {
+        if (error instanceof StepUpCancelled) return
+        setChangeError(getErrorMessage(error))
+      })
+      .finally(() => setRequesting(false))
+  }
 
   const confirmChange = useMutation(EmailVerificationService.method.confirmEmailChange, {
     onSuccess: () => {
@@ -294,9 +319,7 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
-                  requestChange.mutate(
-                    create(RequestEmailChangeRequestSchema, { newEmail: changeEmail.trim() })
-                  )
+                  requestChange(changeEmail.trim())
                 }}
               >
                 <div {...stylex.props(styles.addressRow)}>
@@ -308,7 +331,7 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
                       value={changeEmail}
                       placeholder='you@example.com'
                       autoComplete='email'
-                      disabled={!changeEnabled || requestChange.isPending}
+                      disabled={!changeEnabled || requesting}
                       onChange={(event) => setChangeEmail(event.target.value)}
                     />
                     {!changeEnabled ? (
@@ -320,11 +343,9 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
                   <Button
                     type='submit'
                     variant='outline'
-                    disabled={
-                      !changeEnabled || changeEmail.trim().length === 0 || requestChange.isPending
-                    }
+                    disabled={!changeEnabled || changeEmail.trim().length === 0 || requesting}
                   >
-                    {requestChange.isPending ? <Spinner /> : <Mail size={16} />}
+                    {requesting ? <Spinner /> : <Mail size={16} />}
                     Request change
                   </Button>
                 </div>
@@ -343,6 +364,12 @@ export function EmailView({ embedded = false }: { embedded?: boolean } = {}) {
           </CardContent>
         </Card>
       </div>
+
+      <ReauthenticateDialog
+        open={stepUp.dialogOpen}
+        onProven={stepUp.onProven}
+        onDismissed={stepUp.onDismissed}
+      />
     </AccountFrame>
   )
 }

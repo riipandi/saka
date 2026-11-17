@@ -165,8 +165,8 @@ sections also carry — the procedure is the same, only the folder differs.
 | DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
 | POST     | `/rpc/saka.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Saka-Reauthentication`; refused when a password already stands) |
 | POST     | `/rpc/saka.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
-| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
-| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
+| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (step-up proof; session only, no API key; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (step-up proof; session only, no API key; confirm code to the new address) |
 | POST     | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
