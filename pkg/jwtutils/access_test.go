@@ -42,7 +42,7 @@ func (k keySource) HMACKey(context.Context) (jwk.Key, error) {
 	return k.hmacKey()
 }
 
-func (k keySource) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
+func (k keySource) SigningAlgorithm(context.Context) (jwa.SignatureAlgorithm, error) {
 	return k.algorithm, nil
 }
 

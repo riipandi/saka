@@ -231,7 +231,7 @@ var Package = do.Package(
 		if err := service.Err(); err != nil {
 			return nil, fmt.Errorf("identity: jwks: %w", err)
 		}
-		if alg, err := service.SigningAlgorithm(); err == nil {
+		if alg, err := service.SigningAlgorithm(context.Background()); err == nil {
 			log.Info("jwks: signing algorithm resolved", "algorithm", alg.String(),
 				"source", resolvedAlgorithmSource(c))
 		} else if errors.Is(err, jwks.ErrNoSigningKey) || errors.Is(err, jwks.ErrNoStoredKeys) {

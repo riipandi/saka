@@ -32,7 +32,7 @@ func testVerifier(t *testing.T, subject string) (*jwtutils.AccessVerifier, strin
 	keys := jwks.NewService(cfg, nil, nil, nil)
 	key, err := keys.HMACKey(t.Context())
 	require.NoError(t, err)
-	algorithm, err := keys.SigningAlgorithm()
+	algorithm, err := keys.SigningAlgorithm(t.Context())
 	require.NoError(t, err)
 	signer, err := jwtutils.NewSigner[jwtutils.AccessClaims](key, algorithm)
 	require.NoError(t, err)

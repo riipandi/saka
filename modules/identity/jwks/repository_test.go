@@ -14,7 +14,7 @@ import (
 
 // migratedPool opens a fresh database with the migrations applied, so the
 // query runs against the real table rather than a hand-built one.
-func migratedPool(t *testing.T) *datastore.Postgres {
+func migratedPool(t testing.TB) *datastore.Postgres {
 	t.Helper()
 
 	return testutils.MigratedPostgres(t, "jwks_test")

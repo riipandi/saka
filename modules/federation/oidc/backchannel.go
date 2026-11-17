@@ -200,7 +200,7 @@ func LogoutTokenSignerFor(keys *jwks.Service, issuer string) LogoutTokenSigner {
 }
 
 func (s jwksLogoutTokenSigner) SignLogoutToken(ctx context.Context, audience, subject, sessionID string) (string, error) {
-	algorithm, err := s.keys.SigningAlgorithm()
+	algorithm, err := s.keys.SigningAlgorithm(ctx)
 	if err != nil {
 		return "", fmt.Errorf("oidc: logout token algorithm: %w", err)
 	}

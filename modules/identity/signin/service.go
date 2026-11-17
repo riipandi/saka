@@ -845,7 +845,7 @@ func (s *Service) SignAccessToken(ctx context.Context, account *Account, session
 // because a renewal signs the same claims for the same session, and the two
 // issuers must not drift apart.
 func (s *Service) SignSessionToken(ctx context.Context, subject string, claims jwtutils.AccessClaims, sessionID session.SessionID, now time.Time) (string, error) {
-	algorithm, err := s.keys.SigningAlgorithm()
+	algorithm, err := s.keys.SigningAlgorithm(ctx)
 	if err != nil {
 		return "", fmt.Errorf("signin: signing algorithm: %w", err)
 	}
