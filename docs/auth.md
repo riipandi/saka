@@ -85,8 +85,9 @@ user's account — the support tool. Its shape:
   together.
 - **Administrator reset** — an administrator can trigger the same reset
   for one account, which signs that account out everywhere.
-- **Lockout** — repeated failed sign-ins lock the account; an
-  administrator lifts the lock and clears the failed-attempt streak.
+- **Lockout** — repeated failed sign-ins lock the account, wrong password
+  and wrong second-factor code alike (ten by default); an administrator
+  lifts the lock and clears the failed-attempt streak.
 - **Ban** — a ban is a recorded restriction that ends the account's live
   sessions immediately; lifting it is equally explicit.
 - **Self-delete** — a user can delete their own account when the

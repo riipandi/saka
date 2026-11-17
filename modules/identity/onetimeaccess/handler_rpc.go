@@ -167,9 +167,6 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeUnavailable, "mailer is not configured")
 	case errors.Is(err, ErrQueueUnavailable):
 		return connect.NewError(connect.CodeUnavailable, "queue is not configured")
-	case errors.Is(err, ErrDeviceMismatch):
-		return connect.NewError(connect.CodeUnauthenticated,
-			"the device token does not match")
 	case errors.Is(err, ErrTokenInvalid):
 		return connect.NewError(connect.CodeUnauthenticated,
 			"the one-time access code is invalid or expired")

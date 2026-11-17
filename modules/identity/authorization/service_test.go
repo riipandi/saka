@@ -301,6 +301,41 @@ func TestSetUserRolesRevokesAndRevives(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRoleNotFound)
 }
 
+// TestSetUserRolesKeepsTheLastAdministrator pins the guard the delete paths
+// already had: a role replacement that drops the administrator role from the
+// only reachable administrator is refused, and the same replacement passes
+// once a second administrator stands.
+func TestSetUserRolesKeepsTheLastAdministrator(t *testing.T) {
+	pool := migratedPool(t)
+	seedCatalog(t, pool)
+	service := testService(t, pool)
+
+	last := seedAccount(t, pool, "langdon")
+	peer := seedAccount(t, pool, "neveu")
+	editor := seedRole(t, pool, "Editor", "editor")
+	var admin string
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT id FROM public.roles WHERE slug = 'administrator'`).Scan(&admin))
+	adminUUID, err := uuid.Parse(admin)
+	require.NoError(t, err)
+	adminWire := FormatID(adminUUID)
+
+	_, err = service.SetUserRoles(t.Context(), last, []string{adminWire}, "")
+	require.NoError(t, err)
+
+	_, err = service.SetUserRoles(t.Context(), last, []string{editor}, "")
+	assert.ErrorIs(t, err, user.ErrLastAdministrator, "the only administrator keeps the role")
+	roles, err := service.ListUserRoles(t.Context(), last)
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+	assert.Equal(t, "administrator", roles[0].Slug, "the refused replacement changed nothing")
+
+	_, err = service.SetUserRoles(t.Context(), peer, []string{adminWire}, "")
+	require.NoError(t, err)
+	_, err = service.SetUserRoles(t.Context(), last, []string{editor}, "")
+	require.NoError(t, err, "a second administrator stands")
+}
+
 func TestSetUserPermissionsReplacesTheDirectGrants(t *testing.T) {
 	pool := migratedPool(t)
 	seedCatalog(t, pool)

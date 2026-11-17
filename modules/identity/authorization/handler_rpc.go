@@ -13,6 +13,7 @@ import (
 	authzv1connect "github.com/riipandi/saka/codegen/proto/go/saka/authz/v1/authzv1connect"
 	commonv1 "github.com/riipandi/saka/codegen/proto/go/saka/common/v1"
 	"github.com/riipandi/saka/framework/webutil"
+	"github.com/riipandi/saka/modules/identity/user"
 	"github.com/riipandi/saka/pkg/jwtutils"
 )
 
@@ -398,6 +399,9 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeNotFound, "permission not found")
 	case errors.Is(err, ErrUserNotFound):
 		return connect.NewError(connect.CodeNotFound, "user not found")
+	case errors.Is(err, user.ErrLastAdministrator):
+		return connect.NewError(connect.CodeFailedPrecondition,
+			"the deployment's last administrator cannot be stripped of the role — grant it to another account first")
 	default:
 		return connect.NewError(connect.CodeInternal, "authorization operation failed")
 	}

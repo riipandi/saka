@@ -463,8 +463,34 @@ func (s *Service) SetUserRoles(ctx context.Context, id string, roleIDs []string,
 
 	var roles []RoleSchema
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// A replacement that drops the administrator role from the last
+		// reachable administrator is the same loss a delete is: the guard
+		// reads the standing before the write and the grants after it, under
+		// the lock every administrator-removing change takes.
+		if lockErr := user.LockAdministrators(ctx, tx); lockErr != nil {
+			return lockErr
+		}
+		wasAdmin, readErr := user.HoldsLiveAdministratorRole(ctx, tx, userID)
+		if readErr != nil {
+			return readErr
+		}
 		if setErr := s.replaceUserRoles(ctx, tx, userID, ids, granter, now); setErr != nil {
 			return setErr
+		}
+		if wasAdmin {
+			stillAdmin, stillErr := user.HoldsLiveAdministratorRole(ctx, tx, userID)
+			if stillErr != nil {
+				return stillErr
+			}
+			if !stillAdmin {
+				other, otherErr := user.HoldsOtherLiveAdministratorRole(ctx, tx, userID)
+				if otherErr != nil {
+					return otherErr
+				}
+				if !other {
+					return user.ErrLastAdministrator
+				}
+			}
 		}
 
 		read, readErr := s.repo.ListRolesOfUser(ctx, tx, userID)

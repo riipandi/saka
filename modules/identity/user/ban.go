@@ -79,6 +79,9 @@ func (s *Service) BanUser(ctx context.Context, id string, params BanParams) (Ban
 	var ended int
 	var banView UserView
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if guardErr := EnsureAnotherAdministrator(ctx, tx, userID); guardErr != nil {
+			return guardErr
+		}
 		if banErr := s.restrictions.ApplyBanAndLift(ctx, tx, userID, params.Reason, params.ExpiresAt, nil, s.now()); banErr != nil {
 			return banErr
 		}

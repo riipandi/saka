@@ -54,14 +54,10 @@ var (
 	// queue client is configured, so the message has nowhere to wait.
 	ErrQueueUnavailable = errors.New("onetimeaccess: queue is not configured")
 
-	// ErrTokenInvalid covers an unknown, expired, and spent code: answering
-	// differently would tell a caller which half was wrong.
+	// ErrTokenInvalid covers an unknown, expired, and spent code — and a code
+	// presented with the wrong device token: answering differently would tell
+	// a caller which half was wrong, and that the code exists.
 	ErrTokenInvalid = errors.New("onetimeaccess: the access code is invalid or expired")
-
-	// ErrDeviceMismatch is an exchange whose device token does not match the
-	// one the email request answered. The code stays spendable: the mistake
-	// is the caller's, not the code's.
-	ErrDeviceMismatch = errors.New("onetimeaccess: the device token does not match")
 
 	// ErrResendTooSoon is an administrative email request inside the cooldown
 	// the last issued code stamped. The public path never reports it — a
@@ -159,15 +155,18 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 // code's own shape — six characters of a 58-symbol alphabet, bound to the
 // device pair it was issued beside, spendable once, alive for the TTL, and
 // ended by a wrong-device budget — plus the anti-enumeration every
-// unauthenticated procedure here keeps.
+// unauthenticated procedure here keeps. A wrong device token answers the
+// refusal an unknown code does.
 //
 // The whole exchange is one transaction: the code's spend, the session it
 // opens, the last-login stamp, and the audit record commit together, so a
 // rollback returns the code — a holder whose sign-in failed halfway can try
 // again within the window, and a log never describes a session that did not
 // open. A device token the code was issued beside must come back exact; a
-// mismatch leaves the code spendable, because the caller's mistake is not the
-// code's spend.
+// mismatch leaves the code spendable until the budget of wrong guesses is
+// spent, and the strike is written on the pool, apart from the transaction
+// the refusal rolls back — a strike inside it would roll back with the
+// refusal and the budget would never fill.
 func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client fwaudit.ClientInfo) (signin.Result, error) {
 	hash := crypto.HashHexToken(crypto.NormalizeCode(rawCode))
 	var result signin.Result
@@ -188,16 +187,16 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			// code that keeps failing is one a third party is holding. The
 			// delete carries the hash this caller resolved, so a code a
 			// re-issue replaced is not swept by the stale read.
-			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, tx, row.ID, maxAttempts)
+			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, s.pool, row.ID, maxAttempts)
 			if budgetErr != nil {
 				return budgetErr
 			}
 			if !live {
-				if _, delErr := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess); delErr != nil {
+				if _, delErr := s.repo.DeleteToken(ctx, s.pool, row.ID, hash, PurposeOneTimeAccess); delErr != nil {
 					return delErr
 				}
 			}
-			return ErrDeviceMismatch
+			return ErrTokenInvalid
 		}
 
 		spent, err := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess)
@@ -228,6 +227,17 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 		// before its session opens. The bridge mints inside this
 		// transaction, so a rollback returns the code — a retry starts
 		// clean.
+		candidate := &signin.Account{
+			ID:              account.ID,
+			Username:        account.Username,
+			Email:           account.Email,
+			DisplayName:     account.DisplayName,
+			Disabled:        account.Disabled,
+			RestrictionKind: account.RestrictionKind,
+		}
+		if stateErr := s.signin.RefuseAccountState(ctx, candidate); stateErr != nil {
+			return stateErr
+		}
 		pending, owed, forkErr := s.signin.Challenge(ctx, account.ID, false)
 		if forkErr != nil {
 			return forkErr
@@ -241,14 +251,7 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			return nil
 		}
 
-		result, err = s.signin.IssueSession(ctx, tx, &signin.Account{
-			ID:              account.ID,
-			Username:        account.Username,
-			Email:           account.Email,
-			DisplayName:     account.DisplayName,
-			Disabled:        account.Disabled,
-			RestrictionKind: account.RestrictionKind,
-		}, signin.ProviderOneTimeAccess, audit.EventOneTimeAccessSignIn, signin.SessionParams{
+		result, err = s.signin.IssueSession(ctx, tx, candidate, signin.ProviderOneTimeAccess, audit.EventOneTimeAccessSignIn, signin.SessionParams{
 			UserAgent:   client.UserAgent,
 			IPAddress:   client.IPAddress,
 			Fingerprint: client.Fingerprint,

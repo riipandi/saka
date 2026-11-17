@@ -158,6 +158,15 @@ type cryptoCipher interface {
 type signinIssuer interface {
 	IssueSession(ctx context.Context, db datastore.Querier, account *signin.Account, provider, event string, params signin.SessionParams) (signin.Result, error)
 	FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*signin.Account, error)
+	// RefuseAccountState is the standing check every path into a session
+	// asks, here before a guess is judged: a locked account answers its
+	// refusal without telling a right code from a wrong one.
+	RefuseAccountState(ctx context.Context, account *signin.Account) error
+	// RegisterFactorFailure counts a wrong code against the failed-credential
+	// streak, the ledger a wrong password feeds.
+	RegisterFactorFailure(ctx context.Context, account *signin.Account)
+	// ResetFailureStreak ends the streak when the sign-in completes.
+	ResetFailureStreak(ctx context.Context, db datastore.Querier, userID uuid.UUID) error
 }
 
 // NewService builds the service. A nil cipher fails every sealing on use —

@@ -21,7 +21,7 @@ const (
 	SettingLockoutMax      = "lockout.max_attempts"
 	SettingLockoutDuration = "lockout.duration"
 	settingMaxFloor        = 5
-	defaultLockoutMax      = 100
+	defaultLockoutMax      = 10
 	defaultLockoutDuration = time.Hour
 	defaultLockoutEnabled  = true
 )
@@ -166,12 +166,15 @@ func (s *Service) policyOf(ctx context.Context) policy {
 	return p
 }
 
-// RegisterFailure advances the account's failed-password streak and lands
-// the lockout when the streak reaches the policy's bound. It runs on the
-// caller's transaction — the same one that judged the credential — so the
-// count, the lockout row, and the audit record commit with the facts that
-// caused them. A streak under the bound changes nothing but the count; the
-// answer says whether the lockout landed.
+// RegisterFailure advances the account's failed-credential streak — a wrong
+// password or a wrong second factor, one ledger — and lands the lockout when
+// the streak reaches the policy's bound. The count, the lockout row and the
+// audit record commit in one transaction. A streak under the bound changes
+// nothing but the count; past the bound the insert is a no-op while a
+// lockout stands, so the record and the notice are written only by the
+// failure that landed the row. An expired lockout is lifted first, so its
+// streak starts fresh and a new lockout can land. The answer says whether
+// this call landed the lockout.
 //
 // The policy off, nothing is counted — the deployment refused the feature,
 // not the attempt.
@@ -183,6 +186,13 @@ func (s *Service) RegisterFailure(ctx context.Context, userID uuid.UUID, email, 
 
 	var locked bool
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		if lifted, liftErr := s.repo.ExpireLifted(ctx, tx, userID, s.now()); liftErr != nil {
+			return liftErr
+		} else if lifted {
+			if zeroErr := s.repo.ZeroFailures(ctx, tx, userID); zeroErr != nil {
+				return zeroErr
+			}
+		}
 		attempts, err := s.repo.BumpFailures(ctx, tx, userID)
 		if errors.Is(err, datastore.ErrNoRows) {
 			return ErrUnknownAccount
@@ -199,8 +209,12 @@ func (s *Service) RegisterFailure(ctx context.Context, userID uuid.UUID, email, 
 			at := s.now().Add(p.duration)
 			expiresAt = &at
 		}
-		if err := s.repo.ApplyLockout(ctx, tx, userID, expiresAt, s.now()); err != nil {
+		landed, err := s.repo.ApplyLockout(ctx, tx, userID, expiresAt, s.now())
+		if err != nil {
 			return err
+		}
+		if !landed {
+			return nil
 		}
 		payload := map[string]string{"attempts": strconv.Itoa(attempts)}
 		if expiresAt != nil {

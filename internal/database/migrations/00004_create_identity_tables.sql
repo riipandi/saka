@@ -87,6 +87,14 @@ CREATE TABLE IF NOT EXISTS public.account_restrictions (
 CREATE INDEX IF NOT EXISTS idx_account_restrictions_user_active
     ON public.account_restrictions USING btree (user_id) WHERE lifted_at IS NULL;
 
+-- At most one open lockout per account. The failed-attempt policy inserts
+-- into this index with ON CONFLICT DO NOTHING, so every failure past the
+-- bound is a no-op instead of a second row, a second audit record and a
+-- second notice, and the first lockout's expiry is never pushed back by an
+-- attacker's further guesses.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_restrictions_open_lockout
+    ON public.account_restrictions USING btree (user_id) WHERE kind = 'lockout' AND lifted_at IS NULL;
+
 
 -- --------------------------------------------------------
 -- Table: public.user_passwords (junction table)

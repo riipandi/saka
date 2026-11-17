@@ -231,13 +231,10 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 		s.registerFailure(ctx, account, nil)
 		return Result{}, ErrInvalidCredentials
 	}
-	// The verification succeeded: the streak it belonged to is over — the
-	// counter is never a lifetime tally.
-	if s.restrictions != nil {
-		if resetErr := s.restrictions.ResetStreak(ctx, s.pool, account.ID); resetErr != nil {
-			return Result{}, resetErr
-		}
-	}
+	// The password verified, but the streak is not over: the sign-in is only
+	// complete when a session opens. A correct password in front of a second
+	// factor must not hand an attacker who holds it a fresh budget of code
+	// guesses, so the streak resets where the session opens.
 
 	// The verification gate runs before the second factor's fork: an
 	// account whose address no code has confirmed yet owes the code, not a
@@ -247,6 +244,14 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 	// below keeps its own path.
 	if account.EmailVerifiedAt == nil {
 		return Result{}, ErrEmailUnverified
+	}
+
+	// The account's standing is judged before the fork, not after it: a
+	// disabled, banned or locked account must not be shown the code prompt
+	// and refused at its completion — the difference would tell a holder of
+	// the password which of its accounts are banned.
+	if stateErr := s.RefuseAccountState(ctx, account); stateErr != nil {
+		return Result{}, stateErr
 	}
 
 	// The second factor's fork runs before any session is opened: an account
@@ -302,7 +307,10 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 			Fingerprint: params.Fingerprint,
 			Remember:    params.Remember,
 		})
-		return issueErr
+		if issueErr != nil {
+			return issueErr
+		}
+		return s.ResetFailureStreak(ctx, tx, account.ID)
 	})
 	if err != nil {
 		return Result{}, err
@@ -319,6 +327,46 @@ func (s *Service) SignIn(ctx context.Context, params Params) (Result, error) {
 		})
 	}
 	return result, nil
+}
+
+// RefuseAccountState answers the refusal the account's standing earns: a
+// switched-off account, a banned one, a locked one, and an address the
+// sign-in restriction names. The restriction the account's read answered
+// decides the shape: a ban keeps its own answer — the account-blind refusal
+// the correct credential earns — and a lockout answers the same generic
+// credential error a wrong password does, so the lockout never becomes the
+// oracle its trip would otherwise hand the attacker. Every path into a
+// session asks it, and the paths with a second factor ask it before the
+// challenge is minted.
+func (s *Service) RefuseAccountState(ctx context.Context, account *Account) error {
+	switch {
+	case account.Disabled:
+		return ErrAccountDisabled
+	case account.RestrictionKind == restrictions.KindBan:
+		return ErrAccountBanned
+	case account.RestrictionKind == restrictions.KindLockout:
+		return ErrInvalidCredentials
+	case s.signinRestricted(ctx, account.Email):
+		return ErrSigninRestricted
+	}
+	return nil
+}
+
+// RegisterFactorFailure counts a wrong second-factor answer against the same
+// streak a wrong password counts against: one ledger, one lockout. The
+// multifactor completion calls it; whatever the ledger does, the caller
+// earns the refusal it already got.
+func (s *Service) RegisterFactorFailure(ctx context.Context, account *Account) {
+	s.registerFailure(ctx, account, nil)
+}
+
+// ResetFailureStreak ends the account's failed-credential streak — the write
+// a completed sign-in makes, on the transaction that opened the session.
+func (s *Service) ResetFailureStreak(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	if s.restrictions == nil {
+		return nil
+	}
+	return s.restrictions.ResetStreak(ctx, db, userID)
 }
 
 // registerFailure advances the account's failed-password streak and lands
@@ -371,20 +419,8 @@ type SessionParams struct {
 // to requests anyone can send.
 func (s *Service) IssueSession(ctx context.Context, db datastore.Querier, account *Account, provider, event string, params SessionParams) (Result, error) {
 	now := s.now()
-	switch {
-	case account.Disabled:
-		return Result{}, ErrAccountDisabled
-	// The restriction the join answered decides the refusal's shape: a ban
-	// keeps its own answer — the account-blind refusal the correct
-	// credential earns — and a lockout answers the same generic credential
-	// error a wrong password does, so the lockout never becomes the
-	// oracle its trip would otherwise hand the attacker.
-	case account.RestrictionKind == restrictions.KindBan:
-		return Result{}, ErrAccountBanned
-	case account.RestrictionKind == restrictions.KindLockout:
-		return Result{}, ErrInvalidCredentials
-	case s.signinRestricted(ctx, account.Email):
-		return Result{}, ErrSigninRestricted
+	if stateErr := s.RefuseAccountState(ctx, account); stateErr != nil {
+		return Result{}, stateErr
 	}
 
 	refresh, err := NewRefreshToken()

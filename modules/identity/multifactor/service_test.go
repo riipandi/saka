@@ -74,6 +74,21 @@ func (c *testCipher) Decrypt(encoded string) (string, error) {
 type fakeIssuer struct {
 	opened []uuid.UUID
 	known  uuid.UUID
+	// failures counts the wrong second-factor answers the ledger was told
+	// about, resets the completed sign-ins, and refusal is the standing the
+	// account answers with.
+	failures int
+	resets   int
+	refusal  error
+}
+
+func (f *fakeIssuer) RefuseAccountState(context.Context, *signin.Account) error { return f.refusal }
+
+func (f *fakeIssuer) RegisterFactorFailure(context.Context, *signin.Account) { f.failures++ }
+
+func (f *fakeIssuer) ResetFailureStreak(context.Context, datastore.Querier, uuid.UUID) error {
+	f.resets++
+	return nil
 }
 
 func (f *fakeIssuer) IssueSession(_ context.Context, _ datastore.Querier, account *signin.Account, _, _ string, _ signin.SessionParams) (signin.Result, error) {
@@ -228,6 +243,57 @@ func TestCompleteSignInExhaustsTheBudgetAndRecoveryCodesStandIn(t *testing.T) {
 	require.NoError(t, err)
 	_, err = service.CompleteSignIn(ctx, thirdOutcome.PendingToken, confirmed.RecoveryCodes[0], nil, signin.SessionParams{})
 	assert.ErrorIs(t, err, ErrCodeInvalid)
+}
+
+// The account ledger: a wrong code counts against the account, not only the
+// bridge it was typed into, so fresh bridges — each costing one correct
+// password — never add up to unlimited guesses; the completed sign-in ends
+// the streak; and an account whose standing is refused is never asked a guess.
+func TestAWrongCodeCountsAgainstTheAccountAcrossBridges(t *testing.T) {
+	service, issuer, userID, currentCode := mfaTestService(t)
+	ctx := t.Context()
+
+	begun, err := service.BeginTotpEnrollment(ctx, userID, "Phone")
+	require.NoError(t, err)
+	_, err = service.ConfirmTotpEnrollment(ctx, userID, begun.TotpID, currentCode(begun.TotpID))
+	require.NoError(t, err)
+
+	for range 3 {
+		outcome, bridgeErr := service.BeginSignIn(ctx, userID, false)
+		require.NoError(t, bridgeErr)
+		_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", nil, signin.SessionParams{})
+		assert.ErrorIs(t, err, ErrCodeInvalid)
+	}
+	assert.Equal(t, 3, issuer.failures, "each wrong code reached the account's ledger")
+	assert.Zero(t, issuer.resets)
+
+	outcome, err := service.BeginSignIn(ctx, userID, false)
+	require.NoError(t, err)
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), nil, signin.SessionParams{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, issuer.resets, "the completed sign-in ended the streak")
+}
+
+func TestARefusedAccountIsNeverAskedAGuess(t *testing.T) {
+	service, issuer, userID, currentCode := mfaTestService(t)
+	ctx := t.Context()
+
+	begun, err := service.BeginTotpEnrollment(ctx, userID, "Phone")
+	require.NoError(t, err)
+	_, err = service.ConfirmTotpEnrollment(ctx, userID, begun.TotpID, currentCode(begun.TotpID))
+	require.NoError(t, err)
+	outcome, err := service.BeginSignIn(ctx, userID, false)
+	require.NoError(t, err)
+
+	// The standing changed after the bridge was minted: the right code and a
+	// wrong one answer alike, and neither is counted or spent.
+	issuer.refusal = signin.ErrInvalidCredentials
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, currentCode(begun.TotpID), nil, signin.SessionParams{})
+	assert.ErrorIs(t, err, signin.ErrInvalidCredentials)
+	_, err = service.CompleteSignIn(ctx, outcome.PendingToken, "000000", nil, signin.SessionParams{})
+	assert.ErrorIs(t, err, signin.ErrInvalidCredentials)
+	assert.Zero(t, issuer.failures)
+	assert.Empty(t, issuer.opened)
 }
 
 // The proofs: regenerate answers a fresh set once, the old codes are dead,

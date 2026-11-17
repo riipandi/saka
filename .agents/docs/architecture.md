@@ -447,9 +447,9 @@ answered for starts fresh.
 
 The writes are the feature's own: the failed-password streak lives on `users.failed_attempts` in
 place (the hot path's counter, one `UPDATE ... RETURNING`), and it is a **streak, never a tally** —
-a successful sign-in zeroes it, a lift zeroes it, an expiry's read zeroes it. The lockout lands
-when the streak reaches `lockout.max_attempts` (floor 5, default 100): the row, the `user_locked`
-audit, and the locked notice behind `mailer.notifications.user_locked_notice_enabled`. The policy
+a completed sign-in zeroes it, a lift zeroes it, an expiry's read zeroes it. The lockout lands
+when the streak reaches `lockout.max_attempts` (floor 5, default 10): the row, the `user_locked`
+audit, and the locked notice behind `mailer.notifications.user_locked_notice_enabled` — written only by the failure that landed the row (a partial unique index keeps one open lockout per account; later failures are a no-op and never push the window back). A wrong second-factor code feeds the same streak, and the streak resets where a session opens, not where the password verifies. The policy
 reads the settings catalog at call time; an unreadable key keeps its default. `Unlock` (the
 `UnlockUser` procedure, guard `Admin`) lifts the open lockout rows, zeroes the streak, and audits
 `user_unlocked`. A ban's write stays the user feature's (`BanUser`/`UnbanUser`/`UpdateUser`'s ban
