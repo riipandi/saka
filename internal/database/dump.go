@@ -103,21 +103,22 @@ type querier interface {
 }
 
 // eachRow runs a query and hands every row to scan. It closes the rows and
-// surfaces the iteration error, so a caller never has to.
-func eachRow(ctx context.Context, q querier, sql string, args []any, scan func(pgx.Rows) error) error {
+// surfaces the iteration error with the caller's cause, so a scan or an
+// iteration failure carries the operation's name.
+func eachRow(ctx context.Context, q querier, cause, sql string, args []any, scan func(pgx.Rows) error) error {
 	rows, err := q.Query(ctx, sql, args...)
 	if err != nil {
-		return fmt.Errorf("database: %w", err)
+		return fmt.Errorf("database: %s: %w", cause, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		if err := scan(rows); err != nil {
-			return fmt.Errorf("database: %w", err)
+			return fmt.Errorf("database: %s: %w", cause, err)
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("database: %w", err)
+		return fmt.Errorf("database: %s: %w", cause, err)
 	}
 	return nil
 }
@@ -132,7 +133,7 @@ type statementWriter struct {
 // write emits one statement or one section heading.
 func (s *statementWriter) write(line string) error {
 	if _, err := io.WriteString(s.w, line+"\n"); err != nil {
-		return err
+		return fmt.Errorf("database: write the dump: %w", err)
 	}
 	s.count++
 	return nil
@@ -140,8 +141,10 @@ func (s *statementWriter) write(line string) error {
 
 // comment emits a section heading. It is not counted as a statement.
 func (s *statementWriter) comment(title string) error {
-	_, err := fmt.Fprintf(s.w, "\n-- %s\n", title)
-	return err
+	if _, err := fmt.Fprintf(s.w, "\n-- %s\n", title); err != nil {
+		return fmt.Errorf("database: write the dump: %w", err)
+	}
+	return nil
 }
 
 // quotedColumns renders each name as a quoted SQL identifier.

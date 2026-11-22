@@ -107,12 +107,11 @@ func (s *Service) WithRefreshWindowSource(source RefreshWindowSource) *Service {
 
 // refreshWindowHours answers the window a grant's refresh token rides:
 // the long one when the grant carries offline_access, the standard one
-// otherwise. A read error fails open to zero — the never-expiring token,
-// the historical behavior — with the warning naming the miss; a refresh
-// window is a convenience window, not a security boundary.
-func (s *Service) refreshWindowHours(ctx context.Context, grant *goidc.Grant) int {
+// otherwise. A read error is returned: zero hours means "never expires", an
+// operator's choice, and a failed read must not make it for them.
+func (s *Service) refreshWindowHours(ctx context.Context, grant *goidc.Grant) (int, error) {
 	if s.refreshWindows == nil {
-		return 0
+		return 0, nil
 	}
 	scopes := strings.Fields(grant.Scopes)
 	read := s.refreshWindows.RefreshTokenHours
@@ -121,11 +120,9 @@ func (s *Service) refreshWindowHours(ctx context.Context, grant *goidc.Grant) in
 	}
 	hours, err := read(ctx)
 	if err != nil {
-		s.log.WarnContext(ctx, "oidc: the refresh window setting is unread; the token rides no expiry",
-			"error", err)
-		return 0
+		return 0, fmt.Errorf("oidc: read the refresh window setting: %w", err)
 	}
-	return hours
+	return hours, nil
 }
 
 // dispatchBackchannelLogout delivers the logout token for one ended
@@ -203,7 +200,7 @@ func LogoutTokenSignerFor(keys *jwks.Service, issuer string) LogoutTokenSigner {
 }
 
 func (s jwksLogoutTokenSigner) SignLogoutToken(ctx context.Context, audience, subject, sessionID string) (string, error) {
-	algorithm, err := s.keys.SigningAlgorithm()
+	algorithm, err := s.keys.SigningAlgorithm(ctx)
 	if err != nil {
 		return "", fmt.Errorf("oidc: logout token algorithm: %w", err)
 	}

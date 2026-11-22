@@ -153,6 +153,51 @@ func TestARestartedDispatcherFetchesAgain(t *testing.T) {
 	}
 }
 
+// TestARestartAfterACancelledContextJoinsThePreviousGeneration is the race
+// the audit reproduced: the start context is cancelled with no stop in
+// between, the fetcher clears the running flag as it leaves, and the next
+// start used to rebuild the channels and contexts under a triggerer and
+// workers that were still reading them. Under -race the old code reports it
+// on nearly every run; the join makes the restart wait for the generation it
+// replaces.
+func TestARestartAfterACancelledContextJoinsThePreviousGeneration(t *testing.T) {
+	client := newTestClient(t)
+
+	processed := make(chan string, 8)
+	client.Register(NewQueue[probeTask](func(_ context.Context, task probeTask) error {
+		processed <- task.Name
+		return nil
+	}))
+	t.Cleanup(func() {
+		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), 5*time.Second)
+		defer cancel()
+		client.Stop(stopCtx)
+	})
+
+	for range 5 {
+		startCtx, cancelStart := context.WithCancel(t.Context())
+		client.Start(startCtx)
+		save(t, client.Add(probeTask{Name: "generation"}))
+		select {
+		case <-processed:
+		case <-time.After(5 * time.Second):
+			require.Fail(t, "a restarted generation never fetched")
+		}
+		cancelStart()
+	}
+
+	startCtx, cancelStart := context.WithCancel(t.Context())
+	defer cancelStart()
+	client.Start(startCtx)
+	save(t, client.Add(probeTask{Name: "last"}))
+	select {
+	case name := <-processed:
+		assert.Equal(t, "last", name)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "the last generation never fetched")
+	}
+}
+
 // deadlineProbeTask outlives its own queue timeout, so the outcome it settles
 // runs while the context it executed under is already dead.
 type deadlineProbeTask struct {

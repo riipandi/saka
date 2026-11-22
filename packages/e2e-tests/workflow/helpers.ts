@@ -179,21 +179,21 @@ async function readMailbox(
 }
 
 /**
- * The 12-character code the message carries, read out of the plain text.
- * The code is the standalone alphanumeric line in the body; the prose's
- * long words ("verification") must not match, so the line anchors it.
+ * The code the message carries, read out of the plain text.
+ * The code is the standalone line in the body; the prose's words must not
+ * match, so the whole line anchors it.
  */
 export function codeFromMail(text: string): string | null {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => /^[A-Za-z0-9]{12,26}$/.test(line))
+    .filter((line) => /^[A-Z]{3}[0-9]{5}$/.test(line))
   const line = lines[lines.length - 1]
-  return line ? line.slice(0, 12) : null
+  return line ?? null
 }
 
 /**
- * Fill the twelve-slot code entry: the first slot takes the focus, the
+ * Fill the eight-slot code entry: the first slot takes the focus, the
  * keystrokes walk the rest. The slots are the only visible inputs of their
  * kind on the page.
  */
@@ -201,7 +201,7 @@ export async function typeCode(page: import('@playwright/test').Page, code: stri
   // Base UI renders a visible slot row and a hidden paste target beside it;
   // both answer the maxlength query, so the first — the focused slot — is
   // the one the keystrokes start from.
-  const firstSlot = page.locator('input[maxlength="12"]').first()
+  const firstSlot = page.locator('input[maxlength="8"]').first()
   await firstSlot.click()
   await page.keyboard.type(code, { delay: 20 })
 }

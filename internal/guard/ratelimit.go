@@ -32,8 +32,8 @@ const (
 )
 
 // RateAuthProcedures names the procedures counted under the credential
-// bucket. They are the surface a script drives: guessing a password, a
-// six-character code, or a TOTP, and provoking the mailer into a bomb. The
+// bucket. They are the surface a script drives: guessing a password, an
+// emailed or device code, or a TOTP, and provoking the mailer into a bomb. The
 // budget they share is rate_limit.auth_limit; the feature-level cooldowns and
 // single-use spend limits stand beside it, not instead of it.
 var RateAuthProcedures = map[string]struct{}{
@@ -79,6 +79,27 @@ var RateAuthProcedures = map[string]struct{}{
 	identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure: {},
 	authnv1connect.OneTimeAccessServiceRequestEmailAsAdminProcedure:       {},
 	authnv1connect.PasswordRecoveryServiceAdminResetUserPasswordProcedure: {},
+	// The device approval pair is session-guarded, but the user code it
+	// takes is about 29 bits: Inspect is the guess and Decide the spend, so
+	// a signed-in caller's drive against the code space is throttled like
+	// any other credential attempt.
+	authnv1connect.DeviceApprovalServiceInspectProcedure: {},
+	authnv1connect.DeviceApprovalServiceDecideProcedure:  {},
+}
+
+// RateCodeProcedures names the procedures that spend a typed code with no
+// account in the request — the code alone finds the row, so a wrong guess has
+// no row to charge and a per-token budget cannot exist. The per-address
+// credential budget does not stop a guesser spread across addresses; these
+// procedures also share one deployment-wide budget, rate_limit.code_global_limit,
+// so the total guess rate stays bounded whatever the attacker's address count.
+var RateCodeProcedures = map[string]struct{}{
+	identityv1connect.EmailVerificationServiceVerifyEmailProcedure:        {},
+	identityv1connect.EmailVerificationServiceConfirmEmailChangeProcedure: {},
+	authnv1connect.PasswordRecoveryServiceResetPasswordProcedure:          {},
+	authnv1connect.OneTimeAccessServiceExchangeTokenProcedure:             {},
+	authnv1connect.DeviceApprovalServiceInspectProcedure:                  {},
+	authnv1connect.DeviceApprovalServiceDecideProcedure:                   {},
 }
 
 // RateDefaultProcedures names the procedures counted under the default
@@ -125,6 +146,13 @@ var RateAuthRestPaths = map[string]struct{}{
 	"/oidc/revoke":               {},
 	"/oidc/par":                  {},
 	"/oidc/device_authorization": {},
+}
+
+// RateGlobalFor answers whether a procedure also spends the deployment-wide
+// code budget. The path takes the same forms RateBucketFor does.
+func RateGlobalFor(path string) bool {
+	_, ok := RateCodeProcedures[strings.TrimPrefix(path, rpcPathPrefix)]
+	return ok
 }
 
 // RateBucketFor answers the bucket a procedure is counted under, or false

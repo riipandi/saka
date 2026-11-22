@@ -210,6 +210,39 @@ func TestValidateRefusesAnUnknownExpiredRevokedOrDisabledKey(t *testing.T) {
 	require.NotNil(t, row.LastUsed)
 }
 
+// TestTheLastUsedInstantMovesOncePerMinute pins the coarse touch: repeated
+// requests inside a minute leave the stored instant alone, and the first one
+// after it moves it.
+func TestTheLastUsedInstantMovesOncePerMinute(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service, now := clock(t, pool)
+	owner := seedAccount(t, pool, "hermione")
+	key := createdExpiring(t, service, owner, "busy-key", 90*24*time.Hour)
+
+	lastUsed := func() time.Time {
+		row, err := service.repo.GetKey(t.Context(), pool, key.Key.ID)
+		require.NoError(t, err)
+		require.NotNil(t, row.LastUsed)
+		return *row.LastUsed
+	}
+
+	_, err := service.Validate(t.Context(), key.Raw)
+	require.NoError(t, err)
+	first := lastUsed()
+
+	jump(t, now, 30*time.Second)
+	_, err = service.Validate(t.Context(), key.Raw)
+	require.NoError(t, err)
+	assert.True(t, lastUsed().Equal(first), "a second request inside the minute writes nothing")
+
+	jump(t, now, 31*time.Second)
+	_, err = service.Validate(t.Context(), key.Raw)
+	require.NoError(t, err)
+	assert.True(t, lastUsed().After(first), "a request a minute later moves the instant")
+}
+
 func TestRenewReplacesAnExpiredKeyAndRefusesALiveOne(t *testing.T) {
 	conttest.SkipWithoutDocker(t)
 

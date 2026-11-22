@@ -5,10 +5,13 @@ package multifactor
 // bridge a password success writes between the first factor and the full
 // session.
 //
-// The secret's sealing uses the same AES-256-GCM cipher the configuration's
-// secret key backs — the one cipher the codebase has, per the crypto
-// package's contract. A secret leaves the server exactly once, in the
-// enrollment's answer; every later read answers metadata only.
+// The secret's sealing uses the auth cipher — the AES-256-GCM key derived
+// from AUTH_SECRET_KEY, not the application secret — so a manual edit of
+// that variable invalidates every enrollment; the supported rotation is
+// `key:rotate`, whose pass re-seals these rows (and the JWKS documents,
+// sealed under the same cipher) under the new secret. A secret leaves the
+// server exactly once, in the enrollment's answer; every later read
+// answers metadata only.
 
 import (
 	"context"
@@ -155,6 +158,15 @@ type cryptoCipher interface {
 type signinIssuer interface {
 	IssueSession(ctx context.Context, db datastore.Querier, account *signin.Account, provider, event string, params signin.SessionParams) (signin.Result, error)
 	FindAccountByIDAny(ctx context.Context, id uuid.UUID) (*signin.Account, error)
+	// RefuseAccountState is the standing check every path into a session
+	// asks, here before a guess is judged: a locked account answers its
+	// refusal without telling a right code from a wrong one.
+	RefuseAccountState(ctx context.Context, account *signin.Account) error
+	// RegisterFactorFailure counts a wrong code against the failed-credential
+	// streak, the ledger a wrong password feeds.
+	RegisterFactorFailure(ctx context.Context, account *signin.Account)
+	// ResetFailureStreak ends the streak when the sign-in completes.
+	ResetFailureStreak(ctx context.Context, db datastore.Querier, userID uuid.UUID) error
 }
 
 // NewService builds the service. A nil cipher fails every sealing on use —

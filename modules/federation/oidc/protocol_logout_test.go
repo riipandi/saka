@@ -58,7 +58,7 @@ func TestEndSessionKillsTheGrantsAndKeepsTheConsent(t *testing.T) {
 
 	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""))
 
-	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, err = grantStore{pool: pool}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
 
 	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
@@ -83,7 +83,7 @@ func TestEndSessionWithConsentRevocationDropsTheLedger(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, views, "the consent dies with the grants")
 
-	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, err = grantStore{pool: pool}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
 	assertEvents(t, pool, auditEventSessionEnded, 1)
 }
@@ -114,7 +114,7 @@ func TestTheLogoutPolicyRefusesAnAccessTokenHint(t *testing.T) {
 	require.Error(t, err)
 
 	// The refusal happens before anything is revoked.
-	_, loadErr := grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, loadErr := grantStore{pool: pool}.Grant(t.Context(), grant)
 	require.NoError(t, loadErr, "a refused hint revokes nothing")
 }
 
@@ -141,7 +141,7 @@ func TestTheLogoutPolicyRevokesTheHintedSubject(t *testing.T) {
 		require.NoError(t, logoutErr)
 	}
 
-	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, err = grantStore{pool: pool}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
 }
 

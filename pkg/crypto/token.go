@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Alphabet sets a feature draws its codes from. AlphabetAlphanumeric covers
@@ -19,6 +20,13 @@ import (
 const (
 	AlphabetAlphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	AlphabetUnambiguous  = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+)
+
+// Letter and digit sets of the emailed code. Both drop the glyphs a person
+// misreads (I/O, 0/1) because the code is typed from a phone.
+const (
+	codeLetters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+	codeDigits  = "23456789"
 )
 
 // hexTokenEntropy is the randomness of one hex token: 256 bits, so the hash
@@ -74,4 +82,26 @@ func RandomString(length int, alphabet string) (string, error) {
 		out[i] = alphabet[n.Int64()]
 	}
 	return string(out), nil
+}
+
+// RandomLetterDigitCode draws the code a message carries for a person to
+// type: three uppercase letters then five digits, such as KQM48215. About
+// 29 bits, so the guess budget is the rate limiter's, not the code's.
+func RandomLetterDigitCode() (string, error) {
+	letters, err := RandomString(3, codeLetters)
+	if err != nil {
+		return "", err
+	}
+	digits, err := RandomString(5, codeDigits)
+	if err != nil {
+		return "", err
+	}
+	return letters + digits, nil
+}
+
+// NormalizeCode folds a typed code to the form RandomLetterDigitCode mints:
+// case, surrounding space, and the hyphens or spaces a person adds while
+// copying do not change which code was meant. Hash this, not the raw input.
+func NormalizeCode(code string) string {
+	return strings.ToUpper(strings.NewReplacer("-", "", " ", "").Replace(strings.TrimSpace(code)))
 }

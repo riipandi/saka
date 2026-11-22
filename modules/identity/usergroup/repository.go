@@ -185,7 +185,7 @@ func (r *Repository) CreateGroup(ctx context.Context, db datastore.Querier, row 
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return GroupID{}, err
+		return GroupID{}, fmt.Errorf("usergroup: create the group: %w", err)
 	}
 	return row.ID, nil
 }

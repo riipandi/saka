@@ -145,6 +145,59 @@ func TestRateLimitLetsTheRequestThroughWhenTheBackendCannotAnswer(t *testing.T) 
 	assert.Empty(t, rec.Header().Get(RateLimitLimitHeader))
 }
 
+// TestAFailClosedClassRefusesWhenTheBackendCannotAnswer pins the credential
+// bucket's posture: an unjudged request is a 503 with a Retry-After and never
+// reaches the handler, while the default class beside it stays open.
+func TestAFailClosedClassRefusesWhenTheBackendCannotAnswer(t *testing.T) {
+	limiter := &stubLimiter{err: context.DeadlineExceeded}
+	classify := func(path string) (RateClass, bool) {
+		return RateClass{Name: "auth", Policy: testPolicy, FailClosed: path == "/closed"}, true
+	}
+	reached := 0
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classify,
+		Unavailable: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) }})(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { reached++ }))
+
+	closed := httptest.NewRecorder()
+	handler.ServeHTTP(closed, httptest.NewRequest(http.MethodPost, "/closed", nil))
+	assert.Equal(t, http.StatusServiceUnavailable, closed.Code)
+	assert.Equal(t, strconv.Itoa(RetryUnavailableSeconds), closed.Header().Get(RateLimitRetryHeader))
+	assert.Zero(t, reached, "an unjudged credential attempt never reaches the handler")
+
+	open := httptest.NewRecorder()
+	handler.ServeHTTP(open, httptest.NewRequest(http.MethodGet, "/open", nil))
+	assert.Equal(t, http.StatusOK, open.Code)
+	assert.Equal(t, 1, reached, "the default class passes when the limiter is down")
+}
+
+// TestAFailClosedClassRefusesWhenOnlyTheGlobalCheckFails covers the second
+// query of a code bucket: the per-address check answered, the shared budget
+// could not, and the request is refused all the same.
+func TestAFailClosedClassRefusesWhenOnlyTheGlobalCheckFails(t *testing.T) {
+	classify := func(string) (RateClass, bool) {
+		return RateClass{Name: "auth", Policy: testPolicy, Global: Policy{Limit: 300, Window: time.Minute}, FailClosed: true}, true
+	}
+	reached := false
+	limiter := &globalFailingLimiter{}
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classify})(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true }))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", nil))
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.False(t, reached)
+}
+
+// globalFailingLimiter answers the per-address key and fails the shared one.
+type globalFailingLimiter struct{}
+
+func (globalFailingLimiter) Allow(_ context.Context, key string, policy Policy) (Result, error) {
+	if strings.HasSuffix(key, ":global") {
+		return Result{}, context.DeadlineExceeded
+	}
+	return Result{Limit: policy.Limit, Remaining: policy.Limit}, nil
+}
+
 func TestRateLimitWithoutALimiterIsAPassThrough(t *testing.T) {
 	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: nil, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -237,4 +290,44 @@ func TestKVStoreLimiterExpiresTheWindow(t *testing.T) {
 	renewed, err := limiter.Allow(t.Context(), key, policy)
 	require.NoError(t, err)
 	assert.False(t, renewed.Limited, "a spent window starts again once it expires")
+}
+
+// keyLimiter limits only the keys it names, so a test can spend one budget
+// and leave the other open.
+type keyLimiter struct {
+	limited string
+	keys    []string
+}
+
+func (k *keyLimiter) Allow(_ context.Context, key string, policy Policy) (Result, error) {
+	k.keys = append(k.keys, key)
+	return Result{Limit: policy.Limit, Limited: strings.Contains(key, k.limited), RetryAfter: time.Second}, nil
+}
+
+func TestRateLimitRefusesWhenTheGlobalBudgetIsSpentFromAnyAddress(t *testing.T) {
+	classify := func(string) (RateClass, bool) {
+		return RateClass{Name: "auth", Policy: testPolicy, Global: Policy{Limit: 300, Window: time.Minute}}, true
+	}
+	limiter := &keyLimiter{limited: ":global"}
+	reached := false
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classify})(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) { reached = true }))
+
+	for _, addr := range []string{"192.0.2.1:1234", "198.51.100.7:1234"} {
+		req := httptest.NewRequest(http.MethodPost, "/rpc/x", nil)
+		req.RemoteAddr = addr
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusTooManyRequests, rec.Code, addr)
+	}
+	assert.False(t, reached, "a spent global budget stops the call whichever address sends it")
+	assert.Contains(t, limiter.keys, "auth:global")
+}
+
+func TestRateLimitWithoutAGlobalBudgetChecksOnlyTheAddress(t *testing.T) {
+	limiter := &keyLimiter{limited: "never"}
+	handler := RateLimit(RateLimitOptions{Surface: "rest", Limiter: limiter, Refuse: envelopeRefuse, Classify: classifyCounted})(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) {}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/x", nil))
+	assert.Len(t, limiter.keys, 1)
 }

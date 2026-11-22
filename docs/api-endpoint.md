@@ -2,7 +2,7 @@
 
 The surfaces the server answers, reconciled against the code on 2026-10-12. The grouping
 follows the Yaak collection (`wk_kBiMYTkhPP`) — sections mirror its folders; the agent-facing
-matrix with per-row status and test evidence is `.llms/endpoint-reference.md`; the code is the
+matrix with per-row status and test evidence is `.agents/docs/endpoint-reference.md`; the code is the
 only record of what is served.
 
 Every ConnectRPC procedure is called with `POST` under `/rpc`; the wire is snake_case JSON. REST
@@ -35,9 +35,9 @@ ride Authentication.
 
 ## One-Time Access
 
-A one-time access code signs an account in without its password. Codes are drawn from an
-alphabet without ambiguous characters — six characters for a code that lives fifteen minutes or
-less, twelve above — and stored as SHA-256 hashes. The email paths are gated by
+A one-time access code signs an account in without its password. A code is three letters then
+five digits, such as `KQM48215`, drawn without the characters that are easy to confuse, and stored as
+SHA-256 hashes. Case and spaces do not matter when it is typed. The email paths are gated by
 `auth.one_time_access_email_as_admin_enabled` and
 `auth.one_time_access_email_as_unauthenticated_enabled`, both off by default. The
 holder's exchange and the unauthenticated email request live under User Account
@@ -165,8 +165,8 @@ sections also carry — the procedure is the same, only the folder differs.
 | DELETE   | `/api/users/me/profile-picture`                                              | HTTP/REST    | Reset own profile picture                       |
 | POST     | `/rpc/saka.identity.v1.UserService/AddPassword`                             | ConnectRPC   | Set the account's first password (step-up proof via `X-Saka-Reauthentication`; refused when a password already stands) |
 | POST     | `/rpc/saka.identity.v1.UserService/RemovePassword`                          | ConnectRPC   | Remove the account's password (step-up proof; refused when the account holds no other live credential — passkey or linked provider) |
-| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
-| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (confirm code to the new address) |
+| POST     | `/rpc/saka.identity.v1.UserService/DeleteMyAccount`                         | ConnectRPC   | Delete the signed-in account (step-up proof; session only, no API key; gated by `users.self_delete_enabled` + per-account override; soft-deleted into `deleted_records`) |
+| POST     | `/rpc/saka.identity.v1.EmailVerificationService/RequestEmailChange`         | ConnectRPC   | Request email change (step-up proof; session only, no API key; confirm code to the new address) |
 | POST     | `/rpc/saka.identity.v1.EmailVerificationService/ConfirmEmailChange`         | ConnectRPC   | Confirm email change (token is the credential)   |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/BeginRegistration`                     | ConnectRPC   | Open a credential-registration ceremony (session) |
 | POST     | `/rpc/saka.authn.v1.WebAuthnService/VerifyRegistration`                    | ConnectRPC   | Verify the attestation and store the credential |
@@ -372,8 +372,9 @@ times at a thirty-second backoff; a redirect, a 4xx other than 408/429, a disabl
 a host the destination policy refuses fails the delivery on its first answer. Deliveries never
 follow a redirect, so the signature headers never reach a redirect target. By default a
 destination whose host resolves to a loopback, private, or link-local address is refused — the
-SSRF guard; `webhook.allow_private_network` lifts it for deployments whose receivers live beside
-the server. The attempt rows carry redacted response metadata only, attempt rows age out at
+SSRF guard, enforced when the connection is made so a name that resolves differently cannot slip
+through; `fetcher.allow_private_network` lifts it, for every outbound integration, in deployments
+whose receivers live beside the server. The attempt rows carry redacted response metadata only, attempt rows age out at
 seven days and terminal deliveries at thirty, and the signing secret is sealed at rest and shown
 exactly once.
 
@@ -394,7 +395,7 @@ exactly once.
 
 The passkey-less pairing sign-in: a browser that cannot sign itself in creates a request, another
 browser approves it, and the creating browser's long poll answers. The user code is
-`XXXX-XXXX` over an alphabet without ambiguous characters; the code and the pairing secret live
+three letters then five digits (`KQM48215`), without the characters that are easy to confuse; the code and the pairing secret live
 only as SHA-256 hashes; decisions are single-use.
 
 | Method   | Service / Endpoint                                            | Protocol     | Summary                                    |
@@ -467,7 +468,7 @@ a release build.
 ## Planned (not implemented)
 
 The scaffolds below exist as empty packages waiting for their phase; **no proto, no routes** —
-every row is uncallable. The designed surfaces live in `.llms/endpoint-reference.md`.
+every row is uncallable. The designed surfaces live in `.agents/docs/endpoint-reference.md`.
 
 | Feature | Scaffold | Surfaces planned |
 | ------- | -------- | ---------------- |

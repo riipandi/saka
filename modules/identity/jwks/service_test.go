@@ -67,7 +67,7 @@ func TestBothStacksSignAndVerify(t *testing.T) {
 	// The asymmetric half, verified against the published set.
 	signKey, err := service.SignKey(ctx)
 	require.NoError(t, err)
-	asymmetricAlg, err := service.SigningAlgorithm()
+	asymmetricAlg, err := service.SigningAlgorithm(ctx)
 	require.NoError(t, err)
 	assert.False(t, asymmetricAlg.IsSymmetric())
 
@@ -157,7 +157,7 @@ func TestAConfiguredAlgorithmWinsOverTheDerivedOne(t *testing.T) {
 	service := NewService(cfg, nil, nil, nil)
 	require.NoError(t, service.Err())
 
-	alg, err := service.SigningAlgorithm()
+	alg, err := service.SigningAlgorithm(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, jwa.HS256(), alg, "the configured algorithm decides, not the key pair")
 }
@@ -182,7 +182,7 @@ func TestTheDerivedAlgorithmComesFromTheRow(t *testing.T) {
 	service := NewService(cfg, source, nil, nil)
 	require.NoError(t, service.Err())
 
-	alg, err := service.SigningAlgorithm()
+	alg, err := service.SigningAlgorithm(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, jwa.ES384(), alg, "the row's own alg is the answer")
 }
@@ -207,7 +207,7 @@ func TestSigningRefusesWhenNothingIsConfigured(t *testing.T) {
 	service := NewService(cfg, stubSource{}, nil, nil)
 	require.NoError(t, service.Err())
 
-	_, err := service.SigningAlgorithm()
+	_, err := service.SigningAlgorithm(t.Context())
 	assert.ErrorIs(t, err, ErrNoSigningKey)
 }
 
@@ -272,7 +272,7 @@ func TestAnHMACKeySignsAHeaderTheVerifierMatches(t *testing.T) {
 }
 
 // testCipher builds the cipher the seal-and-unseal round trips share.
-func testCipher(t *testing.T) *crypto.Cipher {
+func testCipher(t testing.TB) *crypto.Cipher {
 	t.Helper()
 
 	cipher, err := crypto.NewCipherFromHex(strings.Repeat("ab", 32))

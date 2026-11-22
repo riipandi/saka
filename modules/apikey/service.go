@@ -282,6 +282,10 @@ func (s *Service) Revoke(ctx context.Context, owner, keyID uuid.UUID) error {
 	})
 }
 
+// lastUsedGranularity is how stale a key's last-used instant may be before a
+// request writes a new one.
+const lastUsedGranularity = time.Minute
+
 // Validate is the authwall's one read: the account a presented X-API-Key
 // value acts as. An unknown, expired, or revoked key answers the same
 // not-found, so the refusal does not disclose which half failed. The owner's
@@ -303,8 +307,13 @@ func (s *Service) Validate(ctx context.Context, presented string) (user.UserSche
 	}
 
 	// The touch is best-effort: the request is already authenticated, and a
-	// metric that loses its write is not a refusal.
-	s.repo.TouchLastUsed(ctx, s.pool, key.ID, now)
+	// metric that loses its write is not a refusal. It is also coarse: a
+	// busy key would otherwise serialize on its own row and bloat the table
+	// with one dead tuple per request, so the instant moves only when the
+	// stored one is a minute old.
+	if key.LastUsed == nil || now.Sub(*key.LastUsed) >= lastUsedGranularity {
+		s.repo.TouchLastUsed(ctx, s.pool, key.ID, now)
+	}
 
 	return owner, nil
 }

@@ -42,6 +42,14 @@ type Options struct {
 	// opening does not stop calls to another.
 	CircuitSuccessThreshold int
 	CircuitResetTimeout     time.Duration
+	// AllowPrivateNetwork lets a call reach loopback, private, link-local,
+	// carrier-grade-NAT and other non-public addresses. The zero value
+	// refuses them at dial time, after name resolution, for every call the
+	// client makes — an administrator-registered or provider-supplied URL is
+	// trusted with the public internet, not with the deployment's own network
+	// (a metadata service, the database, another container). Enable it for a
+	// deployment whose integrations genuinely live beside the server.
+	AllowPrivateNetwork bool
 	// MaxBodyBytes is how much of a response body is kept. The rest is
 	// refused, so an upstream cannot grow the process without a bound.
 	MaxBodyBytes int64

@@ -9,7 +9,7 @@ on:
   #     - ".vite-hooks/**"
   #     - ".github/workflows/release.yml"
   #     - ".goreleaser.yaml"
-  #     - ".llms/**"
+  #     - ".agents/docs/**"
   #     - ".vscode/**"
   #     - ".zed/**"
   #     - "container/**"
@@ -24,7 +24,7 @@ on:
       - ".vite-hooks/**"
       - ".github/workflows/release.yml"
       - ".goreleaser.yaml"
-      - ".llms/**"
+      - ".agents/docs/**"
       - ".vscode/**"
       - ".zed/**"
       - "container/**"
@@ -195,9 +195,22 @@ jobs:
         # render dies with "React.act is not a function" (seen on PR #7).
         # Vitest sets NODE_ENV=test itself.
 
+      # -p bounds the packages that start a container at once: unbounded, the
+      # container reaper's name conflict and the pool's ping timeout fail
+      # packages that pass alone.
       - name: Run unit tests (backend)
-        run: gotestsum --format testname ./...
+        run: gotestsum --format testname -- -p 2 ./...
         env:
+          NODE_ENV: production
+
+      # The race detector needs cgo, which the job turns off for the builds.
+      # Linux only: the macOS runner skips the container tests, and the
+      # detector's cost is worth paying once.
+      - name: Run unit tests (backend, race detector)
+        if: runner.os == 'Linux'
+        run: gotestsum --format testname -- -race -p 2 ./framework/... ./internal/... ./modules/... ./pkg/...
+        env:
+          CGO_ENABLED: 1
           NODE_ENV: production
 
       - name: Run unit tests (backend, debug tags)

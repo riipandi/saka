@@ -169,7 +169,7 @@ func TestVerifyEmailConsumesTheToken(t *testing.T) {
 	service := testService(t, pool, true)
 	userID := seedUser(t, pool, "hermione", "hermione@example.com", false)
 
-	raw := "verification-token-value"
+	raw := "VRF90382"
 	seedToken(t, pool, userID, raw, time.Now().Add(tokenTTL))
 
 	require.NoError(t, service.VerifyEmail(t.Context(), raw))
@@ -288,9 +288,9 @@ func waitForCode(t *testing.T, mailpit *conttest.Mailpit) string {
 				continue
 			}
 			body := readMessageBody(t, mailpit, message.ID)
-			// The code sits alone in its own element — the only 12-character
-			// run the template renders as one node.
-			if match := regexp.MustCompile(`>[a-km-zA-KM-NP-Z2-9]{12}<`).FindString(body); match != "" {
+			// The code sits alone in its own element — the only run of this
+			// shape the template renders as one node.
+			if match := regexp.MustCompile(`>[A-HJ-NP-Z]{3}[2-9]{5}<`).FindString(body); match != "" {
 				return match[1 : len(match)-1]
 			}
 		}

@@ -193,6 +193,13 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 		// offline_access rides the long window, the rest the standard
 		// one, and zero is the never-expiring token.
 		provider.WithGrantHandler(func(ctx context.Context, grantType goidc.GrantType, grant *goidc.Grant) error {
+			// A refresh renews only for an account that still qualifies:
+			// the library runs this handler on every rotation, so it is
+			// where a ban, a disable, a delete or a group removal ends the
+			// renewable token the account's earlier standing minted.
+			if refused := refuseDisqualifiedAccount(ctx, service, grantType, grant); refused != nil {
+				return refused
+			}
 			return stampRefreshWindow(ctx, service, grantType, grant)
 		}),
 		// The client-credentials grant is the machine-to-machine surface:
@@ -271,7 +278,7 @@ func NewProtocol(pool *datastore.Postgres, service *Service, keys *jwks.Service,
 			provider.WithTokenRevocationEndpoint(protocolRevokeEndpoint)),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: build the provider: %w", err)
 	}
 	return &Protocol{provider: p, baseURL: baseURL}, nil
 }
@@ -289,12 +296,18 @@ func revocationPolicy() goidc.IsClientAllowedFunc {
 
 // stampRefreshWindow is the grant-handler body: the refresh window rides
 // the settings, read at every issuance and rotation, and the offline
-// scope picks the long window. Zero hours is the never-expiring token.
+// scope picks the long window. Zero hours is the never-expiring token an
+// operator chose; an unreadable setting is not that choice, so the grant
+// fails rather than mint a token that never expires.
 func stampRefreshWindow(ctx context.Context, service *Service, grantType goidc.GrantType, grant *goidc.Grant) error {
 	if grantType != goidc.GrantAuthorizationCode && grantType != goidc.GrantRefreshToken {
 		return nil
 	}
-	if hours := service.refreshWindowHours(ctx, grant); hours > 0 {
+	hours, err := service.refreshWindowHours(ctx, grant)
+	if err != nil {
+		return err
+	}
+	if hours > 0 {
 		grant.RefreshTokenExpiresAt = grant.CreatedAt + hours*3600
 	} else {
 		grant.RefreshTokenExpiresAt = 0
@@ -623,8 +636,16 @@ func idTokenClaims(service *Service) goidc.IDTokenClaimsFunc {
 }
 
 // userInfoClaims is the same map the userinfo endpoint answers with.
+//
+// An account that no longer qualifies for the client — disabled, banned,
+// deleted, or out of an allowed group — gets the subject and nothing else:
+// the access token it still holds is valid until it expires, but it reads no
+// profile.
 func userInfoClaims(service *Service) goidc.UserInfoClaimsFunc {
 	return func(ctx context.Context, grant *goidc.Grant) map[string]any {
+		if qualifies, err := service.accountQualifies(ctx, grant); err != nil || !qualifies {
+			return map[string]any{}
+		}
 		return subjectClaims(ctx, service, service.claims, grant)
 	}
 }

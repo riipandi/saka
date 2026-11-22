@@ -161,21 +161,21 @@ for (let i = 0; i < 20; i += 1) {
   const hit = (list.messages ?? []).find((m) => /verify/i.test(m.Subject))
   if (!hit) continue
   const detail = await (await fetch(`${mailpit}/api/v1/message/${hit.ID}`)).json()
-  // The code stands alone on its own line; a bare 12-char regex would grab
-  // any long word in the prose ("verification" included).
+  // The code stands alone on its own line; a bare letters-and-digits regex
+  // would grab any word in the prose.
   const line = String(detail.Text ?? '')
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => /^[A-Za-z0-9]{12,26}$/.test(l))
+    .filter((l) => /^[A-Z]{3}[0-9]{5}$/.test(l))
     .pop()
   if (line) {
-    code = line.slice(0, 12)
+    code = line
     break
   }
 }
 record(
-  'Mailpit carries the 12-char code',
-  code.length === 12,
+  'Mailpit carries the 8-char code',
+  code.length === 8,
   code ? `${code.slice(0, 4)}…` : '(none)'
 )
 const verified = await rpcJson('/rpc/saka.identity.v1.EmailVerificationService/VerifyEmail', null, {

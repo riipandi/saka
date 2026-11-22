@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	identityv1 "github.com/riipandi/saka/codegen/proto/go/saka/identity/v1"
+	"github.com/riipandi/saka/codegen/proto/go/saka/identity/v1/identityv1connect"
 	appauthz "github.com/riipandi/saka/internal/authz"
 	"github.com/riipandi/saka/internal/guard"
 	"github.com/riipandi/saka/pkg/jwtutils"
@@ -16,8 +17,8 @@ import (
 // with or without the delegation an impersonated session carries.
 func caller(userID string, admin bool) *jwtutils.Caller {
 	return &jwtutils.Caller{
-		UserID:       userID,
-		AccessClaims: jwtutils.AccessClaims{Username: "hermione", Roles: adminRoles(admin)},
+		UserID:   userID,
+		Username: "hermione", Roles: adminRoles(admin),
 	}
 }
 
@@ -34,13 +35,11 @@ func adminRoles(admin bool) []string {
 // the subject while naming the administrator behind it.
 func impersonator(subject string) *jwtutils.Caller {
 	return &jwtutils.Caller{
-		UserID: subject,
-		AccessClaims: jwtutils.AccessClaims{
-			Username:      "hermione",
-			Roles:         adminRoles(true),
-			ActorID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
-			ActorUsername: "admin",
-		},
+		UserID:        subject,
+		Username:      "hermione",
+		Roles:         adminRoles(true),
+		ActorID:       "01a0da1c-cb41-779d-bd02-99b3eb5da32a",
+		ActorUsername: "admin",
 	}
 }
 
@@ -262,34 +261,54 @@ func TestEveryDeclaredProcedureExistsInTheContract(t *testing.T) {
 // caller without a session is refused as unauthenticated.
 func TestStopImpersonatingRuleRequiresTheDelegation(t *testing.T) {
 	delegated := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-			ActorID:   "user_01a0da1ccb4177900000000001",
-		},
+		UserID:    "user_01a0da1ccb4177900000000000",
+		Username:  "sophie_neveu",
+		SessionID: "sess_01a0da1ccb4177900000000000",
+		ActorID:   "user_01a0da1ccb4177900000000001",
 	}
 	assert.NoError(t, guard.StopImpersonating(delegated, guard.Target{}))
 
 	plain := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-		},
+		UserID:    "user_01a0da1ccb4177900000000000",
+		Username:  "sophie_neveu",
+		SessionID: "sess_01a0da1ccb4177900000000000",
 	}
 	assert.ErrorIs(t, guard.StopImpersonating(plain, guard.Target{}), guard.ErrImpersonated)
 
 	machine := &jwtutils.Caller{
-		UserID: "user_01a0da1ccb4177900000000000",
-		AccessClaims: jwtutils.AccessClaims{
-			Username:  "sophie_neveu",
-			SessionID: "sess_01a0da1ccb4177900000000000",
-			ActorID:   "user_01a0da1ccb4177900000000001",
-		},
+		UserID:     "user_01a0da1ccb4177900000000000",
+		Username:   "sophie_neveu",
+		SessionID:  "sess_01a0da1ccb4177900000000000",
+		ActorID:    "user_01a0da1ccb4177900000000001",
 		Credential: jwtutils.CredentialAPIKey,
 	}
 	assert.ErrorIs(t, guard.StopImpersonating(machine, guard.Target{}), guard.ErrMachineCredential)
 
 	assert.ErrorIs(t, guard.StopImpersonating(nil, guard.Target{}), guard.ErrUnauthenticated)
+}
+
+// TestTheAccountTakeoverProceduresTakeASessionAndAProof pins the two
+// procedures an API key or a stolen access token could use to take an account
+// for good — moving its address (the confirmed address then owns the public
+// password reset) and deleting it: both need a session credential and the
+// holder's step-up proof.
+func TestTheAccountTakeoverProceduresTakeASessionAndAProof(t *testing.T) {
+	for _, procedure := range []string{
+		identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure,
+		identityv1connect.UserServiceDeleteMyAccountProcedure,
+	} {
+		rule := guard.RuleFor(procedure)
+		require.NotNil(t, rule, procedure)
+
+		session := caller("01a0", false)
+		session.Credential = jwtutils.CredentialSession
+		session.SessionID = "sess_01a0da1ccb4177900000000000"
+		assert.NoError(t, rule(session, guard.Target{}), procedure)
+
+		key := caller("01a0", false)
+		key.Credential = jwtutils.CredentialAPIKey
+		assert.Error(t, rule(key, guard.Target{}), "%s refuses a machine credential", procedure)
+
+		assert.True(t, guard.RequiresReauthentication(procedure), "%s needs the holder's proof", procedure)
+	}
 }

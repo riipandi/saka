@@ -137,19 +137,24 @@ func (r *Repository) LiftLockouts(ctx context.Context, db datastore.Querier, use
 }
 
 // ApplyLockout writes the automated restriction the failed-attempt policy
-// lands. The expiry is the policy duration's answer — NULL when the
-// deployment locked without an end.
-func (r *Repository) ApplyLockout(ctx context.Context, db datastore.Querier, userID uuid.UUID, expiresAt *time.Time, now time.Time) error {
+// lands, and answers whether a row landed. The expiry is the policy
+// duration's answer — NULL when the deployment locked without an end. The
+// partial unique index on the open lockout makes the insert a no-op while one
+// stands: the first lockout keeps its window, and only the failure that
+// created the row earns the audit record and the notice.
+func (r *Repository) ApplyLockout(ctx context.Context, db datastore.Querier, userID uuid.UUID, expiresAt *time.Time, now time.Time) (bool, error) {
 	ib := sqlbuilder.PostgreSQL.NewInsertBuilder()
 	ib.InsertInto(entity.TableAccountRestrictions)
 	ib.Cols("user_id", "kind", "reason", "started_at", "expires_at")
 	ib.Values(userID, KindLockout, nil, now, expiresAt)
+	ib.SQL("ON CONFLICT (user_id) WHERE kind = 'lockout' AND lifted_at IS NULL DO NOTHING")
 
 	query, args := ib.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("restrictions: apply lockout: %w", err)
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("restrictions: apply lockout: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // BumpFailures advances the account's failed-password streak in place and

@@ -22,8 +22,8 @@ import (
 func seedSession(t *testing.T, pool *datastore.Postgres, kind, key string, expiresAt any) {
 	t.Helper()
 	_, err := pool.Exec(t.Context(),
-		`INSERT INTO public.oauth_sessions (kind, key, request_id, request_data, expires_at)
-		 VALUES ($1, $2, $2, '{"probe":true}'::jsonb, $3)`,
+		`INSERT INTO public.oauth_sessions (kind, key, request_data, expires_at)
+		 VALUES ($1, $2, '{"probe":true}'::jsonb, $3)`,
 		kind, key, expiresAt)
 	require.NoError(t, err)
 }

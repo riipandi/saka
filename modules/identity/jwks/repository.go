@@ -26,7 +26,7 @@ func NewRepository(db datastore.Querier, cipher *crypto.Cipher) *Repository {
 	return &Repository{db: db, cipher: cipher}
 }
 
-// ActiveSigningKeys returns the keys that are currently valid for signature
+// ActiveSigningKeys returns, newest first, the keys that are currently valid for signature
 // verification: active, marked `sig`, and either without an expiry or with one
 // still in the future.
 //
@@ -49,7 +49,7 @@ func (r *Repository) ActiveSigningKeys(ctx context.Context) ([]StoredKey, error)
 			sb.GreaterThan("expires_at", time.Now()),
 		),
 	)
-	sb.OrderBy("key_id")
+	sb.OrderBy("created_at DESC", "key_id")
 	query, args := sb.Build()
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -91,7 +91,7 @@ func (r *Repository) ActiveSigningKeyPairs(ctx context.Context) ([]SigningKeyPai
 			sb.GreaterThan("expires_at", time.Now()),
 		),
 	)
-	sb.OrderBy("key_id")
+	sb.OrderBy("created_at DESC", "key_id")
 	query, args := sb.Build()
 
 	rows, err := r.db.Query(ctx, query, args...)

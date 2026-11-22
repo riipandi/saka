@@ -11,9 +11,9 @@ the machinery around them.
 | --- | --- | --- |
 | **Password** | Types an email or username and a password | Length and character-class rules; "remember me" picks the long session window |
 | **Passkey** | Unlocks with the device's fingerprint, face, or security key | The credential is a WebAuthn ceremony — the server never sees a secret, only a proof it can verify |
-| **One-time email code** | Types an email address, receives a short code | The code is single-use, stored only as a hash, and dies in minutes (six characters for short windows, twelve for longer ones) |
+| **One-time email code** | Types an email address, receives a short code | The code is eight characters (three letters, five digits), single-use, stored only as a hash, and dies in minutes |
 | **External provider** | Clicks the provider's button — one per connection the deployment enabled | See [OAuth SSO](oauth-sso.md) |
-| **Device pairing** | A device shows a code (`XXXX-XXXX`); another browser approves it | One decision per request; the code and the pairing secret live only as hashes |
+| **Device pairing** | A device shows a code (`KQM48215`); another browser approves it | One decision per request; the code and the pairing secret live only as hashes |
 
 Two flows pause mid-way and ask for more:
 
@@ -76,7 +76,7 @@ user's account — the support tool. Its shape:
 
 ## Recovery and lockouts
 
-- **Forgot password** — a reset request emails a twelve-character code,
+- **Forgot password** — a reset request emails an eight-character code,
   stored only as a hash, that the reset screen asks the user to type (an
   emailed code, never a link, and never the secret itself). Asking for an
   unknown address answers exactly the same as a known one: the response
@@ -85,8 +85,9 @@ user's account — the support tool. Its shape:
   together.
 - **Administrator reset** — an administrator can trigger the same reset
   for one account, which signs that account out everywhere.
-- **Lockout** — repeated failed sign-ins lock the account; an
-  administrator lifts the lock and clears the failed-attempt streak.
+- **Lockout** — repeated failed sign-ins lock the account, wrong password
+  and wrong second-factor code alike (ten by default); an administrator
+  lifts the lock and clears the failed-attempt streak.
 - **Ban** — a ban is a recorded restriction that ends the account's live
   sessions immediately; lifting it is equally explicit.
 - **Self-delete** — a user can delete their own account when the

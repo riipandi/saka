@@ -70,7 +70,7 @@ func TestRevokingAConsentKillsTheGrantsAndTheirTokens(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, views)
 
-	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, err = grantStore{pool: pool}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound)
 }
 
@@ -135,7 +135,7 @@ func TestEndSessionWithAnUnreadableSwitchRevokesTheGrantsOnly(t *testing.T) {
 	require.NoError(t, service.EndSession(t.Context(), userID.String(), issued.Client.ID, ""),
 		"an unreadable switch fails closed, it does not fail the logout")
 
-	_, err = grantStore{protocolStore: protocolStore{pool: pool}}.Grant(t.Context(), grant)
+	_, err = grantStore{pool: pool}.Grant(t.Context(), grant)
 	assert.ErrorIs(t, err, goidc.ErrNotFound, "the grants die as always")
 	views, err := service.MyAuthorizedClients(t.Context(), userID.String())
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestEndSessionWithAnUnreadableSwitchRevokesTheGrantsOnly(t *testing.T) {
 func seedGrant(t *testing.T, pool *datastore.Postgres, subject, clientID string) string {
 	t.Helper()
 
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	grant := &goidc.Grant{
 		ID:                    "grant-" + subject[:8] + "-revocation",
 		CreatedAt:             int(time.Now().Unix()),

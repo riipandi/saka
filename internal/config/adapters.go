@@ -33,6 +33,7 @@ func (c Config) FetcherOptions() fetcher.Options {
 		CircuitSuccessThreshold: c.Fetcher.CircuitSuccessThreshold,
 		CircuitResetTimeout:     c.Fetcher.CircuitResetTimeout,
 		MaxBodyBytes:            c.Fetcher.MaxBodyBytes,
+		AllowPrivateNetwork:     c.Fetcher.AllowPrivateNetwork,
 	}
 }
 

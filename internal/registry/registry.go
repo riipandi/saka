@@ -109,6 +109,9 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 		guard.RateAuth: {
 			Name:   guard.RateAuth,
 			Policy: fwmiddleware.Policy{Limit: c.RateLimit.AuthLimit, Window: c.RateLimit.Window},
+			// The credential and code budget is the brute-force surface: a
+			// limiter that cannot answer refuses rather than waves through.
+			FailClosed: true,
 		},
 		guard.RateDefault: {
 			Name:   guard.RateDefault,
@@ -121,6 +124,9 @@ func newRouter(i do.Injector, areas []Area) (chi.Router, error) {
 			return fwmiddleware.RateClass{}, false
 		}
 		class, ok := classes[bucket]
+		if ok && guard.RateGlobalFor(path) {
+			class.Global = fwmiddleware.Policy{Limit: c.RateLimit.CodeGlobalLimit, Window: c.RateLimit.Window}
+		}
 		return class, ok
 	}
 

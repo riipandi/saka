@@ -268,6 +268,38 @@ func TestCreateSealsTheTokenAndAnswersItOnce(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoProvider)
 }
 
+// TestAnEndpointChangeCarriesItsOwnToken pins the repoint defence: the stored
+// token follows its endpoint, so a new endpoint with no token is refused and
+// the sealed token never moves; the same endpoint keeps it, and a new endpoint
+// with a new token seals the new one.
+func TestAnEndpointChangeCarriesItsOwnToken(t *testing.T) {
+	pool := migratedPool(t)
+	clientID := "33333333-3333-5333-8333-333333333333"
+	seedClient(t, pool, clientID, false)
+	svc := testService(t, pool, newStubRemote(t))
+	created, err := svc.Create(t.Context(), clientID, "https://sp.example/scim/v2", "operator-secret")
+	require.NoError(t, err)
+	before, err := svc.repo.ByID(t.Context(), pool, created.ID)
+	require.NoError(t, err)
+
+	_, err = svc.Update(t.Context(), created.ID, "https://attacker.example/scim/v2", "")
+	require.ErrorIs(t, err, ErrTokenRequired)
+	after, err := svc.repo.ByID(t.Context(), pool, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "https://sp.example/scim/v2", after.Endpoint, "the refused change wrote nothing")
+	assert.Equal(t, before.SealedToken, after.SealedToken)
+
+	_, err = svc.Update(t.Context(), created.ID, "https://sp.example/scim/v2", "")
+	require.NoError(t, err, "the same endpoint keeps its token")
+
+	moved, err := svc.Update(t.Context(), created.ID, "https://sp2.example/scim/v2", "new-secret")
+	require.NoError(t, err)
+	assert.Equal(t, "https://sp2.example/scim/v2", moved.Endpoint)
+	row, err := svc.repo.ByID(t.Context(), pool, created.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, before.SealedToken, row.SealedToken, "the new endpoint holds the new token")
+}
+
 // TestSyncProvisionsTheVisibleAccountsAndGroups runs one pass against a
 // scripted remote with empty listings, so everything the snapshot holds is
 // created: two accounts and one group for an unrestricted client.

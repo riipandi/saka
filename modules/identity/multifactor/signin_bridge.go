@@ -3,6 +3,7 @@ package multifactor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -47,7 +48,7 @@ func (s *Service) beginBridge(ctx context.Context, userID uuid.UUID, remember bo
 
 	token, err := crypto.RandomHexToken(32)
 	if err != nil {
-		return SignInOutcome{}, err
+		return SignInOutcome{}, fmt.Errorf("multifactor: mint bridge token: %w", err)
 	}
 	hash := crypto.HashHexToken(token)
 
@@ -135,6 +136,12 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 	if err != nil {
 		return CompleteSignInResult{}, err
 	}
+	// A bridge minted before the account was locked, banned or disabled must
+	// not be a way to keep guessing: the standing is judged before the guess,
+	// so a refused account answers the same whatever code arrives.
+	if stateErr := s.issuer.RefuseAccountState(ctx, account); stateErr != nil {
+		return CompleteSignInResult{}, stateErr
+	}
 
 	var result CompleteSignInResult
 	var challengeErr error
@@ -170,13 +177,22 @@ func (s *Service) CompleteSignIn(ctx context.Context, pendingToken, code string,
 			Fingerprint: session.Fingerprint,
 			Remember:    pending.Remember,
 		})
-		return issueErr
+		if issueErr != nil {
+			return issueErr
+		}
+		// The sign-in is complete: the streak the password and the codes fed
+		// ends with the session that opened.
+		return s.issuer.ResetFailureStreak(ctx, tx, account.ID)
 	})
 	if err != nil {
 		if errors.Is(challengeErr, ErrCodeInvalid) {
-			// The wrong answer is the bridge's problem, not the session's:
-			// the budget rides the row, committed apart from the rolled-back
-			// proof, and the strike that fills it ends the bridge.
+			// A wrong answer counts against the account, not only the bridge:
+			// a fresh bridge costs one correct password, so a budget that
+			// lived on the bridge alone would never add up to a lockout.
+			s.issuer.RegisterFactorFailure(ctx, account)
+			// The wrong answer is also the bridge's problem, not the
+			// session's: the budget rides the row, committed apart from the
+			// rolled-back proof, and the strike that fills it ends the bridge.
 			last, budgetErr := s.repo.RegisterWrongAttempt(ctx, s.pool, pending.ID, maxAttempts)
 			if budgetErr != nil {
 				return CompleteSignInResult{}, budgetErr

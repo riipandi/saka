@@ -1305,6 +1305,53 @@ func TestDeleteUserRefusesABannedAdministrator(t *testing.T) {
 	assert.ErrorIs(t, err, ErrLastAdministrator)
 }
 
+// TestDisableAndBanKeepTheLastAdministrator pins the guard on the other
+// changes that remove an administrator's standing: the administrator replace
+// that disables the account, the replace that bans it, and the ban procedure
+// all refuse while it is the only reachable administrator, and pass once a
+// peer stands.
+func TestDisableAndBanKeepTheLastAdministrator(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	service := testService(t, pool)
+	ctx := t.Context()
+
+	last, err := service.CreateUser(ctx, CreateParams{
+		Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, last.ID)
+
+	replace := func(mutate func(*UpdateParams)) error {
+		params := UpdateParams{
+			Username: "langdon", Email: "langdon@inferno.falls", FirstName: "Robert", LastName: "Langdon",
+			DisplayName: "Robert Langdon",
+		}
+		mutate(&params)
+		_, updateErr := service.UpdateUser(ctx, last.ID, params)
+		return updateErr
+	}
+	future := time.Now().Add(time.Hour)
+
+	assert.ErrorIs(t, replace(func(p *UpdateParams) { p.Disabled = true }), ErrLastAdministrator)
+	assert.ErrorIs(t, replace(func(p *UpdateParams) { p.BanExpiresAt = &future }), ErrLastAdministrator)
+	_, err = service.BanUser(ctx, last.ID, BanParams{Reason: "the test"})
+	assert.ErrorIs(t, err, ErrLastAdministrator)
+
+	// An edit that neither disables nor bans is not the guard's business.
+	require.NoError(t, replace(func(p *UpdateParams) { p.DisplayName = "R. Langdon" }))
+
+	peer, err := service.CreateUser(ctx, CreateParams{
+		Username: "neveu", Email: "neveu@inferno.falls", FirstName: "Sophie", LastName: "Neveu",
+	})
+	require.NoError(t, err)
+	grantAdministratorRole(t, pool, peer.ID)
+
+	_, err = service.BanUser(ctx, last.ID, BanParams{Reason: "a peer stands"})
+	require.NoError(t, err)
+}
+
 func TestGetUserAnswersTheRoleSlugs(t *testing.T) {
 	conttest.SkipWithoutDocker(t)
 

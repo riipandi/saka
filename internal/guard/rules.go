@@ -74,10 +74,13 @@ var ProcedureRules = map[string]Entry{
 	identityv1connect.EmailVerificationServiceVerifyEmailProcedure: {Rule: Public},
 
 	// The email-change flow splits at the same line its sibling
-	// verification does: the request runs on the caller's own token, and
+	// verification does: the request runs on the caller's own session, and
 	// the confirmation is answered without one — the pending token is the
-	// credential it judges.
-	identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure: {Rule: Authenticated},
+	// credential it judges. The request is the first half of an account
+	// takeover (the confirmed address then owns the public password reset),
+	// so it takes a session — never an API key or another machine
+	// credential — and the step-up proof that names the holder.
+	identityv1connect.EmailVerificationServiceRequestEmailChangeProcedure: {Rule: Session, StepUp: true},
 	identityv1connect.EmailVerificationServiceConfirmEmailChangeProcedure: {Rule: Public},
 
 	// The one-time access codes. The exchange is the sign-in a caller makes
@@ -240,7 +243,9 @@ var ProcedureRules = map[string]Entry{
 	// another account is not the door to that account's own profile.
 	identityv1connect.UserServiceGetCurrentUserProcedure:    {Rule: Authenticated},
 	identityv1connect.UserServiceUpdateCurrentUserProcedure: {Rule: Authenticated},
-	identityv1connect.UserServiceDeleteMyAccountProcedure:   {Rule: Authenticated},
+	// Deleting the account is irreversible and ends every credential it
+	// holds: a session and the holder's proof, like the credential writes.
+	identityv1connect.UserServiceDeleteMyAccountProcedure: {Rule: Session, StepUp: true},
 	// The first credential is a sensitive write: the session names the
 	// account, the step-up proof names the holder — an email code when no
 	// password and no passkey stands, else the credential itself — and the

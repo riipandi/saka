@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"errors"
 	"sync"
 	"uuid"
 )
@@ -10,6 +11,16 @@ import (
 // the stream is a convenience, the inbox is the record — so a dropped
 // event costs a client-side catch-up through the list, not a message.
 const eventBuffer = 32
+
+// MaxStreamsPerAccount bounds the open streams one account may hold. Each
+// stream is a goroutine and a buffered channel the broker keeps for as long
+// as the connection lives; a signed-in account that opens streams in a loop
+// would otherwise grow both without limit. A browser holds one per tab, so
+// the bound is generous for a person and hard for a script.
+const MaxStreamsPerAccount = 5
+
+// ErrTooManyStreams is a subscribe past the per-account bound.
+var ErrTooManyStreams = errors.New("notification: too many open streams for the account")
 
 // Broker is the live tail the watch procedure reads: the in-process
 // registry of open streams, keyed by the account each stream watches for.
@@ -28,11 +39,16 @@ func NewBroker() *Broker {
 }
 
 // Subscribe registers one stream and answers the channel it reads with the
-// function that closes it. The cancel is idempotent and safe to defer.
-func (b *Broker) Subscribe(userID uuid.UUID) (<-chan Notification, func()) {
+// function that closes it. The cancel is idempotent and safe to defer. The
+// account's sixth open stream is refused with ErrTooManyStreams.
+func (b *Broker) Subscribe(userID uuid.UUID) (<-chan Notification, func(), error) {
 	ch := make(chan Notification, eventBuffer)
 
 	b.mu.Lock()
+	if len(b.subs[userID]) >= MaxStreamsPerAccount {
+		b.mu.Unlock()
+		return nil, nil, ErrTooManyStreams
+	}
 	if b.subs[userID] == nil {
 		b.subs[userID] = map[chan Notification]struct{}{}
 	}
@@ -50,7 +66,7 @@ func (b *Broker) Subscribe(userID uuid.UUID) (<-chan Notification, func()) {
 		}
 		close(ch)
 	}
-	return ch, cancel
+	return ch, cancel, nil
 }
 
 // PublishAll hands one notification to every open stream — the global

@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -61,8 +62,10 @@ func insertTasks(ctx context.Context, q datastore.Querier, tasks []*taskRow) err
 	}
 
 	query, args := ib.Build()
-	_, err := q.Exec(ctx, query, args...)
-	return err
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("queue: insert the tasks: %w", err)
+	}
+	return nil
 }
 
 // claimReady claims the earliest tasks a dispatcher may run right now: never
@@ -94,7 +97,7 @@ func claimReady(ctx context.Context, q datastore.Querier, at time.Time, reclaimB
 	query, args := ub.Build()
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("queue: claim the ready tasks: %w", err)
 	}
 	defer rows.Close()
 
@@ -103,11 +106,14 @@ func claimReady(ctx context.Context, q datastore.Querier, at time.Time, reclaimB
 		t := &taskRow{}
 		if err := rows.Scan(&t.ID, &t.Queue, &t.Payload, &t.Attempts, &t.Priority,
 			&t.WaitUntil, &t.CreatedAt, &t.LastExecutedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("queue: claim the ready tasks: %w", err)
 		}
 		tasks = append(tasks, t)
 	}
-	return tasks, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("queue: claim the ready tasks: %w", err)
+	}
+	return tasks, nil
 }
 
 // peekNext reports the wait of the next task the dispatcher could act on,
@@ -129,7 +135,7 @@ func peekNext(ctx context.Context, q datastore.Querier, deadline time.Time) (boo
 		return false, nil, nil
 	}
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("queue: peek the next task: %w", err)
 	}
 	return true, wait, nil
 }
@@ -148,8 +154,10 @@ func requeueTask(ctx context.Context, q datastore.Querier, id uuid.UUID, waitUnt
 	ub.Where(ub.Equal("id", id))
 
 	query, args := ub.Build()
-	_, err := q.Exec(ctx, query, args...)
-	return err
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("queue: requeue the task: %w", err)
+	}
+	return nil
 }
 
 // deleteTask removes a task from the pending table.
@@ -159,8 +167,10 @@ func deleteTask(ctx context.Context, q datastore.Querier, id uuid.UUID) error {
 	db.Where(db.Equal("id", id))
 
 	query, args := db.Build()
-	_, err := q.Exec(ctx, query, args...)
-	return err
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("queue: delete the task: %w", err)
+	}
+	return nil
 }
 
 // cancelTask removes an unclaimed task and reports whether it was still
@@ -175,7 +185,7 @@ func cancelTask(ctx context.Context, q datastore.Querier, id uuid.UUID) (bool, e
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("queue: cancel the task: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -194,8 +204,10 @@ func insertCompleted(ctx context.Context, q datastore.Querier, c *completedRow) 
 	)
 
 	query, args := ib.Build()
-	_, err := q.Exec(ctx, query, args...)
-	return err
+	if _, err := q.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("queue: archive the completed task: %w", err)
+	}
+	return nil
 }
 
 // deleteExpiredCompleted removes the completed records their retention has
@@ -208,7 +220,7 @@ func deleteExpiredCompleted(ctx context.Context, q datastore.Querier, now time.T
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("queue: delete the expired completed records: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }
@@ -224,7 +236,10 @@ func countPending(ctx context.Context, q datastore.Querier, queue string) (int64
 	query, args := sb.Build()
 	var count int64
 	err := q.QueryRow(ctx, query, args...).Scan(&count)
-	return count, err
+	if err != nil {
+		return 0, fmt.Errorf("queue: count the pending tasks: %w", err)
+	}
+	return count, nil
 }
 
 // flushPending removes every unclaimed task and reports how many went.
@@ -238,7 +253,7 @@ func flushPending(ctx context.Context, q datastore.Querier) (int64, error) {
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("queue: flush the pending tasks: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }
@@ -251,7 +266,7 @@ func flushCompleted(ctx context.Context, q datastore.Querier) (int64, error) {
 	query, args := db.Build()
 	tag, err := q.Exec(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("queue: flush the completed records: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }
@@ -277,7 +292,7 @@ func deadRows(ctx context.Context, q datastore.Querier, at time.Time, queue stri
 	query, args := sb.Build()
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("queue: list the dead tasks: %w", err)
 	}
 	defer rows.Close()
 
@@ -286,11 +301,14 @@ func deadRows(ctx context.Context, q datastore.Querier, at time.Time, queue stri
 		c := &completedRow{}
 		if err := rows.Scan(&c.ID, &c.Queue, &c.Payload, &c.Attempts, &c.LastDuration,
 			&c.Succeeded, &c.Error, &c.ExpiresAt, &c.LastExecutedAt, &c.CreatedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("queue: list the dead tasks: %w", err)
 		}
 		dead = append(dead, c)
 	}
-	return dead, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("queue: list the dead tasks: %w", err)
+	}
+	return dead, nil
 }
 
 // countDead reports how many dead tasks a queue's archive holds: the ones
@@ -304,7 +322,10 @@ func countDead(ctx context.Context, q datastore.Querier, queue string) (int64, e
 	query, args := sb.Build()
 	var count int64
 	err := q.QueryRow(ctx, query, args...).Scan(&count)
-	return count, err
+	if err != nil {
+		return 0, fmt.Errorf("queue: count the dead tasks: %w", err)
+	}
+	return count, nil
 }
 
 // pendingSortColumns is the whitelist a pending page's sort key resolves
@@ -334,7 +355,7 @@ func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string,
 	query, args := sb.Build()
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: list the pending tasks: %w", err)
 	}
 	defer rows.Close()
 
@@ -343,12 +364,12 @@ func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string,
 		t := &taskRow{}
 		if err := rows.Scan(&t.ID, &t.Queue, &t.Payload, &t.Attempts, &t.Priority,
 			&t.WaitUntil, &t.ClaimedAt, &t.CreatedAt, &t.LastExecutedAt); err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("queue: list the pending tasks: %w", err)
 		}
 		tasks = append(tasks, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: list the pending tasks: %w", err)
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -360,7 +381,7 @@ func listPending(ctx context.Context, q datastore.Querier, queue, sortBy string,
 	query, args = cb.Build()
 	var total int64
 	if err := q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: count the pending tasks: %w", err)
 	}
 	return tasks, total, nil
 }
@@ -393,7 +414,7 @@ func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, as
 	query, args := sb.Build()
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: list the dead page: %w", err)
 	}
 	defer rows.Close()
 
@@ -402,12 +423,12 @@ func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, as
 		c := &completedRow{}
 		if err := rows.Scan(&c.ID, &c.Queue, &c.Attempts, &c.Error, &c.ExpiresAt,
 			&c.LastExecutedAt, &c.CreatedAt); err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("queue: list the dead page: %w", err)
 		}
 		dead = append(dead, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: list the dead page: %w", err)
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -423,7 +444,7 @@ func listDead(ctx context.Context, q datastore.Querier, queue, sortBy string, as
 	query, args = cb.Build()
 	var total int64
 	if err := q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("queue: count the dead tasks: %w", err)
 	}
 	return dead, total, nil
 }
@@ -440,19 +461,22 @@ func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending
 	query, args := sb.Build()
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, fmt.Errorf("queue: read the task detail: %w", err)
 	}
 	defer rows.Close()
 	if rows.Next() {
 		t := &taskRow{}
 		if scanErr := rows.Scan(&t.ID, &t.Queue, &t.Payload, &t.Attempts, &t.Priority,
 			&t.WaitUntil, &t.ClaimedAt, &t.CreatedAt, &t.LastExecutedAt); scanErr != nil {
-			return nil, nil, false, scanErr
+			return nil, nil, false, fmt.Errorf("queue: read the task detail: %w", scanErr)
 		}
-		return t, nil, true, rows.Err()
+		if rowsErr := rows.Err(); rowsErr != nil {
+			return nil, nil, false, fmt.Errorf("queue: read the task detail: %w", rowsErr)
+		}
+		return t, nil, true, nil
 	}
 	if rowsErr := rows.Err(); rowsErr != nil {
-		return nil, nil, false, rowsErr
+		return nil, nil, false, fmt.Errorf("queue: read the task detail: %w", rowsErr)
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -470,7 +494,7 @@ func taskDetail(ctx context.Context, q datastore.Querier, id uuid.UUID) (pending
 		return nil, nil, false, nil
 	}
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, fmt.Errorf("queue: read the task detail: %w", err)
 	}
 	return nil, completed, true, nil
 }
@@ -487,7 +511,7 @@ func deleteCompletedByIDs(ctx context.Context, q datastore.Querier, ids []uuid.U
 
 		query, args := db.Build()
 		if _, err := q.Exec(ctx, query, args...); err != nil {
-			return err
+			return fmt.Errorf("queue: delete the completed record %s: %w", id, err)
 		}
 	}
 	return nil
@@ -512,7 +536,7 @@ func taskStatus(ctx context.Context, q datastore.Querier, id uuid.UUID) (TaskSta
 		}
 		return TaskStatusPending, nil
 	case !errors.Is(err, datastore.ErrNoRows):
-		return TaskStatusNotFound, err
+		return TaskStatusNotFound, fmt.Errorf("queue: read the task status: %w", err)
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -530,7 +554,7 @@ func taskStatus(ctx context.Context, q datastore.Querier, id uuid.UUID) (TaskSta
 		}
 		return TaskStatusFailure, nil
 	case !errors.Is(err, datastore.ErrNoRows):
-		return TaskStatusNotFound, err
+		return TaskStatusNotFound, fmt.Errorf("queue: read the task status: %w", err)
 	}
 	return TaskStatusNotFound, nil
 }

@@ -18,6 +18,12 @@ import (
 // the bytes arrived.
 const TusLengthKey = "tus_upload_length"
 
+// TusOwnerKey is the manifest-metadata key that names the account a session
+// belongs to. The engine learns no caller type: the transport hands it an
+// opaque owner string, and every read or write of a session compares it. The
+// key survives completion, so the stored object still names who uploaded it.
+const TusOwnerKey = "tus_owner"
+
 // TusSessionExpiry is how long an interrupted session's row and staging
 // file live before the expiry job reclaims them. A tus client resumes with
 // a HEAD and continues from the offset, so the window only has to cover a
@@ -54,11 +60,13 @@ var (
 )
 
 // TusBegin opens a session: an empty staging file and a pending manifest
-// row that carries the declared length inside the feature's metadata. A
-// re-begin of the same bucket/key rewrites both — the session's state is
-// the staging file and the row, nothing else, so a client that restarts an
-// upload from zero needs no other cleanup.
-func (m *Manager) TusBegin(ctx context.Context, bucket, key string, length int64, metadata map[string]any) error {
+// row that carries the declared length and the owner inside the feature's
+// metadata. The owner may restart its own session of the same bucket/key —
+// the session's state is the staging file and the row, nothing else, so a
+// client that restarts an upload from zero needs no other cleanup — but a
+// key that already holds a stored file, or another owner's session, is
+// never replaced: ErrExists.
+func (m *Manager) TusBegin(ctx context.Context, bucket, key string, length int64, owner string, metadata map[string]any) error {
 	if length < 0 {
 		return fmt.Errorf("storage: upload length %d: %w", length, ErrLengthMismatch)
 	}
@@ -77,14 +85,35 @@ func (m *Manager) TusBegin(ctx context.Context, bucket, key string, length int64
 		metadata = map[string]any{}
 	}
 	metadata[TusLengthKey] = length
+	metadata[TusOwnerKey] = owner
 
+	// The row is claimed before the staging file is touched: a refused begin
+	// must leave the owner's bytes alone.
+	if err := m.manifests.StageSession(ctx, m.db, bucketID, key, micros(time.Now()), metadata); err != nil {
+		return err
+	}
 	if err := m.truncateStaging(bucket, key); err != nil {
 		return err
 	}
-	if err := m.manifests.Stage(ctx, m.db, bucketID, key, 0, micros(time.Now()), metadata, false); err != nil {
+	m.metrics.recordStaged(ctx)
+	return nil
+}
+
+// TusSession answers ErrNotFound unless bucket/key is an open tus session
+// owned by owner. The refusal is the same for a missing session, a stored
+// file and another account's session, so a probe learns nothing about which
+// keys exist.
+func (m *Manager) TusSession(ctx context.Context, bucket, key, owner string) error {
+	manifest, err := m.Manifest(ctx, bucket, key)
+	if err != nil {
 		return err
 	}
-	m.metrics.recordStaged(ctx)
+	if _, marked := tusLengthMarked(manifest.Metadata); !marked {
+		return ErrNotFound
+	}
+	if got, _ := manifest.Metadata[TusOwnerKey].(string); got != owner {
+		return ErrNotFound
+	}
 	return nil
 }
 
@@ -221,16 +250,19 @@ func tusLengthMarked(metadata map[string]any) (int64, bool) {
 
 // TusDiscard ends a session without storing anything: the staging file is
 // removed and its manifest row deleted, the state a termination request
-// leaves and the expiry job reclaims.
+// leaves and the expiry job reclaims. A row that is not an open session —
+// a stored file, or a session that completed a moment ago — is refused with
+// ErrNotFound before any byte is touched: the delete is the claim, and the
+// staging file goes only once the claim succeeded.
 func (m *Manager) TusDiscard(ctx context.Context, bucket, key string) error {
 	bucketID, err := m.resolveBucket(ctx, bucket)
 	if err != nil {
 		return err
 	}
-	if err := m.removeStaging(bucket, key); err != nil {
+	if err := m.manifests.DeleteSession(ctx, m.db, bucketID, key); err != nil {
 		return err
 	}
-	return m.manifests.Delete(ctx, m.db, bucketID, key)
+	return m.removeStaging(bucket, key)
 }
 
 // PendingStagedRefs answers the bucket-scoped references whose manifest is
@@ -255,7 +287,9 @@ func (m *Manager) ExpireSessions(ctx context.Context, before time.Time) (int, er
 		if splitErr != nil {
 			return 0, splitErr
 		}
-		if discardErr := m.TusDiscard(ctx, bucket, key); discardErr != nil {
+		// A session that completed after the list was read is final now: the
+		// discard refuses it, and that is the right answer, not a failure.
+		if discardErr := m.TusDiscard(ctx, bucket, key); discardErr != nil && !errors.Is(discardErr, ErrNotFound) {
 			return 0, fmt.Errorf("storage: expire %q: %w", ref, discardErr)
 		}
 	}

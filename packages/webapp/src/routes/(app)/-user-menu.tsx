@@ -43,14 +43,11 @@ const styles = stylex.create({
   identity: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 2,
-    paddingTop: unit.x2,
-    paddingBottom: unit.x2,
-    paddingLeft: unit.x2,
-    paddingRight: unit.x2,
-    maxWidth: '18rem'
+    gap: 0,
+    paddingBlock: unit.x1_5
   },
   name: {
+    paddingBlock: 0,
     fontSize: fontSize.body2,
     fontWeight: fontWeight.semibold,
     color: colors.foregroundNeutral,
@@ -58,7 +55,11 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap'
   },
+  // The label's own inline inset (unit.x3) is the menu's text edge: an item's
+  // margin and padding add up to the same, so the email and the theme row
+  // share it and every line starts at one x.
   email: {
+    paddingInline: unit.x3,
     fontSize: fontSize.caption1,
     color: colors.foregroundNeutralFaded,
     overflow: 'hidden',
@@ -70,10 +71,9 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: unit.x3,
-    paddingTop: unit.x2,
-    paddingBottom: unit.x2,
-    paddingLeft: unit.x2,
-    paddingRight: unit.x2
+    marginInline: unit.x1,
+    paddingBlock: 0,
+    paddingInline: unit.x2
   },
   themeLabel: {
     fontSize: fontSize.body2,

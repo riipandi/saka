@@ -48,8 +48,10 @@ test.describe.serial('the account profile flow', () => {
   test('saves the profile and reads it back after a reload', async ({ browser }) => {
     const account = requireUser()
     const page = await signIn(browser, requireUser())
-    await page.goto('/settings')
-    await expect(page).toHaveURL(/\/settings$/)
+    // The old `/settings` path redirects under the account shell — navigate
+    // to the profile tab it lands on instead of racing the redirect.
+    await page.goto('/account/profile')
+    await expect(page).toHaveURL(/\/account\/profile$/)
 
     const display = page.locator('#display-name')
     await expect(display).toHaveValue(/Throwaway/)
@@ -119,6 +121,11 @@ test.describe.serial('the account profile flow', () => {
       await dialog.locator('input').fill(account.username)
       await expect(confirm).toBeEnabled()
       await confirm.click()
+
+      // The deletion is step-up guarded: the password proves the holder
+      // before the call is made.
+      await page.fill('#reauth-password', account.password)
+      await page.getByRole('button', { name: 'Confirm', exact: true }).click()
 
       // The account is gone server-side; the browser is carried to login.
       await expect(page).toHaveURL(/\/login/, { timeout: 15_000 })

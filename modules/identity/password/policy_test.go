@@ -166,6 +166,7 @@ func serveCorpus(t *testing.T, answer func(prefix string) (int, string)) *corpus
 	t.Cleanup(captured.server.Close)
 
 	opts := config.Default().FetcherOptions()
+	opts.AllowPrivateNetwork = true // the breach-corpus stub is a loopback httptest server
 	opts.RetryCount = 0
 	opts.Timeout = 2 * time.Second
 	client, err := fetcher.New(opts, nil)

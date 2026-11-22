@@ -33,7 +33,7 @@ func base64Decode(encoded string) ([]byte, error) {
 // testConfig returns a configuration with a fresh HMAC secret, so no test
 // depends on a checked-in value. The signing key pair lives in the database;
 // a test that needs one wires pairSource.
-func testConfig(t *testing.T) config.Config {
+func testConfig(t testing.TB) config.Config {
 	t.Helper()
 
 	generator, err := crypto.NewKeyGenerator(crypto.DefaultSecretAlgorithm)

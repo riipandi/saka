@@ -30,7 +30,7 @@ func seedDeviceGrant(t *testing.T, pool *datastore.Postgres, deviceCode string) 
 	issued, err := service.Create(t.Context(), owner, createParams("Device Portal"))
 	require.NoError(t, err)
 
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	require.NoError(t, store.SaveGrant(t.Context(), &goidc.Grant{
 		ID:                  "grant-" + deviceCode,
 		ClientID:            issued.Client.ID,
@@ -55,7 +55,7 @@ var errAlreadyRedeemed = errors.New("test: the device code has already been rede
 func redeem(t *testing.T, pool *datastore.Postgres, deviceCode string) error {
 	t.Helper()
 	ctx := withGrantSnapshotCache(t.Context())
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	grant, err := store.GrantByDeviceCode(ctx, deviceCode)
 	if err != nil {
 		return err
@@ -77,9 +77,7 @@ func TestADeviceCodeRedeemsExactlyOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 	for range contenders {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			err := redeem(t, pool, "device-plain-1")
 			switch {
@@ -96,7 +94,7 @@ func TestADeviceCodeRedeemsExactlyOnce(t *testing.T) {
 			default:
 				t.Errorf("unexpected redemption error: %v", err)
 			}
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -106,7 +104,7 @@ func TestADeviceCodeRedeemsExactlyOnce(t *testing.T) {
 
 	// The grant is consumed and its pointer is gone: a later redemption
 	// is a not-found, the replay shape the protocol answers.
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	grant, err := store.Grant(t.Context(), "grant-device-plain-1")
 	require.NoError(t, err)
 	assert.NotZero(t, grant.DeviceCodeConsumedAt)
@@ -119,7 +117,7 @@ func TestTheRedeemingRequestCanStillRevokeOnAFailedIssuance(t *testing.T) {
 	seedDeviceGrant(t, pool, "device-plain-2")
 
 	ctx := withGrantSnapshotCache(t.Context())
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	grant, err := store.GrantByDeviceCode(ctx, "device-plain-2")
 	require.NoError(t, err)
 
@@ -145,12 +143,12 @@ func TestAStaleGrantSaveIsRefused(t *testing.T) {
 	// the plain write the creation and approval paths use — rewrites the
 	// row underneath it. The first request's save must now refuse.
 	ctx := withGrantSnapshotCache(t.Context())
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	stale, err := store.GrantByDeviceCode(ctx, "device-plain-3")
 	require.NoError(t, err)
 	stale.Username = "langdon"
 
-	plain := grantStore{protocolStore: protocolStore{pool: pool}}
+	plain := grantStore{pool: pool}
 	fresh, err := plain.Grant(t.Context(), "grant-device-plain-3")
 	require.NoError(t, err)
 	fresh.Username = "vetra"
@@ -173,7 +171,7 @@ func TestAGrantCreatedOnTheRouteSavesWithoutASnapshot(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := withGrantSnapshotCache(t.Context())
-	store := grantStore{protocolStore: protocolStore{pool: pool}}
+	store := grantStore{pool: pool}
 	require.NoError(t, store.SaveGrant(ctx, &goidc.Grant{
 		ID:                  "grant-fresh",
 		ClientID:            issued.Client.ID,

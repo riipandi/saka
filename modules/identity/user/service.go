@@ -38,10 +38,11 @@ var (
 	// cannot perform: their own signed-in account.
 	ErrSelfDeletion = errors.New("user: cannot delete the signed-in account")
 
-	// ErrLastAdministrator is the refusal of a deletion that would strip
-	// the deployment of its only reachable administrator — the standing a
+	// ErrLastAdministrator is the refusal of a change that would strip the
+	// deployment of its only reachable administrator — a deletion, a ban, a
+	// disable, or a role replacement that drops the role: the standing a
 	// management surface cannot be recovered from without the database.
-	ErrLastAdministrator = errors.New("user: the deployment's last administrator cannot be deleted")
+	ErrLastAdministrator = errors.New("user: the deployment's last administrator cannot be removed, disabled, banned or stripped of the role")
 
 	// ErrTimezoneInvalid is a timezone preference that names no zone the
 	// tz database carries. The proto constraint bounds its length; only
@@ -574,55 +575,55 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, subject string, params 
 	if err != nil {
 		return UserView{}, ErrUserNotFound
 	}
-	existing, err := s.repo.GetUser(ctx, s.pool, userID)
-	if errors.Is(err, datastore.ErrNoRows) {
-		return UserView{}, ErrUserNotFound
-	}
-	if err != nil {
-		return UserView{}, err
-	}
-
-	// The username is the gated field: absent keeps the current one, and a
-	// present value goes through the toggle, the pattern, and the column's
-	// unique index — in that order, so a refused change is a cheap refusal.
-	username := existing.Username
-	usernameChanged := false
-	if params.Username != "" && !strings.EqualFold(params.Username, existing.Username) {
-		if !s.gateOpen(ctx, SettingChangeUsernameEnabled, nil) {
-			return UserView{}, ErrUserNotFound
-		}
-		if !usernamePattern.MatchString(params.Username) {
-			return UserView{}, ErrUsernameInvalid
-		}
-		username = params.Username
-		usernameChanged = true
-	}
 
 	timezone, tzErr := normalizeTimezone(params.Timezone)
 	if tzErr != nil {
 		return UserView{}, tzErr
 	}
 
-	row := UserSchema{
-		ID:          userID,
-		Username:    username,
-		Email:       existing.Email,
-		FirstName:   params.FirstName,
-		LastName:    params.LastName,
-		DisplayName: params.DisplayName,
-		Metadata:    UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw(),
-		Disabled:    existing.Disabled,
-		// The immutable columns and the ban state ride through untouched:
-		// this update owns the profile, nothing else.
-		CreatedAt:       existing.CreatedAt,
-		BannedAt:        existing.BannedAt,
-		BanExpires:      existing.BanExpires,
-		BanReason:       existing.BanReason,
-		EmailVerifiedAt: existing.EmailVerifiedAt,
-	}
-
+	// The row is locked before it is read, and the write covers the profile
+	// columns only: an administrator's disable or the email-change
+	// confirmation that lands between the read and the write is a change
+	// this update must neither undo nor overwrite.
+	var row UserSchema
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
+		if lockErr := s.repo.LockUser(ctx, tx, userID); errors.Is(lockErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		} else if lockErr != nil {
+			return lockErr
+		}
+		existing, readErr := s.repo.GetUser(ctx, tx, userID)
+		if errors.Is(readErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		if readErr != nil {
+			return readErr
+		}
+
+		// The username is the gated field: absent keeps the current one, and a
+		// present value goes through the toggle, the pattern, and the column's
+		// unique index — in that order, so a refused change is a cheap refusal.
+		username := existing.Username
+		usernameChanged := false
+		if params.Username != "" && !strings.EqualFold(params.Username, existing.Username) {
+			if !s.gateOpen(ctx, SettingChangeUsernameEnabled, nil) {
+				return ErrUserNotFound
+			}
+			if !usernamePattern.MatchString(params.Username) {
+				return ErrUsernameInvalid
+			}
+			username = params.Username
+			usernameChanged = true
+		}
+
+		row = existing
+		row.Username = username
+		row.FirstName = params.FirstName
+		row.LastName = params.LastName
+		row.DisplayName = params.DisplayName
+		row.Metadata = UserMetadata{Locale: params.Locale, Timezone: timezone}.Raw()
+
+		updated, updateErr := s.repo.UpdateProfile(ctx, tx, row)
 		if errUniqueViolation(updateErr) {
 			return ErrAccountExists
 		}
@@ -711,7 +712,7 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 	}
 
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if guardErr := s.refuseTheLastAdministrator(ctx, tx, userID); guardErr != nil {
+		if guardErr := EnsureAnotherAdministrator(ctx, tx, userID); guardErr != nil {
 			return guardErr
 		}
 		deleted, deleteErr := s.repo.DeleteUser(ctx, tx, userID)
@@ -736,13 +737,33 @@ func (s *Service) DeleteMyAccount(ctx context.Context, subject string) error {
 	})
 }
 
-// refuseTheLastAdministrator is the deletion guard both paths share: an
-// account that carries the administrator standing cannot leave if no
-// reachable administrator would remain. The caller runs it inside the
-// delete's transaction, so the grants the check reads are the grants the
-// delete acts on. A non-administrator target passes without a read of the
-// deployment's administrators.
-func (s *Service) refuseTheLastAdministrator(ctx context.Context, tx datastore.Querier, userID uuid.UUID) error {
+// administratorGuardLockKey is the advisory lock every administrator-removing
+// change takes, so two of them racing — each reading "another administrator
+// exists" while the other is about to remove it — are serialized.
+const administratorGuardLockKey = 7243311906
+
+// LockAdministrators takes the guard's transaction-scoped advisory lock. A
+// change that can remove an administrator's standing takes it before it
+// reads the grants it judges, inside the transaction that writes the change.
+func LockAdministrators(ctx context.Context, tx datastore.Querier) error {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, administratorGuardLockKey); err != nil {
+		return fmt.Errorf("user: lock the administrators: %w", err)
+	}
+	return nil
+}
+
+// EnsureAnotherAdministrator is the guard every change that can remove an
+// administrator's standing shares — deleting the account, banning it,
+// disabling it, replacing its roles without the administrator role: an
+// account that carries the standing cannot lose it if no reachable
+// administrator would remain. The caller runs it inside the change's
+// transaction, before the write, so the grants the check reads are the grants
+// the change acts on. A non-administrator target passes without a read of the
+// deployment's other administrators.
+func EnsureAnotherAdministrator(ctx context.Context, tx datastore.Querier, userID uuid.UUID) error {
+	if err := LockAdministrators(ctx, tx); err != nil {
+		return err
+	}
 	admin, err := HoldsLiveAdministratorRole(ctx, tx, userID)
 	if err != nil {
 		return err
@@ -856,6 +877,21 @@ func (s *Service) UpdateUser(ctx context.Context, id string, params UpdateParams
 	// when", so a re-ban does not move it — and an absent expiry lifts the
 	// ban as a unit, reason included.
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// The row lock serializes this replace with a profile edit or an
+		// email-change confirmation in flight: whichever commits second
+		// reads the other's result instead of overwriting it.
+		if lockErr := s.repo.LockUser(ctx, tx, userID); errors.Is(lockErr, datastore.ErrNoRows) {
+			return ErrUserNotFound
+		} else if lockErr != nil {
+			return lockErr
+		}
+		// Disabling or banning removes the account from the reachable
+		// administrators the same way deleting it does.
+		if params.Disabled || params.BanExpiresAt != nil {
+			if guardErr := EnsureAnotherAdministrator(ctx, tx, userID); guardErr != nil {
+				return guardErr
+			}
+		}
 		updated, updateErr := s.repo.UpdateUser(ctx, tx, row)
 		if errUniqueViolation(updateErr) {
 			return ErrAccountExists
@@ -1016,7 +1052,7 @@ func (s *Service) DeleteUser(ctx context.Context, id, callerUsername string) err
 	// the same grants, or two racing deletions can both pass the check and
 	// leave the deployment without an administrator to reach.
 	return s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
-		if guardErr := s.refuseTheLastAdministrator(ctx, tx, userID); guardErr != nil {
+		if guardErr := EnsureAnotherAdministrator(ctx, tx, userID); guardErr != nil {
 			return guardErr
 		}
 		deleted, deleteErr := s.repo.DeleteUser(ctx, tx, userID)

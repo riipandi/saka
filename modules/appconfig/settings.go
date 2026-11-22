@@ -183,7 +183,7 @@ const (
 	// against the account.
 	SettingLockoutEnabled = "lockout.enabled"
 
-	// SettingLockoutMaxAttempts is the failed-password streak a lockout
+	// SettingLockoutMaxAttempts is the failed-credential streak a lockout
 	// lands at. The streak resets on a success, on the lift, and on the
 	// expiry — it is never a lifetime tally.
 	SettingLockoutMaxAttempts = "lockout.max_attempts"
@@ -405,8 +405,8 @@ func Catalog() []SettingDef {
 		},
 		{
 			Key:         SettingLockoutMaxAttempts,
-			Default:     "100",
-			Description: "The failed-password streak an automated lockout lands at. The streak resets on a successful verification, on the lockout's lift, and on its expiry — never a lifetime tally. The reader's floor is 5.",
+			Default:     "10",
+			Description: "The failed-credential streak an automated lockout lands at — wrong passwords and wrong second-factor codes count alike. The streak resets when a sign-in completes, on the lockout's lift, and on its expiry — never a lifetime tally. The reader's floor is 5.",
 		},
 		{
 			Key:         SettingLockoutDuration,

@@ -388,7 +388,7 @@ func mapError(err error) error {
 	case errors.Is(err, ErrSelfDeletion):
 		return connect.NewError(connect.CodeFailedPrecondition, "an administrator cannot delete the account they are signed in with")
 	case errors.Is(err, ErrLastAdministrator):
-		return connect.NewError(connect.CodeFailedPrecondition, "the deployment's last administrator cannot be deleted — grant the role to another account first")
+		return connect.NewError(connect.CodeFailedPrecondition, "the deployment's last administrator cannot be removed, disabled, banned or stripped of the role — grant the role to another account first")
 	case errors.Is(err, ErrBanInPast):
 		return connect.NewError(connect.CodeInvalidArgument, "the ban expiry is in the past")
 	case errors.Is(err, ErrTimezoneInvalid):

@@ -27,6 +27,7 @@ import (
 	"log/slog"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
@@ -192,6 +193,34 @@ type Service struct {
 	configured string
 
 	parseErr error
+
+	// The signing material is read on every authenticated request, so it
+	// is cached for SigningCacheTTL: the algorithm the newest row declares,
+	// the opened private key it signs with, the public set a token verifies
+	// against, and the provider's opened pairs. invalidateStaleSeals drops
+	// them all; another process's rotation arrives with the TTL.
+	algorithmCache ttlCache[jwa.SignatureAlgorithm]
+	signKeyCache   ttlCache[jwk.Key]
+	verifySetCache ttlCache[jwk.Set]
+	oidcKeysCache  ttlCache[[]jwk.Key]
+	// epoch advances when a rotation drops the caches; see ttlCache.
+	epoch atomic.Uint64
+	now   func() time.Time
+}
+
+// clock answers the service's time, the wall clock unless a test pinned one.
+func (s *Service) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+// dropSigningCaches forgets every cached signing artifact. The stale-seal
+// rotation calls it: the rows it retired and provisioned are the ones the
+// caches would otherwise keep answering from.
+func (s *Service) dropSigningCaches() {
+	s.epoch.Add(1)
 }
 
 // WithSealer wires the auto-invalidation write path. generate mints a
@@ -302,7 +331,7 @@ func (s *Service) parseHMAC(cfg config.Config) {
 // material — the algorithm the active signing row carries when the database
 // holds one, the HMAC secret's length otherwise — so a deployment with one
 // stack never has to state what its material already says.
-func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
+func (s *Service) SigningAlgorithm(ctx context.Context) (jwa.SignatureAlgorithm, error) {
 	if s.parseErr != nil {
 		return jwa.NoSignature(), s.parseErr
 	}
@@ -322,30 +351,47 @@ func (s *Service) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
 		return alg, nil
 	}
 
-	// The asymmetric half signs from the database: an active signing row
-	// carries the algorithm in its own column, so the row decides when the
-	// deployment names no override.
-	if pairs, err := s.signingPairs(context.Background()); err == nil && len(pairs) > 0 {
-		row := pairs[0]
-		if row.Algorithm == "" {
-			// The generator always stamps `alg`, so a row without one was
-			// written by hand. The curve determines the algorithm, but the
-			// mapping lives in an internal jwx package, so rather than
-			// restating it here the deployment is asked to say what it means.
-			return jwa.NoSignature(), fmt.Errorf(
-				"jwks: signing key %s carries no algorithm; set auth.jwt_algorithm", row.KeyID)
-		}
-		looked, ok := jwa.LookupSignatureAlgorithm(row.Algorithm)
-		if !ok {
-			return jwa.NoSignature(), fmt.Errorf(
-				"jwks: signing key %s: %q is not a signature algorithm", row.KeyID, row.Algorithm)
-		}
-		return looked, nil
+	// The asymmetric half signs from the database: the newest active signing
+	// row carries the algorithm in its own column, so the row decides when
+	// the deployment names no override. The answer is cached; a database
+	// that cannot answer falls through to the HMAC half.
+	if alg, err := s.algorithmCache.get(s.clock(), SigningCacheTTL, s.epoch.Load(), func() (jwa.SignatureAlgorithm, error) {
+		return s.rowAlgorithm(ctx)
+	}); err == nil {
+		return alg, nil
+	} else if !errors.Is(err, ErrNoStoredKeys) && s.hmacKey == nil {
+		return jwa.NoSignature(), err
 	}
 	if s.hmacKey != nil {
 		return s.HMACAlgorithm()
 	}
 	return jwa.NoSignature(), ErrNoSigningKey
+}
+
+// rowAlgorithm reads the algorithm the newest active signing row declares.
+func (s *Service) rowAlgorithm(ctx context.Context) (jwa.SignatureAlgorithm, error) {
+	pairs, err := s.signingPairs(ctx)
+	if err != nil {
+		return jwa.NoSignature(), err
+	}
+	if len(pairs) == 0 {
+		return jwa.NoSignature(), ErrNoStoredKeys
+	}
+	row := pairs[0]
+	if row.Algorithm == "" {
+		// The generator always stamps `alg`, so a row without one was
+		// written by hand. The curve determines the algorithm, but the
+		// mapping lives in an internal jwx package, so rather than
+		// restating it here the deployment is asked to say what it means.
+		return jwa.NoSignature(), fmt.Errorf(
+			"jwks: signing key %s carries no algorithm; set auth.jwt_algorithm", row.KeyID)
+	}
+	looked, ok := jwa.LookupSignatureAlgorithm(row.Algorithm)
+	if !ok {
+		return jwa.NoSignature(), fmt.Errorf(
+			"jwks: signing key %s: %q is not a signature algorithm", row.KeyID, row.Algorithm)
+	}
+	return looked, nil
 }
 
 // Err reports the parse failure of the configured keys, if any.
@@ -369,11 +415,13 @@ func (s *Service) SignKey(ctx context.Context) (jwk.Key, error) {
 	if s.parseErr != nil {
 		return nil, s.parseErr
 	}
-	return s.signingPrivateKey(ctx)
+	return s.signKeyCache.get(s.clock(), SigningCacheTTL, s.epoch.Load(), func() (jwk.Key, error) {
+		return s.signingPrivateKey(ctx)
+	})
 }
 
-// signingPrivateKey unseals the first active signing row's private key. The
-// rows are ordered stably, so the first row is the key every mint names.
+// signingPrivateKey unseals the newest active signing row's private key. The
+// rows are ordered newest first, so the first row is the key every mint names.
 // An AUTH_SECRET_KEY rotation discovered on the way re-provisions the rows,
 // so the read runs once more before the failure is answered.
 func (s *Service) signingPrivateKey(ctx context.Context) (jwk.Key, error) {
@@ -470,7 +518,13 @@ func (s *Service) VerifyKeySet(ctx context.Context) (jwk.Set, error) {
 	if s.parseErr != nil {
 		return nil, s.parseErr
 	}
+	return s.verifySetCache.get(s.clock(), SigningCacheTTL, s.epoch.Load(), func() (jwk.Set, error) {
+		return s.buildVerifyKeySet(ctx)
+	})
+}
 
+// buildVerifyKeySet reads the stored rows and assembles the public set.
+func (s *Service) buildVerifyKeySet(ctx context.Context) (jwk.Set, error) {
 	set := jwk.NewSet()
 	seen := make(map[string]struct{}, 1)
 
@@ -524,6 +578,13 @@ func (s *Service) OIDCSigningKeys(ctx context.Context) ([]jwk.Key, error) {
 	if s.parseErr != nil {
 		return nil, s.parseErr
 	}
+	return s.oidcKeysCache.get(s.clock(), SigningCacheTTL, s.epoch.Load(), func() ([]jwk.Key, error) {
+		return s.openOIDCSigningKeys(ctx)
+	})
+}
+
+// openOIDCSigningKeys reads and opens the provider's pairs.
+func (s *Service) openOIDCSigningKeys(ctx context.Context) ([]jwk.Key, error) {
 	pairs, ok := s.source.(PairSource)
 	if !ok || pairs == nil {
 		return nil, ErrNoStoredKeys
@@ -672,6 +733,7 @@ func (s *Service) invalidateStaleSeals(ctx context.Context) (bool, error) {
 	if err := s.sealer.InsertProvisionedPair(ctx, pair); err != nil {
 		return false, fmt.Errorf("jwks: store replacement pair: %w", err)
 	}
+	s.dropSigningCaches()
 	s.log.WarnContext(ctx, "jwks: AUTH_SECRET_KEY rotated — stale signing keys retired and a replacement provisioned",
 		"kid", pair.KeyID, "algorithm", pair.Algorithm, "retired", retired)
 	if s.recorder != nil {

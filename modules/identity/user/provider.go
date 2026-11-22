@@ -25,6 +25,11 @@ type ProviderProfile struct {
 // display name an account's owner wrote survives a provider that keeps
 // answering the same names. A source that names nobody changes nothing.
 func (s *Service) ApplyProviderProfile(ctx context.Context, db datastore.Querier, userID uuid.UUID, profile ProviderProfile) error {
+	if err := s.repo.LockUser(ctx, db, userID); errors.Is(err, datastore.ErrNoRows) {
+		return ErrUserNotFound
+	} else if err != nil {
+		return err
+	}
 	row, err := s.repo.GetUser(ctx, db, userID)
 	if errors.Is(err, datastore.ErrNoRows) {
 		return ErrUserNotFound
@@ -53,7 +58,7 @@ func (s *Service) ApplyProviderProfile(ctx context.Context, db datastore.Querier
 		row.DisplayName = name
 	}
 
-	if _, err := s.repo.UpdateUser(ctx, db, row); err != nil {
+	if _, err := s.repo.UpdateProfile(ctx, db, row); err != nil {
 		return fmt.Errorf("user: apply provider profile: %w", err)
 	}
 	return nil

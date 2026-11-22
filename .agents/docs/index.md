@@ -1,0 +1,156 @@
+# Agents Documentation Index
+
+Agent-only documentation. Start at the repo root `AGENTS.md` (rules), then
+`.agents/docs/architecture.md` (per-package reasoning and traps). Everything else is
+reference, history, or contract — navigate from here.
+
+## Core documents
+
+| Path | Read it for |
+| --- | --- |
+| `/AGENTS.md` | The workflow rules: read order, ambiguous-decision protocol, the per-area skill map, workflow, git. |
+| `.agents/docs/index.md` | The documentation map — this file. |
+| `.agents/docs/shape.md` | The repository's shape: the monorepo layout, the stack, the Vite+ toolchain and its commit hooks, the frontend conventions, the static-analysis tooling, the porting contract. |
+| `.agents/docs/rules.md` | The detailed rules behind `AGENTS.md`: tasks, per-package contracts (multifactor, JWKS, notification, authz, guard, audit, datastore, storage, tus, serving), how-to-change recipes, traps, plan-document spec. |
+| `.agents/docs/architecture.md` | Per-package reasoning, kernel/transport/registry contracts, library decision records. Read the relevant section before changing a package. |
+| `.agents/docs/auth-design.md` | The authentication design the auth surface follows. |
+| `.agents/docs/upstream-deviations.md` | Every intentional departure from Pocket ID upstream, with reasons. |
+| `.agents/docs/endpoint-reference.md` | Shipped endpoints vs the ported upstream reference, at a glance. |
+| `.agents/docs/references/pocket-id-api-reference.md` | The upstream API surface the port maps onto. |
+| `.agents/docs/references/supabase-storage-schema.sql`, `database-reference.sql` | Storage-model source material and the database's table inventory. |
+
+## Docs sync
+
+`AGENTS.md` carries the rule: a behavior change and its documentation land in
+the same turn and the same commit. This file is the map the rule dispatches
+on — when a diff touches what a document claims, update that document here
+and nowhere else. A plan's closing phase owns the full sweep (see
+`.agents/docs/rules.md`, "Plan documents"); ordinary turns only touch the documents
+the diff actually made stale.
+
+## Plans (`.agents/docs/plans/`)
+
+A plan is a contract: frontmatter `status`, decisions with rejected
+alternatives, phases with commits. Never start, resume, or continue one
+without the owner's explicit instruction. The directory keeps only the
+plans that still hold open work — a completed plan archives flat to
+`.agents/docs/archive/plan-<stamp>.md` under its existing name (2026-10-14: the
+seven completed plans, `plan-20261008_1739.md` through
+`plan-20261014_0915.md`, moved; `plan-20261014_0930.md` and
+`plan-20261014_0955.md` remain).
+The archive carries the plans' own subject lines and decision records;
+the older history (35 files) lives there too.
+
+| File | Subject |
+| --- | --- |
+| `plan-20261117_1806.md` | Close the 2026-11-17 architecture audit — fifteen phases fixing the code findings (owner-bound uploads and sandboxed serving, OIDC tokens that follow the account, case-insensitive emails and SSO adoption, step-up on email change and deletion, lockout and second-factor accounting, key-set JWT verification, fail-closed limiter, dial-time network policy, one-way jobs/modules imports, transport features as modules), then product docs, agent docs, ledger and handover; migrations edited in place, dev database reset allowed — `awaiting-approval` |
+| `plan-20261014_0930.md` | The login-toggles and auth-wiring decisions: the deployment document keeps `oidc.enabled` and the two one-time-access switches (owner pick 2026-10-14, re-affirming D7 of plan-20261009_0025), and the two Connect transports are recorded as the worker boundary's shape (D3) — the ownership boundaries recorded in rules/architecture/docs, both issues closed `wontfix` and archived — `in-progress`: phases 1–2 landed (`b42f8765`), phase 3 (final validation) waits for the owner's word |
+| `plan-20261115_1800.md` | The overview says something true — the lists' totals as tiles, an account view for every caller and the console's state above it for the administrator (D1–D7, owner picks 2026-11-15), and the sidebar's administration groups gated on the administrator role — `done` 2026-11-15 (`1f7dd971` through the closing docs commit), the matrix green |
+| `plan-20261115_1600.md` | The sidebar spends less height — dense rows from the existing scale, groups that fold over a grid row with the preference kept in `app.store`, one-word group names, a `16rem` rail; items and order kept (owner picks 2026-11-15) — `done` 2026-11-15 (`dbc97786` through the closing docs commit), the matrix green |
+| `plan-20261115_1505.md` | Emailed codes take one shape — three letters then five digits, uppercase, `RandomLetterDigitCode` and `NormalizeCode` in `pkg/crypto`, six consumers (the five identity codes and the device user code), the input folded before hashing, device `Inspect`/`Decide` joined the credential bucket (D4), no schema or wire-shape change — `done` 2026-11-15 (`3bd92a1a` through the closing docs commit), the matrix green |
+| `plan-20261014_0955.md` | `key:rotate`: one command re-seals every surface the two secrets encrypt (D1 amended to both secrets — the owner picked the six-surface scope after the wiring showed the TOTP and JWKS rows seal under the auth cipher; D2 hybrid key supply with `--dry-run`, D3 queue payloads re-seal in the pass, D4 all-or-nothing), the new keys written to the env file `key:generate`-style — took issue-20261014_0949's open residue — `done` 2026-10-14 (`4f2925ed`, `162dca78`), the matrix green; the manual-path gap lives in `issue-20261014_1245.md` |
+
+## Handovers (`.agents/docs/handover/`)
+
+Session compactions, named `handover-<yyyymmdd>_<hhmm>.md`. Every handover —
+live and archived alike — carries the frontmatter convention
+(`status` / `captured` / `plan` / `wave`; `captured` derives mechanically from
+the filename stamp, the other keys from the body, and a key the body cannot
+name is omitted rather than guessed). The directory keeps the five newest; the
+older history (72 files) lives flat in
+`.agents/docs/archive/handover-<stamp>.md`, moved under their existing names —
+each summarizes its session and what stayed open; anything still true is
+folded into the core documents above. Newest:
+`handover-20261115_1900.md` (plan-20261115_1800: the overview's account and
+administrator views from the existing lists, the sidebar's role gate; the
+matrix green).
+
+## Audits (`.agents/docs/audit/`)
+
+Point-in-time reviews against the tree; conclusions age, the tree wins.
+Every audit carries the frontmatter convention (`status` / `updated` /
+`reference`): `status` is `resolved` when every finding the audit demanded
+is closed in the tree (an owner-accepted risk recorded in the decision
+records does not hold the audit open) or `open` while a finding waits on
+its issue or plan; `reference` names the plan and issue that carry the
+outcome, omitted when direct commits closed the findings.
+
+- `audit-20260928_0239.md` — post-incident re-audit (deliberate designs vs defects). resolved.
+- `audit-20260929_1613.md` — federation, device flow, SCIM. resolved (plan-20260929_1722).
+- `audit-20261005_0940.md` — the framework extraction: boundary, concurrency, the tus lock leak fix, the accepted otel/log vulnerability. resolved.
+- `audit-20261005_1105.md` — the k6 load test: smoke/load/stress over the crucial endpoints, the ceiling not yet reached at ~450 req/s. resolved.
+- `audit-20261005_1825.md` — the OIDC provider deep pass: metadata-contract fixes (dead `jwks_uri`, closed registration mount), the CAS-loser 500 → `invalid_grant`, the revocation-delete indexes, the live E2E and race harnesses, the specification inventory (implemented vs not, per spec), certification readiness. resolved (plan-20261005_1845; the hosted submission run stays open in issue-20261006_0050).
+- `audit-20261014_0329.md` — the backend auth audit (sessions, refresh rotation, revocation): the inactivity gate's rolled-back revocation fixed, the gate's mis-aimed test re-pointed, the EXPLAIN probes at 200k rows, the replay pattern judged sound, the missing session sweep opened as `issue-20261014_0330.md`. resolved — the sweep closed with `plan-20261014_0504.md`.
+- `audit-20261117_1734.md` — the architecture audit, layers plus a module-by-module pass (35 findings, 2 high): any signed-in account can overwrite or delete stored files and serve script from the app origin, OIDC grants outlive a ban, the SSO-linking and email-change takeover paths, case-sensitive emails, the queue dispatcher's restart race, the never-swept `rate_limits` table, the `internal/jobs` ↔ `modules` import inversion, documentation drift; nine decisions wait on the owner. open.
+
+## Roadmap (`.agents/docs/roadmap/`)
+
+Parked future improvements and the delivery analyses — not plans, not
+issues: an entry here carries its own `status` / `updated` frontmatter
+(line), the unlock that makes it worth planning, and the source issue it
+came from; when an unlock fires the entry re-enters `.agents/docs/issues/` or
+goes straight to a plan. The directory's documents are `living` (updated
+in place, stamped) rather than point-in-time records.
+
+- `future-improvements.md` — the parked decisions the issue ledger
+  stopped carrying (2026-10-14): the six OIDC/federation entries
+  (RFC 8707 resource indicators, internal MCP servers, DCR, Form Post
+  OP, the RP conformance rehearsal, RP-side logout), the two CLI/tooling
+  entries (`storage:migrate`, the deferred `rs/cors` replacement), and
+  the three upstream-gated dependency/toolchain entries (connect v1 out
+  of `go.mod`, validate/otelconnect `/v2`, the Dockerfile's `vp run`
+  restoration). Sources: issue-20261014_0935, issue-20261014_0949, and
+  the archived 0936/0937.
+- `frontend-integration.md` — the recommended order for wiring the
+  served backend surface into the webapp, as a delivery checklist
+  (`- [ ]`): what is wired, what each wave lands, the reference map
+  (which acknowledged inspiration each flow consults), the recommended
+  route file layout, the E2E happy/unhappy scenario matrix per flow, the
+  supporting-library research, the shared machinery each piece needs.
+  Analysis and recommendation — each wave becomes a plan on the owner's
+  instruction.
+
+## Product docs (`docs/`)
+
+For humans, not agents: `api-endpoint.md`, `api-response.md`,
+`product-guide.md`, `users.md`, `auth.md`, `oauth-sso.md`, `oidc.md`,
+`oidc-profiles.md`, `deployment.md`. The rule `AGENTS.md`
+carries: no technical references here — internals, engine paths, and agent
+context belong in `.agents/docs/`; keep the orientation on the human reader. Keep
+aligned when a shipped surface changes.
+
+## Issues (`.agents/docs/issues/`)
+
+The open and considering items, newest capture first:
+`issue-YYYYMMDD_hhmm.md` with a frontmatter rollup (`status`, `captured`,
+`updated`) and per-item status lines carrying their plan references and
+reopen triggers. The
+rule lives in `AGENTS.md` ("Issues"): a finding that outlives the turn
+lands there the moment it is found — not in chat memory. An issue file
+whose every item reaches a terminal status (`resolved`) leaves the
+directory for `.agents/docs/archive/issue-<stamp>.md`, flat, under its existing
+name — the live directory lists only what is open or considering. A
+rollup that still carries live items may also archive, its open and
+considering items re-homed first into a fresh issue file that names the
+source (2026-10-14: the five 2026-10-06 → 2026-10-12 rollups archived,
+their live items carved into the files below; later the same day the
+aspirational items moved on to the roadmap — 0936 and 0937 archived
+whole, 0935 and 0949 shrunk — so a parked improvement lives in
+`.agents/docs/roadmap/`, not as a floating issue).
+Newest: `issue-20261014_0949.md`.
+
+Recap (status rollup per file, cross-checked against the tree and the
+plans on 2026-10-14 — the files are the tracker, this is the index; the
+previous cross-check ran 2026-10-12):
+
+| File | Rollup | Subject |
+| --- | --- | --- |
+| `issue-20261014_0935.md` | open (1) + considering (1) | The live residues of the 2026-10-06 certification rollup after two carves: the owner's hosted certification run (open, owner's action) and the commented compose blocks (owner's call). The six parked protocol/direction decisions (ISS-002–007) moved to the roadmap 2026-10-14 as RI-1–RI-6; the terminal items stay with the archive |
+| `issue-20261014_1245.md` | considering (1) | Found while landing `key:rotate`: the wiring seals two surfaces (TOTP secrets, JWKS private documents) with the **auth cipher** — a manual `AUTH_SECRET_KEY` edit skips the re-seal and kills every TOTP enrollment with no `seal_fp`-style recovery, unlike jwks' self-heal; the command's own pass re-seals both halves, so the gap is the manual path only. Decide the story when a rotation outside `key:rotate` becomes a need |
+
+## Finding history fast
+
+- **A design decision** → the plan's Decisions section (dated, with rejected alternatives); the storage model's decisions live in `plan-20261003_2359.md`.
+- **An open item** → `.agents/docs/issues/` (above).
+- **What changed when** → `git log --oneline`; commit subjects follow `{feat,fix,docs,refactor,chore}[(scope)]:`.
+- **What a past session did** → the handover of that date; memory recall supplements it.

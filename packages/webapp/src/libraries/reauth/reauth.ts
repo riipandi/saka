@@ -3,21 +3,6 @@ import { Code, type CallOptions, ConnectError } from '@connectrpc/connect'
 /** The header a step-up-guarded procedure reads its proof from. */
 export const REAUTHENTICATION_HEADER = 'x-saka-reauthentication'
 
-/**
- * The procedures this SPA calls that the guard's rule table marks
- * step-up-guarded (`internal/guard/rules.go`), mirrored by path. The set is
- * what a call site consults before reaching for the reauthentication modal —
- * a new guarded action joins here with the action that needs it.
- */
-export const STEP_UP_PROCEDURES: ReadonlySet<string> = new Set([
-  'saka.authn.v1.SessionService/RevokeSession',
-  'saka.authn.v1.MultifactorService/RegenerateRecoveryCodes',
-  'saka.authn.v1.MultifactorService/DisableMfa',
-  'saka.authn.v1.WebAuthnService/DeleteCredential',
-  'saka.identity.v1.UserService/AddPassword',
-  'saka.identity.v1.UserService/RemovePassword'
-])
-
 /** The per-call options that spend one reauthentication proof. */
 export function reauthOptions(token: string): CallOptions {
   return { headers: { [REAUTHENTICATION_HEADER]: token } }

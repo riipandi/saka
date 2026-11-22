@@ -157,6 +157,7 @@ var catalog = []Event{
 	{Source: audit.EventOauthSsoSignIn, Name: "oauth_sso.sign_in", Description: "A session opened through a linked OAuth provider identity."},
 	{Source: audit.EventOauthSsoAccountCreated, Name: "oauth_sso.account_created", Description: "An account was provisioned by an OAuth sign-in."},
 	{Source: audit.EventOauthSsoAccountLinked, Name: "oauth_sso.account_linked", Description: "An OAuth provider identity was bound into an account."},
+	{Source: audit.EventOauthSsoAccountAdopted, Name: "oauth_sso.account_adopted", Description: "An unverified account was taken over by a provider's verified email and its credentials were removed."},
 	{Source: audit.EventOauthSsoAccountUnlinked, Name: "oauth_sso.account_unlinked", Description: "An OAuth provider identity was removed from an account."},
 	{Source: audit.EventUserLocked, Name: "user.locked", Description: "An account was locked by the failed-attempt policy."},
 	{Source: audit.EventUserUnlocked, Name: "user.unlocked", Description: "An account's lockout was lifted."},

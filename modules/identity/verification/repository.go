@@ -105,19 +105,20 @@ func (r *Repository) FindTokenByUser(ctx context.Context, db datastore.Querier, 
 // MarkVerified stamps the account's address as verified. The conditional
 // update keeps an earlier verification instant when one is on record: a
 // row that already carries the stamp is matched by nothing and stays as it
-// was, and the caller treats that as success — the token is consumed either
-// way.
-func (r *Repository) MarkVerified(ctx context.Context, db datastore.Querier, userID uuid.UUID, at time.Time) error {
+// was, and the token path treats that as success — the token is consumed
+// either way. The answer says whether this call moved the stamp.
+func (r *Repository) MarkVerified(ctx context.Context, db datastore.Querier, userID uuid.UUID, at time.Time) (bool, error) {
 	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	ub.Update(entity.TableUsers)
 	ub.Set(ub.Assign("email_verified_at", at))
 	ub.Where(ub.Equal("id", userID), ub.IsNull("email_verified_at"))
 
 	query, args := ub.Build()
-	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("verification: mark verified: %w", err)
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("verification: mark verified: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // DeleteToken consumes the token row. The WHERE carries the hash the caller

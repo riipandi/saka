@@ -172,6 +172,7 @@ var recommendedKeys = []string{
 	"cache.driver",
 	"database.max_conns",
 	"database.min_conns",
+	"fetcher.allow_private_network",
 	"kvstore.enable",
 	"kvstore.db",
 	"log.format",
@@ -187,7 +188,6 @@ var recommendedKeys = []string{
 	"queue.encrypt",
 	"rate_limit.driver",
 	"server.trusted_proxy_headers",
-	"webhook.allow_private_network",
 }
 
 // samplePublishes reports whether the generated sample carries a key. The

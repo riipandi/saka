@@ -8,7 +8,11 @@
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     username CITEXT UNIQUE,
-    email TEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+    -- CITEXT makes the address's identity case-insensitive in the database
+    -- itself: the unique index, every lookup and every join agree that
+    -- Alice@x.com and alice@x.com are one account, whatever a caller forgot
+    -- to fold. The stored text keeps the case the holder typed.
+    email CITEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     display_name TEXT NOT NULL CHECK (char_length(display_name) > 0),
@@ -49,7 +53,15 @@ CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW E
 CREATE TRIGGER trg_users_deleted_record AFTER DELETE ON public.users FOR EACH ROW EXECUTE FUNCTION fn_soft_delete();
 
 CREATE INDEX IF NOT EXISTS idx_users_display_name ON public.users USING gin (display_name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING GIN (username gin_trgm_ops) WHERE username IS NOT NULL;
+-- username is CITEXT, whose type the planner will not match `~~*` against in
+-- the plain-column gin_trgm_ops form — this index never served a search (the
+-- arm stayed unindexable and the three-arm OR seq-scanned). The expression
+-- form is what the query's cast can compose with.
+CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING GIN ((username::text) gin_trgm_ops) WHERE username IS NOT NULL;
+-- The account search filters username, email, and display name with ILIKE
+-- '%term%' (user.ListUsers); the email arm needs its trigram beside the
+-- other two or the three-arm OR cannot compose a full BitmapOr.
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users USING gin (email gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_last_login_at ON public.users (last_login_at) WHERE last_login_at IS NOT NULL;
 
@@ -74,6 +86,14 @@ CREATE TABLE IF NOT EXISTS public.account_restrictions (
 
 CREATE INDEX IF NOT EXISTS idx_account_restrictions_user_active
     ON public.account_restrictions USING btree (user_id) WHERE lifted_at IS NULL;
+
+-- At most one open lockout per account. The failed-attempt policy inserts
+-- into this index with ON CONFLICT DO NOTHING, so every failure past the
+-- bound is a no-op instead of a second row, a second audit record and a
+-- second notice, and the first lockout's expiry is never pushed back by an
+-- attacker's further guesses.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_restrictions_open_lockout
+    ON public.account_restrictions USING btree (user_id) WHERE kind = 'lockout' AND lifted_at IS NULL;
 
 
 -- --------------------------------------------------------
@@ -146,6 +166,10 @@ CREATE TABLE IF NOT EXISTS public.sessions (
 
 -- (user_id needs no single-column index: idx_sessions_user_id_expires_at leads with it)
 CREATE INDEX IF NOT EXISTS idx_sessions_rotated_token_hash ON public.sessions (rotated_token_hash) WHERE rotated_token_hash IS NOT NULL;
+-- The retention sweep's arms (revoked_at < cutoff OR expires_at < cutoff) are user-less, so
+-- the (user_id, expires_at) index cannot serve them; one btree per arm composes as a BitmapOr.
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions USING btree (expires_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_revoked_at ON public.sessions (revoked_at) WHERE revoked_at IS NOT NULL;
 
 -- The table remembering every browser fingerprint an account has signed in
 -- from. A session row is a poor record of a device — it expires and gets
@@ -272,11 +296,15 @@ DROP INDEX IF EXISTS idx_auth_tokens_user_id_purpose;
 DROP INDEX IF EXISTS idx_auth_tokens_expires_at;
 DROP INDEX IF EXISTS idx_auth_tokens_user_id;
 DROP INDEX IF EXISTS idx_sessions_user_id_expires_at;
+DROP INDEX IF EXISTS idx_sessions_revoked_at;
+DROP INDEX IF EXISTS idx_sessions_expires_at;
+DROP INDEX IF EXISTS idx_sessions_rotated_token_hash;
 DROP INDEX IF EXISTS idx_user_groups_users_user_group_id;
 DROP INDEX IF EXISTS idx_user_groups_users_user_id;
 DROP INDEX IF EXISTS idx_users_last_login_at;
 DROP INDEX IF EXISTS idx_users_created_at;
 DROP INDEX IF EXISTS idx_users_username;
+DROP INDEX IF EXISTS idx_users_email;
 DROP INDEX IF EXISTS idx_users_display_name;
 DROP INDEX IF EXISTS idx_user_passwords_updated_at;
 DROP INDEX IF EXISTS idx_user_passwords_created_at;

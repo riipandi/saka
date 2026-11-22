@@ -125,6 +125,7 @@ var catalog = []Event{
 	{EventOauthSsoSignIn, "A session opened through a linked OAuth provider identity."},
 	{EventOauthSsoAccountCreated, "An account was provisioned by an OAuth sign-in."},
 	{EventOauthSsoAccountLinked, "An OAuth provider identity was bound into an account."},
+	{EventOauthSsoAccountAdopted, "An unverified account was taken over by a provider's verified email and its credentials were removed."},
 	{EventOauthSsoAccountUnlinked, "An OAuth provider identity was removed from an account."},
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/urfave/cli/v3"
 
+	"github.com/riipandi/saka/framework/datastore"
 	"github.com/riipandi/saka/internal/config"
 	"github.com/riipandi/saka/internal/registry"
 )
@@ -77,6 +78,19 @@ file decides.`,
 		err = registry.Prewarm(ctx, injector)
 		if err != nil {
 			return fmt.Errorf("serve: %w", err)
+		}
+
+		// The administrator grant is read against the catalog the binary
+		// carries: a deployment seeded before the newest catalog addition
+		// keeps minting tokens whose permissions claim hides the newest
+		// surfaces, and this warning is the only thing that names the gap.
+		// The check is a read, and its own failure never blocks the run.
+		pool, err := do.Invoke[*datastore.Postgres](injector)
+		if err != nil {
+			return fmt.Errorf("serve: %w", err)
+		}
+		if lagErr := checkAdministratorGrants(ctx, pool, log.Slog()); lagErr != nil {
+			log.Slog().WarnContext(ctx, "serve: the administrator grant check failed", "err", lagErr)
 		}
 
 		// The runners are the long-running components of the run, in start

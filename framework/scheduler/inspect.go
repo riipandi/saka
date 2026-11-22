@@ -8,6 +8,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -71,7 +72,7 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	query, args := sb.Build()
 	rows, err := s.store.Query(ctx, query, args...)
 	if err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("scheduler: list the jobs: %w", err)
 	}
 	defer rows.Close()
 
@@ -79,12 +80,12 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	for rows.Next() {
 		var v JobView
 		if err := rows.Scan(&v.ID, &v.Name, &v.Spec, &v.NextDue, &v.LastFired, &v.UpdatedAt); err != nil {
-			return nil, webutil.Pagination{}, err
+			return nil, webutil.Pagination{}, fmt.Errorf("scheduler: list the jobs: %w", err)
 		}
 		jobs = append(jobs, v)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("scheduler: list the jobs: %w", err)
 	}
 
 	cb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -94,7 +95,7 @@ func (s *Scheduler) Jobs(ctx context.Context, search, sortBy string, ascending b
 	query, args = cb.Build()
 	var total int64
 	if err := s.store.QueryRow(ctx, query, args...).Scan(&total); err != nil {
-		return nil, webutil.Pagination{}, err
+		return nil, webutil.Pagination{}, fmt.Errorf("scheduler: count the jobs: %w", err)
 	}
 
 	return jobs, webutil.NewPagination(webutil.PaginationParams{Page: page, Limit: limit}, int(total)), nil
@@ -123,7 +124,7 @@ func (s *Scheduler) RunNow(ctx context.Context, wire string) error {
 		return ErrJobUnknown
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("scheduler: read the job name: %w", err)
 	}
 
 	for i := range s.jobs {

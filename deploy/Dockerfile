@@ -26,7 +26,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && apt-get update -y \
     && apt-get -yqq --no-install-recommends install build-essential curl \
-       inotify-tools pkg-config libssl-dev git unzip ca-certificates jq \
+    inotify-tools pkg-config libssl-dev git unzip ca-certificates jq \
     && update-ca-certificates
 
 # Install the Vite+ global CLI; it manages both the Node.js runtime and pnpm
@@ -43,9 +43,9 @@ RUN set -eux; \
     TINI_DOWNLOAD_URL="https://github.com/krallin/tini/releases/download/v0.19.0" \
     ARCH="$(dpkg --print-architecture)"; \
     case "${ARCH}" in \
-      amd64|x86_64) TINI_BIN_URL="${TINI_DOWNLOAD_URL}/tini" ;; \
-      arm64|aarch64) TINI_BIN_URL="${TINI_DOWNLOAD_URL}/tini-arm64" ;; \
-      *) echo "unsupported architecture: ${ARCH}"; exit 1 ;; \
+    amd64|x86_64) TINI_BIN_URL="${TINI_DOWNLOAD_URL}/tini" ;; \
+    arm64|aarch64) TINI_BIN_URL="${TINI_DOWNLOAD_URL}/tini-arm64" ;; \
+    *) echo "unsupported architecture: ${ARCH}"; exit 1 ;; \
     esac; \
     curl -fsSL "${TINI_BIN_URL}" -o /usr/bin/tini; \
     chmod +x /usr/bin/tini

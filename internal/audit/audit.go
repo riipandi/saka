@@ -514,6 +514,12 @@ const (
 	// email or the spent code.
 	EventOauthSsoAccountLinked = "oauthsso_account_linked"
 
+	// EventOauthSsoAccountAdopted is an unverified local account a provider's
+	// verified email took over: the address was proven by the provider, so
+	// the credentials the unverified row held — set by whoever registered
+	// the address first — were removed before the identity was bound.
+	EventOauthSsoAccountAdopted = "oauthsso_account_adopted"
+
 	// EventOauthSsoAccountUnlinked is a provider identity removed from an
 	// account — by its holder or by an administrator. The payload names
 	// the connection and the provider account id.

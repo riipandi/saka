@@ -218,7 +218,8 @@ func TestAnExpiredLockoutLiftsOnTheReadAndStartsTheStreakFresh(t *testing.T) {
 	repo := NewRepository()
 
 	past := now.Add(-time.Hour)
-	require.NoError(t, repo.ApplyLockout(t.Context(), pool, id, &past, past))
+	_, lockErr := repo.ApplyLockout(t.Context(), pool, id, &past, past)
+	require.NoError(t, lockErr)
 	require.NoError(t, pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
 		for range 5 {
 			if _, err := repo.BumpFailures(t.Context(), tx, id); err != nil {
@@ -249,7 +250,8 @@ func TestAnIndefiniteLockoutStaysUntilTheUnlock(t *testing.T) {
 	id := createAccount(t, pool)
 	now := time.Now().UTC()
 
-	require.NoError(t, NewRepository().ApplyLockout(t.Context(), pool, id, nil, now))
+	_, lockErr := NewRepository().ApplyLockout(t.Context(), pool, id, nil, now)
+	require.NoError(t, lockErr)
 	require.NoError(t, pool.WithTx(t.Context(), func(ctx context.Context, tx datastore.Querier) error {
 		for range 4 {
 			if _, err := NewRepository().BumpFailures(t.Context(), tx, id); err != nil {
@@ -277,4 +279,70 @@ func TestAnIndefiniteLockoutStaysUntilTheUnlock(t *testing.T) {
 	again, err := service.Unlock(t.Context(), id, nil)
 	require.NoError(t, err)
 	assert.False(t, again, "the unlock of an unlocked account is the no-op success")
+}
+
+// TestTheFailuresPastTheBoundLandOneLockout pins the ledger's ceiling: twelve
+// failures at a bound of five leave one open lockout row, one audit record and
+// one notice — and the first lockout's window is never pushed back.
+func TestTheFailuresPastTheBoundLandOneLockout(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	id := createAccount(t, pool)
+	notices := &recordingNotices{}
+	service := NewService(pool, fwaudit.NewRecorder(nil), nil).
+		WithSettings(lockoutSettings).WithLockedNotice(notices)
+
+	landed := 0
+	for range 12 {
+		locked, err := service.RegisterFailure(t.Context(), id, "langdon@example.com", "Robert Langdon")
+		require.NoError(t, err)
+		if locked {
+			landed++
+		}
+	}
+
+	var rows, records int
+	var startedAt, expiresAt time.Time
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*), min(started_at), min(expires_at) FROM public.account_restrictions
+		 WHERE user_id = $1 AND kind = 'lockout' AND lifted_at IS NULL`, id).Scan(&rows, &startedAt, &expiresAt))
+	require.NoError(t, pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM public.audit_logs WHERE event = 'user_locked'`).Scan(&records))
+	assert.Equal(t, 1, rows, "one open lockout")
+	assert.Equal(t, 1, records, "one audit record")
+	assert.Equal(t, 1, landed, "only the failure that landed the row reports a lockout")
+	assert.Len(t, notices.locked, 1, "one notice")
+	assert.Equal(t, 12, failures(t, pool, id), "the streak keeps counting")
+	assert.WithinDuration(t, startedAt.Add(time.Hour), expiresAt, time.Second, "the window was set once")
+}
+
+// TestAnExpiredLockoutDoesNotBlockTheNextOne pins the other side of the unique
+// index: a lockout whose window ended is lifted by the next failure before it
+// counts, so the streak starts fresh and a new lockout can land.
+func TestAnExpiredLockoutDoesNotBlockTheNextOne(t *testing.T) {
+	conttest.SkipWithoutDocker(t)
+
+	pool := migratedPool(t)
+	id := createAccount(t, pool)
+	service := NewService(pool, fwaudit.NewRecorder(nil), nil).WithSettings(lockoutSettings)
+
+	past := time.Now().UTC().Add(-2 * time.Hour)
+	_, err := NewRepository().ApplyLockout(t.Context(), pool, id, new(past.Add(time.Hour)), past)
+	require.NoError(t, err)
+	_, err = pool.Exec(t.Context(), `UPDATE public.users SET failed_attempts = 5 WHERE id = $1`, id)
+	require.NoError(t, err)
+
+	locked, err := service.RegisterFailure(t.Context(), id, "langdon@example.com", "Robert Langdon")
+	require.NoError(t, err)
+	assert.False(t, locked, "the expired window ended the old streak; one failure is not a lockout")
+	assert.Equal(t, 1, failures(t, pool, id))
+
+	for range 4 {
+		_, err = service.RegisterFailure(t.Context(), id, "langdon@example.com", "Robert Langdon")
+		require.NoError(t, err)
+	}
+	status, err := service.Active(t.Context(), pool, id)
+	require.NoError(t, err)
+	assert.Equal(t, KindLockout, status.Kind, "five fresh failures lock again")
 }

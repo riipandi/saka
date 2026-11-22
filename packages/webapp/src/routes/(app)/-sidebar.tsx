@@ -15,7 +15,7 @@ import {
   ShieldOff,
   Users
 } from '@keyline-icons/react'
-import { PanelLeft, PanelRight } from '@keyline-icons/react'
+import { ChevronDown, PanelLeft, PanelRight } from '@keyline-icons/react'
 // The two-tone variant paints the accent the stroke set only outlines, so
 // the selected item reads filled where its idle siblings stay outlined.
 import {
@@ -39,6 +39,13 @@ import * as stylex from '@stylexjs/stylex'
 import { Link, useRouterState } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { Fragment, useState } from 'react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from 'uilibs/components/base/tooltip'
+import { setSidebarGroupOpen, useSidebarClosedGroups } from '#/libraries/app.store'
 import { usePermissions } from '#/libraries/guard/use-permissions'
 import { sidebarStyles } from '#/styles/element/sidebar.stylex'
 
@@ -75,7 +82,7 @@ interface AdminNavItem extends NavItem {
  */
 export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
   {
-    label: 'Identity & Access',
+    label: 'Identity',
     items: [
       {
         icon: Users,
@@ -108,7 +115,7 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
     ]
   },
   {
-    label: 'Security & Governance',
+    label: 'Security',
     items: [
       {
         icon: History,
@@ -134,7 +141,7 @@ export const adminGroups: Array<{ label: string; items: AdminNavItem[] }> = [
     ]
   },
   {
-    label: 'Developer & Integrations',
+    label: 'Developer',
     items: [
       {
         icon: Blocks,
@@ -232,16 +239,18 @@ export function admitsAdminNav(
   can: (permission: string) => boolean,
   isAdministrator: boolean
 ) {
-  return (
-    (item.adminOnly === true && isAdministrator) ||
-    (item.permission !== undefined && can(item.permission))
-  )
+  // The server judges every administration procedure by the administrator role
+  // (`Rule: Admin`), and the admin routes redirect anyone else: a catalog slug
+  // alone never opens a screen, so a non-administrator sees none of them.
+  if (!isAdministrator) return false
+  return item.adminOnly === true || (item.permission !== undefined && can(item.permission))
 }
 
 export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { can, isAdministrator } = usePermissions()
   const [headerHover, setHeaderHover] = useState(false)
+  const closedGroups = useSidebarClosedGroups()
 
   const isActive = (href: LinkProps['to']) =>
     href !== undefined && (pathname === href || pathname.startsWith(href))
@@ -250,7 +259,7 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
     items.map((item) => {
       const itemActive = isActive(item.href)
       const Icon = itemActive && item.activeIcon ? item.activeIcon : item.icon
-      return (
+      const link = (
         <Link
           key={item.label}
           to={item.href}
@@ -265,84 +274,143 @@ export function SideNavbar({ collapsed = false, onToggleCollapse }: SideNavbarPr
           {!collapsed && <span {...stylex.props(sidebarStyles.navLabel)}>{item.label}</span>}
         </Link>
       )
+      // A collapsed item shows only its icon, so the label moves to a tooltip
+      // on the side the content lies on; an expanded one already reads it.
+      if (!collapsed) return link
+      return (
+        <Tooltip key={item.label}>
+          <TooltipTrigger render={link} />
+          <TooltipContent side='right' sideOffset={10}>
+            {item.label}
+          </TooltipContent>
+        </Tooltip>
+      )
     })
 
   return (
-    <nav
-      aria-label='Sidebar'
-      {...stylex.props(
-        sidebarStyles.container,
-        collapsed ? sidebarStyles.containerCollapsed : sidebarStyles.containerExpanded
-      )}
-    >
-      {/* Header zone: logo + hover-reveal collapse trigger */}
-      <div
-        onMouseEnter={() => setHeaderHover(true)}
-        onMouseLeave={() => setHeaderHover(false)}
-        {...stylex.props(sidebarStyles.headerZone, collapsed && sidebarStyles.headerZoneCollapsed)}
+    <TooltipProvider>
+      <nav
+        aria-label='Sidebar'
+        {...stylex.props(
+          sidebarStyles.container,
+          collapsed ? sidebarStyles.containerCollapsed : sidebarStyles.containerExpanded
+        )}
       >
+        {/* Header zone: logo + hover-reveal collapse trigger */}
         <div
+          onMouseEnter={() => setHeaderHover(true)}
+          onMouseLeave={() => setHeaderHover(false)}
           {...stylex.props(
-            sidebarStyles.logoSection,
-            collapsed && sidebarStyles.logoSectionCollapsed
+            sidebarStyles.headerZone,
+            collapsed && sidebarStyles.headerZoneCollapsed
           )}
         >
-          <Link
-            to='/'
-            aria-label='Home'
+          <div
             {...stylex.props(
-              sidebarStyles.logoLink,
-              collapsed && sidebarStyles.logoLinkCollapsed,
-              collapsed && headerHover && sidebarStyles.logoFade
+              sidebarStyles.logoSection,
+              collapsed && sidebarStyles.logoSectionCollapsed
             )}
           >
-            <div {...stylex.props(sidebarStyles.logoIconWrap)}>
-              <LogoMark />
-            </div>
-            {!collapsed && (
-              <div>
-                <div {...stylex.props(sidebarStyles.logoText)}>Saka</div>
-                <div {...stylex.props(sidebarStyles.logoVersion)}>
-                  {import.meta.env.PUBLIC_APP_VERSION}
-                </div>
+            <Link
+              to='/'
+              aria-label='Home'
+              {...stylex.props(
+                sidebarStyles.logoLink,
+                collapsed && sidebarStyles.logoLinkCollapsed,
+                collapsed && headerHover && sidebarStyles.logoFade
+              )}
+            >
+              <div {...stylex.props(sidebarStyles.logoIconWrap)}>
+                <LogoMark />
               </div>
-            )}
-          </Link>
+              {!collapsed && (
+                <div>
+                  <div {...stylex.props(sidebarStyles.logoText)}>Saka</div>
+                  <div {...stylex.props(sidebarStyles.logoVersion)}>
+                    {import.meta.env.PUBLIC_APP_VERSION}
+                  </div>
+                </div>
+              )}
+            </Link>
+          </div>
+
+          {onToggleCollapse && (
+            <button
+              type='button'
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              {...stylex.props(
+                sidebarStyles.collapseTrigger,
+                (!collapsed || headerHover) && sidebarStyles.collapseTriggerVisible,
+                collapsed && sidebarStyles.collapseTriggerCollapsed
+              )}
+            >
+              {collapsed ? <PanelRight size={16} /> : <PanelLeft size={16} />}
+            </button>
+          )}
         </div>
 
-        {onToggleCollapse && (
-          <button
-            type='button'
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            {...stylex.props(
-              sidebarStyles.collapseTrigger,
-              (!collapsed || headerHover) && sidebarStyles.collapseTriggerVisible,
-              collapsed && sidebarStyles.collapseTriggerCollapsed
-            )}
-          >
-            {collapsed ? <PanelRight size={16} /> : <PanelLeft size={16} />}
-          </button>
-        )}
-      </div>
-
-      {/* Main nav */}
-      <div
-        {...stylex.props(sidebarStyles.navContent, collapsed && sidebarStyles.navContentCollapsed)}
-      >
-        {renderNavItems(navItems)}
-        {adminGroups.map((group) => {
-          const items = group.items.filter((item) => admitsAdminNav(item, can, isAdministrator))
-          if (items.length === 0) return null
-          return (
-            <Fragment key={group.label}>
-              {collapsed && <div {...stylex.props(sidebarStyles.divider)} />}
-              {!collapsed && <p {...stylex.props(sidebarStyles.sectionLabel)}>{group.label}</p>}
-              {renderNavItems(items)}
-            </Fragment>
-          )
-        })}
-      </div>
-    </nav>
+        {/* Main nav */}
+        <div
+          {...stylex.props(
+            sidebarStyles.navContent,
+            collapsed && sidebarStyles.navContentCollapsed
+          )}
+        >
+          {renderNavItems(navItems)}
+          {adminGroups.map((group) => {
+            const items = group.items.filter((item) => admitsAdminNav(item, can, isAdministrator))
+            if (items.length === 0) return null
+            if (collapsed) {
+              // No labels in the icon-only rail, so there is nothing to fold under.
+              return (
+                <Fragment key={group.label}>
+                  <div {...stylex.props(sidebarStyles.divider)} />
+                  {renderNavItems(items)}
+                </Fragment>
+              )
+            }
+            // The fold is a preference; the page the user is on is a fact, so the
+            // group holding the active route stays open over a stored close.
+            const open =
+              !closedGroups.includes(group.label) || items.some((item) => isActive(item.href))
+            const panelId = `sidebar-group-${group.label.toLowerCase().replace(/\W+/g, '-')}`
+            return (
+              <div key={group.label} {...stylex.props(sidebarStyles.group)}>
+                <button
+                  type='button'
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => setSidebarGroupOpen(group.label, !open)}
+                  {...stylex.props(sidebarStyles.groupTrigger)}
+                >
+                  <span {...stylex.props(sidebarStyles.groupLabel)}>{group.label}</span>
+                  <ChevronDown
+                    {...stylex.props(
+                      sidebarStyles.groupChevron,
+                      !open && sidebarStyles.groupChevronClosed
+                    )}
+                  />
+                </button>
+                {/* A grid row that goes between 1fr and 0fr: the browser animates the real
+                    content height, with no measured value to fall out of step at the end. */}
+                <div
+                  id={panelId}
+                  inert={!open}
+                  {...stylex.props(
+                    sidebarStyles.groupPanel,
+                    open ? sidebarStyles.groupPanelOpen : sidebarStyles.groupPanelClosed
+                  )}
+                >
+                  <div {...stylex.props(sidebarStyles.groupPanelInner)}>
+                    {renderNavItems(items)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </nav>
+    </TooltipProvider>
   )
 }

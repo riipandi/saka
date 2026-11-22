@@ -231,7 +231,7 @@ var Package = do.Package(
 		if err := service.Err(); err != nil {
 			return nil, fmt.Errorf("identity: jwks: %w", err)
 		}
-		if alg, err := service.SigningAlgorithm(); err == nil {
+		if alg, err := service.SigningAlgorithm(context.Background()); err == nil {
 			log.Info("jwks: signing algorithm resolved", "algorithm", alg.String(),
 				"source", resolvedAlgorithmSource(c))
 		} else if errors.Is(err, jwks.ErrNoSigningKey) || errors.Is(err, jwks.ErrNoStoredKeys) {
@@ -505,7 +505,7 @@ var Package = do.Package(
 		}
 		service, err := webauthn.NewService(*c, pool, webauthn.NewRepository(), issuer, reader, recorder, log)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("identity: webauthn service: %w", err)
 		}
 		// The email-code proof's send pair rides the post-construction
 		// seam, the way the password recovery service takes its notifier:
@@ -663,6 +663,12 @@ var Package = do.Package(
 		if profiles := do.MustInvoke[*user.Service](i); profiles != nil {
 			service = service.WithProfiles(profiles)
 		}
+		service = service.WithAccountAdopter(accountAdoption{
+			verification: do.MustInvoke[*verification.Service](i),
+			passwords:    do.MustInvoke[*password.Service](i),
+			factors:      do.MustInvoke[*multifactor.Service](i),
+			sessions:     do.MustInvoke[*session.Service](i),
+		})
 		if tokenPosts != nil {
 			service = service.WithTokenPoster(tokenPosts)
 		}

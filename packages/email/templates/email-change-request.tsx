@@ -63,7 +63,7 @@ export const EmailChangeRequest = ({ logoURL, appName, data }: EmailChangeReques
       <Hr style={{ marginTop: '20px' }} />
 
       <Alert variant='warning' style={{ marginTop: '20px' }}>
-        <strong>Important:</strong> This code will expire in 24 hours. If you did not request this
+        <strong>Important:</strong> This code will expire in 15 minutes. If you did not request this
         change, please ignore this email.
       </Alert>
 
@@ -93,7 +93,7 @@ EmailChangeRequest.PreviewProps = {
     name: 'John Doe',
     oldEmail: 'current@example.com',
     newEmail: 'new@example.com',
-    confirmCode: 'CHAMBER-SECRETS'
+    confirmCode: 'HRM20483'
   }
 }
 

@@ -6,7 +6,8 @@ the **Administration** section in the sidebar — puts all of it behind a
 sign-in that carries the administrator role; a visitor without it is
 simply not shown the section, and the screens themselves stay out of
 reach. Everything here is also the administrative API — the same one the
-console uses.
+console uses. Each group in the sidebar folds; the console remembers the
+groups you closed, and keeps the group you are working in open.
 
 ## Accounts
 

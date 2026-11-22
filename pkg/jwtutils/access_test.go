@@ -42,7 +42,7 @@ func (k keySource) HMACKey(context.Context) (jwk.Key, error) {
 	return k.hmacKey()
 }
 
-func (k keySource) SigningAlgorithm() (jwa.SignatureAlgorithm, error) {
+func (k keySource) SigningAlgorithm(context.Context) (jwa.SignatureAlgorithm, error) {
 	return k.algorithm, nil
 }
 
@@ -144,8 +144,8 @@ func TestNewCallerRefusesATokenWithoutASubject(t *testing.T) {
 // carries the registered claim the private claims do not.
 func TestNewCallerKeepsTheSubjectAndTheClaims(t *testing.T) {
 	caller, err := NewCaller(Verified[AccessClaims]{
-		Standard: Standard{Subject: "0197abc"},
-		Private:  AccessClaims{Username: "hermione", Roles: []string{"administrator"}, Permissions: []string{"user:*:read", "user:*:ban"}},
+		Subject: "0197abc",
+		Private: AccessClaims{Username: "hermione", Roles: []string{"administrator"}, Permissions: []string{"user:*:read", "user:*:ban"}},
 	})
 	require.NoError(t, err)
 

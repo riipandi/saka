@@ -22,6 +22,7 @@ import (
 	"github.com/riipandi/saka/internal/transport/devtools"
 	"github.com/riipandi/saka/internal/transport/handler"
 	"github.com/riipandi/saka/internal/transport/middleware"
+	"github.com/riipandi/saka/pkg/jwtutils"
 	appweb "github.com/riipandi/saka/web"
 )
 
@@ -204,7 +205,7 @@ func NewRouter(opts Options) chi.Router {
 	r.Group(func(throttled chi.Router) {
 		if opts.RateLimiter != nil {
 			throttled.Use(fwmiddleware.RateLimit(fwmiddleware.RateLimitOptions{
-				Surface: "rest", Limiter: opts.RateLimiter, Refuse: restRefuse,
+				Surface: "rest", Limiter: opts.RateLimiter, Refuse: restRefuse, Unavailable: restUnavailable,
 				Classify: opts.RateClassify, Excluded: httpRateLimitExclusions, TelemetryNamespace: config.AppIdentifier,
 			}))
 		}
@@ -239,7 +240,14 @@ func NewRouter(opts Options) chi.Router {
 					// One handler serves both routes: the per-upload locks
 					// the creation-with-upload append and the PATCHes race
 					// over live on the instance, not on the route.
-					tus := storage.NewTusHandler(manager, log)
+					// The bearer middleware has already put the caller in the
+					// context; an API key acts as the account that owns it.
+					tus := storage.NewTusHandler(manager, log, func(r *http.Request) string {
+						if caller, ok := jwtutils.CallerFrom(r.Context()); ok {
+							return caller.UserID
+						}
+						return ""
+					})
 					mod.Handle("/api/uploads", tus)
 					mod.Handle("/api/uploads/*", tus)
 				}
@@ -258,8 +266,9 @@ func NewRouter(opts Options) chi.Router {
 		if opts.RateLimiter != nil {
 			throttled.Use(fwmiddleware.RateLimit(fwmiddleware.RateLimitOptions{
 				Surface: "rpc", Limiter: opts.RateLimiter,
-				Refuse:   rpcRefuseWith(opts.Config.Server.MaxRequestBytes),
-				Classify: opts.RateClassify, Excluded: rpcRateLimitExclusions, TelemetryNamespace: config.AppIdentifier,
+				Refuse:      rpcRefuseWith(opts.Config.Server.MaxRequestBytes),
+				Unavailable: rpcUnavailableWith(opts.Config.Server.MaxRequestBytes),
+				Classify:    opts.RateClassify, Excluded: rpcRateLimitExclusions, TelemetryNamespace: config.AppIdentifier,
 			}))
 		}
 
@@ -292,6 +301,12 @@ func NewRouter(opts Options) chi.Router {
 	// tags from the embedded manifest.
 	appweb.SetupStatic(r)
 	return r
+}
+
+// restUnavailable answers a REST request the limiter could not judge, for a
+// class that fails closed: a 503 in the envelope.
+func restUnavailable(w http.ResponseWriter, r *http.Request) {
+	webutil.Fail(w, r, http.StatusServiceUnavailable, "the request limiter is unavailable; retry shortly")
 }
 
 // restRefuse answers a limited REST request with the envelope: a 429 whose

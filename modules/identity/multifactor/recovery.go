@@ -243,3 +243,16 @@ func (s *Service) VerifyRecoveryCode(ctx context.Context, userID uuid.UUID, code
 	})
 	return nil
 }
+
+// DiscardFactors removes every authenticator, recovery code and open
+// sign-in bridge an account holds, inside the caller's transaction — the
+// second-factor half of an account's adoption by a verified identity.
+func (s *Service) DiscardFactors(ctx context.Context, tx datastore.Querier, userID uuid.UUID) error {
+	if _, err := s.repo.DeleteAllTotpForUser(ctx, tx, userID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteAllRecoveryForUser(ctx, tx, userID); err != nil {
+		return err
+	}
+	return s.repo.DeletePendingForUser(ctx, tx, userID)
+}

@@ -72,7 +72,7 @@ func (r *Repository) Insert(ctx context.Context, db datastore.Querier, conn Conn
 		if errors.As(err, &pg) && pg.Code == "23505" {
 			return uuid.Nil(), time.Time{}, ErrProviderTaken
 		}
-		return uuid.Nil(), time.Time{}, err
+		return uuid.Nil(), time.Time{}, fmt.Errorf("oauthsso: create the connection: %w", err)
 	}
 	return id, create, nil
 }
@@ -88,7 +88,7 @@ func (r *Repository) List(ctx context.Context) ([]Connection, error) {
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oauthsso: list connections: %w", err)
 	}
 	defer rows.Close()
 
@@ -96,11 +96,14 @@ func (r *Repository) List(ctx context.Context) ([]Connection, error) {
 	for rows.Next() {
 		conn, err := scanConnection(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("oauthsso: list connections: %w", err)
 		}
 		out = append(out, conn)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oauthsso: list connections: %w", err)
+	}
+	return out, nil
 }
 
 // ByID reads one connection by its row id, on the query surface it is
@@ -111,7 +114,11 @@ func (r *Repository) ByID(ctx context.Context, db datastore.Querier, id uuid.UUI
 	sb.From(entity.TableOAuthConnections)
 	sb.Where(sb.Equal("id", id))
 	query, args := sb.Build()
-	return scanConnection(db.QueryRow(ctx, query, args...))
+	conn, err := scanConnection(db.QueryRow(ctx, query, args...))
+	if err != nil && !errors.Is(err, ErrConnectionNotFound) {
+		return Connection{}, fmt.Errorf("oauthsso: read the connection: %w", err)
+	}
+	return conn, err
 }
 
 // ByProvider reads one connection by its provider slug — the word
@@ -122,7 +129,11 @@ func (r *Repository) ByProvider(ctx context.Context, db datastore.Querier, provi
 	sb.From(entity.TableOAuthConnections)
 	sb.Where(sb.Equal("provider", provider))
 	query, args := sb.Build()
-	return scanConnection(db.QueryRow(ctx, query, args...))
+	conn, err := scanConnection(db.QueryRow(ctx, query, args...))
+	if err != nil && !errors.Is(err, ErrConnectionNotFound) {
+		return Connection{}, fmt.Errorf("oauthsso: read the connection: %w", err)
+	}
+	return conn, err
 }
 
 // Update rewrites one connection's editable columns and answers the row's
@@ -156,7 +167,7 @@ func (r *Repository) Update(ctx context.Context, db datastore.Querier, id uuid.U
 		if errors.As(err, &pg) && pg.Code == "23505" {
 			return time.Time{}, ErrProviderTaken
 		}
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("oauthsso: update the connection: %w", err)
 	}
 	if updated == nil {
 		return time.Time{}, nil
@@ -174,7 +185,7 @@ func (r *Repository) Delete(ctx context.Context, db datastore.Querier, id uuid.U
 	query, args := dbb.Build()
 	tag, err := db.Exec(ctx, query, args...)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oauthsso: delete the connection: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -213,7 +224,7 @@ func (r *Repository) CreateFlow(ctx context.Context, db datastore.Querier, connI
 		if errors.As(err, &pg) && pg.Code == "23505" {
 			return uuid.Nil(), fmt.Errorf("oauthsso: the flow's state collided with a live one")
 		}
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("oauthsso: create the flow: %w", err)
 	}
 	return id, nil
 }
@@ -263,7 +274,7 @@ func (r *Repository) ConsumePending(ctx context.Context, db datastore.Querier, i
 	query, args := sb.Build()
 	tag, err := db.Exec(ctx, query, args...)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oauthsso: consume the flow: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -297,7 +308,7 @@ func (r *Repository) DeleteExpiredFlows(ctx context.Context, now time.Time) (int
 	query, args := dbt.Build()
 	tag, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("oauthsso: delete expired flows: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }
@@ -330,7 +341,7 @@ func (r *Repository) CreateLinkedAccount(ctx context.Context, db datastore.Queri
 		row.EmailVerified, profileJSONFromBytes(row.Profile), row.AccessToken, row.RefreshToken, row.AccessExpiresAt)
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return err
+		return fmt.Errorf("oauthsso: create the linked account: %w", err)
 	}
 	return nil
 }
@@ -351,7 +362,7 @@ func (r *Repository) UpdateBindingTokens(ctx context.Context, db datastore.Queri
 	ub.Where(ub.Equal("id", id))
 	query, args := ub.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return err
+		return fmt.Errorf("oauthsso: update the binding tokens: %w", err)
 	}
 	return nil
 }
@@ -372,7 +383,7 @@ func (r *Repository) AccountIDByEmail(ctx context.Context, db datastore.Querier,
 		return uuid.Nil(), datastore.ErrNoRows
 	}
 	if err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("oauthsso: find the account by email: %w", err)
 	}
 	return id, nil
 }
@@ -389,7 +400,7 @@ func (r *Repository) CreateAccount(ctx context.Context, db datastore.Querier, ro
 		nullIfEmpty(row.LastName), row.DisplayName, row.EmailVerifiedAt)
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("oauthsso: create the account: %w", err)
 	}
 	return row.ID, nil
 }
@@ -409,7 +420,11 @@ func (r *Repository) MoveToVerifyEmail(ctx context.Context, db datastore.Querier
 	)
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageResolved)))
 	query, args := sb.Build()
-	return execAffected(ctx, db, query, args...)
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: move the flow to the verify-email stage: %w", err)
+	}
+	return landed, nil
 }
 
 // MoveToRequireNames pauses the flow for the names the provider did not
@@ -420,7 +435,11 @@ func (r *Repository) MoveToRequireNames(ctx context.Context, db datastore.Querie
 	sb.Set(sb.Assign("stage", string(StageRequireNames)))
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageResolved)))
 	query, args := sb.Build()
-	return execAffected(ctx, db, query, args...)
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: move the flow to the names stage: %w", err)
+	}
+	return landed, nil
 }
 
 // UpdateFlowNames stores the names the caller collected at the names
@@ -431,7 +450,11 @@ func (r *Repository) UpdateFlowNames(ctx context.Context, db datastore.Querier, 
 	sb.Set(sb.Assign("given_name", given), sb.Assign("family_name", family))
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageRequireNames)))
 	query, args := sb.Build()
-	return execAffected(ctx, db, query, args...)
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: store the flow's names: %w", err)
+	}
+	return landed, nil
 }
 
 // SpendEmailCode consumes the verify_email stage: the guarded update
@@ -451,7 +474,11 @@ func (r *Repository) SpendEmailCode(ctx context.Context, db datastore.Querier, i
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageVerifyEmail)),
 		sb.Equal("email_code_hash", codeHash), sb.LessThan("wrong_codes", maxWrongCodes))
 	query, args := sb.Build()
-	return execAffected(ctx, db, query, args...)
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: spend the email code: %w", err)
+	}
+	return landed, nil
 }
 
 // StrikeEmailCode counts one wrong answer and reports whether the flow
@@ -465,8 +492,11 @@ func (r *Repository) StrikeEmailCode(ctx context.Context, db datastore.Querier, 
 	sb.Where(sb.Equal("id", id), sb.Equal("stage", string(StageVerifyEmail)), sb.Equal("wrong_codes", strikes))
 	query, args := sb.Build()
 	landed, err := execAffected(ctx, db, query, args...)
-	if err != nil || !landed {
-		return false, err
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: strike the email code: %w", err)
+	}
+	if !landed {
+		return false, nil
 	}
 	return strikes+1 >= maxWrongCodes, nil
 }
@@ -479,8 +509,10 @@ func (r *Repository) FailFlow(ctx context.Context, db datastore.Querier, id uuid
 	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("email_code_hash", ""))
 	sb.Where(sb.Equal("id", id))
 	query, args := sb.Build()
-	_, err := db.Exec(ctx, query, args...)
-	return err
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("oauthsso: fail the flow: %w", err)
+	}
+	return nil
 }
 
 // CompleteFlow spends the flow the resolution served: the account the
@@ -492,7 +524,11 @@ func (r *Repository) CompleteFlow(ctx context.Context, db datastore.Querier, id 
 	sb.Set(sb.Assign("stage", string(StageCompleted)), sb.Assign("user_id", userID))
 	sb.Where(sb.Equal("id", id), sb.In("stage", string(StageResolved), string(StageRequireNames)))
 	query, args := sb.Build()
-	return execAffected(ctx, db, query, args...)
+	landed, err := execAffected(ctx, db, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("oauthsso: complete the flow: %w", err)
+	}
+	return landed, nil
 }
 
 // execAffected answers whether the write found its row — the guarded
@@ -566,18 +602,21 @@ func (r *Repository) LinkedAccountsByUser(ctx context.Context, db datastore.Quer
 	query, args := sb.Build()
 	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oauthsso: list the linked accounts: %w", err)
 	}
 	defer rows.Close()
 	var out []LinkedAccountView
 	for rows.Next() {
 		view, scanErr := scanLinkedAccountView(rows)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, fmt.Errorf("oauthsso: list the linked accounts: %w", scanErr)
 		}
 		out = append(out, view)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oauthsso: list the linked accounts: %w", err)
+	}
+	return out, nil
 }
 
 // LinkedAccountByID reads one binding with its connection's slug.
@@ -593,7 +632,7 @@ func (r *Repository) LinkedAccountByID(ctx context.Context, db datastore.Querier
 		return LinkedAccountView{}, datastore.ErrNoRows
 	}
 	if err != nil {
-		return LinkedAccountView{}, err
+		return LinkedAccountView{}, fmt.Errorf("oauthsso: read the linked account: %w", err)
 	}
 	return view, nil
 }
@@ -620,18 +659,21 @@ func (r *Repository) OffboardCandidates(ctx context.Context, db datastore.Querie
 	query, args := sb.Build()
 	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oauthsso: list the offboard candidates: %w", err)
 	}
 	defer rows.Close()
 	var out []LinkedAccountView
 	for rows.Next() {
 		view, scanErr := scanLinkedAccountView(rows)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, fmt.Errorf("oauthsso: list the offboard candidates: %w", scanErr)
 		}
 		out = append(out, view)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("oauthsso: list the offboard candidates: %w", err)
+	}
+	return out, nil
 }
 
 // CountTokenlessBindings answers how many bindings carry no refresh token —
@@ -644,7 +686,7 @@ func (r *Repository) CountTokenlessBindings(ctx context.Context, db datastore.Qu
 	query, args := sb.Build()
 	var count int
 	if err := db.QueryRow(ctx, query, args...).Scan(&count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("oauthsso: count the tokenless bindings: %w", err)
 	}
 	return count, nil
 }
@@ -661,7 +703,7 @@ func (r *Repository) KeepsAnotherCredential(ctx context.Context, db datastore.Qu
 		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID, excludeID).
 		Scan(&others)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oauthsso: count the other credentials: %w", err)
 	}
 	return others > 0, nil
 }
@@ -678,7 +720,7 @@ func (r *Repository) HoldsAlternativeCredential(ctx context.Context, db datastor
 		  + (SELECT count(*) FROM public.webauthn_credentials WHERE user_id = $1)`, userID).
 		Scan(&others)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("oauthsso: count the alternative credentials: %w", err)
 	}
 	return others > 0, nil
 }

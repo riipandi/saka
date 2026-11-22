@@ -147,7 +147,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 	if search != "" {
 		pattern := "%" + search + "%"
 		sb.Where(sb.Or(
-			sb.ILike("u.username", pattern),
+			sb.ILike("u.username::text", pattern),
 			sb.ILike("u.email", pattern),
 			sb.ILike("u.display_name", pattern),
 		))
@@ -180,7 +180,7 @@ func (r *Repository) ListUsers(ctx context.Context, db datastore.Querier, search
 	if search != "" {
 		pattern := "%" + search + "%"
 		cb.Where(cb.Or(
-			cb.ILike("username", pattern),
+			cb.ILike("username::text", pattern),
 			cb.ILike("email", pattern),
 			cb.ILike("display_name", pattern),
 		))
@@ -211,9 +211,51 @@ func (r *Repository) CreateUser(ctx context.Context, db datastore.Querier, row U
 
 	query, args := ib.Build()
 	if _, err := db.Exec(ctx, query, args...); err != nil {
-		return uuid.Nil(), err
+		return uuid.Nil(), fmt.Errorf("user: create the account: %w", err)
 	}
 	return row.ID, nil
+}
+
+// LockUser takes the account's row lock for the rest of the transaction, so
+// a read that follows sees the committed state and a write that follows
+// cannot be undone by one that read before it. ErrNoRows names an account
+// that does not exist.
+func (r *Repository) LockUser(ctx context.Context, db datastore.Querier, id uuid.UUID) error {
+	var locked uuid.UUID
+	err := db.QueryRow(ctx, `SELECT id FROM `+entity.TableUsers+` WHERE id = $1 FOR UPDATE`, id).Scan(&locked)
+	if errors.Is(err, datastore.ErrNoRows) {
+		return datastore.ErrNoRows
+	}
+	if err != nil {
+		return fmt.Errorf("user: lock: %w", err)
+	}
+	return nil
+}
+
+// UpdateProfile writes the columns an account's holder and its identity
+// sources own — the handle, the names, the display name and the preference
+// document. The address, the disabled flag and the verification stamp are
+// not here: they belong to the email-change confirmation and the
+// administrator, and a profile write must never carry a stale copy of them
+// back over a change that landed in between.
+func (r *Repository) UpdateProfile(ctx context.Context, db datastore.Querier, row UserSchema) (bool, error) {
+	ub := sqlbuilder.PostgreSQL.NewUpdateBuilder()
+	ub.Update(entity.TableUsers)
+	ub.Set(
+		ub.Assign("username", row.Username),
+		ub.Assign("first_name", nullIfEmpty(row.FirstName)),
+		ub.Assign("last_name", nullIfEmpty(row.LastName)),
+		ub.Assign("display_name", row.DisplayName),
+		ub.Assign("metadata", nullJSON(row.Metadata)),
+	)
+	ub.Where(ub.Equal("id", row.ID))
+
+	query, args := ub.Build()
+	tag, err := db.Exec(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("user: update profile: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // UpdateUser replaces an account's writable fields and answers whether the

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
@@ -106,6 +107,12 @@ type Caller struct {
 	// zero value is a session, because a token is the only credential the
 	// field's absence can mean.
 	Credential CredentialKind
+
+	// ExpiresAt is when the credential the request authenticated with ends:
+	// the access token's own expiry. A long-lived request — a server stream —
+	// must not outlive it. The zero value means the credential carries no
+	// expiry of its own (an API key), so no deadline applies.
+	ExpiresAt time.Time
 }
 
 // NewCaller builds the caller from a verified token. A token whose subject is
@@ -115,7 +122,7 @@ func NewCaller(verified Verified[AccessClaims]) (*Caller, error) {
 	if verified.Subject == "" {
 		return nil, ErrMissingSubject
 	}
-	return &Caller{AccessClaims: verified.Private, UserID: verified.Subject}, nil
+	return &Caller{AccessClaims: verified.Private, UserID: verified.Subject, ExpiresAt: verified.ExpiresAt}, nil
 }
 
 // IsImpersonating reports whether the caller acts for another account. A
@@ -155,17 +162,20 @@ func (c *Caller) HasRole(role string) bool {
 //
 // jwks.Service satisfies it. The cached KeyProvider does not — an HMAC secret
 // is not in the published set, so a verifier resolves through the key service
-// itself and a rotation is picked up on the next call.
+// itself and a rotation is picked up within the service's own cache window.
 type SigningKeySource interface {
 	KeyProvider
 	HMACKey(ctx context.Context) (jwk.Key, error)
-	SigningAlgorithm() (jwa.SignatureAlgorithm, error)
+	SigningAlgorithm(ctx context.Context) (jwa.SignatureAlgorithm, error)
 }
 
-// AccessVerifier verifies the access tokens this process signs. The key and
-// algorithm resolve on every call, and the verifier is built with that exact
-// pair, so the accepted algorithm is pinned by construction — a token signed
-// under another algorithm fails before any key material is tried.
+// AccessVerifier verifies the access tokens this process signs. The algorithm
+// resolves on every call: a symmetric one verifies with the HMAC secret, any
+// other against the published public key set by the token's `kid`, so every
+// active key verifies — a key staged for rotation is accepted before it signs,
+// and the retiring one until it is retired — and the private half is never
+// opened to verify. The accepted algorithm is pinned by the key's own `alg`
+// in the set.
 type AccessVerifier struct {
 	keys   SigningKeySource
 	issuer string
@@ -179,26 +189,32 @@ func NewAccessVerifier(keys SigningKeySource, issuer string) *AccessVerifier {
 
 // Verify checks the token and decodes its typed private claims.
 func (v *AccessVerifier) Verify(ctx context.Context, token string) (Verified[AccessClaims], error) {
-	algorithm, err := v.keys.SigningAlgorithm()
+	algorithm, err := v.keys.SigningAlgorithm(ctx)
 	if err != nil {
 		return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: signing algorithm: %w", err)
 	}
 
-	var key jwk.Key
 	if algorithm.IsSymmetric() {
-		key, err = v.keys.HMACKey(ctx)
-	} else {
-		key, err = v.keys.SignKey(ctx)
-	}
-	if err != nil {
-		return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: signing key: %w", err)
+		key, keyErr := v.keys.HMACKey(ctx)
+		if keyErr != nil {
+			return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: signing key: %w", keyErr)
+		}
+		verifier, verifierErr := NewVerifier[AccessClaims](key, algorithm)
+		if verifierErr != nil {
+			return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: verifier: %w", verifierErr)
+		}
+		return verifier.WithIssuer(v.issuer).Verify(token)
 	}
 
-	verifier, err := NewVerifier[AccessClaims](key, algorithm)
+	set, err := v.keys.VerifyKeySet(ctx)
+	if err != nil {
+		return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: verification keys: %w", err)
+	}
+	verifier, err := NewVerifier[AccessClaims](nil, algorithm)
 	if err != nil {
 		return Verified[AccessClaims]{}, fmt.Errorf("jwtutils: verifier: %w", err)
 	}
-	return verifier.WithIssuer(v.issuer).Verify(token)
+	return verifier.WithKeySet(set).WithIssuer(v.issuer).Verify(token)
 }
 
 // VerifyCaller verifies the token and answers the principal it authenticates.

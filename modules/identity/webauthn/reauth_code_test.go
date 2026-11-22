@@ -49,7 +49,7 @@ func TestTheEmailCodeProofMintsTheToken(t *testing.T) {
 	require.Len(t, enqueuer.mail, 1)
 	sent := enqueuer.mail[0]
 	assert.Equal(t, account.Email, sent.Email)
-	assert.Len(t, sent.Token, reauthCodeLength)
+	assert.Regexp(t, `^[A-HJ-NP-Z]{3}[2-9]{5}$`, sent.Token)
 
 	// The code proves the caller and mints the standard token — the one
 	// the guarded call's header spends exactly once.

@@ -198,10 +198,11 @@ func TestUserSeederIsIdempotent(t *testing.T) {
 	assert.Equal(t, hash, storedHash(t, pool), "a skipped account must keep its password")
 }
 
-// public.users.email is TEXT, not citext, so the lookup is case-sensitive. The
-// seeder claims its own address and leaves a differently-cased one alone, which
-// is what the unique index on email does.
-func TestUserSeederTreatsEmailCaseSensitively(t *testing.T) {
+// public.users.email is CITEXT, so the lookup folds case: an account holding
+// the default address in another case is the default account, and the seeder
+// leaves it alone rather than inserting a second one the unique index would
+// refuse.
+func TestUserSeederTreatsEmailCaseInsensitively(t *testing.T) {
 	pool := newSeededPool(t)
 	ctx := t.Context()
 
@@ -211,9 +212,8 @@ func TestUserSeederTreatsEmailCaseSensitively(t *testing.T) {
 
 	results := runSeeders(t, pool, false)
 
-	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+5)
-	assert.Empty(t, results[1].Skipped)
-	assert.Equal(t, len(seeders.ScenarioEmails)+3, userCount(t, pool), "the conformance suite account rides the full seed")
+	assert.Len(t, results[1].Created, len(seeders.ScenarioEmails)+4, "the scenario accounts, the administrator grant on the existing account")
+	assert.Equal(t, len(seeders.ScenarioEmails)+2, userCount(t, pool), "the conformance suite account rides the full seed")
 }
 
 // A conflict on the username alone must also leave the existing account in

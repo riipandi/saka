@@ -104,6 +104,11 @@ test.describe.serial('the account email flow', () => {
 
     await page.locator('#new-email').fill(secondEmail)
     await page.getByRole('button', { name: 'Request change' }).click()
+
+    // The request is step-up guarded: the dialog asks for the account's
+    // password before the call is made.
+    await page.fill('#reauth-password', password)
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(page.getByText(`The confirm code was sent to ${secondEmail}`)).toBeVisible({
       timeout: 15_000
     })

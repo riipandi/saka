@@ -36,13 +36,18 @@ const TusMaxMetadataBytes = 4096
 // staging file's size, the length is the manifest metadata's record — so
 // there is no second book beside the engine's.
 //
-// Authentication is the transport's bearer middleware; the handler reads
-// nothing about the caller. Authorization is the creation-time check the
-// bucket's existence and limits make; any authenticated account may upload
-// into any bucket until a per-bucket model exists.
+// Authentication is the transport's bearer middleware; the handler learns
+// the caller only through the Owner function it is given. Authorization is
+// two checks: the creation-time one the bucket's existence and limits make
+// (any authenticated account may upload into any bucket until a per-bucket
+// model exists), and the ownership one — a session belongs to the account
+// that began it, a key that already holds a stored file is never replaced,
+// and every other request names a session it does not own with the answer a
+// missing one gets.
 type TusHandler struct {
 	manager *Manager
 	log     *slog.Logger
+	owner   func(*http.Request) string
 
 	// locks serializes the appends per upload: the offset claim a PATCH
 	// makes is only the whole concurrency story if two chunks for one file
@@ -52,12 +57,18 @@ type TusHandler struct {
 	locks sync.Map
 }
 
-// NewTusHandler builds the protocol handler over the engine.
-func NewTusHandler(manager *Manager, log *slog.Logger) *TusHandler {
+// NewTusHandler builds the protocol handler over the engine. owner names the
+// account a request acts for; it must answer the same string for the same
+// account on every request, and a handler built with a nil owner treats
+// every caller as the same anonymous one.
+func NewTusHandler(manager *Manager, log *slog.Logger, owner func(*http.Request) string) *TusHandler {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &TusHandler{manager: manager, log: log}
+	if owner == nil {
+		owner = func(*http.Request) string { return "" }
+	}
+	return &TusHandler{manager: manager, log: log, owner: owner}
 }
 
 // ServeHTTP routes the protocol's methods. The version handshake wraps
@@ -159,7 +170,11 @@ func (h *TusHandler) create(w http.ResponseWriter, r *http.Request) {
 		store["content_type"] = fileType
 	}
 
-	if err := h.manager.TusBegin(r.Context(), bucket, key, length, store); err != nil {
+	if err := h.manager.TusBegin(r.Context(), bucket, key, length, h.owner(r), store); err != nil {
+		if errors.Is(err, ErrExists) {
+			tusFail(w, http.StatusConflict, "the key already holds an upload")
+			return
+		}
 		h.refuse(w, r, "the upload could not begin", err)
 		return
 	}
@@ -186,6 +201,9 @@ func (h *TusHandler) head(w http.ResponseWriter, r *http.Request, ref string) {
 	bucket, key, err := SplitRef(ref)
 	if err != nil {
 		tusFail(w, http.StatusNotFound, "no such upload")
+		return
+	}
+	if !h.owns(w, r, bucket, key) {
 		return
 	}
 	offset, err := h.manager.TusOffset(r.Context(), bucket, key)
@@ -229,6 +247,9 @@ func (h *TusHandler) patch(w http.ResponseWriter, r *http.Request, ref string) {
 	unlock := h.lockUpload(bucket + "/" + key)
 	defer unlock()
 
+	if !h.owns(w, r, bucket, key) {
+		return
+	}
 	offset, err := h.appendChunk(r.Context(), bucket, key, claimed, r.Body)
 	if errors.Is(err, ErrOffsetMismatch) {
 		tusFail(w, http.StatusConflict, "the Upload-Offset does not match the upload's current offset")
@@ -250,6 +271,9 @@ func (h *TusHandler) terminate(w http.ResponseWriter, r *http.Request, ref strin
 		tusFail(w, http.StatusNotFound, "no such upload")
 		return
 	}
+	if !h.owns(w, r, bucket, key) {
+		return
+	}
 	if err := h.manager.TusDiscard(r.Context(), bucket, key); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			tusFail(w, http.StatusNotFound, "no such upload")
@@ -259,6 +283,23 @@ func (h *TusHandler) terminate(w http.ResponseWriter, r *http.Request, ref strin
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// owns answers whether the request's account owns the open session at
+// bucket/key, and writes the refusal when it does not. Every kind of
+// "not yours" — no such key, a stored file, someone else's session — is the
+// one 404 a missing upload gets.
+func (h *TusHandler) owns(w http.ResponseWriter, r *http.Request, bucket, key string) bool {
+	err := h.manager.TusSession(r.Context(), bucket, key, h.owner(r))
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, ErrNotFound) {
+		tusFail(w, http.StatusNotFound, "no such upload")
+	} else {
+		h.refuse(w, r, "the upload could not be read", err)
+	}
+	return false
 }
 
 // appendChunk writes one chunk through the engine and completes the
@@ -368,7 +409,7 @@ func parseUploadMetadata(raw string) (map[string]string, error) {
 	if len(raw) > TusMaxMetadataBytes {
 		return nil, errors.New("the Upload-Metadata header is too long")
 	}
-	for _, pair := range strings.Split(raw, ",") {
+	for pair := range strings.SplitSeq(raw, ",") {
 		parts := strings.SplitN(strings.TrimSpace(pair), " ", 2)
 		name := parts[0]
 		if name == "" {

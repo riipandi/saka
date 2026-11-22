@@ -266,14 +266,39 @@ func (h *rpcHandler) WatchNotifications(ctx context.Context, req *notificationv1
 	if err != nil {
 		return err
 	}
+	return h.watch(ctx, caller, stream.Send)
+}
 
+// watch is the stream's body, over the send the transport supplies, so the
+// lifetime rules — the per-account bound and the end at the token's expiry —
+// are testable without a wire.
+func (h *rpcHandler) watch(ctx context.Context, caller *jwtutils.Caller, send func(*notificationv1.WatchEvent) error) error {
 	userID, err := callerUUID(caller)
 	if err != nil {
 		return mapError(err)
 	}
 
-	events, cancel := h.service.Subscribe(userID)
+	events, cancel, err := h.service.Subscribe(userID)
+	if errors.Is(err, ErrTooManyStreams) {
+		return connect.NewError(connect.CodeResourceExhausted, "too many open notification streams")
+	}
+	if err != nil {
+		return mapError(err)
+	}
 	defer cancel()
+
+	// The stream was authenticated once, at open, and its deadline is lifted:
+	// it must not outlive the credential that opened it. At the access
+	// token's expiry it ends and the client reconnects with the token it
+	// refreshed. A revoked session or a banned account is cut the same way,
+	// by the next reconnect failing — the token is the window the stream is
+	// trusted for.
+	var expired <-chan time.Time
+	if !caller.ExpiresAt.IsZero() {
+		timer := time.NewTimer(time.Until(caller.ExpiresAt))
+		defer timer.Stop()
+		expired = timer.C
+	}
 
 	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
@@ -281,7 +306,7 @@ func (h *rpcHandler) WatchNotifications(ctx context.Context, req *notificationv1
 	// The first ping goes out before anything else, so a client that waits
 	// for the stream to open knows the subscription is live — and a create
 	// that follows the open reaches the stream, not the gap before it.
-	if err := stream.Send(&notificationv1.WatchEvent{Kind: "ping"}); err != nil {
+	if err := send(&notificationv1.WatchEvent{Kind: "ping"}); err != nil {
 		return err
 	}
 
@@ -291,16 +316,18 @@ func (h *rpcHandler) WatchNotifications(ctx context.Context, req *notificationv1
 			if !ok {
 				return nil
 			}
-			if err := stream.Send(&notificationv1.WatchEvent{
+			if err := send(&notificationv1.WatchEvent{
 				Kind:         "notification",
 				Notification: wireNotification(row, nil, nil, nil),
 			}); err != nil {
 				return err
 			}
 		case <-ticker.C:
-			if err := stream.Send(&notificationv1.WatchEvent{Kind: "ping"}); err != nil {
+			if err := send(&notificationv1.WatchEvent{Kind: "ping"}); err != nil {
 				return err
 			}
+		case <-expired:
+			return connect.NewError(connect.CodeUnauthenticated, "the access token expired; reconnect with a fresh one")
 		case <-ctx.Done():
 			return nil
 		}

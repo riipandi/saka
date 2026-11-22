@@ -397,7 +397,8 @@ func TestTheBrokerDeliversToTheAudienceItNames(t *testing.T) {
 	hermione := seedAccount(t, pool, "hermione", false)
 	ron := seedAccount(t, pool, "ron", false)
 
-	events, cancel := service.Subscribe(hermione)
+	events, cancel, subscribeErr := service.Subscribe(hermione)
+	require.NoError(t, subscribeErr)
 	defer cancel()
 
 	global := created(t, service, "The Marauder's Map")
@@ -424,7 +425,8 @@ func TestTheBrokerDeliversToTheAudienceItNames(t *testing.T) {
 	}
 
 	// The same create must not have leaked to a stream it did not name.
-	ronEvents, ronCancel := service.Subscribe(ron)
+	ronEvents, ronCancel, ronErr := service.Subscribe(ron)
+	require.NoError(t, ronErr)
 	defer ronCancel()
 	select {
 	case got := <-ronEvents:

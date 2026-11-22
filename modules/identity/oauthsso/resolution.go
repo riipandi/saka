@@ -34,15 +34,9 @@ const (
 	SettingAccountLinkingEnabled = "oauth.account_linking_enabled"
 )
 
-// The email code's shape: the twelve-character unambiguous alphabet the
-// verification codes keep, and a window as long as the flow's own — a
-// code that outlives its ceremony is a hash on a dead row. The drawn
-// form always fits the users column's username check, so the pattern
-// lives in the candidate derivation below.
-const (
-	signInCodeLength   = 12
-	signInCodeLifetime = flowLifetime
-)
+// signInCodeLifetime is as long as the flow's own — a code that outlives its
+// ceremony is a hash on a dead row.
+const signInCodeLifetime = flowLifetime
 
 // usernameCandidate derives the JIT username: the mapped username claim
 // when the provider answered one — cleaned to the users column's shape —
@@ -126,6 +120,26 @@ type signInIssuer interface {
 	// IssueSession opens the session. The provider and the audit event
 	// are the caller's vocabulary: this feature names its own.
 	IssueSession(ctx context.Context, db datastore.Querier, account *signin.Account, provider, event string, params signin.SessionParams) (signin.Result, error)
+}
+
+// accountAdopter is the seam an unverified account's takeover runs through.
+// The identity area implements it from the credential features' own
+// transactional deletes; this feature only decides when it is owed.
+type accountAdopter interface {
+	// AdoptUnverified stamps the account's address verified and, when this
+	// call is the one that moved the stamp, removes every credential the
+	// unverified row held — whoever registered the address first set them
+	// without proving it. It answers whether it adopted anything; an account
+	// whose holder verified it in the meantime is left as it is.
+	AdoptUnverified(ctx context.Context, tx datastore.Querier, userID uuid.UUID) (bool, error)
+}
+
+// WithAccountAdopter wires the adoption seam. Nil refuses the link to an
+// unverified account — linking without the wipe is the vector the seam
+// closes.
+func (s *Service) WithAccountAdopter(adopter accountAdopter) *Service {
+	s.adopter = adopter
+	return s
 }
 
 // mfaGate is the second factor's seam, the shape the password path asks:
@@ -303,7 +317,7 @@ func (s *Service) VerifySignInEmail(ctx context.Context, flowToken, code string)
 	if err != nil {
 		return "", err
 	}
-	codeHash := hashSecret(strings.TrimSpace(code))
+	codeHash := hashSecret(crypto.NormalizeCode(code))
 	next := StageResolved
 	if strings.TrimSpace(flow.GivenName) == "" || strings.TrimSpace(flow.FamilyName) == "" {
 		next = StageRequireNames
@@ -336,7 +350,7 @@ func (s *Service) pauseForEmailCode(ctx context.Context, flow Flow, conn Connect
 	if s.codes == nil {
 		return ContinueResult{}, fmt.Errorf("oauthsso: no code notifier is wired")
 	}
-	code, err := crypto.RandomString(signInCodeLength, crypto.AlphabetUnambiguous)
+	code, err := crypto.RandomLetterDigitCode()
 	if err != nil {
 		return ContinueResult{}, fmt.Errorf("oauthsso: draw code: %w", err)
 	}
@@ -355,14 +369,37 @@ func (s *Service) pauseForEmailCode(ctx context.Context, flow Flow, conn Connect
 
 // linkAndOpen binds the provider identity to the account the verified
 // address already names, then opens the session — one transaction, so
-// the binding and the session it earned commit together.
+// the binding and the session it earned commit together. An account the
+// address's holder never verified is adopted first.
 func (s *Service) linkAndOpen(ctx context.Context, flow Flow, conn Connection, accountID uuid.UUID, params ContinueParams) (ContinueResult, error) {
 	account, err := s.issuer.FindAccountByIDAny(ctx, accountID)
 	if err != nil {
 		return ContinueResult{}, err
 	}
+	if account.EmailVerifiedAt == nil && s.adopter == nil {
+		return ContinueResult{}, fmt.Errorf("oauthsso: no account adopter is wired")
+	}
 	var result ContinueResult
 	err = s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
+		// A local account whose address no code has confirmed was registered
+		// by someone who never proved the address: the provider's verified
+		// claim is the proof, and the credentials that registration left in
+		// the row go before the identity binds — otherwise the password a
+		// squatter chose would outlive the owner's first sign-in.
+		if account.EmailVerifiedAt == nil {
+			adopted, adoptErr := s.adopter.AdoptUnverified(ctx, tx, account.ID)
+			if adoptErr != nil {
+				return fmt.Errorf("oauthsso: adopt the unverified account: %w", adoptErr)
+			}
+			if adopted {
+				s.audit.Record(ctx, tx, fwaudit.Entry{
+					Event:   audit.EventOauthSsoAccountAdopted,
+					Status:  fwaudit.StatusSuccess,
+					UserID:  account.ID.String(),
+					Payload: map[string]string{"provider": conn.Provider},
+				})
+			}
+		}
 		if bindErr := s.bindIdentity(ctx, tx, flow, conn, account.ID); bindErr != nil {
 			return bindErr
 		}
@@ -525,7 +562,7 @@ func (s *Service) createJITAccount(ctx context.Context, tx datastore.Querier, fl
 	name := displayName(flow.GivenName, flow.FamilyName)
 	verifiedAt := s.now()
 	attempt := usernameCandidate(flow.Username, flow.Email, 0)
-	for tries := 0; tries < 3; tries++ {
+	for tries := range 3 {
 		// The taken name's retry runs inside the caller's transaction,
 		// where one failed statement would poison every later one — the
 		// savepoint rolls back exactly the refused insert.

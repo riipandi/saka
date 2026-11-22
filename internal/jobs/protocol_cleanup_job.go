@@ -97,7 +97,7 @@ func protocolCleanupProcessor(ctx context.Context, task ProtocolCleanupTask, poo
 		IntervalMillis: task.IntervalMillis,
 	}).Ctx(ctx).Wait(interval).Save()
 	if err != nil {
-		return err
+		return fmt.Errorf("protocol_cleanup: enqueue: %w", err)
 	}
 	return nil
 }

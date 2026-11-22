@@ -177,12 +177,24 @@ func (s *Service) Create(ctx context.Context, clientID, endpoint, token string) 
 	return created, nil
 }
 
+// ErrTokenRequired is an endpoint change that names no new token. The stored
+// token is the credential of the endpoint it was issued for; handing it to a
+// different host would let anyone who can edit the provider repoint it at a
+// server they control and receive the sealed token on the next pass — which
+// defeats "shown once".
+var ErrTokenRequired = errors.New("scimsync: a new token is required when the endpoint changes")
+
 // Update replaces a provider's endpoint and token. An empty token keeps
-// the stored one — a rotation is a value the caller supplies.
+// the stored one — a rotation is a value the caller supplies — unless the
+// endpoint changes: the stored token belongs to the endpoint it was issued
+// for, so a change of endpoint must carry its own token.
 func (s *Service) Update(ctx context.Context, id uuid.UUID, endpoint, token string) (Provider, error) {
 	existing, err := s.repo.ByID(ctx, s.pool, id)
 	if err != nil {
 		return Provider{}, err
+	}
+	if token == "" && endpoint != existing.Endpoint {
+		return Provider{}, ErrTokenRequired
 	}
 	sealed := existing.SealedToken
 	if token != "" {

@@ -43,8 +43,8 @@ type Account struct {
 // the same judgement the sign-in issuer keeps.
 func (a Account) BannedNow() bool { return a.Banned == restrictions.KindBan }
 
-// FindUserByEmail reads the account an address names. The email is TEXT
-// matched exactly, the way its unique index does — the same match the
+// FindUserByEmail reads the account an address names. The column is CITEXT,
+// so the match folds case the way its unique index does — the same match the
 // sign-in identity accepts.
 func (r *Repository) FindUserByEmail(ctx context.Context, db datastore.Querier, email string) (Account, error) {
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
@@ -187,6 +187,19 @@ func (r *Repository) DeleteToken(ctx context.Context, db datastore.Querier, id u
 		return false, fmt.Errorf("password: delete reset token: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// DeleteResetTokensForUser drops every pending reset the account holds.
+func (r *Repository) DeleteResetTokensForUser(ctx context.Context, db datastore.Querier, userID uuid.UUID) error {
+	dbl := sqlbuilder.PostgreSQL.NewDeleteBuilder()
+	dbl.DeleteFrom(entity.TableAuthTokens)
+	dbl.Where(dbl.Equal("user_id", userID), dbl.Equal("purpose", PurposePasswordReset))
+
+	query, args := dbl.Build()
+	if _, err := db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("password: delete reset tokens: %w", err)
+	}
+	return nil
 }
 
 // FindPasswordHash reads the account's current credential hash, or an

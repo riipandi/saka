@@ -54,14 +54,10 @@ var (
 	// queue client is configured, so the message has nowhere to wait.
 	ErrQueueUnavailable = errors.New("onetimeaccess: queue is not configured")
 
-	// ErrTokenInvalid covers an unknown, expired, and spent code: answering
-	// differently would tell a caller which half was wrong.
+	// ErrTokenInvalid covers an unknown, expired, and spent code — and a code
+	// presented with the wrong device token: answering differently would tell
+	// a caller which half was wrong, and that the code exists.
 	ErrTokenInvalid = errors.New("onetimeaccess: the access code is invalid or expired")
-
-	// ErrDeviceMismatch is an exchange whose device token does not match the
-	// one the email request answered. The code stays spendable: the mistake
-	// is the caller's, not the code's.
-	ErrDeviceMismatch = errors.New("onetimeaccess: the device token does not match")
 
 	// ErrResendTooSoon is an administrative email request inside the cooldown
 	// the last issued code stamped. The public path never reports it — a
@@ -74,16 +70,6 @@ const (
 	// defaultTTL is the window a request without one asks for: fifteen
 	// minutes, the same window the public email path fixes.
 	defaultTTL = 15 * time.Minute
-
-	// shortCodeWindow is the boundary between the two code forms. A code that
-	// lives fifteen minutes or less is six characters — short enough to type
-	// from a phone reading the message — and anything longer is twelve,
-	// because a longer-lived credential buys its entropy back.
-	shortCodeWindow = 15 * time.Minute
-
-	// shortCodeLength and longCodeLength are the two code forms.
-	shortCodeLength = 6
-	longCodeLength  = 12
 
 	// deviceTokenLength is the entropy of the device token the public email
 	// request answers with. It is never typed by a human — the frontend holds
@@ -149,7 +135,7 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 	}
 	ttl := ttlOr(ttlSeconds)
 
-	code, err := generateCode(ttl)
+	code, err := generateCode()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("onetimeaccess: code: %w", err)
 	}
@@ -169,17 +155,20 @@ func (s *Service) CreateToken(ctx context.Context, userID string, ttlSeconds int
 // code's own shape — six characters of a 58-symbol alphabet, bound to the
 // device pair it was issued beside, spendable once, alive for the TTL, and
 // ended by a wrong-device budget — plus the anti-enumeration every
-// unauthenticated procedure here keeps.
+// unauthenticated procedure here keeps. A wrong device token answers the
+// refusal an unknown code does.
 //
 // The whole exchange is one transaction: the code's spend, the session it
 // opens, the last-login stamp, and the audit record commit together, so a
 // rollback returns the code — a holder whose sign-in failed halfway can try
 // again within the window, and a log never describes a session that did not
 // open. A device token the code was issued beside must come back exact; a
-// mismatch leaves the code spendable, because the caller's mistake is not the
-// code's spend.
+// mismatch leaves the code spendable until the budget of wrong guesses is
+// spent, and the strike is written on the pool, apart from the transaction
+// the refusal rolls back — a strike inside it would roll back with the
+// refusal and the budget would never fill.
 func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, client fwaudit.ClientInfo) (signin.Result, error) {
-	hash := crypto.HashHexToken(rawCode)
+	hash := crypto.HashHexToken(crypto.NormalizeCode(rawCode))
 	var result signin.Result
 	err := s.pool.WithTx(ctx, func(ctx context.Context, tx datastore.Querier) error {
 		row, err := s.repo.FindTokenByHash(ctx, tx, hash)
@@ -198,16 +187,16 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			// code that keeps failing is one a third party is holding. The
 			// delete carries the hash this caller resolved, so a code a
 			// re-issue replaced is not swept by the stale read.
-			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, tx, row.ID, maxAttempts)
+			live, budgetErr := s.repo.RegisterWrongAttempt(ctx, s.pool, row.ID, maxAttempts)
 			if budgetErr != nil {
 				return budgetErr
 			}
 			if !live {
-				if _, delErr := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess); delErr != nil {
+				if _, delErr := s.repo.DeleteToken(ctx, s.pool, row.ID, hash, PurposeOneTimeAccess); delErr != nil {
 					return delErr
 				}
 			}
-			return ErrDeviceMismatch
+			return ErrTokenInvalid
 		}
 
 		spent, err := s.repo.DeleteToken(ctx, tx, row.ID, hash, PurposeOneTimeAccess)
@@ -238,6 +227,17 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 		// before its session opens. The bridge mints inside this
 		// transaction, so a rollback returns the code — a retry starts
 		// clean.
+		candidate := &signin.Account{
+			ID:              account.ID,
+			Username:        account.Username,
+			Email:           account.Email,
+			DisplayName:     account.DisplayName,
+			Disabled:        account.Disabled,
+			RestrictionKind: account.RestrictionKind,
+		}
+		if stateErr := s.signin.RefuseAccountState(ctx, candidate); stateErr != nil {
+			return stateErr
+		}
 		pending, owed, forkErr := s.signin.Challenge(ctx, account.ID, false)
 		if forkErr != nil {
 			return forkErr
@@ -251,14 +251,7 @@ func (s *Service) Exchange(ctx context.Context, rawCode, deviceToken string, cli
 			return nil
 		}
 
-		result, err = s.signin.IssueSession(ctx, tx, &signin.Account{
-			ID:              account.ID,
-			Username:        account.Username,
-			Email:           account.Email,
-			DisplayName:     account.DisplayName,
-			Disabled:        account.Disabled,
-			RestrictionKind: account.RestrictionKind,
-		}, signin.ProviderOneTimeAccess, audit.EventOneTimeAccessSignIn, signin.SessionParams{
+		result, err = s.signin.IssueSession(ctx, tx, candidate, signin.ProviderOneTimeAccess, audit.EventOneTimeAccessSignIn, signin.SessionParams{
 			UserAgent:   client.UserAgent,
 			IPAddress:   client.IPAddress,
 			Fingerprint: client.Fingerprint,
@@ -367,7 +360,7 @@ func (s *Service) issueEmailCode(ctx context.Context, account Account, ttl time.
 		return ErrQueueUnavailable
 	}
 
-	code, err := generateCode(ttl)
+	code, err := generateCode()
 	if err != nil {
 		return fmt.Errorf("onetimeaccess: code: %w", err)
 	}
@@ -428,14 +421,9 @@ func ttlOr(ttlSeconds int32) time.Duration {
 	return time.Duration(ttlSeconds) * time.Second
 }
 
-// generateCode draws a code from the unambiguous alphabet, six characters for
-// a code that lives fifteen minutes or less and twelve for anything longer.
-func generateCode(ttl time.Duration) (string, error) {
-	length := longCodeLength
-	if ttl <= shortCodeWindow {
-		length = shortCodeLength
-	}
-	return crypto.RandomString(length, crypto.AlphabetUnambiguous)
+// generateCode draws the single-use code the message carries.
+func generateCode() (string, error) {
+	return crypto.RandomLetterDigitCode()
 }
 
 // generateDeviceToken draws the device token the public email request answers
