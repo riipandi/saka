@@ -29,7 +29,7 @@ func TestBackchannelLogoutDeliversTheFormEncodedToken(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client, err := fetcher.New(config.Default().FetcherOptions(), nil)
+	client, err := fetcher.New(loopbackFetcherOptions(), nil)
 	require.NoError(t, err)
 
 	task := BackchannelLogoutTask{ClientID: "client-one", URL: server.URL, Token: "signed.logout.token"}
@@ -45,7 +45,7 @@ func TestBackchannelLogoutRefusesANonSuccessAnswer(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client, err := fetcher.New(config.Default().FetcherOptions(), nil)
+	client, err := fetcher.New(loopbackFetcherOptions(), nil)
 	require.NoError(t, err)
 
 	task := BackchannelLogoutTask{ClientID: "client-one", URL: server.URL, Token: "signed"}
@@ -68,4 +68,12 @@ func TestBackchannelLogoutRefusesAnUnwiredClient(t *testing.T) {
 	task := BackchannelLogoutTask{ClientID: "c", URL: "https://rp.example", Token: "t"}
 	err := backchannelLogoutProcessor(context.Background(), task, nil)
 	require.Error(t, err, "a nil fetch client is a wiring miss, not a silent drop")
+}
+
+// loopbackFetcherOptions is the default client with the private-network policy
+// lifted: the receivers these tests post to are httptest servers on loopback.
+func loopbackFetcherOptions() fetcher.Options {
+	options := config.Default().FetcherOptions()
+	options.AllowPrivateNetwork = true
+	return options
 }

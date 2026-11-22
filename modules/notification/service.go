@@ -406,8 +406,9 @@ func (s *Service) UnreadCount(ctx context.Context, userID uuid.UUID) (int, error
 	return s.repo.UnreadCount(ctx, s.pool, userID)
 }
 
-// Subscribe registers one live-tail stream for the account.
-func (s *Service) Subscribe(userID uuid.UUID) (<-chan Notification, func()) {
+// Subscribe registers one live-tail stream for the account, or refuses it
+// with ErrTooManyStreams past the per-account bound.
+func (s *Service) Subscribe(userID uuid.UUID) (<-chan Notification, func(), error) {
 	return s.broker.Subscribe(userID)
 }
 

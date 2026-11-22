@@ -384,9 +384,12 @@ func newClientWithLog(t *testing.T, opts Options, log *slog.Logger) *Client {
 }
 
 // testOptions is the option set the tests build on: sane floors, a fixture
-// user agent, and a scope that names no application.
+// user agent, and a scope that names no application. The private-network
+// policy is lifted because the fixtures are httptest servers on loopback;
+// network_test.go builds the policy-on client itself.
 func testOptions() Options {
 	return Options{
+		AllowPrivateNetwork:     true,
 		Scope:                   "fetcher-test",
 		UserAgent:               testUserAgent,
 		Timeout:                 5 * time.Second,

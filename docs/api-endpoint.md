@@ -372,8 +372,9 @@ times at a thirty-second backoff; a redirect, a 4xx other than 408/429, a disabl
 a host the destination policy refuses fails the delivery on its first answer. Deliveries never
 follow a redirect, so the signature headers never reach a redirect target. By default a
 destination whose host resolves to a loopback, private, or link-local address is refused — the
-SSRF guard; `webhook.allow_private_network` lifts it for deployments whose receivers live beside
-the server. The attempt rows carry redacted response metadata only, attempt rows age out at
+SSRF guard, enforced when the connection is made so a name that resolves differently cannot slip
+through; `fetcher.allow_private_network` lifts it, for every outbound integration, in deployments
+whose receivers live beside the server. The attempt rows carry redacted response metadata only, attempt rows age out at
 seven days and terminal deliveries at thirty, and the signing secret is sealed at rest and shown
 exactly once.
 

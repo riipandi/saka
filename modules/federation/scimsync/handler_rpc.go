@@ -132,6 +132,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeNotFound, "SCIM service provider not found")
 	case errors.Is(err, ErrProviderExists):
 		return connect.NewError(connect.CodeFailedPrecondition, "the client already has a SCIM service provider")
+	case errors.Is(err, ErrTokenRequired):
+		return connect.NewError(connect.CodeInvalidArgument, "a new token is required when the endpoint changes")
 	case errors.Is(err, ErrNoDirectory):
 		return connect.NewError(connect.CodeFailedPrecondition, "no account directory is wired")
 	default:

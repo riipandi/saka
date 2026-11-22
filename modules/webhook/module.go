@@ -58,7 +58,7 @@ var Package = do.Package(
 			cipher = built
 		}
 
-		service := NewService(pool, recorder, client, fetch, cipher, log, c.Webhook.AllowPrivateNetwork)
+		service := NewService(pool, recorder, client, fetch, cipher, log)
 		recorder.WithSink(service)
 		return service, nil
 	}),

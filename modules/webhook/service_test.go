@@ -72,7 +72,11 @@ func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Serv
 
 	var fetch *fetcher.Client
 	if receiver != nil {
-		fetchClient, err := fetcher.New(config.Default().FetcherOptions(), slog.New(slog.DiscardHandler))
+		// The test receivers are loopback httptest servers; lifting the
+		// private-network policy is the state the delivery tests need.
+		options := config.Default().FetcherOptions()
+		options.AllowPrivateNetwork = true
+		fetchClient, err := fetcher.New(options, slog.New(slog.DiscardHandler))
 		require.NoError(t, err)
 		fetch = fetchClient
 	}
@@ -84,9 +88,6 @@ func testService(t *testing.T, pool *datastore.Postgres, receiver *httptest.Serv
 		fetch,
 		testSecretKey(t),
 		slog.New(slog.DiscardHandler),
-		// The test receivers are loopback httptest servers; the private
-		// network is the state the delivery tests need.
-		true,
 	)
 }
 
@@ -537,8 +538,13 @@ func TestRunDeliveryRefusesAPrivateDestination(t *testing.T) {
 	pool := migratedPool(t)
 	r := newReceiver(t, http.StatusOK)
 	service := testService(t, pool, r.server)
+	// The policy is the fetcher's, applied at dial time: a client built with
+	// the default options refuses the loopback receiver.
+	guarded, err := fetcher.New(config.Default().FetcherOptions(), slog.New(slog.DiscardHandler))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = guarded.Shutdown(context.Background()) })
 	blocked := Service{pool: pool, repo: service.repo, audit: service.audit, queue: service.queue,
-		fetch: service.fetch, cipher: service.cipher, log: service.log, now: service.now}
+		fetch: guarded, cipher: service.cipher, log: service.log, now: service.now}
 
 	row := endpoint(t, service, r, "loopback", "session.signed_in")
 	refusedID := emitOne(t, service, row.ID, audit.EventSignIn)

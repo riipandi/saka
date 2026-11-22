@@ -28,7 +28,6 @@ type Config struct {
 	RateLimit RateLimit `koanf:"rate_limit" json:"rate_limit"`
 	Server    Server    `koanf:"server" json:"server"`
 	Storage   Storage   `koanf:"storage" json:"storage"`
-	Webhook   Webhook   `koanf:"webhook" json:"webhook"`
 
 	// origin records which source last set each key, for conflict resolution.
 	// It is unexported so it never reaches JSON or a log line.
@@ -208,6 +207,17 @@ type Fetcher struct {
 	// MaxBodyBytes is how much of a response body is kept. The rest is
 	// refused, so an upstream cannot grow the process without a bound.
 	MaxBodyBytes int64 `koanf:"max_body_bytes" json:"max_body_bytes"`
+	// AllowPrivateNetwork lets an outbound call reach loopback, private,
+	// link-local, carrier-grade-NAT and other non-public addresses. The
+	// default refusal is the SSRF guard, enforced at dial time for every
+	// integration that calls out — webhook deliveries, SCIM sync, provider
+	// discovery and token calls, client-metadata fetches, back-channel
+	// logout. An administrator-supplied URL is trusted with the public
+	// internet, and reaching into the deployment's own network — a metadata
+	// service, the database, another container — is a capability a leaked
+	// admin credential should not carry. Enable it for a deployment whose
+	// receivers, providers or directories genuinely live beside the server.
+	AllowPrivateNetwork bool `koanf:"allow_private_network" json:"allow_private_network"`
 }
 
 // KVStore holds the optional key-value backend settings, for a Valkey or Redis
@@ -691,16 +701,4 @@ type S3 struct {
 	// set, because the client refuses to resolve an endpoint without one, so
 	// the default is a usable value rather than an empty string.
 	Region string `koanf:"region" json:"region"`
-}
-
-// Webhook holds the outbound webhook delivery settings.
-type Webhook struct {
-	// AllowPrivateNetwork admits delivery endpoints whose host resolves to a
-	// loopback, private, or link-local address. The default refusal is the
-	// SSRF guard: an administrator-registered destination is trusted with
-	// the public internet, and reaching into the deployment's own network —
-	// a metadata service, the database, another container — is a capability
-	// a leaked admin credential should not carry by default. Enable it for
-	// deployments whose receivers genuinely live beside the server.
-	AllowPrivateNetwork bool `koanf:"allow_private_network" json:"allow_private_network"`
 }

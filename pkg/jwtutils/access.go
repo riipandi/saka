@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
@@ -106,6 +107,12 @@ type Caller struct {
 	// zero value is a session, because a token is the only credential the
 	// field's absence can mean.
 	Credential CredentialKind
+
+	// ExpiresAt is when the credential the request authenticated with ends:
+	// the access token's own expiry. A long-lived request — a server stream —
+	// must not outlive it. The zero value means the credential carries no
+	// expiry of its own (an API key), so no deadline applies.
+	ExpiresAt time.Time
 }
 
 // NewCaller builds the caller from a verified token. A token whose subject is
@@ -115,7 +122,7 @@ func NewCaller(verified Verified[AccessClaims]) (*Caller, error) {
 	if verified.Subject == "" {
 		return nil, ErrMissingSubject
 	}
-	return &Caller{AccessClaims: verified.Private, UserID: verified.Subject}, nil
+	return &Caller{AccessClaims: verified.Private, UserID: verified.Subject, ExpiresAt: verified.ExpiresAt}, nil
 }
 
 // IsImpersonating reports whether the caller acts for another account. A

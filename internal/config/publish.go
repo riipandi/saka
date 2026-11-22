@@ -44,7 +44,6 @@ type Published struct {
 	RateLimit PublishedRateLimit `json:"rate_limit,omitzero"`
 	Server    PublishedServer    `json:"server,omitzero"`
 	Storage   PublishedStorage   `json:"storage,omitzero"`
-	Webhook   PublishedWebhook   `json:"webhook,omitzero"`
 }
 
 // PublishedApp is the app section. The mode is public: the SPA reads it to
@@ -118,6 +117,7 @@ type PublishedFetcher struct {
 	CircuitSuccessThreshold int      `json:"circuit_success_threshold,omitzero"`
 	CircuitResetTimeout     Duration `json:"circuit_reset_timeout,omitzero"`
 	MaxBodyBytes            int64    `json:"max_body_bytes,omitzero"`
+	AllowPrivateNetwork     bool     `json:"allow_private_network,omitzero"`
 }
 
 // PublishedKVStore is the kvstore section. The URL is published only in the
@@ -289,12 +289,6 @@ type PublishedStorage struct {
 	S3        PublishedS3 `json:"s3,omitzero"`
 }
 
-// PublishedWebhook is the webhook section: the delivery policy an operator
-// reads to know what a registered destination may reach.
-type PublishedWebhook struct {
-	AllowPrivateNetwork bool `json:"allow_private_network,omitzero"`
-}
-
 // PublishedS3 is the object-storage settings. Both credentials are
 // published only as their redactions.
 type PublishedS3 struct {
@@ -401,6 +395,7 @@ func (c Config) Published(full bool) Published {
 		CircuitSuccessThreshold: c.Fetcher.CircuitSuccessThreshold,
 		CircuitResetTimeout:     seconds(c.Fetcher.CircuitResetTimeout),
 		MaxBodyBytes:            c.Fetcher.MaxBodyBytes,
+		AllowPrivateNetwork:     c.Fetcher.AllowPrivateNetwork,
 	}
 	public.KVStore = PublishedKVStore{
 		Enable: c.KVStore.Enable,
@@ -513,9 +508,6 @@ func (c Config) Published(full bool) Published {
 			ForcePathStyle: c.Storage.S3.ForcePathStyle,
 			Region:         c.Storage.S3.Region,
 		},
-	}
-	public.Webhook = PublishedWebhook{
-		AllowPrivateNetwork: c.Webhook.AllowPrivateNetwork,
 	}
 	return public
 }

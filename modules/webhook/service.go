@@ -8,10 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/netip"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -111,18 +108,13 @@ type Service struct {
 	cipher *crypto.Cipher
 	log    *slog.Logger
 
-	// allowPrivateNetwork says whether a delivery may reach a loopback,
-	// private, or link-local address. The refusal is the deployment's SSRF
-	// stance, read from configuration rather than decided here.
-	allowPrivateNetwork bool
-
 	// now is the instant the service's decisions read. It is a field so a
 	// test can hold the clock still without waiting out a window.
 	now func() time.Time
 }
 
 // NewService builds the service over the shared pool.
-func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger, allowPrivateNetwork bool) *Service {
+func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, client *queue.Client, fetch *fetcher.Client, cipher *crypto.Cipher, log *slog.Logger) *Service {
 	return &Service{
 		pool:   pool,
 		repo:   NewRepository(),
@@ -132,10 +124,6 @@ func NewService(pool *datastore.Postgres, recorder *fwaudit.Recorder, client *qu
 		cipher: cipher,
 		log:    log,
 		now:    time.Now,
-		// The destination policy is a configuration decision, not a rule the
-		// surface owns: an operator who hosts receivers beside the server
-		// turns the private network on, and everyone else gets the refusal.
-		allowPrivateNetwork: allowPrivateNetwork,
 	}
 }
 
@@ -611,18 +599,7 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 		return fmt.Errorf("webhook: unseal secret: %w", sealErr)
 	}
 
-	// The destination policy is decided here, at the only moment a receiver
-	// is actually reached: a refusal is a fact no retry saves, so a private
-	// destination ends the delivery the way a disabled endpoint does.
 	target := deref(endpoint.Endpoint)
-	if !s.allowPrivateNetwork {
-		if refuseErr := s.checkDestination(ctx, target); refuseErr != nil {
-			if refusal, ok := errors.AsType[destinationRefusal](refuseErr); ok {
-				return s.failQuietly(ctx, delivery, refusal.Error())
-			}
-			return fmt.Errorf("webhook: destination: %w", refuseErr)
-		}
-	}
 
 	attemptNumber := delivery.AttemptCount + 1
 	started := s.now()
@@ -653,6 +630,11 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 		NoRedirect: true,
 	})
 	duration := int(time.Since(started).Milliseconds())
+	// The network policy is the fetcher's, applied at dial time: a receiver
+	// that resolves outside the public internet is refused there, and the
+	// refusal is a fact no retry saves — the same name resolves the same way
+	// — so the delivery fails now instead of spending the queue's retries.
+	refused := err != nil && errors.Is(err, fetcher.ErrDestinationRefused)
 
 	attempt := AttemptSchema{
 		DeliveryID:    delivery.ID,
@@ -685,7 +667,7 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 		var statusErr error
 		if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
 			statusErr = s.repo.CompleteDelivery(ctx, tx, delivery.ID, attemptNumber, s.now())
-		} else if permanentStatus(res) || attemptNumber >= maxAttempts {
+		} else if refused || permanentStatus(res) || attemptNumber >= maxAttempts {
 			statusErr = s.repo.FailDelivery(ctx, tx, delivery.ID, attemptNumber)
 		}
 		if errors.Is(statusErr, datastore.ErrNoRows) {
@@ -703,7 +685,7 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 	switch {
 	case err == nil && res.StatusCode >= 200 && res.StatusCode < 300:
 		return nil
-	case res != nil && permanentStatus(res):
+	case refused || res != nil && permanentStatus(res):
 		return nil
 	case attemptNumber >= maxAttempts:
 		return nil
@@ -721,49 +703,6 @@ func (s *Service) RunDelivery(ctx context.Context, deliveryID string) error {
 func permanentStatus(res *fetcher.Response) bool {
 	return res != nil && res.StatusCode >= 300 && res.StatusCode < 500 &&
 		res.StatusCode != http.StatusRequestTimeout && res.StatusCode != http.StatusTooManyRequests
-}
-
-// destinationRefusal is a destination the delivery policy keeps out of reach.
-// It is a fact about the address, not a transient failure, so the caller
-// marks the delivery failed instead of spending the queue's retries on it.
-type destinationRefusal struct{ reason string }
-
-func (e destinationRefusal) Error() string { return e.reason }
-
-// checkDestination resolves the endpoint's host and refuses the address
-// ranges the private network holds — loopback, private, link-local,
-// unspecified. The resolution runs per attempt, so a hostname whose answer
-// changed between registration and delivery is judged as delivered, not as
-// registered; the residual risk is the resolver answering two addresses in
-// one attempt, which a dial-time policy would be needed to close.
-func (s *Service) checkDestination(ctx context.Context, rawURL string) error {
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Hostname() == "" {
-		return destinationRefusal{"the endpoint URL does not name a host"}
-	}
-
-	addresses := []netip.Addr{}
-	if literal, literalErr := netip.ParseAddr(parsed.Hostname()); literalErr == nil {
-		addresses = append(addresses, literal)
-	} else {
-		resolved, lookupErr := net.DefaultResolver.LookupHost(ctx, parsed.Hostname())
-		if lookupErr != nil {
-			// A name the resolver cannot answer may answer next attempt.
-			return fmt.Errorf("the endpoint host could not be resolved: %w", lookupErr)
-		}
-		for _, address := range resolved {
-			if parsed, parseErr := netip.ParseAddr(address); parseErr == nil {
-				addresses = append(addresses, parsed)
-			}
-		}
-	}
-	for _, address := range addresses {
-		if address.IsLoopback() || address.IsPrivate() || address.IsLinkLocalUnicast() ||
-			address.IsLinkLocalMulticast() || address.IsUnspecified() {
-			return destinationRefusal{"the endpoint host is not reachable under the private-network policy"}
-		}
-	}
-	return nil
 }
 
 // endpointFor reads the delivery's endpoint. A delivery whose endpoint row is

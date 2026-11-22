@@ -45,6 +45,14 @@ source.oidc = {
   enabled: true
 }
 
+// The suite's providers, receivers and conformance fixtures live on loopback
+// beside the server; the deployment's outbound network policy refuses that
+// by default, so the run lifts it.
+source.fetcher = {
+  ...source.fetcher,
+  allow_private_network: true
+}
+
 const target = resolve(root, 'build', buildTag, 'app.config.e2e.json')
 mkdirSync(dirname(target), { recursive: true })
 writeFileSync(target, JSON.stringify(source, null, 2))

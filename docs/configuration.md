@@ -45,7 +45,7 @@ flowchart LR
 | `rate_limit` | The throttles | per-bucket budgets |
 | `auth` | Authentication behavior | session lifetimes, one-time-access email switches |
 | `oidc` | The identity-provider surface | enablement, token lifetimes |
-| `webhook` | Outbound deliveries | the private-network guard |
+| `fetcher` | Every outbound call | timeouts, retries, the private-network guard (`allow_private_network`) |
 
 Durations are written as plain seconds (`900`, not `"15m"` — though the
 longer form is accepted). Lists and maps can be written as comma-

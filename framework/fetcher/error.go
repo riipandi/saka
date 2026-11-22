@@ -28,6 +28,10 @@ const (
 	ErrRetryExhausted = sentinel("fetcher: retries exhausted")
 	// ErrCircuitOpen means the breaker did not let the attempt onto the network.
 	ErrCircuitOpen = sentinel("fetcher: circuit open")
+	// ErrDestinationRefused is a call the network policy refused at dial
+	// time: the destination resolved to an address outside the public
+	// internet. It is permanent — a retry resolves the same name.
+	ErrDestinationRefused = sentinel("fetcher: destination refused")
 	// ErrStatus is an HTTP status of 400 or above. Error.Status is the code.
 	ErrStatus = sentinel("fetcher: http status")
 )
@@ -110,6 +114,9 @@ func classify(retryCount int, baseURL, method, rawURL string, attempts int, res 
 	case errors.Is(err, resty.ErrCircuitBreakerOpen):
 		failure.Kind = ErrCircuitOpen
 		failure.Status = 0
+	case errors.Is(err, errDestinationRefused):
+		failure.Kind = ErrDestinationRefused
+		failure.Status = 0
 	case errors.Is(err, context.Canceled):
 		failure.Kind = ErrCanceled
 		failure.Status = 0
@@ -138,7 +145,7 @@ func retriesRanOut(retryCount, attempts int, failure *Error) bool {
 		return false
 	}
 	switch failure.Kind {
-	case ErrCanceled, ErrCircuitOpen:
+	case ErrCanceled, ErrCircuitOpen, ErrDestinationRefused:
 		return false
 	case ErrStatus:
 		return retryableStatus(failure.Status)
@@ -214,7 +221,7 @@ func retryable(res *resty.Response, err error) bool {
 		return false
 	}
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, errDestinationRefused) {
 			return false
 		}
 		if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {

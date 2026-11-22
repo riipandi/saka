@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -90,6 +91,14 @@ func New(opts Options, log *slog.Logger) (*Client, error) {
 	baseHTTP := seed.Client()
 	if err := seed.Close(); err != nil {
 		return nil, err
+	}
+	if !settings.AllowPrivateNetwork {
+		transport, ok := baseHTTP.Transport.(*http.Transport)
+		if !ok {
+			return nil, errors.New("fetcher: the shared transport is not an *http.Transport; the network policy cannot be installed")
+		}
+		dialer := &net.Dialer{Timeout: settings.Timeout, KeepAlive: 30 * time.Second, Control: dialGuard}
+		transport.DialContext = dialer.DialContext
 	}
 
 	return &Client{
